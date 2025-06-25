@@ -2,9 +2,6 @@
 module aptos_experimental::order_book_types {
     use std::option;
     use std::option::Option;
-    use aptos_std::bcs;
-    use aptos_std::from_bcs;
-    use aptos_framework::transaction_context;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
     friend aptos_experimental::active_order_book;
     friend aptos_experimental::order_book;
@@ -29,8 +26,18 @@ module aptos_experimental::order_book_types {
         account_order_id: u64
     }
 
+    // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
     struct UniqueIdxType has store, copy, drop {
         idx: u256
+    }
+
+    // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
+    // Returned ids are ascending and unique within a single instance of AscendingIdGenerator.
+    enum AscendingIdGenerator has store, drop {
+        FromCounter {
+            value: u64
+        }
+        // TODO: add stateless (and with that fully parallel) support for id creation via native function
     }
 
     struct ActiveMatchedOrder has copy, drop {
@@ -83,44 +90,50 @@ module aptos_experimental::order_book_types {
         TriggerCondition::TimeBased(time)
     }
 
-    public fun new_order_id_type(account: address, account_order_id: u64): OrderIdType {
+    public(friend) fun new_order_id_type(
+        account: address, account_order_id: u64
+    ): OrderIdType {
         OrderIdType { account, account_order_id }
     }
 
-    public fun generate_unique_idx_fifo_tiebraker(): UniqueIdxType {
-        // TODO change from random to monothonically increasing value
-        new_unique_idx_type(
-            from_bcs::to_u256(
-                bcs::to_bytes(&transaction_context::generate_auid_address())
-            )
-        )
+    public(friend) fun new_ascending_id_generator(): AscendingIdGenerator {
+        AscendingIdGenerator::FromCounter { value: 0 }
     }
 
-    public fun new_unique_idx_type(idx: u256): UniqueIdxType {
+    public(friend) fun generate_tie_breaker(
+        self: &mut AscendingIdGenerator
+    ): UniqueIdxType {
+        self.value += 1;
+        new_unique_idx_type(self.value as u256)
+    }
+
+    public(friend) fun new_unique_idx_type(idx: u256): UniqueIdxType {
         UniqueIdxType { idx }
     }
 
-    public fun descending_idx(self: &UniqueIdxType): UniqueIdxType {
+    public(friend) fun descending_idx(self: &UniqueIdxType): UniqueIdxType {
         UniqueIdxType { idx: U256_MAX - self.idx }
     }
 
-    public fun new_active_matched_order(
+    public(friend) fun new_active_matched_order(
         order_id: OrderIdType, matched_size: u64, remaining_size: u64
     ): ActiveMatchedOrder {
         ActiveMatchedOrder { order_id, matched_size, remaining_size }
     }
 
-    public fun destroy_active_matched_order(self: ActiveMatchedOrder): (OrderIdType, u64, u64) {
+    public(friend) fun destroy_active_matched_order(
+        self: ActiveMatchedOrder
+    ): (OrderIdType, u64, u64) {
         (self.order_id, self.matched_size, self.remaining_size)
     }
 
-    public fun new_order<M: store + copy + drop>(
+    public(friend) fun new_order<M: store + copy + drop>(
         order_id: OrderIdType,
         unique_priority_idx: UniqueIdxType,
         price: u64,
         orig_size: u64,
         size: u64,
-        is_buy: bool,
+        is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
         metadata: M
     ): Order<M> {
@@ -130,23 +143,23 @@ module aptos_experimental::order_book_types {
             price,
             orig_size,
             remaining_size: size,
-            is_bid: is_buy,
+            is_bid: is_bid,
             trigger_condition,
             metadata
         }
     }
 
-    public fun new_single_order_match<M: store + copy + drop>(
+    public(friend) fun new_single_order_match<M: store + copy + drop>(
         order: Order<M>, matched_size: u64
     ): SingleOrderMatch<M> {
         SingleOrderMatch { order, matched_size }
     }
 
-    public fun get_active_matched_size(self: &ActiveMatchedOrder): u64 {
+    public(friend) fun get_active_matched_size(self: &ActiveMatchedOrder): u64 {
         self.matched_size
     }
 
-    public fun get_matched_size<M: store + copy + drop>(
+    public(friend) fun get_matched_size<M: store + copy + drop>(
         self: &SingleOrderMatch<M>
     ): u64 {
         self.matched_size
@@ -167,18 +180,18 @@ module aptos_experimental::order_book_types {
     }
 
     // Returns the price move down index and price move up index for a particular trigger condition
-    public fun index(self: &TriggerCondition, is_buy: bool):
+    public fun index(self: &TriggerCondition, is_bid: bool):
         (Option<u64>, Option<u64>, Option<u64>) {
         match(self) {
             TriggerCondition::TakeProfit(tp) => {
-                if (is_buy) {
+                if (is_bid) {
                     (option::some(*tp), option::none(), option::none())
                 } else {
                     (option::none(), option::some(*tp), option::none())
                 }
             }
             TriggerCondition::StopLoss(sl) => {
-                if (is_buy) {
+                if (is_bid) {
                     (option::none(), option::some(*sl), option::none())
                 } else {
                     (option::some(*sl), option::none(), option::none())
@@ -206,7 +219,9 @@ module aptos_experimental::order_book_types {
         self.order_id
     }
 
-    public fun get_unique_priority_idx<M: store + copy + drop>(self: &Order<M>): UniqueIdxType {
+    public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
+        self: &Order<M>
+    ): UniqueIdxType {
         self.unique_priority_idx
     }
 
@@ -271,10 +286,9 @@ module aptos_experimental::order_book_types {
 
     public fun destroy_order<M: store + copy + drop>(
         self: Order<M>
-    ): (OrderIdType, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, M) {
+    ): (OrderIdType, u64, u64, u64, bool, Option<TriggerCondition>, M) {
         (
             self.order_id,
-            self.unique_priority_idx,
             self.price,
             self.orig_size,
             self.remaining_size,
