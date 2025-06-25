@@ -23,6 +23,7 @@ use move_compiler_v2::external_checks::ExpChecker;
 pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
     vec![
         Box::<almost_swapped::AlmostSwapped>::default(),
+        Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
@@ -34,6 +35,5 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
-        Box::<assert_const::AssertConst>::default(),
     ]
 }
