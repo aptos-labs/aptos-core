@@ -47,6 +47,12 @@ pub enum DataRequest {
     SubscribeTransactionOutputsWithProof(SubscribeTransactionOutputsWithProofRequest), // Subscribes to transaction outputs with a proof
     SubscribeTransactionsOrOutputsWithProof(SubscribeTransactionsOrOutputsWithProofRequest), // Subscribes to transactions or outputs with a proof
     SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest), // Subscribes to transactions with a proof
+
+    // All the requests listed below are for transaction data v2 (i.e., transactions with auxiliary information).
+    // TODO: eventually we should deprecate all the old request types.
+    GetTransactionDataWithProof(GetTransactionDataWithProofRequest), // Fetches transaction data with a proof
+    GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest), // Optimistically fetches new transaction data with a proof
+    SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest), // Subscribes to transaction data with a proof
 }
 
 impl DataRequest {
@@ -73,6 +79,45 @@ impl DataRequest {
                 "subscribe_transactions_or_outputs_with_proof"
             },
             Self::SubscribeTransactionsWithProof(_) => "subscribe_transactions_with_proof",
+
+            // Transaction data v2 requests (transactions with auxiliary data)
+            Self::GetTransactionDataWithProof(request) => match request
+                .transaction_data_request_type
+            {
+                TransactionDataRequestType::TransactionData(_) => "get_transactions_with_proof_v2",
+                TransactionDataRequestType::TransactionOutputData => {
+                    "get_transaction_outputs_with_proof_v2"
+                },
+                TransactionDataRequestType::TransactionOrOutputData(_) => {
+                    "get_transactions_or_outputs_with_proof_v2"
+                },
+            },
+            Self::GetNewTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(_) => {
+                        "get_new_transactions_with_proof_v2"
+                    },
+                    TransactionDataRequestType::TransactionOutputData => {
+                        "get_new_transaction_outputs_with_proof_v2"
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(_) => {
+                        "get_new_transactions_or_outputs_with_proof_v2"
+                    },
+                }
+            },
+            Self::SubscribeTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(_) => {
+                        "subscribe_transactions_with_proof_v2"
+                    },
+                    TransactionDataRequestType::TransactionOutputData => {
+                        "subscribe_transaction_outputs_with_proof_v2"
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(_) => {
+                        "subscribe_transactions_or_outputs_with_proof_v2"
+                    },
+                }
+            },
         }
     }
 
@@ -80,6 +125,7 @@ impl DataRequest {
         matches!(self, &Self::GetNewTransactionOutputsWithProof(_))
             || matches!(self, &Self::GetNewTransactionsWithProof(_))
             || matches!(self, Self::GetNewTransactionsOrOutputsWithProof(_))
+            || matches!(self, &Self::GetNewTransactionDataWithProof(_))
     }
 
     pub fn is_protocol_version_request(&self) -> bool {
@@ -94,6 +140,13 @@ impl DataRequest {
         matches!(self, &Self::SubscribeTransactionOutputsWithProof(_))
             || matches!(self, &Self::SubscribeTransactionsWithProof(_))
             || matches!(self, Self::SubscribeTransactionsOrOutputsWithProof(_))
+            || matches!(self, Self::SubscribeTransactionDataWithProof(_))
+    }
+
+    pub fn is_transaction_data_v2_request(&self) -> bool {
+        matches!(self, &Self::GetTransactionDataWithProof(_))
+            || matches!(self, &Self::GetNewTransactionDataWithProof(_))
+            || matches!(self, &Self::SubscribeTransactionDataWithProof(_))
     }
 }
 
@@ -202,4 +255,46 @@ pub struct SubscriptionStreamMetadata {
     pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
     pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
     pub subscription_stream_id: u64,        // The unique id of the subscription stream
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct GetTransactionDataWithProofRequest {
+    pub transaction_data_request_type: TransactionDataRequestType, // The type of transaction data to request
+    pub proof_version: u64,      // The version the proof should be relative to
+    pub start_version: u64,      // The starting version of the data
+    pub end_version: u64,        // The ending version of the data (inclusive)
+    pub max_response_bytes: u64, // The max number of bytes to return in the response
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct GetNewTransactionDataWithProofRequest {
+    pub transaction_data_request_type: TransactionDataRequestType, // The type of transaction data to request
+    pub known_version: u64,                                        // The highest known version
+    pub known_epoch: u64,                                          // The highest known epoch
+    pub max_response_bytes: u64, // The max number of bytes to return in the response
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscribeTransactionDataWithProofRequest {
+    pub transaction_data_request_type: TransactionDataRequestType, // The type of transaction data to request
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
+    pub subscription_stream_index: u64, // The request index of the subscription stream
+    pub max_response_bytes: u64,        // The max number of bytes to return in the response
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum TransactionDataRequestType {
+    TransactionData(TransactionData),
+    TransactionOutputData,
+    TransactionOrOutputData(TransactionOrOutputData),
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct TransactionData {
+    pub include_events: bool, // Whether to include events with the transactions
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct TransactionOrOutputData {
+    pub include_events: bool, // Whether to include events with the transactions
 }
