@@ -24,8 +24,14 @@ mod epoch_manager;
 mod error;
 mod liveness;
 mod logging;
+#[cfg(not(feature = "consensus_fuzzer"))]
 mod metrics_safety_rules;
+#[cfg(not(feature = "consensus_fuzzer"))]
 mod network;
+#[cfg(feature = "consensus_fuzzer")]
+pub mod metrics_safety_rules;
+#[cfg(feature = "consensus_fuzzer")]
+pub mod network;
 #[cfg(test)]
 mod network_tests;
 mod payload_client;
@@ -36,7 +42,10 @@ mod pending_votes_test;
 pub mod persistent_liveness_storage;
 mod pipeline;
 pub mod quorum_store;
+#[cfg(not(feature = "consensus_fuzzer"))]
 mod rand;
+#[cfg(feature = "consensus_fuzzer")]
+pub mod rand;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
