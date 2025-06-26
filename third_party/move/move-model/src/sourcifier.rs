@@ -476,6 +476,7 @@ mod Prio {
 impl<'a> ExpSourcifier<'a> {
     /// Creates a sourcifier for the given expression in the context of the function
     pub fn for_fun(parent: &'a Sourcifier<'a>, fun_env: &'a FunctionEnv, exp: &Exp) -> Self {
+        print!("[Debug] Processing function {:?}\n", fun_env.get_name_str());
         let type_display_context = fun_env.get_type_display_ctx();
         let temp_names = (0..fun_env.get_parameter_count())
             .map(|i| (i, fun_env.get_local_name(i)))

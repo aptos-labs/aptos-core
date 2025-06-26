@@ -207,8 +207,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "checking-lang-v2.2",
             runner: |p| run_test(p, get_config_by_name("checking-lang-v2.2")),
             include: vec!["/checking-lang-v2.2/"],
-            stop_after: StopAfter::FirstAstPipeline,
-            dump_ast: DumpLevel::EndStage,
+            //stop_after: StopAfter::FirstAstPipeline,
+            dump_ast: DumpLevel::AllStages,
+            dump_bytecode: DumpLevel::AllStages,
             ..config().lang(LanguageVersion::V2_2)
         },
         // Tests for checking v2 language features only supported if 2.3 or later
@@ -292,9 +293,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             runner: |p| run_test(p, get_config_by_name("bytecode-gen")),
             include: vec!["/bytecode-generator/"],
             dump_ast: DumpLevel::EndStage,
-            dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
+            dump_bytecode: DumpLevel::AllStages,
+            // dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
             ..config()
+            .exp(Experiment::AST_SIMPLIFY)
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
