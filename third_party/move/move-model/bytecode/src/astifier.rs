@@ -257,19 +257,37 @@ impl<'a> Context<'a> {
         }
         // Build a label substitution for stubs.
         let mut label_subst = BTreeMap::new();
+
+        let label_subst_loop_detected = |label1: Label, label2: Label, label_subset: BTreeMap<Label, Label>| {
+            let mut visited = BTreeSet::new();
+            visited.insert(label1);
+            let mut target = label2;
+            while let Some(s) = label_subset.get(&target) {
+                if !visited.insert(target) {
+                    return true;
+                }
+                target = *s;
+            }
+            false
+        };
+
         for blk_id in self.forward_cfg.blocks() {
             let block_code = self.code_for_block(blk_id);
             if block_code.len() == 2 {
                 if let (Bytecode::Label(_, label1), Bytecode::Jump(_, label2)) =
                     (&block_code[0], &block_code[1])
                 {
-                    label_subst.insert(*label1, *label2);
+                    if label_subst_loop_detected(*label1, *label2, label_subst.clone()) {
+                        label_subst.insert(*label1, *label2);
+                    }
                 }
             }
         }
         let substitute_label = |mut label: Label| {
             let mut visited = BTreeSet::new();
             while let Some(s) = label_subst.get(&label) {
+                // This assert should always hold as we have prevented cycles
+                // when building the label_subst map.
                 assert!(
                     visited.insert(label),
                     "unexpected cyclic label substitution"
@@ -963,10 +981,18 @@ impl Generator {
                 Operation::MoveFunction(*mid, *fid),
                 srcs,
             ),
-            Closure(..) | Invoke => {
-                // TODO(#15664): implement closure opcodes for astifier
-                panic!("closure operations not supported: {:?}", oper)
-            },
+            Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
+                ctx,
+                Some(inst),
+                dests,
+                Operation::Closure(*mid, *fid, *closure_mask),
+                srcs,
+            ),
+            Invoke =>  self.gen_invoke(
+                ctx,
+                dests,
+                srcs
+            ),
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
@@ -1144,6 +1170,29 @@ impl Generator {
             self.gen_assign(ctx, dests, call)
         } else {
             self.add_stm(call)
+        }
+    }
+
+    fn gen_invoke(
+        &mut self,
+        ctx: &Context,
+        dests: &[TempIndex],
+        srcs: &[TempIndex],
+    ) {
+        let ty = Type::tuple(
+            dests
+                .iter()
+                .map(|d| ctx.target.get_local_type(*d).clone())
+                .collect(),
+        );
+        let invoke_id = self.new_node_id(ctx, ty);
+        let mut temps = self.make_temps(ctx, srcs.iter().copied());
+        let closure = temps.pop().expect("closure must be present for invoke");
+        let invoke = ExpData::Invoke(invoke_id, closure, temps);
+        if !dests.is_empty() {
+            self.gen_assign(ctx, dests, invoke)
+        } else {
+            self.add_stm(invoke)
         }
     }
 

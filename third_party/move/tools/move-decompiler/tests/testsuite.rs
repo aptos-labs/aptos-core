@@ -4,13 +4,8 @@
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use libtest_mimic::{Arguments, Trial};
-use move_compiler_v2::{logging, run_move_compiler_for_analysis, Experiment,
-    Options,
-};
-use move_model::{
-    metadata::LanguageVersion,
-    model::GlobalEnv,
-};
+use move_compiler_v2::{logging, run_move_compiler_for_analysis, Experiment, Options};
+use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use once_cell::unsync::Lazy;
 use std::{
@@ -156,7 +151,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen,
+            stop_after: StopAfter::SourcifierRun,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -170,7 +165,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen,
+            stop_after: StopAfter::SourcifierRun,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -182,12 +177,12 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             sources_deps: vec![],
             dependencies: vec![
                 "../../../../aptos-move/framework/move-stdlib/sources",
-                "../../../../aptos-move/framework/aptos-stdlib/sources"
+                "../../../../aptos-move/framework/aptos-stdlib/sources",
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec![],
-            stop_after: StopAfter::AstGen,
+            stop_after: StopAfter::SourcifierRun,
             test_level: TestLevel::Decompile,
             ..config().lang(LanguageVersion::latest())
         },
@@ -244,12 +239,11 @@ fn run_compile_decompile_test_workflow(
     let mut error_writer = Buffer::no_color();
     let env = run_move_compiler_for_analysis(&mut error_writer, compiler_options.clone());
     let env = match env {
-        Ok(env) => {
-            env
-        },
+        Ok(env) => env,
         Err(_) => {
             // skip the test if compilation fails
-            print!("\n\nWarning: skipping test `{}` due to compilation failure {}.\n",
+            print!(
+                "\n\nWarning: skipping test `{}` due to compilation failure {}.\n",
                 config.name,
                 String::from_utf8_lossy(&error_writer.into_inner())
             );
@@ -330,14 +324,34 @@ fn decompile_test_case(
             // lift file format bytecode to stackless bytecode
             decompiler.lift_to_stackless_bytecode(module_id, &mut targets);
             if config.stop_after == StopAfter::StackLessBytecodeGen {
-                print!("[Debug]: Decompilation one module of `{}` to stackless bytecode completed.\n", config.name);
+                print!(
+                    "[Debug]: Decompilation one module of `{}` to stackless bytecode completed.\n",
+                    config.name
+                );
                 continue;
             }
+
+
+            let decompile_module_env = decompiler.env().get_module(module_id);
+            for func_env in decompile_module_env.get_functions() {
+                if func_env.is_inline() {
+                    continue;
+                }
+                for (variant, target) in targets.get_targets(&func_env) {
+                    if !target.data.code.is_empty() || target.func_env.is_native_or_intrinsic() {
+                        print!("\n[variant {}]\n{}", variant, target);
+                    }
+                }
+            }
+
 
             // lift stackless bytecode to AST
             decompiler.lift_to_ast(&targets);
             if config.stop_after == StopAfter::AstGen {
-                print!("[Debug]: Decompilation one module of `{}` to AST completed.\n", config.name);
+                print!(
+                    "[Debug]: Decompilation one module of `{}` to AST completed.\n",
+                    config.name
+                );
                 continue;
             }
             // sourcify the AST
@@ -354,7 +368,10 @@ fn decompile_test_case(
                     module_env.get_full_name_str()
                 ));
             }
-            print!("[Debug]: Decompilation one module of `{}` completed and produce {}.\n", config.name, res);
+            print!(
+                "[Debug]: Decompilation one module of `{}` completed and produce {}.\n",
+                config.name, res
+            );
         }
     }
     Ok((decompiler, targets))
@@ -427,7 +444,8 @@ fn collect_tests() -> Vec<Trial> {
         let config = &get_config_by_name(name);
         if !config.is_package {
             for file in src_target {
-                let test_prompt = format!("decompiler[config={}]::move-file::{}", config.name, file);
+                let test_prompt =
+                    format!("decompiler[config={}]::move-file::{}", config.name, file);
                 let test_path = PathBuf::from(file);
                 let runner = config.runner;
                 tests.push(Trial::test(test_prompt, move || {
@@ -441,7 +459,10 @@ fn collect_tests() -> Vec<Trial> {
                 config.name
             );
             let folder = src_target[0].clone();
-            let test_prompt = format!("decompiler[config={}]::move-package::{}", config.name, folder);
+            let test_prompt = format!(
+                "decompiler[config={}]::move-package::{}",
+                config.name, folder
+            );
             let test_path = PathBuf::from(folder);
             let runner = config.runner;
             tests.push(Trial::test(test_prompt, move || {
