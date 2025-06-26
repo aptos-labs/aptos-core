@@ -9,7 +9,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
     vm_status::StatusCode,
 };
@@ -29,11 +29,6 @@ pub(crate) fn import_type_tag(
     type_tag: &TypeTag,
     module_resolver: &BTreeMap<ModuleId, CompiledModule>,
 ) -> PartialVMResult<SignatureToken> {
-    let to_list = |script_builder: &mut CompiledScriptBuilder, ts: &[TypeTag]| {
-        ts.iter()
-            .map(|t| import_type_tag(script_builder, t, module_resolver))
-            .collect::<PartialVMResult<Vec<_>>>()
-    };
     Ok(match type_tag {
         TypeTag::Address => SignatureToken::Address,
         TypeTag::U8 => SignatureToken::U8,
@@ -56,17 +51,44 @@ pub(crate) fn import_type_tag(
             if s.type_args.is_empty() {
                 SignatureToken::Struct(struct_idx)
             } else {
-                SignatureToken::StructInstantiation(
-                    struct_idx,
-                    to_list(script_builder, &s.type_args)?,
-                )
+                let type_args = s
+                    .type_args
+                    .iter()
+                    .map(|t| import_type_tag(script_builder, t, module_resolver))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                SignatureToken::StructInstantiation(struct_idx, type_args)
             }
         },
-        TypeTag::Function(f) => SignatureToken::Function(
-            to_list(script_builder, &f.args)?,
-            to_list(script_builder, &f.results)?,
-            f.abilities,
-        ),
+        TypeTag::Function(f) => {
+            let to_list = |script_builder: &mut CompiledScriptBuilder,
+                           ts: &[FunctionParamOrReturnTag]| {
+                ts.iter()
+                    .map(|t| {
+                        Ok(match t {
+                            FunctionParamOrReturnTag::Reference(t) => SignatureToken::Reference(
+                                Box::new(import_type_tag(script_builder, t, module_resolver)?),
+                            ),
+                            FunctionParamOrReturnTag::MutableReference(t) => {
+                                SignatureToken::MutableReference(Box::new(import_type_tag(
+                                    script_builder,
+                                    t,
+                                    module_resolver,
+                                )?))
+                            },
+                            FunctionParamOrReturnTag::Value(t) => {
+                                import_type_tag(script_builder, t, module_resolver)?
+                            },
+                        })
+                    })
+                    .collect::<PartialVMResult<Vec<_>>>()
+            };
+
+            SignatureToken::Function(
+                to_list(script_builder, &f.args)?,
+                to_list(script_builder, &f.results)?,
+                f.abilities,
+            )
+        },
     })
 }
 

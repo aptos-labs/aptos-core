@@ -107,15 +107,23 @@ impl AptosDB {
 
         if !readonly {
             if let Some(version) = myself.get_synced_version()? {
-                myself.ledger_pruner
+                myself
+                    .ledger_pruner
                     .maybe_set_pruner_target_db_version(version);
-                myself.state_store
+                myself
+                    .state_store
                     .state_kv_pruner
                     .maybe_set_pruner_target_db_version(version);
             }
             if let Some(version) = myself.get_latest_state_checkpoint_version()? {
-                myself.state_store.state_merkle_pruner.maybe_set_pruner_target_db_version(version);
-                myself.state_store.epoch_snapshot_pruner.maybe_set_pruner_target_db_version(version);
+                myself
+                    .state_store
+                    .state_merkle_pruner
+                    .maybe_set_pruner_target_db_version(version);
+                myself
+                    .state_store
+                    .epoch_snapshot_pruner
+                    .maybe_set_pruner_target_db_version(version);
             }
         }
 

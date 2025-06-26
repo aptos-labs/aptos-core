@@ -32,7 +32,9 @@ options provided to the prover.
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
 
+{%-if S != "'$1_cmp_Ordering'" %}
 function $Arbitrary_value_of{{S}}(): {{T}};
+{% endif %}
 
 {% endfor %}
 
