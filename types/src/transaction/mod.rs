@@ -2688,9 +2688,16 @@ impl AuxiliaryInfo {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Serialize, Deserialize)]
+#[derive(
+    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum PersistedAuxiliaryInfo {
     None,
+    // The index of the transaction in a block (after shuffler, before execution).
+    // Note that this would be slightly different from the index of transactions that get committed
+    // onchain, as this considers transactions that may get discarded.
+    V1 { transaction_index: u32 },
 }
 
 #[derive(Debug, Clone, Copy)]

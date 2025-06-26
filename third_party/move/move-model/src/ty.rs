@@ -21,7 +21,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    language_storage::{FunctionTag, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     u256::U256,
 };
 use num::BigInt;
@@ -1579,8 +1579,22 @@ impl Type {
                     results,
                     abilities,
                 } = fun.as_ref();
-                let from_vec = |ts: &[TypeTag]| {
-                    Type::tuple(ts.iter().map(|t| Type::from_type_tag(t, env)).collect_vec())
+                let from_vec = |ts: &[FunctionParamOrReturnTag]| {
+                    Type::tuple(
+                        ts.iter()
+                            .map(|t| match t {
+                                FunctionParamOrReturnTag::Reference(t) => Reference(
+                                    ReferenceKind::Immutable,
+                                    Box::new(Type::from_type_tag(t, env)),
+                                ),
+                                FunctionParamOrReturnTag::MutableReference(t) => Reference(
+                                    ReferenceKind::Mutable,
+                                    Box::new(Type::from_type_tag(t, env)),
+                                ),
+                                FunctionParamOrReturnTag::Value(t) => Type::from_type_tag(t, env),
+                            })
+                            .collect_vec(),
+                    )
                 };
                 Fun(
                     Box::new(from_vec(args)),
