@@ -362,6 +362,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns the persisted auxiliary info at the specified version.
+    /// If no auxiliary info is found, returns None.
+    fn get_persisted_auxiliary_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<Option<PersistedAuxiliaryInfo>> {
+        gauged_api("get_persisted_auxiliary_info_by_version", || {
+            self.ledger_db
+                .persisted_auxiliary_info_db()
+                .get_persisted_auxiliary_info(version)
+        })
+    }
+
     /// TODO(bowu): Deprecate after internal index migration
     fn get_events(
         &self,

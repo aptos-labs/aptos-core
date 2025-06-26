@@ -25,8 +25,8 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
@@ -165,6 +165,14 @@ pub trait DbReader: Send + Sync {
             &self,
             version: Version,
         ) -> Result<Option<TransactionAuxiliaryData>>;
+
+        /// See [AptosDB::get_persisted_auxiliary_info_by_version].
+        ///
+        /// [AptosDB::get_persisted_auxiliary_info_by_version]: ../aptosdb/struct.AptosDB.html#method.get_persisted_auxiliary_info_by_version
+        fn get_persisted_auxiliary_info_by_version(
+            &self,
+            version: Version,
+        ) -> Result<Option<PersistedAuxiliaryInfo>>;
 
         /// See [AptosDB::get_first_txn_version].
         ///
