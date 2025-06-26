@@ -1,5 +1,5 @@
 
-module 0x99::m {
+module 0x99::nested_loops {
     fun nested_for_loops() {
         let _t4;
         let _t3;
