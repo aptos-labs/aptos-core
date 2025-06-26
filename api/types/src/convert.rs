@@ -387,6 +387,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     transaction_payload: None,
                                 })
                             },
+                            aptos_types::transaction::TransactionExecutable::Encrypted(encrypted) => {
+                                bail!("Encrypted executable is not supported for multisig transactions")
+                            },
                         }
                     } else {
                         match executable {
@@ -400,6 +403,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             },
                             aptos_types::transaction::TransactionExecutable::Empty => {
                                 bail!("Empty executable is not supported for non-multisig transactions")
+                            },
+                            aptos_types::transaction::TransactionExecutable::Encrypted(encrypted) => {
+                                unimplemented!()
                             },
                         }
                     }

@@ -8,7 +8,7 @@ use crate::{
     dag::DAGNetworkMessage,
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::network_messages::RandGenMessage,
+    rand::rand_gen::network_messages::{DecTxnMessage, RandGenMessage},
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -26,7 +26,7 @@ use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},
     ProtocolId,
 };
-use aptos_types::{epoch_change::EpochChangeProof, PeerId};
+use aptos_types::{decryption::DecryptionMessage, epoch_change::EpochChangeProof, PeerId};
 use bytes::Bytes;
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
@@ -88,6 +88,8 @@ pub enum ConsensusMsg {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     /// RPC to get a chain of block of the given length starting from the given block id, using epoch and round.
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
+    /// Decryption message
+    DecMessage(DecTxnMessage),
 }
 
 /// Network type for consensus
@@ -117,6 +119,7 @@ impl ConsensusMsg {
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
             ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::DecMessage(_) => "DecMessage",
         }
     }
 }

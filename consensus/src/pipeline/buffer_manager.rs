@@ -38,7 +38,7 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use bytes::Bytes;
 use fail::fail_point;
@@ -408,6 +408,38 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
+
+        let mut num_encrypted_txns = vec![];
+        for block in &ordered_blocks {
+            if block.block().is_encrypted() {
+                if let Some(futures) = block.pipeline_futs() {
+                    if let Some(fut) = futures.maybe_compute_decryption_fut.as_ref() {
+                        let dec_txns = fut.clone().await.expect("Decryption failed");
+                        num_encrypted_txns.push(dec_txns.len());
+                        block.set_dec_txns(dec_txns.to_vec());
+                    } else {
+                        error!(
+                            "Block {} is encrypted but maybe_compute_decryption_fut is not set",
+                            block.block().id()
+                        );
+                    }
+                } else {
+                    error!(
+                        "Block {} is encrypted but pipeline_futs is not set",
+                        block.block().id()
+                    );
+                }
+            }
+        }
+
+        if !num_encrypted_txns.is_empty() {
+            info!(
+                "[daniel] Set decryption txns nums {:?} for {} ordered block ends with {}",
+                num_encrypted_txns,
+                ordered_blocks.len(),
+                ordered_proof.commit_info(),
+            );
+        }
 
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),

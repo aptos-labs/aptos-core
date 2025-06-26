@@ -4,7 +4,7 @@
 
 use crate::{
     error::StateSyncError,
-    network::{IncomingCommitRequest, IncomingRandGenRequest},
+    network::{IncomingCommitRequest, IncomingDecRequest, IncomingRandGenRequest},
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
@@ -110,6 +110,9 @@ impl TExecutionClient for MockExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
+        _dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        _dec_config: Option<DecConfig>,
+        _fast_dec_config: Option<DecConfig>,
     ) {
     }
 

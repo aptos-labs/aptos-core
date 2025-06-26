@@ -162,6 +162,7 @@ impl PriorityIndex {
             address: txn.get_sender(),
             replay_protector: txn.get_replay_protector(),
             hash: txn.get_committed_hash(),
+            is_encrypted: txn.is_encrypted(),
         }
     }
 
@@ -182,6 +183,8 @@ pub struct OrderedQueueKey {
     pub address: AccountAddress,
     pub replay_protector: ReplayProtector,
     pub hash: HashValue,
+    // If true, this transaction is an encrypted transaction
+    pub is_encrypted: bool,
 }
 
 impl PartialOrd for OrderedQueueKey {

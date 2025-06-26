@@ -28,7 +28,7 @@ use crate::{
         publisher::consensus_publisher::ConsensusPublisher,
     },
     dag::DagCommitSigner,
-    network::{IncomingCommitRequest, IncomingRandGenRequest},
+    network::{IncomingCommitRequest, IncomingDecRequest, IncomingRandGenRequest},
     network_interface::CommitMessage,
     pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
 };
@@ -1073,6 +1073,8 @@ impl ConsensusObserver {
         let dummy_signer = Arc::new(DagCommitSigner::new(signer.clone()));
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
+        let (_, dec_msg_rx) =
+            aptos_channel::new::<AccountAddress, IncomingDecRequest>(QueueStyle::FIFO, 1, None);
         self.execution_client
             .start_epoch(
                 sk,
@@ -1087,10 +1089,13 @@ impl ConsensusObserver {
                 rand_msg_rx,
                 0,
                 self.pipeline_enabled(),
+                dec_msg_rx,
+                None,
+                None,
             )
             .await;
         if self.pipeline_enabled() {
-            self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer))
+            self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer, None))
         }
     }
 

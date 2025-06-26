@@ -3,7 +3,7 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{decryption::{DecKey, Id}, transaction::SignedTransaction, PeerId};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -323,9 +323,78 @@ impl OptQuorumStorePayloadV1 {
     }
 }
 
+static DEFAULT_INLINE_ENCRYPTED_TXNS: InlineEncryptedTxns = InlineEncryptedTxns {
+    encrypted_txns: Vec::new(),
+};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct InlineEncryptedTxns{
+    encrypted_txns: Vec<SignedTransaction>,
+}
+
+impl InlineEncryptedTxns {
+    pub fn new(txns: Vec<SignedTransaction>) -> Self {
+        Self {
+            encrypted_txns: txns,
+        }
+    }
+
+    pub fn txns(&self) -> &Vec<SignedTransaction> {
+        &self.encrypted_txns
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.encrypted_txns.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.encrypted_txns.is_empty()
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        self.encrypted_txns.iter().map(|txn| txn.txn_bytes_len()).sum()
+    }
+
+    pub fn ids(&self) -> Vec<Id> {
+        self.encrypted_txns.iter().map(|txn| txn.ct_id().unwrap()).collect()
+    }
+
+    pub fn add(&mut self, encrypted_txns: Vec<SignedTransaction>) {
+        self.encrypted_txns.extend(encrypted_txns);
+    }
+
+    pub fn verify_ids(&self) -> anyhow::Result<()> {
+        // check if all encrypted txns have id
+        ensure!(self.encrypted_txns.iter().all(|txn| txn.ct_id().is_some()), "All encrypted txns must have id");
+        Ok(())
+    }
+
+    pub fn verify_encrypted_txns(&self) -> anyhow::Result<()> {
+        // daniel todo
+        Ok(())
+    }
+
+    pub fn verify(&self) -> anyhow::Result<()> {
+        // daniel todo
+        // self.verify_ids()?;
+        // self.verify_encrypted_txns()?;
+        Ok(())
+    }
+
+    pub fn decrypt(&self, decryption_key: &DecKey) -> anyhow::Result<Vec<SignedTransaction>> {
+        let mut decrypted_txns = Vec::new();
+        for txn in self.encrypted_txns.iter() {
+            let decrypted_txn = txn.decrypt(decryption_key)?;
+            decrypted_txns.push(decrypted_txn.clone());
+        }
+        Ok(decrypted_txns)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum OptQuorumStorePayload {
     V1(OptQuorumStorePayloadV1),
+    V2(OptQuorumStorePayloadV1, InlineEncryptedTxns),
 }
 
 impl OptQuorumStorePayload {
@@ -344,14 +413,17 @@ impl OptQuorumStorePayload {
     }
 
     pub(crate) fn num_txns(&self) -> usize {
-        self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
+        self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns() + self.inline_encrypted_txns().num_txns()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty()
+        self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty() && self.inline_encrypted_txns().is_empty()
     }
 
     pub(crate) fn extend(mut self, other: Self) -> Self {
+        if let OptQuorumStorePayload::V2(_, ref mut inline_encrypted_txns) = self {
+            inline_encrypted_txns.add(other.inline_encrypted_txns().txns().clone());
+        }
         let other: OptQuorumStorePayloadV1 = other.into_inner();
         self.inline_batches.extend(other.inline_batches.0);
         self.opt_batches.extend(other.opt_batches);
@@ -361,12 +433,13 @@ impl OptQuorumStorePayload {
     }
 
     pub(crate) fn num_bytes(&self) -> usize {
-        self.opt_batches.num_bytes() + self.proofs.num_bytes() + self.inline_batches.num_bytes()
+        self.opt_batches.num_bytes() + self.proofs.num_bytes() + self.inline_batches.num_bytes() + self.inline_encrypted_txns().num_bytes()
     }
 
     pub fn into_inner(self) -> OptQuorumStorePayloadV1 {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 
@@ -385,6 +458,28 @@ impl OptQuorumStorePayload {
     pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
         self.execution_limits = execution_limits;
     }
+
+    pub fn inline_encrypted_txns(&self) -> &InlineEncryptedTxns {
+        match self {
+            OptQuorumStorePayload::V1(_) => &DEFAULT_INLINE_ENCRYPTED_TXNS,
+            OptQuorumStorePayload::V2(_, inline_encrypted_txns) => inline_encrypted_txns,
+        }
+    }
+
+    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>) {
+        if encrypted_txns.is_empty() {
+            return;
+        }
+        match self {
+            OptQuorumStorePayload::V1(opt_qs_payload) => {
+                // change to v2
+                *self = OptQuorumStorePayload::V2(opt_qs_payload.clone(), InlineEncryptedTxns::new(encrypted_txns));
+            }
+            OptQuorumStorePayload::V2(_, ref mut inline_encrypted_txns) => {
+                inline_encrypted_txns.add(encrypted_txns);
+            },
+        }
+    }
 }
 
 impl Deref for OptQuorumStorePayload {
@@ -393,6 +488,7 @@ impl Deref for OptQuorumStorePayload {
     fn deref(&self) -> &Self::Target {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 }
@@ -401,6 +497,7 @@ impl DerefMut for OptQuorumStorePayload {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 }

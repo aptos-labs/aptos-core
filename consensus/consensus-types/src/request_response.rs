@@ -29,6 +29,9 @@ pub struct GetPayloadRequest {
     pub callback: oneshot::Sender<Result<GetPayloadResponse>>,
     // block timestamp
     pub block_timestamp: Duration,
+    // for inline encrypted txns
+    // max number of inline encrypted txns
+    pub max_inline_encrypted_txns: PayloadTxnsSize,
 }
 
 pub enum GetPayloadCommand {

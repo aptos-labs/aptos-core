@@ -353,7 +353,8 @@ pub(crate) fn realistic_env_max_load_test(
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .transaction_type(TransactionTypeArg::EncryptedCoinTransfer.materialize_default())
+                .mode(EmitJobMode::ConstTps { tps: 1000 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
@@ -388,12 +389,12 @@ pub(crate) fn realistic_env_max_load_test(
                 .observer_fallback_sync_lag_threshold_ms = 30_000; // 30 seconds
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
-        .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100)),
-        )
+        // .with_emit_job(
+        //     EmitJobRequest::default()
+        //         .mode(EmitJobMode::ConstTps { tps: 100 })
+        //         .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+        //         .latency_polling_interval(Duration::from_millis(100)),
+        // )
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)

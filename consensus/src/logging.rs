@@ -16,6 +16,8 @@ pub struct LogSchema {
     epoch: Option<u64>,
     round: Option<Round>,
     id: Option<HashValue>,
+    num_encrypted_txns: Option<usize>,
+    num_decrypted_txns: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -58,6 +60,13 @@ pub enum LogEvent {
     // randomness fast path
     BroadcastRandShareFastPath,
     ReceiveRandShareFastPath,
+    BuiltPipeline,
+    // log events related to decryption
+    BroadcastDecShare,
+    BroadcastFastDecShare,
+    ReceiveProactiveDecShare,
+    ReceiveReactiveDecShare,
+    ReceiveFastDecShare,
 }
 
 impl LogSchema {
@@ -69,6 +78,8 @@ impl LogSchema {
             epoch: None,
             round: None,
             id: None,
+            num_encrypted_txns: None,
+            num_decrypted_txns: None,
         }
     }
 }

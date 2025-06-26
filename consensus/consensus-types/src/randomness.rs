@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block::Block;
-use aptos_types::randomness::FullRandMetadata;
+use aptos_types::{decryption::DecMetadata, randomness::FullRandMetadata};
 
 impl From<&Block> for FullRandMetadata {
     fn from(block: &Block) -> Self {
@@ -12,5 +12,11 @@ impl From<&Block> for FullRandMetadata {
             block.id(),
             block.timestamp_usecs(),
         )
+    }
+}
+
+impl From<&Block> for DecMetadata {
+    fn from(block: &Block) -> Self {
+        DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id())
     }
 }

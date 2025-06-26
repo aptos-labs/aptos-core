@@ -52,6 +52,7 @@ async fn queue_mempool_batch_response(
         _return_non_full,
         exclude_txns,
         callback,
+        _pull_encrypted_txns_only,
     ) = timeout(
         Duration::from_millis(1_000),
         quorum_store_to_mempool_receiver.select_next_some(),

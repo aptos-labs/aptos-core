@@ -25,6 +25,8 @@ pub struct PayloadPullParameters {
     pub recent_max_fill_fraction: f32,
     pub block_timestamp: Duration,
     pub maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
+    // for inline encrypted txns
+    pub max_inline_encrypted_txns: PayloadTxnsSize,
 }
 
 impl std::fmt::Debug for OptQSPayloadPullParams {
@@ -63,6 +65,7 @@ impl PayloadPullParameters {
             recent_max_fill_fraction,
             block_timestamp,
             maybe_optqs_payload_pull_params: None,
+            max_inline_encrypted_txns: PayloadTxnsSize::new(0, 0),
         }
     }
 }

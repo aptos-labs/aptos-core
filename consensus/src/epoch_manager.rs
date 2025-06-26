@@ -32,7 +32,7 @@ use crate::{
     monitor,
     network::{
         DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
-        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
+        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingDecRequest, IncomingRandGenRequest,
         IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -46,6 +46,7 @@ use crate::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
         quorum_store_db::QuorumStoreStorage,
+        utils::MempoolProxy,
     },
     rand::rand_gen::{
         storage::interface::RandStorage,
@@ -81,6 +82,7 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
+    decryption::DecConfig,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -147,6 +149,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
+    // channels to dec manager
+    dec_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingDecRequest>>,
     // channels to round manager
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
@@ -221,6 +225,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
+            dec_manager_msg_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
             buffered_proposal_tx: None,
@@ -651,6 +656,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Shutdown the previous rand manager
         self.rand_manager_msg_tx = None;
 
+        // Shutdown the previous dec manager
+        self.dec_manager_msg_tx = None;
+
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.execution_client.end_epoch().await;
 
@@ -752,11 +760,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.quorum_store_msg_tx = quorum_store_msg_tx;
         self.payload_manager = payload_manager.clone();
 
+        let mempool_proxy = Arc::new(MempoolProxy::new(
+            self.quorum_store_to_mempool_sender.clone(),
+            self.config.mempool_txn_pull_timeout_ms,
+        ));
+
         let payload_client = QuorumStoreClient::new(
             consensus_to_quorum_store_tx,
             self.config.quorum_store_pull_timeout_ms,
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
+            mempool_proxy,
         );
         (payload_manager, payload_client, quorum_store_builder)
     }
@@ -797,6 +811,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -858,13 +875,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 recovery_data.commit_root_block().round(),
                 self.config.enable_pipeline,
+                dec_msg_rx,
+                dec_config,
+                fast_dec_config,
             )
             .await;
         let consensus_sk = consensus_key;
 
         let maybe_pipeline_builder = if self.config.enable_pipeline {
             let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
-            Some(self.execution_client.pipeline_builder(signer))
+            Some(self.execution_client.pipeline_builder(signer, Some(network_sender.clone())))
         } else {
             None
         };
@@ -1231,6 +1251,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         };
 
+        let dec_config = rand_config.as_ref().map(|rand_config| DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), rand_config.wconfig().clone()));
+        let fast_dec_config = fast_rand_config.as_ref().map(|rand_config| DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), rand_config.wconfig().clone()));
+
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",
             epoch_state.epoch, rand_config, fast_rand_config
@@ -1250,7 +1273,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             None,
         );
 
+        let (dec_msg_tx, dec_msg_rx) = aptos_channel::new::<AccountAddress, IncomingDecRequest>(
+            QueueStyle::KLAST,
+            10,
+            None,
+        );
+
         self.rand_manager_msg_tx = Some(rand_msg_tx);
+        self.dec_manager_msg_tx = Some(dec_msg_tx);
 
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
@@ -1266,6 +1296,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                dec_msg_rx,
+                dec_config,
+                fast_dec_config,
             )
             .await
         } else {
@@ -1282,6 +1315,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                dec_msg_rx,
+                dec_config,
+                fast_dec_config,
             )
             .await
         }
@@ -1337,6 +1373,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     ) {
         match self.storage.start(
             consensus_config.order_vote_enabled(),
@@ -1358,6 +1397,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     rand_config,
                     fast_rand_config,
                     rand_msg_rx,
+                    dec_msg_rx,
+                    dec_config,
+                    fast_dec_config,
                 )
                 .await
             },
@@ -1388,6 +1430,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     ) {
         let epoch = epoch_state.epoch;
         let signer = Arc::new(ValidatorSigner::new(
@@ -1422,6 +1467,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 highest_committed_round,
                 self.config.enable_pipeline,
+                dec_msg_rx,
+                dec_config,
+                fast_dec_config,
             )
             .await;
 
@@ -1786,6 +1834,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     tx.push(peer_id, request)
                 } else {
                     bail!("Rand manager not started");
+                }
+            },
+            IncomingRpcRequest::DecRequest(request) => {
+                if let Some(tx) = &self.dec_manager_msg_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    bail!("Dec manager not started");
                 }
             },
             IncomingRpcRequest::BlockRetrieval(request) => {

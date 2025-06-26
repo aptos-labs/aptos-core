@@ -33,7 +33,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
@@ -606,6 +606,9 @@ impl ProposalGenerator {
                         pending_uncommitted_blocks: pending_blocks.len(),
                         recent_max_fill_fraction: max_fill_fraction,
                         block_timestamp: timestamp,
+                        // for inline encrypted txns
+                        // daniel todo: move to configs
+                        max_inline_encrypted_txns: PayloadTxnsSize::new(128, 128 * 10 * 1024),
                     },
                     validator_txn_filter,
                     wait_callback,

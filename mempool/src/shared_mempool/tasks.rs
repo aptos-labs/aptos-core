@@ -561,6 +561,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
             return_non_full,
             exclude_transactions,
             callback,
+            pull_encrypted_txns_only,
         ) => {
             let txns;
             {
@@ -587,8 +588,11 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     counters::GET_BLOCK_GET_BATCH_LABEL,
                     counters::REQUEST_SUCCESS_LABEL,
                 );
-                txns =
-                    mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions);
+                txns = if pull_encrypted_txns_only {
+                    mempool.get_batch_with_encrypted_txns_only(max_txns, max_bytes, return_non_full, exclude_transactions)
+                } else {
+                    mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions)
+                };
             }
 
             // mempool_service_transactions is logged inside get_batch

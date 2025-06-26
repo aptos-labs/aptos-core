@@ -885,6 +885,11 @@ impl RoundManager {
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
     async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
+        let enc = if proposal.encrypted_payload_size() > 0 { "non-empty" } else { "empty" };
+        let all = if proposal.payload_size() > 0 { "non-empty" } else { "empty" };
+        info!("[daniel] process_proposal round {} has {} encrypted txns: {}, {} all txns: {}", proposal.round(), enc, proposal.encrypted_payload_size(), all, proposal.payload_size());
+
+
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
@@ -1227,7 +1232,7 @@ impl RoundManager {
             });
 
             let order_vote = order_vote_msg.order_vote();
-            trace!(
+            info!(
                 self.new_log(LogEvent::ReceiveOrderVote)
                     .remote_peer(order_vote.author()),
                 epoch = order_vote.ledger_info().epoch(),
@@ -1397,7 +1402,7 @@ impl RoundManager {
                 is_timeout = vote.is_timeout(),
             );
         } else {
-            trace!(
+            info!(
                 self.new_log(LogEvent::ReceiveVote)
                     .remote_peer(vote.author()),
                 epoch = vote.vote_data().proposed().epoch(),

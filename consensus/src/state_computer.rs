@@ -9,6 +9,7 @@ use crate::{
     error::StateSyncError,
     execution_pipeline::{ExecutionPipeline, PreCommitHook},
     monitor,
+    network::NetworkSender,
     payload_manager::TPayloadManager,
     pipeline::{pipeline_builder::PipelineBuilder, pipeline_phase::CountedRequest},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -187,7 +188,7 @@ impl ExecutionProxy {
         })
     }
 
-    pub fn pipeline_builder(&self, commit_signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+    pub fn pipeline_builder(&self, commit_signer: Arc<ValidatorSigner>, network: Option<Arc<NetworkSender>>) -> PipelineBuilder {
         let MutableState {
             validators,
             payload_manager,
@@ -221,6 +222,7 @@ impl ExecutionProxy {
             self.txn_notifier.clone(),
             self.enable_pre_commit,
             order_vote_enabled,
+            network,
         )
     }
 }

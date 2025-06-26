@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
+    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits, InlineEncryptedTxns},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::ensure;
@@ -487,6 +487,35 @@ impl Payload {
         !matches!(self, Payload::DirectMempool(_))
     }
 
+    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>) {
+        if encrypted_txns.is_empty() {
+            return;
+        }
+        match self {
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                opt_qs_payload.add_encrypted_txns(encrypted_txns);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn encrypted_txns(&self) -> Option<&InlineEncryptedTxns> {
+        match self {
+            Payload::OptQuorumStore(opt_qs_payload) => {
+                if !opt_qs_payload.inline_encrypted_txns().is_empty() {
+                    Some(opt_qs_payload.inline_encrypted_txns())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn num_encrypted_txns(&self) -> usize {
+        self.encrypted_txns().map(|txns| txns.num_txns()).unwrap_or(0)
+    }
+
     /// This is potentially computationally expensive
     pub fn size(&self) -> usize {
         match self {
@@ -564,6 +593,12 @@ impl Payload {
         Ok(())
     }
 
+    pub fn verify_inline_encrypted_txns(
+        inline_encrypted_txns: &InlineEncryptedTxns,
+    ) -> anyhow::Result<()> {
+        inline_encrypted_txns.verify()
+    }
+
     pub fn verify(
         &self,
         verifier: &ValidatorVerifier,
@@ -598,6 +633,7 @@ impl Payload {
                         .map(|batch| (batch.info(), batch.transactions())),
                 )?;
                 Self::verify_opt_batches(verifier, opt_quorum_store.opt_batches())?;
+                Self::verify_inline_encrypted_txns(opt_quorum_store.inline_encrypted_txns())?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -737,7 +773,7 @@ impl BatchPayload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(HashSet<BatchInfo>),
+    InQuorumStore(HashSet<BatchInfo>, Vec<TransactionSummary>),
     Empty,
 }
 
@@ -764,6 +800,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             PayloadFilter::DirectMempool(exclude_txns)
         } else {
             let mut exclude_batches = HashSet::new();
+            let mut exclude_txns = Vec::new();
             for payload in exclude_payloads {
                 match payload {
                     Payload::InQuorumStore(proof_with_status) => {
@@ -798,10 +835,20 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         for proof in &opt_qs_payload.proof_with_data().batch_summary {
                             exclude_batches.insert(proof.info().clone());
                         }
+                        for txn in opt_qs_payload.inline_encrypted_txns().txns() {
+                            // if let Some(encrypted_txn_id) = txn.encrypted_txn_id() {
+                            //     exclude_encrypted_txns.insert(encrypted_txn_id.id);
+                            // }
+                            exclude_txns.push(TransactionSummary {
+                                sender: txn.sender(),
+                                replay_protector: txn.replay_protector(),
+                                hash: txn.committed_hash(),
+                            });
+                        }
                     },
                 }
             }
-            PayloadFilter::InQuorumStore(exclude_batches)
+            PayloadFilter::InQuorumStore(exclude_batches, exclude_txns)
         }
     }
 }
@@ -816,10 +863,13 @@ impl fmt::Display for PayloadFilter {
                 }
                 write!(f, "{}", txns_str)
             },
-            PayloadFilter::InQuorumStore(excluded_proofs) => {
+            PayloadFilter::InQuorumStore(excluded_proofs, excluded_txns) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
                     write!(proofs_str, "{} ", proof.digest())?;
+                }
+                for tx in excluded_txns.iter() {
+                    write!(proofs_str, "{} ", tx)?;
                 }
                 write!(f, "{}", proofs_str)
             },

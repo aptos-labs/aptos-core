@@ -4,7 +4,7 @@ use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, decryption::{Id, Round}, transaction::SignedTransaction, LocalAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},
@@ -150,6 +150,7 @@ pub struct P2PTransactionGenerator {
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
+    encrypted: bool,
 }
 
 impl P2PTransactionGenerator {
@@ -161,6 +162,7 @@ impl P2PTransactionGenerator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampler: Box<dyn Sampler<AccountAddress>>,
+        encrypted: bool,
     ) -> Self {
         Self {
             rng,
@@ -170,10 +172,25 @@ impl P2PTransactionGenerator {
             sampler,
             invalid_transaction_ratio,
             use_fa_transfer,
+            encrypted,
         }
     }
 
     fn gen_single_txn(
+        &self,
+        from: &LocalAccount,
+        to: &AccountAddress,
+        num_coins: u64,
+        txn_factory: &TransactionFactory,
+    ) -> SignedTransaction {
+        if self.encrypted {
+            self.gen_single_encrypted_txn(from, to, num_coins, txn_factory)
+        } else {
+            self.gen_single_plain_txn(from, to, num_coins, txn_factory)
+        }
+    }
+
+    fn gen_single_plain_txn(
         &self,
         from: &LocalAccount,
         to: &AccountAddress,
@@ -189,6 +206,28 @@ impl P2PTransactionGenerator {
                 txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
             },
         )
+    }
+
+    fn gen_single_encrypted_txn(
+        &self,
+        from: &LocalAccount,
+        to: &AccountAddress,
+        num_coins: u64,
+        txn_factory: &TransactionFactory,
+    ) -> SignedTransaction {
+        let payload = if self.use_fa_transfer {
+            aptos_stdlib::aptos_account_fungible_transfer_only(
+                *to, num_coins,
+            )
+        } else {
+            aptos_stdlib::aptos_coin_transfer(*to, num_coins)
+        };
+        let id = Id::random();
+        let round = Round::default();
+        let encrypted_payload = payload.clone().into_encrypted(id, round).unwrap();
+        let signed_encrypted_txn = from.sign_with_transaction_builder(txn_factory.payload(encrypted_payload));
+        assert!(signed_encrypted_txn.is_encrypted());
+        signed_encrypted_txn
     }
 
     fn generate_invalid_transaction(
@@ -308,6 +347,7 @@ pub struct P2PTransactionGeneratorCreator {
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
     sampling_mode: SamplingMode,
+    encrypted: bool,
 }
 
 impl P2PTransactionGeneratorCreator {
@@ -318,6 +358,7 @@ impl P2PTransactionGeneratorCreator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampling_mode: SamplingMode,
+        encrypted: bool,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
         all_addresses.shuffle(&mut rng);
@@ -329,6 +370,7 @@ impl P2PTransactionGeneratorCreator {
             invalid_transaction_ratio,
             use_fa_transfer,
             sampling_mode,
+            encrypted,
         }
     }
 }
@@ -350,6 +392,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.invalid_transaction_ratio,
             self.use_fa_transfer,
             sampler,
+            self.encrypted,
         ))
     }
 }

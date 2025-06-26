@@ -125,6 +125,7 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
                 sender_use_account_pool: false,
                 non_conflicting: false,
                 use_fa_transfer: true,
+                encrypted: false,
             },
             100,
         )]],

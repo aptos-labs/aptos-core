@@ -112,6 +112,7 @@ impl MempoolProxy {
         max_items: u64,
         max_bytes: u64,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+        pull_encrypted_txns_only: bool,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
@@ -120,6 +121,7 @@ impl MempoolProxy {
             true,
             exclude_transactions,
             callback,
+            pull_encrypted_txns_only,
         );
         self.mempool_tx
             .clone()

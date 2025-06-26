@@ -27,6 +27,7 @@ pub async fn generate_traffic_and_assert_committed(
                 sender_use_account_pool: false,
                 non_conflicting: false,
                 use_fa_transfer: true,
+                encrypted: false,
             },
             70,
         ),

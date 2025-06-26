@@ -65,6 +65,7 @@ pub enum TransactionType {
         sender_use_account_pool: bool,
         non_conflicting: bool,
         use_fa_transfer: bool,
+        encrypted: bool,
     },
     AccountGeneration {
         add_created_accounts_to_pool: bool,
@@ -125,6 +126,7 @@ impl Default for TransactionType {
             sender_use_account_pool: false,
             non_conflicting: false,
             use_fa_transfer: true,
+            encrypted: false,
         }
     }
 }
@@ -297,6 +299,7 @@ pub async fn create_txn_generator_creator(
                     sender_use_account_pool,
                     non_conflicting,
                     use_fa_transfer,
+                    encrypted,
                 } => wrap_accounts_pool(
                     Box::new(P2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
@@ -309,6 +312,7 @@ pub async fn create_txn_generator_creator(
                         } else {
                             SamplingMode::Basic
                         },
+                        encrypted,
                     )),
                     sender_use_account_pool,
                     &accounts_pool,

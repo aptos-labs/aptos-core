@@ -8,7 +8,7 @@ use crate::{
 use aptos_consensus_types::{
     common::Payload, payload_pull_params::PayloadPullParameters, utils::PayloadTxnsSize,
 };
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
 use fail::fail_point;

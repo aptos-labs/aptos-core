@@ -1113,6 +1113,13 @@ impl AptosVM {
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
+            TransactionExecutableRef::Encrypted(_) => {
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Executable not decrypted!".to_string()),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+            },
         };
         // Failures here will be propagated back.
         let payload_bytes: Vec<Vec<u8>> = session

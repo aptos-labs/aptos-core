@@ -159,6 +159,9 @@ impl AptosDebugger {
                         // TODO[Orderless]: Implement this
                         unimplemented!("not supported yet")
                     },
+                    TransactionExecutableRef::Encrypted(_) => {
+                        unimplemented!("not supported for encrypted transactions")
+                    },
                 };
                 gas_profiler
             },
@@ -394,6 +397,7 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
                     ),
                     Ok(TransactionExecutableRef::Script(_)) => "script".to_string(),
                     Ok(TransactionExecutableRef::Empty) => "empty".to_string(),
+                    Ok(TransactionExecutableRef::Encrypted(_)) => "encrypted".to_string(),
                     Err(e) => {
                         panic!("deprecated transaction payload: {}", e)
                     },

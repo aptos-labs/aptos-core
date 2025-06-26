@@ -17,4 +17,6 @@ pub enum Error {
     ResetDropped,
     #[error("Rand Reset host dropped")]
     RandResetDropped,
+    #[error("Dec Reset host dropped")]
+    DecResetDropped,
 }

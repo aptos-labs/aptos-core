@@ -103,12 +103,12 @@ impl ProofManager {
     pub(crate) fn handle_proposal_request(&mut self, msg: GetPayloadCommand) {
         let GetPayloadCommand::GetPayloadRequest(request) = msg;
 
-        let excluded_batches: HashSet<_> = match request.filter {
+        let excluded_batches = match request.filter {
             PayloadFilter::Empty => HashSet::new(),
             PayloadFilter::DirectMempool(_) => {
                 unreachable!()
             },
-            PayloadFilter::InQuorumStore(batches) => batches,
+            PayloadFilter::InQuorumStore(batches, _) => batches,
         };
 
         let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =

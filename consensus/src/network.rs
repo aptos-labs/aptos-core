@@ -15,7 +15,7 @@ use crate::{
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::{
-        network_messages::{RandGenMessage, RandMessage},
+        network_messages::{DecTxnMessage, RandGenMessage, RandMessage, DecMessage},
         types::{AugmentedData, FastShare, Share},
     },
 };
@@ -41,7 +41,7 @@ use aptos_network::{
 };
 use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    account_address::AccountAddress, decryption::{DecShare, DecryptionKeyShare, DecryptionMessage, FastDecShare}, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
 use async_trait::async_trait;
@@ -147,6 +147,14 @@ pub struct IncomingRandGenRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingDecRequest {
+    pub req: DecTxnMessage,
+    pub sender: Author,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
     /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
@@ -156,6 +164,7 @@ pub enum IncomingRpcRequest {
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
     BlockRetrieval(IncomingBlockRetrievalRequest),
+    DecRequest(IncomingDecRequest),
 }
 
 impl IncomingRpcRequest {
@@ -168,6 +177,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::DecRequest(req) => Some(req.req.epoch()),
         }
     }
 }
@@ -459,6 +469,16 @@ impl NetworkSender {
         fail_point!("consensus::send::broadcast_share", |_| ());
         let msg = tokio::task::spawn_blocking(|| {
             RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
+        })
+        .await
+        .expect("task cannot fail to execute");
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_fast_decryption_share(&self, dec_share: FastDecShare) {
+        fail_point!("consensus::send::fast_decryption_share", |_| ());
+        let msg = tokio::task::spawn_blocking(|| {
+            DecMessage::FastDecShare(dec_share).into_network_message()
         })
         .await
         .expect("task cannot fail to execute");
@@ -830,6 +850,22 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
+                        ConsensusMsg::DecMessage(req) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::DecRequest(IncomingDecRequest {
+                                    req,
+                                    sender: peer_id,
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
+                        },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
@@ -902,6 +938,14 @@ impl NetworkTask {
                         },
                         ConsensusMsg::RandGenMessage(req) => {
                             IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                req,
+                                sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        ConsensusMsg::DecMessage(req) => {
+                            IncomingRpcRequest::DecRequest(IncomingDecRequest {
                                 req,
                                 sender: peer_id,
                                 protocol,

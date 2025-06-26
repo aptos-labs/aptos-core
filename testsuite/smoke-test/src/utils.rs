@@ -18,6 +18,7 @@ use aptos_sdk::{
 use aptos_types::{
     network_address::{NetworkAddress, Protocol},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig},
+    decryption::{Id, Round},
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;

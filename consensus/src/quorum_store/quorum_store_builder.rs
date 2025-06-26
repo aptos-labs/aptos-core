@@ -24,6 +24,7 @@ use crate::{
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
         types::{Batch, BatchResponse},
+        utils::MempoolProxy,
     },
     round_manager::VerifiedEvent,
 };
@@ -278,6 +279,11 @@ impl InnerBuilder {
             self.config.batch_generation_poll_interval_ms as u64,
         ));
 
+        let mempool_proxy = Arc::new(MempoolProxy::new(
+            self.quorum_store_to_mempool_sender.clone(),
+            self.mempool_txn_pull_timeout_ms,
+        ));
+
         let coordinator_rx = self.coordinator_rx.take().unwrap();
         let quorum_store_coordinator = QuorumStoreCoordinator::new(
             self.author,
@@ -300,8 +306,7 @@ impl InnerBuilder {
             self.config.clone(),
             self.quorum_store_storage.clone(),
             self.batch_store.clone().unwrap(),
-            self.quorum_store_to_mempool_sender,
-            self.mempool_txn_pull_timeout_ms,
+            mempool_proxy.clone(),
         );
         spawn_named!(
             "batch_generator",

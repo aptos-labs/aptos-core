@@ -1254,6 +1254,9 @@ impl TransactionsApi {
                                 ));
                             }
                         },
+                        TransactionExecutable::Encrypted(_) => {
+                            unimplemented!()
+                        },
                     },
                 }
                 // TODO: Verify script args?

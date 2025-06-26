@@ -18,9 +18,7 @@ use aptos_consensus_types::{
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
-use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
-use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -64,7 +62,7 @@ pub struct BatchGenerator {
     db: Arc<dyn QuorumStoreStorage>,
     batch_writer: Arc<dyn BatchWriter>,
     config: QuorumStoreConfig,
-    mempool_proxy: MempoolProxy,
+    mempool_proxy: Arc<MempoolProxy>,
     batches_in_progress: HashMap<(PeerId, BatchId), BatchInProgress>,
     txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInProgress>,
     batch_expirations: TimeExpirations<(PeerId, BatchId)>,
@@ -81,8 +79,7 @@ impl BatchGenerator {
         config: QuorumStoreConfig,
         db: Arc<dyn QuorumStoreStorage>,
         batch_writer: Arc<dyn BatchWriter>,
-        mempool_tx: Sender<QuorumStoreRequest>,
-        mempool_txn_pull_timeout_ms: u64,
+        mempool_proxy: Arc<MempoolProxy>,
     ) -> Self {
         let batch_id = if let Some(mut id) = db
             .clean_and_get_batch_id(epoch)
@@ -107,7 +104,7 @@ impl BatchGenerator {
             db,
             batch_writer,
             config,
-            mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
+            mempool_proxy,
             batches_in_progress: HashMap::new(),
             txns_in_progress_sorted: BTreeMap::new(),
             batch_expirations: TimeExpirations::new(),
@@ -338,6 +335,7 @@ impl BatchGenerator {
                 max_count,
                 self.config.sender_max_total_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
+                false,
             )
             .await
             .unwrap_or_default();

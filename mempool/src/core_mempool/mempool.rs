@@ -422,13 +422,37 @@ impl Mempool {
     ///                          exclude_transactions. Should only be true for Quorum Store.
     /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
     ///  mempool should filter out such transactions.
-    #[allow(clippy::explicit_counter_loop)]
+    ///
+    /// `target_round_for_encrypted_txns` - if set, only pull encrypted transactions for the given target round. if not set, only pull non-encrypted transactions.
+    #[allow(dead_code)]
     pub(crate) fn get_batch(
         &self,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
         exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> Vec<SignedTransaction> {
+        self.get_batch_impl(max_txns, max_bytes, return_non_full, exclude_transactions, false)
+    }
+
+    pub(crate) fn get_batch_with_encrypted_txns_only(
+        &self,
+        max_txns: u64,
+        max_bytes: u64,
+        return_non_full: bool,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> Vec<SignedTransaction> {
+        self.get_batch_impl(max_txns, max_bytes, return_non_full, exclude_transactions, true)
+    }
+
+    #[allow(clippy::explicit_counter_loop)]
+    pub(crate) fn get_batch_impl(
+        &self,
+        max_txns: u64,
+        max_bytes: u64,
+        return_non_full: bool,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
+        pull_encrypted_txns_only: bool,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
@@ -455,6 +479,11 @@ impl Mempool {
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
+
+            if pull_encrypted_txns_only != txn.is_encrypted {
+                continue;
+            }
+
             let txn_replay_protector = txn.replay_protector;
             match txn_replay_protector {
                 ReplayProtector::SequenceNumber(txn_seq) => {
@@ -581,6 +610,9 @@ impl Mempool {
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
             self.log_consensus_pulled_latency(transaction.sender(), transaction.replay_protector());
+        }
+        if pull_encrypted_txns_only {
+            assert!(block.iter().all(|txn| txn.is_encrypted()));
         }
         block
     }

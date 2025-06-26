@@ -7,7 +7,7 @@ use crate::{
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
         AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig, RandShare,
-        RequestShare, TAugmentedData, TShare,
+        RequestShare, TAugmentedData, TShare, RequestDecShare,
     },
 };
 use anyhow::{bail, ensure};
@@ -15,7 +15,7 @@ use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
-use aptos_types::epoch_state::EpochState;
+use aptos_types::{decryption::{DecConfig, DecShare, FastDecShare}, epoch_state::EpochState};
 use bytes::Bytes;
 use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
@@ -123,6 +123,104 @@ impl core::fmt::Debug for RandGenMessage {
 
 pub struct RpcRequest<S, D> {
     pub req: RandMessage<S, D>,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Clone, Serialize, Deserialize, EnumConversion)]
+pub enum DecMessage {
+    // decryption messages
+    RequestDecShare(RequestDecShare),
+    DecShare(DecShare),
+    FastDecShare(FastDecShare),
+}
+
+impl DecMessage {
+    pub fn verify(
+        &self,
+        epoch_state: &EpochState,
+        dec_config: &DecConfig,
+        fast_dec_config: &Option<DecConfig>,
+    ) -> anyhow::Result<()> {
+        ensure!(self.epoch() == epoch_state.epoch);
+        match self {
+            DecMessage::RequestDecShare(_) => Ok(()),
+            DecMessage::DecShare(dec_share) => {
+                dec_share.verify(dec_config)
+            },
+            DecMessage::FastDecShare(fast_dec_share) => {
+                if let Some(fast_dec_config) = fast_dec_config {
+                    fast_dec_share
+                        .share
+                        .verify(fast_dec_config)
+                } else {
+                    bail!("[DecMessage] fast_dec_config not found")
+                }
+            },
+            _ => bail!("[DecMessage] unexpected message type"),
+        }
+    }
+}
+
+impl RBMessage for DecMessage {}
+
+impl TConsensusMsg for DecMessage {
+    fn epoch(&self) -> u64 {
+        match self {
+            DecMessage::RequestDecShare(request) => request.epoch(),
+            DecMessage::DecShare(dec_share) => dec_share.metadata.epoch,
+            DecMessage::FastDecShare(fast_dec_share) => fast_dec_share.share.metadata.epoch,
+        }
+    }
+
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DecMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
+        }
+    }
+
+    #[allow(clippy::unwrap_used)]
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DecMessage(DecTxnMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DecTxnMessage {
+    epoch: u64,
+    #[serde(with = "serde_bytes")]
+    data: Vec<u8>,
+}
+
+impl DecTxnMessage {
+    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
+        Self { epoch, data }
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
+impl core::fmt::Debug for DecTxnMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DecTxnMessage")
+            .field("epoch", &self.epoch)
+            .field("data", &hex::encode(&self.data[..min(20, self.data.len())]))
+            .finish()
+    }
+}
+
+pub struct RpcRequestDecShare {
+    pub req: DecMessage,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }

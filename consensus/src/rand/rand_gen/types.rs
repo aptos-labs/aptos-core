@@ -13,6 +13,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::debug;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
+    decryption::DecMetadata,
     randomness::{
         Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, WVUF,
     },
@@ -390,6 +391,28 @@ impl RequestShare {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RequestDecShare {
+    metadata: DecMetadata,
+}
+
+impl RequestDecShare {
+    pub fn new(metadata: DecMetadata) -> Self {
+        Self { metadata }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.metadata.epoch
+    }
+
+    pub fn dec_metadata(&self) -> &DecMetadata {
+        &self.metadata
+    }
+}
+
+
+
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct FastShare<S> {
     pub share: RandShare<S>,
@@ -625,6 +648,10 @@ impl RandConfig {
 
     pub fn author(&self) -> Author {
         self.author
+    }
+
+    pub fn wconfig(&self) -> &WeightedConfig {
+        &self.wconfig
     }
 
     pub fn get_id(&self, peer: &Author) -> usize {

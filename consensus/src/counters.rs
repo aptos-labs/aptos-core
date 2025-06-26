@@ -1289,6 +1289,7 @@ pub fn update_counters_for_block(block: &Block) {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
     quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+    NUM_ENCRYPTED_TXNS_PER_BLOCK.observe(block.encrypted_payload_size() as f64);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
@@ -1360,6 +1361,14 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static DEC_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_dec_queue_size",
+        "Number of decryption-pending blocks."
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
@@ -1403,4 +1412,17 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "aptos_optqs_last_consecutive_successes",
         "The number of last consecutive successes capped at window length",
     )
+});
+
+
+/// For encrypted txns
+
+/// Histogram for the number of encrypted txns per (committed) blocks.
+pub static NUM_ENCRYPTED_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_num_encrypted_txns_per_block",
+        "Histogram for the number of encrypted txns per (committed) blocks.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
 });

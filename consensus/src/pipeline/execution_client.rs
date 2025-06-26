@@ -6,7 +6,7 @@ use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters,
     error::StateSyncError,
-    network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
+    network::{IncomingCommitRequest, IncomingDecRequest, IncomingRandGenRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_manager::TPayloadManager,
     pipeline::{
@@ -18,6 +18,7 @@ use crate::{
     },
     rand::rand_gen::{
         rand_manager::RandManager,
+        dec_manager::DecManager,
         storage::interface::RandStorage,
         types::{AugmentedData, RandConfig, Share},
     },
@@ -41,6 +42,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_types::{
+    decryption::DecConfig,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
@@ -72,6 +74,9 @@ pub trait TExecutionClient: Send + Sync {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -109,7 +114,7 @@ pub trait TExecutionClient: Send + Sync {
     async fn end_epoch(&self);
 
     /// Returns a pipeline builder for the current epoch.
-    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>, network: Option<Arc<NetworkSender>>) -> PipelineBuilder;
 }
 
 struct BufferManagerHandle {
@@ -118,6 +123,7 @@ struct BufferManagerHandle {
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
+    pub reset_tx_to_dec_manager: Option<UnboundedSender<ResetRequest>>,
 }
 
 impl BufferManagerHandle {
@@ -127,6 +133,7 @@ impl BufferManagerHandle {
             commit_tx: None,
             reset_tx_to_buffer_manager: None,
             reset_tx_to_rand_manager: None,
+            reset_tx_to_dec_manager: None,
         }
     }
 
@@ -136,11 +143,13 @@ impl BufferManagerHandle {
         commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
+        reset_tx_to_dec_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
         self.execute_tx = Some(execute_tx);
         self.commit_tx = Some(commit_tx);
         self.reset_tx_to_buffer_manager = Some(reset_tx_to_buffer_manager);
         self.reset_tx_to_rand_manager = reset_tx_to_rand_manager;
+        self.reset_tx_to_dec_manager = reset_tx_to_dec_manager;
     }
 
     pub fn reset(
@@ -148,12 +157,14 @@ impl BufferManagerHandle {
     ) -> (
         Option<UnboundedSender<ResetRequest>>,
         Option<UnboundedSender<ResetRequest>>,
+        Option<UnboundedSender<ResetRequest>>,
     ) {
         let reset_tx_to_rand_manager = self.reset_tx_to_rand_manager.take();
         let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
+        let reset_tx_to_dec_manager = self.reset_tx_to_dec_manager.take();
         self.execute_tx = None;
         self.commit_tx = None;
-        (reset_tx_to_rand_manager, reset_tx_to_buffer_manager)
+        (reset_tx_to_rand_manager, reset_tx_to_buffer_manager, reset_tx_to_dec_manager)
     }
 }
 
@@ -211,6 +222,9 @@ impl ExecutionProxyClient {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         new_pipeline_enabled: bool,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -228,43 +242,141 @@ impl ExecutionProxyClient {
                 Some(&counters::BUFFER_MANAGER_MSGS),
             );
 
-        let (execution_ready_block_tx, execution_ready_block_rx, maybe_reset_tx_to_rand_manager) =
-            if let Some(rand_config) = rand_config {
-                let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-                let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+        let (execution_ready_block_tx, execution_ready_block_rx, maybe_reset_tx_to_rand_manager, maybe_reset_tx_to_dec_manager) =
+            match (rand_config, dec_config) {
+                (Some(rand_config), Some(dec_config)) => {
+                    let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                    let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+                    let (dec_ready_block_tx, dec_ready_block_rx) = unbounded::<OrderedBlocks>();
 
-                let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-                let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+                    let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
+                    let (reset_tx_to_dec_manager, reset_dec_manager_rx) = unbounded::<ResetRequest>();
 
-                let rand_manager = RandManager::<Share, AugmentedData>::new(
-                    self.author,
-                    epoch_state.clone(),
-                    signer,
-                    rand_config,
-                    fast_rand_config,
-                    rand_ready_block_tx,
-                    Arc::new(network_sender.clone()),
-                    self.rand_storage.clone(),
-                    self.bounded_executor.clone(),
-                    &self.consensus_config.rand_rb_config,
-                );
+                    let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
 
-                tokio::spawn(rand_manager.start(
-                    ordered_block_rx,
-                    rand_msg_rx,
-                    reset_rand_manager_rx,
-                    self.bounded_executor.clone(),
-                    highest_committed_round,
-                ));
+                    let rand_manager = RandManager::<Share, AugmentedData>::new(
+                        self.author,
+                        epoch_state.clone(),
+                        signer.clone(),
+                        rand_config,
+                        fast_rand_config,
+                        rand_ready_block_tx,
+                        Arc::new(network_sender.clone()),
+                        self.rand_storage.clone(),
+                        self.bounded_executor.clone(),
+                        &self.consensus_config.rand_rb_config,
+                    );
 
-                (
-                    ordered_block_tx,
-                    rand_ready_block_rx,
-                    Some(reset_tx_to_rand_manager),
-                )
-            } else {
-                let (ordered_block_tx, ordered_block_rx) = unbounded();
-                (ordered_block_tx, ordered_block_rx, None)
+                    tokio::spawn(rand_manager.start(
+                        ordered_block_rx,
+                        rand_msg_rx,
+                        reset_rand_manager_rx,
+                        self.bounded_executor.clone(),
+                        highest_committed_round,
+                    ));
+
+                    let dec_manager = DecManager::new(
+                        self.author,
+                        epoch_state.clone(),
+                        signer,
+                        dec_config,
+                        fast_dec_config,
+                        dec_ready_block_tx,
+                        Arc::new(network_sender.clone()),
+                        self.bounded_executor.clone(),
+                        &self.consensus_config.rand_rb_config,
+                    );
+
+                    tokio::spawn(dec_manager.start(
+                        rand_ready_block_rx,
+                        dec_msg_rx,
+                        reset_dec_manager_rx,
+                        self.bounded_executor.clone(),
+                        highest_committed_round,
+                    ));
+
+                    (
+                        ordered_block_tx,
+                        dec_ready_block_rx,
+                        Some(reset_tx_to_rand_manager),
+                        Some(reset_tx_to_dec_manager),
+                    )
+                },
+                (Some(rand_config), None) => {
+                    let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                    let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+
+                    let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
+
+                    let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+
+                    let rand_manager = RandManager::<Share, AugmentedData>::new(
+                        self.author,
+                        epoch_state.clone(),
+                        signer,
+                        rand_config,
+                        fast_rand_config,
+                        rand_ready_block_tx,
+                        Arc::new(network_sender.clone()),
+                        self.rand_storage.clone(),
+                        self.bounded_executor.clone(),
+                        &self.consensus_config.rand_rb_config,
+                    );
+
+                    tokio::spawn(rand_manager.start(
+                        ordered_block_rx,
+                        rand_msg_rx,
+                        reset_rand_manager_rx,
+                        self.bounded_executor.clone(),
+                        highest_committed_round,
+                    ));
+
+                    (
+                        ordered_block_tx,
+                        rand_ready_block_rx,
+                        Some(reset_tx_to_rand_manager),
+                        None,
+                    )
+                },
+                (None, Some(dec_config)) => {
+                    let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                    let (dec_ready_block_tx, dec_ready_block_rx) = unbounded::<OrderedBlocks>();
+
+                    let (reset_tx_to_dec_manager, reset_dec_manager_rx) = unbounded::<ResetRequest>();
+
+                    let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+
+                    let dec_manager = DecManager::new(
+                        self.author,
+                        epoch_state.clone(),
+                        signer,
+                        dec_config,
+                        fast_dec_config,
+                        dec_ready_block_tx,
+                        Arc::new(network_sender.clone()),
+                        self.bounded_executor.clone(),
+                        &self.consensus_config.rand_rb_config,
+                    );
+
+                    tokio::spawn(dec_manager.start(
+                        ordered_block_rx,
+                        dec_msg_rx,
+                        reset_dec_manager_rx,
+                        self.bounded_executor.clone(),
+                        highest_committed_round,
+                    ));
+
+                    (
+                        ordered_block_tx,
+                        dec_ready_block_rx,
+                        None,
+                        Some(reset_tx_to_dec_manager),
+                    )
+                },
+                (None, None) => {
+                    let (ordered_block_tx, ordered_block_rx) = unbounded();
+                    (ordered_block_tx, ordered_block_rx, None, None)
+                },
             };
 
         self.handle.write().init(
@@ -272,6 +384,7 @@ impl ExecutionProxyClient {
             commit_msg_tx,
             reset_buffer_manager_tx,
             maybe_reset_tx_to_rand_manager,
+            maybe_reset_tx_to_dec_manager,
         );
 
         let (
@@ -325,6 +438,9 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
+        dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        dec_config: Option<DecConfig>,
+        fast_dec_config: Option<DecConfig>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
@@ -339,6 +455,9 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
             new_pipeline_enabled,
+            dec_msg_rx,
+            dec_config,
+            fast_dec_config,
         );
 
         let transaction_shuffler =
@@ -456,10 +575,11 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()> {
-        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+        let (reset_tx_to_rand_manager, reset_tx_to_dec_manager, reset_tx_to_buffer_manager) = {
             let handle = self.handle.read();
             (
                 handle.reset_tx_to_rand_manager.clone(),
+                handle.reset_tx_to_dec_manager.clone(),
                 handle.reset_tx_to_buffer_manager.clone(),
             )
         };
@@ -474,6 +594,18 @@ impl TExecutionClient for ExecutionProxyClient {
                 .await
                 .map_err(|_| Error::RandResetDropped)?;
             ack_rx.await.map_err(|_| Error::RandResetDropped)?;
+        }
+
+        if let Some(mut reset_tx) = reset_tx_to_dec_manager {
+            let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
+            reset_tx
+                .send(ResetRequest {
+                    tx: ack_tx,
+                    signal: ResetSignal::TargetRound(target.commit_info().round()),
+                })
+                .await
+                .map_err(|_| Error::DecResetDropped)?;
+            ack_rx.await.map_err(|_| Error::DecResetDropped)?;
         }
 
         if let Some(mut reset_tx) = reset_tx_to_buffer_manager {
@@ -493,7 +625,7 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn end_epoch(&self) {
-        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager, reset_tx_to_dec_manager) = {
             let mut handle = self.handle.write();
             handle.reset()
         };
@@ -511,6 +643,19 @@ impl TExecutionClient for ExecutionProxyClient {
                 .expect("[EpochManager] Fail to drop rand manager");
         }
 
+        if let Some(mut tx) = reset_tx_to_dec_manager {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            tx.send(ResetRequest {
+                tx: ack_tx,
+                signal: ResetSignal::Stop,
+            })
+            .await
+            .expect("[EpochManager] Fail to drop dec manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop dec manager");
+        }
+
         if let Some(mut tx) = reset_tx_to_buffer_manager {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
@@ -526,8 +671,8 @@ impl TExecutionClient for ExecutionProxyClient {
         self.execution_proxy.end_epoch();
     }
 
-    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder {
-        self.execution_proxy.pipeline_builder(signer)
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>, network: Option<Arc<NetworkSender>>) -> PipelineBuilder {
+        self.execution_proxy.pipeline_builder(signer, network)
     }
 }
 
@@ -549,6 +694,9 @@ impl TExecutionClient for DummyExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
+        _dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
+        _dec_config: Option<DecConfig>,
+        _fast_dec_config: Option<DecConfig>,
     ) {
     }
 
@@ -588,7 +736,7 @@ impl TExecutionClient for DummyExecutionClient {
 
     async fn end_epoch(&self) {}
 
-    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>, _network: Option<Arc<NetworkSender>>) -> PipelineBuilder {
         todo!()
     }
 }

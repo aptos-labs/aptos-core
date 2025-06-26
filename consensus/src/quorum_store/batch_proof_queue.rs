@@ -25,6 +25,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+
 /// QueueItem represents an item in the ProofBatchQueue.
 /// It stores the transaction summaries and proof associated with the
 /// batch.

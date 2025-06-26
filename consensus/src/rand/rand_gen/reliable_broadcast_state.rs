@@ -4,11 +4,12 @@
 use crate::{
     logging::{LogEvent, LogSchema},
     rand::rand_gen::{
-        network_messages::RandMessage,
+        network_messages::{DecMessage, RandMessage},
         rand_store::RandStore,
+        dec_store::DecStore,
         types::{
             AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, PathType, RandConfig,
-            RandShare, RequestShare, TAugmentedData, TShare,
+            RandShare, RequestDecShare, RequestShare, TAugmentedData, TShare,
         },
     },
 };
@@ -18,7 +19,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
+    aggregate_signature::PartialSignatures, decryption::{DecMetadata, DecConfig, DecShare}, epoch_state::EpochState, randomness::RandMetadata,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -142,6 +143,55 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
             .round(share.metadata().round)
             .remote_peer(*share.author()));
         let mut store = self.rand_store.lock();
+        let aggregated = if store.add_share(share, PathType::Slow)? {
+            Some(())
+        } else {
+            None
+        };
+        Ok(aggregated)
+    }
+}
+
+pub struct DecShareAggregateState {
+    dec_metadata: DecMetadata,
+    dec_store: Arc<Mutex<DecStore>>,
+    dec_config: DecConfig,
+}
+
+impl DecShareAggregateState {
+    pub fn new(
+        dec_store: Arc<Mutex<DecStore>>,
+        dec_metadata: DecMetadata,
+        dec_config: DecConfig,
+    ) -> Self {
+        Self {
+            dec_store,
+            dec_metadata,
+            dec_config,
+        }
+    }
+}
+
+impl BroadcastStatus<DecMessage, DecMessage> for Arc<DecShareAggregateState>
+{
+    type Aggregated = ();
+    type Message = RequestDecShare;
+    type Response = DecShare;
+
+    fn add(&self, peer: Author, share: Self::Response) -> anyhow::Result<Option<()>> {
+        ensure!(share.author() == &peer, "Author does not match");
+        ensure!(
+            share.metadata() == &self.dec_metadata,
+            "Metadata does not match: local {:?}, received {:?}",
+            self.dec_metadata,
+            share.metadata()
+        );
+        share.verify(&self.dec_config)?;
+        info!(LogSchema::new(LogEvent::ReceiveReactiveDecShare)
+            .epoch(share.epoch())
+            .round(share.metadata().round)
+            .remote_peer(*share.author()));
+        let mut store = self.dec_store.lock();
         let aggregated = if store.add_share(share, PathType::Slow)? {
             Some(())
         } else {
