@@ -114,6 +114,8 @@ impl Function {
         let is_entry = def.is_entry;
 
         let (native, is_native) = if def.is_native() {
+            // If a native function is missing an implementation it will succeed to load,
+            // but fail to execute.
             let native = natives.resolve(
                 module_id.address(),
                 module_id.name().as_str(),
@@ -258,7 +260,7 @@ impl Function {
 
     pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
         self.native.as_deref().ok_or_else(|| {
-            PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
+            PartialVMError::new(StatusCode::MISSING_NATIVE_FUNCTION)
                 .with_message(format!("Missing Native Function `{}`", self.name))
         })
     }

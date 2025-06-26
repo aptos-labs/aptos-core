@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, MoveHarness};
+use crate::{assert_success, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::vm_status::StatusCode;
@@ -37,11 +37,16 @@ module 0xcafe::test {
     ));
 
     // Should not be able to call something entry
-    let status = h.run_entry_function(
+    let result = h.try_run_entry_function(
         &acc,
         str::parse("0xcafe::test::something").unwrap(),
         vec![],
         vec![],
     );
-    assert_vm_status!(status, StatusCode::MISSING_DEPENDENCY)
+
+    assert!(result.is_err());
+    let status = result.unwrap_err();
+
+    assert_eq!(status.status_code(), StatusCode::MISSING_NATIVE_FUNCTION);
+    assert!(status.message().unwrap().contains("`undefined`"));
 }

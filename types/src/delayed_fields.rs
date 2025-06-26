@@ -18,12 +18,14 @@ use std::fmt::Display;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PanicError {
     CodeInvariantError(String),
+    MissingNativeFunction(String),
 }
 
 impl Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PanicError::CodeInvariantError(e) => write!(f, "{}", e),
+            PanicError::MissingNativeFunction(e) => write!(f, "{}", e),
         }
     }
 }
@@ -34,6 +36,9 @@ impl From<PanicError> for PartialVMError {
             PanicError::CodeInvariantError(msg) => {
                 PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
+            },
+            PanicError::MissingNativeFunction(msg) => {
+                PartialVMError::new(StatusCode::MISSING_NATIVE_FUNCTION).with_message(msg)
             },
         }
     }

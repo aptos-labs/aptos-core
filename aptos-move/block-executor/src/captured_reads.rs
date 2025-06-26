@@ -531,6 +531,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_delayed_field_read_error<E: std::fmt::Debug>(&mut self, e: &PanicOr<E>) {
         match e {
             PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
+            PanicOr::MissingNativeFunction(_) => self.incorrect_use = true,
             PanicOr::Or(_) => self.speculative_failure = true,
         };
     }

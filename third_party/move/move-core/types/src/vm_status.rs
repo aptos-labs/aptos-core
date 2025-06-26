@@ -793,6 +793,9 @@ pub enum StatusCode {
     RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2039,
     RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2040,
 
+    // Supra specific invariant violation errors
+    MISSING_NATIVE_FUNCTION = 2100,
+
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
     UNKNOWN_BINARY_ERROR = 3000,

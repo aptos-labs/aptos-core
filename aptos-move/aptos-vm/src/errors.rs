@@ -138,9 +138,7 @@ pub fn convert_prologue_error(
                 (INVALID_STATE, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT) => {
                     StatusCode::INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT
                 },
-                (INVALID_STATE, ENO_ACTIVE_AUTOMATION_TASK) => {
-                    StatusCode::NO_ACTIVE_AUTOMATED_TASK
-                },
+                (INVALID_STATE, ENO_ACTIVE_AUTOMATION_TASK) => StatusCode::NO_ACTIVE_AUTOMATED_TASK,
                 (category, reason) => {
                     let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                     location, code, category, reason);
@@ -230,7 +228,8 @@ pub fn expect_only_successful_execution(
         e @ VMStatus::Error {
             status_code:
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
-                | StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                | StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                | StatusCode::MISSING_NATIVE_FUNCTION,
             ..
         } => e,
         status => {

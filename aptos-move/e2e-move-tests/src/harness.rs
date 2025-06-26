@@ -31,6 +31,7 @@ use aptos_types::{
         TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
         ViewFunctionOutput,
     },
+    vm_status::VMStatus,
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -200,6 +201,17 @@ impl MoveHarness {
         }
         output.fill_error_status();
         output
+    }
+
+    /// Runs a signed transaction. On success, applies the write set.
+    pub fn try_run_raw(&mut self, txn: SignedTransaction) -> Result<TransactionOutput, VMStatus> {
+        let mut output = self.executor.try_execute_transaction(txn)?;
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+            self.executor.append_events(output.events().to_vec());
+        }
+        output.fill_error_status();
+        Ok(output)
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -396,6 +408,19 @@ impl MoveHarness {
     ) -> TransactionStatus {
         let txn = self.create_entry_function(account, fun, ty_args, args);
         self.run(txn)
+    }
+
+    /// Run the specified entry point `fun`. Arguments need to be provided in bcs-serialized form.
+    pub fn try_run_entry_function(
+        &mut self,
+        account: &Account,
+        fun: MemberId,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Result<TransactionStatus, VMStatus> {
+        let txn = self.create_entry_function(account, fun, ty_args, args);
+        self.try_run_raw(txn)
+            .map(|output| output.status().to_owned())
     }
 
     /// Run the multisig transaction.

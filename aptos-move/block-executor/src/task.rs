@@ -39,6 +39,9 @@ pub enum ExecutionStatus<O, E> {
     /// Code invariant error was detected during transaction execution, which
     /// can only be caused by the bug in the code.
     DelayedFieldsCodeInvariantError(String),
+    /// Transaction can't be executed because it requires a native function that is present
+    /// framework, but not in the current VM implementation.
+    MissingNativeFunction(String),
 }
 
 /// Inference result of a transaction.

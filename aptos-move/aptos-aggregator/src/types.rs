@@ -27,6 +27,7 @@ use move_vm_types::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PanicOr<T: std::fmt::Debug> {
     CodeInvariantError(String),
+    MissingNativeFunction(String),
     Or(T),
 }
 
@@ -34,6 +35,7 @@ impl<T: std::fmt::Debug> PanicOr<T> {
     pub fn map_non_panic<E: std::fmt::Debug>(self, f: impl FnOnce(T) -> E) -> PanicOr<E> {
         match self {
             PanicOr::CodeInvariantError(msg) => PanicOr::CodeInvariantError(msg),
+            PanicOr::MissingNativeFunction(msg) => PanicOr::MissingNativeFunction(msg),
             PanicOr::Or(value) => PanicOr::Or(f(value)),
         }
     }
@@ -56,6 +58,7 @@ impl<T: std::fmt::Debug> From<PanicError> for PanicOr<T> {
     fn from(err: PanicError) -> Self {
         match err {
             PanicError::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+            PanicError::MissingNativeFunction(e) => PanicOr::MissingNativeFunction(e),
         }
     }
 }
@@ -80,6 +83,7 @@ impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
             PanicOr::CodeInvariantError(_) => {
                 StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
             },
+            PanicOr::MissingNativeFunction(_) => StatusCode::MISSING_NATIVE_FUNCTION,
             PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
         }
     }
@@ -91,6 +95,9 @@ impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
             PanicOr::CodeInvariantError(msg) => {
                 PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
+            },
+            PanicOr::MissingNativeFunction(msg) => {
+                PartialVMError::new(StatusCode::MISSING_NATIVE_FUNCTION).with_message(msg)
             },
             PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
                 .with_message(format!("{:?}", err)),

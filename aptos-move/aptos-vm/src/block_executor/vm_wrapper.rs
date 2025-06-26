@@ -76,6 +76,10 @@ impl ExecutorTask for AptosExecutorTask {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
+                } else if vm_status.status_code() == StatusCode::MISSING_NATIVE_FUNCTION {
+                    ExecutionStatus::MissingNativeFunction(
+                        vm_status.message().cloned().unwrap_or_default(),
+                    )
                 } else if AptosVM::should_restart_execution(vm_output.change_set()) {
                     speculative_info!(
                         &log_context,
@@ -101,6 +105,10 @@ impl ExecutorTask for AptosExecutorTask {
                     == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
                 {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
+                        err.message().cloned().unwrap_or_default(),
+                    )
+                } else if err.status_code() == StatusCode::MISSING_NATIVE_FUNCTION {
+                    ExecutionStatus::MissingNativeFunction(
                         err.message().cloned().unwrap_or_default(),
                     )
                 } else {
