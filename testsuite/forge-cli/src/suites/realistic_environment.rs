@@ -382,10 +382,10 @@ pub(crate) fn realistic_env_max_load_test(
             // Increase the consensus observer fallback thresholds
             config
                 .consensus_observer
-                .observer_fallback_progress_threshold_ms = 20_000; // 20 seconds
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
             config
                 .consensus_observer
-                .observer_fallback_sync_lag_threshold_ms = 30_000; // 30 seconds
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
