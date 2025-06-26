@@ -1,0 +1,34 @@
+
+Diagnostics:
+warning: Function `0xc0ffee::m::never_call_warn` is unused: it has no current callers and is private to its module.
+  ┌─ tests/checking/unused/unused_entry.move:6:9
+  │
+6 │     fun never_call_warn() {
+  │         ^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    private fun never_call_warn() {
+        Tuple()
+    }
+    private entry fun never_called_ok() {
+        Tuple()
+    }
+} // end 0xc0ffee::m
+module <SELF>_0 {
+    private fun never_called_ok() {
+        Tuple()
+    }
+} // end <SELF>_0
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    fun never_call_warn() {
+    }
+    entry fun never_called_ok() {
+    }
+}
+script {
+    fun never_called_ok() {
+    }
+}

@@ -583,9 +583,9 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                     let callee_loc = callee_func.get_id_loc();
                     let callee_is_script = callee_func.module_env.get_name().is_script();
 
-                    // Entry functions in a script don't need any uses.
+                    // Entry functions (and function in script) don't need any uses.
                     // Check others which are private.
-                    if !callee_is_script {
+                    if !callee_is_script && !callee_func.is_entry() {
                         let is_private = matches!(callee_func.visibility(), Visibility::Private);
                         if functions_with_inaccessible_callers.contains(&callee) {
                             let msg = format!(
