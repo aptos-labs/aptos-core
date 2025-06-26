@@ -6,8 +6,8 @@ use crate::{
     transaction::{
         BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
         DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
-        MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
-        WriteModule, WriteResource, WriteTableItem,
+        MultisigTransactionPayload, ScheduledTransactionInfo, StateCheckpointTransaction,
+        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
@@ -182,8 +182,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
-            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction,
+            ScheduledTransaction, StateCheckpoint, UserTransaction,
         };
         let aux_data = self
             .db
@@ -244,8 +244,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {
                 Transaction::ValidatorTransaction((txn, info, events, timestamp).into())
             },
-            aptos_types::transaction::Transaction::ScheduledTransaction(_) => {
-                unimplemented!()
+            ScheduledTransaction(txn) => {
+                Transaction::ScheduledTransactionInfo(ScheduledTransactionInfo {
+                    info,
+                    sender: txn.sender_handle.into(),
+                    max_gas_amount: txn.max_gas_amount.into(),
+                    max_gas_unit_price: txn.max_gas_unit_price.into(),
+                    gas_unit_price_charged: txn.gas_unit_price_charged.into(),
+                    schedule_time: txn.key.time.into(),
+                    txn_id: txn.key.txn_id.into(),
+                    timestamp: timestamp.into(),
+                })
             },
         })
     }

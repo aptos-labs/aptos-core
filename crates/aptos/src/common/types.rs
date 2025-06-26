@@ -1598,6 +1598,18 @@ impl From<&Transaction> for TransactionSummary {
                 version: Some(txn.transaction_info().version.0),
                 vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
+            Transaction::ScheduledTransactionInfo(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                gas_used: Some(txn.info.gas_used.0),
+                gas_unit_price: Some(txn.gas_unit_price_charged.0),
+                pending: None,
+                sender: Some(*txn.sender.inner()),
+                sequence_number: None,
+                success: Some(txn.info.success),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+                timestamp_us: Some(txn.timestamp.0),
+            },
         }
     }
 }
