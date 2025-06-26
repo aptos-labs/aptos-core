@@ -362,6 +362,23 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns an iterator that yields the requested number of persisted auxiliary
+    /// info's starting from the specified version. Note: the caller should ensure
+    /// that the iterator does not query data beyond the latest version.
+    fn get_persisted_auxiliary_info_iterator(
+        &self,
+        start_version: Version,
+        num_persisted_auxiliary_info: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
+        gauged_api("get_persisted_auxiliary_info_iterator", || {
+            let iter = self
+                .ledger_db
+                .persisted_auxiliary_info_db()
+                .get_persisted_auxiliary_info_iter(start_version, num_persisted_auxiliary_info)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>)
+        })
+    }
+
     /// TODO(bowu): Deprecate after internal index migration
     fn get_events(
         &self,
