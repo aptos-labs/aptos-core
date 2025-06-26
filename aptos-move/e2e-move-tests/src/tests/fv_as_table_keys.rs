@@ -3,12 +3,11 @@
 
 //! Tests for using function values as keys in tables.
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
-use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn fv_in_table() {
@@ -231,48 +230,36 @@ fn fv_in_table_with_refs() {
         "#,
     );
     assert_success!(result);
-    assert_vm_status!(
-        h.run_entry_function(
-            &acc,
-            str::parse("0x99::m1::test_store").unwrap(),
-            vec![],
-            vec![],
-        ),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
-    assert_vm_status!(
-        h.run_entry_function(
-            &acc,
-            str::parse("0x99::m1::contain").unwrap(),
-            vec![],
-            vec![],
-        ),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x99::m1::test_store").unwrap(),
+        vec![],
+        vec![],
+    ));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x99::m1::contain").unwrap(),
+        vec![],
+        vec![],
+    ));
     assert_success!(h.run_entry_function(
         &acc,
         str::parse("0x99::m1::ref_in_vec").unwrap(),
         vec![],
         vec![],
     ));
-    assert_vm_status!(
-        h.run_entry_function(
-            &acc,
-            str::parse("0x99::m1::contain_via_vec").unwrap(),
-            vec![],
-            vec![],
-        ),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
-    assert_vm_status!(
-        h.run_entry_function(
-            &acc,
-            str::parse("0x99::m1::test_fetch").unwrap(),
-            vec![],
-            vec![],
-        ),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x99::m1::contain_via_vec").unwrap(),
+        vec![],
+        vec![],
+    ));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x99::m1::test_fetch").unwrap(),
+        vec![],
+        vec![],
+    ));
 }
 
 #[test]
