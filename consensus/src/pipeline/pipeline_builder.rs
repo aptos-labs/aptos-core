@@ -5,7 +5,6 @@ use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
-    execution_pipeline::SIG_VERIFY_POOL,
     monitor,
     payload_manager::TPayloadManager,
     txn_notifier::TxnNotifier,
@@ -37,12 +36,14 @@ use aptos_types::{
     randomness::Randomness,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        SignedTransaction, Transaction,
+        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
+        Transaction,
     },
     validator_signer::ValidatorSigner,
 };
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     future::Future,
@@ -50,6 +51,15 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(16)
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .expect("Failed to create signature verification thread pool"),
+    )
+});
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -564,11 +574,30 @@ impl PipelineBuilder {
             user_txns.as_ref().clone(),
         ]
         .concat();
+        let proposer_index = block
+            .author()
+            .and_then(|proposer| validator.iter().position(|&v| v == proposer));
+        let auxiliary_info = txns
+            .iter()
+            .map(|txn| {
+                txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                    AuxiliaryInfo::new_empty(),
+                    |_| {
+                        AuxiliaryInfo::new(
+                            PersistedAuxiliaryInfo::None,
+                            proposer_index.map(|index| EphemeralAuxiliaryInfo {
+                                proposer_index: index as u64,
+                            }),
+                        )
+                    },
+                )
+            })
+            .collect();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor
                 .execute_and_update_state(
-                    (block.id(), txns).into(),
+                    (block.id(), txns, auxiliary_info).into(),
                     block.parent_id(),
                     onchain_execution_config,
                 )

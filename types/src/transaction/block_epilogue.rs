@@ -21,13 +21,34 @@ pub enum BlockEpiloguePayload {
         block_id: HashValue,
         block_end_info: BlockEndInfo,
     },
+    V1 {
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    },
 }
 
 impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
+            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum FeeDistribution {
+    V0 {
+        // Validator index -> Octa
+        amount: BTreeMap<u64, u64>,
+    },
+}
+
+impl FeeDistribution {
+    pub fn new(amount: BTreeMap<u64, u64>) -> Self {
+        Self::V0 { amount }
     }
 }
 

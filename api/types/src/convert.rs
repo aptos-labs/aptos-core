@@ -32,8 +32,8 @@ use aptos_types::{
         StateView,
     },
     transaction::{
-        BlockEndInfo, BlockEpiloguePayload, EntryFunction, ExecutionStatus, Multisig,
-        RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
+        BlockEndInfo, EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script,
+        SignedTransaction, TransactionAuxiliaryData,
     },
     vm::module_metadata::get_metadata,
     vm_status::AbortLocation,
@@ -218,26 +218,27 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 })
             },
             BlockEpilogue(block_epilogue_payload) => {
+                let block_end_info = block_epilogue_payload
+                    .try_as_block_end_info()
+                    .unwrap()
+                    .clone();
+                let block_end_info = match block_end_info {
+                    BlockEndInfo::V0 {
+                        block_gas_limit_reached,
+                        block_output_limit_reached,
+                        block_effective_block_gas_units,
+                        block_approx_output_size,
+                    } => Some(crate::transaction::BlockEndInfo {
+                        block_gas_limit_reached,
+                        block_output_limit_reached,
+                        block_effective_block_gas_units,
+                        block_approx_output_size,
+                    }),
+                };
                 Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
                     info,
                     timestamp: timestamp.into(),
-                    block_end_info: match block_epilogue_payload {
-                        BlockEpiloguePayload::V0 {
-                            block_end_info:
-                                BlockEndInfo::V0 {
-                                    block_gas_limit_reached,
-                                    block_output_limit_reached,
-                                    block_effective_block_gas_units,
-                                    block_approx_output_size,
-                                },
-                            ..
-                        } => Some(crate::transaction::BlockEndInfo {
-                            block_gas_limit_reached,
-                            block_output_limit_reached,
-                            block_effective_block_gas_units,
-                            block_approx_output_size,
-                        }),
-                    },
+                    block_end_info,
                 })
             },
             aptos_types::transaction::Transaction::ValidatorTransaction(txn) => {

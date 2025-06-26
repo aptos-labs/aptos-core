@@ -82,6 +82,12 @@ module aptos_experimental::confidential_asset {
     /// Sender and recipient amounts encrypt different transfer amounts
     const EINVALID_SENDER_AMOUNT: u64 = 17;
 
+    /// The confidential asset controller is not installed.
+    const EFA_CONTROLLER_NOT_INSTALLED: u64 = 18;
+
+    /// [TEST-ONLY] The confidential asset module initialization failed.
+    const EINIT_MODULE_FAILED: u64 = 1000;
+
     //
     // Constants
     //
@@ -91,6 +97,9 @@ module aptos_experimental::confidential_asset {
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
+
+    /// The testnet chain ID.
+    const TESTNET_CHAIN_ID: u8 = 2;
 
     //
     // Structs
@@ -512,6 +521,12 @@ module aptos_experimental::confidential_asset {
     }
 
     #[view]
+    /// Checks if the confidential asset controller is installed.
+    public fun confidential_asset_controller_exists(): bool {
+        exists<FAController>(@aptos_experimental)
+    }
+
+    #[view]
     /// Checks if the token is allowed for confidential transfers.
     public fun is_token_allowed(token: Object<Metadata>): bool acquires FAController, FAConfig {
         if (!is_allow_list_enabled()) {
@@ -532,6 +547,7 @@ module aptos_experimental::confidential_asset {
     /// If the allow list is enabled, only tokens from the allow list can be transferred.
     /// Otherwise, all tokens are allowed.
     public fun is_allow_list_enabled(): bool acquires FAController {
+        assert!(confidential_asset_controller_exists(), error::invalid_state(EFA_CONTROLLER_NOT_INSTALLED));
         borrow_global<FAController>(@aptos_experimental).allow_list_enabled
     }
 
@@ -610,6 +626,14 @@ module aptos_experimental::confidential_asset {
         assert!(primary_fungible_store::primary_store_exists(fa_store_address, token), EINTERNAL_ERROR);
 
         primary_fungible_store::balance(fa_store_address, token)
+    }
+
+    #[view]
+    /// Returns the pending balance transfer count for the specified token.
+    public fun get_pending_balance_transfer_count(user: address, token: Object<Metadata>): u64 acquires ConfidentialAssetStore {
+        assert!(has_confidential_asset_store(user, token), error::not_found(ECA_STORE_NOT_PUBLISHED));
+
+        borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).pending_counter
     }
 
     //
@@ -1080,10 +1104,16 @@ module aptos_experimental::confidential_asset {
         fa
     }
 
+    entry fun init_module_for_genesis(deployer: &signer) {
+        assert!(signer::address_of(deployer) == @aptos_experimental, error::invalid_argument(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != MAINNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        assert!(chain_id::get() != TESTNET_CHAIN_ID, error::invalid_state(EINIT_MODULE_FAILED));
+        init_module(deployer)
+    }
+
     //
     // Test-only functions
     //
-
     #[test_only]
     public fun init_module_for_testing(deployer: &signer) {
         init_module(deployer)

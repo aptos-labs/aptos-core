@@ -20,8 +20,8 @@ use crate::{
         verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
     },
     storage::{
-        dependencies_gas_charging::check_dependencies_and_charge_gas,
-        depth_formula_calculator::DepthFormulaCalculator,
+        dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
+        ty_depth_checker::TypeDepthChecker,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -39,7 +39,6 @@ use move_core_types::{
     language_storage::TypeTag,
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -86,7 +85,7 @@ pub(crate) trait InterpreterDebugInterface {
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
 /// It mimics execution on a single thread, with an call stack and an operand stack.
-pub(crate) struct InterpreterImpl<'ctx> {
+pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     pub(crate) operand_stack: Stack,
     /// The stack of active functions.
@@ -97,6 +96,8 @@ pub(crate) struct InterpreterImpl<'ctx> {
     access_control: AccessControlState,
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
+    /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
+    ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -118,6 +119,7 @@ impl Interpreter {
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        ty_depth_checker: &TypeDepthChecker<impl Loader>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -128,6 +130,7 @@ impl Interpreter {
             args,
             data_cache,
             module_storage,
+            ty_depth_checker,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -136,7 +139,10 @@ impl Interpreter {
     }
 }
 
-impl InterpreterImpl<'_> {
+impl<LoaderImpl> InterpreterImpl<'_, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
@@ -144,6 +150,7 @@ impl InterpreterImpl<'_> {
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -155,6 +162,7 @@ impl InterpreterImpl<'_> {
             vm_config: module_storage.runtime_environment().vm_config(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
+            ty_depth_checker,
         };
 
         let function = Rc::new(function);
@@ -185,7 +193,10 @@ impl InterpreterImpl<'_> {
         }
     }
 
-    fn load_generic_function(
+    /// Loads a generic function with instantiated type arguments. Does not perform any checks if
+    /// the function is callable (i.e., visible to the caller). The visibility check should be done
+    /// at the call-site.
+    fn load_generic_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -198,15 +209,12 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_instantiation_and_ty_args(module_storage, idx, ty_args)
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
-    fn load_function(
+    /// Loads a non-generic function. Does not perform any checks if the function is callable
+    /// (i.e., visible to the caller). The visibility check should be done at the call-site.
+    fn load_function_no_visibility_checks(
         &mut self,
         module_storage: &impl ModuleStorage,
         current_frame: &Frame,
@@ -215,11 +223,6 @@ impl InterpreterImpl<'_> {
         let function = current_frame
             .build_loaded_function_from_handle_and_ty_args(module_storage, fh_idx, vec![])
             .map_err(|e| self.set_location(e))?;
-
-        if self.vm_config.paranoid_type_checks {
-            self.check_friend_or_private_call(&current_frame.function, &function)?;
-        }
-
         Ok(function)
     }
 
@@ -316,6 +319,7 @@ impl InterpreterImpl<'_> {
                     resource_resolver,
                     module_storage,
                     gas_meter,
+                    traversal_context,
                 )
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
 
@@ -372,11 +376,12 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function = Rc::new(self.load_function(
-                                        module_storage,
-                                        &current_frame,
-                                        fh_idx,
-                                    )?);
+                                    let function =
+                                        Rc::new(self.load_function_no_visibility_checks(
+                                            module_storage,
+                                            &current_frame,
+                                            fh_idx,
+                                        )?);
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -392,7 +397,7 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_function(
+                        let function = Rc::new(self.load_function_no_visibility_checks(
                             module_storage,
                             &current_frame,
                             fh_idx,
@@ -401,16 +406,17 @@ impl InterpreterImpl<'_> {
                         (function, frame_cache)
                     };
 
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
-                    let module_id = function.module_id().ok_or_else(|| {
-                        let err = PartialVMError::new_invariant_violation(
-                            "Failed to get native function module id",
-                        );
-                        set_err_info!(current_frame, err)
-                    })?;
                     gas_meter
                         .charge_call(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             self.operand_stack
                                 .last_n(function.param_tys().len())
@@ -467,13 +473,14 @@ impl InterpreterImpl<'_> {
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::<LoadedFunction>::new(self.load_generic_function(
+                                    let function = Rc::<LoadedFunction>::new(
+                                        self.load_generic_function_no_visibility_checks(
                                             module_storage,
                                             &current_frame,
                                             gas_meter,
                                             idx,
-                                        )?);
+                                        )?,
+                                    );
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -489,28 +496,29 @@ impl InterpreterImpl<'_> {
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(self.load_generic_function(
-                            module_storage,
-                            &current_frame,
-                            gas_meter,
-                            idx,
-                        )?);
+                        let function = Rc::<LoadedFunction>::new(
+                            self.load_generic_function_no_visibility_checks(
+                                module_storage,
+                                &current_frame,
+                                gas_meter,
+                                idx,
+                            )?,
+                        );
                         let frame_cache = FrameTypeCache::make_rc();
                         (function, frame_cache)
                     };
 
-                    let module_id = function
-                        .module_id()
-                        .ok_or_else(|| {
-                            PartialVMError::new_invariant_violation(
-                                "Failed to get native function module id",
-                            )
-                        })
-                        .map_err(|e| set_err_info!(current_frame, e))?;
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &function,
+                        CallType::Regular,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
+
                     // Charge gas
                     gas_meter
                         .charge_call_generic(
-                            module_id,
+                            function.owner_as_module()?.self_id(),
                             function.name(),
                             function
                                 .ty_args()
@@ -603,8 +611,15 @@ impl InterpreterImpl<'_> {
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
                     let callee = lazy_function
-                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .as_resolved(module_storage)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    RTTCheck::check_call_visibility(
+                        &current_frame.function,
+                        &callee,
+                        CallType::ClosureDynamicDispatch,
+                    )
+                    .map_err(|err| set_err_info!(current_frame, err))?;
 
                     // Charge gas for call and for the parameters. The current APIs
                     // require an ExactSizeIterator to be passed for charge_call, so
@@ -626,10 +641,6 @@ impl InterpreterImpl<'_> {
                             (callee.local_tys().len() as u64).into(),
                         )
                         .map_err(|e| set_err_info!(current_frame, e))?;
-
-                    // In difference to regular calls, we skip visibility check.
-                    // It is possible to call a private function of another module via
-                    // a closure.
 
                     // Call function
                     if callee.is_native() {
@@ -863,15 +874,6 @@ impl InterpreterImpl<'_> {
             }
         }
 
-        let mut native_context = NativeContext::new(
-            self,
-            data_cache,
-            resource_resolver,
-            module_storage,
-            extensions,
-            gas_meter.balance_internal(),
-            traversal_context,
-        );
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
@@ -882,9 +884,16 @@ impl InterpreterImpl<'_> {
             args.iter(),
         )?;
 
+        let mut native_context = NativeContext::new(
+            self,
+            data_cache,
+            resource_resolver,
+            module_storage,
+            extensions,
+            gas_meter,
+            traversal_context,
+        );
         let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
-
-        gas_meter.charge_heap_memory(native_context.heap_memory_usage())?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -952,19 +961,11 @@ impl InterpreterImpl<'_> {
                     ty_args,
                 )?;
 
-                if target_func.is_friend_or_private()
-                    || target_func.module_id() == function.module_id()
-                {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message(
-                            "Invoking private or friend function during dispatch".to_string(),
-                        ));
-                }
-
-                if target_func.is_native() {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message("Invoking native function during dispatch".to_string()));
-                }
+                RTTCheck::check_call_visibility(
+                    function,
+                    &target_func,
+                    CallType::NativeDynamicDispatch,
+                )?;
 
                 // Checking type of the dispatch target function
                 //
@@ -1032,38 +1033,6 @@ impl InterpreterImpl<'_> {
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
             },
-        }
-    }
-
-    /// Make sure only private/friend function can only be invoked by modules under the same address.
-    fn check_friend_or_private_call(
-        &self,
-        caller: &LoadedFunction,
-        callee: &LoadedFunction,
-    ) -> VMResult<()> {
-        if callee.is_friend_or_private() {
-            match (caller.module_id(), callee.module_id()) {
-                (Some(caller_id), Some(callee_id)) => {
-                    if caller_id.address() == callee_id.address() {
-                        Ok(())
-                    } else {
-                        Err(self.set_location(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    format!("Private/Friend function invokation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
-                                )))
-                    }
-                },
-                _ => Err(self.set_location(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Private/Friend function invokation error caller: {:?}, callee {:?}",
-                            caller.name(),
-                            callee.name()
-                        )),
-                )),
-            }
-        } else {
-            Ok(())
         }
     }
 
@@ -1526,7 +1495,10 @@ impl InterpreterImpl<'_> {
     }
 }
 
-impl InterpreterDebugInterface for InterpreterImpl<'_> {
+impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
     #[allow(dead_code)]
     fn debug_print_stack_trace(
         &self,
@@ -1715,100 +1687,6 @@ impl CallStack {
     }
 }
 
-fn check_depth_of_type(module_storage: &impl ModuleStorage, ty: &Type) -> PartialVMResult<()> {
-    let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
-
-    // Start at 1 since we always call this right before we add a new node to the value's depth.
-    let max_depth = match module_storage
-        .runtime_environment()
-        .vm_config()
-        .max_value_nest_depth
-    {
-        Some(max_depth) => max_depth,
-        None => return Ok(()),
-    };
-    check_depth_of_type_impl(module_storage, ty, max_depth, 1)?;
-    Ok(())
-}
-
-fn check_depth_of_type_impl(
-    module_storage: &impl ModuleStorage,
-    ty: &Type,
-    max_depth: u64,
-    depth: u64,
-) -> PartialVMResult<u64> {
-    macro_rules! check_depth {
-        ($additional_depth:expr) => {{
-            let new_depth = depth.saturating_add($additional_depth);
-            if new_depth > max_depth {
-                return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
-            } else {
-                new_depth
-            }
-        }};
-    }
-
-    // Calculate depth of the type itself
-    let ty_depth = match ty {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::Address
-        | Type::Signer => check_depth!(0),
-        // Even though this is recursive this is OK since the depth of this recursion is
-        // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Vector(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Struct { idx, .. } => {
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&[]))
-        },
-        // NB: substitution must be performed before calling this function
-        Type::StructInstantiation { idx, ty_args, .. } => {
-            // Calculate depth of all type arguments, and make sure they themselves are not too deep.
-            let ty_arg_depths = ty_args
-                .iter()
-                .map(|ty| {
-                    // Ty args should be fully resolved and not need any type arguments
-                    check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(0))
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&ty_arg_depths))
-        },
-        Type::Function { args, results, .. } => {
-            let mut ty_max_depth = depth;
-            for ty in args.iter().chain(results) {
-                ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
-                    module_storage,
-                    ty,
-                    max_depth,
-                    check_depth!(1),
-                )?);
-            }
-            ty_max_depth
-        },
-        Type::TyParam(_) => {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Type parameter should be fully resolved".to_string()),
-            )
-        },
-    };
-
-    Ok(ty_depth)
-}
-
 /// An `ExitCode` from `execute_code_unit`.
 #[derive(Debug)]
 enum ExitCode {
@@ -1822,11 +1700,12 @@ impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
-        interpreter: &mut InterpreterImpl,
+        interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(
             interpreter,
@@ -1834,6 +1713,7 @@ impl Frame {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
         )
         .map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
@@ -1847,11 +1727,12 @@ impl Frame {
 
     fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
-        interpreter: &mut InterpreterImpl,
+        interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
@@ -2121,11 +2002,15 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let get_field_count_charge_gas_and_check_depth =
+                        let mut get_field_count_charge_gas_and_check_depth =
                             || -> PartialVMResult<u16> {
                                 let field_count = self.field_count(*sd_idx);
                                 let struct_type = self.get_struct_ty(*sd_idx);
-                                check_depth_of_type(module_storage, &struct_type)?;
+                                interpreter.ty_depth_checker.check_depth_of_type(
+                                    gas_meter,
+                                    traversal_context,
+                                    &struct_type,
+                                )?;
                                 Ok(field_count)
                             };
 
@@ -2156,7 +2041,11 @@ impl Frame {
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        check_depth_of_type(module_storage, &struct_type)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                        )?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2186,7 +2075,11 @@ impl Frame {
 
                                 let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                check_depth_of_type(module_storage, ty)?;
+                                interpreter.ty_depth_checker.check_depth_of_type(
+                                    gas_meter,
+                                    traversal_context,
+                                    ty,
+                                )?;
                                 Ok(self.field_instantiation_count(*si_idx))
                             };
 
@@ -2228,7 +2121,11 @@ impl Frame {
 
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2278,7 +2175,11 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2301,7 +2202,11 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2693,7 +2598,11 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,

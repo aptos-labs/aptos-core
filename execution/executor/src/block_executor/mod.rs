@@ -189,6 +189,7 @@ where
         let ExecutableBlock {
             block_id,
             transactions,
+            auxiliary_info,
         } = block;
         let mut block_vec = self
             .block_tree
@@ -232,6 +233,7 @@ where
                 DoGetExecutionOutput::by_transaction_execution(
                     &self.block_executor,
                     transactions,
+                    auxiliary_info,
                     parent_output.result_state(),
                     state_view,
                     onchain_config.clone(),

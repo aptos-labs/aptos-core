@@ -42,10 +42,11 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    on_chain_config::BlockGasLimitType,
+    on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, Transaction,
+        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, FeeDistribution,
+        Transaction,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -82,7 +83,7 @@ pub struct BlockExecutor<T, E, S, L, TP> {
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, TP)>,
+    phantom: PhantomData<fn() -> (T, E, S, L, TP)>,
 }
 
 impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
@@ -670,7 +671,7 @@ where
 
     fn publish_module_writes(
         txn_idx: TxnIndex,
-        module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        module_write_set: Vec<ModuleWrite<T::Value>>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -680,7 +681,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
-        for (_, write) in module_write_set {
+        for write in module_write_set {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -824,7 +825,7 @@ where
         let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
-            versioned_cache.data(),
+            last_input_output,
             txn_idx
         )?;
         let materialized_resource_write_set =
@@ -1158,7 +1159,13 @@ where
             .map_or(false, |idx| outputs[idx].has_new_epoch_event());
         if !has_reconfig {
             if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
-                block_epilogue_txn = Some(Self::gen_block_epilogue(block_id, block_end_info));
+                block_epilogue_txn = Some(self.gen_block_epilogue(
+                    block_id,
+                    signature_verified_block,
+                    &outputs,
+                    block_end_info,
+                    module_cache_manager_guard.environment().features(),
+                ));
                 // TODO(grao): Call VM for block_epilogue_txn.
             }
         }
@@ -1169,10 +1176,81 @@ where
     }
 
     fn gen_block_epilogue(
+        &self,
         block_id: HashValue,
+        signature_verified_block: &TP,
+        outputs: &[E::Output],
         block_end_info: TBlockEndInfoExt<T::Key>,
+        features: &Features,
     ) -> Transaction {
-        Transaction::block_epilogue(block_id, block_end_info.to_persistent())
+        // TODO(grao): Remove this check once AIP-88 is fully enabled.
+        if !self
+            .config
+            .onchain
+            .block_gas_limit_type
+            .add_block_limit_outcome_onchain()
+        {
+            return Transaction::StateCheckpoint(block_id);
+        }
+        if !features.is_calculate_transaction_fee_for_distribution_enabled() {
+            return Transaction::block_epilogue_v0(block_id, block_end_info.to_persistent());
+        }
+
+        let mut amount = BTreeMap::new();
+
+        // TODO(HotState): there are three possible paths where the block epilogue
+        // output is passed to the DB:
+        //   1. a block from consensus is executed: the VM outputs the block end info
+        //      and the block epilogue transaction and output are generated here.
+        //   2. a chunk re-executed: The VM will see the block epilogue transaction and
+        //      should output the transaction output by looking at the block end info
+        //      embedded in the epilogue transaction (and maybe the state view).
+        //   3. a chunk replayed by transaction output: we get the transaction output
+        //      directly.
+        assert!(
+            outputs.len() == signature_verified_block.num_txns(),
+            "Output must have same size as input."
+        );
+
+        for (i, output) in outputs.iter().enumerate() {
+            // TODO(grao): Also include other transactions that is "Keep" if we are confident
+            // that we successfully charge enough gas amount as it appears in the FeeStatement
+            // for every corner cases.
+            if !output.is_success() {
+                continue;
+            }
+            let txn = signature_verified_block.get_txn(i as TxnIndex);
+            if let Some(user_txn) = txn.try_as_signed_user_txn() {
+                let auxiliary_info = signature_verified_block.get_auxiliary_info(i as TxnIndex);
+                if let Some(ephemeral_info) = auxiliary_info.ephemeral_info() {
+                    let gas_price = user_txn.gas_unit_price();
+                    let proposer_index = ephemeral_info.proposer_index;
+                    let fee_statement = output.fee_statement();
+                    let total_gas_unit = fee_statement.gas_used();
+                    // Total gas unit here includes the storage fee (deposit), which is not
+                    // available for distribution. Only the execution gas and IO gas are available
+                    // to distribute. Note here we deliberately NOT use the execution gas and IO
+                    // gas value from the fee statement, because they might round up during the
+                    // calculation and the sum of them could be larger than the actual value we
+                    // burn. Instead we use the total amount (which is the total we've burnt)
+                    // minus the storage deposit (round up), to avoid over distribution.
+                    let gas_unit_available_to_distribute = total_gas_unit
+                        .saturating_sub(fee_statement.storage_fee_used().div_ceil(gas_price));
+                    // We burn a fix amount of gas per gas unit.
+                    let gas_price_to_burn = self.config.onchain.gas_price_to_burn();
+                    if gas_price > gas_price_to_burn && gas_unit_available_to_distribute > 0 {
+                        let fee_to_distribute =
+                            gas_unit_available_to_distribute * (gas_price - gas_price_to_burn);
+                        *amount.entry(proposer_index).or_insert(0) += fee_to_distribute;
+                    }
+                }
+            }
+        }
+        Transaction::block_epilogue_v1(
+            block_id,
+            block_end_info.to_persistent(),
+            FeeDistribution::new(amount),
+        )
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.
@@ -1210,7 +1288,6 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1223,6 +1300,7 @@ where
                 );
                 PanicError::CodeInvariantError(msg)
             })?;
+        global_module_cache.mark_overridden(&id);
         Ok(())
     }
 
@@ -1254,7 +1332,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for (_, write) in output.module_write_set().into_iter() {
+        for write in output.module_write_set().into_iter() {
             Self::add_module_write_to_module_cache(
                 write,
                 txn_idx,
@@ -1608,27 +1686,29 @@ where
                 || block_limit_processor.should_end_block_sequential()
                 || idx + 1 == num_txns
             {
+                let mut has_reconfig = false;
+                if let Some(last_output) = ret.last() {
+                    if last_output.has_new_epoch_event() {
+                        has_reconfig = true;
+                    }
+                }
+                ret.resize_with(num_txns, E::Output::skip_output);
                 if let Some(block_id) =
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
-                    let mut has_reconfig = false;
-                    if let Some(last_output) = ret.last() {
-                        if last_output.has_new_epoch_event() {
-                            has_reconfig = true;
-                        }
-                    }
                     if !has_reconfig {
-                        block_epilogue_txn = Some(Self::gen_block_epilogue(
+                        block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
+                            signature_verified_block,
+                            &ret,
                             block_limit_processor.get_block_end_info(),
+                            module_cache_manager_guard.environment().features(),
                         ));
                     }
                 }
                 break;
             }
         }
-
-        ret.resize_with(num_txns, E::Output::skip_output);
 
         block_limit_processor
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);

@@ -58,6 +58,7 @@ pub const REQUEST_SUCCESS_LABEL: &str = "success";
 
 // Process txn breakdown type labels
 pub const FETCH_SEQ_NUM_LABEL: &str = "storage_fetch";
+pub const FILTER_TRANSACTIONS_LABEL: &str = "filter_transactions";
 pub const VM_VALIDATION_LABEL: &str = "vm_validation";
 
 // Txn process result labels

@@ -151,6 +151,51 @@ impl<'env> BoogieTranslator<'env> {
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_function(&self, writer: &CodeWriter, signature: &str, body_fn: impl Fn()) {
+        self.emit_function_with_attr(writer, "{:inline} ", signature, body_fn)
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_procedure(&self, writer: &CodeWriter, signature: &str, body_fn: impl Fn()) {
+        self.emit_procedure_with_attr(writer, "{:inline 1} ", signature, body_fn)
+    }
+
+    fn emit_with_attr(
+        &self,
+        writer: &CodeWriter,
+        sig: &str,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        emitln!(writer, "{} {}{} {{", sig, attr, signature);
+        writer.indent();
+        body_fn();
+        writer.unindent();
+        emitln!(writer, "}");
+    }
+
+    fn emit_function_with_attr(
+        &self,
+        writer: &CodeWriter,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        self.emit_with_attr(writer, "function", attr, signature, body_fn)
+    }
+
+    fn emit_procedure_with_attr(
+        &self,
+        writer: &CodeWriter,
+        attr: &str,
+        signature: &str,
+        body_fn: impl Fn(),
+    ) {
+        self.emit_with_attr(writer, "procedure", attr, signature, body_fn)
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
     pub fn translate(&mut self) {
         let writer = self.writer;
         let env = self.env;
@@ -257,6 +302,39 @@ impl<'env> BoogieTranslator<'env> {
 
             // declare the memory variable for this type
             emitln!(writer, "var {}_$memory: $Memory {};", suffix, param_type);
+
+            // If cmp module is included, emit cmp functions for generic types
+            if env
+                .get_modules()
+                .any(|m| m.get_full_name_str() == "0x1::cmp")
+            {
+                self.emit_function(
+                    writer,
+                    &format!(
+                        "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                        suffix, param_type, param_type
+                    ),
+                    || {
+                        emitln!(
+                            writer,
+                            "if $IsEqual'{}'(v1, v2) then $1_cmp_Ordering_Equal()",
+                            suffix
+                        );
+                        emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+                    },
+                );
+
+                self.emit_procedure(
+                    writer,
+                    &format!(
+                        "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                        suffix, param_type, param_type
+                    ),
+                    || {
+                        emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                    },
+                );
+            }
         }
         emitln!(writer);
 
@@ -511,7 +589,8 @@ impl StructTranslator<'_> {
         }
 
         // Emit $IsValid function for `variant`.
-        self.emit_function_with_attr(
+        self.parent.emit_function_with_attr(
+            writer,
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
             || {
@@ -538,7 +617,8 @@ impl StructTranslator<'_> {
     // Emit $IsValid function for struct.
     fn emit_is_valid_struct(&self, struct_env: &StructEnv, struct_name: &str, emit_fn: impl Fn()) {
         let writer = self.parent.writer;
-        self.emit_function_with_attr(
+        self.parent.emit_function_with_attr(
+            writer,
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", struct_name, struct_name),
             || {
@@ -640,6 +720,121 @@ impl StructTranslator<'_> {
             sep = "";
         }
         emitln!(writer, "else false");
+    }
+
+    /// Emit the function cmp::compare for enum
+    fn emit_cmp_for_enum(&self, struct_env: &StructEnv, struct_name: &str) {
+        let writer = self.parent.writer;
+        let suffix: String = boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+        self.emit_function(
+            &format!(
+                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                suffix, struct_name, struct_name
+            ),
+            || {
+                let mut else_symbol = "";
+                for (pos_1, v1) in struct_env.get_variants().collect_vec().iter().enumerate() {
+                    for (pos_2, v2) in struct_env.get_variants().collect_vec().iter().enumerate() {
+                        if pos_2 <= pos_1 {
+                            continue;
+                        }
+                        let struct_variant_name_1 =
+                            boogie_struct_variant_name(struct_env, self.type_inst, *v1);
+                        let struct_variant_name_2 =
+                            boogie_struct_variant_name(struct_env, self.type_inst, *v2);
+                        let cmp_order_less = format!(
+                            "{} if v1 is {} && v2 is {} then $1_cmp_Ordering_Less()",
+                            else_symbol, struct_variant_name_1, struct_variant_name_2
+                        );
+                        let cmp_order_greater = format!(
+                            "else if v1 is {} && v2 is {} then $1_cmp_Ordering_Greater()",
+                            struct_variant_name_2, struct_variant_name_1
+                        );
+                        if else_symbol.is_empty() {
+                            else_symbol = "else";
+                        }
+                        emitln!(writer, "{}", cmp_order_less);
+                        emitln!(writer, "{}", cmp_order_greater);
+                    }
+                }
+                for variant in struct_env.get_variants().collect_vec().iter() {
+                    let struct_variant_name_1 =
+                        boogie_struct_variant_name(struct_env, self.type_inst, *variant);
+                    let suffix_variant =
+                        boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, variant);
+                    let cmp_order = format!(
+                        "{} if v1 is {} && v2 is {} then $1_cmp_$compare'{}'(v1, v2)",
+                        else_symbol, struct_variant_name_1, struct_variant_name_1, suffix_variant
+                    );
+                    emitln!(writer, "{}", cmp_order);
+                }
+                emitln!(writer, "else $Arbitrary_value_of'$1_cmp_Ordering'()");
+            },
+        );
+        for variant in struct_env.get_variants().collect_vec().iter() {
+            self.emit_cmp_for_enum_variant(struct_env, *variant, struct_name);
+        }
+    }
+
+    /// Emit the function cmp::compare for each enum variant
+    fn emit_cmp_for_enum_variant(
+        &self,
+        struct_env: &StructEnv,
+        variant: Symbol,
+        struct_name: &str,
+    ) {
+        let writer = self.parent.writer;
+        let suffix_variant =
+            boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
+        self.emit_function(
+            &format!(
+                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                suffix_variant, struct_name, struct_name
+            ),
+            || {
+                if struct_env
+                    .get_fields_of_variant(variant)
+                    .collect_vec()
+                    .is_empty()
+                {
+                    emitln!(writer, "$1_cmp_Ordering_Equal()");
+                } else {
+                    for (pos, field) in struct_env.get_fields_of_variant(variant).enumerate() {
+                        let bv_flag = self.field_bv_flag(&field);
+                        let field_type_name = boogie_type_suffix_bv(
+                            self.parent.env,
+                            &self.inst(&field.get_type()),
+                            bv_flag,
+                        );
+                        let cmp_field_call = format!(
+                            "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                            field_type_name,
+                            boogie_field_sel(&field),
+                            boogie_field_sel(&field)
+                        );
+                        let cmp_field_call_less =
+                            format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                        let cmp_field_call_greater =
+                            format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                        emitln!(writer, "if {}", cmp_field_call_less);
+                        emitln!(writer, "then $1_cmp_Ordering_Less()");
+                        emitln!(writer, "else if {}", cmp_field_call_greater);
+                        emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                        if pos
+                            < struct_env
+                                .get_fields_of_variant(variant)
+                                .collect_vec()
+                                .len()
+                                - 1
+                        {
+                            emitln!(writer, "else");
+                        } else {
+                            emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                        }
+                    }
+                }
+            },
+        );
     }
 
     /// Return whether a field involves bitwise operations
@@ -805,21 +1000,90 @@ impl StructTranslator<'_> {
             emitln!(writer, "var {}: $Memory {};", memory_name, struct_name);
         }
 
+        // Emit compare function and procedure
+        let cmp_struct_types = self.parent.env.cmp_types.borrow();
+        for cmp_struct_type in cmp_struct_types.iter() {
+            if let Some((cur_struct, inst)) = cmp_struct_type.get_struct(env) {
+                if cur_struct.get_id() == struct_env.get_id() && inst == self.type_inst {
+                    if !struct_env.has_variants() {
+                        let suffix =
+                            boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+                        self.emit_function(
+                            &format!(
+                                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                                suffix, struct_name, struct_name
+                            ),
+                            || {
+                                for (pos, field) in struct_env.get_fields().enumerate() {
+                                    let bv_flag = self.field_bv_flag(&field);
+                                    let suffix_ty = boogie_type_suffix_bv(
+                                        self.parent.env,
+                                        &self.inst(&field.get_type()),
+                                        bv_flag,
+                                    );
+                                    let cmp_field_call = format!(
+                                        "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                                        suffix_ty,
+                                        boogie_field_sel(&field),
+                                        boogie_field_sel(&field)
+                                    );
+                                    let cmp_field_call_less =
+                                        format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                                    let cmp_field_call_greater =
+                                        format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                                    emitln!(writer, "if {}", cmp_field_call_less);
+                                    emitln!(writer, "then $1_cmp_Ordering_Less()");
+                                    emitln!(writer, "else if {}", cmp_field_call_greater);
+                                    emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                                    if pos < struct_env.get_field_count() - 1 {
+                                        emitln!(writer, "else");
+                                    } else {
+                                        emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                                    }
+                                }
+                            },
+                        );
+                        self.emit_procedure(
+                            &format!(
+                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            suffix, struct_name, struct_name
+                        ),
+                            || {
+                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                            },
+                        );
+                    } else {
+                        self.emit_cmp_for_enum(struct_env, &struct_name);
+                        let suffix: String =
+                            boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
+                        self.emit_procedure(
+                            &format!(
+                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            suffix, struct_name, struct_name
+                        ),
+                            || {
+                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                            },
+                        );
+                    }
+                    break;
+                }
+            }
+        }
+
         emitln!(writer);
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
     fn emit_function(&self, signature: &str, body_fn: impl Fn()) {
-        self.emit_function_with_attr("{:inline} ", signature, body_fn)
+        self.parent
+            .emit_function(self.parent.writer, signature, body_fn);
     }
 
-    fn emit_function_with_attr(&self, attr: &str, signature: &str, body_fn: impl Fn()) {
-        let writer = self.parent.writer;
-        emitln!(writer, "function {}{} {{", attr, signature);
-        writer.indent();
-        body_fn();
-        writer.unindent();
-        emitln!(writer, "}");
+    #[allow(clippy::literal_string_with_formatting_args)]
+    fn emit_procedure(&self, signature: &str, body_fn: impl Fn()) {
+        self.parent
+            .emit_procedure(self.parent.writer, signature, body_fn);
     }
 }
 
@@ -1622,6 +1886,11 @@ impl FunctionTranslator<'_> {
                             } else {
                                 let dest_bv_flag = !dests.is_empty() && compute_flag(dests[0]);
                                 let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
+                                if module_env.is_cmp() {
+                                    fun_name = boogie_function_bv_name(&callee_env, inst, &[
+                                        bv_flag || dest_bv_flag,
+                                    ]);
+                                }
                                 // Handle the case where the return value of length is assigned to a bv int because
                                 // length always returns a non-bv result
                                 if module_env.is_std_vector() {

@@ -747,7 +747,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        let txn_provider = DefaultTxnProvider::new(txn_block);
+        let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
         AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,

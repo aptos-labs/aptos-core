@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+use aptos_consensus_types::block::Block;
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
     register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
@@ -150,14 +151,74 @@ pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
 /// Histograms
 
 /// Histogram for the number of batches per (committed) blocks.
-pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "quorum_store_num_batch_per_block",
+/// types: proof, inline_batch, opt_batch
+pub static BATCH_NUM_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_batch_num_per_block",
         "Histogram for the number of batches per (committed) blocks.",
+        &["type"],
         TRANSACTION_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
+
+/// Histogram for the number of txns per batch type in (committed) blocks.
+/// types: proof, inline_batch, opt_batch
+pub static TXN_NUM_PER_BATCH_TYPE_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_txn_num_per_batch_type_per_block",
+        "Histogram for the number of txns per batch type in (committed) blocks.",
+        &["type"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the txn bytes per batch type in (committed) blocks.
+/// types: proof, inline_batch, opt_batch
+pub static TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_txn_bytes_per_batch_type_per_block",
+        "Histogram for the txn bytes per batch type in (committed) blocks.",
+        &["type"],
+        BYTE_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub fn update_batch_stats(block: &Block) {
+    let (proof_num, proof_txn_num, proof_txn_bytes) = block.proof_stats();
+    BATCH_NUM_PER_BLOCK
+        .with_label_values(&["proof"])
+        .observe(proof_num as f64);
+    TXN_NUM_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["proof"])
+        .observe(proof_txn_num as f64);
+    TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["proof"])
+        .observe(proof_txn_bytes as f64);
+    let (inline_batch_num, inline_batch_txn_num, inline_batch_txn_bytes) =
+        block.inline_batch_stats();
+    BATCH_NUM_PER_BLOCK
+        .with_label_values(&["inline_batch"])
+        .observe(inline_batch_num as f64);
+    TXN_NUM_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["inline_batch"])
+        .observe(inline_batch_txn_num as f64);
+    TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["inline_batch"])
+        .observe(inline_batch_txn_bytes as f64);
+    let (opt_batch_num, opt_batch_txn_num, opt_batch_txn_bytes) = block.opt_batch_stats();
+    BATCH_NUM_PER_BLOCK
+        .with_label_values(&["opt_batch"])
+        .observe(opt_batch_num as f64);
+    TXN_NUM_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["opt_batch"])
+        .observe(opt_batch_txn_num as f64);
+    TXN_BYTES_PER_BATCH_TYPE_PER_BLOCK
+        .with_label_values(&["opt_batch"])
+        .observe(opt_batch_txn_bytes as f64);
+}
 
 /// Histogram for the number of transactions per batch.
 static NUM_TXN_PER_BATCH: Lazy<HistogramVec> = Lazy::new(|| {
