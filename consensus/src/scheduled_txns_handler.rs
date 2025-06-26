@@ -52,7 +52,7 @@ impl ScheduledTxnsHandler {
         state_view: &impl StateView,
         block_timestamp_ms: u64,
     ) -> Vec<ScheduledTransactionInfoWithKey> {
-        let res = AptosVM::execute_function(
+        let res = AptosVM::execute_system_function_no_gas_meter(
             state_view,
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_name,

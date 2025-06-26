@@ -181,7 +181,7 @@ module aptos_framework::scheduled_txns {
         system_addresses::assert_aptos_framework(framework);
 
         // Create owner account for handling deposits
-        let owner_addr = @0xb; // Replace with your desired address
+        let owner_addr = @0xb;
         let (owner_signer, owner_cap) =
             account::create_framework_reserved_account(owner_addr);
 
@@ -422,7 +422,7 @@ module aptos_framework::scheduled_txns {
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
 
-    fun u256_to_u64_safe(val: u256): u64 {
+    fun truncate_to_u64(val: u256): u64 {
         let masked = val & MASK_64; // Truncate high bits
         (masked as u64) // Now safe: always <= u64::MAX
     }
@@ -555,7 +555,7 @@ module aptos_framework::scheduled_txns {
     /// IMP: Make sure this does not affect parallel execution of txns
     public(friend) fun finish_execution(key: ScheduleMapKey) acquires ToRemoveTbl {
         // Calculate table index using hash
-        let tbl_idx = ((u256_to_u64_safe(key.txn_id) % TO_REMOVE_PARALLELISM) as u16);
+        let tbl_idx = ((truncate_to_u64(key.txn_id) % TO_REMOVE_PARALLELISM) as u16);
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
 
         if (!to_remove.remove_tbl.contains(tbl_idx)) {
@@ -621,7 +621,7 @@ module aptos_framework::scheduled_txns {
         };
     }
 
-    fun emit_transaction_failed_event(
+    public(friend) fun emit_transaction_failed_event(
         key: ScheduleMapKey, sender_addr: address
     ) {
         event::emit(

@@ -51,6 +51,7 @@ pub struct ScheduledTransactionInfoWithKey {
 pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
     Lazy::new(|| ScheduledTxnsModuleInfo {
         module_addr: CORE_CODE_ADDRESS,
+        deposit_owner_addr: AccountAddress::from_hex_literal("0xb").unwrap(),
         module_name: Identifier::new("scheduled_txns").unwrap(),
         get_ready_transactions_name: Identifier::new("get_ready_transactions").unwrap(),
         get_ready_transactions_with_limit_name: Identifier::new(
@@ -59,17 +60,15 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
         .unwrap(),
         execute_user_function_wrapper_name: Identifier::new("execute_user_function_wrapper")
             .unwrap(),
-        emit_transaction_failed_event_name: Identifier::new("emit_transaction_failed_event")
-            .unwrap(),
     });
 
 pub struct ScheduledTxnsModuleInfo {
     pub module_addr: AccountAddress,
+    pub deposit_owner_addr: AccountAddress,
     pub module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
     pub get_ready_transactions_with_limit_name: Identifier,
     pub execute_user_function_wrapper_name: Identifier,
-    pub emit_transaction_failed_event_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {

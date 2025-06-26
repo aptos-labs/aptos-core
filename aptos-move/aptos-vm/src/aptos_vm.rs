@@ -222,6 +222,22 @@ pub(crate) fn get_system_transaction_output(
     ))
 }
 
+pub(crate) fn get_sched_txn_output(
+    session: SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    change_set_configs: &ChangeSetConfigs,
+    fee_statement: FeeStatement,
+) -> Result<VMOutput, VMStatus> {
+    let change_set = session.finish(change_set_configs, module_storage)?;
+
+    Ok(VMOutput::new(
+        change_set,
+        ModuleWriteSet::empty(), // todo: is this empty always? If so, do we explicitly limit the sched txn ?
+        fee_statement,
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    ))
+}
+
 pub(crate) fn get_or_vm_startup_failure<'a, T>(
     gas_params: &'a Result<T, String>,
     log_context: &AdapterLogSchema,
@@ -2381,7 +2397,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    pub fn execute_function(
+    pub fn execute_system_function_no_gas_meter(
         state_view: &impl StateView,
         module_id: &ModuleId,
         function_name: &Identifier,
@@ -2743,30 +2759,16 @@ impl AptosVM {
                 (vm_status, output)
             },
             Transaction::ScheduledTransaction(txn) => {
-                let storage = TraversalStorage::new();
-                let mut context = TraversalContext::new(&storage);
-                match self.process_scheduled_transaction(
+                let traversal_storage = TraversalStorage::new();
+                let mut traversal_context = TraversalContext::new(&traversal_storage);
+                let (vm_status, output) = self.process_scheduled_transaction(
                     resolver,
                     txn.clone(),
-                    &mut context,
+                    &mut traversal_context,
                     code_storage,
                     log_context,
-                ) {
-                    Ok((vm_status, output)) => (vm_status, output),
-                    Err(e) => {
-                        let mut session =
-                            self.new_session(resolver, SessionId::scheduled_txn(txn.hash()), None);
-                        run_scheduled_txn_cleanup(&mut session, txn, &mut context, code_storage);
-                        let output = get_system_transaction_output(
-                            session,
-                            code_storage,
-                            &self.storage_gas_params(log_context)?.change_set_configs,
-                        )
-                        .unwrap();
-                        warn!("scheduled transaction {:?} failed: {:?}", txn, e);
-                        (VMStatus::Executed, output)
-                    },
-                }
+                )?;
+                (vm_status, output)
             },
         })
     }
@@ -2787,7 +2789,7 @@ impl AptosVM {
             storage_gas.clone(),
             false,
             balance.into(),
-            &NoopBlockSynchronizationKillSwitch {},
+            code_storage,
         );
 
         // no need of scheduled txn prologue for now.
@@ -2797,7 +2799,7 @@ impl AptosVM {
         ];
         let mut session =
             self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
-        session.execute_function_bypass_visibility(
+        let user_func_status = session.execute_function_bypass_visibility(
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
             vec![],
@@ -2805,20 +2807,89 @@ impl AptosVM {
             &mut gas_meter,
             traversal_context,
             code_storage,
-        )?;
-        run_scheduled_txn_epilogue(
+        );
+        match user_func_status {
+            Ok(_) => {},
+            Err(err) => {
+                // If the user function execution fails, we return the error status and an empty output.
+                let error_vm_status = err.into_vm_status();
+                let txn_status = TransactionStatus::from_vm_status(
+                    error_vm_status.clone(),
+                    self.features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                );
+                match txn_status {
+                    TransactionStatus::Keep(_) => {
+                        // In this case, we will run the epilogue and charge the gas used.
+                        warn!(
+                            "Scheduled txn user function execution failed: {:?}",
+                            error_vm_status
+                        );
+                    },
+                    TransactionStatus::Discard(status_code) => {
+                        error!(
+                            "Discarding scheduled txn; user function execution failed: {:?}",
+                            error_vm_status
+                        );
+                        let discarded_output = discarded_output(status_code);
+                        // todo: should we run_scheduled_txn_cleanup() here ?
+                        //       otherwise, the scheduled transaction will remain in the queue and
+                        //       will be retried in subsequent blocks.
+                        return Ok((error_vm_status, discarded_output));
+                    },
+                    TransactionStatus::Retry => {
+                        unreachable!("We can't retry scheduled transactions");
+                    },
+                }
+            },
+        };
+
+        let fee_statement =
+            Self::fee_statement_from_gas_meter(txn.max_gas_amount.into(), &gas_meter, 0);
+
+        // Run epilogue but store result instead of propagating error
+        match run_scheduled_txn_epilogue(
             &mut session,
             &txn,
             gas_meter.balance(),
-            Self::fee_statement_from_gas_meter(txn.max_gas_amount.into(), &gas_meter, 0),
+            fee_statement,
             traversal_context,
             code_storage,
-        )?;
-        let output = get_system_transaction_output(
+        ) {
+            Ok(()) => {},
+            Err(e) => {
+                warn!(
+                    "Scheduled transaction epilogue failed: {:?}, txn: {:?}; trying to just remove the txn from scheduled queue",
+                    e, txn
+                );
+                let mut cleanup_session =
+                    self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
+                match run_scheduled_txn_cleanup(
+                    &mut cleanup_session,
+                    &txn,
+                    traversal_context,
+                    code_storage,
+                ) {
+                    Ok(_) => {},
+                    Err(cleanup_err) => {
+                        error!(
+                            "Scheduled transaction cleanup failed after epilogue failure: {:?}",
+                            cleanup_err
+                        );
+                    },
+                }
+            },
+        };
+
+        // Irrespective of whether the epilogue succeeded or failed, fee statement is included in
+        // the output if user function was successfully executed
+        let output = get_sched_txn_output(
             session,
             code_storage,
             &self.storage_gas_params(log_context)?.change_set_configs,
+            fee_statement,
         )?;
+
         Ok((VMStatus::Executed, output))
     }
 }

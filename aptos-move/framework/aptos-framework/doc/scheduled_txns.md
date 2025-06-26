@@ -25,7 +25,7 @@
 -  [Function `new_scheduled_transaction`](#0x1_scheduled_txns_new_scheduled_transaction)
 -  [Function `insert`](#0x1_scheduled_txns_insert)
 -  [Function `cancel`](#0x1_scheduled_txns_cancel)
--  [Function `u256_to_u64_safe`](#0x1_scheduled_txns_u256_to_u64_safe)
+-  [Function `truncate_to_u64`](#0x1_scheduled_txns_truncate_to_u64)
 -  [Function `hash_to_u256`](#0x1_scheduled_txns_hash_to_u256)
 -  [Function `move_scheduled_transaction_container`](#0x1_scheduled_txns_move_scheduled_transaction_container)
 -  [Function `cancel_internal`](#0x1_scheduled_txns_cancel_internal)
@@ -798,7 +798,7 @@ Can be called only by the framework
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
 
     // Create owner <a href="account.md#0x1_account">account</a> for handling deposits
-    <b>let</b> owner_addr = @0xb; // Replace <b>with</b> your desired <b>address</b>
+    <b>let</b> owner_addr = @0xb;
     <b>let</b> (owner_signer, owner_cap) =
         <a href="account.md#0x1_account_create_framework_reserved_account">account::create_framework_reserved_account</a>(owner_addr);
 
@@ -1141,13 +1141,13 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
 
 </details>
 
-<a id="0x1_scheduled_txns_u256_to_u64_safe"></a>
+<a id="0x1_scheduled_txns_truncate_to_u64"></a>
 
-## Function `u256_to_u64_safe`
+## Function `truncate_to_u64`
 
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(val: u256): u64
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_truncate_to_u64">truncate_to_u64</a>(val: u256): u64
 </code></pre>
 
 
@@ -1156,7 +1156,7 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(val: u256): u64 {
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_truncate_to_u64">truncate_to_u64</a>(val: u256): u64 {
     <b>let</b> masked = val & <a href="scheduled_txns.md#0x1_scheduled_txns_MASK_64">MASK_64</a>; // Truncate high bits
     (masked <b>as</b> u64) // Now safe: always &lt;= u64::MAX
 }
@@ -1408,7 +1408,7 @@ IMP: Make sure this does not affect parallel execution of txns
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">finish_execution</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
     // Calculate <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> index using <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
-    <b>let</b> tbl_idx = ((<a href="scheduled_txns.md#0x1_scheduled_txns_u256_to_u64_safe">u256_to_u64_safe</a>(key.txn_id) % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
+    <b>let</b> tbl_idx = ((<a href="scheduled_txns.md#0x1_scheduled_txns_truncate_to_u64">truncate_to_u64</a>(key.txn_id) % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
 
     <b>if</b> (!to_remove.remove_tbl.contains(tbl_idx)) {
@@ -1525,7 +1525,7 @@ Called by the executor when the scheduled transaction is run
 
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, sender_addr: <b>address</b>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, sender_addr: <b>address</b>)
 </code></pre>
 
 
@@ -1534,7 +1534,7 @@ Called by the executor when the scheduled transaction is run
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">emit_transaction_failed_event</a>(
     key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>, sender_addr: <b>address</b>
 ) {
     <a href="event.md#0x1_event_emit">event::emit</a>(

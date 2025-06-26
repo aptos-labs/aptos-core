@@ -234,7 +234,7 @@ where
                     MoveValue::U64(mock_block_time_ms + 1000),
                     MoveValue::U64(ready_sched_txns_limit as u64),
                 ];
-                let res = AptosVM::execute_function(
+                let res = AptosVM::execute_system_function_no_gas_meter(
                     &state_view,
                     &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
                     &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_with_limit_name,

@@ -700,7 +700,7 @@ pub(crate) fn run_scheduled_txn_epilogue(
     module_storage: &impl ModuleStorage,
 ) -> VMResult<()> {
     let args = vec![
-        MoveValue::Signer(AccountAddress::from_hex_literal("0xb").unwrap()),
+        MoveValue::Signer(SCHEDULED_TRANSACTIONS_MODULE_INFO.deposit_owner_addr),
         MoveValue::Address(txn.sender_handle),
         txn.key.as_move_value(),
         MoveValue::U64(fee_statement.storage_fee_refund()),
@@ -730,8 +730,13 @@ pub(crate) fn run_scheduled_txn_cleanup(
     txn: &ScheduledTransactionInfoWithKey,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
-) {
-    let args = vec![txn.key.as_move_value()];
+) -> VMResult<()> {
+    // remove from the schedule queue and emit a failure event
+    let args = vec![
+        txn.key.as_move_value(),
+        MoveValue::Address(txn.sender_handle),
+        MoveValue::Bool(true),
+    ];
     session
         .execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -743,23 +748,6 @@ pub(crate) fn run_scheduled_txn_cleanup(
             module_storage,
         )
         .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)
-        .expect("Failed to run scheduled txn cleanup");
-
-    // emit event for the failed scheduled transaction
-    let args = vec![
-        txn.key.as_move_value(),
-        MoveValue::Address(txn.sender_handle),
-    ];
-    session
-        .execute_function_bypass_visibility(
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
-            &SCHEDULED_TRANSACTIONS_MODULE_INFO.emit_transaction_failed_event_name,
-            vec![],
-            serialize_values(&args),
-            &mut UnmeteredGasMeter,
-            traversal_context,
-            module_storage,
-        )
-        .expect("Failed to emit transaction failed event");
+        .map_err(expect_no_verification_errors)?;
+    Ok(())
 }
