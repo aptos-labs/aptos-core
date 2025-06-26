@@ -71,6 +71,7 @@ use aptos_types::{
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
+        block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -1380,7 +1381,7 @@ impl AptosVM {
                 }
 
                 let size_if_old_module_exists = module_storage
-                    .fetch_module_size_in_bytes(addr, name)?
+                    .unmetered_get_module_size(addr, name)?
                     .map(|v| v as u64);
                 if let Some(old_size) = size_if_old_module_exists {
                     gas_meter
@@ -2079,7 +2080,6 @@ impl AptosVM {
         &self,
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
-        module_storage: &impl AptosModuleStorage,
         change_set: &VMChangeSet,
         module_write_set: &ModuleWriteSet,
     ) -> PartialVMResult<()> {
@@ -2089,12 +2089,13 @@ impl AptosVM {
         );
 
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
-        // access path that the write set is going to update.
-        for write in module_write_set.writes().values() {
-            // It is sufficient to simply get the size in order to enforce read-before-write.
-            module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
-                .map_err(|e| e.to_partial())?;
+        // access path that the write set is going to update (because the write set comes directly
+        // form the transaction payload).
+        for state_key in module_write_set.writes().keys() {
+            executor_view.read_state_value(state_key).map_err(|err| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(format!("Cannot read module at {:?}: {:?}", state_key, err))
+            })?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;
@@ -2152,7 +2153,6 @@ impl AptosVM {
         self.read_change_set(
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
-            code_storage,
             &change_set,
             &module_write_set,
         )
@@ -2294,6 +2294,81 @@ impl AptosVM {
             module_storage,
             &self.storage_gas_params(log_context)?.change_set_configs,
         )?;
+        Ok((VMStatus::Executed, output))
+    }
+
+    fn process_block_epilogue(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        module_storage: &impl AptosModuleStorage,
+        block_epilogue: BlockEpiloguePayload,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let (block_id, fee_distribution) = match block_epilogue {
+            BlockEpiloguePayload::V0 { .. } => {
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                let output = VMOutput::empty_with_status(status);
+                return Ok((VMStatus::Executed, output));
+            },
+            BlockEpiloguePayload::V1 {
+                block_id,
+                fee_distribution,
+                ..
+            } => (block_id, fee_distribution),
+        };
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut session = self.new_session(resolver, SessionId::block_epilogue(block_id), None);
+
+        let (validator_indices, amounts) = match fee_distribution {
+            FeeDistribution::V0 { amount } => amount
+                .into_iter()
+                .map(|(validator_index, amount)| {
+                    (MoveValue::U64(validator_index), MoveValue::U64(amount))
+                })
+                .unzip(),
+        };
+
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+            MoveValue::Vector(validator_indices),
+            MoveValue::Vector(amounts),
+        ];
+
+        let storage = TraversalStorage::new();
+
+        let output = match session
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_EPILOGUE,
+                vec![],
+                serialize_values(&args),
+                &mut gas_meter,
+                &mut TraversalContext::new(&storage),
+                module_storage,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context))
+        {
+            Ok(_) => get_system_transaction_output(
+                session,
+                module_storage,
+                &self.storage_gas_params(log_context)?.change_set_configs,
+            )?,
+            Err(e) => {
+                error!(
+                    "Unexpected error from BlockEpilogue txn: {e:?}, fallback to return success."
+                );
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                VMOutput::empty_with_status(status)
+            },
+        };
+
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        // TODO(HotState): generate an output according to the block end info in the
+        //   transaction. (maybe resort to the move resolver, but for simplicity I would
+        //   just include the full slot in both the transaction and the output).
         Ok((VMStatus::Executed, output))
     }
 
@@ -2604,14 +2679,12 @@ impl AptosVM {
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output)
             },
-            Transaction::BlockEpilogue(_) => {
-                let status = TransactionStatus::Keep(ExecutionStatus::Success);
-                // TODO(HotState): generate an output according to the block end info in the
-                //   transaction. (maybe resort to the move resolver, but for simplicity I would
-                //   just include the full slot in both the transaction and the output).
-                let output = VMOutput::empty_with_status(status);
-                (VMStatus::Executed, output)
-            },
+            Transaction::BlockEpilogue(block_epilogue) => self.process_block_epilogue(
+                resolver,
+                code_storage,
+                block_epilogue.clone(),
+                log_context,
+            )?,
             Transaction::ValidatorTransaction(txn) => {
                 let (vm_status, output) = self.process_validator_transaction(
                     resolver,

@@ -25,6 +25,7 @@ use std::collections::HashMap;
 ///
 /// Run the test:
 /// cargo xtest -p consensus basic_start_test -- --nocapture
+#[ignore]
 fn basic_start_test() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

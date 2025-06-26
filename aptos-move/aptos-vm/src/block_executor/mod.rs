@@ -195,13 +195,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get module writes")
             .module_write_set()
-            .clone()
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -365,6 +367,24 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .get()
             .expect("Must call after commit.")
             .has_new_epoch_event()
+    }
+
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool {
+        if let Some(committed_output) = self.committed_output.get() {
+            committed_output
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Either vm_output or committed_output must exist.")
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        }
     }
 
     fn output_approx_size(&self) -> u64 {

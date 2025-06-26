@@ -53,7 +53,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -1860,6 +1860,7 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
             transaction_hash,
@@ -1868,6 +1869,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            auxiliary_info_hash,
         ))
     }
 
@@ -1884,6 +1886,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            None,
         )
     }
 
@@ -1896,6 +1899,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
+            None,
         )
     }
 }
@@ -1936,8 +1940,8 @@ pub struct TransactionInfoV0 {
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
 
-    /// Potentially summarizes all evicted items from state. Always `None` for now.
-    state_cemetery_hash: Option<HashValue>,
+    /// The hash value summarizing PersistedAuxiliaryInfo.
+    auxiliary_info_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1948,6 +1952,7 @@ impl TransactionInfoV0 {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -1956,7 +1961,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
-            state_cemetery_hash: None,
+            auxiliary_info_hash,
         }
     }
 
@@ -1974,6 +1979,10 @@ impl TransactionInfoV0 {
 
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        self.auxiliary_info_hash
     }
 
     pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
@@ -2499,10 +2508,22 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
-    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+    pub fn block_epilogue_v0(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V0 {
             block_id,
             block_end_info,
+        })
+    }
+
+    pub fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V1 {
+            block_id,
+            block_end_info,
+            fee_distribution,
         })
     }
 
@@ -2608,6 +2629,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+
+    /// None if it is not a user transaction.
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        None
+    }
+
+    fn from_txn(_txn: Transaction) -> Self {
+        unimplemented!()
+    }
 }
 
 pub struct ViewFunctionOutput {
@@ -2619,4 +2649,60 @@ impl ViewFunctionOutput {
     pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
         Self { values, gas_used }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AuxiliaryInfo {
+    persisted_info: PersistedAuxiliaryInfo,
+    ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+}
+
+impl AuxiliaryInfo {
+    pub fn new(
+        persisted_info: PersistedAuxiliaryInfo,
+        ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            persisted_info,
+            ephemeral_info,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
+        self.persisted_info
+    }
+
+    pub fn persisted_info(&self) -> &PersistedAuxiliaryInfo {
+        &self.persisted_info
+    }
+
+    pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
+        &self.ephemeral_info
+    }
+}
+
+#[derive(
+    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum PersistedAuxiliaryInfo {
+    None,
+    // The index of the transaction in a block (after shuffler, before execution).
+    // Note that this would be slightly different from the index of transactions that get committed
+    // onchain, as this considers transactions that may get discarded.
+    V1 { transaction_index: u32 },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EphemeralAuxiliaryInfo {
+    // TODO(grao): After execution pool is implemented we might want this information be persisted
+    // onchain?
+    pub proposer_index: u64,
 }

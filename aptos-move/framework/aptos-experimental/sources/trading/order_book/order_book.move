@@ -51,7 +51,6 @@ module aptos_experimental::order_book {
     struct OrderRequest<M: store + copy + drop> has copy, drop {
         account: address,
         account_order_id: u64,
-        unique_priority_idx: Option<UniqueIdxType>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -77,7 +76,6 @@ module aptos_experimental::order_book {
     public fun new_order_request<M: store + copy + drop>(
         account: address,
         account_order_id: u64,
-        unique_priority_idx: Option<UniqueIdxType>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -88,7 +86,6 @@ module aptos_experimental::order_book {
         OrderRequest {
             account,
             account_order_id,
-            unique_priority_idx,
             price,
             orig_size,
             remaining_size,
@@ -163,12 +160,7 @@ module aptos_experimental::order_book {
         };
 
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx =
-            if (order_req.unique_priority_idx.is_some()) {
-                order_req.unique_priority_idx.destroy_some()
-            } else {
-                generate_unique_idx_fifo_tiebraker()
-            };
+        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
 
         assert!(
             !self.orders.contains(&order_id),
@@ -200,7 +192,9 @@ module aptos_experimental::order_book {
     /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
     /// it is added to the order book, if it exists, it's size is updated.
     public fun reinsert_maker_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_req: OrderRequest<M>
+        self: &mut OrderBook<M>,
+        order_req: OrderRequest<M>,
+        unique_priority_idx: UniqueIdxType
     ) {
         assert!(order_req.trigger_condition.is_none(), E_NOT_ACTIVE_ORDER);
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
@@ -212,7 +206,7 @@ module aptos_experimental::order_book {
         self.orders.add(order_id, order_with_state);
         self.active_orders.increase_order_size(
             order_req.price,
-            order_req.unique_priority_idx.destroy_some(),
+            unique_priority_idx,
             order_req.remaining_size,
             order_req.is_buy
         );
@@ -222,12 +216,7 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ) {
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx =
-            if (order_req.unique_priority_idx.is_some()) {
-                order_req.unique_priority_idx.destroy_some()
-            } else {
-                generate_unique_idx_fifo_tiebraker()
-            };
+        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
         let order =
             new_order(
                 order_id,
@@ -402,7 +391,6 @@ module aptos_experimental::order_book {
                     OrderRequest {
                         account: order_req.account,
                         account_order_id: order_req.account_order_id,
-                        unique_priority_idx: option::none(),
                         price: order_req.price,
                         orig_size: order_req.orig_size,
                         remaining_size: remainig_size,
@@ -431,12 +419,10 @@ module aptos_experimental::order_book {
         let unique_priority_idx =
             self.get_unique_priority_idx(order_req.account, order_req.account_order_id);
         assert!(unique_priority_idx.is_some(), EORDER_NOT_FOUND);
-        let unique_priority_idx = unique_priority_idx.destroy_some();
         self.cancel_order(order_req.account, order_req.account_order_id);
         let order_req = OrderRequest {
             account: order_req.account,
             account_order_id: order_req.account_order_id,
-            unique_priority_idx: option::some(unique_priority_idx),
             price: order_req.price,
             orig_size: order_req.orig_size,
             remaining_size: order_req.remaining_size,
@@ -458,7 +444,7 @@ module aptos_experimental::order_book {
             let order = ready_orders[i];
             let (
                 order_id,
-                unique_priority_idx,
+                _unique_priority_idx,
                 price,
                 orig_size,
                 remaining_size,
@@ -470,7 +456,6 @@ module aptos_experimental::order_book {
             let order_req = OrderRequest {
                 account,
                 account_order_id,
-                unique_priority_idx: option::some(unique_priority_idx),
                 price,
                 orig_size,
                 remaining_size,
@@ -480,7 +465,7 @@ module aptos_experimental::order_book {
             };
             let match_results = self.place_order_and_get_matches(order_req);
             all_matches.append(match_results);
-            i = i + 1;
+            i += 1;
         };
         all_matches
     }
@@ -511,7 +496,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -540,7 +524,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -593,7 +576,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 101,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -609,7 +591,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -626,7 +607,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 2,
-                    unique_priority_idx: option::none(),
                     price: 101,
                     orig_size: 500,
                     remaining_size: 500,
@@ -659,7 +639,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -676,7 +655,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 99,
                     orig_size: 500,
                     remaining_size: 500,
@@ -693,7 +671,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 99,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -728,7 +705,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 101,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -744,7 +720,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -761,7 +736,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 3,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -785,7 +759,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -802,7 +775,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -830,7 +802,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 2,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -878,7 +849,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -896,7 +866,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 800,
                     remaining_size: 800,
@@ -947,7 +916,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -966,7 +934,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -1003,7 +970,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 2,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -1061,7 +1027,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xAA,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -1080,7 +1045,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 1,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -1118,7 +1082,6 @@ module aptos_experimental::order_book {
                 OrderRequest {
                     account: @0xBB,
                     account_order_id: 2,
-                    unique_priority_idx: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -1174,7 +1137,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1189,7 +1151,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xBB,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 100,
             remaining_size: 100,
@@ -1216,7 +1177,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::some(unique_idx),
             price,
             orig_size,
             remaining_size: 50,
@@ -1224,7 +1184,7 @@ module aptos_experimental::order_book {
             trigger_condition: option::none(),
             metadata
         };
-        order_book.reinsert_maker_order(order_req);
+        order_book.reinsert_maker_order(order_req, unique_idx);
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(@0xAA, 1) == 950);
         order_book.destroy_order_book();
@@ -1238,7 +1198,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1253,7 +1212,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xBB,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1280,7 +1238,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::some(unique_idx),
             price,
             orig_size,
             remaining_size: 500,
@@ -1288,7 +1245,7 @@ module aptos_experimental::order_book {
             trigger_condition: option::none(),
             metadata
         };
-        order_book.reinsert_maker_order(order_req);
+        order_book.reinsert_maker_order(order_req, unique_idx);
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(@0xAA, 1) == 500);
         order_book.destroy_order_book();
@@ -1302,7 +1259,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xAA,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1320,7 +1276,6 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest {
             account: @0xBB,
             account_order_id: 1,
-            unique_priority_idx: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,

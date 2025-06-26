@@ -607,6 +607,8 @@ pub struct GlobalEnv {
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
+    /// A set of types that are instantiated in cmp module.
+    pub cmp_types: RefCell<BTreeSet<Type>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -668,6 +670,7 @@ impl GlobalEnv {
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
             generated_by_v2: false,
+            cmp_types: RefCell::new(Default::default()),
         }
     }
 
@@ -3605,6 +3608,10 @@ impl<'env> ModuleEnv<'env> {
             || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
+    }
+
+    pub fn is_cmp(&self) -> bool {
+        self.is_module_in_std("cmp")
     }
 }
 

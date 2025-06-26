@@ -72,7 +72,7 @@ fn run_transactions<K, V, E>(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     for _ in 0..num_repeat {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -203,7 +203,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .into_iter()
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
         phantom: PhantomData,
@@ -266,7 +266,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .into_iter()
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -391,7 +391,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions.clone());
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions.clone());
     // Confirm still no intersection
     let mut guard = AptosModuleCacheManagerGuard::none();
     let output = BlockExecutor::<
@@ -440,7 +440,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
     for _ in 0..200 {
         let mut guard = AptosModuleCacheManagerGuard::none();
 
@@ -515,7 +515,7 @@ fn non_empty_group(
             txn_gen.materialize_groups::<[u8; 32], MockEvent>(&key_universe, group_size_pcts)
         })
         .collect();
-    let txn_provider = DefaultTxnProvider::new(transactions);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(key_universe_len - 3)..key_universe_len]

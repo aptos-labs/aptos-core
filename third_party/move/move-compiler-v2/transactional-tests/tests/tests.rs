@@ -136,6 +136,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "optimization/bug_14223_unused_non_droppable.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
+    // Different error messages depending on optimizations or not
+    "no-v1-comparison/fv_as_keys.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

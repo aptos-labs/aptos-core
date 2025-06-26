@@ -13,7 +13,10 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::{gas::GasMeter, module_linker_error};
+use move_vm_types::{
+    gas::{DependencyGasMeter, GasMeter},
+    module_linker_error,
+};
 use std::collections::BTreeSet;
 
 pub fn check_script_dependencies_and_check_gas(
@@ -80,8 +83,8 @@ pub fn check_type_tag_dependencies_and_charge_gas(
 /// `ModuleId`, a.k.a. heap allocations, as much as possible, which is critical for
 /// performance.
 pub fn check_dependencies_and_charge_gas<'a, I>(
-    module_storage: &impl ModuleStorage,
-    gas_meter: &mut impl GasMeter,
+    module_storage: &dyn ModuleStorage,
+    gas_meter: &mut dyn DependencyGasMeter,
     traversal_context: &mut TraversalContext<'a>,
     ids: I,
 ) -> VMResult<()>
@@ -99,7 +102,7 @@ where
 
     while let Some((addr, name)) = stack.pop() {
         let size = module_storage
-            .fetch_module_size_in_bytes(addr, name)?
+            .unmetered_get_module_size(addr, name)?
             .ok_or_else(|| module_linker_error!(addr, name))?;
         gas_meter
             .charge_dependency(false, addr, name, NumBytes::new(size as u64))

@@ -580,15 +580,13 @@ impl TransactionsApi {
             let ledger_info = context.get_latest_ledger_info()?;
             let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
 
-            // Confirm the simulation filter allows the transaction. We use HashValue::zero()
-            // here for the block ID because we don't allow filtering by block ID for the
-            // simulation filters. See the ConfigSanitizer for ApiConfig.
-            if !context.node_config.api.simulation_filter.allows(
-                aptos_crypto::HashValue::zero(),
-                ledger_info.epoch(),
-                ledger_info.timestamp(),
-                &signed_transaction,
-            ) {
+            // Confirm the simulation filter allows the transaction
+            if !context
+                .node_config
+                .api
+                .simulation_filter
+                .allows(&signed_transaction)
+            {
                 return Err(SubmitTransactionError::forbidden_with_code(
                     "Transaction not allowed by simulation filter",
                     AptosErrorCode::InvalidInput,
@@ -1405,6 +1403,10 @@ impl TransactionsApi {
                 format!("Transaction was rejected with status {}", mempool_status,),
                 AptosErrorCode::InternalError,
             )),
+            MempoolStatusCode::RejectedByFilter => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::RejectedByFilter,
+            )),
         }
     }
 
@@ -1612,6 +1614,7 @@ impl TransactionsApi {
             None,
             output.gas_used(),
             exe_status,
+            None,
         );
         let mut events = output.events().to_vec();
         let _ = self

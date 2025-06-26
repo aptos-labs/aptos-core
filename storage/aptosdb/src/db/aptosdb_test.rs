@@ -199,6 +199,7 @@ fn test_get_latest_ledger_summary() {
         Some(state_hash),
         0,
         ExecutionStatus::MiscellaneousError(None),
+        Some(HashValue::random()),
     );
     let root_hash = txn_info.hash();
     let mut txn_to_commit = TransactionToCommit::dummy();

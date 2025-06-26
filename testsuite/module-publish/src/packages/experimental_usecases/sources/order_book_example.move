@@ -64,7 +64,6 @@ module 0xABCD::order_book_example {
             order_book::new_order_request(
                 sender, // account
                 account_order_id,
-                option::none(), // unique_priority_idx,
                 bid_price,
                 volume,
                 volume,

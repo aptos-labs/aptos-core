@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: '|&||u64|u64 has drop + store + key'
+   ┌─ tests/ability-check/fv_as_keys/store_fv.move:13:5
+   │
+13 │     move_to<| &||u64 |u64 has store+drop+key>(acc, f);
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │     │
+   │     Invalid call to MoveTo<|&||u64|u64 has drop + store + key>.

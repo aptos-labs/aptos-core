@@ -32,7 +32,7 @@ use move_vm_types::loaded_data::{
     struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fmt::Debug,
     ops::Deref,
     sync::Arc,
@@ -93,6 +93,10 @@ pub struct Module {
     // `VecMutBorrow(SignatureIndex)`, the `SignatureIndex` maps to a single `SignatureToken`, and
     // hence, a single type.
     pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
+
+    // Friends of this module. Needed for re-entrancy visibility checks if lazy loading is enabled.
+    // Particularly, if a callee has friend visibility, the caller's module must be in this set.
+    pub(crate) friends: BTreeSet<ModuleId>,
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +157,10 @@ impl Module {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let friends = module
+            .immediate_friends_iter()
+            .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
+            .collect::<BTreeSet<_>>();
 
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
@@ -373,7 +381,46 @@ impl Module {
             function_map,
             struct_map,
             single_signature_token_map,
+            friends,
         })
+    }
+
+    /// Creates a new Module instance for testing purposes.
+    /// This method creates a minimal Module with empty contents.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_for_test(module_id: ModuleId) -> Self {
+        use move_binary_format::file_format::empty_module;
+
+        // Start with an empty module
+        let mut empty_module = empty_module();
+
+        // Update the module ID
+        empty_module.identifiers[0] = module_id.name().to_owned();
+        empty_module.address_identifiers[0] = *module_id.address();
+
+        // Create necessary empty collections
+        let module_arc = Arc::new(empty_module);
+
+        Self {
+            id: module_id,
+            size: 0,
+            module: module_arc,
+            structs: vec![],
+            struct_instantiations: vec![],
+            struct_variant_infos: vec![],
+            struct_variant_instantiation_infos: vec![],
+            function_refs: vec![],
+            function_defs: vec![],
+            function_instantiations: vec![],
+            field_handles: vec![],
+            field_instantiations: vec![],
+            variant_field_infos: vec![],
+            variant_field_instantiation_infos: vec![],
+            function_map: HashMap::new(),
+            struct_map: HashMap::new(),
+            single_signature_token_map: BTreeMap::new(),
+            friends: BTreeSet::new(),
+        }
     }
 
     fn make_struct_type(

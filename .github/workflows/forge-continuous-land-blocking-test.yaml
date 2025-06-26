@@ -12,6 +12,11 @@ permissions:
 on:
   # Allow triggering manually
   workflow_dispatch:
+    inputs:
+      FORGE_CLUSTER_NAME:
+        required: false
+        type: string
+        description: The Forge k8s cluster to be used for test
   push:
     branches:
       # Use this branch for canary
@@ -85,6 +90,7 @@ jobs:
       FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
 
@@ -144,6 +150,7 @@ jobs:
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
 
@@ -161,5 +168,6 @@ jobs:
       FORGE_TEST_SUITE: framework_upgrade
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
