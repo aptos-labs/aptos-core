@@ -560,7 +560,7 @@ crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "5.5.3", features = ["inline"] }
+dashmap = { version = "6.1.0", features = ["inline"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
