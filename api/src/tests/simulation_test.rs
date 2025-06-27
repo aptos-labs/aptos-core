@@ -3,6 +3,7 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, pretty, TestContext};
+use aptos_cached_packages::aptos_stdlib::aptos_account_create_account;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_types::{
     account_address::AccountAddress,
@@ -439,4 +440,39 @@ async fn test_bcs_execute_fee_payer_transaction_no_authenticator_fail() {
         .as_str()
         .unwrap()
         .contains("INVALID_SIGNATURE"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_with_fee_payer() {
+    let mut context = new_test_context(current_function_name!());
+    let sender = context.gen_account();
+    let fee_payer = context.create_account().await;
+
+    let raw_txn = context
+        .transaction_factory()
+        .payload(aptos_account_create_account(
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ))
+        .sender(sender.address())
+        .sequence_number(sender.sequence_number())
+        .gas_unit_price(1)
+        .expiration_timestamp_secs(u64::MAX)
+        .build();
+
+    let txn = SignedTransaction::new_signed_transaction(
+        raw_txn.clone(),
+        TransactionAuthenticator::FeePayer {
+            sender: AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signer_addresses: vec![],
+            secondary_signers: vec![],
+            fee_payer_address: fee_payer.address(),
+            fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
+        },
+    );
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(200)
+        .post_bcs_txn("/transactions/simulate?estimate_max_gas_amount=true", body)
+        .await;
+    assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
 }
