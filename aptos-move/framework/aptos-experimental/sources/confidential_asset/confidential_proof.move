@@ -453,12 +453,6 @@ module aptos_experimental::confidential_proof {
         );
 
         let scalar_h = ristretto255::scalar_mul(&gammas.g5, &proof.alphas.a5);
-        vector::range(0, 8).for_each(|i| {
-            ristretto255::scalar_add_assign(
-                &mut scalar_h,
-                &scalar_mul_3(&gammas.g1, &proof.alphas.a6s[i], &new_scalar_from_pow2(i * 16))
-            );
-        });
         vector::range(0, 4).for_each(|i| {
             ristretto255::scalar_sub_assign(
                 &mut scalar_h,
@@ -501,12 +495,7 @@ module aptos_experimental::confidential_proof {
         });
 
         let scalars_new_balance_d = vector::range(0, 8).map(|i| {
-            let scalar = ristretto255::scalar_mul(&gammas.g2s[i], &rho);
-            ristretto255::scalar_sub_assign(
-                &mut scalar,
-                &scalar_mul_3(&gammas.g1, &proof.alphas.a2, &new_scalar_from_pow2(i * 16))
-            );
-            scalar
+            ristretto255::scalar_mul(&gammas.g2s[i], &rho)
         });
 
         let scalars_recipient_amount_d = vector::range(0, 4).map(|i| {
@@ -1561,37 +1550,21 @@ module aptos_experimental::confidential_proof {
             &scalar_linear_combination(&sigma_r.x1s, &vector::range(0, 8).map(|i| new_scalar_from_pow2(i * 16)))
         );
 
-        ristretto255::point_add_assign(
+        ristretto255::point_sub_assign(
             &mut x1,
             &ristretto255::point_mul(
                 &ristretto255::hash_to_point_base(),
-                &ristretto255::scalar_sub(
-                    &scalar_linear_combination(
-                        &sigma_r.x6s,
-                        &vector::range(0, 8).map(|i| new_scalar_from_pow2(i * 16))
-                    ),
-                    &scalar_linear_combination(&sigma_r.x3s, &vector::range(0, 4).map(|i| new_scalar_from_pow2(i * 16)))
-                )
+                &scalar_linear_combination(&sigma_r.x3s, &vector::range(0, 4).map(|i| new_scalar_from_pow2(i * 16)))
             ),
         );
 
         let current_balance_d = confidential_balance::balance_to_points_d(current_balance);
-        let new_balance_d = confidential_balance::balance_to_points_d(&new_balance);
 
         vector::range(0, 8).for_each(|i| {
             ristretto255::point_add_assign(
                 &mut x1,
                 &ristretto255::point_mul(
                     &current_balance_d[i],
-                    &ristretto255::scalar_mul(&sigma_r.x2, &new_scalar_from_pow2(i * 16))
-                ),
-            );
-        });
-        vector::range(0, 8).for_each(|i| {
-            ristretto255::point_sub_assign(
-                &mut x1,
-                &ristretto255::point_mul(
-                    &new_balance_d[i],
                     &ristretto255::scalar_mul(&sigma_r.x2, &new_scalar_from_pow2(i * 16))
                 ),
             );
