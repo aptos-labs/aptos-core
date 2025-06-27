@@ -91,12 +91,12 @@ impl PersistedAuxiliaryInfoDb {
     pub(crate) fn commit_auxiliary_info(
         &self,
         first_version: Version,
-        persisted_auxiliary_info: &[PersistedAuxiliaryInfo],
+        persisted_auxiliary_infos: &[PersistedAuxiliaryInfo],
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_auxiliary_info"]);
 
         let mut batch = SchemaBatch::new();
-        persisted_auxiliary_info.iter().enumerate().try_for_each(
+        persisted_auxiliary_infos.iter().enumerate().try_for_each(
             |(i, aux_info)| -> Result<()> {
                 let version = first_version + i as u64;
                 Self::put_persisted_auxiliary_info(version, aux_info, &mut batch)

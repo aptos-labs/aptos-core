@@ -23,7 +23,7 @@ use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_time_service::TimeService;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof, TransactionOutputListWithProofV2},
 };
 use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
@@ -364,6 +364,8 @@ async fn test_notifications_continuous_transactions_target() {
 
                 // Update the next expected version
                 let num_transactions = transactions_with_proof.transactions.len() as u64;
+                let num_auxiliary_infos = transactions_with_proof.auxiliary_infos.len() as u64;
+                assert_eq!(num_auxiliary_infos, num_transactions);
                 next_expected_version += num_transactions;
 
                 // Update epochs if we've hit the epoch end
@@ -1904,7 +1906,7 @@ fn verify_continuous_outputs_with_proof(
     expected_epoch: u64,
     expected_version: u64,
     ledger_info_with_sigs: LedgerInfoWithSignatures,
-    outputs_with_proofs: TransactionOutputListWithProof,
+    outputs_with_proofs: TransactionOutputListWithProofV2,
 ) -> (u64, u64) {
     // Verify the ledger info epoch matches the expected epoch
     let ledger_info = ledger_info_with_sigs.ledger_info();
@@ -1937,7 +1939,7 @@ fn verify_continuous_transactions_with_proof(
     expected_epoch: u64,
     expected_version: u64,
     ledger_info_with_sigs: LedgerInfoWithSignatures,
-    transactions_with_proofs: TransactionListWithProof,
+    transactions_with_proofs: TransactionListWithProofV2,
 ) -> (u64, u64) {
     // Verify the ledger info epoch matches the expected epoch
     let ledger_info = ledger_info_with_sigs.ledger_info();
@@ -1949,6 +1951,8 @@ fn verify_continuous_transactions_with_proof(
 
     // Calculate the next expected version
     let num_transactions = transactions_with_proofs.transactions.len() as u64;
+    let num_auxiliary_infos = transactions_with_proofs.auxiliary_infos.len() as u64;
+    assert_eq!(num_auxiliary_infos, num_transactions);
     let next_expected_version = expected_version + num_transactions;
 
     // Update epochs if we've hit the epoch end

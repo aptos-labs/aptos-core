@@ -139,6 +139,7 @@ pub enum DataResponse {
     TransactionsWithProof(TransactionListWithProof),
     NewTransactionsOrOutputsWithProof((TransactionOrOutputListWithProof, LedgerInfoWithSignatures)),
     TransactionsOrOutputsWithProof(TransactionOrOutputListWithProof),
+    DataV2(DataResponseV2)
 }
 
 impl DataResponse {

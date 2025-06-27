@@ -14,7 +14,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         StateViewId, StateViewResult, TStateView,
     },
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
 };
 use lru::LruCache;
 use move_core_types::language_storage::ModuleId;
@@ -46,7 +46,7 @@ pub trait AptosValidatorInterface: Sync {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)>;
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<PersistedAuxiliaryInfo>)>;
 
     async fn get_and_filter_committed_transactions(
         &self,

@@ -32,10 +32,7 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
-        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        use_case::UseCaseAwareTransaction, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, ReplayProtector, Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionListWithProofV2, TransactionOutput, TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionPayload, TransactionStatus, Version
     },
     validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
@@ -143,10 +140,10 @@ pub fn create_ledger_info_at_version(version: Version) -> LedgerInfoWithSignatur
 }
 
 /// Creates a test transaction output list with proof
-pub fn create_output_list_with_proof() -> TransactionOutputListWithProof {
+pub fn create_output_list_with_proof() -> TransactionOutputListWithProofV2 {
     let transaction_info_list_with_proof = create_transaction_info_list_with_proof();
-    let transaction_and_output = (create_transaction(), create_transaction_output());
-    TransactionOutputListWithProof::new(
+    let transaction_and_output = (create_transaction(), create_transaction_output(), create_auxiliary_info());
+    TransactionOutputListWithProofV2::new(
         vec![transaction_and_output],
         Some(0),
         transaction_info_list_with_proof,
@@ -245,6 +242,10 @@ pub fn create_transaction_info() -> TransactionInfo {
     )
 }
 
+pub fn create_auxiliary_info() -> PersistedAuxiliaryInfo {
+    PersistedAuxiliaryInfo::V1 { transaction_index: 10 }
+}
+
 /// Creates a test transaction info list with proof
 pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof {
     TransactionInfoListWithProof::new(TransactionAccumulatorRangeProof::new_empty(), vec![
@@ -253,10 +254,11 @@ pub fn create_transaction_info_list_with_proof() -> TransactionInfoListWithProof
 }
 
 /// Creates a test transaction list with proof
-pub fn create_transaction_list_with_proof() -> TransactionListWithProof {
+pub fn create_transaction_list_with_proof() -> TransactionListWithProofV2 {
     let transaction_info_list_with_proof = create_transaction_info_list_with_proof();
-    TransactionListWithProof::new(
+    TransactionListWithProofV2::new(
         vec![create_transaction()],
+        vec![create_auxiliary_info()],
         None,
         Some(0),
         transaction_info_list_with_proof,

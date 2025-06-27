@@ -45,9 +45,7 @@ use aptos_types::{
         TStateView,
     },
     transaction::{
-        block_epilogue::BlockEndInfo,
-        use_case::{UseCaseAwareTransaction, UseCaseKey},
-        IndexedTransactionSummary, SignedTransaction, Transaction, TransactionWithProof, Version,
+        block_epilogue::BlockEndInfo, use_case::{UseCaseAwareTransaction, UseCaseKey}, IndexedTransactionSummary, SignedTransaction, Transaction, TransactionWithProof, Version
     },
 };
 use futures::{channel::oneshot, SinkExt};

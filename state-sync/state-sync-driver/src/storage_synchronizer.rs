@@ -30,8 +30,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        Version,
+        Transaction, TransactionListWithProofV2, TransactionOutput, TransactionOutputListWithProofV2, Version
     },
 };
 use async_trait::async_trait;
@@ -59,7 +58,7 @@ pub trait StorageSynchronizerInterface {
     async fn apply_transaction_outputs(
         &mut self,
         notification_metadata: NotificationMetadata,
-        output_list_with_proof: TransactionOutputListWithProof,
+        output_list_with_proof: TransactionOutputListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
@@ -70,7 +69,7 @@ pub trait StorageSynchronizerInterface {
     async fn execute_transactions(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: TransactionListWithProof,
+        transaction_list_with_proof: TransactionListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
@@ -85,7 +84,7 @@ pub trait StorageSynchronizerInterface {
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
-        target_output_with_proof: TransactionOutputListWithProof,
+        target_output_with_proof: TransactionOutputListWithProofV2,
     ) -> Result<JoinHandle<()>, Error>;
 
     /// Returns true iff there is storage data that is still waiting
@@ -331,7 +330,7 @@ impl<
     async fn apply_transaction_outputs(
         &mut self,
         notification_metadata: NotificationMetadata,
-        output_list_with_proof: TransactionOutputListWithProof,
+        output_list_with_proof: TransactionOutputListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
@@ -355,7 +354,7 @@ impl<
     async fn execute_transactions(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: TransactionListWithProof,
+        transaction_list_with_proof: TransactionListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
@@ -380,7 +379,7 @@ impl<
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
-        target_output_with_proof: TransactionOutputListWithProof,
+        target_output_with_proof: TransactionOutputListWithProofV2,
     ) -> Result<JoinHandle<()>, Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
         let max_pending_data_chunks = self.driver_config.max_pending_data_chunks as usize;
@@ -471,13 +470,14 @@ enum StorageDataChunk {
     States(NotificationId, StateValueChunkWithProof),
     Transactions(
         NotificationMetadata,
-        TransactionListWithProof,
+        // Question[MI Counter]: Is it okay to change the type as this is internal?
+        TransactionListWithProofV2,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
     TransactionOutputs(
         NotificationMetadata,
-        TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
@@ -838,7 +838,7 @@ fn spawn_state_snapshot_receiver<
     storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
     target_ledger_info: LedgerInfoWithSignatures,
-    target_output_with_proof: TransactionOutputListWithProof,
+    target_output_with_proof: TransactionOutputListWithProofV2,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a state snapshot receiver
@@ -985,7 +985,7 @@ fn spawn_state_snapshot_receiver<
 /// block the async thread.
 async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    outputs_with_proof: TransactionOutputListWithProof,
+    outputs_with_proof: TransactionOutputListWithProofV2,
     target_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
@@ -1025,7 +1025,7 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
 /// doesn't block the async thread.
 async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    transactions_with_proof: TransactionListWithProof,
+    transactions_with_proof: TransactionListWithProofV2,
     target_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
@@ -1111,7 +1111,7 @@ async fn finalize_storage_and_send_commit<
     >,
     storage: DbReaderWriter,
     epoch_change_proofs: &[LedgerInfoWithSignatures],
-    target_output_with_proof: TransactionOutputListWithProof,
+    target_output_with_proof: TransactionOutputListWithProofV2,
     version: Version,
     target_ledger_info: &LedgerInfoWithSignatures,
     last_committed_state_index: u64,
@@ -1180,7 +1180,7 @@ async fn finalize_storage_and_send_commit<
 
 /// Creates a commit notification for the new committed state snapshot
 fn create_commit_notification(
-    target_output_with_proof: &TransactionOutputListWithProof,
+    target_output_with_proof: &TransactionOutputListWithProofV2,
     last_committed_state_index: u64,
     version: u64,
 ) -> CommitNotification {
@@ -1189,6 +1189,7 @@ fn create_commit_notification(
             .transactions_and_outputs
             .clone()
             .into_iter()
+            .map(|(txn, output, _)| (txn, output))
             .unzip();
     let events = outputs
         .into_iter()

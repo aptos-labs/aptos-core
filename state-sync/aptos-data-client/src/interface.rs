@@ -6,7 +6,7 @@ use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, E
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof, TransactionOutputListWithProofV2, Version},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -268,8 +268,11 @@ pub enum ResponsePayload {
     NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
     NumberOfStates(u64),
     StateValuesWithProof(StateValueChunkWithProof),
+    // Question[MI counter]: Not adding V2 versions for this, as these seem outdated. Is that okay?
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+    TransactionOutputsWithProofV2((TransactionOutputListWithProofV2, LedgerInfoWithSignatures)),
+    TransactionsWithProofV2((TransactionListWithProofV2, LedgerInfoWithSignatures)),
 }
 
 impl ResponsePayload {
@@ -284,6 +287,8 @@ impl ResponsePayload {
             Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
+            Self::TransactionOutputsWithProofV2(_) => "transaction_outputs_with_proof_v2",
+            Self::TransactionsWithProofV2(_) => "transactions_with_proof_v2",
         }
     }
 
@@ -310,6 +315,12 @@ impl ResponsePayload {
                 outputs_with_proof.transactions_and_outputs.len()
             },
             Self::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
+            Self::TransactionOutputsWithProofV2((outputs_with_proof, _)) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::TransactionsWithProofV2((transactions_with_proof, _)) => {
                 transactions_with_proof.transactions.len()
             },
         }

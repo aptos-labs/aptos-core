@@ -4132,6 +4132,12 @@ async fn wait_for_notification_and_verify(
                     DataPayload::ContinuousTransactionOutputsWithProof(..) => {
                         assert!(allow_transactions_or_outputs || !transaction_syncing);
                     },
+                    DataPayload::ContinuousTransactionsWithProofV2(..) => {
+                        assert!(allow_transactions_or_outputs || transaction_syncing);
+                    },
+                    DataPayload::ContinuousTransactionOutputsWithProofV2(..) => {
+                        assert!(allow_transactions_or_outputs || !transaction_syncing);
+                    },
                     _ => {
                         panic!(
                             "Invalid data notification found: {:?}",
