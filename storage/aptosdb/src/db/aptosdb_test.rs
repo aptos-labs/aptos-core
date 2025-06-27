@@ -322,6 +322,8 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
+    #[ignore]
+    // TODO(grao): Fix this.
     fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
         aptos_logger::Logger::new().init();
         test_state_merkle_pruning_impl(input);

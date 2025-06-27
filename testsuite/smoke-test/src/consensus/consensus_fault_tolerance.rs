@@ -49,6 +49,7 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
                 .state_sync
                 .state_sync_driver
                 .max_connection_deadline_secs = 3;
+            config.indexer_db_config.enable_event = true;
         }))
         .build()
         .await;

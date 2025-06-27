@@ -1194,6 +1194,7 @@ impl TestContext {
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+        self.wait_for_internal_indexer_caught_up().await;
         let resp = self.reply(req).await;
 
         let headers = resp.headers();
