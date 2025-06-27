@@ -9,7 +9,7 @@ use aptos_forge::{
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice, MetricSamples},
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJob, EmitJobMode, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest,
-    Result, Test, TxnStats, WorkflowProgress,
+    ReplayProtectionType, Result, Test, TxnStats, WorkflowProgress,
 };
 use async_trait::async_trait;
 use log::{error, info};
@@ -111,6 +111,7 @@ impl Workloads {
 #[derive(Debug, Clone)]
 pub struct TransactionWorkload {
     pub transaction_type: TransactionTypeArg,
+    pub replay_protection_type: ReplayProtectionType,
     pub num_modules: usize,
     pub unique_senders: bool,
     pub load: EmitJobMode,
@@ -118,9 +119,14 @@ pub struct TransactionWorkload {
 }
 
 impl TransactionWorkload {
-    pub fn new(transaction_type: TransactionTypeArg, mempool_backlog: usize) -> Self {
+    pub fn new(
+        transaction_type: TransactionTypeArg,
+        replay_protection_type: ReplayProtectionType,
+        mempool_backlog: usize,
+    ) -> Self {
         Self {
             transaction_type,
+            replay_protection_type,
             num_modules: 1,
             unique_senders: false,
             load: EmitJobMode::MaxLoad { mempool_backlog },
@@ -128,9 +134,14 @@ impl TransactionWorkload {
         }
     }
 
-    pub fn new_const_tps(transaction_type: TransactionTypeArg, tps: usize) -> Self {
+    pub fn new_const_tps(
+        transaction_type: TransactionTypeArg,
+        replay_protection_type: ReplayProtectionType,
+        tps: usize,
+    ) -> Self {
         Self {
             transaction_type,
+            replay_protection_type,
             num_modules: 1,
             unique_senders: false,
             load: EmitJobMode::ConstTps { tps },
@@ -140,12 +151,14 @@ impl TransactionWorkload {
 
     pub fn new_wave_tps(
         transaction_type: TransactionTypeArg,
+        replay_protection_type: ReplayProtectionType,
         average_tps: usize,
         wave_ratio: f32,
         num_waves: usize,
     ) -> Self {
         Self {
             transaction_type,
+            replay_protection_type,
             num_modules: 1,
             unique_senders: false,
             load: EmitJobMode::WaveTps {
@@ -196,18 +209,25 @@ impl TransactionWorkload {
             );
             request.transaction_mix_per_phase(vec![
                 // warmup
-                vec![(account_creation_type.clone(), 1)],
-                vec![(account_creation_type, 1)],
-                vec![(write_type.clone(), 1)],
+                vec![(
+                    account_creation_type.clone(),
+                    self.replay_protection_type,
+                    1,
+                )],
+                vec![(account_creation_type, self.replay_protection_type, 1)],
+                vec![(write_type.clone(), self.replay_protection_type, 1)],
                 // cooldown
-                vec![(write_type, 1)],
+                vec![(write_type, self.replay_protection_type, 1)],
             ])
         } else {
-            request.transaction_type(self.transaction_type.materialize(
-                self.num_modules,
-                false,
-                WorkflowProgress::when_done_default(),
-            ))
+            request.transaction_type(
+                self.transaction_type.materialize(
+                    self.num_modules,
+                    false,
+                    WorkflowProgress::when_done_default(),
+                ),
+                self.replay_protection_type,
+            )
         }
     }
 
@@ -309,32 +329,33 @@ impl NetworkTest for LoadVsPerfBenchmark {
         let mut ctx_locker = ctx.ctx.lock().await;
         let ctx = ctx_locker.deref_mut();
 
-        let mut background_job = if let Some(background_traffic) = &self.background_traffic {
-            let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
-                .get_destination_nodes(ctx.swarm.clone())
-                .await;
-            let rng = SeedableRng::from_rng(ctx.core().rng())?;
-            let (mut emitter, emit_job_request) = create_emitter_and_request(
-                ctx.swarm.clone(),
-                background_traffic.traffic.clone(),
-                &nodes_to_send_load_to,
-                rng,
-            )
-            .await
-            .context("create emitter")?;
-
-            let job = emitter
-                .start_job(
-                    ctx.swarm.read().await.chain_info().root_account,
-                    emit_job_request,
-                    1 + 2 * self.workloads.len(),
+        let mut background_job: Option<EmitJob> =
+            if let Some(background_traffic) = &self.background_traffic {
+                let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
+                    .get_destination_nodes(ctx.swarm.clone())
+                    .await;
+                let rng = SeedableRng::from_rng(ctx.core().rng())?;
+                let (mut emitter, emit_job_request) = create_emitter_and_request(
+                    ctx.swarm.clone(),
+                    background_traffic.traffic.clone(),
+                    &nodes_to_send_load_to,
+                    rng,
                 )
                 .await
-                .context("start emitter job")?;
-            Some(job)
-        } else {
-            None
-        };
+                .context("create emitter")?;
+
+                let job = emitter
+                    .start_job(
+                        ctx.swarm.read().await.chain_info().root_account,
+                        emit_job_request,
+                        1 + 2 * self.workloads.len(),
+                    )
+                    .await
+                    .context("start emitter job")?;
+                Some(job)
+            } else {
+                None
+            };
 
         let (phase_duration, buffer) = self.workloads.split_duration(ctx.global_duration);
 
@@ -569,9 +590,17 @@ fn test_phases_duration() {
     use assert_approx_eq::assert_approx_eq;
     use std::ops::{Add, Mul};
 
-    let one_phase = TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000);
-    let two_phase = TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 20000)
-        .with_unique_senders();
+    let one_phase = TransactionWorkload::new(
+        TransactionTypeArg::CoinTransfer,
+        ReplayProtectionType::SequenceNumber,
+        20000,
+    );
+    let two_phase = TransactionWorkload::new(
+        TransactionTypeArg::ModifyGlobalResource,
+        ReplayProtectionType::Nonce,
+        20000,
+    )
+    .with_unique_senders();
 
     {
         let workload = Workloads::TRANSACTIONS(vec![one_phase.clone()]);

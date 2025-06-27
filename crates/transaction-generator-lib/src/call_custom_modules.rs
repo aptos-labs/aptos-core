@@ -5,7 +5,7 @@ use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
 use crate::{
     create_account_transaction,
     publishing::{entry_point_trait::PreBuiltPackages, publish_util::PackageHandler},
-    RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator,
+    ReplayProtectionType, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator,
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -24,6 +24,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
+        ReplayProtectionType,
     ) -> Option<SignedTransaction>
     + Send
     + Sync;
@@ -87,6 +88,7 @@ pub struct CustomModulesDelegationGenerator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl CustomModulesDelegationGenerator {
@@ -95,12 +97,14 @@ impl CustomModulesDelegationGenerator {
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             rng,
             txn_factory,
             packages,
             txn_generator,
+            replay_protection_type,
         }
     }
 }
@@ -121,6 +125,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 publisher,
                 &self.txn_factory,
                 &mut self.rng,
+                self.replay_protection_type,
             );
             if let Some(request) = request {
                 requests.push(request);
@@ -134,6 +139,7 @@ pub struct CustomModulesDelegationGeneratorCreator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl CustomModulesDelegationGeneratorCreator {
@@ -142,11 +148,13 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             txn_factory,
             packages,
             txn_generator,
+            replay_protection_type,
         }
     }
 
@@ -159,6 +167,7 @@ impl CustomModulesDelegationGeneratorCreator {
         pre_built: &'static dyn PreBuiltPackages,
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         let packages = Self::publish_package(
             init_txn_factory.clone(),
@@ -168,6 +177,7 @@ impl CustomModulesDelegationGeneratorCreator {
             pre_built,
             package_name,
             None,
+            replay_protection_type,
         )
         .await;
         let worker = Self::create_worker(
@@ -182,6 +192,7 @@ impl CustomModulesDelegationGeneratorCreator {
             txn_factory,
             packages: Arc::new(packages),
             txn_generator: worker,
+            replay_protection_type,
         }
     }
 
@@ -230,6 +241,7 @@ impl CustomModulesDelegationGeneratorCreator {
         pre_built: &'static dyn PreBuiltPackages,
         package_name: &str,
         publisher_balance: Option<u64>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Vec<(Package, LocalAccount)> {
         let mut rng = StdRng::from_entropy();
         let mut requests_create = Vec::with_capacity(num_modules);
@@ -253,13 +265,16 @@ impl CustomModulesDelegationGeneratorCreator {
                 publisher_address,
                 &init_txn_factory,
                 publisher_balance,
+                replay_protection_type,
             ));
 
             let package = package_handler.pick_package(&mut rng, publisher.address());
             for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
-                requests_publish.push(
-                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
-                );
+                let mut txn_builder = init_txn_factory.payload(payload);
+                if let ReplayProtectionType::Nonce = replay_protection_type {
+                    txn_builder = txn_builder.upgrade_payload(true, true);
+                }
+                requests_publish.push(publisher.sign_with_transaction_builder(txn_builder));
             }
 
             packages.push((package, publisher));
@@ -303,6 +318,7 @@ impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
             self.txn_factory.clone(),
             self.packages.clone(),
             self.txn_generator.clone(),
+            self.replay_protection_type,
         ))
     }
 }
