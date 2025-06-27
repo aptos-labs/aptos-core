@@ -218,6 +218,8 @@ module aptos_framework::account {
     const ENOT_A_KEYLESS_PUBLIC_KEY: u64 = 25;
     /// The provided public key is not the original public key for the account
     const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
+    /// The set_originating_address is disabled due to potential poisoning from account abstraction
+    const ESET_ORIGINATING_ADDRESS_DISABLED: u64 = 27;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -828,6 +830,8 @@ module aptos_framework::account {
     /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
     /// authority of the new authentication key.
     entry fun set_originating_address(account: &signer) acquires Account, OriginatingAddress {
+        abort error::invalid_state(ESET_ORIGINATING_ADDRESS_DISABLED);
+
         let account_addr = signer::address_of(account);
         assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let auth_key_as_address =
@@ -2101,5 +2105,11 @@ module aptos_framework::account {
 
         let event = CoinRegister { account: addr, type_info: type_info::type_of<SadFakeCoin>() };
         assert!(!event::was_event_emitted(&event), 3);
+    }
+
+    #[test(account = @0x1234)]
+    #[expected_failure(abort_code = 0x3001b, location = Self)]
+    fun test_set_originating_address_fails(account: &signer) acquires Account, OriginatingAddress {
+        set_originating_address(account);
     }
 }
