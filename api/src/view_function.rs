@@ -18,6 +18,7 @@ use aptos_api_types::{
     U64,
 };
 use aptos_bcs_utils::serialize_uleb128;
+use aptos_types::transaction::ViewFunctionError;
 use aptos_vm::AptosVM;
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
@@ -140,8 +141,23 @@ fn view_request(
         view_function.args.clone(),
         context.node_config.api.max_gas_view_function,
     );
-    let values = output.values.map_err(|err| {
-        BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
+
+    let values = output.values.map_err(|status| {
+        let (err_string, vm_error_code) = match status {
+            ViewFunctionError::ExecutionStatus(status, vm_error_code) => {
+                let vm_status = state_view
+                    .as_converter(context.db.clone(), context.indexer_reader.clone())
+                    .explain_vm_status(&status, None);
+                (vm_status, vm_error_code)
+            },
+            ViewFunctionError::ErrorMessage(message, vm_error_code) => (message, vm_error_code),
+        };
+        BasicErrorWith404::bad_request_with_optional_vm_status_and_ledger_info(
+            anyhow::anyhow!(err_string),
+            AptosErrorCode::InvalidInput,
+            vm_error_code,
+            Some(&ledger_info),
+        )
     })?;
     let result = match accept_type {
         AcceptType::Bcs => {

@@ -36,7 +36,7 @@ use aptos_types::{
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
         RawTransactionWithData, Script, SignedTransaction, TransactionExecutable,
-        TransactionPayload, TransactionPayloadInner,
+        TransactionPayload, TransactionPayloadInner, ViewFunctionError,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -639,10 +639,23 @@ impl TransactionsApi {
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
-                let values = output.values.map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
+                let values = output.values.map_err(|status| {
+                    let (err_string, vm_error_code) = match status {
+                        ViewFunctionError::ExecutionStatus(status, vm_error_code) => {
+                            let vm_status = state_view
+                                .as_converter(context.db.clone(), context.indexer_reader.clone())
+                                .explain_vm_status(&status, None);
+                            (vm_status, vm_error_code)
+                        },
+                        ViewFunctionError::ErrorMessage(message, vm_error_code) => {
+                            (message, vm_error_code)
+                        },
+                    };
+                    SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
+                        anyhow::anyhow!(err_string),
                         AptosErrorCode::InvalidInput,
+                        vm_error_code,
+                        Some(&ledger_info),
                     )
                 })?;
                 let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {

@@ -146,6 +146,79 @@ async fn test_view_blocklist() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_error_type_resolution_error() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let resp = context
+        .expect_status_code(400)
+        .post(
+            "/view",
+            json!({
+                "function":"0x1::coin::is_account_registered",
+                "arguments": vec![AccountAddress::random().to_string()],
+                "type_arguments": ["0x1::aptos_coin::NewCoin"], // Does not exist
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_error_move_abort() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let resp = context
+        .expect_status_code(400)
+        .post(
+            "/view",
+            json!({
+                "function":"0x1::account::get_rotation_capability_offer_for", // Rotation capability does not exist
+                "arguments": vec![owner.address().to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_view_does_not_exist() {
+    let mut context = new_test_context(current_function_name!());
+    let creator = &mut context.gen_account();
+    let owner = &mut context.gen_account();
+    let txn1 = context.mint_user_account(creator).await;
+    let txn2 = context.account_transfer(creator, owner, 100_000);
+
+    context.commit_block(&vec![txn1, txn2]).await;
+
+    let resp = context
+        .expect_status_code(400)
+        .post(
+            "/view",
+            json!({
+                "function":"0x1::aptos_account::fake_function",
+                "arguments": vec![owner.address().to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_simple_view_invalid() {
     let mut context = new_test_context(current_function_name!());
     let creator = &mut context.gen_account();

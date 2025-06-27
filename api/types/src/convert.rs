@@ -1029,10 +1029,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         let code = self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.name.0.as_ident_str())
-            .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
+            .ok_or_else(|| format_err!("could not find view function by {}", function))?;
         ensure!(
             func.generic_type_params.len() == type_arguments.len(),
-            "expected {} type arguments for entry function {}, but got {}",
+            "expected {} type arguments for view function {}, but got {}",
             func.generic_type_params.len(),
             function,
             type_arguments.len()
@@ -1061,7 +1061,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         Ok(None)
     }
 
-    fn explain_vm_status(
+    pub fn explain_vm_status(
         &self,
         status: &ExecutionStatus,
         txn_aux_data: Option<TransactionAuxiliaryData>,
