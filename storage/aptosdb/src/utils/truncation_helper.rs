@@ -385,6 +385,7 @@ fn delete_transaction_index_data(
             .zip(transactions)
             .collect::<Vec<_>>();
         transaction_store.prune_transaction_by_account(&transactions, batch)?;
+        transaction_store.prune_transaction_summaries_by_account(&transactions, batch)?;
     }
 
     Ok(())
