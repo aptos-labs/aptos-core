@@ -18,10 +18,10 @@ aptos-block-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-move-debugger = { workspace = true }
 aptos-push-metrics = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
@@ -29,8 +29,10 @@ claims = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 move-core-types = { workspace = true }
+move-package = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 
