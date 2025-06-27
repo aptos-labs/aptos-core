@@ -1,0 +1,15 @@
+---
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+# replace with below for actual release, compat test needs concrete URL above:
+# remote_endpoint: ~
+name: "v1.31.2"
+proposals:
+  - name: proposal_1_upgrade_framework
+    metadata:
+      title: "Multi-step proposal to upgrade mainnet framework, version v1.31.2"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.31"
+    execution_mode: MultiStep
+    update_sequence:
+      - Framework:
+          bytecode_version: 7
+          git_hash: ~
