@@ -2,15 +2,36 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{value_serde::ValueSerDeContext, values::prop::layout_and_value_strategy};
+use crate::{
+    value_serde::{MockFunctionValueExtension, ValueSerDeContext},
+    values::prop::layout_and_value_strategy,
+};
+use better_any::TidExt;
 use move_core_types::value::MoveValue;
 use proptest::prelude::*;
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10000))]
     #[test]
     fn serializer_round_trip((layout, value) in layout_and_value_strategy()) {
-        let blob = ValueSerDeContext::new().serialize(&value, &layout).unwrap().expect("must serialize");
-        let value_deserialized = ValueSerDeContext::new().deserialize(&blob, &layout).expect("must deserialize");
+
+        // Set up mock function extension for function value serialization
+        let mut ext_mock = MockFunctionValueExtension::new();
+        ext_mock
+            .expect_get_serialization_data()
+            .returning(move |af| {
+                Ok(af
+                    .downcast_ref::<crate::values::function_values_impl::mock::MockAbstractFunction>()
+                    .expect("cast")
+                    .data.clone())
+            });
+        ext_mock
+            .expect_create_from_serialization_data()
+            .returning(move |data| Ok(Box::new(crate::values::function_values_impl::mock::MockAbstractFunction::new_from_data(data))));
+
+        let ctx = ValueSerDeContext::new().with_func_args_deserialization(&ext_mock);
+        let blob = ctx.serialize(&value, &layout).unwrap().expect("must serialize");
+        let value_deserialized = ValueSerDeContext::new().with_func_args_deserialization(&ext_mock).deserialize(&blob, &layout).expect("must deserialize");
         assert!(value.equals(&value_deserialized).unwrap());
 
         let move_value = value.as_move_value(&layout);
