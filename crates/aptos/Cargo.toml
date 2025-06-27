@@ -37,7 +37,7 @@ aptos-localnet = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
-aptos-node = { workspace = true }
+aptos-node = { workspace = true, optional = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
@@ -49,7 +49,7 @@ aptos-vm-environment = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
-aptos-workspace-server = { workspace = true }
+aptos-workspace-server = { workspace = true, optional = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }
@@ -115,7 +115,10 @@ jemallocator = { version = "0.5.0", features = [
 ] }
 
 [features]
-default = []
+# Core dependencies used for running a local testnet
+local-testnet = ["dep:aptos-node", "dep:aptos-workspace-server"]
+# The default build enables the local testnet setup
+default = ["local-testnet"]
 fuzzing = []
 no-upload-proposal = []
 indexer = ["aptos-node/indexer"]
