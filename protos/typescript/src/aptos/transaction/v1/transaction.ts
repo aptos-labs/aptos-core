@@ -230,6 +230,7 @@ export interface Transaction {
     | undefined;
   /** value 22 is used up below (all Transaction fields have to have different index), so going to 23 */
   blockEpilogue?: BlockEpilogueTransaction | undefined;
+  scheduled?: ScheduledTransactionInfo | undefined;
   sizeInfo?: TransactionSizeInfo | undefined;
 }
 
@@ -242,6 +243,7 @@ export enum Transaction_TransactionType {
   /** TRANSACTION_TYPE_VALIDATOR - values 5-19 skipped for no reason */
   TRANSACTION_TYPE_VALIDATOR = 20,
   TRANSACTION_TYPE_BLOCK_EPILOGUE = 21,
+  TRANSACTION_TYPE_SCHEDULED = 22,
   UNRECOGNIZED = -1,
 }
 
@@ -268,6 +270,9 @@ export function transaction_TransactionTypeFromJSON(object: any): Transaction_Tr
     case 21:
     case "TRANSACTION_TYPE_BLOCK_EPILOGUE":
       return Transaction_TransactionType.TRANSACTION_TYPE_BLOCK_EPILOGUE;
+    case 22:
+    case "TRANSACTION_TYPE_SCHEDULED":
+      return Transaction_TransactionType.TRANSACTION_TYPE_SCHEDULED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -291,6 +296,8 @@ export function transaction_TransactionTypeToJSON(object: Transaction_Transactio
       return "TRANSACTION_TYPE_VALIDATOR";
     case Transaction_TransactionType.TRANSACTION_TYPE_BLOCK_EPILOGUE:
       return "TRANSACTION_TYPE_BLOCK_EPILOGUE";
+    case Transaction_TransactionType.TRANSACTION_TYPE_SCHEDULED:
+      return "TRANSACTION_TYPE_SCHEDULED";
     case Transaction_TransactionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -381,6 +388,18 @@ export interface BlockEndInfo {
   blockOutputLimitReached?: boolean | undefined;
   blockEffectiveBlockGasUnits?: bigint | undefined;
   blockApproxOutputSize?: bigint | undefined;
+}
+
+export interface ScheduledTransactionInfo {
+  sender?: string | undefined;
+  maxGasAmount?: bigint | undefined;
+  maxGasUnitPrice?: bigint | undefined;
+  gasUnitPriceCharged?: bigint | undefined;
+  scheduleTime?:
+    | bigint
+    | undefined;
+  /** U256 encoded as bytes */
+  txnId?: Uint8Array | undefined;
 }
 
 export interface UserTransaction {
@@ -1369,6 +1388,7 @@ function createBaseTransaction(): Transaction {
     user: undefined,
     validator: undefined,
     blockEpilogue: undefined,
+    scheduled: undefined,
     sizeInfo: undefined,
   };
 }
@@ -1419,6 +1439,9 @@ export const Transaction = {
     }
     if (message.blockEpilogue !== undefined) {
       BlockEpilogueTransaction.encode(message.blockEpilogue, writer.uint32(186).fork()).ldelim();
+    }
+    if (message.scheduled !== undefined) {
+      ScheduledTransactionInfo.encode(message.scheduled, writer.uint32(194).fork()).ldelim();
     }
     if (message.sizeInfo !== undefined) {
       TransactionSizeInfo.encode(message.sizeInfo, writer.uint32(178).fork()).ldelim();
@@ -1517,6 +1540,13 @@ export const Transaction = {
 
           message.blockEpilogue = BlockEpilogueTransaction.decode(reader, reader.uint32());
           continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.scheduled = ScheduledTransactionInfo.decode(reader, reader.uint32());
+          continue;
         case 22:
           if (tag !== 178) {
             break;
@@ -1581,6 +1611,7 @@ export const Transaction = {
       user: isSet(object.user) ? UserTransaction.fromJSON(object.user) : undefined,
       validator: isSet(object.validator) ? ValidatorTransaction.fromJSON(object.validator) : undefined,
       blockEpilogue: isSet(object.blockEpilogue) ? BlockEpilogueTransaction.fromJSON(object.blockEpilogue) : undefined,
+      scheduled: isSet(object.scheduled) ? ScheduledTransactionInfo.fromJSON(object.scheduled) : undefined,
       sizeInfo: isSet(object.sizeInfo) ? TransactionSizeInfo.fromJSON(object.sizeInfo) : undefined,
     };
   },
@@ -1623,6 +1654,9 @@ export const Transaction = {
     if (message.blockEpilogue !== undefined) {
       obj.blockEpilogue = BlockEpilogueTransaction.toJSON(message.blockEpilogue);
     }
+    if (message.scheduled !== undefined) {
+      obj.scheduled = ScheduledTransactionInfo.toJSON(message.scheduled);
+    }
     if (message.sizeInfo !== undefined) {
       obj.sizeInfo = TransactionSizeInfo.toJSON(message.sizeInfo);
     }
@@ -1661,6 +1695,9 @@ export const Transaction = {
       : undefined;
     message.blockEpilogue = (object.blockEpilogue !== undefined && object.blockEpilogue !== null)
       ? BlockEpilogueTransaction.fromPartial(object.blockEpilogue)
+      : undefined;
+    message.scheduled = (object.scheduled !== undefined && object.scheduled !== null)
+      ? ScheduledTransactionInfo.fromPartial(object.scheduled)
       : undefined;
     message.sizeInfo = (object.sizeInfo !== undefined && object.sizeInfo !== null)
       ? TransactionSizeInfo.fromPartial(object.sizeInfo)
@@ -3631,6 +3668,193 @@ export const BlockEndInfo = {
     message.blockOutputLimitReached = object.blockOutputLimitReached ?? false;
     message.blockEffectiveBlockGasUnits = object.blockEffectiveBlockGasUnits ?? BigInt("0");
     message.blockApproxOutputSize = object.blockApproxOutputSize ?? BigInt("0");
+    return message;
+  },
+};
+
+function createBaseScheduledTransactionInfo(): ScheduledTransactionInfo {
+  return {
+    sender: "",
+    maxGasAmount: BigInt("0"),
+    maxGasUnitPrice: BigInt("0"),
+    gasUnitPriceCharged: BigInt("0"),
+    scheduleTime: BigInt("0"),
+    txnId: new Uint8Array(0),
+  };
+}
+
+export const ScheduledTransactionInfo = {
+  encode(message: ScheduledTransactionInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sender !== undefined && message.sender !== "") {
+      writer.uint32(10).string(message.sender);
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
+        throw new globalThis.Error("value provided for field message.maxGasAmount of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.maxGasAmount.toString());
+    }
+    if (message.maxGasUnitPrice !== undefined && message.maxGasUnitPrice !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.maxGasUnitPrice) !== message.maxGasUnitPrice) {
+        throw new globalThis.Error("value provided for field message.maxGasUnitPrice of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.maxGasUnitPrice.toString());
+    }
+    if (message.gasUnitPriceCharged !== undefined && message.gasUnitPriceCharged !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.gasUnitPriceCharged) !== message.gasUnitPriceCharged) {
+        throw new globalThis.Error("value provided for field message.gasUnitPriceCharged of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.gasUnitPriceCharged.toString());
+    }
+    if (message.scheduleTime !== undefined && message.scheduleTime !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.scheduleTime) !== message.scheduleTime) {
+        throw new globalThis.Error("value provided for field message.scheduleTime of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.scheduleTime.toString());
+    }
+    if (message.txnId !== undefined && message.txnId.length !== 0) {
+      writer.uint32(50).bytes(message.txnId);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ScheduledTransactionInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseScheduledTransactionInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sender = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.maxGasAmount = longToBigint(reader.uint64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.maxGasUnitPrice = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.gasUnitPriceCharged = longToBigint(reader.uint64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.scheduleTime = longToBigint(reader.uint64() as Long);
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.txnId = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ScheduledTransactionInfo, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ScheduledTransactionInfo | ScheduledTransactionInfo[]>
+      | Iterable<ScheduledTransactionInfo | ScheduledTransactionInfo[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ScheduledTransactionInfo.encode(p).finish()];
+        }
+      } else {
+        yield* [ScheduledTransactionInfo.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ScheduledTransactionInfo>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ScheduledTransactionInfo> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ScheduledTransactionInfo.decode(p)];
+        }
+      } else {
+        yield* [ScheduledTransactionInfo.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ScheduledTransactionInfo {
+    return {
+      sender: isSet(object.sender) ? globalThis.String(object.sender) : "",
+      maxGasAmount: isSet(object.maxGasAmount) ? BigInt(object.maxGasAmount) : BigInt("0"),
+      maxGasUnitPrice: isSet(object.maxGasUnitPrice) ? BigInt(object.maxGasUnitPrice) : BigInt("0"),
+      gasUnitPriceCharged: isSet(object.gasUnitPriceCharged) ? BigInt(object.gasUnitPriceCharged) : BigInt("0"),
+      scheduleTime: isSet(object.scheduleTime) ? BigInt(object.scheduleTime) : BigInt("0"),
+      txnId: isSet(object.txnId) ? bytesFromBase64(object.txnId) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ScheduledTransactionInfo): unknown {
+    const obj: any = {};
+    if (message.sender !== undefined && message.sender !== "") {
+      obj.sender = message.sender;
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      obj.maxGasAmount = message.maxGasAmount.toString();
+    }
+    if (message.maxGasUnitPrice !== undefined && message.maxGasUnitPrice !== BigInt("0")) {
+      obj.maxGasUnitPrice = message.maxGasUnitPrice.toString();
+    }
+    if (message.gasUnitPriceCharged !== undefined && message.gasUnitPriceCharged !== BigInt("0")) {
+      obj.gasUnitPriceCharged = message.gasUnitPriceCharged.toString();
+    }
+    if (message.scheduleTime !== undefined && message.scheduleTime !== BigInt("0")) {
+      obj.scheduleTime = message.scheduleTime.toString();
+    }
+    if (message.txnId !== undefined && message.txnId.length !== 0) {
+      obj.txnId = base64FromBytes(message.txnId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ScheduledTransactionInfo>): ScheduledTransactionInfo {
+    return ScheduledTransactionInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ScheduledTransactionInfo>): ScheduledTransactionInfo {
+    const message = createBaseScheduledTransactionInfo();
+    message.sender = object.sender ?? "";
+    message.maxGasAmount = object.maxGasAmount ?? BigInt("0");
+    message.maxGasUnitPrice = object.maxGasUnitPrice ?? BigInt("0");
+    message.gasUnitPriceCharged = object.gasUnitPriceCharged ?? BigInt("0");
+    message.scheduleTime = object.scheduleTime ?? BigInt("0");
+    message.txnId = object.txnId ?? new Uint8Array(0);
     return message;
   },
 };

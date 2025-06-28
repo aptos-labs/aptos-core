@@ -822,6 +822,9 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
         },
+        Transaction::ScheduledTransactionInfo(_) => {
+            transaction::transaction::TransactionType::Scheduled
+        },
     };
 
     let txn_data = match &transaction {
@@ -892,6 +895,16 @@ pub fn convert_transaction(
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(api_validator_txn) => {
             convert_validator_transaction(api_validator_txn)
+        },
+        Transaction::ScheduledTransactionInfo(scheduled_txn) => {
+            transaction::transaction::TxnData::Scheduled(transaction::ScheduledTransactionInfo {
+                sender: scheduled_txn.sender.to_string(),
+                max_gas_amount: scheduled_txn.max_gas_amount.0,
+                max_gas_unit_price: scheduled_txn.max_gas_unit_price.0,
+                gas_unit_price_charged: scheduled_txn.gas_unit_price_charged.0,
+                schedule_time: scheduled_txn.schedule_time.0,
+                txn_id: scheduled_txn.txn_id.0.to_le_bytes().to_vec(),
+            })
         },
     };
 
