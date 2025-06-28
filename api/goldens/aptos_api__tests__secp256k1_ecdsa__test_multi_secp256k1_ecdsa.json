@@ -1,19 +1,5 @@
 {
-  "public_keys": [
-    {
-      "value": "0x049b8327d929a0e45285c04d19c9fffbee065c266b701972922d807228120e43f34ad68ac77f6ec0205fe39f7c5b6055dad973a03464a3a743302de0feaf6ec6d9",
-      "type": "secp256k1_ecdsa"
-    }
-  ],
-  "signatures": [
-    {
-      "index": 0,
-      "signature": {
-        "value": "0xd1c84463d33b27977431b60664b36c6c1717569b1fbe2f9808c1e78f36958ae71a2b59a7c062e9491c12e69e25e3d3f82253a4efd1c1857b3695ff1b9050c5e4",
-        "type": "secp256k1_ecdsa"
-      }
-    }
-  ],
-  "signatures_required": 1,
-  "type": "single_sender"
+  "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+  "signature": "0x56e2eb368dc65d486aeeb59ced618b1866a79e5abf6cc5e58b77690a3de4ec7a4cf953c7ca73c2a1ee9576847efcec9798c69dc081651a58db649dc3595e2c05",
+  "type": "ed25519_signature"
 }

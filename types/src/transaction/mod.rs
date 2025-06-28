@@ -843,6 +843,7 @@ impl TransactionPayload {
     // Used in sdk and a lot of tests when upgrading current payload format to the new format.
     pub fn upgrade_payload(
         self,
+        rng: &mut impl Rng,
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
@@ -858,10 +859,8 @@ impl TransactionPayload {
                         replay_protection_nonce,
                     } => TransactionExtraConfig::V1 {
                         multisig_address,
-                        replay_protection_nonce: replay_protection_nonce.or_else(|| {
-                            let mut rng = rand::thread_rng();
-                            Some(rng.gen())
-                        }),
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(rng.gen())),
                     },
                 }
             }
