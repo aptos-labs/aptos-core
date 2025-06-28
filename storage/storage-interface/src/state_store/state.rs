@@ -20,7 +20,9 @@ use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_key::StateKey,
+        state_slot::{HotLRUEntry, StateSlot},
+        state_storage_usage::StateStorageUsage,
         StateViewId,
     },
     transaction::Version,
@@ -31,12 +33,42 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 
+/// Metadata for hot state and underlying LRU. No actual `StateValue` goes here
+/// since those are already contained in speculative state.
+#[allow(dead_code)] // TODO(HotState): remove.
+#[derive(Debug)]
+pub struct HotStateMeta {
+    hot_lru: MapLayer<StateKey, HotLRUEntry>,
+    /// The newest entry. `None` if empty.
+    head: Option<StateKey>,
+    /// The oldest entry. `None` if empty.
+    tail: Option<StateKey>,
+    num_items: usize,
+    total_key_bytes: usize,
+    total_value_bytes: usize,
+}
+
+impl HotStateMeta {
+    pub fn new_empty() -> Self {
+        Self {
+            hot_lru: MapLayer::new_family("hot_state_meta"),
+            head: None,
+            tail: None,
+            num_items: 0,
+            total_key_bytes: 0,
+            total_value_bytes: 0,
+        }
+    }
+}
+
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
 #[derive(Clone, Debug)]
 pub struct State {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
+    #[allow(dead_code)] // TODO(HotState): remove.
+    hot_state_meta: Arc<HotStateMeta>,
     /// The updates made to the state at the current version.
     ///  N.b. this is not directly iterable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
@@ -49,11 +81,13 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
+        hot_state_meta: Arc<HotStateMeta>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
+            hot_state_meta,
             shards,
             usage,
         }
@@ -62,6 +96,7 @@ impl State {
     pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
         Self::new_with_updates(
             version,
+            Arc::new(HotStateMeta::new_empty()),
             Arc::new(arr![MapLayer::new_family("state"); 16]),
             usage,
         )
@@ -150,7 +185,10 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        // TODO(HotState): actually construct this from the previous state.
+        let hot_state_meta = Arc::new(HotStateMeta::new_empty());
+
+        State::new_with_updates(updates.last_version(), hot_state_meta, shards, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
