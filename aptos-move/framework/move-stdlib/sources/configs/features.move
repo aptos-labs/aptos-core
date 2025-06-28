@@ -732,6 +732,12 @@ module std::features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
+    const DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION: u64 = 98;
+
+    public fun is_new_token_v1_collection_creation_disabled(): bool acquires Features {
+        is_enabled(DISABLE_NEW_TOKEN_V1_COLLECTION_CREATION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
