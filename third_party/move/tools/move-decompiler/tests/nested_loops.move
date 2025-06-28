@@ -1,5 +1,5 @@
 //* Test cases with nested loops
-module 0x99::m {
+module 0x99::nested_loops {
     fun nested_for_loops() {
         let y = 0;
         for (i in 0..10) {
