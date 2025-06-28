@@ -7,6 +7,7 @@ use crate::{
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
     monitor,
     payload_manager::TPayloadManager,
+    scheduled_txns_handler::ScheduledTxnsHandler,
     txn_notifier::TxnNotifier,
     IntGaugeGuard,
 };
@@ -35,6 +36,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     randomness::Randomness,
     transaction::{
+        scheduled_txn::ScheduledTransactionInfoWithKey,
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
         Transaction,
@@ -484,6 +486,93 @@ impl PipelineBuilder {
         (all_fut, tx, abort_handles)
     }
 
+    fn merge_scheduled_txns_with_user_txns(
+        mut scheduled_txns: Vec<ScheduledTransactionInfoWithKey>,
+        user_txns: Vec<SignatureVerifiedTransaction>,
+    ) -> Vec<SignatureVerifiedTransaction> {
+        if scheduled_txns.is_empty() {
+            return user_txns;
+        }
+
+        // Sort scheduled transactions by their gas priority
+        scheduled_txns.sort_by_key(|txn| std::cmp::Reverse(txn.max_gas_unit_price));
+
+        let fn_gas_unit_price_user_txn = |txn: &SignatureVerifiedTransaction| {
+            txn.expect_valid()
+                .try_as_signed_user_txn()
+                .expect("Expected a signed user txn")
+                .gas_unit_price()
+        };
+
+        // todo: Can we assume that user txns are mostly sorted by their gas priority and avoid this
+        //       extra looping over user txns ??
+        // todo: aptos_global_constants::GAS_UNIT_PRICE
+        //       Is this the right config to use or should we get this from onchain config ?
+        const MIN_GAS_UNIT_PRICE: u64 = 100;
+        let mut max_gas_unit_price_of_user_txns = MIN_GAS_UNIT_PRICE;
+        for txn in &user_txns {
+            if fn_gas_unit_price_user_txn(txn) > max_gas_unit_price_of_user_txns {
+                max_gas_unit_price_of_user_txns = fn_gas_unit_price_user_txn(txn);
+            }
+        }
+
+        let mut merged_txns = Vec::with_capacity(scheduled_txns.len() + user_txns.len());
+        let mut user_txns_iter = user_txns.into_iter();
+        let mut sched_txns_iter = scheduled_txns.into_iter();
+
+        let mut curr_user_txn = user_txns_iter.next();
+        let mut curr_sched_txn = sched_txns_iter.next();
+
+        loop {
+            match (&curr_user_txn, &curr_sched_txn) {
+                (None, None) => break,
+                (None, Some(_)) => {
+                    // Move scheduled transaction into merged_txns
+                    if let Some(mut sched_txn) = curr_sched_txn.take() {
+                        sched_txn.gas_unit_price_charged = std::cmp::min(
+                            sched_txn.max_gas_unit_price,
+                            max_gas_unit_price_of_user_txns + 1,
+                        );
+                        merged_txns.push(SignatureVerifiedTransaction::from(
+                            Transaction::ScheduledTransaction(sched_txn),
+                        ));
+                    }
+                    curr_sched_txn = sched_txns_iter.next();
+                },
+                (Some(_), None) => {
+                    // Move user transaction into merged_txns
+                    if let Some(user_txn) = curr_user_txn.take() {
+                        merged_txns.push(user_txn);
+                    }
+                    curr_user_txn = user_txns_iter.next();
+                },
+                (Some(user_txn), Some(sched_txn)) => {
+                    if sched_txn.max_gas_unit_price > fn_gas_unit_price_user_txn(user_txn) {
+                        // Move scheduled transaction into merged_txns
+                        if let Some(mut sched_txn) = curr_sched_txn.take() {
+                            sched_txn.gas_unit_price_charged = std::cmp::min(
+                                sched_txn.max_gas_unit_price,
+                                max_gas_unit_price_of_user_txns + 1,
+                            );
+                            merged_txns.push(SignatureVerifiedTransaction::from(
+                                Transaction::ScheduledTransaction(sched_txn),
+                            ));
+                        }
+                        curr_sched_txn = sched_txns_iter.next();
+                    } else {
+                        // Move user transaction into merged_txns
+                        if let Some(user_txn) = curr_user_txn.take() {
+                            merged_txns.push(user_txn);
+                        }
+                        curr_user_txn = user_txns_iter.next();
+                    }
+                },
+            }
+        }
+
+        merged_txns
+    }
+
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
     async fn prepare(
@@ -546,6 +635,13 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+        let scheduled_txns: Vec<ScheduledTransactionInfoWithKey> = {
+            if let Ok(state_view) = executor.state_view(block.parent_id()) {
+                ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs() / 1000)
+            } else {
+                vec![]
+            }
+        };
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
@@ -559,6 +655,23 @@ impl PipelineBuilder {
         } else {
             block.new_block_metadata(&validator).into()
         };
+        let num_validator_txns = if block.validator_txns().is_some() {
+            block
+                .validator_txns()
+                .expect("expected validator_txns")
+                .len()
+        } else {
+            0
+        };
+        info!(
+            "[Pipeline] Block execute txn counts: user: {}, validator: {}, scheduled: {}",
+            user_txns.len(),
+            num_validator_txns,
+            scheduled_txns.len()
+        );
+        let user_and_scheduled_txns =
+            Self::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns.as_ref().clone());
+
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(
                 metadata_txn,
@@ -571,7 +684,7 @@ impl PipelineBuilder {
                 .map(Transaction::ValidatorTransaction)
                 .map(SignatureVerifiedTransaction::from)
                 .collect(),
-            user_txns.as_ref().clone(),
+            user_and_scheduled_txns,
         ]
         .concat();
         let proposer_index = block
@@ -921,5 +1034,104 @@ impl PipelineBuilder {
             format!("{epoch} {round} {block_id} commit ledger"),
         )
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{
+            authenticator::{AccountAuthenticator, TransactionAuthenticator},
+            scheduled_txn::{ScheduleMapKey, ScheduledTransactionInfoWithKey},
+            RawTransaction, Script, SignedTransaction,
+        },
+    };
+    use move_core_types::u256::U256;
+
+    fn create_user_txn(gas_unit_price: u64) -> SignatureVerifiedTransaction {
+        let sender = AccountAddress::random();
+        let raw_txn = RawTransaction::new_script(
+            sender,
+            0, // sequence_number
+            Script::new(vec![], vec![], vec![]),
+            100, // max_gas_amount
+            gas_unit_price,
+            0,               // expiration_timestamp_secs
+            ChainId::new(1), // test chain id
+        );
+
+        let signed_txn = SignedTransaction::new_signed_transaction(
+            raw_txn,
+            TransactionAuthenticator::SingleSender {
+                sender: AccountAuthenticator::NoAccountAuthenticator,
+            },
+        );
+        SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(signed_txn))
+    }
+
+    fn create_scheduled_txn(max_gas_unit_price: u64) -> ScheduledTransactionInfoWithKey {
+        ScheduledTransactionInfoWithKey {
+            sender_handle: AccountAddress::random(),
+            max_gas_amount: 100000,
+            max_gas_unit_price,
+            gas_unit_price_charged: 0,
+            key: ScheduleMapKey {
+                time: 0,
+                gas_priority: max_gas_unit_price,
+                txn_id: U256::zero(),
+            },
+        }
+    }
+
+    #[test]
+    fn test_empty_scheduled_txns() {
+        let scheduled_txns = vec![];
+        let user_txns = vec![
+            create_user_txn(100),
+            create_user_txn(200),
+            create_user_txn(300),
+        ];
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns.clone());
+        assert_eq!(merged.len(), user_txns.len());
+    }
+
+    #[test]
+    fn test_empty_user_txns() {
+        let scheduled_txns = vec![create_scheduled_txn(100), create_scheduled_txn(200)];
+        let user_txns = vec![];
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_with_ordering() {
+        let scheduled_txns = vec![
+            create_scheduled_txn(500),
+            create_scheduled_txn(200),
+            create_scheduled_txn(300),
+        ];
+        let user_txns = vec![
+            create_user_txn(400),
+            create_user_txn(100),
+            create_user_txn(250),
+        ];
+
+        let merged =
+            PipelineBuilder::merge_scheduled_txns_with_user_txns(scheduled_txns, user_txns);
+        let gas_prices: Vec<u64> = merged
+            .iter()
+            .map(|txn| match txn.get_transaction().unwrap() {
+                Transaction::UserTransaction(t) => t.gas_unit_price(),
+                Transaction::ScheduledTransaction(t) => t.gas_unit_price_charged,
+                _ => panic!("Unexpected transaction type"),
+            })
+            .collect();
+        assert_eq!(merged.len(), 6);
+        assert_eq!(gas_prices, vec![401, 400, 300, 200, 100, 250]);
     }
 }

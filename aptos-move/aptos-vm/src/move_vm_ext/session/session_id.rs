@@ -78,6 +78,9 @@ pub enum SessionId {
         // block id
         id: HashValue,
     },
+    ScheduledTxn {
+        hash: HashValue,
+    },
 }
 
 impl SessionId {
@@ -175,6 +178,10 @@ impl SessionId {
         }
     }
 
+    pub fn scheduled_txn(hash: HashValue) -> Self {
+        Self::ScheduledTxn { hash }
+    }
+
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
@@ -190,7 +197,8 @@ impl SessionId {
             | Self::OrderlessTxnProlouge { script_hash, .. }
             | Self::OrderlessTxnEpilogue { script_hash, .. }
             | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash,
-            Self::BlockMeta { id: _ }
+            | Self::ScheduledTxn { hash: _ } // todo: check if this is good
+            | Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
             | Self::BlockEpilogue { id: _ }

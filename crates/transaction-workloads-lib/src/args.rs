@@ -93,6 +93,7 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    ScheduleTxnsInsertPerf,
 }
 
 impl TransactionTypeArg {
@@ -405,6 +406,25 @@ impl TransactionTypeArg {
                     max_sell_size: 50,
                     max_buy_size: 950,
                 })
+            },
+            TransactionTypeArg::ScheduleTxnsInsertPerf => {
+                let current_time_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                // Fixed timestamp for very far in the future (say 2075), so that we can insert
+                let future_time_ms = 4_000_000_000_000; // 2096-10-02
+                                                        // Note: Use the corresponding future time in execution benchmark, otherwise txns
+                                                        //       can expire
+                                                        // Set sender_use_account_pool to true for unique senders
+                assert!(future_time_ms > current_time_ms);
+                TransactionType::CallCustomModules {
+                    entry_point: Box::new(EntryPoints::ScheduleTxnPerf {
+                        time_ms: future_time_ms,
+                    }),
+                    num_modules: module_working_set_size,
+                    use_account_pool: true, // Force this to true to use unique senders
+                }
             },
         }
     }

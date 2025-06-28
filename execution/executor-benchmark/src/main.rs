@@ -150,6 +150,11 @@ pub struct PipelineOpt {
     /// Sharding configuration.
     #[clap(flatten)]
     sharding_opt: ShardingOpt,
+    /// Set this flag to run (execute) scheduled transactions after they are scheduled.
+    #[clap(long)]
+    run_scheduled_txns: bool,
+    #[clap(long, default_value = "1000")]
+    ready_sched_txns_limit: usize,
 }
 
 impl PipelineOpt {
@@ -165,6 +170,8 @@ impl PipelineOpt {
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
             num_sig_verify_threads: self.num_sig_verify_threads,
+            run_scheduled_txns: self.run_scheduled_txns,
+            ready_sched_txns_limit: self.ready_sched_txns_limit,
             print_transactions: false,
         }
     }
