@@ -307,30 +307,30 @@ module aptos_experimental::sigma_protos {
 
     /// Deserializes and returns an `WithdrawalSubproof` given its byte representation.
     public fun deserialize_withdrawal_subproof(proof_bytes: vector<u8>): Option<WithdrawalSubproof> {
-        if (proof_bytes.length::<u8>() != 192) {
+        if (proof_bytes.length() != 192) {
             return std::option::none<WithdrawalSubproof>()
         };
 
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
-        if (!x1.is_some::<RistrettoPoint>()) {
+        if (!x1.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x1 = x1.extract::<RistrettoPoint>();
+        let x1 = x1.extract();
 
         let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x2 = ristretto255::new_point_from_bytes(x2_bytes);
-        if (!x2.is_some::<RistrettoPoint>()) {
+        if (!x2.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x2 = x2.extract::<RistrettoPoint>();
+        let x2 = x2.extract();
 
         let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!x3.is_some::<RistrettoPoint>()) {
+        if (!x3.is_some()) {
             return std::option::none<WithdrawalSubproof>()
         };
-        let x3 = x3.extract::<RistrettoPoint>();
+        let x3 = x3.extract();
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -360,58 +360,58 @@ module aptos_experimental::sigma_protos {
 
     /// Deserializes and returns a `TransferSubproof` given its byte representation.
     public fun deserialize_transfer_subproof(proof_bytes: vector<u8>): Option<TransferSubproof> {
-        if (proof_bytes.length::<u8>() != 384) {
+        if (proof_bytes.length() != 384) {
             return std::option::none<TransferSubproof>()
         };
 
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
-        if (!x1.is_some::<RistrettoPoint>()) {
+        if (!x1.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x1 = x1.extract::<RistrettoPoint>();
+        let x1 = x1.extract();
 
         let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x2 = ristretto255::new_point_from_bytes(x2_bytes);
-        if (!x2.is_some::<RistrettoPoint>()) {
+        if (!x2.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x2 = x2.extract::<RistrettoPoint>();
+        let x2 = x2.extract();
 
         let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!x3.is_some::<RistrettoPoint>()) {
+        if (!x3.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x3 = x3.extract::<RistrettoPoint>();
+        let x3 = x3.extract();
 
         let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x4 = ristretto255::new_point_from_bytes(x4_bytes);
-        if (!x4.is_some::<RistrettoPoint>()) {
+        if (!x4.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x4 = x4.extract::<RistrettoPoint>();
+        let x4 = x4.extract();
 
         let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x5 = ristretto255::new_point_from_bytes(x5_bytes);
-        if (!x5.is_some::<RistrettoPoint>()) {
+        if (!x5.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x5 = x5.extract::<RistrettoPoint>();
+        let x5 = x5.extract();
 
         let x6_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x6 = ristretto255::new_point_from_bytes(x6_bytes);
-        if (!x6.is_some::<RistrettoPoint>()) {
+        if (!x6.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x6 = x6.extract::<RistrettoPoint>();
+        let x6 = x6.extract();
 
         let x7_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x7 = ristretto255::new_point_from_bytes(x7_bytes);
-        if (!x7.is_some::<RistrettoPoint>()) {
+        if (!x7.is_some()) {
             return std::option::none<TransferSubproof>()
         };
-        let x7 = x7.extract::<RistrettoPoint>();
+        let x7 = x7.extract();
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -474,18 +474,18 @@ module aptos_experimental::sigma_protos {
 
         let bytes = vector::empty<u8>();
 
-        bytes.append::<u8>(FIAT_SHAMIR_SIGMA_DST);
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
-        bytes.append::<u8>(ristretto255::point_to_bytes(
+        bytes.append(FIAT_SHAMIR_SIGMA_DST);
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
+        bytes.append(ristretto255::point_to_bytes(
             &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        bytes.append::<u8>(ristretto255::scalar_to_bytes(amount));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
+        bytes.append(ristretto255::point_to_bytes(&y));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
+        bytes.append(ristretto255::scalar_to_bytes(amount));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -518,26 +518,26 @@ module aptos_experimental::sigma_protos {
 
         let bytes = vector::empty<u8>();
 
-        bytes.append::<u8>(FIAT_SHAMIR_SIGMA_DST);
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
-        bytes.append::<u8>(ristretto255::point_to_bytes(
+        bytes.append(FIAT_SHAMIR_SIGMA_DST);
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
+        bytes.append(ristretto255::point_to_bytes(
             &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&y_prime));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c_prime)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(big_d)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x5)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x6)));
-        bytes.append::<u8>(ristretto255::point_to_bytes(&ristretto255::point_compress(x7)));
+        bytes.append(ristretto255::point_to_bytes(&y));
+        bytes.append(ristretto255::point_to_bytes(&y_prime));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(big_c_prime)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(big_d)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x5)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x6)));
+        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(x7)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -723,12 +723,12 @@ module aptos_experimental::sigma_protos {
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
 
         let bytes = vector::empty<u8>();
-        bytes.append::<u8>(alpha3_bytes);
-        bytes.append::<u8>(alpha2_bytes);
-        bytes.append::<u8>(alpha1_bytes);
-        bytes.append::<u8>(x3_bytes);
-        bytes.append::<u8>(x2_bytes);
-        bytes.append::<u8>(x1_bytes);
+        bytes.append(alpha3_bytes);
+        bytes.append(alpha2_bytes);
+        bytes.append(alpha1_bytes);
+        bytes.append(x3_bytes);
+        bytes.append(x2_bytes);
+        bytes.append(x1_bytes);
 
         bytes
     }
@@ -752,18 +752,18 @@ module aptos_experimental::sigma_protos {
         let alpha5_bytes = ristretto255::scalar_to_bytes(&proof.alpha5);
 
         let bytes = vector::empty<u8>();
-        bytes.append::<u8>(alpha5_bytes);
-        bytes.append::<u8>(alpha4_bytes);
-        bytes.append::<u8>(alpha3_bytes);
-        bytes.append::<u8>(alpha2_bytes);
-        bytes.append::<u8>(alpha1_bytes);
-        bytes.append::<u8>(x7_bytes);
-        bytes.append::<u8>(x6_bytes);
-        bytes.append::<u8>(x5_bytes);
-        bytes.append::<u8>(x4_bytes);
-        bytes.append::<u8>(x3_bytes);
-        bytes.append::<u8>(x2_bytes);
-        bytes.append::<u8>(x1_bytes);
+        bytes.append(alpha5_bytes);
+        bytes.append(alpha4_bytes);
+        bytes.append(alpha3_bytes);
+        bytes.append(alpha2_bytes);
+        bytes.append(alpha1_bytes);
+        bytes.append(x7_bytes);
+        bytes.append(x6_bytes);
+        bytes.append(x5_bytes);
+        bytes.append(x4_bytes);
+        bytes.append(x3_bytes);
+        bytes.append(x2_bytes);
+        bytes.append(x1_bytes);
 
         bytes
     }
@@ -932,7 +932,7 @@ module aptos_experimental::sigma_protos {
 
         let sigma_proof_bytes = serialize_transfer_subproof(&sigma_proof);
 
-        let deserialized_proof = deserialize_transfer_subproof(sigma_proof_bytes).extract::<TransferSubproof>();
+        let deserialized_proof = deserialize_transfer_subproof(sigma_proof_bytes).extract();
 
         assert!(ristretto255::point_equals(&sigma_proof.x1, &deserialized_proof.x1), 1);
         assert!(ristretto255::point_equals(&sigma_proof.x2, &deserialized_proof.x2), 1);
