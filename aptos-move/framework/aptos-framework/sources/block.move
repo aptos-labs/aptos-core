@@ -246,6 +246,14 @@ module aptos_framework::block {
         };
     }
 
+    fun block_epilogue(
+        vm: &signer,
+        fee_distribution_validator_indices: vector<u64>,
+        fee_amounts_octa: vector<u64>,
+    ) {
+        stake::record_fee(vm, fee_distribution_validator_indices, fee_amounts_octa);
+    }
+
     #[view]
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockResource {
