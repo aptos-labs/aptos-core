@@ -360,11 +360,8 @@ impl Parser {
             base_state_view.prime_cache(to_commit.state_update_refs())?;
         }
 
-        let result_state = parent_state.update_with_memorized_reads(
-            base_state_view.persisted_state(),
-            to_commit.state_update_refs(),
-            base_state_view.memorized_reads(),
-        );
+        let result_state = parent_state
+            .update_with_memorized_reads(&base_state_view, to_commit.state_update_refs());
         let state_reads = base_state_view.into_memorized_reads();
 
         let out = ExecutionOutput::new(
