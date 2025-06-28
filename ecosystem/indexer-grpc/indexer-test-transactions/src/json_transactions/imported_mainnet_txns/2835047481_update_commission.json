@@ -1,0 +1,365 @@
+{
+  "timestamp": {
+    "seconds": "1749230344",
+    "nanos": 291307000
+  },
+  "version": "2835047481",
+  "info": {
+    "hash": "TVUUv8SNbGsI543pGkxJwkiDQvJgFIryLoBJP7ia3iU=",
+    "stateChangeHash": "N+c2rdnbOvtIU0HRM8iRnqc9rk6jIS33C1gBKmQE24s=",
+    "eventRootHash": "qkp9R4Y908ikYRJKlO/39ndxge7OzDlC3fYRW+X+3Bo=",
+    "gasUsed": "517",
+    "success": true,
+    "vmStatus": "Executed successfully",
+    "accumulatorRootHash": "Ot5tkVhlXgQu1Z4CW4oW5tIKwke+8DfuIy2/n2Pz2wM=",
+    "changes": [
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5",
+          "stateKeyHash": "0wuFNnZ237SzpOVHakUhMonifiCZbutKhFWFJjrk7WI=",
+          "type": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "StakePool"
+          },
+          "typeStr": "0x1::stake::StakePool",
+          "data": "{\"active\":{\"value\":\"622904011921981\"},\"add_stake_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"4\"}}},\"delegated_voter\":\"0x17a23057cc0ff1038a859d7ad3bd1d5c8a11b74824d7c2744e2959b7c2f86102\",\"distribute_rewards_events\":{\"counter\":\"3201\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"10\"}}},\"inactive\":{\"value\":\"0\"},\"increase_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"8\"}}},\"initialize_validator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"2\"}}},\"join_validator_set_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"9\"}}},\"leave_validator_set_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"13\"}}},\"locked_until_secs\":\"1750336726\",\"operator_address\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"pending_active\":{\"value\":\"0\"},\"pending_inactive\":{\"value\":\"72422091801\"},\"reactivate_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"5\"}}},\"rotate_consensus_key_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"6\"}}},\"set_operator_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"3\"}}},\"unlock_stake_events\":{\"counter\":\"10\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"11\"}}},\"update_network_and_fullnode_addresses_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"7\"}}},\"withdraw_stake_events\":{\"counter\":\"9\",\"guid\":{\"id\":{\"addr\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"creation_num\":\"12\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4",
+          "stateKeyHash": "gNW2Y4Qb1kHJPTavVOVjktLwE7yrRfgEekrQ2B6qFco=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"52212800\"},\"deposit_events\":{\"counter\":\"5\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4",
+          "stateKeyHash": "YxP/iTthdBRYw1Ii3Hd+rLD9eASgHBpv3nH+lSIjskc=",
+          "type": {
+            "address": "0x1",
+            "module": "account",
+            "name": "Account"
+          },
+          "typeStr": "0x1::account::Account",
+          "data": "{\"authentication_key\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"0\"}}},\"guid_creation_num\":\"14\",\"key_rotation_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"1\"}}},\"rotation_capability_offer\":{\"for\":{\"vec\":[]}},\"sequence_number\":\"2\",\"signer_capability_offer\":{\"for\":{\"vec\":[]}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4",
+          "stateKeyHash": "0mJOcECxCvBPyLG82ZylcmriZ+04VIABoE+lXLVV6ws=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Store"
+          },
+          "typeStr": "0x1::staking_contract::Store",
+          "data": "{\"add_distribution_events\":{\"counter\":\"10\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"11\"}}},\"add_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"7\"}}},\"create_staking_contract_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"4\"}}},\"distribute_events\":{\"counter\":\"9\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"12\"}}},\"request_commission_events\":{\"counter\":\"10\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"8\"}}},\"reset_lockup_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"6\"}}},\"staking_contracts\":{\"data\":[{\"key\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"value\":{\"commission_percentage\":\"5\",\"distribution_pool\":{\"scaling_factor\":\"1\",\"shareholders\":[\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\"],\"shareholders_limit\":\"20\",\"shares\":{\"data\":[{\"key\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"value\":\"72422091801\"}]},\"total_coins\":\"72422091801\",\"total_shares\":\"72422091801\"},\"owner_cap\":{\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"},\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"principal\":\"622904011921981\",\"signer_cap\":{\"account\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"}}}]},\"switch_operator_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"10\"}}},\"unlock_stake_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"9\"}}},\"update_voter_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"5\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4",
+          "stateKeyHash": "hAxlcsInDYB7SWuN1ZrUGlSsSecal5r/lGZQKF8R2qM=",
+          "type": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "StakingGroupUpdateCommissionEvent"
+          },
+          "typeStr": "0x1::staking_contract::StakingGroupUpdateCommissionEvent",
+          "data": "{\"update_commission_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\",\"creation_num\":\"13\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_RESOURCE",
+        "writeResource": {
+          "address": "0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda",
+          "stateKeyHash": "wvc+Zd3lvqliPeq+KMAjmi5gxSqElJUoQgXTX7YrVLk=",
+          "type": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "CoinStore",
+            "genericTypeParams": [
+              {
+                "type": "MOVE_TYPES_STRUCT",
+                "struct": {
+                  "address": "0x1",
+                  "module": "aptos_coin",
+                  "name": "AptosCoin"
+                }
+              }
+            ]
+          },
+          "typeStr": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+          "data": "{\"coin\":{\"value\":\"5740357728607\"},\"deposit_events\":{\"counter\":\"12\",\"guid\":{\"id\":{\"addr\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"creation_num\":\"2\"}}},\"frozen\":false,\"withdraw_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"creation_num\":\"3\"}}}}"
+        }
+      },
+      {
+        "type": "TYPE_WRITE_TABLE_ITEM",
+        "writeTableItem": {
+          "stateKeyHash": "bkso1A+YoQamUWNTCSTA3LQME0nTqpFdEItNbPwd2xk=",
+          "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+          "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+          "data": {
+            "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
+            "keyType": "address",
+            "value": "\"115066037187901939\"",
+            "valueType": "u128"
+          }
+        }
+      }
+    ]
+  },
+  "epoch": "11672",
+  "blockHeight": "357766618",
+  "type": "TRANSACTION_TYPE_USER",
+  "sizeInfo": {
+    "transactionBytes": 276,
+    "eventSizeInfo": [
+      {
+        "typeTagBytes": 54,
+        "totalBytes": 94
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 108
+      },
+      {
+        "typeTagBytes": 62,
+        "totalBytes": 166
+      },
+      {
+        "typeTagBytes": 67,
+        "totalBytes": 139
+      },
+      {
+        "typeTagBytes": 52,
+        "totalBytes": 92
+      },
+      {
+        "typeTagBytes": 69,
+        "totalBytes": 149
+      },
+      {
+        "typeTagBytes": 68,
+        "totalBytes": 148
+      },
+      {
+        "typeTagBytes": 63,
+        "totalBytes": 103
+      }
+    ],
+    "writeOpSizeInfo": [
+      {
+        "keyBytes": 84,
+        "valueBytes": 680
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 84,
+        "valueBytes": 147
+      },
+      {
+        "keyBytes": 91,
+        "valueBytes": 683
+      },
+      {
+        "keyBytes": 107,
+        "valueBytes": 134
+      },
+      {
+        "keyBytes": 138,
+        "valueBytes": 105
+      },
+      {
+        "keyBytes": 66,
+        "valueBytes": 16
+      }
+    ]
+  },
+  "user": {
+    "request": {
+      "sender": "0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4",
+      "sequenceNumber": "1",
+      "maxGasAmount": "3000",
+      "gasUnitPrice": "100",
+      "expirationTimestampSecs": {
+        "seconds": "1749316657"
+      },
+      "payload": {
+        "type": "TYPE_ENTRY_FUNCTION_PAYLOAD",
+        "entryFunctionPayload": {
+          "function": {
+            "module": {
+              "address": "0x1",
+              "name": "staking_contract"
+            },
+            "name": "update_commision"
+          },
+          "arguments": [
+            "\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\"",
+            "\"5\""
+          ],
+          "entryFunctionIdStr": "0x1::staking_contract::update_commision"
+        }
+      },
+      "signature": {
+        "type": "TYPE_ED25519",
+        "ed25519": {
+          "publicKey": "+hH1EDNbeDkQNPC0nuKAhDdu6HHdOBV+U0OyWu/dKxk=",
+          "signature": "vQNT3zvG/9rawJwlH9Ak7cmbRRdAfjI6nh4tjme2OYuLZ/UPU4QRcLEr/jnhaYtNKy3nKApIJdl9GLH0kReFDA=="
+        }
+      }
+    },
+    "events": [
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "WithdrawStake"
+          }
+        },
+        "typeStr": "0x1::stake::WithdrawStake",
+        "data": "{\"amount_withdrawn\":\"961718590937\",\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"}"
+      },
+      {
+        "key": {
+          "creationNumber": "2",
+          "accountAddress": "0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda"
+        },
+        "sequenceNumber": "11",
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "coin",
+            "name": "DepositEvent"
+          }
+        },
+        "typeStr": "0x1::coin::DepositEvent",
+        "data": "{\"amount\":\"961718590937\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "Distribute"
+          }
+        },
+        "typeStr": "0x1::staking_contract::Distribute",
+        "data": "{\"amount\":\"961718590937\",\"operator\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\",\"recipient\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "AddDistribution"
+          }
+        },
+        "typeStr": "0x1::staking_contract::AddDistribution",
+        "data": "{\"amount\":\"72422091801\",\"operator\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "stake",
+            "name": "UnlockStake"
+          }
+        },
+        "typeStr": "0x1::stake::UnlockStake",
+        "data": "{\"amount_unlocked\":\"72422091801\",\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "RequestCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::RequestCommission",
+        "data": "{\"accumulated_rewards\":\"289688367206\",\"commission_amount\":\"72422091801\",\"operator\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"pool_address\":\"0x4cf01e6c54a8ec918bf1b5666ffa26dcea3dc8044bdf011a58df1aeae9756fa5\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "staking_contract",
+            "name": "UpdateCommission"
+          }
+        },
+        "typeStr": "0x1::staking_contract::UpdateCommission",
+        "data": "{\"new_commission_percentage\":\"5\",\"old_commission_percentage\":\"25\",\"operator\":\"0x6ecb724844c6bd7c31e717cac0cd51b239c3f63406d20c15803fac6f7188dbda\",\"staker\":\"0x5510f369bec070c2a52e51eb50f2ab535cbf73a3368fce43ae0e97810d0d01e4\"}"
+      },
+      {
+        "key": {
+          "accountAddress": "0x0"
+        },
+        "type": {
+          "type": "MOVE_TYPES_STRUCT",
+          "struct": {
+            "address": "0x1",
+            "module": "transaction_fee",
+            "name": "FeeStatement"
+          }
+        },
+        "typeStr": "0x1::transaction_fee::FeeStatement",
+        "data": "{\"execution_gas_units\":\"7\",\"io_gas_units\":\"15\",\"storage_fee_octas\":\"49560\",\"storage_fee_refund_octas\":\"0\",\"total_charge_gas_units\":\"517\"}"
+      }
+    ]
+  }
+}
