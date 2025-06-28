@@ -83,12 +83,26 @@ impl PersistedWriteOp {
 }
 
 /// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
     MakeHot { prev_slot: StateSlot },
+    Eviction { prev_slot: StateSlot },
+}
+
+impl std::fmt::Debug for BaseStateOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let var = match self {
+            Self::Creation(_) => "Creation(...)",
+            Self::Modification(_) => "Modification(...)",
+            Self::Deletion(_) => "Deletion(...)",
+            Self::MakeHot { .. } => "MakeHot",
+            Self::Eviction { .. } => "Eviction",
+        };
+        write!(f, "{}", var)
+    }
 }
 
 impl BaseStateOp {
@@ -99,6 +113,7 @@ impl BaseStateOp {
             Creation(val) | Modification(val) => Some(val),
             Deletion(_) => None,
             MakeHot { prev_slot } => prev_slot.as_state_value_opt(),
+            Eviction { prev_slot } => prev_slot.as_state_value_opt(),
         }
     }
 
@@ -107,7 +122,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => Some(WriteOp::ref_cast(self)),
-            MakeHot { .. } => None,
+            MakeHot { .. } | Eviction { .. } => None,
         }
     }
 
@@ -120,7 +135,7 @@ impl BaseStateOp {
 
         match self {
             Creation(_) | Modification(_) | Deletion(_) => true,
-            MakeHot { .. } => false,
+            MakeHot { .. } | Eviction { .. } => false,
         }
     }
 }
@@ -140,7 +155,9 @@ impl WriteOp {
                 BaseStateOp::Creation(v) => Creation(v.bytes().clone()),
                 BaseStateOp::Modification(v) => Modification(v.bytes().clone()),
                 BaseStateOp::Deletion { .. } => Deletion,
-                BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                    unreachable!("malformed write op")
+                },
             },
             Some(metadata) => match &self.0 {
                 BaseStateOp::Creation(v) => CreationWithMetadata {
@@ -152,7 +169,9 @@ impl WriteOp {
                     metadata,
                 },
                 BaseStateOp::Deletion { .. } => DeletionWithMetadata { metadata },
-                BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                    unreachable!("malformed write op")
+                },
             },
         }
     }
@@ -165,7 +184,8 @@ impl WriteOp {
         use BaseStateOp::*;
 
         match (&mut op.0, other.0) {
-            (MakeHot {..}, ..) | (.., MakeHot {..}) => unreachable!("malformed write op"),
+            (MakeHot {..}, ..) | (.., MakeHot {..})
+            | (Eviction {..}, ..) | (.., Eviction {..}) => unreachable!("malformed write op"),
             (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
             | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
@@ -236,7 +256,7 @@ impl WriteOp {
         match &self.0 {
             Creation(v) | Modification(v) => v.metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
@@ -246,7 +266,7 @@ impl WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.metadata_mut(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
@@ -256,7 +276,7 @@ impl WriteOp {
         match self.0 {
             Creation(v) | Modification(v) => v.into_metadata(),
             Deletion(meta) => meta,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
@@ -306,7 +326,7 @@ impl WriteOp {
                 write_len: get_size().expect("Modification must have size"),
             },
             Deletion { .. } => WriteOpSize::Deletion,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
@@ -324,7 +344,7 @@ impl WriteOp {
         match &self.0 {
             Creation(_) | Modification(_) => false,
             Deletion(_) => true,
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 }
@@ -455,7 +475,9 @@ impl TransactionWrite for WriteOp {
             BaseStateOp::Creation { .. } => Creation,
             BaseStateOp::Modification { .. } => Modification,
             BaseStateOp::Deletion { .. } => Deletion,
-            BaseStateOp::MakeHot { .. } => unreachable!("malformed write op"),
+            BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                unreachable!("malformed write op")
+            },
         }
     }
 
@@ -465,7 +487,7 @@ impl TransactionWrite for WriteOp {
         match &mut self.0 {
             Creation(v) | Modification(v) => v.set_bytes(bytes),
             Deletion { .. } => (),
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 }
@@ -497,7 +519,7 @@ impl Debug for WriteOp {
             Deletion(metadata) => {
                 write!(f, "Deletion(metadata:{:?})", metadata,)
             },
-            MakeHot { .. } => unreachable!("malformed write op"),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 }
@@ -540,6 +562,9 @@ impl Debug for HotStateOp {
         match &self.0 {
             MakeHot { prev_slot } => {
                 write!(f, "MakeHot(prev_slot:{:?})", prev_slot)
+            },
+            Eviction { prev_slot } => {
+                write!(f, "Eviction(prev_slot:{:?})", prev_slot)
             },
             Creation(_) | Modification(_) | Deletion(_) => {
                 unreachable!("malformed hot state op")

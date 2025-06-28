@@ -19,8 +19,11 @@ use anyhow::Result;
 use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_key::StateKey,
+        state_slot::{HotLRUEntry, StateSlot},
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
 };
@@ -218,7 +221,7 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key)? {
+        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_hot"]);
             slot
         } else if let Some(base_version) = self.base_version() {
@@ -248,6 +251,18 @@ impl CachedStateView {
 
     pub fn memorized_reads(&self) -> &ShardedStateCache {
         &self.memorized
+    }
+
+    pub(crate) fn get_hot_lru_entry(&self, state_key: &StateKey) -> Option<HotLRUEntry> {
+        self.hot.get_lru_entry(state_key)
+    }
+
+    pub(crate) fn get_lru_head(&self) -> Option<StateKey> {
+        self.speculative.get_newest_key()
+    }
+
+    pub(crate) fn get_lru_tail(&self) -> Option<StateKey> {
+        self.speculative.get_oldest_key()
     }
 }
 
@@ -280,6 +295,32 @@ impl TStateView for CachedStateView {
 
     fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        Some(self.speculative.num_free_hot_slots())
+    }
+
+    fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        if self.speculative.hot_state_contains(state_key) {
+            return true;
+        }
+
+        self.hot.get_state_slot(state_key).is_some()
+    }
+
+    fn get_next_old_key(&self, state_key: Option<&StateKey>) -> Option<StateKey> {
+        let key = match state_key {
+            Some(k) => k,
+            None => return self.speculative.get_oldest_key(),
+        };
+        if let Some(x) = self.speculative.get_lru_entry(key) {
+            return x.next;
+        }
+        if let Some(x) = self.hot.get_lru_entry(key) {
+            return x.next;
+        }
+        None
     }
 }
 
