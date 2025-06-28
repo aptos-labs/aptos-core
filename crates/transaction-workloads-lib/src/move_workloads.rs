@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-pub use super::raw_module_data::PreBuiltPackagesImpl;
+pub use super::prebuilt_packages::PreBuiltPackagesImpl;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
