@@ -17,7 +17,7 @@
 ## we use `https://github.com/sushichop/action-repository-permission` to ensure these
 ## jobs are only executed when a repo member with "write" permission has triggered
 ## the workflow (directly through a push or indirectly by applying a label or enabling
-## auto_merge).
+## auto_merge)
 
 name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
