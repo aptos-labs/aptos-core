@@ -22,7 +22,7 @@ pub const SIG_VERIFY_RAYON_MIN_THRESHOLD: usize = 32;
 
 /// Executes preparation stage - set of operations that are
 /// executed in a separate stage of the pipeline from execution,
-/// like signature verificaiton or block partitioning
+/// like signature verification or block partitioning
 pub(crate) struct BlockPreparationStage {
     /// Number of blocks processed
     num_blocks_processed: usize,
