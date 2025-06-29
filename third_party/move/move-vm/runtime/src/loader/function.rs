@@ -4,8 +4,10 @@
 
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
+    module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    ModuleStorage, RuntimeEnvironment,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -22,16 +24,18 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::DependencyGasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -129,6 +133,10 @@ pub(crate) enum LazyLoadedFunctionState {
         // unresolved case, the type argument tags are stored with the serialized data.
         ty_args: Vec<TypeTag>,
         mask: ClosureMask,
+        // Layouts for captured arguments. The invariant is that these are always set for storable
+        // closures at construction time. Non-storable closures just have None as they will not be
+        // serialized anyway.
+        captured_layouts: Option<Vec<MoveTypeLayout>>,
     },
 }
 
@@ -140,18 +148,82 @@ impl LazyLoadedFunction {
     }
 
     pub(crate) fn new_resolved(
-        runtime_environment: &RuntimeEnvironment,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
+        let runtime_environment = module_storage.runtime_environment();
         let ty_args = fun
             .ty_args
             .iter()
             .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
+
+        // When building a closure, if it captures arguments, and it is persistent (i.e., it may
+        // be stored to storage), pre-compute layouts which will be stored alongside the captured
+        // arguments. This way layouts always exist for storable closures and there is no need to
+        // construct them at serialization time. This makes loading and metering logic much simpler
+        // while adding layout construction overhead only for storable closures.
+        let captured_layouts = fun
+            .function
+            .is_persistent()
+            .then(|| {
+                Self::construct_captured_layouts(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    &fun,
+                    mask,
+                )
+            })
+            .transpose()?;
+
         Ok(Self(Rc::new(RefCell::new(
-            LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
+            LazyLoadedFunctionState::Resolved {
+                fun,
+                ty_args,
+                mask,
+                captured_layouts,
+            },
         ))))
+    }
+
+    /// For a given function and a mask, constructs a vector of layouts for the captured arguments.
+    pub(crate) fn construct_captured_layouts(
+        module_storage: &impl ModuleStorage,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        fun: &LoadedFunction,
+        mask: ClosureMask,
+    ) -> PartialVMResult<Vec<MoveTypeLayout>> {
+        let ty_converter = StorageLayoutConverter::new(module_storage);
+        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+
+        mask.extract(fun.param_tys(), true)
+            .into_iter()
+            .map(|ty| {
+                let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
+                    ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                } else {
+                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                    ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                };
+
+                // Do not allow delayed fields to be serialized.
+                if contains_delayed_fields {
+                    let err = PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                        .with_message(
+                            "Function values that capture delayed fields cannot be serialized"
+                                .to_string(),
+                        );
+                    return Err(err);
+                }
+
+                Ok(layout)
+            })
+            .collect::<PartialVMResult<Vec<_>>>()
     }
 
     pub(crate) fn expect_this_impl(
@@ -205,17 +277,19 @@ impl LazyLoadedFunction {
                         fun_id,
                         ty_args,
                         mask,
-                        captured_layouts: _,
+                        captured_layouts,
                     },
             } => {
                 let fun = module_storage
                     .load_function(module_id, fun_id, ty_args)
                     .map(Rc::new)
                     .map_err(|err| err.to_partial())?;
+
                 *state = LazyLoadedFunctionState::Resolved {
                     fun: fun.clone(),
-                    ty_args: ty_args.clone(),
+                    ty_args: mem::take(ty_args),
                     mask: *mask,
+                    captured_layouts: Some(mem::take(captured_layouts)),
                 };
                 fun
             },
@@ -254,7 +328,7 @@ impl AbstractFunction for LazyLoadedFunction {
     fn to_canonical_string(&self) -> String {
         self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
-                format!("0x{}::{}::", m.address(), m.name())
+                format!("{}::{}", m.address(), m.name())
             } else {
                 "".to_string()
             };

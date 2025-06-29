@@ -1245,7 +1245,9 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1262,7 +1264,7 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 &module_storage,
             );
             if let Err(err) = result {
@@ -1302,7 +1304,10 @@ impl FakeExecutor {
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             session
                 .execute_function_bypass_visibility(
                     &module_id,
@@ -1311,7 +1316,7 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
+                    &mut traversal_context,
                     &module_storage,
                 )
                 .unwrap_or_else(|e| {

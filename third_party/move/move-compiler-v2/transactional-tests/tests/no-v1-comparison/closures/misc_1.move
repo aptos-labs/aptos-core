@@ -2,16 +2,37 @@
 module 0xc0ffee::m {
     use std::bcs;
 
-    public fun test(): bool {
+    public fun test1(): bool {
         let x = 1;
         let y = 2;
         let f: || u64 has drop = || {x + y + 1};
-        let g: || u64 has drop = || {x + y + 1};
-        bcs::to_bytes(&f) == bcs::to_bytes(&g)
+        // Serialization fails!
+        let _ = bcs::to_bytes(&f);
+        true
+    }
+
+    public fun foo() {}
+
+    #[persistent]
+    fun bar() {}
+
+    public fun test2() {
+        let f: || has drop = foo;
+        let b: || has drop = bar;
+        assert!(bcs::to_bytes(&f) != bcs::to_bytes(&b), 1);
+    }
+
+    public fun test3() {
+        let f: || has drop = foo;
+        assert!(bcs::to_bytes(&f) == bcs::to_bytes(&f), 2);
     }
 }
 
-//# run 0xc0ffee::m::test
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::test3
 
 //# publish
 module 0xc0ffee::n {

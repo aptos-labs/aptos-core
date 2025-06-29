@@ -2190,7 +2190,9 @@ impl AptosVM {
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
         );
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -2198,7 +2200,7 @@ impl AptosVM {
                 vec![],
                 args,
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2271,7 +2273,8 @@ impl AptosVM {
                 .as_move_value(),
         ];
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         session
             .execute_function_bypass_visibility(
@@ -2280,7 +2283,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2335,7 +2338,8 @@ impl AptosVM {
             MoveValue::Vector(amounts),
         ];
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         let output = match session
             .execute_function_bypass_visibility(
@@ -2344,7 +2348,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())

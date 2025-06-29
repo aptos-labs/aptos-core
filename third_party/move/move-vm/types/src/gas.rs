@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::views::{TypeView, ValueView};
+use ambassador::delegatable_trait;
 use move_binary_format::{
     errors::PartialVMResult, file_format::CodeOffset, file_format_common::Opcodes,
 };
@@ -143,6 +144,7 @@ impl SimpleInstruction {
 ///
 /// Note: because native functions are trait objects, it is not possible to make [GasMeter] a trait
 /// object as well as it has APIs that are generic.
+#[delegatable_trait]
 pub trait DependencyGasMeter {
     fn charge_dependency(
         &mut self,
