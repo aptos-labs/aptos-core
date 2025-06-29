@@ -14,7 +14,6 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     AptosVM,
 };
-use aptos_gas_algebra::Fee;
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -32,7 +31,6 @@ pub struct EpilogueSession<'r> {
     #[deref]
     #[deref_mut]
     session: RespawnedSession<'r>,
-    storage_refund: Fee,
     module_write_set: ModuleWriteSet,
 }
 
@@ -42,17 +40,9 @@ impl<'r> EpilogueSession<'r> {
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
         user_session_change_set: UserSessionChangeSet,
-        storage_refund: Fee,
     ) -> Self {
         let (change_set, module_write_set) = user_session_change_set.unpack();
-        Self::new(
-            vm,
-            txn_meta,
-            resolver,
-            change_set,
-            module_write_set,
-            storage_refund,
-        )
+        Self::new(vm, txn_meta, resolver, change_set, module_write_set)
     }
 
     pub fn on_user_session_failure(
@@ -67,7 +57,6 @@ impl<'r> EpilogueSession<'r> {
             resolver,
             previous_session_change_set.unpack(),
             ModuleWriteSet::empty(),
-            0.into(),
         )
     }
 
@@ -77,7 +66,6 @@ impl<'r> EpilogueSession<'r> {
         resolver: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         module_write_set: ModuleWriteSet,
-        storage_refund: Fee,
     ) -> Self {
         let session_id = SessionId::epilogue_meta(txn_meta);
         let session = RespawnedSession::spawn(
@@ -90,13 +78,8 @@ impl<'r> EpilogueSession<'r> {
 
         Self {
             session,
-            storage_refund,
             module_write_set,
         }
-    }
-
-    pub fn get_storage_fee_refund(&self) -> Fee {
-        self.storage_refund
     }
 
     pub fn finish(
@@ -108,7 +91,6 @@ impl<'r> EpilogueSession<'r> {
     ) -> Result<VMOutput, VMStatus> {
         let Self {
             session,
-            storage_refund: _,
             module_write_set,
         } = self;
 
