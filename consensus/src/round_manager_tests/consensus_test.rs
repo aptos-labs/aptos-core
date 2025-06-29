@@ -23,6 +23,7 @@ use aptos_consensus_types::{
     },
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalStatus},
     common::{Author, Payload, Round},
+    opt_proposal_msg::OptProposalMsg,
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
@@ -38,7 +39,53 @@ use futures::{channel::oneshot, StreamExt};
 use std::{sync::Arc, time::Duration};
 use tokio::{runtime::Runtime, time::timeout};
 
-fn process_and_vote_on_proposal(
+pub(super) fn process_and_vote_opt_proposal(
+    runtime: &Runtime,
+    node: &mut NodeSetup,
+    opt_proposal_msg: OptProposalMsg,
+    expected_round: Round,
+    expected_qc_ordered_round: Round,
+    expected_qc_committed_round: Round,
+) {
+    info!("Processing opt proposal on {}", node.identity_desc());
+
+    assert_eq!(opt_proposal_msg.round(), expected_round);
+    assert_eq!(
+        opt_proposal_msg.sync_info().highest_ordered_round(),
+        expected_qc_ordered_round.saturating_sub(1)
+    );
+    assert_eq!(
+        opt_proposal_msg.sync_info().highest_commit_round(),
+        expected_qc_committed_round
+    );
+
+    timed_block_on(
+        runtime,
+        node.round_manager
+            .process_opt_proposal_msg(opt_proposal_msg),
+    )
+    .unwrap();
+    info!("Finish process opt proposal on {}", node.identity_desc());
+
+    info!(
+        "Processing proposal (from opt proposal) on {}",
+        node.identity_desc()
+    );
+
+    let opt_block_data = timed_block_on(runtime, node.processed_opt_proposal_rx.next()).unwrap();
+    timed_block_on(
+        runtime,
+        node.round_manager.process_opt_proposal(opt_block_data),
+    )
+    .unwrap();
+
+    info!(
+        "Finish process proposal (from opt proposal) on {}",
+        node.identity_desc()
+    );
+}
+
+pub(super) fn process_and_vote_on_proposal(
     runtime: &Runtime,
     nodes: &mut [NodeSetup],
     next_proposer: usize,
@@ -86,45 +133,14 @@ fn process_and_vote_on_proposal(
                     .unwrap();
                     info!("Finish process proposal on {}", node.identity_desc());
                 },
-                ProposalMsgType::Optimistic(opt_proposal_msg) => {
-                    info!("Processing opt proposal on {}", node.identity_desc());
-
-                    assert_eq!(opt_proposal_msg.round(), expected_round);
-                    assert_eq!(
-                        opt_proposal_msg.sync_info().highest_ordered_round(),
-                        expected_qc_ordered_round.saturating_sub(1)
-                    );
-                    assert_eq!(
-                        opt_proposal_msg.sync_info().highest_commit_round(),
-                        expected_qc_committed_round
-                    );
-
-                    timed_block_on(
-                        runtime,
-                        node.round_manager
-                            .process_opt_proposal_msg(opt_proposal_msg),
-                    )
-                    .unwrap();
-                    info!("Finish process opt proposal on {}", node.identity_desc());
-
-                    info!(
-                        "Processing proposal (from opt proposal) on {}",
-                        node.identity_desc()
-                    );
-
-                    let opt_block_data =
-                        timed_block_on(runtime, node.processed_opt_proposal_rx.next()).unwrap();
-                    timed_block_on(
-                        runtime,
-                        node.round_manager.process_opt_proposal(opt_block_data),
-                    )
-                    .unwrap();
-
-                    info!(
-                        "Finish process proposal (from opt proposal) on {}",
-                        node.identity_desc()
-                    );
-                },
+                ProposalMsgType::Optimistic(opt_proposal_msg) => process_and_vote_opt_proposal(
+                    runtime,
+                    node,
+                    opt_proposal_msg,
+                    expected_round,
+                    expected_qc_ordered_round,
+                    expected_qc_committed_round,
+                ),
             }
             num_votes += 1;
         }

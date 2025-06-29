@@ -87,6 +87,7 @@ use std::{
 use tokio::{runtime::Handle, task::JoinHandle};
 
 mod consensus_test;
+mod opt_proposal_test;
 mod vtxn_on_proposal_test;
 
 fn config_with_round_timeout_msg_disabled() -> ConsensusConfig {
