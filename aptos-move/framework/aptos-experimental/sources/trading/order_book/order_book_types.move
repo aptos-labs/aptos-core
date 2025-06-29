@@ -87,7 +87,7 @@ module aptos_experimental::order_book_types {
         OrderIdType { account, account_order_id }
     }
 
-    public fun generate_unique_idx_fifo_tiebraker(): UniqueIdxType {
+    public fun generate_unique_idx_fifo_tiebreaker(): UniqueIdxType {
         // TODO change from random to monothonically increasing value
         new_unique_idx_type(
             from_bcs::to_u256(

@@ -19,7 +19,7 @@ module aptos_experimental::order_book {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         OrderWithState,
-        generate_unique_idx_fifo_tiebraker,
+        generate_unique_idx_fifo_tiebreaker,
         new_order_id_type,
         new_order,
         new_order_with_state,
@@ -160,7 +160,7 @@ module aptos_experimental::order_book {
         };
 
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
+        let unique_priority_idx = generate_unique_idx_fifo_tiebreaker();
 
         assert!(
             !self.orders.contains(&order_id),
@@ -216,7 +216,7 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ) {
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
+        let unique_priority_idx = generate_unique_idx_fifo_tiebreaker();
         let order =
             new_order(
                 order_id,
