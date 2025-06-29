@@ -12622,6 +12622,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
