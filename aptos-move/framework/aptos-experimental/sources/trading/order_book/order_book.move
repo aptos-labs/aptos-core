@@ -5,7 +5,7 @@
 /// The orders are matched based on time-price priority.
 /// 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
 /// types of pending orders are supported.
-///  - Price move up - Trigggered when the price moves above a certain price level
+/// - Price move up - Triggered when the price moves above a certain price level
 /// - Price move down - Triggered when the price moves below a certain price level
 /// - Time based - Triggered when a certain time has passed
 /// 3. Orders: This is a BigOrderMap of order id to order details.
@@ -142,7 +142,7 @@ module aptos_experimental::order_book {
         return order
     }
 
-    /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
+    /// Checks if the order is a taker order i.e., matched immediately with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
         price: Option<u64>,

@@ -179,9 +179,9 @@ module aptos_experimental::active_order_book {
         unique_priority_idx: UniqueIdxType, is_bid: bool
     ): UniqueIdxType {
         if (is_bid) {
-            unique_priority_idx
-        } else {
             unique_priority_idx.descending_idx()
+        } else {
+            unique_priority_idx
         }
     }
 
@@ -395,7 +395,7 @@ module aptos_experimental::active_order_book {
     }
 
     #[test]
-    // TODO (skedia) Add more comprehensive tests for the acive order book
+    // TODO (skedia) Add more comprehensive tests for the active order book
     fun test_active_order_book() {
         let active_order_book = new_active_order_book();
 
@@ -618,6 +618,114 @@ module aptos_experimental::active_order_book {
         // Impact size larger than total available should still use all orders
         // (50 * 200 + 100 * 150 + 150 * 100) / 300 = 133
         assert!(active_order_book.get_impact_bid_price(1000).destroy_some() == 133, 4);
+
+        active_order_book.destroy_active_order_book();
+    }
+
+    #[test]
+    fun test_get_single_match_for_sell_order_unique_idx_tie_breaker_order() {
+        let active_order_book = new_active_order_book();
+
+        // Place test buy orders at same price
+        active_order_book.place_test_order(
+            TestOrder {
+                account: @0xAA,
+                account_order_id: 1,
+                price: 200,
+                size: 50,
+                unique_idx: new_unique_idx_type(1),
+                is_bid: true
+            }
+        );
+
+        active_order_book.place_test_order(
+            TestOrder {
+                account: @0xAA,
+                account_order_id: 2,
+                price: 200,
+                size: 100,
+                unique_idx: new_unique_idx_type(2),
+                is_bid: true
+            }
+        );
+
+        // Get single match for sell order of size 25 < first order size 50
+        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(200, 10).destroy_active_matched_order();
+
+        // Assert that the matched order is the first order
+        assert!(order_id == new_order_id_type(@0xAA, 1));
+
+        // Assert that the matched size is 10
+        assert!(matched_size == 10);
+
+        // Assert that the remaining size is 50 - 10 = 40. 50 is the size of the first order
+        assert!(remaining_size == 40);
+
+        // Get single match for sell order of size 100 > first order size 50
+        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(200, 100).destroy_active_matched_order();
+
+        // Assert that the matched order is the first order
+        assert!(order_id == new_order_id_type(@0xAA, 1));
+
+        // Assert that the matched size is 40 which is the remaining size of the first order
+        assert!(matched_size == 40);
+
+        // Assert that the remaining size is 0 because the first order is fully matched
+        assert!(remaining_size == 0);
+
+        active_order_book.destroy_active_order_book();
+    }
+
+    #[test]
+    fun test_get_single_match_for_buy_order_unique_idx_tie_breaker_order() {
+        let active_order_book = new_active_order_book();
+
+        // Place test buy orders at same price
+        active_order_book.place_test_order(
+            TestOrder {
+                account: @0xAA,
+                account_order_id: 1,
+                price: 200,
+                size: 50,
+                unique_idx: new_unique_idx_type(1),
+                is_bid: false
+            }
+        );
+
+        active_order_book.place_test_order(
+            TestOrder {
+                account: @0xAA,
+                account_order_id: 2,
+                price: 200,
+                size: 100,
+                unique_idx: new_unique_idx_type(2),
+                is_bid: false
+            }
+        );
+
+        // Get single match for buy order of size 25 < first order size 50
+        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(200, 10).destroy_active_matched_order();
+
+        // Assert that the matched order is the first order
+        assert!(order_id == new_order_id_type(@0xAA, 1));
+
+        // Assert that the matched size is 10
+        assert!(matched_size == 10);
+
+        // Assert that the remaining size is 50 - 10 = 40. 50 is the size of the first order
+        assert!(remaining_size == 40);
+
+        // Get single match for buy order of size 100 > first order size 50
+        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(200, 100).destroy_active_matched_order();
+
+        // Assert that the matched order is the first order
+        assert!(order_id == new_order_id_type(@0xAA, 1));
+
+        // Assert that the matched size is 40 which is the remaining size of the first order
+        assert!(matched_size == 40);
+
+        // Assert that the remaining size is 0 because the first order is fully matched
+        assert!(remaining_size == 0);
 
         active_order_book.destroy_active_order_book();
     }
