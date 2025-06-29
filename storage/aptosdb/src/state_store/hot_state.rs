@@ -9,7 +9,10 @@ use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{state_key::StateKey, state_slot::StateSlot, StateViewResult};
+use aptos_types::state_store::{
+    state_key::StateKey,
+    state_slot::{HotLRUEntry, StateSlot},
+};
 use dashmap::DashMap;
 use std::sync::{
     mpsc::{Receiver, SyncSender, TryRecvError},
@@ -65,8 +68,15 @@ where
 }
 
 impl HotStateView for HotStateBase<StateKey, StateSlot> {
-    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<Option<StateSlot>> {
-        Ok(self.get(state_key))
+    fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
+        self.get(state_key)
+    }
+
+    fn get_lru_entry(&self, state_key: &StateKey) -> Option<HotLRUEntry> {
+        self.inner.get(state_key).map(|entry| HotLRUEntry {
+            prev: entry.prev.clone(),
+            next: entry.next.clone(),
+        })
     }
 }
 
