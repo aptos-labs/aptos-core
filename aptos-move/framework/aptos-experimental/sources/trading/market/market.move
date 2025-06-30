@@ -4,7 +4,7 @@
 /// A clearing house implementation is expected to implement the following APIs
 ///  - settle_trade(taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size): SettleTradeResult ->
 /// Called by the market when there is an match between taker and maker. The clearinghouse is expected to settle the trade
-/// and return the result. Please note that the clearing house settlment size might not be the same as the order match size and
+/// and return the result. Please note that the clearing house settlement size might not be the same as the order match size and
 /// the settlement might also fail. The fill_id is an incremental counter for matched orders and can be used to track specific fills
 ///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 ///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
@@ -16,7 +16,7 @@
 /// any other book keeping operations.
 ///
 /// - cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
-/// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
+/// The clearinghouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
 /// that passes the validate_order_placement check,
 /// the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
 ///
@@ -106,7 +106,7 @@ module aptos_experimental::market {
         V1 {
             /// Weather to allow self matching orders
             allow_self_trade: bool,
-            /// Whether to allow sending all events for the markett
+            /// Whether to allow sending all events for the market
             allow_events_emission: bool
         }
     }
@@ -203,7 +203,7 @@ module aptos_experimental::market {
         parent: &signer, market: &signer, config: MarketConfig
     ): Market<M> {
         // requiring signers, and not addresses, purely to guarantee different dexes
-        // cannot polute events to each other, accidentally or maliciously.
+        // cannot pollute events to each other, accidentally or maliciously.
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
@@ -645,7 +645,7 @@ module aptos_experimental::market {
     /// - order_id: The order id for the order - this is needed because for orders with trigger conditions, the order
     /// id is generated when the order is placed and when they are triggered, the same order id is used to match the order.
     /// - emit_taker_order_open: bool: Whether to emit an order open event for the taker order - this is used when
-    /// the caller do not wants to emit an open order event for a taker in case the taker order was intterrupted because
+    /// the caller do not wants to emit an open order event for a taker in case the taker order was interrupted because
     /// of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
     public fun place_order_with_order_id<M: store + copy + drop>(
         self: &mut Market<M>,
