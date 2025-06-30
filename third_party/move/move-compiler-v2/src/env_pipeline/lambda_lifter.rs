@@ -40,6 +40,8 @@
 //! like `|x| f(c, x)` can be represented as `Closure(f, mask(0b01), c)`, whereas
 //! `|x| f(x, c)` can be represented as `Closure(f, mask(0b10), c)`.
 
+use crate::COMPILER_BUG_REPORT_MSG;
+use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::function::ClosureMask;
@@ -723,7 +725,12 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
                     module_id,
                     fun_id,
                     ClosureMask::new_for_leading(closure_args.len()).unwrap_or_else(|err| {
-                        env.error(&env.get_node_loc(id), &err);
+                        env.diag_with_notes(
+                            Severity::Bug,
+                            &env.get_node_loc(id),
+                            &format!("compiler internal error: {}", err),
+                            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+                        );
                         ClosureMask::empty()
                     }),
                 ),

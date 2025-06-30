@@ -3,7 +3,6 @@
 export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 # Nightly version control
-# Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
 NIGHTLY_VERSION="nightly-2025-04-03"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID

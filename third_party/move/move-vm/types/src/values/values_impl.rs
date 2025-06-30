@@ -4736,14 +4736,23 @@ pub mod prop {
                     })
                     .boxed(),
             },
-            L::Struct(struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => struct_layout
-                // TODO(#13806): do we need to have a strategy for different variants?
-                .fields(Some(variants.len().wrapping_sub(1))) // choose last variant
-                .iter()
-                .map(value_strategy_with_layout)
-                .collect::<Vec<_>>()
-                .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
-                .boxed(),
+            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+                // Randomly choose a variant index
+                let variant_count = variants.len();
+                let variants = variants.clone();
+                (0..variant_count as u16)
+                    .prop_flat_map(move |variant_tag| {
+                        let variant_layouts = variants[variant_tag as usize].clone();
+                        variant_layouts
+                            .iter()
+                            .map(value_strategy_with_layout)
+                            .collect::<Vec<_>>()
+                            .prop_map(move |vals| {
+                                Value::struct_(Struct::pack_variant(variant_tag, vals))
+                            })
+                    })
+                    .boxed()
+            },
 
             L::Struct(struct_layout) => struct_layout
                 .fields(None)
@@ -4815,8 +4824,10 @@ pub mod prop {
             4 => leaf.prop_recursive(8, 32, 2, |inner| {
                 prop_oneof![
                     1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
-                    1 => vec(inner, 0..=5).prop_map(|f_layouts| {
+                    1 => vec(inner.clone(), 0..=5).prop_map(|f_layouts| {
                             L::Struct(MoveStructLayout::new(f_layouts))}),
+                    1 => vec(vec(inner, 0..=3), 1..=4).prop_map(|variant_layouts| {
+                            L::Struct(MoveStructLayout::new_variants(variant_layouts))}),
                 ]
             }),
             2 => Just(L::Function),

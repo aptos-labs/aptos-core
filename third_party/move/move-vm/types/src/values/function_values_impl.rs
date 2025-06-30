@@ -218,6 +218,9 @@ where
     }
 }
 
+/// Mock AbstractFunction for testing
+/// Value:closure(AbstractFunction, [Value]) requires an AbstractFunction, which is agnostic from runtime implementation.
+/// This mock is used to test the function values system.
 #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 pub(crate) mod mock {
     use super::*;
@@ -280,6 +283,7 @@ pub(crate) mod mock {
         }
 
         fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            // Didn't need it in the test
             unimplemented!()
         }
 

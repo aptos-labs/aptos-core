@@ -10,6 +10,7 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
     file_format_common::VERSION_MAX,
 };
+use move_vm_types::natives::function::StatusCode;
 
 #[derive(Arbitrary, Debug)]
 enum ExecVariant {
@@ -34,15 +35,21 @@ fn run_case_module(module: &CompiledModule) -> Corpus {
         .serialize_for_version(Some(VERSION_MAX), &mut module_code)
         .is_err()
     {
-        return Corpus::Keep;
+        return Corpus::Reject;
     }
-    match CompiledModule::deserialize_with_config(&module_code, &DeserializerConfig::default()) {
+
+    match CompiledModule::deserialize_no_check_bounds(&module_code) {
         Ok(mut m) => {
             m.version = module.version;
             assert_eq!(*module, m);
             Corpus::Keep
         },
-        Err(_) => Corpus::Keep,
+        Err(e) => {
+            if e.major_status() != StatusCode::MALFORMED {
+                panic!("Failed to deserialize module after serialization\nCompiledModule:\n{:?}\nSerialized:{:?}", module, module_code);
+            }
+            Corpus::Reject
+        },
     }
 }
 
@@ -52,15 +59,21 @@ fn run_case_script(script: &CompiledScript) -> Corpus {
         .serialize_for_version(Some(VERSION_MAX), &mut script_code)
         .is_err()
     {
-        return Corpus::Keep;
+        return Corpus::Reject;
     }
-    match CompiledScript::deserialize_with_config(&script_code, &DeserializerConfig::default()) {
+
+    match CompiledScript::deserialize_no_check_bounds(&script_code) {
         Ok(mut s) => {
             s.version = script.version;
             assert_eq!(*script, s);
             Corpus::Keep
         },
-        Err(_) => Corpus::Keep,
+        Err(e) => {
+            if e.major_status() != StatusCode::MALFORMED {
+                panic!("Failed to deserialize script after serialization\nCompiledScript:\n{:?}\nSerialized:{:?}", script, script_code);
+            }
+            Corpus::Reject
+        },
     }
 }
 
