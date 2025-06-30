@@ -17,6 +17,7 @@ module supra_framework::reconfiguration_with_dkg {
     use supra_framework::stake;
     use supra_framework::supra_config;
     use supra_framework::system_addresses;
+    use supra_framework::evm_config;
     friend supra_framework::block;
     friend supra_framework::supra_governance;
 
@@ -59,6 +60,7 @@ module supra_framework::reconfiguration_with_dkg {
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
+        evm_config::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }
 
