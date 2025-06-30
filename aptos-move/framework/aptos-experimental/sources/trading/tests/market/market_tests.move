@@ -18,10 +18,12 @@ module aptos_experimental::market_tests {
         verify_fills
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market::{
+    use aptos_experimental::market_types::{
         good_till_cancelled,
         post_only,
         immediate_or_cancel,
+    };
+    use aptos_experimental::market::{
         new_market,
         new_market_config
     };
@@ -224,7 +226,7 @@ module aptos_experimental::market_tests {
                 maker2,
                 1100,
                 1000000,
-                false, // is_buy
+                false, // is_bid
                 post_only(), // order_type
                 &mut event_store,
                 false,
@@ -281,7 +283,7 @@ module aptos_experimental::market_tests {
                 maker,
                 1000,
                 1000000,
-                true, // is_buy
+                true, // is_bid
                 good_till_cancelled(), // order_type
                 &mut event_store,
                 false,
@@ -297,7 +299,7 @@ module aptos_experimental::market_tests {
                 taker,
                 1000,
                 1000000,
-                false, // is_buy
+                false, // is_bid
                 post_only(), // order_type
                 &mut event_store,
                 true,
@@ -347,7 +349,7 @@ module aptos_experimental::market_tests {
                 maker,
                 1000,
                 1000000,
-                true, // is_buy
+                true, // is_bid
                 good_till_cancelled(), // order_type
                 &mut event_store,
                 false,
@@ -363,7 +365,7 @@ module aptos_experimental::market_tests {
                 taker,
                 1000,
                 1000000,
-                false, // is_buy
+                false, // is_bid
                 immediate_or_cancel(), // order_type
                 vector[1000000],
                 vector[1000],
@@ -420,7 +422,7 @@ module aptos_experimental::market_tests {
                 maker,
                 1000,
                 1000000,
-                true, // is_buy
+                true, // is_bid
                 good_till_cancelled(), // order_type
                 &mut event_store,
                 false,
@@ -436,7 +438,7 @@ module aptos_experimental::market_tests {
                 taker,
                 1000,
                 2000000,
-                false, // is_buy
+                false, // is_bid
                 immediate_or_cancel(), // order_type
                 vector[1000000],
                 vector[1000],
@@ -493,7 +495,7 @@ module aptos_experimental::market_tests {
                 maker,
                 1000,
                 1000000, // 1 BTC
-                true, // is_buy
+                true, // is_bid
                 good_till_cancelled(), // order_type
                 &mut event_store,
                 false,
@@ -509,7 +511,7 @@ module aptos_experimental::market_tests {
                 taker,
                 1200,
                 1000000, // 1 BTC
-                false, // is_buy
+                false, // is_bid
                 immediate_or_cancel(), // order_type
                 &mut event_store,
                 false, // Despite it being a "taker", this order will not cross
@@ -563,7 +565,7 @@ module aptos_experimental::market_tests {
                 maker,
                 1000, // price
                 500000, // 0.5 BTC
-                true, // is_buy
+                true, // is_bid
                 good_till_cancelled(),
                 &mut event_store,
                 false,
@@ -579,7 +581,7 @@ module aptos_experimental::market_tests {
                 taker,
                 1000,
                 1000000, // 1 BTC
-                false, // is_buy
+                false, // is_bid
                 good_till_cancelled(),
                 vector[500000], // 0.5 BTC
                 vector[1000],
@@ -1031,5 +1033,4 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker2_addr) == 0);
         market.destroy_market()
     }
-
 }
