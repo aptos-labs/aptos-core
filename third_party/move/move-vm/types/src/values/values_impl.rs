@@ -4614,7 +4614,7 @@ pub mod prop {
     use move_core_types::{
         ability::AbilitySet,
         function::ClosureMask,
-        language_storage::TypeTag,
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
         value::{MoveStruct, MoveValue},
     };
     use proptest::{collection::vec, prelude::*};
@@ -4647,8 +4647,8 @@ pub mod prop {
             }),
             1 => (vec(leaf.clone(), 0..=2), vec(leaf, 0..=2), any::<AbilitySet>()).prop_map(|(args, results, abilities)| {
                 TypeTag::Function(Box::new(FunctionTag {
-                    args,
-                    results,
+                    args: args.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
+                    results: results.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
                     abilities,
                 }))
             }),
