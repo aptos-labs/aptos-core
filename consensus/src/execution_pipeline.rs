@@ -288,6 +288,7 @@ impl ExecutionPipeline {
         {
             counters::APPLY_LEDGER_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             debug!("ledger_apply stage received block {}.", block_id);
+
             let res = async {
                 let execution_duration = execution_time?;
                 let executor = executor.clone();

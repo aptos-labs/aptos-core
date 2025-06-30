@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checks::node::global_storage_includes::GlobalStorageIncludes;
-use crate::types::storage::{MovementAptosStorage, MovementStorage};
+use crate::{
+    checks::node::global_storage_includes::GlobalStorageIncludes,
+    types::storage::{MovementAptosStorage, MovementStorage},
+};
 use clap::Parser;
 use std::path::PathBuf;
 

@@ -34,7 +34,6 @@ const PREMAINNET: &str = "premainnet";
 const MOVEMENT_MAINNET: &str = "movement_mainnet";
 const MOVEMENT_TESTNET: &str = "movement_testnet";
 
-
 impl NamedChain {
     fn str_to_chain_id(string: &str) -> Result<ChainId> {
         let named_chain = NamedChain::from_str(string)?;
@@ -92,6 +91,14 @@ impl ChainId {
     /// Returns true iff the chain ID matches mainnet
     pub fn is_mainnet(&self) -> bool {
         self.matches_named_chain(NamedChain::MAINNET)
+    }
+
+    pub fn is_movement_mainnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::MOVEMAINNET)
+    }
+
+    pub fn is_movement_testnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::MOVETESTNET)
     }
 
     /// Returns true iff the chain ID matches the given named chain

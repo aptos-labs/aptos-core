@@ -665,18 +665,21 @@ impl LeaderReputation {
 
                 if chosen {
                     // do not treat chain as unhealthy, if chain just started, and we don't have enough history to decide.
-                    let voting_power_participation_ratio: VotingPowerRatio =
-                        if history.len() < *participants_window_size && self.epoch <= 2 {
-                            1.0
-                        } else if total_voting_power >= 1.0 {
-                            participating_voting_power / total_voting_power
-                        } else {
-                            error!(
-                                "Total voting power is {}, should never happen",
-                                total_voting_power
-                            );
-                            1.0
-                        };
+                    // Also handle single validator case where participation should always be 1.0
+                    let voting_power_participation_ratio: VotingPowerRatio = if history.len()
+                        < *participants_window_size
+                        && (self.epoch <= 2 || candidates.len() == 1)
+                    {
+                        1.0
+                    } else if total_voting_power >= 1.0 {
+                        participating_voting_power / total_voting_power
+                    } else {
+                        error!(
+                            "Total voting power is {}, should never happen",
+                            total_voting_power
+                        );
+                        1.0
+                    };
                     CHAIN_HEALTH_REPUTATION_PARTICIPATING_VOTING_POWER_FRACTION
                         .set(voting_power_participation_ratio);
                     result = Some(voting_power_participation_ratio);

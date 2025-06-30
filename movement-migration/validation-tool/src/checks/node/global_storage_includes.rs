@@ -1,16 +1,20 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checks::error::ValidationError;
-use crate::types::storage::{MovementAptosStorage, MovementStorage};
-use aptos_types::access_path::Path;
-use aptos_types::account_config::{AccountResource, CoinStoreResourceUntyped};
-use aptos_types::state_store::state_key::inner::StateKeyInner;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::TStateView;
+use crate::{
+    checks::error::ValidationError,
+    types::storage::{MovementAptosStorage, MovementStorage},
+};
+use aptos_types::{
+    access_path::Path,
+    account_config::{AccountResource, CoinStoreResourceUntyped},
+    state_store::{
+        state_key::{inner::StateKeyInner, StateKey},
+        TStateView,
+    },
+};
 use bytes::Bytes;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::str::FromStr;
 use tracing::{debug, info};
 

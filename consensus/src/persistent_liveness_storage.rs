@@ -109,25 +109,26 @@ impl LedgerRecoveryData {
     ) -> Result<RootInfo> {
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
-        let (latest_commit_id, latest_ledger_info_sig) =
-            if self.storage_ledger.ledger_info().ends_epoch() {
-                let genesis =
-                    Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
-                let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
-                    self.storage_ledger.ledger_info(),
-                    genesis.id(),
-                );
-                let genesis_ledger_info = genesis_qc.ledger_info().clone();
-                let genesis_id = genesis.id();
-                blocks.push(genesis);
-                quorum_certs.push(genesis_qc);
-                (genesis_id, genesis_ledger_info)
-            } else {
-                (
-                    self.storage_ledger.ledger_info().consensus_block_id(),
-                    self.storage_ledger.clone(),
-                )
-            };
+        let ends_epoch = self.storage_ledger.ledger_info().ends_epoch();
+        let blocks_empty = blocks.is_empty();
+        let (latest_commit_id, latest_ledger_info_sig) = if ends_epoch || blocks_empty {
+            let genesis =
+                Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
+            let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+                self.storage_ledger.ledger_info(),
+                genesis.id(),
+            );
+            let genesis_ledger_info = genesis_qc.ledger_info().clone();
+            let genesis_id = genesis.id();
+            blocks.push(genesis);
+            quorum_certs.push(genesis_qc);
+            (genesis_id, genesis_ledger_info)
+        } else {
+            (
+                self.storage_ledger.ledger_info().consensus_block_id(),
+                self.storage_ledger.clone(),
+            )
+        };
 
         // sort by (epoch, round) to guarantee the topological order of parent <- child
         blocks.sort_by_key(|b| (b.epoch(), b.round()));
@@ -209,7 +210,9 @@ impl LedgerRecoveryData {
     ) -> Result<RootInfo> {
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
-        let (root_id, latest_ledger_info_sig) = if self.storage_ledger.ledger_info().ends_epoch() {
+        let ends_epoch = self.storage_ledger.ledger_info().ends_epoch();
+        let blocks_empty = blocks.is_empty();
+        let (root_id, latest_ledger_info_sig) = if ends_epoch || blocks_empty {
             let genesis =
                 Block::make_genesis_block_from_ledger_info(self.storage_ledger.ledger_info());
             let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
@@ -228,9 +231,7 @@ impl LedgerRecoveryData {
             )
         };
 
-        // sort by (epoch, round) to guarantee the topological order of parent <- child
         blocks.sort_by_key(|b| (b.epoch(), b.round()));
-
         let root_idx = blocks
             .iter()
             .position(|block| block.id() == root_id)

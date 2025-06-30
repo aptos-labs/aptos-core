@@ -1781,7 +1781,7 @@ impl TransactionOutput {
                     _ => (),
                 }
             },
-            _ => ()
+            _ => (),
         }
         ensure!(
             self.status() == &expected_txn_status,

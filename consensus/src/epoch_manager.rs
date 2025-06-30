@@ -1476,9 +1476,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
     }
 
+    //TODO(l1-migration) turn on quorum store
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
         fail_point!("consensus::start_new_epoch::disable_qs", |_| false);
-        onchain_config.quorum_store_enabled()
+        onchain_config.quorum_store_enabled() && false
     }
 
     async fn process_message(

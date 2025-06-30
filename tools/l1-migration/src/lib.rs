@@ -1,3 +1,3 @@
-pub mod genesis_waypoint_extraction;
+pub mod utils;
 
-pub use genesis_waypoint_extraction::extract_genesis_and_waypoint;
+pub use utils::extract_genesis_and_waypoint;

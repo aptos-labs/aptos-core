@@ -111,7 +111,6 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-
             (ChargeBytesForPrints, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
                 .unwrap()

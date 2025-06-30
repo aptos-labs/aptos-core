@@ -11,20 +11,24 @@ use crate::{
     logging::{LogEntry, LogSchema},
     types::partial_state_compute_result::PartialStateComputeResult,
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, ensure, Ok, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::ExecutorError;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_storage_interface::DbReader;
-use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader,
+};
+use aptos_types::{
+    account_config::ChainIdResource, ledger_info::LedgerInfo, on_chain_config::OnChainConfig,
+    proof::definition::LeafCount,
+};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{mpsc::Receiver, Arc, Weak},
 };
-
 pub struct Block {
     pub id: HashValue,
     pub output: PartialStateComputeResult,
@@ -205,6 +209,21 @@ impl BlockTree {
         self.block_lookup.multi_get(ids)
     }
 
+    fn is_new_virtual_genesis(db: &Arc<dyn DbReader>) -> Result<bool> {
+        let db_state_view = db
+            .latest_state_checkpoint_view()
+            .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
+        let chain_id = ChainIdResource::fetch_config(&db_state_view)
+            .expect("[aptos-node] missing chain ID resource")
+            .chain_id();
+        let ledger_info_with_sigs = db.get_latest_ledger_info()?;
+        let cur_epoch = ledger_info_with_sigs.ledger_info().epoch();
+        if chain_id.is_movement_mainnet() && cur_epoch == 1848695 {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
     fn root_from_db(block_lookup: &Arc<BlockLookup>, db: &Arc<dyn DbReader>) -> Result<Arc<Block>> {
         let ledger_info_with_sigs = db.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sigs.ledger_info();
@@ -217,13 +236,14 @@ impl BlockTree {
             ledger_info.version(),
         );
 
-        let id = if ledger_info.ends_epoch() {
+        let id = if ledger_info.ends_epoch() || Self::is_new_virtual_genesis(db)? {
             epoch_genesis_block_id(ledger_info)
         } else {
             ledger_info.consensus_block_id()
         };
 
-        let output = PartialStateComputeResult::new_empty(ledger_summary);
+        let output: PartialStateComputeResult =
+            PartialStateComputeResult::new_empty(ledger_summary);
 
         block_lookup.fetch_or_add_block(id, output, None)
     }

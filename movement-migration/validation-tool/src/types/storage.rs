@@ -10,9 +10,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::state_store::state_key::StateKey;
 use either::Either;
-use std::ops::Deref;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{ops::Deref, path::PathBuf, sync::Arc};
 
 pub struct Storage(Arc<dyn DbReader>);
 

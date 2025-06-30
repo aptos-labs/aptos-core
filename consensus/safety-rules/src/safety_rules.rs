@@ -131,6 +131,7 @@ impl SafetyRules {
         let mut updated = false;
         let one_chain = qc.certified_block().round();
         let two_chain = qc.parent_block().round();
+
         if one_chain > safety_data.one_chain_round {
             safety_data.one_chain_round = one_chain;
             trace!(
@@ -260,6 +261,7 @@ impl SafetyRules {
         let last_li = proof
             .verify(&waypoint)
             .map_err(|e| Error::InvalidEpochChangeProof(format!("{}", e)))?;
+
         let ledger_info = last_li.ledger_info();
         let epoch_state = ledger_info
             .next_epoch_state()

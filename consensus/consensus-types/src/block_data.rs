@@ -188,6 +188,22 @@ impl BlockData {
         }
     }
 
+    pub fn make_genesis_block_from_any_ledger_info(ledger_info: &LedgerInfo) -> Self {
+        let ancestor = ledger_info.commit_info().to_owned();
+
+        // Genesis carries a placeholder quorum certificate to its parent id with LedgerInfo
+        // carrying information about version from the last LedgerInfo of previous epoch.
+        let genesis_quorum_cert = QuorumCert::new(
+            VoteData::new(ancestor.clone(), ancestor.clone()),
+            LedgerInfoWithSignatures::new(
+                LedgerInfo::new(ancestor, HashValue::zero()),
+                AggregateSignature::empty(),
+            ),
+        );
+
+        BlockData::new_starting_block(ledger_info.timestamp_usecs(), genesis_quorum_cert)
+    }
+
     pub fn new_genesis_from_ledger_info(ledger_info: &LedgerInfo) -> Self {
         assert!(ledger_info.ends_epoch());
         let ancestor = BlockInfo::new(
@@ -247,8 +263,21 @@ impl BlockData {
     #[allow(unexpected_cfgs)]
     pub fn new_genesis(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
         assume!(quorum_cert.certified_block().epoch() < u64::MAX); // unlikely to be false in this universe
+        let genesis_epoch = quorum_cert.certified_block().epoch() + 1;
         Self {
-            epoch: quorum_cert.certified_block().epoch() + 1,
+            epoch: genesis_epoch,
+            round: 0,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::Genesis,
+        }
+    }
+
+    #[allow(unexpected_cfgs)]
+    pub fn new_starting_block(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
+        assume!(quorum_cert.certified_block().epoch() < u64::MAX); // unlikely to be false in this universe
+        Self {
+            epoch: quorum_cert.certified_block().epoch(),
             round: 0,
             timestamp_usecs,
             quorum_cert,

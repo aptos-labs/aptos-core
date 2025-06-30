@@ -82,31 +82,51 @@ impl QuorumCert {
     /// - the accumulator root hash of the LedgerInfo is set to the last executed state of previous
     ///   epoch.
     /// - the map of signatures is empty because genesis block is implicitly agreed.
+    // TODO(l1-migration): This is for recovery when we lost consensu DB data
+    // We create this virual block and don't want to add 1 since it is not epoch_ending block
+
     pub fn certificate_for_genesis_from_ledger_info(
         ledger_info: &LedgerInfo,
         genesis_id: HashValue,
     ) -> QuorumCert {
-        let ancestor = BlockInfo::new(
+        let ancestor_epoch = if ledger_info.ends_epoch() {
             ledger_info
                 .epoch()
                 .checked_add(1)
-                .expect("Integer overflow when creating cert for genesis from ledger info"),
-            0,
-            genesis_id,
-            ledger_info.transaction_accumulator_hash(),
-            ledger_info.version(),
-            ledger_info.timestamp_usecs(),
-            None,
-        );
+                .expect("Integer overflow when creating cert for genesis from ledger info")
+        } else {
+            ledger_info.epoch()
+        };
+
+        let ancestor = if ledger_info.ends_epoch() {
+            BlockInfo::new(
+                ancestor_epoch,
+                0,
+                genesis_id,
+                ledger_info.transaction_accumulator_hash(),
+                ledger_info.version(),
+                ledger_info.timestamp_usecs(),
+                None,
+            )
+        } else {
+            BlockInfo::new(
+                ancestor_epoch,
+                0,
+                genesis_id,
+                ledger_info.transaction_accumulator_hash(),
+                ledger_info.version(),
+                ledger_info.timestamp_usecs(),
+                None,
+            )
+        };
 
         let vote_data = VoteData::new(ancestor.clone(), ancestor.clone());
         let li = LedgerInfo::new(ancestor, vote_data.hash());
 
         let validator_set_size = ledger_info
             .next_epoch_state()
-            .expect("Next epoch state not found in ledger info")
-            .verifier
-            .len();
+            .map(|epoch_state| epoch_state.verifier.len())
+            .unwrap_or(1);
 
         QuorumCert::new(
             vote_data,
