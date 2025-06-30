@@ -18,7 +18,7 @@ mod tests {
         account_address::AccountAddress,
         function::{ClosureMask, MoveClosure},
         identifier::Identifier,
-        language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
@@ -214,13 +214,15 @@ mod tests {
         vec![
             TypeTag::Address,
             TypeTag::Function(Box::new(FunctionTag {
-                args: vec![TypeTag::Struct(Box::new(StructTag {
-                    address: AccountAddress::TEN,
-                    module: Identifier::new("mod").unwrap(),
-                    name: Identifier::new("st").unwrap(),
-                    type_args: vec![TypeTag::Signer],
-                }))],
-                results: vec![TypeTag::Address],
+                args: vec![FunctionParamOrReturnTag::Value(TypeTag::Struct(Box::new(
+                    StructTag {
+                        address: AccountAddress::TEN,
+                        module: Identifier::new("mod").unwrap(),
+                        name: Identifier::new("st").unwrap(),
+                        type_args: vec![TypeTag::Signer],
+                    },
+                )))],
+                results: vec![FunctionParamOrReturnTag::Value(TypeTag::Address)],
                 abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
