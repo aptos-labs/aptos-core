@@ -2,18 +2,69 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::publish_util::Package;
+use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
+    bcs,
     move_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format::CompiledScript,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
+    CompiledModule,
+};
 use rand::rngs::StdRng;
+use std::{fs, path::PathBuf};
 
 pub trait PreBuiltPackages: std::fmt::Debug + Sync + Send {
-    fn package_metadata(&self, package_name: &str) -> &[u8];
-    fn package_modules(&self, package_name: &str) -> &[Vec<u8>];
-    fn package_script(&self, package_name: &str) -> Option<&Vec<u8>>;
+    fn package_metadata_path(&self, package_name: &str) -> PathBuf;
+    fn package_modules_paths(&self, package_name: &str) -> Box<dyn Iterator<Item = PathBuf>>;
+    fn package_script_path(&self, package_name: &str) -> PathBuf;
+
+    fn package_metadata(&self, package_name: &str) -> PackageMetadata {
+        let path = self.package_metadata_path(package_name);
+        let bytes = fs::read(&path).unwrap_or_else(|err| panic!("Failed to read {path:?}: {err}"));
+        bcs::from_bytes::<PackageMetadata>(&bytes).expect("Package metadata must deserialize")
+    }
+
+    fn package_modules(&self, package_name: &str) -> Vec<(String, CompiledModule, u32)> {
+        let paths = self.package_modules_paths(package_name);
+
+        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let mut results = vec![];
+
+        for module_path in paths {
+            let bytes = fs::read(&module_path)
+                .unwrap_or_else(|err| panic!("Cannot read module file {module_path:?}: {err}"));
+            let (module, binary_format_version) = if let Ok(module) =
+                CompiledModule::deserialize_with_config(&bytes, &default_config)
+            {
+                (module, VERSION_DEFAULT)
+            } else {
+                let module =
+                    CompiledModule::deserialize(&bytes).expect("Module must always deserialize");
+                (module, VERSION_MAX)
+            };
+
+            results.push((
+                module.self_id().name().to_string(),
+                module,
+                binary_format_version,
+            ));
+        }
+
+        results
+    }
+
+    fn package_script(&self, package_name: &str) -> Option<CompiledScript> {
+        let path = self.package_script_path(package_name);
+        fs::read(&path)
+            .ok()
+            .map(|bytes| CompiledScript::deserialize(&bytes).expect("Script must deserialize"))
+    }
 }
 
 pub enum MultiSigConfig {
