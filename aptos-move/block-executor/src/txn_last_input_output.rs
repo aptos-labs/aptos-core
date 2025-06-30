@@ -494,14 +494,4 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             code_invariant_error("[BlockSTM]: Output must be uniquely owned after execution")
         })
     }
-
-    pub(crate) fn take_read_set(&self, txn_idx: TxnIndex) -> Result<TxnInput<T>, PanicError> {
-        let owning_ptr = self.inputs[txn_idx as usize].swap(None).ok_or_else(|| {
-            code_invariant_error("[BlockSTM]: Input must be recorded after execution")
-        })?;
-
-        Arc::try_unwrap(owning_ptr).map_err(|_| {
-            code_invariant_error("[BlockSTM]: Input must be uniquely owned after execution")
-        })
-    }
 }

@@ -6,9 +6,14 @@ use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
 use crossbeam::utils::CachePadded;
+use move_core_types::language_storage::ModuleId;
 use std::{
     cmp,
-    sync::atomic::{AtomicU32, AtomicU8, Ordering},
+    collections::BTreeSet,
+    sync::{
+        atomic::{AtomicU32, AtomicU8, Ordering},
+        Arc,
+    },
 };
 
 /**
@@ -43,8 +48,10 @@ through a well-defined lifecycle:
       - A successful [ExecutionStatuses::start_abort] must be followed by a
         [ExecutionStatuses::finish_abort] call on the status.
         • If the status was 'Executed', it transitions to 'PendingScheduling' for the
-          next incarnation.
-        • If the status was 'Executing', it transitions to 'Aborted'.
+          next incarnation, unless start_next_incarnation is true. In this case, the status
+          goes directly to 'Executing' without going through 'PendingScheduling'.
+        • If the status was 'Executing', it transitions to 'Aborted'. In this case,
+          start_next_incarnation must be false.
       - When transaction T1 successfully aborts transaction T2 (where T2 > T1):
         • T2 stops executing as soon as possible,
         • Subsequent scheduling of T2 may wait until T1 finishes, since T1 has higher
@@ -71,16 +78,21 @@ Executing(i) ------------------------------> Executed(i)
     ↓                    finish_execution       ↓
 Aborted(i) ------------------------------> PendingScheduling(i+1)
 
-Note: [ExecutionStatuses::start_abort] doesn't change the status directly but marks the
-transaction for abort. The actual status change occurs during
-[ExecutionStatuses::finish_abort]. Both steps are required to complete the abort process.
+Notes:
+*  [ExecutionStatuses::start_abort] doesn't change the status directly but marks the
+   transaction for abort. The actual status change occurs during
+   [ExecutionStatuses::finish_abort]. Both steps are required to complete the abort process.
+*  [ExecutionStatuses::finish_abort] can be called with start_next_incarnation = true,
+   in which case the status must be Executed and it is updated to Executing directly, i.e.
+   can be viewed as [ExecutionStatuses::finish_abort] immediately (atomically) followed by
+   [ExecutionStatuses::start_executing].
 
 ============================== Transaction Stall Mechanism ==============================
 
 In the BlockSTMv2 scheduler, a transaction status can be "stalled," meaning there have been
 more [ExecutionStatuses::add_stall] than [ExecutionStatuses::remove_stall] calls on its status.
 Each successful [ExecutionStatuses::add_stall] call requires a guarantee that the
-corresponding[ExecutionStatuses::remove_stall] will eventually be performed.
+corresponding [ExecutionStatuses::remove_stall] will eventually be performed.
 
 The stall mechanism can be conceptualized as balanced parentheses - `add_stall` represents
 an opening bracket '(' and `remove_stall` represents a closing bracket ')'. A status becomes
@@ -283,7 +295,7 @@ pub(crate) struct ExecutionStatus {
     /// This mutex synchronizes writes to incarnation and status changes, as well
     /// as modifications that affect the dependency shortcut (e.g., when stall count
     /// changes between 0 and non-zero).
-    status_with_incarnation: CachePadded<Mutex<StatusWithIncarnation>>,
+    pub(crate) status_with_incarnation: CachePadded<Mutex<StatusWithIncarnation>>,
 
     /// Counter to track and filter abort attempts.
     ///
@@ -304,10 +316,20 @@ pub(crate) struct ExecutionStatus {
     /// Each add_stall increments this counter, and each remove_stall decrements it.
     /// The status is "unstalled" when the counter returns to 0.
     num_stalls: CachePadded<AtomicU32>,
+
+    /// Tracks the module IDs that need to be validated after txn execution finishes.
+    /// Can be recorded for a specific incarnation when the status is executing, and
+    /// gets cleared upon abort or finish execution (finish execution returns).
+    /// In rare scenarios, it is possible for multiple requirements to be deferred
+    /// during the same incarnation execution (due to multiple concurrently committed
+    /// txns publishing modules). In this case, the requirements are recorded in a
+    /// vector and processed together when execution finishes.
+    /// TODO(BlockSMTv2): Test.
+    module_validation_requirements: Mutex<Vec<Arc<BTreeSet<ModuleId>>>>,
 }
 
 pub(crate) struct ExecutionStatuses {
-    statuses: Vec<CachePadded<ExecutionStatus>>,
+    pub(crate) statuses: Vec<CachePadded<ExecutionStatus>>,
     /// Interface to manage the transaction execution queue.
     ///
     /// Allows adding or removing transactions from the execution queue based on
@@ -459,22 +481,10 @@ impl ExecutionStatuses {
         &self,
         txn_idx: TxnIndex,
     ) -> Result<Option<Incarnation>, PanicError> {
-        let status = &self.statuses[txn_idx as usize];
-
-        let status_guard = &mut *status.status_with_incarnation.lock();
-        let ret = status_guard.start_executing();
-
-        if ret.is_some() {
-            // When status is PendingScheduling the dependency status should be
-            // WaitForExecution (default or set by abort under lock).
-            status.swap_dependency_status_any(
-                &[DependencyStatus::ShouldDefer],
-                DependencyStatus::WaitForExecution,
-                "start_executing",
-            )?;
-        }
-
-        Ok(ret)
+        let status_guard = &mut *self.statuses[txn_idx as usize]
+            .status_with_incarnation
+            .lock();
+        self.to_executing(txn_idx, status_guard)
     }
 
     /// Attempts to mark a transaction incarnation for abort.
@@ -519,15 +529,16 @@ impl ExecutionStatuses {
     /// - `finished_incarnation`: The incarnation that has finished execution
     ///
     /// # Returns
-    /// - 'Ok(is the execution still valid at the time finish was recorded)', in particular:
-    ///     - `Ok(true)` if transitioned from Executing to Executed
-    ///     - `Ok(false)` if transitioned from Aborted to PendingScheduling
-    /// - `Err` if the current state doesn't allow finishing execution
+    /// - 'Ok(Some(deferred module validation requirements))' if the execution is still valid at 
+    ///   the time finish was recorded (empty vec if no requirements), in particular:
+    ///     - `Ok(Some(vec of requirements))` if transitioned from Executing to Executed
+    ///     - `Ok(None)` if transitioned from Aborted to PendingScheduling.
+    /// - `Err` if the current state doesn't allow finishing execution.
     pub(crate) fn finish_execution(
         &self,
         txn_idx: TxnIndex,
         finished_incarnation: Incarnation,
-    ) -> Result<bool, PanicError> {
+    ) -> Result<Option<Vec<Arc<BTreeSet<ModuleId>>>>, PanicError> {
         // TODO(BlockSMTv2): Handle waiting workers when supported (defer waking up).
 
         let status = &self.statuses[txn_idx as usize];
@@ -558,11 +569,15 @@ impl ExecutionStatuses {
                     "finish_execution",
                 )?;
 
-                Ok(true)
+                Ok(Some(std::mem::take(
+                    &mut *self.statuses[txn_idx as usize]
+                        .module_validation_requirements
+                        .lock(),
+                )))
             },
             SchedulingStatus::Aborted => {
                 self.to_pending_scheduling(txn_idx, status_guard, finished_incarnation + 1, true);
-                Ok(false)
+                Ok(None)
             },
             SchedulingStatus::PendingScheduling | SchedulingStatus::Executed => {
                 Err(code_invariant_error(format!(
@@ -577,13 +592,18 @@ impl ExecutionStatuses {
     /// the two-step abort process. It must be called after a successful
     /// [ExecutionStatuses::start_abort] and updates the transaction's status.
     /// - If Executing → Aborted
-    /// - If Executed → PendingScheduling with incremented incarnation
+    /// - If Executed → PendingScheduling with incremented incarnation when
+    /// start_next_incarnation is false, and Executed → Executing when it is true.
+    /// This implies the caller wants to start the next incarnation immediately,
+    /// without going through neither the intermediate PendingScheduling status nor
+    /// ExecutionQueueManager. Useful for re-executions while committing the txn,
+    /// as o.w. e.g. removing a stall might assign re-execution to a different worker.
     ///
     /// # Parameters
     /// - `aborted_incarnation`: The incarnation being aborted
-    /// - `add_to_schedule`: If applicable (i.e. not stalled and requiring re-execution)
-    /// whether to add the transaction to the scheduler's execution queue. The parameter
-    /// may be false, e.g., if the caller can re-execute the transaction itself.
+    /// - `start_next_incarnation`: If true, the status is expected to be Executed (o.w.
+    /// an invariant violation / PanicError is returned). In this case, the next
+    /// incarnation already starts executing, while the status lock is held.
     ///
     /// # Returns
     /// - `Ok(())` if abort was completed successfully
@@ -592,7 +612,7 @@ impl ExecutionStatuses {
         &self,
         txn_idx: TxnIndex,
         aborted_incarnation: Incarnation,
-        add_to_schedule: bool,
+        start_next_incarnation: bool,
     ) -> Result<(), PanicError> {
         let status = &self.statuses[txn_idx as usize];
         let new_incarnation = aborted_incarnation + 1;
@@ -619,6 +639,14 @@ impl ExecutionStatuses {
 
             match status_guard.status {
                 SchedulingStatus::Executing => {
+                    if start_next_incarnation {
+                        return Err(code_invariant_error(format!(
+                            "Finish abort for txn_idx: {} incarnation: {} w. start_next_incarnation \
+                            expected Executed Status, got Executing",
+                            txn_idx, aborted_incarnation
+                        )));
+                    }
+
                     status_guard.status = SchedulingStatus::Aborted;
                     status.swap_dependency_status_any(
                         &[DependencyStatus::WaitForExecution],
@@ -631,8 +659,18 @@ impl ExecutionStatuses {
                         txn_idx,
                         status_guard,
                         new_incarnation,
-                        add_to_schedule,
+                        !start_next_incarnation,
                     );
+                    if start_next_incarnation {
+                        let started_incarnation = self.to_executing(txn_idx, status_guard)?;
+                        if Some(aborted_incarnation + 1) != started_incarnation {
+                            return Err(code_invariant_error(format!(
+                                "Finish abort started incarnation {:?} != expected {}",
+                                txn_idx,
+                                aborted_incarnation + 1
+                            )));
+                        }
+                    }
                 },
                 SchedulingStatus::PendingScheduling | SchedulingStatus::Aborted => {
                     return Err(code_invariant_error(format!(
@@ -717,6 +755,7 @@ impl ExecutionStatuses {
         // Update inner status.
         status_guard.status = SchedulingStatus::PendingScheduling;
         status_guard.incarnation = new_incarnation;
+        status.module_validation_requirements.lock().clear();
 
         // Under the lock, update the shortcuts.
         status
@@ -730,6 +769,112 @@ impl ExecutionStatuses {
                 .add_to_schedule(new_incarnation == 1, txn_idx);
         }
     }
+
+    fn to_executing(
+        &self,
+        txn_idx: TxnIndex,
+        status_guard: &mut StatusWithIncarnation,
+    ) -> Result<Option<Incarnation>, PanicError> {
+        let status = &self.statuses[txn_idx as usize];
+        let ret = status_guard.start_executing();
+        if ret.is_some() {
+            // When status is PendingScheduling the dependency status should be
+            // WaitForExecution (default or set by abort under lock).
+            status.swap_dependency_status_any(
+                &[DependencyStatus::ShouldDefer],
+                DependencyStatus::WaitForExecution,
+                "start_executing",
+            )?;
+        }
+        Ok(ret)
+    }
+
+    // If the txn is executing or executed, it might require module validation when a
+    // lower txn that published a module is committed. The validation requirement applies
+    // to the specific incarnation that is returned (i.e. if the incarnation gets aborted
+    // before the validation is performed, then validation can be safely skipped). While
+    // executing, a txn's read-set is only stored locally and can't be validated by other
+    // workers. In this case, the boolean is set to true indicating that the caller may
+    // want to call [ExecutionStatuses::add_module_validation_requirement] (which will
+    // records the requirement to be performed after the execution finishes, but such
+    // logic can also be implemented by the caller). If the incarnation is already
+    // executed, then the boolean is set to false.
+    //
+    // # Returns
+    // - `Some((incarnation, is_executing))` if the txn requires module validation
+    // - `None` if the txn is not executing / executed.
+    pub(crate) fn requires_module_validation(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<(Incarnation, bool)> {
+        let status = &self.statuses[txn_idx as usize];
+        let status_guard = status.status_with_incarnation.lock();
+
+        match status_guard.status {
+            SchedulingStatus::Executing => Some((status_guard.incarnation(), true)),
+            SchedulingStatus::Executed => Some((status_guard.incarnation(), false)),
+            SchedulingStatus::PendingScheduling | SchedulingStatus::Aborted => None,
+        }
+    }
+
+    /// If the txn is executing, but there has been a module publishing requiring
+    /// the validation of its module reads, it will be recorded in the status to be handled
+    /// after finishing the execution (an abort clears the requirement).
+    ///
+    /// # Parameters
+    /// - `txn_idx`: The transaction index
+    /// - `incarnation`: The incarnation number
+    /// - `requirements`: The module IDs that need to be validated
+    ///
+    /// # Returns
+    /// - `Ok(Some(true))` if the requirements are deferred
+    /// - `Ok(Some(false))` if the requirements are not deferred but must be processed
+    /// by the caller (i.e. the dedicated worker), as execution has already finished.
+    /// - `Ok(None)` if the requirements are no longer relevant
+    /// - `Err` for invariant violations (e.g. validating future incarnation).
+    ///
+    /// TODO(BlockSTMv2): Cover with tests.
+    pub(crate) fn defer_module_validation(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        requirements: &Arc<BTreeSet<ModuleId>>,
+    ) -> Result<Option<bool>, PanicError> {
+        let status = &self.statuses[txn_idx as usize];
+        let status_guard = status.status_with_incarnation.lock();
+
+        if status_guard.incarnation() < incarnation {
+            return Err(code_invariant_error(format!(
+                "Deferring module validation for txn_idx: {} incarnation: {} < incarnation to validate {}",
+                txn_idx, status_guard.incarnation(), incarnation
+            )));
+        }
+        if status_guard.incarnation() > incarnation {
+            // Nothing to be done as a higher incarnation has already been created.
+            return Ok(None);
+        }
+
+        match status_guard.status {
+            SchedulingStatus::PendingScheduling => {
+                return Err(code_invariant_error(format!(
+                    "Deferring module validation for txn_idx: {} incarnation: {} is pending scheduling",
+                    txn_idx, status_guard.incarnation()
+                )));
+            },
+            SchedulingStatus::Executing => {
+                status
+                    .module_validation_requirements
+                    .lock()
+                    .push(requirements.clone());
+                Ok(Some(true))
+            },
+            SchedulingStatus::Executed => Ok(Some(false)),
+            SchedulingStatus::Aborted => {
+                // Already aborted, nothing to be done.
+                Ok(None)
+            },
+        }
+    }
 }
 
 impl ExecutionStatus {
@@ -741,6 +886,7 @@ impl ExecutionStatus {
                 DependencyStatus::ShouldDefer as u8,
             )),
             num_stalls: CachePadded::new(AtomicU32::new(0)),
+            module_validation_requirements: Mutex::new(Vec::new()),
         }
     }
 
@@ -834,6 +980,7 @@ impl ExecutionStatus {
             next_incarnation_to_abort: CachePadded::new(AtomicU32::new(incarnation)),
             dependency_shortcut: CachePadded::new(AtomicU8::new(shortcut as u8)),
             num_stalls: CachePadded::new(AtomicU32::new(num_stalls)),
+            module_validation_requirements: Mutex::new(Vec::new()),
         }
     }
 }
@@ -912,7 +1059,7 @@ mod tests {
         // Compatible with start (incompatible with abort and finish).
         for i in [0, 2] {
             assert_err!(statuses.finish_execution(txn_idx, i));
-            assert_err!(statuses.finish_abort(txn_idx, i, true));
+            assert_err!(statuses.finish_abort(txn_idx, i, false));
         }
         assert_some_eq!(statuses.start_executing(txn_idx).unwrap(), 0);
 
@@ -924,7 +1071,7 @@ mod tests {
 
         // Compatible with finish(0) & finish_abort(0) only. Here, we test finish.
         assert_none!(statuses.start_executing(txn_idx).unwrap());
-        assert_err!(statuses.finish_abort(txn_idx, 1, true));
+        assert_err!(statuses.finish_abort(txn_idx, 1, false));
         assert_err!(statuses.finish_execution(txn_idx, 1));
         if stall_before_finish {
             assert_ok_eq!(statuses.add_stall(txn_idx), true);
@@ -950,13 +1097,13 @@ mod tests {
         assert_none!(statuses.start_executing(txn_idx).unwrap());
         assert_err!(statuses.finish_execution(txn_idx, 0));
         assert_err!(statuses.finish_execution(txn_idx, 1));
-        assert_err!(statuses.finish_abort(txn_idx, 1, true));
+        assert_err!(statuses.finish_abort(txn_idx, 1, false));
 
         statuses
             .execution_queue_manager
             .assert_execution_queue(&vec![]);
         assert_ok_eq!(statuses.start_abort(txn_idx, 0), true);
-        assert_ok!(statuses.finish_abort(txn_idx, 0, true));
+        assert_ok!(statuses.finish_abort(txn_idx, 0, false));
         if stall_before_finish {
             // Not rescheduled - deferred for remove_stall.
             statuses
@@ -987,12 +1134,12 @@ mod tests {
         for i in 0..5 {
             // Outdated call.
             assert_ok_eq!(statuses.start_abort(txn_idx, i), false);
-            assert_err!(statuses.finish_abort(txn_idx, i, true));
+            assert_err!(statuses.finish_abort(txn_idx, i, false));
             // Must have been called already to get to incarnation 5.
             assert_err!(statuses.finish_execution(txn_idx, i));
             // Impossible calls before 5 has even started execution.
             assert_err!(statuses.finish_execution(txn_idx, 5 + i));
-            assert_err!(statuses.finish_abort(txn_idx, 5 + i, true));
+            assert_err!(statuses.finish_abort(txn_idx, 5 + i, false));
         }
         assert_some_eq!(statuses.start_executing(txn_idx).unwrap(), 5);
 
@@ -1005,15 +1152,15 @@ mod tests {
         // Compatible with finish(5) & finish_abort(5) only. Here, we test abort.
         assert_none!(statuses.start_executing(txn_idx).unwrap());
         assert_ok_eq!(statuses.start_abort(txn_idx, 4), false);
-        assert_err!(statuses.finish_abort(txn_idx, 4, true));
+        assert_err!(statuses.finish_abort(txn_idx, 4, false));
         assert_err!(statuses.finish_execution(txn_idx, 4));
         assert_err!(statuses.finish_execution(txn_idx, 6));
-        assert_err!(statuses.finish_abort(txn_idx, 6, true));
+        assert_err!(statuses.finish_abort(txn_idx, 6, false));
 
         assert_eq!(status.next_incarnation_to_abort.load(Ordering::Relaxed), 5);
         assert_ok_eq!(statuses.start_abort(txn_idx, 5), true);
         assert_eq!(status.next_incarnation_to_abort.load(Ordering::Relaxed), 6);
-        assert_ok!(statuses.finish_abort(txn_idx, 5, true));
+        assert_ok!(statuses.finish_abort(txn_idx, 5, false));
         assert_eq!(status.next_incarnation_to_abort.load(Ordering::Relaxed), 6);
         assert_eq!(status.status_with_incarnation.lock().incarnation(), 5);
         // Not re-scheduled because finish_execution has not happened.
@@ -1028,18 +1175,18 @@ mod tests {
         // Compatible w. finish_execution(5) only.
         assert_none!(statuses.start_executing(txn_idx).unwrap());
         assert_ok_eq!(statuses.start_abort(txn_idx, 5), false);
-        assert_err!(statuses.finish_abort(txn_idx, 5, true));
+        assert_err!(statuses.finish_abort(txn_idx, 5, false));
         assert_err!(statuses.finish_execution(txn_idx, 4));
         assert_err!(statuses.finish_execution(txn_idx, 6));
-        assert_err!(statuses.finish_abort(txn_idx, 6, true));
+        assert_err!(statuses.finish_abort(txn_idx, 6, false));
 
         if stall_before_finish {
             assert_ok_eq!(statuses.add_stall(txn_idx), true);
         }
         // Finish execution from aborted, must return Ok(false).
         assert_ok_eq!(statuses.start_abort(txn_idx, 5), false);
-        assert_err!(statuses.finish_abort(txn_idx, 5, true));
-        assert_ok_eq!(statuses.finish_execution(txn_idx, 5), false);
+        assert_err!(statuses.finish_abort(txn_idx, 5, false));
+        assert_none!(statuses.finish_execution(txn_idx, 5).unwrap());
         assert_eq!(status.status_with_incarnation.lock().incarnation(), 6);
 
         check_after_finish_and_abort(&statuses, 0, 6, stall_before_finish);

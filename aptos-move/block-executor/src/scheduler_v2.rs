@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, scheduler::ArmedLock, scheduler_status::ExecutionStatuses};
+use crate::{
+    cold_validation::{ColdValidationRequirements, ValidationRequirement},
+    counters,
+    scheduler::ArmedLock,
+    scheduler_status::ExecutionStatuses,
+};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
@@ -9,34 +14,38 @@ use aptos_vm_logging::clear_speculative_txn_logs;
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
+use move_core_types::language_storage::ModuleId;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
+        Arc,
+    },
 };
 
 /**
 ================================ BlockSTMv2 Scheduler (SchedulerV2) ================================
 
-This module implements `SchedulerV2`, the core component of the BlockSTMv2 execution engine.
-`SchedulerV2` orchestrates the parallel execution of transactions within a block, managing
+This module implements [SchedulerV2], the core component of the BlockSTMv2 execution engine.
+[SchedulerV2] orchestrates the parallel execution of transactions within a block, managing
 their lifecycle from initial scheduling through execution, potential aborts and re-executions,
 and eventual commit and post-commit processing.
 
 Key Responsibilities:
 ---------------------
-1.  **Task Management**: `SchedulerV2` provides tasks to worker threads. These tasks can be
+1.  **Task Management**: [SchedulerV2] provides tasks to worker threads. These tasks can be
     to execute a transaction, or to perform post-commit processing for a committed transaction.
-    It uses a `TaskKind` enum to represent these different types of tasks.
+    It uses a [TaskKind] enum to represent these different types of tasks.
 
-2.  **Transaction Lifecycle Coordination**: It interacts closely with `ExecutionStatuses` (from
-    `scheduler_status.rs`) to track and update the state of each transaction (e.g.,
-    `PendingScheduling`, `Executing`, `Executed`, `Aborted`).
+2.  **Transaction Lifecycle Coordination**: It interacts closely with [ExecutionStatuses] (from
+    [scheduler_status.rs]) to track and update the state of each transaction (e.g.,
+    PendingScheduling, Executing, Executed, or Aborted.
 
 3.  **Concurrency Control & Dependency Management**:
-    -   **Abort Handling**: It utilizes an `AbortManager` to handle invalidations. When a
+    -   **Abort Handling**: It utilizes an [AbortManager] to handle invalidations. When a
         transaction's execution output might affect other transactions that read its prior
         state, those dependent transactions are aborted and rescheduled.
-    -   **Stall Propagation**: It manages `AbortedDependencies` to track which transactions
+    -   **Stall Propagation**: It manages [AbortedDependencies] to track which transactions
         have been previously aborted due to changes in a dependency. This information is
         used to implement a "stall" mechanism. If a transaction T_i is stalled (e.g.,
         because a lower-indexed transaction T_j it depends on was aborted and T_j might
@@ -48,7 +57,7 @@ Key Responsibilities:
     `CommitMarkerFlag`s to track the commit state of each transaction (NotCommitted,
     CommitStarted, Committed). A lock (`queueing_commits_lock`) is used to serialize
     the dispatching of sequential commit hooks. Once the lock is acquired,
-    `[SchedulerV2::start_commit]` and `[SchedulerV2::end_commit]` are called to
+    [SchedulerV2::start_commit] and [SchedulerV2::end_commit] are called to
     start and end the commit process for a transaction (which includes the caller
     specified sequential commit hooks / logic).
 
@@ -58,34 +67,39 @@ Key Responsibilities:
         defer the first re-execution of a transaction until all preceding transactions
         have produced their initial speculative writes.
     -   **`min_not_scheduled_idx`**: An optimization that tracks the minimum transaction
-        index that has not yet been scheduled, helping to quickly identify available work.
+        index that has not yet been scheduled. This is currently used to identify maximum
+        range of the interval that may require a traversal for module read validation
+        (after a committed txn that publishes a module), but can be generally useful for
+        tracking the evolution of the "active" interval of the scheduler.
+        TODO(BlockSTMv2): consider constraining the interval to have a maximum size, for
+        optimizing performance as well as for integration w. execution pooling, etc.
 
 6.  **Halt and Completion**: Provides mechanisms to halt ongoing execution prematurely and
     to determine when all transactions in the block are fully processed and committed.
 
 Interaction with Other Components:
 ---------------------------------
--   **`ExecutionStatuses`**: The source of truth for the status (scheduling state, incarnation,
-    stall count) of individual transactions. `SchedulerV2` queries and updates these statuses.
--   **`ExecutionQueueManager`**: Embedded within `ExecutionStatuses`, it manages the actual
-    queue of transactions ready for execution. `SchedulerV2` interacts with it to pop
+-   **[ExecutionStatuses]**: The source of truth for the status (scheduling state, incarnation,
+    stall count) of individual transactions. [SchedulerV2] queries and updates these statuses.
+-   **[ExecutionQueueManager]**: Embedded within [ExecutionStatuses], it manages the actual
+    queue of transactions ready for execution. [SchedulerV2] interacts with it to pop
     transactions for execution and to add transactions back (e.g., upon re-scheduling).
--   **`AbortManager`**: Used by worker threads during `[SchedulerV2::finish_execution]`. When a worker
-    completes a transaction, it uses the `AbortManager` to identify and initiate aborts for
-    dependent transactions that read its (now potentially changed) output. `SchedulerV2`
-    consumes the `AbortManager` to finalize these aborts and update dependencies.
--   **Worker Threads**: Continuously request tasks from `SchedulerV2` via `[SchedulerV2::next_task]`.
-    They execute these tasks and report results (e.g., via `[SchedulerV2::finish_execution]`,
-    `[SchedulerV2::end_commit]`).
+-   **[AbortManager]**: Used by worker threads during [SchedulerV2::finish_execution]. When a worker
+    completes a transaction, it uses the [AbortManager] to identify and initiate aborts for
+    dependent transactions that read its (now potentially changed) output. [SchedulerV2]
+    consumes the [AbortManager] to finalize these aborts and update dependencies.
+-   **Worker Threads**: Continuously request tasks from `SchedulerV2` via [SchedulerV2::next_task].
+    They execute these tasks and report results (e.g., via [SchedulerV2::finish_execution],
+    [SchedulerV2::end_commit]).
 
 Conceptual Execution Model:
 --------------------------
-Workers request tasks. `SchedulerV2` prioritizes:
+Workers request tasks. [SchedulerV2] prioritizes:
 1.  **Post-Commit Processing Tasks**: If there are transactions that have been committed and
     are awaiting their parallel post-commit logic, these are dispatched first. This provides
     more parallelism and ensures that committed work is finalized promptly.
 2.  **Execution Tasks**: If no post-commit tasks are pending, `SchedulerV2` attempts to pop
-    a transaction from the `ExecutionQueueManager`. If successful, it transitions the
+    a transaction from the [ExecutionQueueManager]. If successful, it transitions the
     transaction's state to `Executing` and returns an `Execute` task to the worker.
 3.  **Control Tasks**: If no work is immediately available, `NextTask` is returned, signaling
     the worker to try again. If all work is done or the scheduler is halted, `Done` is returned.
@@ -97,19 +111,19 @@ heuristic to reduce wasted work from cascading aborts.
 
 /// Manages push-invalidations caused by a transaction's output and handles aborting dependent transactions.
 ///
-/// `AbortManager` is a non-Sync struct designed for a worker executing a particular transaction
+/// [AbortManager] is a non-Sync struct designed for a worker executing a particular transaction
 /// (the "owner transaction", identified by `owner_txn_idx` and `owner_incarnation`).
 /// When the owner transaction finishes execution, its writes might necessitate the re-execution
-/// of other transactions that read the same data locations. `AbortManager` is used by the
+/// of other transactions that read the same data locations. [AbortManager] is used by the
 /// worker thread responsible for the owner transaction to:
 ///
 /// 1.  Identify such dependent transactions.
-/// 2.  Attempt to initiate their abort by calling `[SchedulerV2::start_abort]` on the scheduler.
+/// 2.  Attempt to initiate their abort by calling [SchedulerV2::start_abort] on the scheduler.
 /// 3.  Track the outcome of these abort attempts within its `invalidations` map.
 ///
-/// After a transaction's execution attempt is processed by the scheduler, the `AbortManager` instance
-/// is transferred by value (moving ownership) to the `SchedulerV2::finish_execution` function.
-/// This transfer enforces a clear ownership model and ensures that the `AbortManager`'s state
+/// After a transaction's execution attempt is processed by the scheduler, the [AbortManager] instance
+/// is transferred by value (moving ownership) to the [SchedulerV2::finish_execution] function.
+/// This transfer enforces a clear ownership model and ensures that the [AbortManager]'s state
 /// is correctly consumed and finalized.
 pub(crate) struct AbortManager<'a> {
     owner_txn_idx: TxnIndex,
@@ -218,9 +232,9 @@ impl<'a> AbortManager<'a> {
     /// Attempts to initiate an abort for the given transaction and incarnation via the scheduler.
     ///
     /// Returns:
-    /// - `Ok(Some(incarnation))` if `[SchedulerV2::start_abort]` was successful for the given `incarnation`.
-    /// - `Ok(None)` if `[SchedulerV2::start_abort]` returned false (e.g., already aborted).
-    /// - `Err(PanicError)` if `[SchedulerV2::start_abort]` itself returns an error.
+    /// - `Ok(Some(incarnation))` if [SchedulerV2::start_abort] was successful for the given `incarnation`.
+    /// - `Ok(None)` if [SchedulerV2::start_abort] returned false (e.g., already aborted).
+    /// - `Err(PanicError)` if [SchedulerV2::start_abort] itself returns an error.
     fn start_abort(
         &self,
         txn_idx: TxnIndex,
@@ -430,12 +444,12 @@ impl ExecutionQueueManager {
     }
 }
 
-/// Represents the different kinds of tasks that a worker thread can receive from `SchedulerV2`.
+/// Represents the different kinds of tasks that a worker thread can receive from [SchedulerV2].
 ///
-/// This enum defines the instructions passed from `[SchedulerV2::next_task]` to an executor (worker thread)
-/// to direct its activity.
+/// This enum defines the instructions passed from [SchedulerV2::next_task] to an executor
+/// (worker thread) to direct its activity.
 #[derive(PartialEq, Debug)]
-pub(crate) enum TaskKind {
+pub(crate) enum TaskKind<'a> {
     /// Instructs the worker to execute a specific `(TxnIndex, Incarnation)` of a transaction.
     /// The incarnation number starts at 0 for the first execution attempt and increments
     /// with each subsequent re-execution (after an abort).
@@ -445,18 +459,20 @@ pub(crate) enum TaskKind {
     /// sequential client-side commit hook has been performed. The post-commit processing
     /// itself is assumed to be parallelizable and typically involves finalization or cleanup steps.
     PostCommitProcessing(TxnIndex),
+    /// The module ids for which validation is required for txns in [from_idx_incl, to_idx_excl).
+    ModuleValidation(TxnIndex, Incarnation, &'a BTreeSet<ModuleId>),
     /// Signals that no specific task (like `Execute` or `PostCommitProcessing`) is immediately
-    /// available from the scheduler. The worker should typically call `next_task()` again soon,
-    /// possibly after a brief pause or yielding, to check for new work.
+    /// available from the scheduler. The worker should typically call [SchedulerV2::next_task]
+    /// again soon, possibly after a brief pause or yielding, to check for new work.
     NextTask,
     /// Signals that all transactions have been processed and committed, and the scheduler
     /// has no more work. The worker thread receiving this task can terminate.
     Done,
 }
 
-/// Flags representing the commit status of a transaction, used by `SchedulerV2`.
+/// Flags representing the commit status of a transaction, used by [SchedulerV2].
 ///
-/// These constant flag values are stored in `SchedulerV2::committed_marker` for each transaction
+/// These constant flag values are stored in [SchedulerV2::committed_marker] for each transaction
 /// to track its progress through the final stages of the commit process.
 ///
 /// The typical lifecycle is: `NotCommitted` -> `CommitStarted` -> `Committed`.
@@ -467,11 +483,11 @@ enum CommitMarkerFlag {
     /// sequential commit hook been dispatched.
     NotCommitted = 0,
     /// The transaction has been identified as the next to commit, and its sequential
-    /// commit hook has been dispatched (obtained via `[SchedulerV2::start_commit]`).
-    /// The system is now waiting for `[SchedulerV2::end_commit]` to be called for this transaction.
+    /// commit hook has been dispatched (obtained via [SchedulerV2::start_commit]).
+    /// The system is now waiting for [SchedulerV2::end_commit] to be called for this transaction.
     CommitStarted = 1,
     /// The transaction's sequential commit hook has been successfully performed (indicated
-    /// by a call to `[SchedulerV2::end_commit]`), and it is now fully committed from the
+    /// by a call to [SchedulerV2::end_commit]), and it is now fully committed from the
     /// scheduler's perspective. Its `PostCommitProcessing` task can now be scheduled.
     Committed = 2,
 }
@@ -480,7 +496,6 @@ pub(crate) struct SchedulerV2 {
     /// Total number of transactions in the block. This is immutable after scheduler creation.
     num_txns: TxnIndex,
     /// The number of worker threads that will be processing tasks from this scheduler. Immutable.
-    #[allow(dead_code)]
     num_workers: u32,
 
     /// Manages the `ExecutionStatus` for each transaction, which includes its current
@@ -497,7 +512,7 @@ pub(crate) struct SchedulerV2 {
 
     /// The index of the next transaction that is eligible to have its sequential commit hook
     /// dispatched. This is incremented atomically as transactions are committed in order.
-    next_to_commit_idx: CachePadded<AtomicU32>,
+    pub(crate) next_to_commit_idx: CachePadded<AtomicU32>,
     /// Flag that becomes true when all transactions in the block have completed their
     /// post-commit processing, signaling that execution is finished.
     is_done: CachePadded<AtomicBool>,
@@ -505,8 +520,13 @@ pub(crate) struct SchedulerV2 {
     /// or a timeout). This signals workers to stop processing tasks.
     is_halted: CachePadded<AtomicBool>,
 
+    /// Manages any uncommon validation requirements necessary before txns can be committed.
+    /// For example, when a txn publishes a module, higher txns must have their module
+    /// accesses validated since the reads are not covered by the normal (push) validation.
+    cold_validation_requirements: ColdValidationRequirements<ModuleId>,
+
     /// An armed lock used to serialize access to the critical section where sequential commit
-    /// hooks are dispatched (`[SchedulerV2::start_commit]`). It helps manage
+    /// hooks are dispatched ([SchedulerV2::start_commit]). It helps manage
     /// contention with the arming mechanism.
     queueing_commits_lock: CachePadded<ArmedLock>,
     /// A concurrent queue holding the indices of transactions that have been committed and
@@ -518,7 +538,7 @@ pub(crate) struct SchedulerV2 {
 }
 
 impl SchedulerV2 {
-    /// Creates a new `SchedulerV2` instance.
+    /// Creates a new [SchedulerV2] instance.
     ///
     /// Initializes all internal structures based on the total number of transactions
     /// (`num_txns`) in the block and the number of worker threads (`num_workers`).
@@ -538,6 +558,7 @@ impl SchedulerV2 {
             next_to_commit_idx: CachePadded::new(AtomicU32::new(0)),
             is_done: CachePadded::new(AtomicBool::new(false)),
             is_halted: CachePadded::new(AtomicBool::new(false)),
+            cold_validation_requirements: ColdValidationRequirements::new(num_txns as u32),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             post_commit_processing_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
                 num_txns as usize,
@@ -552,8 +573,8 @@ impl SchedulerV2 {
     ///
     /// Workers should call this to gain exclusive access to the critical section for
     /// dispatching sequential commit hooks. If the lock is acquired (`true`), the worker
-    /// should proceed to call `[SchedulerV2::start_commit]` repeatedly, and then ensure
-    /// `[SchedulerV2::commit_hooks_unlock]` is called.
+    /// should proceed to call [SchedulerV2::start_commit] repeatedly, and then ensure
+    /// [SchedulerV2::commit_hooks_unlock] is called.
     ///
     /// Returns `true` if the lock was acquired, `false` otherwise.
     pub(crate) fn commit_hooks_try_lock(&self) -> bool {
@@ -571,7 +592,7 @@ impl SchedulerV2 {
     /// 1. The scheduler is not halted.
     /// 2. `next_to_commit_idx` is less than `num_txns` (i.e., there are transactions remaining).
     /// 3. The transaction at `next_to_commit_idx` has its status as `Executed` (verified by
-    ///    `[ExecutionStatuses::is_executed]`).
+    ///    [ExecutionStatuses::is_executed]).
     ///
     /// If all conditions are met:
     /// - The `committed_marker` for `next_to_commit_idx` is updated from `NotCommitted` to
@@ -587,36 +608,44 @@ impl SchedulerV2 {
     pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
         // Relaxed ordering due to armed lock acq-rel.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
-
         assert!(next_to_commit_idx <= self.num_txns);
-        if next_to_commit_idx > 0 {
-            // Since the commit hooks lock is held by caller during this method and while performing
-            // the hook itself, the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
-            // call to start_commit that must have increased the index did not set the status, while
-            // PENDING_COMMIT_HOOK means the caller never successfully followed the hook by the
-            // end_commit call (should only happen in error scenarios).
-            let prev_committed_marker =
-                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
-            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
-                return Err(code_invariant_error(format!(
-                    "Trying to get commit hook for {}, but previous index marker {} != {} (COMMITTED)",
-                    next_to_commit_idx, prev_committed_marker, CommitMarkerFlag::Committed as u8,
-                )));
-            };
-        }
 
         if self.is_halted() || next_to_commit_idx == self.num_txns {
             // All sequential commit hooks are already dispatched.
             return Ok(None);
         }
 
+        let incarnation = self.txn_statuses.incarnation(next_to_commit_idx);
         if self.txn_statuses.is_executed(next_to_commit_idx) {
+            self.commit_marker_invariant_check(next_to_commit_idx)?;
+
             // All prior transactions are committed and the latest incarnation of the transaction
             // at next_to_commit_idx has finished but has not been aborted. If any of its reads was
             // incorrect, it would have been invalidated by the respective transaction's last
             // (committed) (re-)execution, and led to an abort in the corresponding finish execution
             // (which, inductively, must occur before the transaction is committed). Hence, it
             // must also be safe to commit the current transaction.
+            //
+            // The only exception is if there are unsatisfied cold validation requirements,
+            // blocking the commit. These may not yet be scheduled for validation, or deferred
+            // until after the txn finished execution, whereby deferral happens before txn status
+            // becomes Executed, while validation and unblocking happens after.
+            if self
+                .cold_validation_requirements
+                .is_commit_blocked(next_to_commit_idx, incarnation)
+            {
+                // May not commit a txn with an unsatisfied validation requirement. This will be
+                // more rare than !is_executed in the common case, hence the order of checks.
+                return Ok(None);
+            }
+            // The check might have passed after the validation requirement has been fulfilled.
+            // Yet, if validation failed, the status would be aborted before removing the block,
+            // which would increase the incarnation number. It is also important to note that
+            // blocking happens during sequential commit hook, while holding the lock (which is
+            // also held here), hence before the call of this method.
+            if incarnation != self.txn_statuses.incarnation(next_to_commit_idx) {
+                return Ok(None);
+            }
 
             if self.committed_marker[next_to_commit_idx as usize]
                 .swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
@@ -655,12 +684,12 @@ impl SchedulerV2 {
     /// 1. Updates the `committed_marker` for `txn_idx` from `CommitStarted` to `Committed`.
     ///    Panics if the previous marker was not `CommitStarted`.
     /// 2. Pushes `txn_idx` to the `post_commit_processing_queue`, making it available for
-    ///    a `PostCommitProcessing` task to be dispatched by `[SchedulerV2::next_task]`.
+    ///    a `PostCommitProcessing` task to be dispatched by [SchedulerV2::next_task].
     ///    Panics if the queue push fails (e.g., if the queue is full, which shouldn't happen
     ///    given it's bounded by `num_txns`).
     ///
     /// It is crucial that `txn_idx` was previously obtained from a successful call to
-    /// `[SchedulerV2::start_commit]`, and that the `queueing_commits_lock` was held
+    /// [SchedulerV2::start_commit], and that the `queueing_commits_lock` was held
     /// by the worker during the execution of the commit hook and this call.
     pub(crate) fn end_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let prev_marker = self.committed_marker[txn_idx as usize].load(Ordering::Relaxed);
@@ -691,7 +720,7 @@ impl SchedulerV2 {
     ///
     /// This method must be called by a worker after it has finished attempting to acquire
     /// and process sequential commit hooks (i.e., after its loop calling
-    /// `[SchedulerV2::start_commit]` and `[SchedulerV2::end_commit]` is done.
+    /// [SchedulerV2::start_commit] and [SchedulerV2::end_commit] is done.
     ///
     /// If the next transaction to commit (`next_to_commit_idx`) is ready (i.e., executed
     /// and not halted), this method will "arm" the lock, signifying that new commit work
@@ -715,71 +744,36 @@ impl SchedulerV2 {
         self.post_commit_processing_queue.is_empty()
     }
 
-    /// Returns the minimum transaction index that has not yet been scheduled (i.e., popped
-    /// from the `execution_queue` by `[ExecutionQueueManager::pop_next]`).
-    ///
-    /// This provides an indication of how far along the scheduler is in dispatching
-    /// initial execution tasks.
-    ///
-    /// The value is retrieved from `[ExecutionQueueManager::min_not_scheduled_idx]`.
-    ///
-    /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater than `num_txns`).
-    #[allow(dead_code)]
-    pub(crate) fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
-        let ret = self
-            .txn_statuses
-            .get_execution_queue_manager()
-            .min_not_scheduled_idx();
-        if ret > self.num_txns {
-            return Err(code_invariant_error(format!(
-                "min_not_scheduled_idx: {} > num_txns: {}",
-                ret, self.num_txns
-            )));
-        }
-        Ok(ret)
-    }
-
-    fn pop_post_commit_task(&self) -> Result<Option<TxnIndex>, PanicError> {
-        match self.post_commit_processing_queue.pop() {
-            Ok(txn_idx) => {
-                if txn_idx == self.num_txns - 1 {
-                    self.is_done.store(true, Ordering::SeqCst);
-                }
-                Ok(Some(txn_idx))
-            },
-            Err(PopError::Empty) => Ok(None),
-            Err(PopError::Closed) => {
-                Err(code_invariant_error("Commit queue should never be closed"))
-            },
-        }
-    }
-
     /// Fetches the next task for a worker thread.
     ///
     /// This is the primary method workers call to get work from the scheduler.
     /// The scheduler prioritizes tasks as follows:
-    /// 1.  **`Done`**: If `[SchedulerV2::is_done]` is true, it returns `TaskKind::Done` immediately.
+    /// 1.  **`Done`**: If [SchedulerV2::is_done] is true, it returns `TaskKind::Done` immediately.
     /// 2.  **`PostCommitProcessing`**: Attempts to pop a `txn_idx` from the
     ///     `post_commit_processing_queue`. If successful, returns
     ///     `TaskKind::PostCommitProcessing(txn_idx)`. If this was the last transaction
     ///     (`num_txns - 1`), it also sets `is_done` to true.
     /// 3.  **`Done` (if halted)**: If the `post_commit_processing_queue` is empty and
-    ///     `[SchedulerV2::is_halted]` is true, returns `TaskKind::Done`.
+    ///     [SchedulerV2::is_halted] is true, returns `TaskKind::Done`.
     /// 4.  **`Execute`**: Attempts to pop a `txn_idx` from the main `execution_queue` via
-    ///     `[ExecutionQueueManager::pop_next]` (accessed through `txn_statuses`). If successful, it then
-    ///     calls `[SchedulerV2::start_executing]` to mark the transaction as `Executing`
-    ///     and get its current incarnation. If `[SchedulerV2::start_executing]` returns `Some(incarnation)`,
-    ///     it returns `TaskKind::Execute(txn_idx, incarnation)`.
+    ///     [ExecutionQueueManager::pop_next] (accessed through `txn_statuses`). If successful,
+    ///     it then calls [SchedulerV2::start_executing] to mark the transaction as `Executing`
+    ///     and get its current incarnation. If [SchedulerV2::start_executing] returns
+    ///     `Some(incarnation)`, it returns [TaskKind::Execute(txn_idx, incarnation)].
     /// 5.  **`NextTask`**: If none of the above yield a task (e.g., queues are empty, no work
-    ///     to start), it returns `TaskKind::NextTask`, indicating the worker should try again.
+    ///     to start), it returns [TaskKind::NextTask], indicating the worker should try again.
     ///
     /// Returns `Err(PanicError)` if an invariant is violated (e.g., commit queue closed).
     ///
-    /// TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
+    /// TODO: dedicate some workers to scan high priority tasks (can use armed lock).
     /// We can also have different versions (e.g. for testing) of next_task.
-    pub(crate) fn next_task(&self) -> Result<TaskKind, PanicError> {
+    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind, PanicError> {
         if self.is_done() {
             return Ok(TaskKind::Done);
+        }
+
+        if let Some(cold_validation_task) = self.handle_cold_validation_requirements(worker_id)? {
+            return Ok(cold_validation_task);
         }
 
         match self.pop_post_commit_task()? {
@@ -816,10 +810,10 @@ impl SchedulerV2 {
     ///     dependencies of `txn_idx`. This is skipped for incarnation 0 as the initial writes
     ///     might cause invalidations very different from the subsequent re-executions.
     /// 3.  **Finish Aborts**: For each transaction in `invalidated_set` for which `start_abort`
-    ///     was successful (i.e., `Some(incarnation)` was stored by `AbortManager`), calls
-    ///     `[ExecutionStatuses::finish_abort]` to complete the abort process. These transactions
+    ///     was successful (i.e., `Some(incarnation)` was stored by [AbortManager]), calls
+    ///     [ExecutionStatuses::finish_abort] to complete the abort process. These transactions
     ///     are added to a `stall_propagation_queue`.
-    /// 4.  **Finish Own Execution**: Calls `[ExecutionStatuses::finish_execution]`
+    /// 4.  **Finish Own Execution**: Calls [ExecutionStatuses::finish_execution]
     ///     to update the status of the just-executed transaction (e.g., to `Executed` or to
     ///     `PendingScheduling` if it was aborted concurrently). If this call indicates the
     ///     transaction is now `Executed` (returns true), `txn_idx` is also added to the
@@ -828,16 +822,18 @@ impl SchedulerV2 {
     ///     or the preceding transaction (`txn_idx - 1`) is no longer `NotCommitted`, it arms
     ///     the `queueing_commits_lock`, implying that `txn_idx` might be ready for commit.
     /// 6.  **Update `executed_once_max_idx`**: If `incarnation == 0`, calls
-    ///     `[SchedulerV2::try_increase_executed_once_max_idx]`.
-    /// 7.  **Propagate Stalls/Unstalls**: Calls `[SchedulerV2::propagate]` to recursively
+    ///     [SchedulerV2::try_increase_executed_once_max_idx].
+    /// 7.  **Propagate Stalls/Unstalls**: Calls [SchedulerV2::propagate] to recursively
     ///     process stall/unstall signals based on the status changes of transactions in the
     ///     `stall_propagation_queue`.
     ///
+    /// Returns Ok(maybe_module_validation_requirements) upon success, whereby if maybe
+    /// module validation requirements are present, the caller needs to process them.
     /// Returns `Err(PanicError)` if any underlying status update fails.
     pub(crate) fn finish_execution<'a>(
         &'a self,
         abort_manager: AbortManager<'a>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Vec<Arc<BTreeSet<ModuleId>>>, PanicError> {
         let (txn_idx, incarnation, invalidated_set) = abort_manager.take();
 
         if incarnation > 0 {
@@ -853,12 +849,14 @@ impl SchedulerV2 {
         let mut stall_propagation_queue: BTreeSet<usize> = BTreeSet::new();
         for (txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
-                self.txn_statuses.finish_abort(txn_idx, incarnation, true)?;
+                self.txn_statuses
+                    .finish_abort(txn_idx, incarnation, false)?;
                 stall_propagation_queue.insert(txn_idx as usize);
             }
         }
 
-        if self.txn_statuses.finish_execution(txn_idx, incarnation)? {
+        let maybe_module_validation_requirements = self.txn_statuses.finish_execution(txn_idx, incarnation)?;
+        if maybe_module_validation_requirements.is_some() {
             stall_propagation_queue.insert(txn_idx as usize);
 
             if txn_idx == 0
@@ -880,14 +878,14 @@ impl SchedulerV2 {
         // Handle recursive propagation of add / remove stall.
         self.propagate(stall_propagation_queue)?;
 
-        Ok(())
+        Ok(maybe_module_validation_requirements.unwrap_or_default())
     }
 
     /// Sets the scheduler to a halted state.
     ///
-    /// This is an atomic operation. Once halted, `[SchedulerV2::is_halted]` will return `true`,
-    /// and `[SchedulerV2::next_task]` will start returning `TaskKind::Done` once the
-    /// `post_commit_processing_queue` is empty.
+    /// This is an atomic operation. Once halted, [SchedulerV2::is_halted] will return `true`,
+    /// and [SchedulerV2::next_task] will start returning [TaskKind::Done] once the
+    /// [post_commit_processing_queue] is empty.
     /// This is typically used to signal an abnormal termination or a need to stop processing
     /// transactions beyond a certain index.
     ///
@@ -904,7 +902,7 @@ impl SchedulerV2 {
     /// This is used by workers during transaction execution to determine if they should
     /// stop processing early.
     ///
-    /// - Returns `true` if `[SchedulerV2::is_halted]` is true.
+    /// - Returns `true` if [SchedulerV2::is_halted] is true.
     /// - If not globally halted and `incarnation == 0`, returns `false` (0-th incarnation
     ///   is never aborted early to ensure its speculative writes are produced).
     /// - Otherwise (not halted, `incarnation > 0`), returns the result of
@@ -934,53 +932,214 @@ impl SchedulerV2 {
     // (1) when processing dependencies (if the heuristics determines the txn is better to be
     // speculatively aborted, e.g. since it is low priority and likely to be invalidated.
     // Since the status must be Executing, we do not bother with propagating add / remove stall.
-    // BlockSTMv2: Consider adding this functionality.
-    // (2) when aborting due to aggregator or delayed field invalidation that happens during
-    // the sequential commit hook - in this case, the immediate re-execution is about to follow.
-    // However, we need to distinguish the case (2) to make sure that an execution task is not
-    // added to the scheduler's execution queue (the caller will re-execute itself).
-    // In this case, add_to_schedule is false.
+    // TODO(BlockSTMv2): Consider adding this functionality.
+    // (2) when re-executing a txn during commit, i.e. due to a delayed field invalidation or
+    // for applying certain outputs of module publishing txn to the shared data structures.
+    // In this case, the caller needs to re-execute the txn itself, and start_next_incarnation
+    // parameter is set to true. This ensures the status was Executed, and atomically turns into
+    // Executing bypassing PendingScheduling to make sure it is not assigned to a different worker
+    // by the scheduler / QueueingCommitManager.
     // (3) The module validation pass can cause invalidation, which requires aborting.
     pub(crate) fn direct_abort(
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        add_to_schedule: bool,
+        start_next_incarnation: bool,
     ) -> Result<bool, PanicError> {
         if self.txn_statuses.start_abort(txn_idx, incarnation)? {
             self.txn_statuses
-                .finish_abort(txn_idx, incarnation, add_to_schedule)?;
-            if !add_to_schedule {
-                let executing_incarnation = self.start_executing(txn_idx)?;
-                if Some(incarnation + 1) != executing_incarnation {
-                    return Err(code_invariant_error(format!(
-                        "SchedulerV2: self-abort for {} incarnation {} started executing with wrong incarnation {:?}",
-                        txn_idx,
-                        incarnation,
-                        executing_incarnation,
-                    )));
-                }
-            }
+                .finish_abort(txn_idx, incarnation, start_next_incarnation)?;
             return Ok(true);
         }
 
-        // TODO(BlockSTMv2): Add better documentation and/or revise flows once all
-        // caller logic is landed. For now it seems that !add_to_schedule is correlated
-        // by the caller needing a guarantee that start_abort must succeed (such as when
-        // direct abort is called from sequential commit hook).
-        if !add_to_schedule {
+        if start_next_incarnation {
             return Err(code_invariant_error(format!(
-                "SchedulerV2: self-abort with !add_to_schedule failed for {} {}",
+                "SchedulerV2: direct abort with start_next_incarnation failed for {} {}",
                 txn_idx, incarnation
             )));
         }
-
+        
         Ok(false)
+    }
+
+    pub(crate) fn record_validation_requirements(
+        &self,
+        worker_id: u32,
+        txn_idx: TxnIndex,
+        module_ids: impl Iterator<Item = ModuleId>,
+    ) -> Result<(), PanicError> {
+        if worker_id >= self.num_workers {
+            return Err(code_invariant_error(format!(
+                "Worker ID {} must be less than the number of workers {}",
+                worker_id, self.num_workers
+            )));
+        }
+        if txn_idx >= self.num_txns {
+            return Err(code_invariant_error(format!(
+                "Txn index {} must be less than the number of transactions {}",
+                txn_idx, self.num_txns
+            )));
+        }
+
+        let min_not_scheduled_idx = self.min_not_scheduled_idx()?;
+        if txn_idx >= min_not_scheduled_idx {
+            return Err(code_invariant_error(format!(
+                "Calling txn idx {} must be less than min_not_scheduled_idx {}",
+                txn_idx, min_not_scheduled_idx
+            )));
+        }
+        self.cold_validation_requirements.record_requirements(
+            worker_id,
+            txn_idx,
+            min_not_scheduled_idx,
+            module_ids,
+        )
+    }
+
+    /// Called from the executor when validation requirement has been fulfilled.
+    pub(crate) fn finish_validation_requirement(
+        &self,
+        worker_id: u32,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        was_deferred: bool,
+    ) -> Result<(), PanicError> {
+        if was_deferred {
+            self.cold_validation_requirements
+                .deferred_requirements_completed(txn_idx, incarnation)?;
+        } else {
+            self.cold_validation_requirements
+                .validation_requirement_processed(worker_id, txn_idx, incarnation, true)?;
+        }
+        Ok(())
     }
 }
 
 /// Private interfaces
 impl SchedulerV2 {
+    fn handle_cold_validation_requirements(
+        &self,
+        worker_id: u32,
+    ) -> Result<Option<TaskKind>, PanicError> {
+        if !self
+            .cold_validation_requirements
+            .is_dedicated_worker(worker_id)
+        {
+            return Ok(None);
+        }
+
+        if let Some((txn_idx, incarnation, validation_requirement)) = self
+            .cold_validation_requirements
+            .get_validation_requirement(
+                worker_id,
+                self.next_to_commit_idx.load(Ordering::Relaxed)
+                    + self.num_workers as TxnIndex * 3
+                    + 4,
+                &self.txn_statuses,
+            )?
+        {
+            match validation_requirement {
+                ValidationRequirement::Active(modules_to_validate) => {
+                    return Ok(Some(TaskKind::ModuleValidation(
+                        txn_idx,
+                        incarnation,
+                        modules_to_validate,
+                    )));
+                },
+                ValidationRequirement::Deferred(arced_modules_to_validate) => {
+                    let defer_outcome = self.txn_statuses.defer_module_validation(
+                        txn_idx,
+                        incarnation,
+                        arced_modules_to_validate,
+                    )?;
+
+                    if defer_outcome == Some(false) {
+                        // defer call did not succeed because the incarnation had finished execution.
+                        // Ask the caller (the dedicated worker) to process the requirements normally.
+                        return Ok(Some(TaskKind::ModuleValidation(
+                            txn_idx,
+                            incarnation,
+                            arced_modules_to_validate.as_ref(),
+                        )));
+                    }
+
+                    // The case when defer call was not successful because the requirements were no
+                    // longer relevant can be handled by reporting that the requirements have been
+                    // successfully processed. Otherwise, we will pass validation_completed = false,
+                    // as the requirements are deferred until the txn incarnation finishes execution.
+                    self.cold_validation_requirements
+                        .validation_requirement_processed(
+                            worker_id,
+                            txn_idx,
+                            incarnation,
+                            defer_outcome.is_none(),
+                        )?;
+                },
+            }
+        }
+        Ok(None)
+    }
+
+    /// Returns the minimum transaction index that has not yet been scheduled (i.e., popped
+    /// from the `execution_queue` by [ExecutionQueueManager::pop_next]).
+    ///
+    /// This provides an indication of how far along the scheduler is in dispatching
+    /// initial execution tasks.
+    ///
+    /// The value is retrieved from [ExecutionQueueManager::min_not_scheduled_idx].
+    ///
+    /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater than `num_txns`).
+    fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
+        let ret = self
+            .txn_statuses
+            .get_execution_queue_manager()
+            .min_not_scheduled_idx();
+        if ret > self.num_txns {
+            return Err(code_invariant_error(format!(
+                "min_not_scheduled_idx: {} > num_txns: {}",
+                ret, self.num_txns
+            )));
+        }
+        Ok(ret)
+    }
+
+    // Called when considering committing a txn. At this point, the commit hooks lock is held by
+    // the caller, and the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
+    // call to [SchedulerV2::start_commit] that increased the index did not set the status,
+    // while PENDING_COMMIT_HOOK would imply the caller never made the end_commit call
+    // (should only happen in error scenarios).
+    fn commit_marker_invariant_check(
+        &self,
+        next_to_commit_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
+        if next_to_commit_idx > 0 {
+            let prev_committed_marker =
+                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
+            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
+                return Err(code_invariant_error(format!(
+                    "Trying to get commit hook for {}, but previous index marker {} != {} (COMMITTED)",
+                    next_to_commit_idx, prev_committed_marker, CommitMarkerFlag::Committed as u8,
+                )));
+            };
+        }
+        Ok(())
+    }
+
+    fn pop_post_commit_task(&self) -> Result<Option<TxnIndex>, PanicError> {
+        match self.post_commit_processing_queue.pop() {
+            Ok(txn_idx) => {
+                if txn_idx == self.num_txns - 1 {
+                    self.is_done.store(true, Ordering::SeqCst);
+                }
+                Ok(Some(txn_idx))
+            },
+            Err(PopError::Empty) => Ok(None),
+            Err(PopError::Closed) => {
+                Err(code_invariant_error("Commit queue should never be closed"))
+            },
+        }
+    }
+
     /// Propagates stall or unstall signals recursively through the dependency graph.
     ///
     /// This method processes a `stall_propagation_queue` containing transaction indices whose
@@ -988,14 +1147,14 @@ impl SchedulerV2 {
     /// For each `task_idx` popped from the queue:
     /// 1. It acquires a lock on `self.aborted_dependencies[task_idx]`.
     /// 2. It checks the current status of `task_idx` using `txn_statuses`:
-    ///    - If `task_idx` is `[ExecutionStatuses::shortcut_executed_and_not_stalled]` (meaning it's executed
-    ///      and not currently considered stalled by `ExecutionStatuses`), it calls
-    ///      `[AbortedDependencies::remove_stall]` on its `AbortedDependencies`. This, in turn, might add
-    ///      more indices (dependencies of `task_idx` that were unstalled) to the
-    ///      `stall_propagation_queue`.
-    ///    - Otherwise (if `task_idx` is not executed or is stalled), it calls `[AbortedDependencies::add_stall]`
-    ///      on its `AbortedDependencies`. This might add more indices (dependencies of
-    ///      `task_idx` that were stalled) to the `stall_propagation_queue`.
+    ///    - If `task_idx` is [ExecutionStatuses::shortcut_executed_and_not_stalled] (i.e.
+    ///      it's executed and not currently considered stalled by [ExecutionStatuses]), it
+    ///      calls [AbortedDependencies::remove_stall] on its [AbortedDependencies]. This, in
+    ///      turn, might add more indices (dependencies of `task_idx` that were unstalled) to
+    ///      the `stall_propagation_queue`.
+    ///    - Otherwise (if `task_idx` is not executed or is stalled), it calls
+    ///      [AbortedDependencies::add_stall] on its [AbortedDependencies]. This might add more
+    ///      indices (dependencies of `task_idx` that were stalled) to the `stall_propagation_queue`.
     ///
     /// The process continues until the `stall_propagation_queue` is empty.
     /// This mechanism ensures that stall states are consistently propagated based on the
@@ -1029,13 +1188,13 @@ impl SchedulerV2 {
 
     /// Initiates the abort process for a specific transaction incarnation via `ExecutionStatuses`.
     ///
-    /// This is a wrapper around `[ExecutionStatuses::start_abort]`.
-    /// If the abort is successfully initiated (i.e., `[ExecutionStatuses::start_abort]` returns `Ok(true)`):
+    /// This is a wrapper around [ExecutionStatuses::start_abort].
+    /// If the abort is successfully initiated (i.e., [ExecutionStatuses::start_abort] returns `Ok(true)`):
     /// - Increments the `SPECULATIVE_ABORT_COUNT` counter.
     /// - Clears any speculative transaction logs for the `txn_idx` (as its current execution
     ///   attempt is being aborted).
     ///
-    /// Returns the result of `[ExecutionStatuses::start_abort]`.
+    /// Returns the result of [ExecutionStatuses::start_abort].
     fn start_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> Result<bool, PanicError> {
         let ret = self.txn_statuses.start_abort(txn_idx, incarnation)?;
         if ret {
@@ -1047,14 +1206,14 @@ impl SchedulerV2 {
         Ok(ret)
     }
 
-    /// Initiates the execution of a transaction via `ExecutionStatuses`.
+    /// Initiates the execution of a transaction via [ExecutionStatuses].
     ///
-    /// This is a direct wrapper around `[ExecutionStatuses::start_executing]`.
+    /// This is a direct wrapper around [ExecutionStatuses::start_executing].
     /// It attempts to transition the transaction at `txn_idx` to the `Executing` state.
     ///
     /// Returns `Ok(Some(incarnation))` if successful, `Ok(None)` if the transaction
     /// was not in a state to start execution (e.g., not `PendingScheduling`), or
-    /// `Err(PanicError)` if an error occurs within `ExecutionStatuses`.
+    /// `Err(PanicError)` if an error occurs within [ExecutionStatuses].
     fn start_executing(&self, txn_idx: TxnIndex) -> Result<Option<Incarnation>, PanicError> {
         self.txn_statuses.start_executing(txn_idx)
     }
@@ -1067,13 +1226,13 @@ impl SchedulerV2 {
     /// This method is typically called when a transaction `txn_idx` finishes its 0-th incarnation.
     /// If `executed_once_max_idx` is currently equal to `txn_idx`, it means `txn_idx` might
     /// be the transaction completing a contiguous block of first-time executions.
-    /// The method then iterates from `txn_idx` upwards, checking `[ExecutionStatuses::ever_executed]`
+    /// The method then iterates from `txn_idx` upwards, checking [ExecutionStatuses::ever_executed]
     /// for each subsequent transaction `idx`. For each `idx` that has been executed at least once:
     /// - `executed_once_max_idx` is updated to `idx + 1`.
-    /// - If `idx` is found to be `[ExecutionStatuses::pending_scheduling_and_not_stalled]`, it is re-added to the
-    ///   `execution_queue`. This handles cases where a transaction `idx` might have been
-    ///   scheduled for re-execution (e.g., its first re-execution) but was deferred because
-    ///   `executed_once_max_idx` was less than `idx`. Now that the watermark is advancing
+    /// - If `idx` is found to be [ExecutionStatuses::pending_scheduling_and_not_stalled], it is
+    ///   re-added to the `execution_queue`. This handles cases where a transaction `idx` might
+    ///   have been scheduled for re-execution (e.g., its first re-execution) but was deferred
+    ///   because `executed_once_max_idx` was less than `idx`. Now that the watermark is advancing
     ///   past `idx`, it can be truly scheduled.
     /// The iteration stops when an `idx` is encountered that has not `ever_executed` or when
     /// `num_txns` is reached.
@@ -1583,7 +1742,13 @@ mod tests {
             );
 
             // Commit hook needs to complete for next one to be dispatched.
-            assert_err!(scheduler.start_commit());
+            if i != num_txns - 1 {
+                // The check for commit flag is after next_to_commit_idx = num_txns
+                // check which returns Ok(None).
+                assert_err!(scheduler.start_commit());
+            } else {
+                assert_none!(scheduler.start_commit().unwrap());
+            }
             assert_ok!(scheduler.end_commit(i));
             assert_eq!(
                 scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
@@ -1603,7 +1768,7 @@ mod tests {
 
         for i in 1..num_txns {
             assert!(!scheduler.is_done());
-            assert_ok_eq!(scheduler.next_task(), TaskKind::PostCommitProcessing(i));
+            assert_ok_eq!(scheduler.next_task(0), TaskKind::PostCommitProcessing(i));
         }
         assert!(scheduler.is_done());
     }
@@ -1621,7 +1786,7 @@ mod tests {
         stall_and_add_dependency(&scheduler, 3, 6, 1);
         stall_and_add_dependency(&scheduler, 6, 9, 1);
         assert_ok_eq!(scheduler.txn_statuses.start_abort(6, 0), true);
-        assert_ok!(scheduler.txn_statuses.finish_abort(6, 0, true));
+        assert_ok!(scheduler.txn_statuses.finish_abort(6, 0, false));
 
         assert_ok!(scheduler.propagate(BTreeSet::from([3])));
 
@@ -1647,7 +1812,7 @@ mod tests {
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
         assert_none!(scheduler.start_commit().unwrap());
         // Next task should start executing (0, 0).
-        assert_ok_eq!(scheduler.next_task(), TaskKind::Execute(0, 0));
+        assert_ok_eq!(scheduler.next_task(0), TaskKind::Execute(0, 0));
         assert_none!(scheduler.start_commit().unwrap());
         // After execution is finished, commit hook can be dispatched.
         assert_ok!(scheduler.finish_execution(AbortManager::new(0, 0, &scheduler)));
@@ -1663,22 +1828,28 @@ mod tests {
             CommitMarkerFlag::CommitStarted as u8
         );
 
-        assert_err!(scheduler.start_commit());
-        scheduler.next_to_commit_idx.store(3, Ordering::Relaxed);
-        assert_err!(scheduler.start_commit());
-        scheduler.committed_marker[2].store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
+        // Ok(None) because txn 1 has not finished execution yet.
         assert_none!(scheduler.start_commit().unwrap());
+        scheduler.next_to_commit_idx.store(0, Ordering::Relaxed);
+        // But calling it again with index 0 would lead to an error.
+        assert_err!(scheduler.start_commit());
 
+        scheduler.next_to_commit_idx.store(3, Ordering::Relaxed);
+        // Execution status is checked first, so start_commit returns Ok(None).
+        assert_none!(scheduler.start_commit().unwrap());
         *scheduler.txn_statuses.get_status_mut(3) = ExecutionStatus::new_for_test(
             StatusWithIncarnation::new_for_test(SchedulingStatus::Executed, 5),
             1,
         );
+        // Now it is an error because the commit flag of txn 2 is not Committed.
+        assert_err!(scheduler.start_commit());
+        scheduler.committed_marker[2].store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
         assert!(scheduler.txn_statuses.get_status(3).is_stalled());
         assert_eq!(
             scheduler.committed_marker[3].load(Ordering::Relaxed),
             CommitMarkerFlag::NotCommitted as u8
         );
-        // Should commit despite being currently stalled.
+        // No longer an error, but should commit despite being currently stalled.
         assert_some_eq!(scheduler.start_commit().unwrap(), (3, 5));
 
         scheduler.next_to_commit_idx.store(10, Ordering::Relaxed);
@@ -1763,7 +1934,7 @@ mod tests {
                             scheduler.commit_hooks_unlock();
                         }
 
-                        match scheduler.next_task().unwrap() {
+                        match scheduler.next_task(0).unwrap() {
                             TaskKind::Execute(txn_idx, incarnation) => {
                                 assert!(incarnation < 2);
 
@@ -1791,7 +1962,7 @@ mod tests {
                                                 assert_ok!(scheduler.txn_statuses.finish_abort(
                                                     txn_idx,
                                                     incarnation,
-                                                    true
+                                                    false
                                                 ));
                                             }
                                         };
@@ -1816,6 +1987,9 @@ mod tests {
                                 assert!(scheduler.txn_statuses.is_executed(txn_idx));
                             },
                             TaskKind::NextTask => {},
+                            TaskKind::ModuleValidation(_, _, _) => {
+                                unreachable!("Module validation task should not be scheduled");
+                            },
                             TaskKind::Done => {
                                 break;
                             },

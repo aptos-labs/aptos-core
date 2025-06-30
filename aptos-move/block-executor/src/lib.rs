@@ -160,4 +160,5 @@ pub mod types;
 #[cfg(test)]
 mod unit_tests;
 mod value_exchange;
+mod cold_validation;
 pub mod view;

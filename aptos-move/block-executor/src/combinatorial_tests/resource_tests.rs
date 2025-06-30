@@ -54,6 +54,7 @@ pub(crate) fn create_executor_thread_pool() -> Arc<rayon::ThreadPool> {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
+            //.num_threads(4)
             .build()
             .unwrap(),
     )
