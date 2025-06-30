@@ -2633,7 +2633,10 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ViewFunctionError {
+    // This is to represent errors are from a MoveAbort and has error info from the module metadata to display.
+    // The ExecutionStatus is used to construct the error message in the same way as MoveAborts for entry functions.
     ExecutionStatus(ExecutionStatus, Option<StatusCode>),
+    // This is a generic error message that takes in a string and display it in the error response.
     ErrorMessage(String, Option<StatusCode>),
 }
 
