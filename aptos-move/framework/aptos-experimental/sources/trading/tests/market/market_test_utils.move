@@ -12,11 +12,9 @@ module aptos_experimental::market_test_utils {
         TimeInForce,
         MarketClearinghouseCallbacks
     };
+    use aptos_experimental::order_book_types::OrderIdType;
 
-    use aptos_experimental::market::{
-        OrderEvent,
-        Market
-    };
+    use aptos_experimental::market::{OrderEvent, Market};
 
     public fun place_order_and_verify<M: store + copy + drop>(
         market: &mut Market<M>,
@@ -30,7 +28,7 @@ module aptos_experimental::market_test_utils {
         is_cancelled: bool,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ): u64 {
+    ): OrderIdType {
         let user_addr = signer::address_of(user);
         if (limit_price.is_some()) {
             market.place_limit_order(
@@ -112,7 +110,7 @@ module aptos_experimental::market_test_utils {
         max_fills: Option<u64>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ): u64 {
+    ): OrderIdType {
         let taker_addr = signer::address_of(taker);
         let max_fills =
             if (max_fills.is_none()) { 1000 }
@@ -174,7 +172,7 @@ module aptos_experimental::market_test_utils {
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
-        maker_order_ids: vector<u64>,
+        maker_order_ids: vector<OrderIdType>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
@@ -182,7 +180,7 @@ module aptos_experimental::market_test_utils {
         max_fills: Option<u64>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ): u64 {
+    ): OrderIdType {
         let order_id =
             place_taker_order(
                 market,
@@ -221,7 +219,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         user: &signer,
         is_taker: bool,
-        order_id: u64,
+        order_id: OrderIdType,
         price: Option<u64>,
         orig_size: u64,
         remaining_size: u64,
@@ -250,14 +248,14 @@ module aptos_experimental::market_test_utils {
     public fun verify_fills<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        taker_order_id: u64,
+        taker_order_id: OrderIdType,
         taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
         fill_sizes: vector<u64>,
         fill_prices: vector<u64>,
         maker_addr: address,
-        maker_order_ids: vector<u64>,
+        maker_order_ids: vector<OrderIdType>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
