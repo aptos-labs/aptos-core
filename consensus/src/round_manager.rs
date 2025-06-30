@@ -249,8 +249,8 @@ pub enum VerifiedEvent {
 }
 
 #[cfg(test)]
-#[path = "round_manager_test.rs"]
-mod round_manager_test;
+#[path = "round_manager_tests/mod.rs"]
+mod round_manager_tests;
 
 #[cfg(feature = "fuzzing")]
 #[path = "round_manager_fuzzing.rs"]

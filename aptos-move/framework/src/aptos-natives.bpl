@@ -17,9 +17,167 @@ procedure {:inline 1} $1_object_exists_at{{S}}(object: int) returns (res: bool) 
 {%- endfor %}
 
 
+datatype $1_cmp_Ordering {
+    $1_cmp_Ordering_Less(),
+    $1_cmp_Ordering_Equal(),
+    $1_cmp_Ordering_Greater()
+}
+function $IsValid'$1_cmp_Ordering_Less'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering_Equal'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering_Greater'(s: $1_cmp_Ordering): bool {
+    true
+}
+function $IsValid'$1_cmp_Ordering'(s: $1_cmp_Ordering): bool {
+    true
+}
+function {:inline} $IsEqual'$1_cmp_Ordering'(s1: $1_cmp_Ordering, s2: $1_cmp_Ordering): bool {
+    s1 == s2
+}
+
+function $Arbitrary_value_of'$1_cmp_Ordering'(): $1_cmp_Ordering;
+
+function {:inline} $1_cmp_$compare'bool'(s1: bool, s2: bool): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 == true then $1_cmp_Ordering_Greater()
+    else 
+        $1_cmp_Ordering_Less()
+}
+
+procedure {:inline 1} $1_cmp_compare'bool'(s1: bool, s2: bool) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'bool'(s1, s2);
+    return;
+}
+
+function {:inline} $1_cmp_$compare'signer'(s1: $signer, s2: $signer): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 is $signer && s2 is $permissioned_signer then $1_cmp_Ordering_Less()
+    else if s1 is $permissioned_signer && s2 is $signer then $1_cmp_Ordering_Greater()
+    else if s1 is $signer then
+        $compare_int(s1 -> $addr, s2 -> $addr)
+    else if s1 -> $addr == s2 -> $addr then
+        $compare_int(s1 -> $permission_addr, s2 -> $permission_addr)
+    else
+        $compare_int(s1 -> $addr, s2 -> $addr)
+}
+
+procedure {:inline 1} $1_cmp_compare'signer'(s1: $signer, s2: $signer) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'signer'(s1, s2);
+    return;
+}
+
+function $compare_int(s1: int, s2: int): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if s1 > s2 then $1_cmp_Ordering_Greater()
+    else $1_cmp_Ordering_Less()
+}
+
+function {:inline} $1_cmp_$compare'num'(s1: int, s2: int): $1_cmp_Ordering {
+    $compare_int(s1, s2)
+}
+
+procedure {:inline 1} $1_cmp_compare'num'(s1: int, s2: int) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $compare_int(s1, s2);
+    return;
+}
+
+function {:inline} $1_cmp_$compare'int'(s1: int, s2: int): $1_cmp_Ordering {
+    $compare_int(s1, s2)
+}
+
+procedure {:inline 1} $1_cmp_compare'int'(s1: int, s2: int) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $compare_int(s1, s2);
+    return;
+}
+
+{%- for impl in bv_instances %}
+
+function {:inline} $1_cmp_$compare'bv{{impl.base}}'(s1: bv{{impl.base}}, s2: bv{{impl.base}}): $1_cmp_Ordering {
+    if s1 == s2 then $1_cmp_Ordering_Equal()
+    else if $Gt'Bv{{impl.base}}'(s1,s2) then $1_cmp_Ordering_Greater()
+    else $1_cmp_Ordering_Less()
+}
+
+procedure {:inline 1} $1_cmp_compare'bv{{impl.base}}'(s1: bv{{impl.base}}, s2: bv{{impl.base}}) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'bv{{impl.base}}'(s1, s2);
+    return;
+}
+
+{%- endfor %}
 
 
-{%- for instance in aggregator_v2_instances %}
+{%- for instance in cmp_int_instances -%}
+{%- set S = instance.suffix  -%}
+{%- set T = instance.name -%}
+
+
+function {:inline} $1_cmp_$compare'{{S}}'(s1: {{T}}, s2: {{T}}): $1_cmp_Ordering {
+    $compare_int(s1, s2)
+}
+
+
+procedure {:inline 1} $1_cmp_compare'{{S}}'(s1: {{T}}, s2: {{T}}) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $compare_int(s1, s2);
+    return;
+}
+
+{%- endfor %}
+
+{%- for instance in cmp_vector_instances -%}
+{%- set S = instance.suffix  -%}
+{%- set T = instance.name -%}
+
+    {% set concat_s = "/" ~ S ~"/" %}
+    {% set rest_s = concat_s | trim_start_matches(pat="/vec'") | trim_end_matches(pat="'/") %}
+
+
+    function {:inline} $1_cmp_$compare'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering {
+        if $IsEqual'{{S}}'(v1, v2) then $1_cmp_Ordering_Equal()
+        else if v1 -> l == 0 && v2 -> l != 0 then
+            $1_cmp_Ordering_Less()
+        else if v2 -> l == 0 && v1 -> l != 0 then
+            $1_cmp_Ordering_Greater()
+        else
+            $compare_vec'{{S}}'(v1, v2)
+    }
+
+    procedure {:inline 1} $1_cmp_compare'{{S}}'(v1: {{T}}, v2: {{T}}) returns ($ret0: $1_cmp_Ordering) {
+        $ret0 := $1_cmp_$compare'{{S}}'(v1, v2);
+        return;
+    }
+
+    function $compare_vec'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering;
+    axiom {:ctor "Vec"} (forall v1: {{T}}, v2: {{T}}, res: $1_cmp_Ordering ::
+        (var res := $compare_vec'{{S}}'(v1, v2);
+        if v1 -> l == 0 && v2 -> l != 0 then
+            res == $1_cmp_Ordering_Less()
+        else if v2 -> l == 0 && v1 -> l != 0 then
+            res == $1_cmp_Ordering_Greater() 
+        else if ReadVec(v1, 0) == ReadVec(v2, 0) then res == $compare_vec'{{S}}'(RemoveAtVec(v1, 0), RemoveAtVec(v2, 0))
+        else res == $1_cmp_$compare'{{rest_s}}'(ReadVec(v1, 0), ReadVec(v2, 0))));
+    
+{%- endfor %}
+
+{% for instance in cmp_table_instances -%}
+{%- set S = instance.suffix  -%}
+{%- set T = instance.name -%}
+
+    function {:inline} $1_cmp_$compare'{{S}}'(v1: {{T}}, v2: {{T}}): $1_cmp_Ordering {
+        $Arbitrary_value_of'$1_cmp_Ordering'()
+    }
+
+    procedure {:inline 1} $1_cmp_compare'{{S}}'(v1: {{T}}, v2: {{T}}) returns ($ret0: $1_cmp_Ordering) {
+        $ret0 := $1_cmp_$compare'{{S}}'(v1, v2);
+        return;
+    }
+    
+{%- endfor %}
+
+
+{% for instance in aggregator_v2_instances %}
 {%- set S = instance.suffix  -%}
 {%- set T = instance.name -%}
 
@@ -234,6 +392,15 @@ function {:inline} $1_aggregator_v2_$read'{{S}}'(s: $1_aggregator_v2_Aggregator'
    function $1_aggregator_v2_$is_at_least_impl'{{S}}'(aggregator: $1_aggregator_v2_Aggregator'{{S}}', min_amount: {{T}}): bool;
 {% endif -%}
 
+function {:inline} $1_cmp_$compare'$1_aggregator_v2_Aggregator'{{S}}''(s1: $1_aggregator_v2_Aggregator'{{S}}', s2: $1_aggregator_v2_Aggregator'{{S}}'): $1_cmp_Ordering {
+    $Arbitrary_value_of'$1_cmp_Ordering'()
+}
+
+procedure {:inline 1} $1_cmp_compare'$1_aggregator_v2_Aggregator'{{S}}''(s1: $1_aggregator_v2_Aggregator'{{S}}', s2: $1_aggregator_v2_Aggregator'{{S}}') returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'$1_aggregator_v2_Aggregator'{{S}}''(s1, s2);
+    return;
+}
+
 {%- endfor %}
 
 // ==================================================================================
@@ -304,6 +471,17 @@ axiom (forall limit: int :: {$1_aggregator_factory_spec_new_aggregator(limit)}
 axiom (forall limit: int :: {$1_aggregator_factory_spec_new_aggregator(limit)}
      (var agg := $1_aggregator_factory_spec_new_aggregator(limit);
      $1_aggregator_spec_aggregator_get_val(agg) == 0));
+
+
+function {:inline} $1_cmp_$compare'$1_aggregator_Aggregator'(s1: $1_aggregator_Aggregator, s2: $1_aggregator_Aggregator): $1_cmp_Ordering {
+    $Arbitrary_value_of'$1_cmp_Ordering'()
+}
+
+procedure {:inline 1} $1_cmp_compare'$1_aggregator_Aggregator'(s1: $1_aggregator_Aggregator, s2: $1_aggregator_Aggregator) returns ($ret0: $1_cmp_Ordering)  {
+    $ret0 := $1_cmp_$compare'$1_aggregator_Aggregator'(s1, s2);
+    return;
+}
+
 
 // ==================================================================================
 // Native for function_info

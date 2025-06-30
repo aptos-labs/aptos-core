@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.6.0]
+- Sets up confidential assets for localnet under the experimental address 0x7
+
 ## [7.5.0]
 - Fix auto-update CLI command to work with more OS's including Mac and Linux on ARM
 - Update localnet indexer processors

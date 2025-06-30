@@ -20,8 +20,8 @@ use crate::{
         verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
     },
     storage::{
-        dependencies_gas_charging::check_dependencies_and_charge_gas,
-        depth_formula_calculator::DepthFormulaCalculator,
+        dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
+        ty_depth_checker::TypeDepthChecker,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -39,7 +39,6 @@ use move_core_types::{
     language_storage::TypeTag,
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -86,7 +85,7 @@ pub(crate) trait InterpreterDebugInterface {
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
 /// It mimics execution on a single thread, with an call stack and an operand stack.
-pub(crate) struct InterpreterImpl<'ctx> {
+pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     pub(crate) operand_stack: Stack,
     /// The stack of active functions.
@@ -97,6 +96,8 @@ pub(crate) struct InterpreterImpl<'ctx> {
     access_control: AccessControlState,
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
+    /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
+    ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -118,6 +119,7 @@ impl Interpreter {
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        ty_depth_checker: &TypeDepthChecker<impl Loader>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -128,6 +130,7 @@ impl Interpreter {
             args,
             data_cache,
             module_storage,
+            ty_depth_checker,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -136,7 +139,10 @@ impl Interpreter {
     }
 }
 
-impl InterpreterImpl<'_> {
+impl<LoaderImpl> InterpreterImpl<'_, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
     pub(crate) fn entrypoint(
@@ -144,6 +150,7 @@ impl InterpreterImpl<'_> {
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -155,6 +162,7 @@ impl InterpreterImpl<'_> {
             vm_config: module_storage.runtime_environment().vm_config(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
+            ty_depth_checker,
         };
 
         let function = Rc::new(function);
@@ -311,6 +319,7 @@ impl InterpreterImpl<'_> {
                     resource_resolver,
                     module_storage,
                     gas_meter,
+                    traversal_context,
                 )
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
 
@@ -602,7 +611,7 @@ impl InterpreterImpl<'_> {
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
                     let callee = lazy_function
-                        .with_resolved_function(module_storage, |f| Ok(f.clone()))
+                        .as_resolved(module_storage)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     RTTCheck::check_call_visibility(
@@ -1486,7 +1495,10 @@ impl InterpreterImpl<'_> {
     }
 }
 
-impl InterpreterDebugInterface for InterpreterImpl<'_> {
+impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
     #[allow(dead_code)]
     fn debug_print_stack_trace(
         &self,
@@ -1675,100 +1687,6 @@ impl CallStack {
     }
 }
 
-fn check_depth_of_type(module_storage: &impl ModuleStorage, ty: &Type) -> PartialVMResult<()> {
-    let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
-
-    // Start at 1 since we always call this right before we add a new node to the value's depth.
-    let max_depth = match module_storage
-        .runtime_environment()
-        .vm_config()
-        .max_value_nest_depth
-    {
-        Some(max_depth) => max_depth,
-        None => return Ok(()),
-    };
-    check_depth_of_type_impl(module_storage, ty, max_depth, 1)?;
-    Ok(())
-}
-
-fn check_depth_of_type_impl(
-    module_storage: &impl ModuleStorage,
-    ty: &Type,
-    max_depth: u64,
-    depth: u64,
-) -> PartialVMResult<u64> {
-    macro_rules! check_depth {
-        ($additional_depth:expr) => {{
-            let new_depth = depth.saturating_add($additional_depth);
-            if new_depth > max_depth {
-                return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
-            } else {
-                new_depth
-            }
-        }};
-    }
-
-    // Calculate depth of the type itself
-    let ty_depth = match ty {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::Address
-        | Type::Signer => check_depth!(0),
-        // Even though this is recursive this is OK since the depth of this recursion is
-        // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Vector(ty) => {
-            check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(1))?
-        },
-        Type::Struct { idx, .. } => {
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&[]))
-        },
-        // NB: substitution must be performed before calling this function
-        Type::StructInstantiation { idx, ty_args, .. } => {
-            // Calculate depth of all type arguments, and make sure they themselves are not too deep.
-            let ty_arg_depths = ty_args
-                .iter()
-                .map(|ty| {
-                    // Ty args should be fully resolved and not need any type arguments
-                    check_depth_of_type_impl(module_storage, ty, max_depth, check_depth!(0))
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula =
-                DepthFormulaCalculator::new(module_storage).calculate_depth_of_struct(idx)?;
-            check_depth!(formula.solve(&ty_arg_depths))
-        },
-        Type::Function { args, results, .. } => {
-            let mut ty_max_depth = depth;
-            for ty in args.iter().chain(results) {
-                ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
-                    module_storage,
-                    ty,
-                    max_depth,
-                    check_depth!(1),
-                )?);
-            }
-            ty_max_depth
-        },
-        Type::TyParam(_) => {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Type parameter should be fully resolved".to_string()),
-            )
-        },
-    };
-
-    Ok(ty_depth)
-}
-
 /// An `ExitCode` from `execute_code_unit`.
 #[derive(Debug)]
 enum ExitCode {
@@ -1782,11 +1700,12 @@ impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
-        interpreter: &mut InterpreterImpl,
+        interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl::<RTTCheck, RTCaches>(
             interpreter,
@@ -1794,6 +1713,7 @@ impl Frame {
             resource_resolver,
             module_storage,
             gas_meter,
+            traversal_context,
         )
         .map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
@@ -1807,11 +1727,12 @@ impl Frame {
 
     fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
-        interpreter: &mut InterpreterImpl,
+        interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
@@ -2081,11 +2002,15 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let get_field_count_charge_gas_and_check_depth =
+                        let mut get_field_count_charge_gas_and_check_depth =
                             || -> PartialVMResult<u16> {
                                 let field_count = self.field_count(*sd_idx);
                                 let struct_type = self.get_struct_ty(*sd_idx);
-                                check_depth_of_type(module_storage, &struct_type)?;
+                                interpreter.ty_depth_checker.check_depth_of_type(
+                                    gas_meter,
+                                    traversal_context,
+                                    &struct_type,
+                                )?;
                                 Ok(field_count)
                             };
 
@@ -2116,7 +2041,11 @@ impl Frame {
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        check_depth_of_type(module_storage, &struct_type)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                        )?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2146,7 +2075,11 @@ impl Frame {
 
                                 let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                check_depth_of_type(module_storage, ty)?;
+                                interpreter.ty_depth_checker.check_depth_of_type(
+                                    gas_meter,
+                                    traversal_context,
+                                    ty,
+                                )?;
                                 Ok(self.field_instantiation_count(*si_idx))
                             };
 
@@ -2188,7 +2121,11 @@ impl Frame {
 
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2238,7 +2175,11 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2261,7 +2202,11 @@ impl Frame {
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2653,7 +2598,11 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(module_storage, ty)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,

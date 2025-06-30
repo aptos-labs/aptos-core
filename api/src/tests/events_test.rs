@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
-use crate::tests::new_test_context_with_db_sharding_and_internal_indexer;
 use aptos_api_test_context::{current_function_name, TestContext};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde_json::json;
@@ -39,8 +38,7 @@ async fn test_get_events_filter_by_start_sequence_number() {
     context.check_golden_output(resp.clone());
 
     // assert the same resp after db sharding migration with internal indexer turned on
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     let new_resp = shard_context
         .get(
             format!(
@@ -101,8 +99,7 @@ async fn test_get_events_by_account_event_handle() {
         .await;
     context.check_golden_output(resp.clone());
 
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     let new_resp = shard_context
         .get("/accounts/0x1/events/0x1::reconfiguration::Configuration/events")
         .await;

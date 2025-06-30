@@ -2,11 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
-use crate::tests::{
-    new_test_context_with_config, new_test_context_with_db_sharding_and_internal_indexer,
-    new_test_context_with_sharding_and_delayed_internal_indexer,
-};
+use crate::tests::{new_test_context, new_test_context_with_config};
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
 use aptos_crypto::{
@@ -493,34 +489,6 @@ async fn test_get_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transaction_by_hash_with_delayed_internal_indexer() {
-    let mut context = new_test_context_with_sharding_and_delayed_internal_indexer(
-        current_function_name!(),
-        Some(2),
-    );
-
-    let mut account = context.gen_account();
-    let txn = context.create_user_account(&account).await;
-    context.commit_block(&vec![txn.clone()]).await;
-    let txn1 = context.account_transfer_to(
-        &mut account,
-        AccountAddress::from_hex_literal("0x1").unwrap(),
-        1,
-    );
-    context.commit_block(&vec![txn1.clone()]).await;
-    let committed_hash = txn1.committed_hash().to_hex_literal();
-
-    let _ = context
-        .get_indexer_reader()
-        .unwrap()
-        .wait_for_internal_indexer(1);
-    let resp = context
-        .get(&format!("/transactions/by_hash/{}", committed_hash))
-        .await;
-    context.check_golden_output(resp);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_transaction_by_hash_not_found() {
     let mut context = new_test_context(current_function_name!());
 
@@ -808,8 +776,7 @@ async fn test_account_transaction_with_context(mut context: TestContext) {
 async fn test_get_account_transactions() {
     let context = new_test_context(current_function_name!());
     test_account_transaction_with_context(context).await;
-    let shard_context =
-        new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let shard_context = new_test_context(current_function_name!());
     test_account_transaction_with_context(shard_context).await;
 }
 

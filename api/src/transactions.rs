@@ -1627,6 +1627,7 @@ impl TransactionsApi {
             None,
             output.gas_used(),
             exe_status,
+            None,
         );
         let mut events = output.events().to_vec();
         let _ = self

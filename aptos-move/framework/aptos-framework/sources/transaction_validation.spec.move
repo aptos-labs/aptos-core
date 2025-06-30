@@ -257,7 +257,7 @@ spec aptos_framework::transaction_validation {
         pragma verify_duration_estimate = 120;
 
         aborts_if !features::spec_is_enabled(features::FEE_PAYER_ENABLED);
-        let gas_payer = create_signer::create_signer(fee_payer_address);
+        let gas_payer = create_signer::spec_create_signer(fee_payer_address);
         include PrologueCommonAbortsIf {
             gas_payer,
             replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),

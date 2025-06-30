@@ -12,7 +12,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
-    transaction::{TransactionInfo, TransactionOutput},
+    transaction::{PersistedAuxiliaryInfo, TransactionInfo, TransactionOutput},
 };
 use itertools::{izip, Itertools};
 use rayon::prelude::*;
@@ -92,7 +92,12 @@ impl DoLedgerUpdate {
             writeset_hashes
         )
         .map(
-            |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
+            |(
+                (txn, txn_out, persisted_info),
+                state_checkpoint_hash,
+                event_root_hash,
+                write_set_hash,
+            )| {
                 TransactionInfo::new(
                     txn.hash(),
                     write_set_hash,
@@ -100,6 +105,11 @@ impl DoLedgerUpdate {
                     state_checkpoint_hash,
                     txn_out.gas_used(),
                     txn_out.status().as_kept_status().expect("Already sorted."),
+                    if matches!(persisted_info, PersistedAuxiliaryInfo::None) {
+                        None
+                    } else {
+                        Some(CryptoHash::hash(persisted_info))
+                    },
                 )
             },
         )
