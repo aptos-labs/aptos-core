@@ -18,7 +18,6 @@
 
 module aptos_framework::sui_derivable_account {
 
-    use aptos_framework::debug;
     use aptos_framework::auth_data::AbstractionAuthData;
     use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
     use aptos_std::ed25519::{ Self, new_signature_from_bytes, new_validated_public_key_from_bytes, public_key_into_unvalidated };
