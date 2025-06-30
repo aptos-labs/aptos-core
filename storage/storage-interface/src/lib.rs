@@ -25,9 +25,7 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionToCommit, TransactionWithProof, Version
     },
     write_set::WriteSet,
 };
@@ -212,6 +210,12 @@ pub trait DbReader: Send + Sync {
             start_version: Version,
             limit: u64,
         ) -> Result<Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>>;
+
+        fn get_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>>;
 
         fn get_events_iterator(
             &self,
@@ -550,7 +554,7 @@ pub trait DbWriter: Send + Sync {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         unimplemented!()

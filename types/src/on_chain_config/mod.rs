@@ -50,7 +50,7 @@ pub use self::{
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
-        OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
+        ExecutionConfigV7, OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{DiffItem, GasSchedule, GasScheduleV2, StorageGasSchedule},
     jwk_consensus_config::{

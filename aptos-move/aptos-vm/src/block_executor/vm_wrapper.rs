@@ -9,7 +9,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     state_store::{StateView, StateViewId},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, Transaction, WriteSetPayload
     },
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -30,6 +30,7 @@ impl ExecutorTask for AptosExecutorTask {
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
+    type AuxiliaryInfo = AuxiliaryInfo;
 
     fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
         let vm = AptosVM::new(environment, state_view);
@@ -48,6 +49,7 @@ impl ExecutorTask for AptosExecutorTask {
               + BlockSynchronizationKillSwitch),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
+        auxiliary_info: &Self::AuxiliaryInfo,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
@@ -57,7 +59,7 @@ impl ExecutorTask for AptosExecutorTask {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, view, &log_context)
+            .execute_single_transaction(txn, &resolver, view, &log_context, auxiliary_info)
         {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {

@@ -897,6 +897,7 @@ where
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        _auxiliary_info: &Self::AuxiliaryInfo,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             MockTransaction::Write {

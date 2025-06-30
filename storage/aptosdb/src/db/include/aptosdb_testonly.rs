@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{
-    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-};
+use aptos_config::config::{BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
+use std::default::Default;
+use aptos_types::transaction::{PersistedAuxiliaryInfo, TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
 use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
-use aptos_types::transaction::{PersistedAuxiliaryInfo, TransactionStatus, TransactionToCommit};
-use std::default::Default;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -113,24 +111,14 @@ impl AptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
     ) -> Result<()> {
-        let (transactions, transaction_outputs, transaction_infos) =
-            Self::disassemble_txns_to_commit(txns_to_commit);
+        let (transactions, transaction_outputs, transaction_infos) = Self::disassemble_txns_to_commit(txns_to_commit);
+        let persisted_auxiliary_infos = (0..txns_to_commit.len()).map(|i| PersistedAuxiliaryInfo::V1 { transaction_index: i as u32 }).collect();
         let is_reconfig = transaction_outputs
             .iter()
             .rev()
             .flat_map(TransactionOutput::events)
             .any(ContractEvent::is_new_epoch_event);
-        let auxiliary_info = transactions
-            .iter()
-            .map(|_| PersistedAuxiliaryInfo::None)
-            .collect();
-        let transactions_to_keep = TransactionsToKeep::make(
-            first_version,
-            transactions,
-            transaction_outputs,
-            auxiliary_info,
-            is_reconfig,
-        );
+        let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, persisted_auxiliary_infos, is_reconfig);
 
         let current = self.state_store.current_state_locked().clone();
         let (hot_state, persisted_state) = self.state_store.get_persisted_state()?;
@@ -149,7 +137,7 @@ impl AptosDB {
         let chunk = ChunkToCommit {
             first_version,
             transactions: &transactions_to_keep.transactions,
-            persisted_info: &transactions_to_keep.persisted_info,
+            persisted_auxiliary_infos: &transactions_to_keep.persisted_auxiliary_infos,
             transaction_outputs: &transactions_to_keep.transaction_outputs,
             transaction_infos: &transaction_infos,
             state: &new_state,

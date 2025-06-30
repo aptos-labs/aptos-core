@@ -14,9 +14,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo,
-        TransactionOutput, TransactionPayload, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput, PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo, TransactionOutput, TransactionPayload, Version
     },
     vm_status::VMStatus,
 };
@@ -55,7 +53,7 @@ impl AptosDebugger {
         &self,
         begin: Version,
         limit: u64,
-    ) -> anyhow::Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> anyhow::Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<PersistedAuxiliaryInfo>)> {
         self.debugger.get_committed_transactions(begin, limit).await
     }
 
@@ -120,6 +118,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
+        auxiliary_info: AuxiliaryInfo,
     ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -163,6 +162,7 @@ impl AptosDebugger {
                 };
                 gas_profiler
             },
+            &auxiliary_info,
         )?;
 
         Ok((status, output, gas_profiler.finish()))
@@ -351,8 +351,8 @@ impl AptosDebugger {
     pub async fn get_committed_transaction_at_version(
         &self,
         version: Version,
-    ) -> anyhow::Result<(Transaction, TransactionInfo)> {
-        let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
+    ) -> anyhow::Result<(Transaction, TransactionInfo, PersistedAuxiliaryInfo)> {
+        let (mut txns, mut info, mut persisted_auxiliary_info) = self.debugger.get_committed_transactions(version, 1).await?;
 
         let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
         let info = info
@@ -442,7 +442,7 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 }
 
 fn execute_block_no_limit(
-    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {

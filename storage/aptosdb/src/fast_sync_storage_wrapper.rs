@@ -13,7 +13,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{TransactionOutputListWithProof, Version},
+    transaction::{TransactionOutputListWithProofV2, Version},
 };
 use either::Either;
 use std::{sync::Arc, time::Instant};
@@ -152,7 +152,7 @@ impl DbWriter for FastSyncStorageWrapper {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         let status = self.get_fast_sync_status();
