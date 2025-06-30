@@ -365,7 +365,7 @@ module supra_framework::transaction_fee {
         supra_account::create_account(alice_addr);
         supra_account::create_account(bob_addr);
         supra_account::create_account(carol_addr);
-        assert!(object::object_address(&coin::ensure_paired_metadata<SupraCoin>()) == @aptos_fungible_asset, 0);
+        assert!(object::object_address(&coin::ensure_paired_metadata<SupraCoin>()) == @supra_fungible_asset, 0);
         coin::deposit(alice_addr, coin::mint(10000, &mint_cap));
         coin::deposit(bob_addr, coin::mint(10000, &mint_cap));
         coin::deposit(carol_addr, coin::mint(10000, &mint_cap));

@@ -860,13 +860,13 @@ module supra_framework::genesis {
         aggregator_factory::initialize_aggregator_factory_for_test(supra_framework);
 
         let (burn_cap, mint_cap) = supra_coin::initialize(supra_framework);
-        supra_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+        supra_coin::ensure_initialized_with_sup_fa_metadata_for_test();
 
         let core_resources = account::create_account(@core_resources);
         supra_account::register_supra(&core_resources); // registers SUPRA store
 
-        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
+        let sup_metadata = object::address_to_object<Metadata>(@supra_fungible_asset);
+        assert!(primary_fungible_store::primary_store_exists(@core_resources, sup_metadata), 2);
 
         supra_coin::configure_accounts_for_test(supra_framework, &core_resources, mint_cap);
         coin::destroy_burn_cap(burn_cap);

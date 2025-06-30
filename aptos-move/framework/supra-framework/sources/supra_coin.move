@@ -159,11 +159,18 @@ module supra_framework::supra_coin {
     #[test_only]
     use supra_framework::aggregator_factory;
     #[test_only]
+    use supra_framework::coin::{
+        initialize_and_register_fake_money, ensure_paired_metadata, name, symbol, decimals, FakeMoney,
+        FreezeCapability
+    };
+    #[test_only]
+    use supra_framework::fungible_asset;
+    #[test_only]
     use supra_framework::fungible_asset::FungibleAsset;
 
     #[test_only]
-    public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
-        ensure_initialized_with_apt_fa_metadata_for_test();
+    public fun mint_sup_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
+        ensure_initialized_with_sup_fa_metadata_for_test();
         coin::coin_to_fungible_asset_for_test(
             coin::mint(
                 amount,
@@ -173,7 +180,7 @@ module supra_framework::supra_coin {
     }
 
     #[test_only]
-    public fun ensure_initialized_with_apt_fa_metadata_for_test() {
+    public fun ensure_initialized_with_sup_fa_metadata_for_test() {
         let supra_framework = account::create_signer_for_test(@supra_framework);
         if (!exists<MintCapStore>(@supra_framework)) {
             if (!aggregator_factory::aggregator_factory_exists_for_testing()) {
@@ -319,5 +326,33 @@ module supra_framework::supra_coin {
         coin::deposit(source_addr, coins_minted);
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
+    }
+
+    #[test_only]
+    struct FakeMoneyCapabilities has key {
+        burn_cap: BurnCapability<FakeMoney>,
+        freeze_cap: FreezeCapability<FakeMoney>,
+        mint_cap: MintCapability<FakeMoney>,
+    }
+
+    #[test(account = @supra_framework)]
+    #[expected_failure(abort_code = 0, location = supra_framework::supra_coin)]
+    fun test_property_mismatch(
+        account: &signer
+    ) {
+        let account_addr = signer::address_of(account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
+        ensure_initialized_with_sup_fa_metadata_for_test();
+
+        assert!(fungible_asset::name(ensure_paired_metadata<FakeMoney>()) == name<SupraCoin>(), 0);
+        assert!(fungible_asset::symbol(ensure_paired_metadata<FakeMoney>()) == symbol<SupraCoin>(), 0);
+        assert!(fungible_asset::decimals(ensure_paired_metadata<FakeMoney>()) == decimals<SupraCoin>(), 0);
+
+        move_to(account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
     }
 }

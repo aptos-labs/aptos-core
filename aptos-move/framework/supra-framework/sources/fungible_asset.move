@@ -82,7 +82,7 @@ module supra_framework::fungible_asset {
     /// Fungible metadata does not exist on this account.
     const EFUNGIBLE_METADATA_EXISTENCE: u64 = 30;
     /// Cannot register dispatch hook for SUPRA.
-    const EAPT_NOT_DISPATCHABLE: u64 = 31;
+    const ESUP_NOT_DISPATCHABLE: u64 = 31;
     /// Flag for Concurrent Supply not enabled
     const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 32;
 
@@ -351,8 +351,8 @@ module supra_framework::fungible_asset {
 
         // Cannot register hook for SUPRA.
         assert!(
-            object::address_from_constructor_ref(constructor_ref) != @aptos_fungible_asset,
-            error::permission_denied(EAPT_NOT_DISPATCHABLE)
+            object::address_from_constructor_ref(constructor_ref) != @supra_fungible_asset,
+            error::permission_denied(ESUP_NOT_DISPATCHABLE)
         );
         assert!(
             !object::can_generate_delete_ref(constructor_ref),
@@ -588,7 +588,7 @@ module supra_framework::fungible_asset {
     fun has_deposit_dispatch_function(metadata: Object<Metadata>): bool acquires DispatchFunctionStore {
         let metadata_addr = object::object_address(&metadata);
         // Short circuit on SUPRA for better perf
-        if(metadata_addr != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
+        if(metadata_addr != @supra_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
             option::is_some(&borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function)
         } else {
             false
@@ -608,7 +608,7 @@ module supra_framework::fungible_asset {
     fun has_withdraw_dispatch_function(metadata: Object<Metadata>): bool acquires DispatchFunctionStore {
         let metadata_addr = object::object_address(&metadata);
         // Short circuit on SUPRA for better perf
-        if (metadata_addr != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
+        if (metadata_addr != @supra_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
             option::is_some(&borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function)
         } else {
             false

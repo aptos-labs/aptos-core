@@ -241,13 +241,13 @@ module supra_framework::supra_account {
         if (fungible_asset::store_exists(store_addr)) {
             store_addr
         } else {
-            object::object_address(&primary_fungible_store::create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset)))
+            object::object_address(&primary_fungible_store::create_primary_store(owner, object::address_to_object<Metadata>(@supra_fungible_asset)))
         }
     }
 
     /// Address of SUPRA Primary Fungible Store
     inline fun primary_fungible_store_address(account: address): address {
-        object::create_user_derived_object_address(account, @aptos_fungible_asset)
+        object::create_user_derived_object_address(account, @supra_fungible_asset)
     }
 
     // tests
@@ -434,13 +434,13 @@ module supra_framework::supra_account {
         use supra_framework::fungible_asset::Metadata;
         use supra_framework::supra_coin;
 
-        supra_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+        supra_coin::ensure_initialized_with_sup_fa_metadata_for_test();
 
-        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        let sup_metadata = object::address_to_object<Metadata>(@supra_fungible_asset);
         let user_addr = signer::address_of(user);
-        assert!(primary_fungible_store_address(user_addr) == primary_fungible_store::primary_store_address(user_addr, apt_metadata), 1);
+        assert!(primary_fungible_store_address(user_addr) == primary_fungible_store::primary_store_address(user_addr, sup_metadata), 1);
 
         ensure_primary_fungible_store_exists(user_addr);
-        assert!(primary_fungible_store::primary_store_exists(user_addr, apt_metadata), 2);
+        assert!(primary_fungible_store::primary_store_exists(user_addr, sup_metadata), 2);
     }
 }
