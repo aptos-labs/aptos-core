@@ -86,6 +86,7 @@ impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
                 | Transaction::BlockMetadata(_)
                 | Transaction::StateCheckpoint(_)
                 | Transaction::ValidatorTransaction(_)
+                | Transaction::ScheduledTransaction(_)
                 | Transaction::BlockMetadataExt(_)
                 | Transaction::BlockEpilogue(_) => None,
             },
