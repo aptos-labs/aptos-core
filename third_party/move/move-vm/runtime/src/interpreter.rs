@@ -2252,6 +2252,22 @@ impl Frame {
                                 vec![],
                             )
                             .map(Rc::new)?;
+
+                        let captured_tys = mask.extract(function.param_tys(), true);
+                        for ty in captured_tys {
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                ty,
+                            )?;
+                        }
+                        gas_meter.charge_pack_closure(
+                            false,
+                            interpreter
+                                .operand_stack
+                                .last_n(mask.captured_count() as usize)?,
+                        )?;
+
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             module_storage.runtime_environment(),
@@ -2281,6 +2297,24 @@ impl Frame {
                                 ty_args,
                             )
                             .map(Rc::new)?;
+
+                        let captured_tys = mask.extract(function.param_tys(), true);
+                        for ty in captured_tys {
+                            // NOTE: creation of type instantiations metered during
+                            //   function building and don't need to be done here.
+                            interpreter.ty_depth_checker.check_depth_of_type(
+                                gas_meter,
+                                traversal_context,
+                                ty,
+                            )?;
+                        }
+                        gas_meter.charge_pack_closure(
+                            true,
+                            interpreter
+                                .operand_stack
+                                .last_n(mask.captured_count() as usize)?,
+                        )?;
+
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             module_storage.runtime_environment(),

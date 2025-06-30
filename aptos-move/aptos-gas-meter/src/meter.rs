@@ -340,6 +340,24 @@ where
     }
 
     #[inline]
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let num_args = NumArgs::new(args.len() as u64);
+
+        match is_generic {
+            false => self
+                .algebra
+                .charge_execution(PACK_CLOSURE_BASE + PACK_CLOSURE_PER_ARG * num_args),
+            true => self.algebra.charge_execution(
+                PACK_CLOSURE_GENERIC_BASE + PACK_CLOSURE_GENERIC_PER_ARG * num_args,
+            ),
+        }
+    }
+
+    #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         let (stack_size, heap_size) = self
             .vm_gas_params()
