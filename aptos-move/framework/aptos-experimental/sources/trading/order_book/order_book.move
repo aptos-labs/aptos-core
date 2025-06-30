@@ -5,7 +5,7 @@
 /// The orders are matched based on time-price priority.
 /// 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
 /// types of pending orders are supported.
-///  - Price move up - Trigggered when the price moves above a certain price level
+/// - Price move up - Triggered when the price moves above a certain price level
 /// - Price move down - Triggered when the price moves below a certain price level
 /// - Time based - Triggered when a certain time has passed
 /// 3. Orders: This is a BigOrderMap of order id to order details.
@@ -19,7 +19,7 @@ module aptos_experimental::order_book {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         OrderWithState,
-        generate_unique_idx_fifo_tiebraker,
+        generate_unique_idx_fifo_tiebreaker,
         new_order_id_type,
         new_order,
         new_order_with_state,
@@ -137,7 +137,7 @@ module aptos_experimental::order_book {
         return option::some(order)
     }
 
-    /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
+    /// Checks if the order is a taker order i.e., matched immediately with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
         price: u64,
@@ -160,7 +160,7 @@ module aptos_experimental::order_book {
         };
 
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
+        let unique_priority_idx = generate_unique_idx_fifo_tiebreaker();
 
         assert!(
             !self.orders.contains(&order_id),
@@ -216,7 +216,7 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ) {
         let order_id = new_order_id_type(order_req.account, order_req.account_order_id);
-        let unique_priority_idx = generate_unique_idx_fifo_tiebraker();
+        let unique_priority_idx = generate_unique_idx_fifo_tiebreaker();
         let order =
             new_order(
                 order_id,
@@ -384,8 +384,8 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ): vector<SingleOrderMatch<M>> {
         let match_results = vector::empty();
-        let remainig_size = order_req.remaining_size;
-        while (remainig_size > 0) {
+        let remaining_size = order_req.remaining_size;
+        while (remaining_size > 0) {
             if (!self.is_taker_order(order_req.price, order_req.is_buy, order_req.trigger_condition)) {
                 self.place_maker_order(
                     OrderRequest {
@@ -393,7 +393,7 @@ module aptos_experimental::order_book {
                         account_order_id: order_req.account_order_id,
                         price: order_req.price,
                         orig_size: order_req.orig_size,
-                        remaining_size: remainig_size,
+                        remaining_size: remaining_size,
                         is_buy: order_req.is_buy,
                         trigger_condition: order_req.trigger_condition,
                         metadata: order_req.metadata
@@ -403,11 +403,11 @@ module aptos_experimental::order_book {
             };
             let match_result =
                 self.get_single_match_for_taker(
-                    order_req.price, remainig_size, order_req.is_buy
+                    order_req.price, remaining_size, order_req.is_buy
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
-            remainig_size -= matched_size;
+            remaining_size -= matched_size;
         };
         return match_results
     }
@@ -730,7 +730,7 @@ module aptos_experimental::order_book {
             );
         assert!(match_result.is_empty());
 
-        // Try to update non existant order
+        // Try to update non existent order
         let match_result =
             order_book.update_order_and_get_matches(
                 OrderRequest {
