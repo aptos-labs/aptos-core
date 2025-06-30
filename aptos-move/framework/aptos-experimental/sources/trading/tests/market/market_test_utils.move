@@ -39,6 +39,7 @@ module aptos_experimental::market_test_utils {
                 time_in_force, // order_type
                 option::none(), // trigger_condition
                 metadata,
+                option::none(),
                 1000,
                 true,
                 callbacks
@@ -49,6 +50,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 is_bid, // is_buy
                 metadata,
+                option::none(), // client_order_id
                 1000,
                 true,
                 callbacks
@@ -64,6 +66,7 @@ module aptos_experimental::market_test_utils {
         let order_id = order_place_event.get_order_id_from_event();
         order_place_event.verify_order_event(
             order_id,
+            option::none(), // client_order_id
             market.get_market(),
             user_addr,
             size,
@@ -85,6 +88,7 @@ module aptos_experimental::market_test_utils {
             let order_cancel_event = events[1];
             order_cancel_event.verify_order_event(
                 order_id,
+                option::none(),
                 market.get_market(),
                 user_addr,
                 size,
@@ -102,6 +106,7 @@ module aptos_experimental::market_test_utils {
     public fun place_taker_order<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
+        client_order_id: Option<u64>,
         taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
@@ -127,6 +132,7 @@ module aptos_experimental::market_test_utils {
                 time_in_force, // order_type
                 option::none(), // trigger_condition
                 metadata,
+                client_order_id,
                 max_fills,
                 true,
                 callbacks
@@ -137,6 +143,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 is_bid, // is_bid
                 metadata,
+                client_order_id,
                 max_fills,
                 true,
                 callbacks
@@ -149,6 +156,7 @@ module aptos_experimental::market_test_utils {
         // Taker order is opened
         order_place_event.verify_order_event(
             order_id,
+            client_order_id,
             market.get_market(),
             taker_addr,
             size,
@@ -173,6 +181,7 @@ module aptos_experimental::market_test_utils {
         fill_prices: vector<u64>,
         maker_addr: address,
         maker_order_ids: vector<OrderIdType>,
+        maker_client_order_ids: vector<Option<u64>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
@@ -185,6 +194,7 @@ module aptos_experimental::market_test_utils {
             place_taker_order(
                 market,
                 taker,
+                option::none(), // client_order_id
                 limit_price,
                 size,
                 is_bid,
@@ -199,6 +209,7 @@ module aptos_experimental::market_test_utils {
             market,
             taker,
             order_id, // taker_order_id
+            option::none(), // taker_client_order_id
             limit_price,
             size,
             is_bid,
@@ -206,6 +217,7 @@ module aptos_experimental::market_test_utils {
             fill_prices,
             maker_addr,
             maker_order_ids,
+            maker_client_order_ids,
             maker_orig_sizes,
             maker_remaining_sizes,
             event_store,
@@ -220,6 +232,7 @@ module aptos_experimental::market_test_utils {
         user: &signer,
         is_taker: bool,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         price: Option<u64>,
         orig_size: u64,
         remaining_size: u64,
@@ -233,6 +246,7 @@ module aptos_experimental::market_test_utils {
         let order_cancel_event = events[0];
         order_cancel_event.verify_order_event(
             order_id,
+            client_order_id,
             market.get_market(),
             user_addr,
             orig_size,
@@ -249,6 +263,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         taker: &signer,
         taker_order_id: OrderIdType,
+        taker_client_order_id: Option<u64>,
         taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
@@ -256,6 +271,7 @@ module aptos_experimental::market_test_utils {
         fill_prices: vector<u64>,
         maker_addr: address,
         maker_order_ids: vector<OrderIdType>,
+        maker_client_order_ids: vector<Option<u64>>,
         maker_orig_sizes: vector<u64>,
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
@@ -286,10 +302,12 @@ module aptos_experimental::market_test_utils {
             let maker_remaining_size = maker_remaining_sizes[fill_index];
             taker_total_fill += fill_size;
             let maker_order_id = maker_order_ids[fill_index];
+            let maker_client_order_id = maker_client_order_ids[fill_index];
             // Taker order is filled
             let taker_order_fill_event = events[2 * fill_index];
             taker_order_fill_event.verify_order_event(
                 taker_order_id,
+                taker_client_order_id,
                 market.get_market(),
                 taker_addr,
                 size,
@@ -304,6 +322,7 @@ module aptos_experimental::market_test_utils {
             let maker_order_fill_event = events[1 + 2 * fill_index];
             maker_order_fill_event.verify_order_event(
                 maker_order_id,
+                maker_client_order_id,
                 market.get_market(),
                 maker_addr,
                 maker_orig_size,
@@ -321,6 +340,7 @@ module aptos_experimental::market_test_utils {
             let order_cancel_event = events[num_expected_events - 1];
             order_cancel_event.verify_order_event(
                 taker_order_id,
+                taker_client_order_id,
                 market.get_market(),
                 taker_addr,
                 size,
@@ -336,6 +356,7 @@ module aptos_experimental::market_test_utils {
             let order_open_event = events[num_expected_events - 1];
             order_open_event.verify_order_event(
                 taker_order_id,
+                taker_client_order_id,
                 market.get_market(),
                 taker_addr,
                 size,
