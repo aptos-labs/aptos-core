@@ -11017,11 +11017,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-crypto",
  "aptos-db",
  "aptos-storage-interface",
  "aptos-types",
- "bcs 0.1.6",
+ "bcs 0.1.4",
  "clap 4.5.21",
+ "hex",
+ "serde_yaml 0.8.26",
 ]
 
 [[package]]

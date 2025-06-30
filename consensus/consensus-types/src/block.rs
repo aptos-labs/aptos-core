@@ -177,7 +177,11 @@ impl Block {
     /// Construct new genesis block for next epoch deterministically from the end-epoch LedgerInfo
     /// We carry over most fields except round and block id
     pub fn make_genesis_block_from_ledger_info(ledger_info: &LedgerInfo) -> Self {
-        let block_data = BlockData::new_genesis_from_ledger_info(ledger_info);
+        let block_data = if ledger_info.ends_epoch() {
+            BlockData::new_genesis_from_ledger_info(ledger_info)
+        } else {
+            BlockData::make_genesis_block_from_any_ledger_info(ledger_info)
+        };
         Block {
             id: block_data.hash(),
             block_data,

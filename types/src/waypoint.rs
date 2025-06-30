@@ -21,7 +21,6 @@ use std::{
 
 // The delimiter between the version and the hash.
 const WAYPOINT_DELIMITER: char = ':';
-
 /// Waypoint keeps information about the LedgerInfo on a given version, which provides an
 /// off-chain mechanism to verify the sync process right after the restart.
 /// At high level, a trusted waypoint verifies the LedgerInfo for a certain epoch change.

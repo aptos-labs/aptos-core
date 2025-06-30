@@ -294,11 +294,25 @@ impl EventSubscriptionService {
                     error
                 ))
             })?;
-        let epoch = ConfigurationResource::fetch_config(&db_state_view)
+
+        let mut epoch = ConfigurationResource::fetch_config(&db_state_view)
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
             })?
             .epoch();
+
+        let db_epoch_state = self
+            .storage
+            .read()
+            .reader
+            .get_latest_epoch_state()
+            .map_err(|_e| {
+                Error::UnexpectedErrorEncountered("Cannot read epoch state from DB".into())
+            })?;
+        // TODO(l1-migration): update once config fixed
+        if epoch < db_epoch_state.epoch {
+            epoch = db_epoch_state.epoch;
+        }
 
         // Return the new on-chain config payload (containing all found configs at this version).
         Ok(OnChainConfigPayload::new(

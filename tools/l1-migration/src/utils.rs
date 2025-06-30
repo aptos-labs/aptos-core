@@ -1,22 +1,33 @@
 use anyhow::Result;
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    Peer, PeerRole, PeerSet, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+};
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
-use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use std::path::Path;
-use std::fs;
+use aptos_types::{
+    account_address::from_identity_public_key, network_address::NetworkAddress,
+    transaction::Transaction, waypoint::Waypoint, PeerId,
+};
+use serde_yaml;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+    str::FromStr,
+};
 
 /// Extract genesis transaction and waypoint from an Aptos database
 pub fn extract_genesis_and_waypoint(db_path: &str, output_dir: &str) -> Result<()> {
     println!("Opening database at: {}", db_path);
-    
+
     // Create storage directory paths
     let storage_dir_paths = StorageDirPaths::from_path(Path::new(db_path));
-    
+
     // Open the database with correct API
     let db = AptosDB::open(
         storage_dir_paths,
-        true,  // readonly
+        true,                        // readonly
         NO_OP_STORAGE_PRUNER_CONFIG, // pruner_config
         RocksdbConfigs::default(),
         false, // enable_indexer
@@ -36,17 +47,17 @@ pub fn extract_genesis_and_waypoint(db_path: &str, output_dir: &str) -> Result<(
     }
 
     let latest_ver = latest_version.unwrap();
-    
+
     // Extract genesis transaction
     extract_genesis_transaction(&db, latest_ver, output_dir)?;
-    
+
     // Extract waypoint
     extract_waypoint(&db, output_dir)?;
 
     println!("✓ Genesis extraction completed successfully!");
     println!("  - genesis.blob: Contains the BCS-serialized genesis transaction");
     println!("  - waypoint.txt: Contains the initial waypoint for bootstrapping");
-    
+
     Ok(())
 }
 
@@ -58,7 +69,7 @@ fn extract_genesis_transaction(db: &AptosDB, latest_ver: u64, output_dir: &str) 
 
     // Serialize the genesis transaction using BCS
     let genesis_bytes = bcs::to_bytes(&genesis_transaction)?;
-    
+
     // Write genesis.blob
     let genesis_path = format!("{}/genesis.blob", output_dir);
     fs::write(&genesis_path, &genesis_bytes)?;
@@ -76,10 +87,10 @@ fn extract_waypoint(db: &AptosDB, output_dir: &str) -> Result<()> {
     // Get the ledger info to extract waypoint
     let ledger_info_with_sigs = db.get_latest_ledger_info()?;
     let ledger_info = ledger_info_with_sigs.ledger_info();
-    
+
     // Generate waypoint using the proper converter
     let waypoint = Waypoint::new_any(ledger_info);
-    
+
     // Write waypoint.txt
     let waypoint_path = format!("{}/waypoint.txt", output_dir);
     fs::write(&waypoint_path, waypoint.to_string())?;
@@ -98,7 +109,10 @@ fn print_genesis_transaction_info(genesis_transaction: &Transaction) {
             match genesis_payload {
                 aptos_types::transaction::WriteSetPayload::Direct(change_set) => {
                     println!("  Direct WriteSet payload");
-                    println!("  Change set size: {} bytes", bcs::to_bytes(change_set).unwrap_or_default().len());
+                    println!(
+                        "  Change set size: {} bytes",
+                        bcs::to_bytes(change_set).unwrap_or_default().len()
+                    );
                 },
                 aptos_types::transaction::WriteSetPayload::Script { .. } => {
                     println!("  Script-based WriteSet");

@@ -311,6 +311,9 @@ impl BlockStore {
         let block_to_commit = self
             .get_block(block_id_to_commit)
             .ok_or_else(|| format_err!("Committed block id not found"))?;
+        if block_to_commit.block().is_genesis_block() && block_to_commit.round() == 0 {
+            return Ok(());
+        }
 
         // First make sure that this commit is new.
         ensure!(

@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use aptos_crypto::x25519;
 use clap::Parser;
 use l1_migration::extract_genesis_and_waypoint;
 use std::path::PathBuf;
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 /// L1 Migration Tool - Extract genesis and waypoint from database
 #[derive(Parser)]
 #[command(name = "l1-migration")]
-#[command(about = "A tool to extract genesis and waypoint data from an Aptos database")]
+#[command(about = "adhoc command for l1 migration")]
 #[command(version)]
 struct Args {
     #[command(subcommand)]
@@ -28,10 +29,16 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Commands::GenerateWaypointGenesis { db_path, destination_path } => {
+        Commands::GenerateWaypointGenesis {
+            db_path,
+            destination_path,
+        } => {
             // Validate that the database path exists
             if !db_path.exists() {
-                eprintln!("Error: Database path '{}' does not exist", db_path.display());
+                eprintln!(
+                    "Error: Database path '{}' does not exist",
+                    db_path.display()
+                );
                 std::process::exit(1);
             }
 
@@ -43,8 +50,8 @@ fn main() -> Result<()> {
             // Call the extraction function from the module
             let db_path_str = db_path.to_string_lossy();
             let destination_path_str = destination_path.to_string_lossy();
-            
+
             extract_genesis_and_waypoint(&db_path_str, &destination_path_str)
-        }
+        },
     }
 }

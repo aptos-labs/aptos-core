@@ -571,15 +571,16 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
-        self.pipeline_futs()
-            .ok_or(ExecutorError::InternalError {
-                error: "Pipeline aborted".to_string(),
-            })?
+        let pipeline_futs = self.pipeline_futs().ok_or(ExecutorError::InternalError {
+            error: "Pipeline aborted".to_string(),
+        })?;
+
+        pipeline_futs
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
             .map_err(|e| ExecutorError::InternalError {
-                error: e.to_string(),
+                error: e.to_string()
             })
     }
 

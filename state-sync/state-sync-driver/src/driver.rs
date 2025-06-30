@@ -48,7 +48,6 @@ use tokio_stream::wrappers::IntervalStream;
 // Useful constants for the driver
 const DRIVER_INFO_LOG_FREQ_SECS: u64 = 2;
 const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
-
 /// The configuration of the state sync driver
 #[derive(Clone)]
 pub struct DriverConfiguration {
@@ -627,7 +626,6 @@ impl<
         if !self.bootstrapper.is_bootstrapped()
             && self.is_consensus_or_observer_enabled()
             && self.driver_configuration.config.enable_auto_bootstrapping
-            && self.driver_configuration.waypoint.version() == 0
         {
             if let Some(start_time) = self.start_time {
                 if let Some(connection_deadline) = start_time.checked_add(Duration::from_secs(
