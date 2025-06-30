@@ -2631,7 +2631,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ViewFunctionError {
     ExecutionStatus(ExecutionStatus, Option<StatusCode>),
     ErrorMessage(String, Option<StatusCode>),
