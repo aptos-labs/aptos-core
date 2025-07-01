@@ -331,7 +331,7 @@ fn decompile_test_case(
                 continue;
             }
 
-
+            /*
             let decompile_module_env = decompiler.env().get_module(module_id);
             for func_env in decompile_module_env.get_functions() {
                 if func_env.is_inline() {
@@ -343,7 +343,7 @@ fn decompile_test_case(
                     }
                 }
             }
-
+            */
 
             // lift stackless bytecode to AST
             decompiler.lift_to_ast(&targets);
