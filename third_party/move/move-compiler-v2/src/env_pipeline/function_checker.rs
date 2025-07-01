@@ -482,6 +482,12 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                     let callees_with_sites = def.used_funs_with_uses();
                     for (callee, sites) in &callees_with_sites {
                         let callee_func = env.get_function(*callee);
+
+                        // Script functions cannot be called.
+                        if callee_func.module_env.is_script_module() {
+                            calling_script_function_error(env, sites, &callee_func);
+                        }
+
                         // Check visibility.
 
                         // Same module is always visible
@@ -836,4 +842,17 @@ fn call_package_fun_from_diff_addr_error(
 ) {
     let why = "they are from different addresses";
     cannot_call_error(env, why, sites, caller, callee);
+}
+
+fn calling_script_function_error(env: &GlobalEnv, sites: &BTreeSet<NodeId>, callee: &FunctionEnv) {
+    let call_details: Vec<_> = sites
+        .iter()
+        .map(|node_id| (env.get_node_loc(*node_id), "used here".to_owned()))
+        .collect();
+    let callee_name = callee.get_name_str();
+    let msg = format!(
+        "script function `{}` cannot be used in Move code",
+        callee_name
+    );
+    env.diag_with_labels(Severity::Error, &callee.get_id_loc(), &msg, call_details);
 }

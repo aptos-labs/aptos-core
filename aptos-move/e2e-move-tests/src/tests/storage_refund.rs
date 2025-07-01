@@ -166,7 +166,7 @@ fn assert_result(
                 deletes += 1
             },
             BaseStateOp::Modification { .. } => (),
-            BaseStateOp::MakeHot { .. } => unreachable!(),
+            BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => unreachable!(),
         }
     }
     if expect_success {

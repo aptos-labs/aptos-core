@@ -240,6 +240,12 @@ pub trait GasMeter: NativeGasMeter {
         self.charge_unpack(is_generic, args)
     }
 
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> PartialVMResult<()>;
+
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 
     fn charge_write_ref(
@@ -468,6 +474,14 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_unpack(
+        &mut self,
+        _is_generic: bool,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_pack_closure(
         &mut self,
         _is_generic: bool,
         _args: impl ExactSizeIterator<Item = impl ValueView>,
