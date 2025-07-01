@@ -1,2 +1,13 @@
 
+Diagnostics:
+warning: structs/enums with visibility modifier are only supported at version 2.3-unstable or later
+  ┌─ tests/more-v1/parser/struct_public.move:1:1
+  │
+1 │ ╭ module 0x42::M {
+2 │ │     // visibility modifiers on structs fail during parsing
+3 │ │     public struct Foo {}
+4 │ │ }
+  │ ╰─^
+
+
 ============ bytecode verification succeeded ========

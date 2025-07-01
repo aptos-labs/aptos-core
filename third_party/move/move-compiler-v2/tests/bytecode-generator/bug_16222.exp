@@ -40,7 +40,7 @@ module 0xc0ffee::n {
 
 
 Diagnostics:
-error: cannot unpack a wrapper struct `m::Lazy` (defined in a different module `0xc0ffee::m`) and invoke the wrapped function value
+error: cannot implicitly unpack a wrapper struct `m::Lazy` defined in a different module `0xc0ffee::m` and invoke the wrapped function value
    ┌─ tests/bytecode-generator/bug_16222.move:13:9
    │
 13 │         l();

@@ -1,0 +1,135 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+    friend fun pack$0xc0ffee$m$Lazy(_0: || has drop): Lazy {
+        pack m::Lazy(_0)
+    }
+    friend fun unpack$0xc0ffee$m$Lazy(_s: Lazy): (|| has drop) {
+        {
+          let m::Lazy{ 0 } = _s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m::Lazy.0(_s)))
+    }
+    friend fun borrow$0xc0ffee$m$Lazy$0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m::Lazy.0(_s))
+    }
+    friend fun borrow_mut$0xc0ffee$m$Lazy$0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m::Lazy.0(_s))
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct Lazy {
+        0: || has drop,
+    }
+    friend fun pack$0xc0ffee$m_friend$Lazy(_0: || has drop): Lazy {
+        pack m_friend::Lazy(_0)
+    }
+    friend fun unpack$0xc0ffee$m_friend$Lazy(_s: Lazy): (|| has drop) {
+        {
+          let m_friend::Lazy{ 0 } = _s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m_friend$Lazy(_s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0(_s)))
+    }
+    friend fun borrow$0xc0ffee$m_friend$Lazy$0(_s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m_friend::Lazy.0(_s))
+    }
+    friend fun borrow_mut$0xc0ffee$m_friend$Lazy$0(_s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m_friend::Lazy.0(_s))
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    public fun test_friend(): m_friend::Lazy {
+        closure#0n::__lambda__1__test_friend()
+    }
+    private fun __lambda__1__test_friend() {
+        Tuple()
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee1::n {
+    public fun test(): 0xc0ffee::m::Lazy {
+        closure#0n::__lambda__1__test()
+    }
+    private fun __lambda__1__test() {
+        Tuple()
+    }
+} // end 0xc0ffee1::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+    friend fun pack_0xc0ffee_m_Lazy(_0: || has drop): Lazy {
+        Lazy(_0)
+    }
+    friend fun unpack_0xc0ffee_m_Lazy(_s: Lazy): (|| has drop) {
+        let Lazy(0) = _s;
+        (0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        (&mut _s.0)
+    }
+    friend fun borrow_0xc0ffee_m_Lazy_0(_s: &Lazy): &|| has drop {
+        &_s.0
+    }
+    friend fun borrow_mut_0xc0ffee_m_Lazy_0(_s: &mut Lazy): &mut || has drop {
+        &mut _s.0
+    }
+}
+module 0xc0ffee::m_friend {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+    friend fun pack_0xc0ffee_m_friend_Lazy(_0: || has drop): Lazy {
+        Lazy(_0)
+    }
+    friend fun unpack_0xc0ffee_m_friend_Lazy(_s: Lazy): (|| has drop) {
+        let Lazy(0) = _s;
+        (0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_friend_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        (&mut _s.0)
+    }
+    friend fun borrow_0xc0ffee_m_friend_Lazy_0(_s: &Lazy): &|| has drop {
+        &_s.0
+    }
+    friend fun borrow_mut_0xc0ffee_m_friend_Lazy_0(_s: &mut Lazy): &mut || has drop {
+        &mut _s.0
+    }
+}
+module 0xc0ffee::n {
+    public fun test_friend(): m_friend::Lazy {
+        <<wrongly typed closure expression>>
+    }
+    fun lambda__1__test_friend() {
+    }
+}
+module 0xc0ffee1::n {
+    public fun test(): 0xc0ffee::m::Lazy {
+        <<wrongly typed closure expression>>
+    }
+    fun lambda__1__test() {
+    }
+}
+
+
+Diagnostics:
+error: cannot implicitly pack a wrapper struct `m_friend::Lazy` defined in a different module `0xc0ffee::m_friend` because it has friend visibility
+   ┌─ tests/bytecode-generator/bug_16543_fv_wrapper_pack_failure.move:13:9
+   │
+13 │         || {}
+   │         ^^^^^
+
+error: cannot implicitly pack a wrapper struct `m::Lazy` defined in a different module `0xc0ffee::m` because it has package visibility
+   ┌─ tests/bytecode-generator/bug_16543_fv_wrapper_pack_failure.move:19:9
+   │
+19 │         || {}
+   │         ^^^^^
