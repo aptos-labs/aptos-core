@@ -7,6 +7,7 @@
 use crate::{
     gas_schedule::VMGasParameters,
     traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
+    ver::gas_feature_versions::RELEASE_V1_33,
 };
 use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs, u256::U256};
@@ -31,7 +32,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bool: AbstractValueSize, "bool", 40],
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
-        [closure: AbstractValueSize, "struct", 40],
+        [closure: AbstractValueSize, { RELEASE_V1_33.. => "closure" }, 40],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
