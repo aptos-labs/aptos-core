@@ -56,7 +56,9 @@ pub struct SingleRunResults {
 }
 
 pub fn default_benchmark_features() -> Features {
-    Features::default()
+    let mut features = Features::default();
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {

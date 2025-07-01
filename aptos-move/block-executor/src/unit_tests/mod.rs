@@ -35,6 +35,7 @@ use aptos_types::{
     contract_event::TransactionEvent,
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, MockStateView},
+    transaction::AuxiliaryInfo,
     write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
@@ -48,6 +49,140 @@ use std::{
     marker::PhantomData,
     sync::Arc,
 };
+
+#[test]
+fn test_block_epilogue_happy_path() {
+    let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 10);
+    let t_0 = MockTransaction::from_behavior(behaivor.clone());
+    let t_1 = MockTransaction::from_behavior(behaivor);
+    let transactions = vec![t_0, t_1];
+
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        MockStateView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+    let data_view = MockStateView::empty();
+
+    let aux_info = vec![AuxiliaryInfo::new_empty(), AuxiliaryInfo::new_empty()];
+
+    let txn_provider = DefaultTxnProvider::new(transactions, aux_info);
+    {
+        let mut guard = AptosModuleCacheManagerGuard::none();
+        let result = block_executor
+            .execute_transactions_sequential(
+                &txn_provider,
+                &data_view,
+                &TransactionSliceMetadata::block_from_u64(0, 1),
+                &mut guard,
+                false,
+            )
+            .unwrap();
+        let (output, block_epilogue_txn) = result.into_inner();
+        assert!(block_epilogue_txn.is_some());
+        assert_eq!(output.len(), 3);
+        assert!(!output[0].skipped);
+        assert!(!output[1].skipped);
+        assert!(!output[2].skipped);
+    }
+
+    {
+        let mut guard = AptosModuleCacheManagerGuard::none();
+        let result = block_executor
+            .execute_transactions_parallel(
+                &txn_provider,
+                &data_view,
+                &TransactionSliceMetadata::block_from_u64(0, 1),
+                &mut guard,
+            )
+            .unwrap();
+        let (output, block_epilogue_txn) = result.into_inner();
+        assert!(block_epilogue_txn.is_some());
+        assert_eq!(output.len(), 3);
+        assert!(!output[0].skipped);
+        assert!(!output[1].skipped);
+        assert!(!output[2].skipped);
+    }
+}
+
+#[test]
+fn test_block_epilogue_block_gas_limit_reached() {
+    let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 10);
+    let t_0 = MockTransaction::from_behavior(behaivor.clone());
+    let t_1 = MockTransaction::from_behavior(behaivor);
+    let transactions = vec![t_0, t_1];
+
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        MockStateView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+    >::new(
+        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(1)),
+        executor_thread_pool,
+        None,
+    );
+    let data_view = MockStateView::empty();
+
+    let aux_info = vec![AuxiliaryInfo::new_empty(), AuxiliaryInfo::new_empty()];
+
+    let txn_provider = DefaultTxnProvider::new(transactions, aux_info);
+    {
+        let mut guard = AptosModuleCacheManagerGuard::none();
+        let result = block_executor
+            .execute_transactions_sequential(
+                &txn_provider,
+                &data_view,
+                &TransactionSliceMetadata::block_from_u64(0, 1),
+                &mut guard,
+                false,
+            )
+            .unwrap();
+        let (output, block_epilogue_txn) = result.into_inner();
+        assert!(block_epilogue_txn.is_some());
+        assert_eq!(output.len(), 3);
+        assert!(!output[0].skipped);
+        assert!(output[1].skipped);
+        assert!(!output[2].skipped);
+    }
+
+    {
+        let mut guard = AptosModuleCacheManagerGuard::none();
+        let result = block_executor
+            .execute_transactions_parallel(
+                &txn_provider,
+                &data_view,
+                &TransactionSliceMetadata::block_from_u64(0, 1),
+                &mut guard,
+            )
+            .unwrap();
+        let (output, block_epilogue_txn) = result.into_inner();
+        assert!(block_epilogue_txn.is_some());
+        assert_eq!(output.len(), 3);
+        assert!(!output[0].skipped);
+        assert!(output[1].skipped);
+        assert!(!output[2].skipped);
+    }
+}
 
 #[test]
 fn test_resource_group_deletion() {
