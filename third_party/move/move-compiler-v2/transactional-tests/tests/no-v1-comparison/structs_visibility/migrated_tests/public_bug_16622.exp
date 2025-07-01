@@ -1,0 +1,14 @@
+processed 13 tasks
+task 0 lines 1-14:  publish [module 0xCAFE::m0 {]
+task 1 lines 16-32:  publish [module 0xCAFE::test_m0 {]
+task 2 lines 34-34:  run 0xCAFE::test_m0::f0
+task 3 lines 36-46:  publish [module 0xCAFE::m1 {]
+task 4 lines 48-80:  publish [module 0xCAFE::test_m1 {]
+task 5 lines 82-82:  run 0xCAFE::test_m1::f0
+task 6 lines 84-84:  run 0xCAFE::test_m1::f1
+task 7 lines 86-103:  publish [module 0xCAFE::m2 {]
+task 8 lines 105-130:  publish [module 0xCAFE::test_m2 {]
+task 9 lines 132-132:  run 0xCAFE::test_m2::f0
+task 10 lines 134-144:  publish [module 0xCAFE::m3 {]
+task 11 lines 146-167:  publish [module 0xCAFE::test_m3 {]
+task 12 lines 169-169:  run 0xCAFE::test_m3::test
