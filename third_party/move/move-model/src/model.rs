@@ -1845,6 +1845,9 @@ impl GlobalEnv {
             variants: None,
             spec: RefCell::new(Spec::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
+            struct_api: None,
         }
     }
 
@@ -3634,6 +3637,25 @@ pub struct StructData {
 
     /// Whether this struct is native
     pub is_native: bool,
+
+    /// Visibility of this struct
+    pub visibility: Visibility,
+
+    /// Whether this struct has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
+
+    pub(crate) struct_api: Option<StructAPI>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructAPI {
+    pub struct_pack_api: BTreeMap<Option<Symbol>, FunId>,
+    pub struct_unpack_api: BTreeMap<Option<Symbol>, FunId>,
+    pub struct_field_borrow_map: BTreeMap<Symbol, FunId>,
+    pub struct_field_borrow_immut_from_mut_map: BTreeMap<Symbol, FunId>,
+    pub struct_field_borrow_mut_map: BTreeMap<Symbol, FunId>,
+    pub struct_test_variant_api: BTreeMap<Symbol, FunId>,
 }
 
 impl StructData {
@@ -3650,6 +3672,9 @@ impl StructData {
             variants: None,
             spec: RefCell::new(Default::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
+            struct_api: None,
         }
     }
 }
@@ -4001,6 +4026,18 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
+    }
+
+    pub fn get_struct_api(&self) -> &Option<StructAPI> {
+        &self.data.struct_api
     }
 }
 
