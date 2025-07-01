@@ -1,0 +1,157 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        pack m::Lazy(closure#0m::__lambda__1__make_lazy())
+    }
+    friend fun pack$0xc0ffee$m$Lazy($0: || has drop): Lazy {
+        pack m::Lazy($0)
+    }
+    friend fun unpack$0xc0ffee$m$Lazy($s: Lazy): (|| has drop) {
+        {
+          let m::Lazy{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m$Lazy($s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m::Lazy.0($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m$Lazy$0$0($s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m::Lazy.0($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m$Lazy$0$0($s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m::Lazy.0($s))
+    }
+    private fun __lambda__1__make_lazy() {
+        Tuple()
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct Lazy {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        pack m_friend::Lazy(closure#0m_friend::__lambda__1__make_lazy())
+    }
+    friend fun pack$0xc0ffee$m_friend$Lazy($0: || has drop): Lazy {
+        pack m_friend::Lazy($0)
+    }
+    friend fun unpack$0xc0ffee$m_friend$Lazy($s: Lazy): (|| has drop) {
+        {
+          let m_friend::Lazy{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack_mut_ref$0xc0ffee$m_friend$Lazy($s: &mut Lazy): (&mut || has drop) {
+        Tuple(Borrow(Mutable)(select_variants m_friend::Lazy.0($s)))
+    }
+    friend fun borrow_from$0xc0ffee$m_friend$Lazy$0$0($s: &Lazy): &|| has drop {
+        Borrow(Immutable)(select m_friend::Lazy.0($s))
+    }
+    friend fun borrow_mut_from$0xc0ffee$m_friend$Lazy$0$0($s: &mut Lazy): &mut || has drop {
+        Borrow(Mutable)(select m_friend::Lazy.0($s))
+    }
+    private fun __lambda__1__make_lazy() {
+        Tuple()
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    public fun test_friend() {
+        {
+          let l: m_friend::Lazy = m_friend::make_lazy();
+          (l)();
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee1::n {
+    public fun test() {
+        {
+          let l: 0xc0ffee::m::Lazy = m::make_lazy();
+          (l)();
+          Tuple()
+        }
+    }
+} // end 0xc0ffee1::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        Lazy(|| lambda__1__make_lazy())
+    }
+    friend fun pack_0xc0ffee_m_Lazy(_0: || has drop): Lazy {
+        Lazy(_0)
+    }
+    friend fun unpack_0xc0ffee_m_Lazy(_s: Lazy): (|| has drop) {
+        let Lazy(0) = _s;
+        (0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        (&mut _s.0)
+    }
+    friend fun borrow_from_0xc0ffee_m_Lazy_0_0(_s: &Lazy): &|| has drop {
+        &_s.0
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        &mut _s.0
+    }
+    fun lambda__1__make_lazy() {
+    }
+}
+module 0xc0ffee::m_friend {
+    struct Lazy has drop {
+        0: || has drop,
+    }
+    public fun make_lazy(): Lazy {
+        Lazy(|| lambda__1__make_lazy())
+    }
+    friend fun pack_0xc0ffee_m_friend_Lazy(_0: || has drop): Lazy {
+        Lazy(_0)
+    }
+    friend fun unpack_0xc0ffee_m_friend_Lazy(_s: Lazy): (|| has drop) {
+        let Lazy(0) = _s;
+        (0)
+    }
+    friend fun unpack_mut_ref_0xc0ffee_m_friend_Lazy(_s: &mut Lazy): (&mut || has drop) {
+        (&mut _s.0)
+    }
+    friend fun borrow_from_0xc0ffee_m_friend_Lazy_0_0(_s: &Lazy): &|| has drop {
+        &_s.0
+    }
+    friend fun borrow_mut_from_0xc0ffee_m_friend_Lazy_0_0(_s: &mut Lazy): &mut || has drop {
+        &mut _s.0
+    }
+    fun lambda__1__make_lazy() {
+    }
+}
+module 0xc0ffee::n {
+    public fun test_friend() {
+        let l = 0xc0ffee::m_friend::make_lazy();
+        l();
+    }
+}
+module 0xc0ffee1::n {
+    public fun test() {
+        let l = 0xc0ffee::m::make_lazy();
+        l();
+    }
+}
+
+
+Diagnostics:
+error: wrapper struct `m_friend::Lazy` (defined in a different module `0xc0ffee::m_friend`) has friend visibility so the wrapped function value cannot be invoked here
+   ┌─ tests/bytecode-generator/bug_16222_fv_wrapper_unpack_failure.move:22:9
+   │
+22 │         l();
+   │         ^^^
+
+error: wrapper struct `m::Lazy` (defined in a different module `0xc0ffee::m`) has package visibility so the wrapped function value cannot be invoked here
+   ┌─ tests/bytecode-generator/bug_16222_fv_wrapper_unpack_failure.move:29:9
+   │
+29 │         l();
+   │         ^^^
