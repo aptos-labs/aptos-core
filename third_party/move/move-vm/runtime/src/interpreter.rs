@@ -97,6 +97,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
+    #[allow(dead_code)]
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
 }
 
@@ -1732,7 +1733,7 @@ impl Frame {
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
+        _traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
@@ -2002,15 +2003,15 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let mut get_field_count_charge_gas_and_check_depth =
+                        let get_field_count_charge_gas_and_check_depth =
                             || -> PartialVMResult<u16> {
                                 let field_count = self.field_count(*sd_idx);
-                                let struct_type = self.get_struct_ty(*sd_idx);
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    &struct_type,
-                                )?;
+                                // let struct_type = self.get_struct_ty(*sd_idx);
+                                // interpreter.ty_depth_checker.check_depth_of_type(
+                                //     gas_meter,
+                                //     traversal_context,
+                                //     &struct_type,
+                                // )?;
                                 Ok(field_count)
                             };
 
@@ -2040,12 +2041,12 @@ impl Frame {
                     },
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
-                        let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            &struct_type,
-                        )?;
+                        // let struct_type = self.create_struct_ty(&info.definition_struct_type);
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     &struct_type,
+                        // )?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2073,13 +2074,13 @@ impl Frame {
                                     gas_meter.charge_create_ty(*ty_count)?;
                                 }
 
-                                let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                                let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    ty,
-                                )?;
+                                // interpreter.ty_depth_checker.check_depth_of_type(
+                                //     gas_meter,
+                                //     traversal_context,
+                                //     ty,
+                                // )?;
                                 Ok(self.field_instantiation_count(*si_idx))
                             };
 
@@ -2119,13 +2120,13 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2172,14 +2173,14 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2199,14 +2200,14 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2598,11 +2599,11 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,
