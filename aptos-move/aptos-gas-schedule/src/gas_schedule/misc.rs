@@ -31,6 +31,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bool: AbstractValueSize, "bool", 40],
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
+        [closure: AbstractValueSize, "struct", 40],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
@@ -207,8 +208,7 @@ impl ValueVisitor for AbstractValueSizeVisitor<'_> {
 
     #[inline]
     fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
-        // TODO(#15664): introduce a dedicated gas parameter?
-        self.size += self.params.struct_;
+        self.size += self.params.closure;
         true
     }
 

@@ -2245,6 +2245,13 @@ impl Frame {
                             .push(reference.test_variant(info.variant)?)?;
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
+                        gas_meter.charge_pack_closure(
+                            false,
+                            interpreter
+                                .operand_stack
+                                .last_n(mask.captured_count() as usize)?,
+                        )?;
+
                         let function = self
                             .build_loaded_function_from_handle_and_ty_args(
                                 module_storage,
@@ -2261,12 +2268,6 @@ impl Frame {
                                 ty,
                             )?;
                         }
-                        gas_meter.charge_pack_closure(
-                            false,
-                            interpreter
-                                .operand_stack
-                                .last_n(mask.captured_count() as usize)?,
-                        )?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
@@ -2288,6 +2289,13 @@ impl Frame {
                         }
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
+                        gas_meter.charge_pack_closure(
+                            true,
+                            interpreter
+                                .operand_stack
+                                .last_n(mask.captured_count() as usize)?,
+                        )?;
+
                         let ty_args =
                             self.instantiate_generic_function(Some(gas_meter), *fi_idx)?;
                         let function = self
@@ -2308,12 +2316,6 @@ impl Frame {
                                 ty,
                             )?;
                         }
-                        gas_meter.charge_pack_closure(
-                            true,
-                            interpreter
-                                .operand_stack
-                                .last_n(mask.captured_count() as usize)?,
-                        )?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
