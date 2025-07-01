@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-11:  publish [module 0xCAFE::Module0 {]
+task 1 lines 13-24:  publish [module 0xCAFE::test_Module0 {]

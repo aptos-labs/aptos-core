@@ -3065,11 +3065,12 @@ fn parse_struct_decl(
     context: &mut Context,
 ) -> Result<StructDefinition, Box<Diagnostic>> {
     let Modifiers {
-        visibility,
+        visibility: visibility_opt,
         entry,
         native,
     } = modifiers;
-    match visibility {
+    let mut visibility = Visibility::Internal;
+    match visibility_opt {
         Some(vis) if !context.env.flags().lang_v2() => {
             let msg = format!(
                 "Invalid struct declaration. Structs cannot have visibility modifiers as they are \
@@ -3079,6 +3080,9 @@ fn parse_struct_decl(
             context
                 .env
                 .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
+        },
+        Some(vis) => {
+            visibility = vis;
         },
         _ => {},
     }
@@ -3168,6 +3172,7 @@ fn parse_struct_decl(
         name,
         type_parameters,
         layout,
+        visibility,
     })
 }
 
@@ -3510,7 +3515,10 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
 fn is_friend_declaration(context: &mut Context) -> bool {
     if context.tokens.peek() == Tok::Friend {
         if let Ok((tok, content)) = context.tokens.lookahead_content() {
-            if ![Tok::Fun, Tok::Inline, Tok::Native].contains(&tok) && content != ENTRY_MODIFIER {
+            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct].contains(&tok)
+                && content != ENTRY_MODIFIER
+                && content != ENUM_MODIFIER
+            {
                 return true;
             }
         }
@@ -3619,7 +3627,7 @@ fn parse_module(
                             Tok::Struct => ModuleMember::Struct(parse_struct_decl(
                                 false, attributes, start_loc, modifiers, context,
                             )?),
-                            Tok::Identifier if context.tokens.content() == "enum" => {
+                            Tok::Identifier if context.tokens.content() == ENUM_MODIFIER => {
                                 ModuleMember::Struct(parse_struct_decl(
                                     true, attributes, start_loc, modifiers, context,
                                 )?)
