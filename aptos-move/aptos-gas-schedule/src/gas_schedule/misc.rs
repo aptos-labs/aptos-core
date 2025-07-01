@@ -380,8 +380,7 @@ impl AbstractValueSizeGasParameters {
 
             #[inline]
             fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
-                // TODO(#15664): independent gas parameter for closures?
-                self.res = Some(self.params.struct_);
+                self.res = Some(self.params.closure);
                 false
             }
 
@@ -530,8 +529,7 @@ impl AbstractValueSizeGasParameters {
 
             #[inline]
             fn visit_closure(&mut self, _depth: usize, _len: usize) -> bool {
-                // TODO(#15664): independent gas parameter
-                self.res = Some(self.params.struct_);
+                self.res = Some(self.params.closure);
                 false
             }
 
