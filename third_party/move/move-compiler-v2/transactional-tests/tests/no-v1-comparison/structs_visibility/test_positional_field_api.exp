@@ -1,0 +1,11 @@
+processed 10 tasks
+task 0 lines 1-10:  publish [module 0x42::m1 {]
+task 1 lines 12-93:  publish [module 0x42::m2 {]
+task 2 lines 96-96:  run 0x42::m2::test_borrow_pair_fields
+task 3 lines 98-98:  run 0x42::m2::test_borrow_wrapper_field
+task 4 lines 100-100:  run 0x42::m2::test_borrow_nested_pair_fields
+task 5 lines 102-102:  run 0x42::m2::test_borrow_vecwrap_element
+task 6 lines 104-104:  run 0x42::m2::test_mut_borrow_pair
+task 7 lines 106-106:  run 0x42::m2::test_mut_borrow_vecwrap_element
+task 8 lines 108-108:  run 0x42::m2::test_mut_borrow_nestedpair
+task 9 lines 110-110:  run 0x42::m2::test_mut_borrow_nestedpair_2

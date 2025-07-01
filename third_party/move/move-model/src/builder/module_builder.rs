@@ -13,7 +13,7 @@ use crate::{
         exp_builder::ExpTranslator,
         model_builder::{
             ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
-            SpecOrBuiltinFunEntry, StructLayout, StructVariant,
+            SpecOrBuiltinFunEntry, StructEntry, StructLayout, StructVariant,
         },
     },
     constant_folder::ConstantFolder,
@@ -32,8 +32,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, Variance,
-        BOOL_TYPE,
+        Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, ReferenceKind, Type,
+        Variance, BOOL_TYPE,
     },
     well_known, LanguageVersion,
 };
@@ -66,12 +66,14 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
     pub friend_decls: Vec<FriendDecl>,
-    /// Location of a friend visibility modifier in the current module
-    pub friend_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Location of a friend/package visibility modifier in the current module
+    pub friend_visibility_loc: Option<move_ir_types::location::Loc>,
     /// Location of a package visibility modifier in the current module
     pub package_fun_loc: Option<move_ir_types::location::Loc>,
     /// Set of functions with package visibility in the current module
     pub package_funs: BTreeSet<FunId>,
+    /// Set of structs with package visibility in the current module
+    pub package_structs: BTreeSet<StructId>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
     /// During the definition analysis, the index into `spec_funs` we are currently
@@ -155,9 +157,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_id,
             module_name,
             use_decls: vec![],
-            friend_fun_loc: None,
+            friend_visibility_loc: None,
             package_fun_loc: None,
             package_funs: BTreeSet::new(),
+            package_structs: BTreeSet::new(),
             friend_decls: vec![],
             spec_funs: vec![],
             inline_spec_builder: Spec::default(),
@@ -519,6 +522,23 @@ impl ModuleBuilder<'_, '_> {
         let struct_id = StructId::new(qsym.symbol);
         let attrs = self.translate_attributes(&def.attributes);
         let abilities = self.translate_abilities(&def.abilities);
+        let visibility = match def.visibility {
+            EA::Visibility::Public(_) => Visibility::Public,
+            EA::Visibility::Friend(loc) => {
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
+                }
+                Visibility::Friend
+            },
+            EA::Visibility::Internal => Visibility::Private,
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                self.package_structs.insert(struct_id);
+                Visibility::Friend
+            },
+        };
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
         let type_params = et.analyze_and_add_type_params(
@@ -536,6 +556,7 @@ impl ModuleBuilder<'_, '_> {
             type_params,
             StructLayout::None, // will be filled in during definition analysis,
             matches!(def.layout, EA::StructLayout::Native(_)),
+            visibility,
         );
     }
 
@@ -551,8 +572,8 @@ impl ModuleBuilder<'_, '_> {
         let visibility = match def.visibility {
             EA::Visibility::Public(_) => Visibility::Public,
             EA::Visibility::Friend(loc) => {
-                if self.friend_fun_loc.is_none() {
-                    self.friend_fun_loc = Some(loc);
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
                 }
                 Visibility::Friend
             },
@@ -1942,7 +1963,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn check_visibility_compatibility(&self) {
         if let Some(package_vis_loc) = &self.package_fun_loc {
             let package_vis_loc = self.parent.to_loc(package_vis_loc);
-            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_fun_loc {
+            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_visibility_loc {
                 Some(self.parent.to_loc(friend_vis_loc))
             } else {
                 self.friend_decls
@@ -3541,11 +3562,790 @@ impl ModuleBuilder<'_, '_> {
     }
 }
 
+/// Build apis for cross-module access of structs/enums
+impl ModuleBuilder<'_, '_> {
+    fn sorted_fields(fields: &BTreeMap<Symbol, FieldData>) -> Vec<(&Symbol, &FieldData)> {
+        let mut sorted_fields: Vec<_> = fields.iter().collect();
+        sorted_fields.sort_by_key(|(_, field)| field.offset);
+        sorted_fields
+    }
+
+    /// Used to build a specific API function (such as an accessor) for non-private structs
+    fn build_function_data(
+        &self,
+        fun_name: Symbol,
+        struct_entry: &StructEntry,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+    ) -> FunctionData {
+        FunctionData {
+            name: fun_name,
+            loc: FunctionLoc {
+                full: struct_entry.loc.clone(),
+                id_loc: struct_entry.loc.clone(),
+                result_type_loc: struct_entry.loc.clone(),
+            },
+            def_idx: None,
+            handle_idx: None,
+            visibility: struct_entry.visibility,
+            has_package_visibility: self.package_structs.contains(&struct_entry.struct_id),
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params: struct_entry.type_params.clone(),
+            params,
+            result_type,
+            access_specifiers: None,
+            acquired_structs: None,
+            spec: RefCell::new(Spec::default()),
+            def: Some(def),
+            called_funs: None,
+            calling_funs: RefCell::default(),
+            transitive_closure_of_called_funs: RefCell::default(),
+            used_funs: Some(BTreeSet::default()),
+            using_funs: RefCell::default(),
+            transitive_closure_of_used_funs: RefCell::default(),
+            used_functions_with_transitive_inline: RefCell::default(),
+            used_structs: RefCell::default(),
+        }
+    }
+
+    /// Creates the complete struct API including pack, unpack, field access, and test variant
+    fn create_struct_api(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        self.create_struct_pack_api_map(struct_name, struct_entry, function_data);
+        self.create_struct_unpack_api_map(struct_name, struct_entry, function_data);
+        self.create_struct_field_api_maps(struct_name, struct_entry, function_data);
+        self.create_struct_test_variant_api_maps(struct_name, struct_entry, function_data);
+    }
+
+    fn insert_api_functions(
+        api_map: impl IntoIterator<Item = FunctionData>,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        for fun_def in api_map {
+            let fun_id = FunId::new(fun_def.name);
+            function_data.insert(fun_id, fun_def);
+        }
+    }
+
+    fn create_struct_pack_api_map(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        let pack_api = self.create_struct_pack_api(struct_name, struct_entry);
+        Self::insert_api_functions(pack_api.into_values(), function_data);
+    }
+
+    fn create_struct_unpack_api_map(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        let unpack_api = self.create_struct_unpack_api(struct_name, struct_entry, false);
+        Self::insert_api_functions(unpack_api.into_values(), function_data);
+
+        let unpack_mut_ref_api = self.create_struct_unpack_api(struct_name, struct_entry, true);
+        Self::insert_api_functions(unpack_mut_ref_api.into_values(), function_data);
+    }
+
+    fn create_struct_field_api_maps(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        // Create immutable borrow
+        self.create_struct_field_apis(struct_name, struct_entry, false, function_data);
+
+        // Create mutable borrow
+        self.create_struct_field_apis(struct_name, struct_entry, true, function_data);
+    }
+
+    fn create_struct_test_variant_api_maps(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        if matches!(struct_entry.layout, StructLayout::Variants(_)) {
+            let test_variant_api = self.create_struct_test_variant_api(struct_name, struct_entry);
+            Self::insert_api_functions(test_variant_api.into_values(), function_data);
+        }
+    }
+
+    /// build pack/unpack api for `struct_name`
+    /// `prefix` could be "pack", "unpack" or "unpack_mut_ref"
+    fn create_pack_unpack_struct_api<F, T>(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        prefix: &str,
+        build_fn: F,
+    ) -> BTreeMap<Option<Symbol>, T>
+    where
+        F: Fn(Symbol, Option<Symbol>, &BTreeMap<Symbol, FieldData>) -> Option<T>,
+    {
+        let mut result_map = BTreeMap::new();
+        let symbol_pool = self.parent.env.symbol_pool();
+
+        match &struct_entry.layout {
+            StructLayout::Singleton(fields, _) => {
+                let fun_name =
+                    symbol_pool.make(&format!("{}${}", prefix, struct_name.display(symbol_pool)));
+                if let Some(data) = build_fn(fun_name, None, fields) {
+                    result_map.insert(None, data);
+                }
+            },
+            StructLayout::Variants(variants) => {
+                for variant in variants {
+                    let fun_name = symbol_pool.make(&format!(
+                        "{}${}${}",
+                        prefix,
+                        struct_name.display(symbol_pool),
+                        variant.name.display(symbol_pool)
+                    ));
+                    if let Some(data) = build_fn(fun_name, Some(variant.name), &variant.fields) {
+                        result_map.insert(Some(variant.name), data);
+                    }
+                }
+            },
+            StructLayout::None => {},
+        }
+
+        result_map
+    }
+
+    fn create_struct_pack_api(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+    ) -> BTreeMap<Option<Symbol>, FunctionData> {
+        self.create_pack_unpack_struct_api(
+            struct_name,
+            struct_entry,
+            "pack",
+            |fun_name, variant: Option<Symbol>, fields| {
+                Some(self.build_pack_function(fun_name, struct_entry, variant, fields))
+            },
+        )
+    }
+
+    fn create_struct_unpack_api(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        is_mut_ref: bool,
+    ) -> BTreeMap<Option<Symbol>, FunctionData> {
+        let symbol_pool = self.parent.env.symbol_pool();
+        let input_para_name = symbol_pool.make("$s");
+        let struct_ty = self
+            .module_id
+            .qualified_inst(
+                struct_entry.struct_id,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            )
+            .to_type();
+
+        let para_type = if is_mut_ref {
+            Type::Reference(ReferenceKind::Mutable, Box::new(struct_ty.clone()))
+        } else {
+            struct_ty.clone()
+        };
+
+        let param = Parameter(input_para_name, para_type.clone(), struct_entry.loc.clone());
+
+        let struct_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), para_type.clone());
+        self.parent.env.set_node_instantiation(
+            struct_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let local_para_var = ExpData::LocalVar(struct_node, input_para_name).into_exp();
+        let params = vec![param];
+        let prefix = if is_mut_ref {
+            "unpack_mut_ref"
+        } else {
+            "unpack"
+        };
+
+        self.create_pack_unpack_struct_api(
+            struct_name,
+            struct_entry,
+            prefix,
+            |fun_name, variant, fields| {
+                if is_mut_ref && !fields.is_empty() {
+                    Some(self.build_unpack_mut_ref_function(
+                        fun_name,
+                        struct_entry,
+                        variant,
+                        fields,
+                        local_para_var.clone(),
+                        params.clone(),
+                    ))
+                } else if !is_mut_ref {
+                    Some(self.build_unpack_function(
+                        fun_name,
+                        struct_entry,
+                        variant,
+                        fields,
+                        struct_ty.clone(),
+                        local_para_var.clone(),
+                        params.clone(),
+                    ))
+                } else {
+                    None
+                }
+            },
+        )
+    }
+
+    /// Build the pack api `pack$struct_name[$variant_name]<generic type params>($field_name: $field_type, ...): struct_type` for structs/enums
+    fn build_pack_function(
+        &self,
+        fun_name: Symbol,
+        struct_entry: &StructEntry,
+        variant: Option<Symbol>,
+        fields: &BTreeMap<Symbol, FieldData>,
+    ) -> FunctionData {
+        let symbol_pool = self.parent.env.symbol_pool();
+        let mut params = vec![];
+        let mut var_list = vec![];
+
+        for (field_name, field) in Self::sorted_fields(fields) {
+            let field_symbol = symbol_pool.make(&format!("${}", field_name.display(symbol_pool)));
+            params.push(Parameter(field_symbol, field.ty.clone(), field.loc.clone()));
+
+            let par_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), field.ty.clone());
+            self.parent.env.set_node_instantiation(
+                par_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+            var_list.push(ExpData::LocalVar(par_node, field_symbol).into());
+        }
+
+        let result_type = Type::Struct(
+            struct_entry.module_id,
+            struct_entry.struct_id,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let def_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), result_type.clone());
+        self.parent.env.set_node_instantiation(
+            def_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let oper = Operation::Pack(struct_entry.module_id, struct_entry.struct_id, variant);
+        let def: Exp = ExpData::Call(def_node, oper, var_list).into();
+
+        self.build_function_data(fun_name, struct_entry, params, result_type, def)
+    }
+
+    /// Build the unpack api `unpack$struct_name[$variant_name]<generic type params>($s: struct_type): (field_type, ...)` for structs/enums
+    fn build_unpack_function(
+        &self,
+        fun_name: Symbol,
+        struct_entry: &StructEntry,
+        variant: Option<Symbol>,
+        fields: &BTreeMap<Symbol, FieldData>,
+        struct_ty: Type,
+        local_para_var: Exp,
+        params: Vec<Parameter>,
+    ) -> FunctionData {
+        let mut ty_list = vec![];
+        let mut pattern_list = vec![];
+        let mut return_tuple = vec![];
+
+        for (field_name, field) in Self::sorted_fields(fields) {
+            ty_list.push(field.ty.clone());
+            let par_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), field.ty.clone());
+            self.parent.env.set_node_instantiation(
+                par_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+            let pattern = Pattern::Var(par_node, *field_name);
+            pattern_list.push(pattern);
+            let exp_var = ExpData::LocalVar(par_node, *field_name);
+            return_tuple.push(exp_var.into());
+        }
+
+        let result_type = Type::Tuple(ty_list);
+        let struct_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), struct_ty.clone());
+        self.parent.env.set_node_instantiation(
+            struct_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let pattern = Pattern::Struct(
+            struct_node,
+            self.module_id.qualified_inst(
+                struct_entry.struct_id,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            ),
+            variant,
+            pattern_list,
+        );
+        let new_def_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), result_type.clone());
+        self.parent.env.set_node_instantiation(
+            new_def_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+
+        let return_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), result_type.clone());
+        self.parent.env.set_node_instantiation(
+            return_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let return_exp = ExpData::Call(return_node, Operation::Tuple, return_tuple);
+
+        let def = ExpData::Block(
+            new_def_node,
+            pattern,
+            Some(local_para_var),
+            return_exp.into_exp(),
+        )
+        .into_exp();
+
+        self.build_function_data(fun_name, struct_entry, params, result_type, def)
+    }
+
+    /// Build the unpack mut ref api `unpack_mut_ref$struct_name[$variant_name]<generic type params>($s: &mut struct_type): (&mut field_type, ...)` for structs/enums
+    fn build_unpack_mut_ref_function(
+        &self,
+        fun_name: Symbol,
+        struct_entry: &StructEntry,
+        variant: Option<Symbol>,
+        fields: &BTreeMap<Symbol, FieldData>,
+        local_para_var: Exp,
+        params: Vec<Parameter>,
+    ) -> FunctionData {
+        let mut ty_list = vec![];
+        let mut pattern_list = vec![];
+        let mut borrow_mut_list = vec![];
+        let symbol_pool = self.parent.env.symbol_pool();
+
+        for (field_name, field) in Self::sorted_fields(fields) {
+            let ref_ty = Type::Reference(ReferenceKind::Mutable, Box::new(field.ty.clone()));
+            ty_list.push(ref_ty.clone());
+            let par_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), ref_ty.clone());
+            self.parent.env.set_node_instantiation(
+                par_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+            let pattern = Pattern::Var(par_node, *field_name);
+            pattern_list.push(pattern);
+
+            let select_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), field.ty.clone());
+            self.parent.env.set_node_instantiation(
+                select_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+
+            let fid = if let Some(variant) = variant {
+                FieldId::new(symbol_pool.make(&FieldId::make_variant_field_id_str(
+                    symbol_pool.string(variant).as_str(),
+                    symbol_pool.string(*field_name).as_str(),
+                )))
+            } else {
+                FieldId::new(*field_name)
+            };
+            let field_ids = vec![fid];
+            let select_op = Operation::SelectVariants(
+                struct_entry.module_id,
+                struct_entry.struct_id,
+                field_ids,
+            );
+
+            let select_exp =
+                ExpData::Call(select_node, select_op, vec![local_para_var.clone()]).into_exp();
+
+            let borrow_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), ref_ty.clone());
+            self.parent.env.set_node_instantiation(
+                borrow_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+
+            let def = ExpData::Call(
+                borrow_node,
+                Operation::Borrow(ReferenceKind::Mutable),
+                vec![select_exp],
+            )
+            .into_exp();
+            borrow_mut_list.push(def);
+        }
+
+        let result_type = Type::Tuple(ty_list);
+
+        let return_block_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), result_type.clone());
+        self.parent.env.set_node_instantiation(
+            return_block_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let return_exp_block = ExpData::Call(return_block_node, Operation::Tuple, borrow_mut_list);
+
+        self.build_function_data(
+            fun_name,
+            struct_entry,
+            params,
+            result_type,
+            return_exp_block.into_exp(),
+        )
+    }
+
+    /// Create the test variant api `test_variant$enum_name$variant_name<generic type params>($s: &enum_type): bool` for enums
+    fn create_struct_test_variant_api(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+    ) -> BTreeMap<Symbol, FunctionData> {
+        let mut test_variant_map = BTreeMap::new();
+        if let StructLayout::Variants(variants) = &struct_entry.layout {
+            let input_para_name = self.parent.env.symbol_pool().make("$s");
+            let struct_ty = self
+                .module_id
+                .qualified_inst(
+                    struct_entry.struct_id,
+                    TypeParameter::vec_to_formals(&struct_entry.type_params),
+                )
+                .to_type();
+            let ref_ty = Type::Reference(ReferenceKind::Immutable, Box::new(struct_ty.clone()));
+            let para = Parameter(input_para_name, ref_ty.clone(), struct_entry.loc.clone());
+            let struct_node = self
+                .parent
+                .env
+                .new_node(struct_entry.loc.clone(), ref_ty.clone());
+            self.parent.env.set_node_instantiation(
+                struct_node,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            );
+            let local_para_var = ExpData::LocalVar(struct_node, input_para_name).into_exp();
+            for variant in variants {
+                let fun_name = self.parent.env.symbol_pool().make(&format!(
+                    "test_variant${}${}",
+                    struct_name.display(self.parent.env.symbol_pool()),
+                    variant.name.display(self.parent.env.symbol_pool())
+                ));
+                let result_type = Type::Primitive(PrimitiveType::Bool);
+                let bool_node = self
+                    .parent
+                    .env
+                    .new_node(struct_entry.loc.clone(), result_type.clone());
+                self.parent.env.set_node_instantiation(
+                    bool_node,
+                    TypeParameter::vec_to_formals(&struct_entry.type_params),
+                );
+                let variant_name = variant.name;
+                let def = ExpData::Call(
+                    bool_node,
+                    Operation::TestVariants(struct_entry.module_id, struct_entry.struct_id, vec![
+                        variant_name,
+                    ]),
+                    vec![local_para_var.clone()],
+                )
+                .into_exp();
+                let data = self.build_function_data(
+                    fun_name,
+                    struct_entry,
+                    vec![para.clone()],
+                    result_type,
+                    def,
+                );
+                test_variant_map.insert(variant_name, data);
+            }
+        }
+        test_variant_map
+    }
+
+    fn collect_shared_variant_fields(
+        &self,
+        variants: &[StructVariant],
+        symbol_pool: &SymbolPool,
+    ) -> (
+        BTreeMap<(Symbol, usize), (Vec<FieldId>, Type, bool)>,
+        BTreeMap<(Symbol, Symbol), (FieldId, Type, usize)>,
+    ) {
+        // partition fields by name and offset when they have the same type
+        // fields that only appear in one variant are also put in here by default.
+        let mut field_name_map = BTreeMap::<(Symbol, usize), Vec<(FieldId, Symbol)>>::new();
+        let mut field_type_map = BTreeMap::<(Symbol, usize), Type>::new();
+        // for fields that share across variants but have different types, they are moved to here.
+        let mut stand_alone_field = BTreeSet::<Symbol>::new();
+        let mut stand_alone_map = BTreeMap::<(Symbol, Symbol), (FieldId, Type, usize)>::new();
+
+        for variant in variants {
+            for (field_name, field) in Self::sorted_fields(&variant.fields) {
+                let offset = field.offset;
+                let fid = FieldId::new(symbol_pool.make(&FieldId::make_variant_field_id_str(
+                    symbol_pool.string(variant.name).as_str(),
+                    symbol_pool.string(*field_name).as_str(),
+                )));
+                if stand_alone_field.contains(field_name) {
+                    stand_alone_map
+                        .insert((*field_name, variant.name), (fid, field.ty.clone(), offset));
+                    continue;
+                }
+
+                match (
+                    field_type_map.get(&(*field_name, offset)),
+                    field_name_map.get_mut(&(*field_name, offset)),
+                ) {
+                    (Some(existing_ty), Some(fids)) if existing_ty == &field.ty => {
+                        fids.push((fid, variant.name));
+                    },
+                    (Some(_), _) => {
+                        // once we find a field with same name, same offset but different type, we move it to stand_alone_field and stand_alone_map
+                        stand_alone_field.insert(*field_name);
+                        stand_alone_map
+                            .insert((*field_name, variant.name), (fid, field.ty.clone(), offset));
+                        let ids = field_name_map.remove(&(*field_name, offset));
+                        let ty = field_type_map.remove(&(*field_name, offset));
+                        if let (Some(ids), Some(ty)) = (ids, ty) {
+                            for (fid, variant_name) in ids {
+                                stand_alone_map
+                                    .insert((*field_name, variant_name), (fid, ty.clone(), offset));
+                            }
+                        }
+                    },
+                    // find a field with unseen name and type
+                    (None, _) => {
+                        field_type_map.insert((*field_name, offset), field.ty.clone());
+
+                        field_name_map.insert((*field_name, offset), vec![(fid, variant.name)]);
+                    },
+                }
+            }
+        }
+
+        (
+            field_name_map
+                .into_iter()
+                .filter_map(|((field_name, offset), fids)| {
+                    field_type_map.get(&(field_name, offset)).map(|ty| {
+                        let fids = fids.iter().map(|(fid, _)| *fid).collect_vec();
+                        ((field_name, offset), (fids, ty.clone(), true))
+                    })
+                })
+                .collect(),
+            stand_alone_map,
+        )
+    }
+
+    /// build borrow field api for `struct_name`
+    /// mutable indicates if the borrow is mutable
+    fn create_struct_field_apis(
+        &self,
+        struct_name: Symbol,
+        struct_entry: &StructEntry,
+        mutable: bool,
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
+        let symbol_pool = self.parent.env.symbol_pool();
+
+        // Setup shared parameter for &$s
+        let input_para_name = symbol_pool.make("$s");
+        let struct_ty = self
+            .module_id
+            .qualified_inst(
+                struct_entry.struct_id,
+                TypeParameter::vec_to_formals(&struct_entry.type_params),
+            )
+            .to_type();
+
+        let ref_ty = Type::Reference(
+            ReferenceKind::from_is_mut(mutable),
+            Box::new(struct_ty.clone()),
+        );
+
+        let param = Parameter(input_para_name, ref_ty.clone(), struct_entry.loc.clone());
+
+        let struct_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), struct_ty.clone());
+        self.parent.env.set_node_instantiation(
+            struct_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+        let local_para_var = ExpData::LocalVar(struct_node, input_para_name).into_exp();
+
+        // Collect borrowable fields and their metadata
+        let field_map = match &struct_entry.layout {
+            StructLayout::Singleton(fields, _) => fields
+                .iter()
+                .map(|(name, field)| {
+                    (
+                        (*name, field.offset),
+                        (vec![FieldId::new(*name)], field.ty.clone(), false),
+                    )
+                })
+                .collect(),
+            StructLayout::Variants(variants) => {
+                let (field_map, stand_alone_map) =
+                    self.collect_shared_variant_fields(variants, symbol_pool);
+                for ((field_name, variant_name), (field_id, ty, offset)) in stand_alone_map {
+                    let fun_data = self.build_borrow_function(
+                        struct_name,
+                        field_name,
+                        vec![field_id],
+                        &param,
+                        &local_para_var,
+                        &ty,
+                        struct_entry,
+                        mutable,
+                        true,
+                        Some(variant_name),
+                        offset,
+                    );
+                    let fun_id = FunId::new(fun_data.name);
+                    function_data.insert(fun_id, fun_data);
+                }
+                field_map
+            },
+            StructLayout::None => BTreeMap::new(),
+        };
+        for ((field_name, offset), (field_ids, ty, is_variant)) in field_map {
+            let fun_data = self.build_borrow_function(
+                struct_name,
+                field_name,
+                field_ids,
+                &param,
+                &local_para_var,
+                &ty,
+                struct_entry,
+                mutable,
+                is_variant,
+                None,
+                offset,
+            );
+            let fun_id = FunId::new(fun_data.name);
+            function_data.insert(fun_id, fun_data);
+        }
+    }
+
+    /// Create the borrow field api `borrow[_mut_]$struct_name$field_name[$variant_name]$offset($s: &[mut] struct_type): &[mut] field_type` for structs/enums
+    fn build_borrow_function(
+        &self,
+        struct_name: Symbol,
+        field_name: Symbol,
+        field_ids: Vec<FieldId>,
+        param: &Parameter,
+        receiver_exp: &Exp,
+        field_type: &Type,
+        struct_entry: &StructEntry,
+        dst_mutable: bool,
+        is_variant: bool,
+        variant_name_opt: Option<Symbol>,
+        offset: usize,
+    ) -> FunctionData {
+        let symbol_pool = self.parent.env.symbol_pool();
+
+        let ref_result_type = Type::Reference(
+            ReferenceKind::from_is_mut(dst_mutable),
+            Box::new(field_type.clone()),
+        );
+
+        let fun_name_str = format!(
+            "borrow{}from${}${}{}${}",
+            if dst_mutable { "_mut_" } else { "_" },
+            struct_name.display(symbol_pool),
+            field_name.display(symbol_pool),
+            if let Some(variant_name) = variant_name_opt {
+                format!("${}", variant_name.display(symbol_pool))
+            } else {
+                "".to_string()
+            },
+            offset,
+        );
+        let fun_name = symbol_pool.make(&fun_name_str);
+
+        let select_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), field_type.clone());
+        self.parent.env.set_node_instantiation(
+            select_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+
+        let select_op = if is_variant {
+            Operation::SelectVariants(struct_entry.module_id, struct_entry.struct_id, field_ids)
+        } else {
+            Operation::Select(struct_entry.module_id, struct_entry.struct_id, field_ids[0])
+        };
+
+        let select_exp =
+            ExpData::Call(select_node, select_op, vec![receiver_exp.clone()]).into_exp();
+
+        let borrow_node = self
+            .parent
+            .env
+            .new_node(struct_entry.loc.clone(), ref_result_type.clone());
+        self.parent.env.set_node_instantiation(
+            borrow_node,
+            TypeParameter::vec_to_formals(&struct_entry.type_params),
+        );
+
+        let def = ExpData::Call(
+            borrow_node,
+            Operation::Borrow(ReferenceKind::from_is_mut(dst_mutable)),
+            vec![select_exp],
+        )
+        .into_exp();
+
+        self.build_function_data(
+            fun_name,
+            struct_entry,
+            vec![param.clone()],
+            ref_result_type,
+            def,
+        )
+    }
+}
+
 /// # Environment Population and finalization
 
 impl ModuleBuilder<'_, '_> {
     fn populate_and_finalize_env(&mut self, loc: Loc, attributes: Vec<Attribute>) {
         let mut struct_data: BTreeMap<StructId, StructData> = Default::default();
+        let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
         for (name, entry) in &self.parent.struct_table {
             if name.module_name != self.module_name {
                 continue;
@@ -3592,10 +4392,34 @@ impl ModuleBuilder<'_, '_> {
                 variants: if is_enum { Some(variants) } else { None },
                 spec: RefCell::new(spec),
                 is_native: entry.is_native,
+                visibility: entry.visibility,
+                has_package_visibility: self.package_structs.contains(&entry.struct_id),
             };
+            if entry.visibility != Visibility::Private {
+                if self
+                    .parent
+                    .env
+                    .language_version()
+                    .language_version_for_public_struct()
+                {
+                    let struct_name = name
+                        .symbol
+                        .display(self.parent.env.symbol_pool())
+                        .to_string();
+                    let module_name = self.module_name.display_full(self.parent.env).to_string();
+                    let replaced_module_name = module_name.replace("::", "$");
+                    let full_name = format!("{}${}", replaced_module_name, struct_name);
+                    let full_symbol = self.parent.env.symbol_pool().make(&full_name);
+                    self.create_struct_api(full_symbol, entry, &mut function_data);
+                } else {
+                    self.parent.env.warning(
+                        &loc,
+                        "structs/enums with visibility modifier are only supported at version 2.4 or later",
+                    );
+                }
+            }
             struct_data.insert(StructId::new(name.symbol), data);
         }
-        let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
         for (name, entry) in &self.parent.fun_table {
             if entry.module_id != self.module_id {
                 continue;
@@ -3642,6 +4466,7 @@ impl ModuleBuilder<'_, '_> {
                 using_funs: RefCell::default(),
                 transitive_closure_of_used_funs: RefCell::default(),
                 used_functions_with_transitive_inline: RefCell::default(),
+                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

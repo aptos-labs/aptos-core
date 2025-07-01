@@ -124,7 +124,7 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_3);
+        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_4);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {

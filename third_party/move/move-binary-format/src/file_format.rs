@@ -667,6 +667,13 @@ impl Visibility {
             Self::Private | Self::Friend => false,
         }
     }
+
+    pub fn is_not_private(&self) -> bool {
+        match self {
+            Self::Public | Self::Friend => true,
+            Self::Private => false,
+        }
+    }
 }
 
 impl std::convert::TryFrom<u8> for Visibility {

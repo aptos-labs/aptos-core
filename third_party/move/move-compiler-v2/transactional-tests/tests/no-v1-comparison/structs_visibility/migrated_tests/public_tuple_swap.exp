@@ -1,0 +1,7 @@
+processed 4 tasks
+task 0 lines 1-8:  publish [module 0xc0ffee::m {]
+task 1 lines 10-30:  publish [module 0xc0ffee::test_m {]
+task 2 lines 32-32:  run 0xc0ffee::test_m::test4
+return values: { 222 }, { 111 }
+task 3 lines 34-34:  run 0xc0ffee::test_m::swap5
+return values: 258, 147

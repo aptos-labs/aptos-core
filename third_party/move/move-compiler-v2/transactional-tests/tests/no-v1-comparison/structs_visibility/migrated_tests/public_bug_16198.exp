@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 1-4:  publish [module 0xc0ffee::m {]
+task 1 lines 6-36:  publish [module 0xc0ffee::m_bug_16198 {]
+task 2 lines 38-38:  run 0xc0ffee::m_bug_16198::test --args 42

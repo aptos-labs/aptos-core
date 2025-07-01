@@ -166,6 +166,7 @@ pub struct StructDefinition {
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub layout: StructLayout,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1145,6 +1146,7 @@ impl AstDebug for (StructName, &StructDefinition) {
                 abilities,
                 type_parameters,
                 layout: fields,
+                visibility,
             },
         ) = self;
 
@@ -1154,7 +1156,7 @@ impl AstDebug for (StructName, &StructDefinition) {
             w.write("native ");
         }
 
-        w.write(format!("struct {}", name));
+        w.write(&format!("{} struct {}", visibility, name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
         if let StructLayout::Singleton(fields, _) = fields {

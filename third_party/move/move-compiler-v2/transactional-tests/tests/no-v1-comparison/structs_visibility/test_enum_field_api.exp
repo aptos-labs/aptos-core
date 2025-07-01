@@ -1,0 +1,13 @@
+processed 12 tasks
+task 0 lines 1-4:  publish [module 0x42::m2 {]
+task 1 lines 6-35:  publish [module 0x42::m {]
+task 2 lines 37-128:  publish [module 0x42::m2 {]
+task 3 lines 130-130:  run 0x42::m2::test_v1
+task 4 lines 132-132:  run 0x42::m2::test_v1_mut_borrow
+task 5 lines 134-134:  run 0x42::m2::test_v2_mut_borrow
+task 6 lines 136-136:  run 0x42::m2::test_data2_mut_borrow
+task 7 lines 138-138:  run 0x42::m2::test_data2_mut_borrow_2
+task 8 lines 140-140:  run 0x42::m2::test_data3_mut_borrow
+task 9 lines 142-142:  run 0x42::m2::test_data4_mut_borrow
+task 10 lines 144-144:  run 0x42::m2::test_data3_mut_borrow_2
+task 11 lines 146-146:  run 0x42::m2::test_data4_mut_borrow_2

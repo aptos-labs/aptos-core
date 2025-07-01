@@ -39,6 +39,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-recursive-check/",
     "/no-access-check/",
     "/no-recursive-type-check/",
+    "/structs_visibility/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -100,7 +101,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, true)],
         language_version: LanguageVersion::V1,
         include: &["/operator_eval/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
     TestConfig {
@@ -109,7 +110,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, true)],
         language_version: LanguageVersion::latest(),
         include: &["/operator_eval/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: true,
     },
     TestConfig {
@@ -118,7 +119,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-check/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
     TestConfig {
@@ -127,7 +128,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::ACCESS_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-access-check/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
     TestConfig {
@@ -136,6 +137,15 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-type-check/"],
+        exclude: &["/structs_visibility/"],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "public-struct",
+        runner: |p| run(p, get_config_by_name("public-struct")),
+        experiments: &[],
+        language_version: LanguageVersion::latest(),
+        include: &["/structs_visibility/"],
         exclude: &[],
         cross_compile: false,
     },
@@ -162,6 +172,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/assert_one.move",
     "no-v1-comparison/closures/reentrancy",
     "no-v1-comparison/closures/reentrancy",
+    "no-v1-comparison/structs_visibility/migrated_tests/public_enum_field_select.move",
     "control_flow/for_loop_non_terminating.move",
     "control_flow/for_loop_nested_break.move",
     "evaluation_order/lazy_assert.move",
