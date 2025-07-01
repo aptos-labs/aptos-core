@@ -1,0 +1,233 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Wrapper {
+        V1 {
+            0: u64,
+            1: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x, Add<u64>(x, 1))
+    }
+    public fun pack$Wrapper$V1($0: u64,$1: u64): Wrapper {
+        pack m::Wrapper::V1($0, $1)
+    }
+    public fun pack$Wrapper$V2($0: u64): Wrapper {
+        pack m::Wrapper::V2($0)
+    }
+    public fun unpack$Wrapper$V1($s: Wrapper): (u64, u64) {
+        {
+          let m::Wrapper::V1{ 0, 1 } = $s;
+          Tuple(0, 1)
+        }
+    }
+    public fun unpack$Wrapper$V2($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V2{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    public fun borrow_from$Wrapper$0($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    public fun borrow_from$Wrapper$1($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.1($s))
+    }
+    public fun borrow_mut_from_mut$Wrapper$0($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    public fun borrow_mut_from_mut$Wrapper$1($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.1($s))
+    }
+    public fun borrow_from_mut$Wrapper$0($s: &mut Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    public fun borrow_from_mut$Wrapper$1($s: &mut Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.1($s))
+    }
+    public fun test_variant$Wrapper$V1($s: &Wrapper): bool {
+        test_variants m::Wrapper::V1($s)
+    }
+    public fun test_variant$Wrapper$V2($s: &Wrapper): bool {
+        test_variants m::Wrapper::V2($s)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun foo(_x: &mut u64,_y: &mut u64) {
+        Tuple()
+    }
+    private fun test_1() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_2() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              x_0 = 23;
+              x_1 = 24;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_match() {
+        {
+          let x: m::Wrapper = m::make(22);
+          match (Borrow(Mutable)(x)) {
+            m::Wrapper::V2{ 0: _ } => {
+              Tuple()
+            }
+            m::Wrapper::V1{ 0: x_0, 1: x_1 } => {
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+
+        }
+    }
+    private fun test_no_err() {
+        {
+          let x: m::Wrapper = m::make(22);
+          select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x) = 23;
+          select_variants m::Wrapper.V1.1<m::Wrapper>(x) = 24;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Wrapper has drop {
+        V1 {
+            0: u64,
+            1: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        Wrapper::V1(x,x + 1)
+    }
+    public fun pack$Wrapper$V1($0: u64, $1: u64): Wrapper {
+        Wrapper::V1($0,$1)
+    }
+    public fun pack$Wrapper$V2($0: u64): Wrapper {
+        Wrapper::V2($0)
+    }
+    public fun unpack$Wrapper$V1($s: Wrapper): (u64, u64) {
+        let Wrapper::V1(0,1) = $s;
+        (0, 1)
+    }
+    public fun unpack$Wrapper$V2($s: Wrapper): (u64) {
+        let Wrapper::V2(0) = $s;
+        (0)
+    }
+    public fun borrow_from$Wrapper$0($s: &Wrapper): &u64 {
+        &$s.0
+    }
+    public fun borrow_from$Wrapper$1($s: &Wrapper): &u64 {
+        &$s.1
+    }
+    public fun borrow_mut_from_mut$Wrapper$0($s: &mut Wrapper): &mut u64 {
+        &mut $s.0
+    }
+    public fun borrow_mut_from_mut$Wrapper$1($s: &mut Wrapper): &mut u64 {
+        &mut $s.1
+    }
+    public fun borrow_from_mut$Wrapper$0($s: &mut Wrapper): &u64 {
+        &$s.0
+    }
+    public fun borrow_from_mut$Wrapper$1($s: &mut Wrapper): &u64 {
+        &$s.1
+    }
+    public fun test_variant$Wrapper$V1($s: &Wrapper): bool {
+        $s is V1
+    }
+    public fun test_variant$Wrapper$V2($s: &Wrapper): bool {
+        $s is V2
+    }
+}
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    fun foo(_x: &mut u64, _y: &mut u64) {
+    }
+    fun test_1() {
+        let x = m::make(22);
+        let x_0 = &mut x.0;
+        let x_1 = &mut x.1;
+        foo(x_0, x_1);
+    }
+    fun test_2() {
+        let x = m::make(22);
+        let x_0 = &mut x.0;
+        let x_1 = &mut x.1;
+        *x_0 = 23;
+        *x_1 = 24;
+    }
+    fun test_match() {
+        let x = m::make(22);
+        match (&mut x) {
+            m::Wrapper::V2(_) => (),
+            m::Wrapper::V1(x_0,x_1) => {
+                foo(x_0, x_1);
+            },
+        }
+    }
+    fun test_no_err() {
+        let x = m::make(22);
+        x.0 = 23;
+        x.1 = 24;
+    }
+}
+
+
+Diagnostics:
+error: cannot transfer mutable value since it is borrowed
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:19:19
+   │
+18 │         let x_0 = &mut x.0;
+   │                   -------- previously mutably borrowed here: field borrow for non-private struct `m::Wrapper` is converted into a function call
+19 │         let x_1 = &mut x.1;
+   │                   ^^^^^^^^ transfer attempted here
+20 │         foo(x_0, x_1);
+   │             --- conflicting reference `x_0` used here
+
+error: cannot transfer mutable value since it is borrowed
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:30:19
+   │
+29 │         let x_0 = &mut x.0;
+   │                   -------- previously mutably borrowed here: field borrow for non-private struct `m::Wrapper` is converted into a function call
+30 │         let x_1 = &mut x.1;
+   │                   ^^^^^^^^ transfer attempted here
+31 │         *x_0 = 23;
+   │         --------- conflicting reference `x_0` used here
+
+error: cannot transfer mutable value since it is borrowed
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:47:13
+   │
+47 │             Wrapper::V1(x_0, x_1) => {
+   │             ^^^^^^^^^^^^^^^^^^^^^
+   │             │
+   │             transfer attempted here
+   │             previously mutably borrowed here: field borrow for non-private struct `m::Wrapper` is converted into a function call
+48 │                 foo(x_0, x_1);
+   │                     --- conflicting reference `x_0` used here

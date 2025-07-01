@@ -1845,6 +1845,9 @@ impl GlobalEnv {
             variants: None,
             spec: RefCell::new(Spec::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
+            struct_api: None,
         }
     }
 
@@ -2027,6 +2030,8 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            struct_api_borrow_info: None,
+            used_structs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2093,6 +2098,8 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            struct_api_borrow_info: None,
+            used_structs: RefCell::new(None),
         }
     }
 
@@ -3130,6 +3137,26 @@ impl<'env> ModuleEnv<'env> {
                     deps.insert(used_mod_id);
                 }
             }
+            if self
+                .env
+                .language_version()
+                .is_at_least(LanguageVersion::V2_4)
+            {
+                for used_struct in fun_env.get_used_structs_with_transitive_inline() {
+                    let used_mod_id = used_struct.module_id;
+                    if self.get_id() == used_struct.module_id {
+                        // no need to friend self
+                        continue;
+                    }
+                    let used_mod_env = self.env.get_module(used_mod_id);
+                    let used_struct_env = used_mod_env.get_struct(used_struct.id);
+                    if used_struct_env.has_package_visibility()
+                        && self.can_call_package_fun_in(&used_mod_env)
+                    {
+                        deps.insert(used_mod_id);
+                    }
+                }
+            }
         }
         deps
     }
@@ -3634,6 +3661,25 @@ pub struct StructData {
 
     /// Whether this struct is native
     pub is_native: bool,
+
+    /// Visibility of this struct
+    pub visibility: Visibility,
+
+    /// Whether this struct has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
+
+    pub(crate) struct_api: Option<StructAPI>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructAPI {
+    pub struct_pack_api: BTreeMap<Option<Symbol>, FunId>,
+    pub struct_unpack_api: BTreeMap<Option<Symbol>, FunId>,
+    pub struct_field_borrow_map: BTreeMap<Symbol, FunId>,
+    pub struct_field_borrow_immut_from_mut_map: BTreeMap<Symbol, FunId>,
+    pub struct_field_borrow_mut_map: BTreeMap<Symbol, FunId>,
+    pub struct_test_variant_api: BTreeMap<Symbol, FunId>,
 }
 
 impl StructData {
@@ -3650,6 +3696,9 @@ impl StructData {
             variants: None,
             spec: RefCell::new(Default::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
+            struct_api: None,
         }
     }
 }
@@ -4001,6 +4050,18 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
+    }
+
+    pub fn get_struct_api(&self) -> &Option<StructAPI> {
+        &self.data.struct_api
     }
 }
 
@@ -4386,6 +4447,12 @@ pub struct FunctionData {
 
     /// A cache for used functions including ones obtained by transitively traversing used inline functions.
     pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    ///  struct api borrow info
+    pub(crate) struct_api_borrow_info: Option<QualifiedId<StructId>>,
+
+    /// A cache for the called structs.
+    pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
 }
 
 impl FunctionData {
@@ -4414,6 +4481,8 @@ impl FunctionData {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            struct_api_borrow_info: None,
+            used_structs: RefCell::new(None),
         }
     }
 }
@@ -5119,6 +5188,30 @@ impl<'env> FunctionEnv<'env> {
         set
     }
 
+    pub fn get_used_structs_with_transitive_inline(&self) -> BTreeSet<QualifiedId<StructId>> {
+        if let Some(used_structs) = &*self.data.used_structs.borrow() {
+            return used_structs.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            if let Some(def) = fnc.get_def() {
+                def.struct_usage(self.module_env.env, &mut set);
+            }
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                if f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_structs.borrow_mut() = Some(set.clone());
+        set
+    }
+
     /// Get the functions that call this one, if available.
     pub fn get_calling_functions(&self) -> Option<BTreeSet<QualifiedId<FunId>>> {
         if let Some(calling) = &*self.data.calling_funs.borrow() {
@@ -5243,6 +5336,10 @@ impl<'env> FunctionEnv<'env> {
             type_param_names: Some(type_param_names),
             ..self.module_env.get_type_display_ctx()
         }
+    }
+
+    pub fn get_struct_api_borrow_info(&self) -> Option<QualifiedId<StructId>> {
+        self.data.struct_api_borrow_info
     }
 }
 

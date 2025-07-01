@@ -222,6 +222,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ..config().lang(LanguageVersion::V2_3)
         },
         TestConfig {
+            name: "checking-lang-v2.4",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.4")),
+            include: vec!["/checking-lang-v2.4/"],
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_4)
+        },
+        TestConfig {
             name: "unused-assignment",
             runner: |p| run_test(p, get_config_by_name("unused-assignment")),
             include: vec!["/unused-assignment/"],
