@@ -38,6 +38,16 @@ impl AdapterLogSchema {
                 base_version: None,
                 txn_idx,
             },
+            StateViewId::GetReadyScheduledTxns {
+                block_id,
+                child_block_id: _,
+            } => Self {
+                name: LogEntry::Execution,
+                block_id: Some(block_id),
+                first_version: None,
+                base_version: None,
+                txn_idx,
+            },
             StateViewId::ChunkExecution { first_version } => Self {
                 name: LogEntry::Execution,
                 block_id: None,

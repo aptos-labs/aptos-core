@@ -636,7 +636,9 @@ impl PipelineBuilder {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
         let scheduled_txns: Vec<ScheduledTransactionInfoWithKey> = {
-            if let Ok(state_view) = executor.state_view(block.parent_id()) {
+            if let Ok(state_view) =
+                executor.state_view_ready_sched_txns(block.id(), block.parent_id())
+            {
                 ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs() / 1000)
             } else {
                 vec![]

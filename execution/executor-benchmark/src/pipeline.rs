@@ -229,7 +229,9 @@ where
             let overall_measuring = OverallMeasuring::start();
 
             while total_executed < total_scheduled_txns {
-                let state_view = executor.state_view(current_parent_id).unwrap();
+                let state_view = executor
+                    .state_view_ready_sched_txns(HashValue::zero(), current_parent_id)
+                    .unwrap();
                 let args = vec![
                     MoveValue::U64(mock_block_time_ms + 1000),
                     MoveValue::U64(ready_sched_txns_limit as u64),
@@ -250,7 +252,8 @@ where
                     break; // No more ready transactions available
                 }
 
-                // append a mock metadata transaction to the block
+                // append a mock metadata transaction to the block; this cleans up the executed txns
+                // from the scheduled transactions queue
                 if !current_block_txns.is_empty() {
                     let block_metadata_txn =
                         Transaction::BlockMetadata(create_mock_meta_data_txn(current_parent_id));

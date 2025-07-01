@@ -150,9 +150,17 @@ where
         *self.inner.write() = None;
     }
 
-    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+    fn state_view_ready_sched_txns(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
         self.maybe_initialize().expect("Failed to initialize.");
-        self.inner.read().as_ref().unwrap().state_view(block_id)
+        self.inner
+            .read()
+            .as_ref()
+            .unwrap()
+            .state_view_ready_sched_txns(block_id, parent_block_id)
     }
 }
 
@@ -184,18 +192,26 @@ where
         self.block_tree.root_block().id
     }
 
-    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+    fn state_view_ready_sched_txns(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
         let block = self
             .block_tree
-            .get_blocks_opt(&[block_id])?
+            .get_blocks_opt(&[parent_block_id])?
             .pop()
             .expect("Must exist.")
-            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         let block_output = &block.output;
         let state_view = {
             let _timer = OTHER_TIMERS.timer_with(&["get_state_view"]);
             CachedStateView::new(
-                StateViewId::BlockExecution { block_id },
+                StateViewId::GetReadyScheduledTxns {
+                    // note we are getting state_view from the parent block
+                    block_id: parent_block_id,
+                    child_block_id: block_id,
+                },
                 Arc::clone(&self.db.reader),
                 block_output.result_state().latest().clone(),
             )?

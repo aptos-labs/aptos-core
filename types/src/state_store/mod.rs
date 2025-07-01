@@ -91,6 +91,11 @@ pub enum StateViewId {
     BlockExecution {
         block_id: HashValue,
     },
+    /// Getting ready scheduled transactions for the block
+    GetReadyScheduledTxns {
+        block_id: HashValue,
+        child_block_id: HashValue,
+    },
     /// VmValidator verifying incoming transaction.
     TransactionValidation {
         base_version: Version,

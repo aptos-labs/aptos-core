@@ -171,7 +171,13 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
-    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView>;
+
+    /// State view to get ready scheduled transactions at the beginning of the block execution.
+    fn state_view_ready_sched_txns(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView>;
 }
 
 #[derive(Clone)]
