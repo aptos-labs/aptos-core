@@ -560,7 +560,7 @@ crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "6.1.0", features = ["inline"] }
+dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
@@ -589,6 +589,7 @@ ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
+equivalent = "1.0"
 erased-serde = "0.3.13"
 ethnum = "1.5.0"
 ethers = { version = "2" }

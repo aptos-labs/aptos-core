@@ -19,7 +19,7 @@ use crate::{
     scheduler_wrapper::SchedulerWrapper,
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
-    txn_last_input_output::{KeyKind, TxnLastInputOutput},
+    txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
@@ -172,10 +172,13 @@ where
         );
         let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
-        let mut prev_modified_keys = last_input_output
-            .modified_keys(idx_to_execute, true)
-            .map_or_else(HashMap::new, |keys| keys.collect());
-
+        let mut prev_modified_resource_keys = last_input_output
+            .modified_resource_keys(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
+        let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
+            .modified_group_keys(idx_to_execute)
+            .into_iter()
+            .collect();
         let mut prev_modified_delayed_fields = last_input_output
             .delayed_field_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.collect());
@@ -210,26 +213,13 @@ where
                 })
                 .collect();
             for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
-                let prev_tags = match prev_modified_keys.remove(&group_key) {
-                    Some(KeyKind::Group(tags)) => tags,
-                    Some(KeyKind::Resource) => {
-                        return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as a Resource KeyKind",
-                            group_key
-                        )));
-                    },
-                    Some(KeyKind::AggregatorV1) => {
-                        return Err(code_invariant_error(format!(
-                            "Group key {:?} recorded as an AggregatorV1 KeyKind",
-                            group_key,
-                        )));
-                    },
-                    None => {
+                let prev_tags = prev_modified_group_keys
+                    .remove(&group_key)
+                    .unwrap_or_else(|| {
                         // Previously no write to the group at all.
                         needs_suffix_validation = true;
                         HashSet::new()
-                    },
-                };
+                    });
 
                 if versioned_cache.data().write_metadata(
                     group_key.clone(),
@@ -261,7 +251,7 @@ where
                     .into_iter()
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
-                if prev_modified_keys.remove(&k).is_none() {
+                if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
                 versioned_cache
@@ -271,7 +261,7 @@ where
 
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
-                if prev_modified_keys.remove(&k).is_none() {
+                if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
@@ -326,32 +316,28 @@ where
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
-        for (k, kind) in prev_modified_keys {
-            use KeyKind::*;
-            match kind {
-                Resource | AggregatorV1 => versioned_cache.data().remove(&k, idx_to_execute),
-                Group(tags) => {
-                    // A change in state observable during speculative execution
-                    // (which includes group metadata and size) changes, suffix
-                    // re-validation is needed. For resources where speculative
-                    // execution waits on estimates, having a write that was there
-                    // but not anymore does not qualify, as it can only cause
-                    // additional waiting but not an incorrect speculation result.
-                    // However, a group size or metadata might be read, and then
-                    // speculative group update might be removed below. Without
-                    // triggering suffix re-validation, a later transaction might
-                    // end up with the incorrect read result (corresponding to the
-                    // removed group information from an incorrect speculative state).
-                    needs_suffix_validation = true;
-
-                    versioned_cache.data().remove(&k, idx_to_execute);
-                    versioned_cache
-                        .group_data()
-                        .remove(&k, idx_to_execute, tags);
-                },
-            };
+        for k in prev_modified_resource_keys {
+            versioned_cache.data().remove(&k, idx_to_execute);
         }
+        for (k, tags) in prev_modified_group_keys {
+            // A change in state observable during speculative execution
+            // (which includes group metadata and size) changes, suffix
+            // re-validation is needed. For resources where speculative
+            // execution waits on estimates, having a write that was there
+            // but not anymore does not qualify, as it can only cause
+            // additional waiting but not an incorrect speculation result.
+            // However, a group size or metadata might be read, and then
+            // speculative group update might be removed below. Without
+            // triggering suffix re-validation, a later transaction might
+            // end up with the incorrect read result (corresponding to the
+            // removed group information from an incorrect speculative state).
+            needs_suffix_validation = true;
 
+            versioned_cache.data().remove(&k, idx_to_execute);
+            versioned_cache
+                .group_data()
+                .remove(&k, idx_to_execute, tags);
+        }
         for id in prev_modified_delayed_fields {
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
@@ -413,27 +399,17 @@ where
         clear_speculative_txn_logs(txn_idx as usize);
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-        if let Some(keys) = last_input_output.modified_keys(txn_idx, false) {
-            for (k, kind) in keys {
-                use KeyKind::*;
-                match kind {
-                    Resource | AggregatorV1 => versioned_cache.data().mark_estimate(&k, txn_idx),
-                    Group(tags) => {
-                        // Validation for both group size and metadata is based on values.
-                        // Execution may wait for estimates.
-                        versioned_cache
-                            .group_data()
-                            .mark_estimate(&k, txn_idx, tags);
-
-                        // Group metadata lives in same versioned cache as data / resources.
-                        // We are not marking metadata change as estimate, but after
-                        // a transaction execution changes metadata, suffix validation
-                        // is guaranteed to be triggered. Estimation affecting execution
-                        // behavior is left to size, which uses a heuristic approach.
-                    },
-                };
+        if let Some(keys) = last_input_output.modified_resource_keys(txn_idx) {
+            for (k, _) in keys {
+                versioned_cache.data().mark_estimate(&k, txn_idx);
             }
         }
+
+        // Group metadata lives in same versioned cache as data / resources.
+        // We are not marking metadata change as estimate, but after a transaction execution
+        // changes metadata, suffix validation is guaranteed to be triggered. Estimation affecting
+        // execution behavior is left to size, which uses a heuristic approach.
+        last_input_output.mark_estimate_group_keys_and_tags(versioned_cache, txn_idx);
 
         if let Some(keys) = last_input_output.delayed_field_keys(txn_idx) {
             for k in keys {

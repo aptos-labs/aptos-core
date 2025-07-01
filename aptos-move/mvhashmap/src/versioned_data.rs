@@ -11,6 +11,7 @@ use aptos_types::write_set::TransactionWrite;
 use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
+use equivalent::Equivalent;
 use move_core_types::value::MoveTypeLayout;
 use std::{
     collections::btree_map::{self, BTreeMap},
@@ -247,7 +248,14 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
     /// (for future incarnation). Will panic if the entry is not in the data-structure.
-    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
+    /// Use the Equivalent trait for key lookup. This avoids having to clone the key when
+    /// only a reference is needed.
+    pub fn mark_estimate<Q>(&self, key: &Q, txn_idx: TxnIndex)
+    where
+        Q: Equivalent<K> + Hash,
+    {
+        // Use dashmap's get method which accepts a reference when Borrow is implemented
+        // The equivalent crate automatically implements the right traits.
         let v = self.values.get(key).expect("Path must exist");
         v.versioned_map
             .get(&ShiftedTxnIndex::new(txn_idx))
@@ -257,7 +265,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
     /// if the corresponding entry does not exist.
-    pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
+    pub fn remove<Q>(&self, key: &Q, txn_idx: TxnIndex)
+    where
+        Q: Equivalent<K> + Hash,
+    {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert_some!(
@@ -266,11 +277,14 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         );
     }
 
-    pub fn fetch_data(
+    pub fn fetch_data<Q>(
         &self,
-        key: &K,
+        key: &Q,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
+    ) -> anyhow::Result<MVDataOutput<V>, MVDataError>
+    where
+        Q: Equivalent<K> + Hash,
+    {
         self.values
             .get(key)
             .map(|v| v.read(txn_idx))
