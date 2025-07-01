@@ -1,0 +1,19 @@
+processed 3 tasks
+task 0 lines 1-4:  publish [module 0xc0ffee::m {]
+task 1 lines 6-30:  publish [module 0xc0ffee::m_mut_ref_downgrade {]
+Error: compilation errors:
+ error: cannot pass `&mut ||u64 has copy + drop` to a function which expects argument of type `&mut ||u64 has drop`
+   ┌─ TEMPFILE1:19:30
+   │
+19 │         assn<||u64 has drop>(&mut b, a);
+   │                              ^^^^^^
+
+
+task 2 lines 32-32:  run 0xc0ffee::m_mut_ref_downgrade::foo
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

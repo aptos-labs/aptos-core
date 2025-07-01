@@ -1,0 +1,7 @@
+processed 6 tasks
+task 0 lines 1-7:  publish [module 0x42::m1 {]
+task 1 lines 9-47:  publish [module 0x42::m2 {]
+task 2 lines 49-49:  run 0x42::m2::try_direct_assignment_and_call
+task 3 lines 51-51:  run 0x42::m2::try_pass_to_apply
+task 4 lines 53-53:  run 0x42::m2::try_nested_wrapper
+task 5 lines 55-55:  run 0x42::m2::try_unpack_wrapper
