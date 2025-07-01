@@ -196,6 +196,8 @@ pub enum LanguageVersion {
     V2_2,
     /// The currently unstable 2.3 version of Move
     V2_3,
+    /// The currently unstable 2.4 version of Move
+    V2_4,
 }
 
 impl Default for LanguageVersion {
@@ -238,8 +240,9 @@ impl FromStr for LanguageVersion {
             "2" | "2.1" => Ok(Self::V2_1),
             "2.2" => Ok(Self::V2_2),
             "2.3" => Ok(Self::V2_3),
+            "2.4" => Ok(Self::V2_4),
             _ => bail!(
-                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.3\")",
+                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.4\")",
                 s
             ),
         }
@@ -254,6 +257,7 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
             LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
             LanguageVersion::V2_2 => CompilerLanguageVersion::V2_2,
             LanguageVersion::V2_3 => CompilerLanguageVersion::V2_3,
+            LanguageVersion::V2_4 => CompilerLanguageVersion::V2_4,
         }
     }
 }
@@ -265,13 +269,13 @@ impl LanguageVersion {
         use LanguageVersion::*;
         match self {
             V1 | V2_0 | V2_1 | V2_2 => false,
-            V2_3 => true,
+            V2_3 | V2_4 => true,
         }
     }
 
     /// The latest language version.
     pub const fn latest() -> Self {
-        LanguageVersion::V2_3
+        LanguageVersion::V2_4
     }
 
     /// The latest stable language version.
@@ -284,6 +288,10 @@ impl LanguageVersion {
         *self >= ver
     }
 
+    pub fn language_version_for_public_struct(&self) -> bool {
+        self.is_at_least(LanguageVersion::V2_3)
+    }
+
     /// If the bytecode version is not specified, infer it from the language version. For
     /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
@@ -292,7 +300,8 @@ impl LanguageVersion {
             LanguageVersion::V2_0
             | LanguageVersion::V2_1
             | LanguageVersion::V2_2
-            | LanguageVersion::V2_3 => VERSION_DEFAULT_LANG_V2,
+            | LanguageVersion::V2_3
+            | LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2,
         })
     }
 
@@ -303,6 +312,7 @@ impl LanguageVersion {
             LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
             LanguageVersion::V2_3 => "2.3",
+            LanguageVersion::V2_4 => "2.4",
         }
     }
 }
@@ -318,6 +328,7 @@ impl Display for LanguageVersion {
                 LanguageVersion::V2_1 => "2.1",
                 LanguageVersion::V2_2 => "2.2",
                 LanguageVersion::V2_3 => "2.3",
+                LanguageVersion::V2_4 => "2.4",
             },
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )

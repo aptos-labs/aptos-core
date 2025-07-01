@@ -214,11 +214,21 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Tests for checking v2 language features only supported if 2.3 or later
         // is selected
         TestConfig {
+            name: "checking-lang-v2.4",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.3")),
+            include: vec!["/checking-lang-v2.4/"],
+            stop_after: StopAfter::FirstAstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_4)
+        },
+        TestConfig {
             name: "checking-lang-v2.3",
             runner: |p| run_test(p, get_config_by_name("checking-lang-v2.3")),
             include: vec!["/checking-lang-v2.3/"],
-            stop_after: StopAfter::FirstAstPipeline,
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
             ..config().lang(LanguageVersion::V2_3)
         },
         TestConfig {
