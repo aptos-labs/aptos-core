@@ -144,8 +144,8 @@ impl<'a> BoundsChecker<'a> {
     }
 
     fn check_module_handles(&self) -> PartialVMResult<()> {
-        for script_handle in self.view.module_handles() {
-            self.check_module_handle(script_handle)?
+        for module_handle in self.view.module_handles() {
+            self.check_module_handle(module_handle)?
         }
         Ok(())
     }
@@ -240,7 +240,7 @@ impl<'a> BoundsChecker<'a> {
         check_bounds_impl(self.view.identifiers(), function_handle.name)?;
         check_bounds_impl(self.view.signatures(), function_handle.parameters)?;
         check_bounds_impl(self.view.signatures(), function_handle.return_)?;
-        // function signature type paramters must be in bounds to the function type parameters
+        // function signature type parameters must be in bounds to the function type parameters
         let type_param_count = function_handle.type_parameters.len();
         self.check_type_parameters_in_signature(function_handle.parameters, type_param_count)?;
         self.check_type_parameters_in_signature(function_handle.return_, type_param_count)?;
@@ -678,6 +678,9 @@ impl<'a> BoundsChecker<'a> {
         Ok(())
     }
 
+    /// Check `ty` for:
+    /// - struct handle bounds
+    /// - struct instantiations have the correct number of type parameters
     fn check_type(&self, ty: &SignatureToken) -> PartialVMResult<()> {
         use self::SignatureToken::*;
 

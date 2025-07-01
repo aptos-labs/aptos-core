@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Options;
+use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -317,7 +317,14 @@ impl<'env> Generator<'env> {
 
     /// Report an (internal) error at the location associated with the node.
     fn internal_error(&self, id: NodeId, msg: impl AsRef<str>) {
-        self.diag(id, Severity::Bug, msg)
+        let env = self.env();
+        let loc = env.get_node_loc(id);
+        env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            &format!("compiler internal error: {}", msg.as_ref()),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        );
     }
 
     fn diag(&self, id: NodeId, severity: Severity, msg: impl AsRef<str>) {
