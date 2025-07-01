@@ -1,0 +1,20 @@
+processed 3 tasks
+
+task 1 'publish'. lines 6-30:
+Error: compilation errors:
+ error: cannot pass `&mut ||u64 has copy + drop` to a function which expects argument of type `&mut ||u64 has drop`
+   ┌─ TEMPFILE1:19:30
+   │
+19 │         assn<||u64 has drop>(&mut b, a);
+   │                              ^^^^^^
+
+
+
+task 2 'run'. lines 32-32:
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
