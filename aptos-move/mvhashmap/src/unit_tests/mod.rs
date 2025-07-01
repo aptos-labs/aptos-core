@@ -24,6 +24,8 @@ use aptos_types::{
 use bytes::Bytes;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 use std::sync::Arc;
+
+mod dependencies;
 mod proptest_types;
 
 fn match_unresolved(

@@ -34,6 +34,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/operator_eval/",
     "/no-recursive-check/",
     "/no-access-check/",
+    "/no-recursive-type-check/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -101,6 +102,14 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::ACCESS_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-access-check/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "no-recursive-type-check",
+        runner: |p| run(p, get_config_by_name("no-recursive-type-check")),
+        experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/no-recursive-type-check/"],
         exclude: &[],
     },
 ];
