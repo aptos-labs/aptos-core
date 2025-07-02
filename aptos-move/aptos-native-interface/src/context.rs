@@ -14,7 +14,11 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
 };
-use move_vm_runtime::{native_functions::NativeContext, Function};
+use move_vm_runtime::{
+    native_extensions::NativeContextExtensions,
+    native_functions::{LoaderContext, NativeContext},
+    Function,
+};
 use move_vm_types::values::Value;
 use std::{
     ops::{Deref, DerefMut},
@@ -61,7 +65,7 @@ impl DerefMut for SafeNativeContext<'_, '_, '_, '_> {
     }
 }
 
-impl SafeNativeContext<'_, '_, '_, '_> {
+impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -126,6 +130,25 @@ impl SafeNativeContext<'_, '_, '_, '_> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size(val, self.gas_feature_version)
+    }
+
+    /// Returns extensions with loader context and gas parameters. Allows to use mutable loader
+    /// context while mutably borrowing the extension.
+    pub fn extensions_with_loader_context_and_gas_params(
+        &mut self,
+    ) -> (
+        &NativeContextExtensions<'b>,
+        LoaderContext<'_, 'c>,
+        &AbstractValueSizeGasParameters,
+        u64,
+    ) {
+        let (extensions, native_layout_converter) = self.inner.extensions_with_loader_context();
+        (
+            extensions,
+            native_layout_converter,
+            &self.misc_gas_params.abs_val,
+            self.gas_feature_version,
+        )
     }
 
     /// Computes the abstract size of the input value.
