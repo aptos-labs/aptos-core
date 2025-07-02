@@ -80,6 +80,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     let enable_resource_access_control =
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
     let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
+    // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 
     VerifierConfig {
         max_loop_depth: Some(5),
@@ -87,7 +88,11 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         max_function_parameters: Some(128),
         max_basic_blocks: Some(1024),
         max_value_stack_size: 1024,
-        max_type_nodes: Some(256),
+        max_type_nodes: if enable_function_values {
+            Some(128)
+        } else {
+            Some(256)
+        },
         max_push_size: Some(10000),
         max_struct_definitions: None,
         max_struct_variants: None,
@@ -103,6 +108,16 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,
+        max_function_return_values: if enable_function_values {
+            Some(128)
+        } else {
+            None
+        },
+        max_type_depth: if enable_function_values {
+            Some(20)
+        } else {
+            None
+        },
     }
 }
 
