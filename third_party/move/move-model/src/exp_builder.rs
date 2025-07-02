@@ -164,7 +164,17 @@ impl<'a> ExpBuilder<'a> {
             ExpData::Sequence(id, elems) => {
                 if let Some(i) = elems
                     .iter()
-                    .position(|e| matches!(e.as_ref(), ExpData::Loop(..) | ExpData::LoopCont(..)))
+                    .position(|e| {
+                        let mut is_loop_or_continue = false;
+                        let mut visitor = |e: &ExpData| {
+                            match e {
+                                ExpData::Loop(..) | ExpData::LoopCont(..) => {is_loop_or_continue = true; false},
+                                _ => true,
+                            }
+                        };
+                        e.visit_pre_order(&mut visitor);
+                        is_loop_or_continue
+                    })
                 {
                     let mut new_elems = elems[0..i].to_vec();
                     let default_loc = self.env().get_node_loc(*id);
