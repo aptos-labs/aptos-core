@@ -40,13 +40,10 @@ where
         traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
     ) -> PartialVMResult<()> {
-        let module_id = traversal_context
-            .referenced_module_ids
-            .alloc(module_id.clone());
-        let addr = module_id.address();
-        let name = module_id.name();
+        if traversal_context.visit_if_not_special_module_id(module_id) {
+            let addr = module_id.address();
+            let name = module_id.name();
 
-        if traversal_context.visit_if_not_special_address(addr, name) {
             let size = self
                 .module_storage
                 .unmetered_get_module_size(addr, name)
