@@ -462,7 +462,7 @@ impl BuiltPackage {
     }
 
     /// Replaces a module by name with a new CompiledModule instance
-    #[cfg(test)]
+    #[cfg(feature = "testing")]
     pub fn replace_module(
         &mut self,
         module_name: &str,
