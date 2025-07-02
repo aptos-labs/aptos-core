@@ -136,3 +136,16 @@ pub trait Loader:
     /// module access! Used to pass to native context. Any other use-cases are discouraged.
     fn unmetered_module_storage(&self) -> &dyn ModuleStorage;
 }
+
+/// Required for any metered script loading.
+pub trait ScriptLoader {
+    /// Loads a script, charging gas for dependencies if needed.
+    fn load_script(
+        &self,
+        config: &LegacyLoaderConfig,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        serialized_script: &[u8],
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction>;
+}
