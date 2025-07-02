@@ -66,7 +66,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -74,12 +76,14 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
+        self.unmetered_get_module_metadata(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -274,7 +278,7 @@ where
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
