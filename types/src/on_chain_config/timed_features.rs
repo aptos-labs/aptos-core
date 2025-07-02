@@ -69,6 +69,10 @@ impl TimedFeatureFlag {
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
+            (_, MOVEMAINNET | MOVETESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 8, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
             // Enabled from the beginning of time.
             (DisableInvariantViolationCheckInSwapLoc, TESTNET) => BEGINNING_OF_TIME,
             (DisableInvariantViolationCheckInSwapLoc, MAINNET) => BEGINNING_OF_TIME,
@@ -106,6 +110,7 @@ impl TimedFeatureFlag {
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
+
 
             (ChargeBytesForPrints, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)

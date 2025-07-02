@@ -252,6 +252,7 @@ members = [
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
     "tools/compute-module-expansion-size",
+    "tools/l1-migration",
     "types",
     "vm-validator",
 ]

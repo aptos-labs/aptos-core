@@ -11012,6 +11012,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "l1-migration"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-db",
+ "aptos-storage-interface",
+ "aptos-types",
+ "bcs 0.1.6",
+ "clap 4.5.21",
+]
+
+[[package]]
 name = "lalrpop"
 version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -22,6 +22,8 @@ pub enum NamedChain {
     DEVNET = 3,
     TESTING = 4,
     PREMAINNET = 5,
+    MOVEMAINNET = 126,
+    MOVETESTNET = 250,
 }
 
 const MAINNET: &str = "mainnet";
@@ -29,6 +31,9 @@ const TESTNET: &str = "testnet";
 const DEVNET: &str = "devnet";
 const TESTING: &str = "testing";
 const PREMAINNET: &str = "premainnet";
+const MOVEMENT_MAINNET: &str = "movement_mainnet";
+const MOVEMENT_TESTNET: &str = "movement_testnet";
+
 
 impl NamedChain {
     fn str_to_chain_id(string: &str) -> Result<ChainId> {
@@ -48,6 +53,8 @@ impl NamedChain {
             3 => Ok(NamedChain::DEVNET), // TODO: this is not correct and should removed. The devnet chain ID changes.
             4 => Ok(NamedChain::TESTING),
             5 => Ok(NamedChain::PREMAINNET),
+            126 => Ok(NamedChain::MOVEMAINNET),
+            250 => Ok(NamedChain::MOVETESTNET),
             _ => Err(format!("Not a named chain. Given ID: {:?}", chain_id)),
         }
     }
@@ -157,6 +164,8 @@ impl fmt::Display for NamedChain {
             NamedChain::MAINNET => MAINNET,
             NamedChain::TESTING => TESTING,
             NamedChain::PREMAINNET => PREMAINNET,
+            NamedChain::MOVEMAINNET => MOVEMENT_MAINNET,
+            NamedChain::MOVETESTNET => MOVEMENT_TESTNET,
         })
     }
 }
