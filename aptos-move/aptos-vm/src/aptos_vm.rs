@@ -2458,7 +2458,7 @@ impl AptosVM {
                 };
                 let status_with_abort_info =
                     vm.inject_abort_info_if_available(&module_storage, execution_status);
-                ViewFunctionOutput::new_execution_status(
+                ViewFunctionOutput::new_move_abort_error(
                     status_with_abort_info,
                     Some(vm_status.status_code()),
                     gas_used,

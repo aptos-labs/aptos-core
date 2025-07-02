@@ -17,6 +17,7 @@ use crate::{
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
         ForbiddenError, InsufficientStorageError, InternalError,
     },
+    view_function::convert_view_function_error,
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
@@ -36,7 +37,7 @@ use aptos_types::{
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
         RawTransactionWithData, Script, SignedTransaction, TransactionExecutable,
-        TransactionPayload, TransactionPayloadInner, ViewFunctionError,
+        TransactionPayload, TransactionPayloadInner,
     },
     vm_status::StatusCode,
     AptosCoinType, CoinType,
@@ -640,17 +641,8 @@ impl TransactionsApi {
                     context.node_config.api.max_gas_view_function,
                 );
                 let values = output.values.map_err(|status| {
-                    let (err_string, vm_error_code) = match status {
-                        ViewFunctionError::ExecutionStatus(status, vm_error_code) => {
-                            let vm_status = state_view
-                                .as_converter(context.db.clone(), context.indexer_reader.clone())
-                                .explain_vm_status(&status, None);
-                            (vm_status, vm_error_code)
-                        },
-                        ViewFunctionError::ErrorMessage(message, vm_error_code) => {
-                            (message, vm_error_code)
-                        },
-                    };
+                    let (err_string, vm_error_code) =
+                        convert_view_function_error(&status, &state_view, &context);
                     SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
                         anyhow::anyhow!(err_string),
                         AptosErrorCode::InvalidInput,

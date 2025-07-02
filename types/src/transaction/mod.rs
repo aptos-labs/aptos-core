@@ -2644,7 +2644,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 pub enum ViewFunctionError {
     // This is to represent errors are from a MoveAbort and has error info from the module metadata to display.
     // The ExecutionStatus is used to construct the error message in the same way as MoveAborts for entry functions.
-    ExecutionStatus(ExecutionStatus, Option<StatusCode>),
+    MoveAbort(ExecutionStatus, Option<StatusCode>),
     // This is a generic error message that takes in a string and display it in the error response.
     ErrorMessage(String, Option<StatusCode>),
 }
@@ -2652,7 +2652,7 @@ pub enum ViewFunctionError {
 impl std::fmt::Display for ViewFunctionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ViewFunctionError::ExecutionStatus(status, vm_status) => {
+            ViewFunctionError::MoveAbort(status, vm_status) => {
                 write!(
                     f,
                     "Execution status: {:?}, VM status: {:?}",
@@ -2694,13 +2694,13 @@ impl ViewFunctionOutput {
         }
     }
 
-    pub fn new_execution_status(
+    pub fn new_move_abort_error(
         status: ExecutionStatus,
         vm_status: Option<StatusCode>,
         gas_used: u64,
     ) -> Self {
         Self {
-            values: Err(ViewFunctionError::ExecutionStatus(status, vm_status)),
+            values: Err(ViewFunctionError::MoveAbort(status, vm_status)),
             gas_used,
         }
     }

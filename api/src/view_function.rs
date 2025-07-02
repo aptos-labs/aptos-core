@@ -18,7 +18,7 @@ use aptos_api_types::{
     U64,
 };
 use aptos_bcs_utils::serialize_uleb128;
-use aptos_types::transaction::ViewFunctionError;
+use aptos_types::{state_store::StateView, transaction::ViewFunctionError, vm_status::StatusCode};
 use aptos_vm::AptosVM;
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
@@ -29,6 +29,24 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct ViewFunctionApi {
     pub context: Arc<Context>,
+}
+
+pub fn convert_view_function_error(
+    error: &ViewFunctionError,
+    state_view: &impl StateView,
+    context: &Context,
+) -> (String, Option<StatusCode>) {
+    match error {
+        ViewFunctionError::MoveAbort(status, vm_error_code) => {
+            let vm_status = state_view
+                .as_converter(context.db.clone(), context.indexer_reader.clone())
+                .explain_vm_status(status, None);
+            (vm_status, *vm_error_code)
+        },
+        ViewFunctionError::ErrorMessage(message, vm_error_code) => {
+            (message.clone(), *vm_error_code)
+        },
+    }
 }
 
 #[derive(ApiRequest, Debug)]
@@ -143,15 +161,8 @@ fn view_request(
     );
 
     let values = output.values.map_err(|status| {
-        let (err_string, vm_error_code) = match status {
-            ViewFunctionError::ExecutionStatus(status, vm_error_code) => {
-                let vm_status = state_view
-                    .as_converter(context.db.clone(), context.indexer_reader.clone())
-                    .explain_vm_status(&status, None);
-                (vm_status, vm_error_code)
-            },
-            ViewFunctionError::ErrorMessage(message, vm_error_code) => (message, vm_error_code),
-        };
+        let (err_string, vm_error_code) =
+            convert_view_function_error(&status, &state_view, &context);
         BasicErrorWith404::bad_request_with_optional_vm_status_and_ledger_info(
             anyhow::anyhow!(err_string),
             AptosErrorCode::InvalidInput,
