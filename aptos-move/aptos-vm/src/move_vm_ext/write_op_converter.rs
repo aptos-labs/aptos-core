@@ -77,10 +77,10 @@ impl<'r> WriteOpConverter<'r> {
 
     pub(crate) fn convert_modules_into_write_ops(
         &self,
+        writes: &mut BTreeMap<StateKey, ModuleWrite<WriteOp>>,
         module_storage: &impl AptosModuleStorage,
         verified_module_bundle: impl Iterator<Item = (ModuleId, Bytes)>,
-    ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
-        let mut writes = BTreeMap::new();
+    ) -> PartialVMResult<()> {
         for (module_id, bytes) in verified_module_bundle {
             let addr = module_id.address();
             let name = module_id.name();
@@ -120,7 +120,7 @@ impl<'r> WriteOpConverter<'r> {
 
             writes.insert(state_key, ModuleWrite::new(module_id, write_op));
         }
-        Ok(writes)
+        Ok(())
     }
 
     pub(crate) fn convert_resource(
@@ -405,8 +405,12 @@ mod tests {
             (d.self_id(), d_bytes.clone()),
         ];
 
-        let results =
-            assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules.into_iter()));
+        let mut results = BTreeMap::new();
+        assert_ok!(woc.convert_modules_into_write_ops(
+            &mut results,
+            &code_storage,
+            modules.into_iter()
+        ));
         assert_eq!(results.len(), 4);
 
         // For `a`, `b`, and `c`, since they exist, metadata is inherited

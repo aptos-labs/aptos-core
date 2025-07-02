@@ -4,7 +4,7 @@
 
 use crate::{
     check_dependencies_and_charge_gas,
-    data_cache::TransactionDataCache,
+    data_cache::{DataCacheEntry, MoveVmDataCache},
     interpreter::InterpreterDebugInterface,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -101,7 +101,7 @@ impl NativeFunctions {
 
 pub struct NativeContext<'a, 'b, 'c> {
     interpreter: &'a dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache,
+    data_store: &'a mut dyn MoveVmDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
@@ -112,7 +112,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
         interpreter: &'a dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache,
+        data_store: &'a mut dyn MoveVmDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
@@ -147,12 +147,8 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-                self.module_storage,
-                self.resource_resolver,
-                &address,
-                ty,
-            )?;
+            let (entry, bytes_loaded) =
+                DataCacheEntry::new(self.module_storage, self.resource_resolver, &address, ty)?;
             let exists = entry.value().exists()?;
             self.data_store
                 .insert_resource(address, ty.clone(), entry)?;

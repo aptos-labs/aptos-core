@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
     dispatch_loader,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
@@ -59,7 +59,7 @@ impl MoveVM {
     pub fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -84,7 +84,7 @@ impl MoveVM {
     pub fn execute_loaded_function_impl(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         loader: &impl Loader,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
