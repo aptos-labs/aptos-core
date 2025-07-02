@@ -3,7 +3,7 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::Options;
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
@@ -533,13 +533,25 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                     caller_func.module_env.get_full_name_str()
                                                 );
                                             } else {
-                                                call_package_fun_from_diff_package_error(
-                                                    env,
-                                                    sites,
-                                                    &caller_func,
-                                                    &callee_func,
-                                                );
-                                                false
+                                                // With "unsafe package visibility" experiment on, all package functions are made
+                                                // visible in all modules with the same address. The prover uses this in filter mode
+                                                // to get around the lack of package-based target filtering functionality.
+                                                let options = env
+                                                    .get_extension::<Options>()
+                                                    .expect("Options is available");
+                                                if options.experiment_on(
+                                                    Experiment::UNSAFE_PACKAGE_VISIBILITY,
+                                                ) {
+                                                    true
+                                                } else {
+                                                    call_package_fun_from_diff_package_error(
+                                                        env,
+                                                        sites,
+                                                        &caller_func,
+                                                        &callee_func,
+                                                    );
+                                                    false
+                                                }
                                             }
                                         } else {
                                             call_package_fun_from_diff_addr_error(
