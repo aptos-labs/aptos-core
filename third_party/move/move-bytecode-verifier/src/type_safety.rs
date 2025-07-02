@@ -361,6 +361,8 @@ fn clos_pack(
     };
     // Check the captured arguments on the stack
     let param_sgn = verifier.resolver.signature_at(func_handle.parameters);
+    // Instruction consistency check has verified that the number of captured arguments
+    // is less than or equal to the number of parameters of the function.
     let captured_param_tys = mask.extract(&param_sgn.0, true);
     for ty in captured_param_tys.into_iter().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());

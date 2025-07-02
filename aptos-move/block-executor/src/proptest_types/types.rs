@@ -498,6 +498,17 @@ impl<
     fn user_txn_bytes_len(&self) -> usize {
         0
     }
+
+    fn from_txn(txn: aptos_types::transaction::Transaction) -> Self {
+        match txn {
+            aptos_types::transaction::Transaction::StateCheckpoint(_)
+            | aptos_types::transaction::Transaction::BlockEpilogue(_) => {
+                let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 0);
+                Self::from_behavior(behaivor)
+            },
+            _ => unreachable!(),
+        }
+    }
 }
 
 // TODO: try and test different strategies.

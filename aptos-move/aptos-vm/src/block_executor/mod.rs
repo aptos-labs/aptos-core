@@ -336,9 +336,16 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
-    /// Return the fee statement of the transaction.
-    /// Should never be called after vm_output is consumed.
+    /// Returns the fee statement of the transaction.
+    ///
+    /// TODO(gelash): Consider defensive access pattern to committed_output / vm_output.
     fn fee_statement(&self) -> FeeStatement {
+        if let Some(committed_output) = self.committed_output.get() {
+            if let Ok(Some(fee_statement)) = committed_output.try_extract_fee_statement() {
+                return fee_statement;
+            }
+            return FeeStatement::zero();
+        }
         *self
             .vm_output
             .lock()
@@ -493,7 +500,7 @@ impl<
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_end_info) = block_output.into_inner();
+                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
                 let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
@@ -508,7 +515,7 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_end_info))
+                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,

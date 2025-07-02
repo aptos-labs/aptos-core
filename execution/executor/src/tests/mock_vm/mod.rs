@@ -205,6 +205,7 @@ impl VMBlockExecutor for MockVM {
                     block_id,
                     BlockEndInfo::new_empty(),
                 ));
+                outputs.push(TransactionOutput::new_empty_success());
             }
         }
 
