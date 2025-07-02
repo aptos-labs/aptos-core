@@ -19,8 +19,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataRequest, StorageServiceRequest, TransactionDataRequestType,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     responses::{StorageServerSummary, StorageServiceResponse},
 };
@@ -124,6 +125,38 @@ impl OptimisticFetchRequest {
                     },
                 )
             },
+            DataRequest::GetNewTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(request) => {
+                        DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                            proof_version: target_version,
+                            start_version,
+                            end_version,
+                            include_events: request.include_events,
+                        })
+                    },
+                    TransactionDataRequestType::TransactionOutputData(_) => {
+                        DataRequest::GetTransactionOutputsWithProof(
+                            TransactionOutputsWithProofRequest {
+                                proof_version: target_version,
+                                start_version,
+                                end_version,
+                            },
+                        )
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(request) => {
+                        DataRequest::GetTransactionsOrOutputsWithProof(
+                            TransactionsOrOutputsWithProofRequest {
+                                proof_version: target_version,
+                                start_version,
+                                end_version,
+                                include_events: request.include_events,
+                                max_num_output_reductions: 0, // Fetch all outputs, or return transactions
+                            },
+                        )
+                    },
+                }
+            },
             request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         };
         let storage_request =
@@ -137,6 +170,7 @@ impl OptimisticFetchRequest {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_version,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_version,
             DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_version,
+            DataRequest::GetNewTransactionDataWithProof(request) => request.known_version,
             request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }
     }
@@ -147,6 +181,7 @@ impl OptimisticFetchRequest {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_epoch,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
             DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_epoch,
+            DataRequest::GetNewTransactionDataWithProof(request) => request.known_epoch,
             request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }
     }
@@ -161,6 +196,19 @@ impl OptimisticFetchRequest {
             DataRequest::GetNewTransactionsWithProof(_) => config.max_transaction_chunk_size,
             DataRequest::GetNewTransactionsOrOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
+            },
+            DataRequest::GetNewTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(_) => {
+                        config.max_transaction_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOutputData(_) => {
+                        config.max_transaction_output_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(_) => {
+                        config.max_transaction_output_chunk_size
+                    },
+                }
             },
             request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }

@@ -19,7 +19,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, SubscriptionStreamMetadata,
+        DataRequest, StorageServiceRequest, SubscriptionStreamMetadata, TransactionDataRequestType,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
     },
@@ -122,6 +122,38 @@ impl SubscriptionRequest {
                     },
                 )
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(request) => {
+                        DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                            proof_version: target_version,
+                            start_version,
+                            end_version,
+                            include_events: request.include_events,
+                        })
+                    },
+                    TransactionDataRequestType::TransactionOutputData(_) => {
+                        DataRequest::GetTransactionOutputsWithProof(
+                            TransactionOutputsWithProofRequest {
+                                proof_version: target_version,
+                                start_version,
+                                end_version,
+                            },
+                        )
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(request) => {
+                        DataRequest::GetTransactionsOrOutputsWithProof(
+                            TransactionsOrOutputsWithProofRequest {
+                                proof_version: target_version,
+                                start_version,
+                                end_version,
+                                include_events: request.include_events,
+                                max_num_output_reductions: 0, // Fetch all outputs, or return transactions
+                            },
+                        )
+                    },
+                }
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         };
         let storage_request =
@@ -143,6 +175,11 @@ impl SubscriptionRequest {
                     .known_version_at_stream_start
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request
                     .subscription_stream_metadata
                     .known_version_at_stream_start
@@ -169,6 +206,11 @@ impl SubscriptionRequest {
                     .subscription_stream_metadata
                     .known_epoch_at_stream_start
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_epoch_at_stream_start
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -184,6 +226,19 @@ impl SubscriptionRequest {
             DataRequest::SubscribeTransactionsOrOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
             },
+            DataRequest::GetNewTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(_) => {
+                        config.max_transaction_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOutputData(_) => {
+                        config.max_transaction_output_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(_) => {
+                        config.max_transaction_output_chunk_size
+                    },
+                }
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -198,6 +253,9 @@ impl SubscriptionRequest {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
@@ -216,6 +274,9 @@ impl SubscriptionRequest {
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
                 request.subscription_stream_index
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                request.subscription_stream_index
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -230,6 +291,9 @@ impl SubscriptionRequest {
                 request.subscription_stream_metadata
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request.subscription_stream_metadata
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
