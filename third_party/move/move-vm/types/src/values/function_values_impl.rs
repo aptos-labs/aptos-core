@@ -284,7 +284,7 @@ pub(crate) mod mock {
 
         fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
             // Didn't need it in the test
-            unimplemented!()
+            unimplemented!("clone_dyn is not implemented for MockAbstractFunction")
         }
 
         fn to_canonical_string(&self) -> String {

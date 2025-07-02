@@ -4610,6 +4610,7 @@ impl GlobalValue {
 #[cfg(feature = "fuzzing")]
 pub mod prop {
     use super::*;
+    use crate::values::function_values_impl::mock;
     #[allow(unused_imports)]
     use move_core_types::{
         ability::AbilitySet,
@@ -4765,35 +4766,39 @@ pub mod prop {
             L::Function => {
                 (
                     "[a-z][a-z0-9_]{0,8}",
-                    any::<u8>().prop_map(|bits| ClosureMask::new((bits % 16) as u64))
-                ).prop_flat_map(|(name, mask)| {
-                    let num_captured = mask.captured_count() as usize;
+                    any::<u8>().prop_map(|bits| ClosureMask::new((bits % 16) as u64)),
+                )
+                    .prop_flat_map(|(name, mask)| {
+                        let num_captured = mask.captured_count() as usize;
 
-                    // Generate random type arguments (0-3 type args)
-                    let ty_args_strategy = vec(type_tag_strategy(), 0..=3);
+                        // Generate random type arguments (0-3 type args)
+                        let ty_args_strategy = vec(type_tag_strategy(), 0..=3);
 
-                    // Generate random layouts for each captured value
-                    let captured_layouts_strategy = vec(layout_strategy(), num_captured);
+                        // Generate random layouts for each captured value
+                        let captured_layouts_strategy = vec(layout_strategy(), num_captured);
 
-                    (ty_args_strategy, captured_layouts_strategy)
-                        .prop_flat_map(move |(ty_args, captured_layouts)| {
-                            // Then recursively generate values matching those layouts
-                            let name = name.clone();
-                            let captured_strategies = captured_layouts.iter()
-                                .map(value_strategy_with_layout)
-                                .collect::<Vec<_>>();
+                        (ty_args_strategy, captured_layouts_strategy).prop_flat_map(
+                            move |(ty_args, captured_layouts)| {
+                                // Then recursively generate values matching those layouts
+                                let name = name.clone();
+                                let captured_strategies = captured_layouts
+                                    .iter()
+                                    .map(value_strategy_with_layout)
+                                    .collect::<Vec<_>>();
 
-                            captured_strategies.prop_map(move |captured_values| {
-                                let fun = crate::values::function_values_impl::mock::MockAbstractFunction::new(
-                                    &name,
-                                    ty_args.clone(),
-                                    mask,
-                                    captured_layouts.clone(),
-                                );
-                                Value::closure(Box::new(fun), captured_values)
-                            })
-                        })
-                }).boxed()
+                                captured_strategies.prop_map(move |captured_values| {
+                                    let fun = mock::MockAbstractFunction::new(
+                                        &name,
+                                        ty_args.clone(),
+                                        mask,
+                                        captured_layouts.clone(),
+                                    );
+                                    Value::closure(Box::new(fun), captured_values)
+                                })
+                            },
+                        )
+                    })
+                    .boxed()
             },
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
