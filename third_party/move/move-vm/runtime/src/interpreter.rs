@@ -576,9 +576,12 @@ where
                     let module_id = lazy_function.with_name_and_ty_args(
                         |module_opt, _func_name, ty_arg_tags| {
                             let Some(module_id) = module_opt else {
-                                // TODO(#15664): currently we need the module id for gas charging
-                                //   of calls, so we can't proceed here without one. But we want
-                                //   to be able to let scripts use closures.
+                                // Note:
+                                //   Module ID of a function should always exist because functions
+                                //   are defined in modules. The only way to have `None` here is
+                                //   when function is a script entrypoint. Note that in this case,
+                                //   entrypoint function cannot be packed as a closure, nor there
+                                //   can be any lambda-lifting in the script.
                                 let err = PartialVMError::new_invariant_violation(format!(
                                     "module id required to charge gas for function `{}`",
                                     lazy_function.to_canonical_string()
