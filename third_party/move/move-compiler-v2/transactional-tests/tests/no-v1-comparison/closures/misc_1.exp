@@ -1,4 +1,4 @@
-processed 6 tasks
+processed 7 tasks
 
 task 1 'run'. lines 31-31:
 Error: Function execution failed with VMError: {
@@ -11,3 +11,12 @@ Error: Function execution failed with VMError: {
 
 task 5 'run'. lines 48-48:
 return values: 42
+
+task 6 'publish'. lines 50-59:
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::o'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0xc0ffee::o,
+    indices: [],
+    offsets: [],
+}
