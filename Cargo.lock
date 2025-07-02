@@ -11123,6 +11123,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "test-case",
 ]
 
 [[package]]
