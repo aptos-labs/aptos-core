@@ -8,3 +8,9 @@ pub struct LRUEntry<K> {
     /// The key that is slightly older than the current entry. `None` for the oldest entry.
     pub next: Option<K>,
 }
+
+#[derive(Clone, Debug)]
+pub enum SpeculativeLRUEntry<K> {
+    Existing(LRUEntry<K>),
+    Deleted,
+}
