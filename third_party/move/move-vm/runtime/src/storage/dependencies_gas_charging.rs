@@ -13,15 +13,12 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter},
-    module_linker_error,
-};
+use move_vm_types::{gas::DependencyGasMeter, module_linker_error};
 use std::collections::BTreeSet;
 
 pub fn check_script_dependencies_and_check_gas(
     code_storage: &impl CodeStorage,
-    gas_meter: &mut impl GasMeter,
+    gas_meter: &mut impl DependencyGasMeter,
     traversal_context: &mut TraversalContext,
     serialized_script: &[u8],
 ) -> VMResult<()> {
@@ -41,7 +38,7 @@ pub fn check_script_dependencies_and_check_gas(
 
 pub fn check_type_tag_dependencies_and_charge_gas(
     module_storage: &impl ModuleStorage,
-    gas_meter: &mut impl GasMeter,
+    gas_meter: &mut impl DependencyGasMeter,
     traversal_context: &mut TraversalContext,
     ty_tags: &[TypeTag],
 ) -> VMResult<()> {
