@@ -61,6 +61,7 @@ where
     /// Checks the depth of a type. If the type is too deep, returns an error. Note that the type
     /// must be non-generic, i.e., all type substitutions must be performed. If needed, the check
     /// traverses multiple modules where inner structs and their fields are defined.
+    #[allow(dead_code)]
     pub(crate) fn check_depth_of_type(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
@@ -138,7 +139,8 @@ where
             | Type::U128
             | Type::U256
             | Type::Address
-            | Type::Signer => check_depth!(0),
+            | Type::Signer
+            | Type::Function { .. } => check_depth!(0),
             Type::Reference(ty) | Type::MutableReference(ty) => self
                 .recursive_check_depth_of_type(
                     gas_meter,
@@ -174,19 +176,6 @@ where
 
                 let formula = visit_struct!(idx);
                 check_depth!(formula.solve(&ty_arg_depths))
-            },
-            Type::Function { args, results, .. } => {
-                let mut ty_max_depth = depth;
-                for ty in args.iter().chain(results) {
-                    ty_max_depth = ty_max_depth.max(self.recursive_check_depth_of_type(
-                        gas_meter,
-                        traversal_context,
-                        ty,
-                        max_depth,
-                        check_depth!(1),
-                    )?);
-                }
-                ty_max_depth
             },
             Type::TyParam(_) => {
                 return Err(
@@ -300,7 +289,8 @@ where
             | Type::Signer
             | Type::U16
             | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
+            | Type::U256
+            | Type::Function { .. } => DepthFormula::constant(1),
             Type::Vector(ty) => self
                 .calculate_type_depth_formula(gas_meter, traversal_context, currently_visiting, ty)?
                 .scale(1),
@@ -342,25 +332,6 @@ where
                     idx,
                 )?;
                 struct_formula.subst(ty_arg_map)?.scale(1)
-            },
-            Type::Function {
-                args,
-                results,
-                abilities: _,
-            } => {
-                let inner_formulas = args
-                    .iter()
-                    .chain(results)
-                    .map(|ty| {
-                        self.calculate_type_depth_formula(
-                            gas_meter,
-                            traversal_context,
-                            currently_visiting,
-                            ty,
-                        )
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                DepthFormula::normalize(inner_formulas).scale(1)
             },
         })
     }

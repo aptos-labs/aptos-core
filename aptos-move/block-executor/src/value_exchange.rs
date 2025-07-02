@@ -20,7 +20,7 @@ use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
     value_serde::{ValueSerDeContext, ValueToIdentifierMapping},
-    value_traversal::find_identifiers_in_value,
+    value_traversal::find_delayed_field_ids_in_values,
     values::Value,
 };
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
@@ -125,7 +125,7 @@ where
             })?;
 
         let mut identifiers = HashSet::new();
-        find_identifiers_in_value(&value, &mut identifiers)?;
+        find_delayed_field_ids_in_values(&value, &mut identifiers)?;
         // TODO[agg_v2](cleanup): ugly way of converting delayed ids to generic type params.
         Ok(identifiers.into_iter().map(DelayedFieldID::from).collect())
     }

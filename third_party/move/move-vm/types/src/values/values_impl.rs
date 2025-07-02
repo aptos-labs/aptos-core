@@ -395,7 +395,7 @@ impl ValueImpl {
  *
  **************************************************************************************/
 impl ValueImpl {
-    fn copy_value(&self) -> PartialVMResult<Self> {
+    pub(crate) fn copy_value(&self) -> PartialVMResult<Self> {
         use ValueImpl::*;
 
         Ok(match self {
@@ -421,13 +421,7 @@ impl ValueImpl {
             // and copying is an internal API.
             DelayedFieldID { id } => DelayedFieldID { id: *id },
 
-            ClosureValue(Closure(fun, captured)) => {
-                let captured = captured
-                    .iter()
-                    .map(|v| v.copy_value())
-                    .collect::<PartialVMResult<_>>()?;
-                ClosureValue(Closure(fun.clone_dyn()?, captured))
-            },
+            ClosureValue(closure) => ClosureValue(closure.copy_value()?),
         })
     }
 }
@@ -523,7 +517,7 @@ impl ContainerRef {
  **************************************************************************************/
 
 impl ValueImpl {
-    fn equals(&self, other: &Self) -> PartialVMResult<bool> {
+    pub(crate) fn equals(&self, other: &Self) -> PartialVMResult<bool> {
         use ValueImpl::*;
 
         let res = match (self, other) {
@@ -551,20 +545,7 @@ impl ValueImpl {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
-            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
-                    && captured1.len() == captured2.len()
-                {
-                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        if !v1.equals(v2)? {
-                            return Ok(false);
-                        }
-                    }
-                    true
-                } else {
-                    false
-                }
-            },
+            (ClosureValue(l), ClosureValue(r)) => l.equals(r)?,
 
             (Invalid, _)
             | (U8(_), _)
@@ -592,7 +573,7 @@ impl ValueImpl {
         Ok(res)
     }
 
-    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+    pub(crate) fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
         use ValueImpl::*;
 
         let res = match (self, other) {
@@ -617,20 +598,7 @@ impl ValueImpl {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
-            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                let o = fun1.cmp_dyn(fun2.as_ref())?;
-                if o == Ordering::Equal {
-                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        let o = v1.compare(v2)?;
-                        if o != Ordering::Equal {
-                            return Ok(o);
-                        }
-                    }
-                    captured1.iter().len().cmp(&captured2.len())
-                } else {
-                    o
-                }
-            },
+            (ClosureValue(l), ClosureValue(r)) => l.compare(r)?,
 
             (Invalid, _)
             | (U8(_), _)
@@ -4384,17 +4352,6 @@ impl Container {
     }
 }
 
-impl Closure {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
-        let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len()) {
-            for val in captured {
-                val.visit_impl(visitor, depth + 1);
-            }
-        }
-    }
-}
-
 impl ContainerRef {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
         use ContainerRef::*;
@@ -4426,7 +4383,7 @@ impl IndexedRef {
 }
 
 impl ValueImpl {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    pub(crate) fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
         use ValueImpl::*;
 
         match self {

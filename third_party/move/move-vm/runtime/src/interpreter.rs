@@ -41,10 +41,11 @@ use move_core_types::{
 };
 use move_vm_types::{
     debug_write, debug_writeln,
-    gas::{GasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, GasMeter, SimpleInstruction},
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
+    value_traversal::check_value_depth,
     values::{
         self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
         Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
@@ -97,6 +98,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
+    #[allow(dead_code)]
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
 }
 
@@ -1357,6 +1359,41 @@ where
         }
     }
 
+    fn check_pack_n_values(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        _ty: &Type,
+        num_values_to_pack: usize,
+    ) -> PartialVMResult<()> {
+        let limit = match self.vm_config.max_value_nest_depth {
+            Some(limit) => limit,
+            None => return Ok(()),
+        };
+        for value in self.operand_stack.last_n(num_values_to_pack)? {
+            // Subtract 1 from limit because we need to check if we can pack 1 extra layer.
+            let adjusted_limit = limit.saturating_sub(1);
+            check_value_depth(value, adjusted_limit)?;
+        }
+
+        // TODO: uncomment
+        // if self.vm_config.deserializer_config.max_binary_format_version >= VERSION_8 {
+        //     let limit = match self.vm_config.max_value_nest_depth {
+        //         Some(limit) => limit,
+        //         None => return Ok(()),
+        //     };
+        //     for value in self.operand_stack.last_n(num_values_to_pack)? {
+        //         // Subtract 1 from limit because we need to check if we can pack 1 extra layer.
+        //         let adjusted_limit = limit.saturating_sub(1);
+        //         check_value_depth(value, adjusted_limit)?;
+        //     }
+        // } else {
+        //     self.ty_depth_checker
+        //         .check_depth_of_type(gas_meter, traversal_context, ty)?;
+        // }
+        Ok(())
+    }
+
     //
     // Debugging and logging helpers.
     //
@@ -2020,32 +2057,28 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let mut get_field_count_charge_gas_and_check_depth =
-                            || -> PartialVMResult<u16> {
-                                let field_count = self.field_count(*sd_idx);
-                                let struct_type = self.get_struct_ty(*sd_idx);
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    &struct_type,
-                                )?;
-                                Ok(field_count)
-                            };
-
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
                                 &frame_cache.per_instruction_cache[self.pc as usize];
                             if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
                                 *field_count
                             } else {
-                                let field_count = get_field_count_charge_gas_and_check_depth()?;
+                                let field_count = self.field_count(*sd_idx);
                                 frame_cache.per_instruction_cache[self.pc as usize] =
                                     PerInstructionCache::Pack(field_count);
                                 field_count
                             }
                         } else {
-                            get_field_count_charge_gas_and_check_depth()?
+                            self.field_count(*sd_idx)
                         };
+
+                        let struct_type = self.get_struct_ty(*sd_idx);
+                        interpreter.check_pack_n_values(
+                            gas_meter,
+                            traversal_context,
+                            &struct_type,
+                            field_count as usize,
+                        )?;
 
                         gas_meter.charge_pack(
                             false,
@@ -2059,10 +2092,11 @@ impl Frame {
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        interpreter.ty_depth_checker.check_depth_of_type(
+                        interpreter.check_pack_n_values(
                             gas_meter,
                             traversal_context,
                             &struct_type,
+                            info.field_count as usize,
                         )?;
                         gas_meter.charge_pack_variant(
                             false,
@@ -2091,13 +2125,21 @@ impl Frame {
                                     gas_meter.charge_create_ty(*ty_count)?;
                                 }
 
-                                let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                                let (_ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                interpreter.ty_depth_checker.check_depth_of_type(
-                                    gas_meter,
-                                    traversal_context,
-                                    ty,
-                                )?;
+                                // TODO: uncomment
+                                // if interpreter
+                                //     .vm_config
+                                //     .deserializer_config
+                                //     .max_binary_format_version
+                                //     < VERSION_8
+                                // {
+                                //     interpreter.ty_depth_checker.check_depth_of_type(
+                                //         gas_meter,
+                                //         traversal_context,
+                                //         ty,
+                                //     )?;
+                                // }
                                 Ok(self.field_instantiation_count(*si_idx))
                             };
 
@@ -2120,6 +2162,24 @@ impl Frame {
                             get_field_count_charge_gas_and_check_depth(frame_cache)?
                         };
 
+                        // TODO: uncomment
+                        // if interpreter
+                        //     .vm_config
+                        //     .deserializer_config
+                        //     .max_binary_format_version
+                        //     >= VERSION_8
+                        {
+                            if let Some(limit) = interpreter.vm_config.max_value_nest_depth {
+                                for value in
+                                    interpreter.operand_stack.last_n(field_count as usize)?
+                                {
+                                    // Subtract 1 from limit because we need to check if we can pack 1 extra layer.
+                                    let adjusted_limit = limit.saturating_sub(1);
+                                    check_value_depth(value, adjusted_limit)?;
+                                }
+                            }
+                        }
+
                         gas_meter.charge_pack(
                             true,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -2139,13 +2199,15 @@ impl Frame {
 
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
+
+                        let info = self.get_struct_variant_instantiation_at(*si_idx);
+                        interpreter.check_pack_n_values(
                             gas_meter,
                             traversal_context,
                             ty,
+                            info.field_count as usize,
                         )?;
 
-                        let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
                             true,
                             interpreter
@@ -2190,14 +2252,8 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2217,14 +2273,8 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2644,10 +2694,11 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
+                        interpreter.check_pack_n_values(
                             gas_meter,
                             traversal_context,
                             ty,
+                            *num as usize,
                         )?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),

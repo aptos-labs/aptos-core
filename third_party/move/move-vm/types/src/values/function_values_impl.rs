@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, Value, ValueImpl};
+use crate::{
+    values::{
+        Container, DeserializationSeed, SerializationReadyValue, VMValueCast, Value, ValueImpl,
+    },
+    views::ValueVisitor,
+};
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -17,9 +22,11 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     fmt,
     fmt::{Debug, Display, Formatter},
+    rc::Rc,
 };
 
 /// A trait describing a function which can be executed. If this is a generic
@@ -35,10 +42,12 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
-pub struct Closure(
-    pub(crate) Box<dyn AbstractFunction>,
-    pub(crate) Vec<ValueImpl>,
-);
+pub struct Closure {
+    fun: Box<dyn AbstractFunction>,
+    // Note: captured arguments are never shared, but we store them behind a shared pointer so they
+    // can be traversed in the same manner as containers.
+    captured_arguments: Rc<RefCell<Vec<ValueImpl>>>,
+}
 
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -57,12 +66,81 @@ pub struct SerializedFunctionData {
 
 impl Closure {
     pub fn pack(fun: Box<dyn AbstractFunction>, captured: impl IntoIterator<Item = Value>) -> Self {
-        Self(fun, captured.into_iter().map(|v| v.0).collect())
+        let captured_arguments = captured.into_iter().map(|v| v.0).collect();
+        Self {
+            fun,
+            captured_arguments: Rc::new(RefCell::new(captured_arguments)),
+        }
+    }
+
+    pub(crate) fn copy_value(&self) -> PartialVMResult<Self> {
+        let captured_arguments = self
+            .captured_arguments
+            .borrow()
+            .iter()
+            .map(|v| v.copy_value())
+            .collect::<PartialVMResult<_>>()?;
+        Ok(Closure {
+            fun: self.fun.clone_dyn()?,
+            captured_arguments: Rc::new(RefCell::new(captured_arguments)),
+        })
+    }
+
+    pub(crate) fn equals(&self, other: &Self) -> PartialVMResult<bool> {
+        let captured_arguments = self.captured_arguments.borrow();
+        let other_captured_arguments = other.captured_arguments.borrow();
+
+        let equal = if self.fun.cmp_dyn(other.fun.as_ref())? == Ordering::Equal
+            && captured_arguments.len() == other_captured_arguments.len()
+        {
+            for (v1, v2) in captured_arguments
+                .iter()
+                .zip(other_captured_arguments.iter())
+            {
+                if !v1.equals(v2)? {
+                    return Ok(false);
+                }
+            }
+            true
+        } else {
+            false
+        };
+        Ok(equal)
+    }
+
+    pub(crate) fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+        let captured_arguments = self.captured_arguments.borrow();
+        let other_captured_arguments = other.captured_arguments.borrow();
+
+        let o = self.fun.cmp_dyn(other.fun.as_ref())?;
+        Ok(if o == Ordering::Equal {
+            for (v1, v2) in captured_arguments
+                .iter()
+                .zip(other_captured_arguments.iter())
+            {
+                let o = v1.compare(v2)?;
+                if o != Ordering::Equal {
+                    return Ok(o);
+                }
+            }
+            captured_arguments
+                .iter()
+                .len()
+                .cmp(&other_captured_arguments.len())
+        } else {
+            o
+        })
     }
 
     pub fn unpack(self) -> (Box<dyn AbstractFunction>, impl Iterator<Item = Value>) {
-        let Self(fun, captured) = self;
-        (fun, captured.into_iter().map(Value))
+        let Self {
+            fun,
+            captured_arguments,
+        } = self;
+        let captured_arguments = Rc::into_inner(captured_arguments)
+            .expect("Captured arguments are never shared")
+            .into_inner();
+        (fun, captured_arguments.into_iter().map(Value))
     }
 
     pub fn into_call_data(
@@ -79,22 +157,43 @@ impl Closure {
             )
         }
     }
+
+    pub(crate) fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+        let captured_arguments = self.captured_arguments.borrow();
+        if visitor.visit_closure(depth, captured_arguments.len()) {
+            for val in captured_arguments.iter() {
+                val.visit_impl(visitor, depth + 1);
+            }
+        }
+    }
 }
 
 impl Debug for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(fun, captured) = self;
-        write!(f, "Closure({}, {:?})", fun.to_canonical_string(), captured)
+        write!(
+            f,
+            "Closure({}, {:?})",
+            self.fun.to_canonical_string(),
+            self.captured_arguments.borrow(),
+        )
     }
 }
 
 impl Display for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(fun, captured) = self;
-        let captured = fun
-            .closure_mask()
-            .format_arguments(captured.iter().map(|v| v.to_string()).collect());
-        write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
+        let captured = self.fun.closure_mask().format_arguments(
+            self.captured_arguments
+                .borrow()
+                .iter()
+                .map(|v| v.to_string())
+                .collect(),
+        );
+        write!(
+            f,
+            "{}({})",
+            self.fun.to_canonical_string(),
+            captured.join(", ")
+        )
     }
 }
 
@@ -110,7 +209,12 @@ impl VMValueCast<Closure> for Value {
 
 impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let Closure(fun, captured) = self.value;
+        let Closure {
+            fun,
+            captured_arguments,
+        } = self.value;
+        let captured_arguments = captured_arguments.borrow();
+
         let fun_ext = self
             .ctx
             .required_function_extension()
@@ -118,13 +222,17 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
-        let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+        let mut seq = serializer.serialize_seq(Some(5 + captured_arguments.len() * 2))?;
         seq.serialize_element(&data.format_version)?;
         seq.serialize_element(&data.module_id)?;
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
-        for (layout, value) in data.captured_layouts.into_iter().zip(captured) {
+        for (layout, value) in data
+            .captured_layouts
+            .into_iter()
+            .zip(captured_arguments.iter())
+        {
             seq.serialize_element(&layout)?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,
@@ -168,7 +276,7 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
 
         let num_captured_values = mask.captured_count() as usize;
         let mut captured_layouts = Vec::with_capacity(num_captured_values);
-        let mut captured = Vec::with_capacity(num_captured_values);
+        let mut captured_arguments = Vec::with_capacity(num_captured_values);
         for _ in 0..num_captured_values {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
             match seq.next_element_seed(DeserializationSeed {
@@ -177,14 +285,14 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
             })? {
                 Some(v) => {
                     captured_layouts.push(layout);
-                    captured.push(v.0)
+                    captured_arguments.push(v.0)
                 },
-                None => return Err(A::Error::invalid_length(captured.len(), &self)),
+                None => return Err(A::Error::invalid_length(captured_arguments.len(), &self)),
             }
         }
         // If the sequence length is known, check whether there are no extra values
         if matches!(seq.size_hint(), Some(remaining) if remaining != 0) {
-            return Err(A::Error::invalid_length(captured.len(), &self));
+            return Err(A::Error::invalid_length(captured_arguments.len(), &self));
         }
         let fun = fun_ext
             .create_from_serialization_data(SerializedFunctionData {
@@ -196,7 +304,10 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
                 captured_layouts,
             })
             .map_err(A::Error::custom)?;
-        Ok(Closure(fun, captured))
+        Ok(Closure {
+            fun,
+            captured_arguments: Rc::new(RefCell::new(captured_arguments)),
+        })
     }
 }
 
@@ -209,4 +320,103 @@ where
         Some(x) => Ok(x),
         None => Err(A::Error::custom("expected more elements")),
     }
+}
+
+/// A pre-order traversal over the value tree. For each node, its depth is tracked. In addition,
+/// callers can provide a callback to perform actions over each node.
+///
+/// INVARIANT: the traversal does not traverse reference fields. When encountering a reference, it
+/// is returned to the caller to handle via callback.
+pub(crate) fn walk_preorder<F, E>(value: &ValueImpl, mut visit: F) -> Result<(), E>
+where
+    F: FnMut(&ValueImpl, u64) -> Result<(), E>,
+{
+    /// Work items kept on the explicit stack.
+    enum Item<'v> {
+        /// A node we already own by shared reference.
+        Direct { value: &'v ValueImpl, depth: u64 },
+        /// An element that lives inside a vector behind a shared pointer.
+        Element {
+            rc: Rc<RefCell<Vec<ValueImpl>>>,
+            idx: usize,
+            depth: u64,
+        },
+    }
+
+    fn push(value: &ValueImpl, depth: u64, stack: &mut Vec<Item>) {
+        use ValueImpl as V;
+        match value {
+            // Leaf nodes:
+            V::Invalid
+            | V::U8(_)
+            | V::U16(_)
+            | V::U32(_)
+            | V::U64(_)
+            | V::U128(_)
+            | V::U256(_)
+            | V::Bool(_)
+            | V::Address(_)
+            | V::DelayedFieldID { .. } => (),
+
+            // References are consider to be leaves as well. No need to push anything.
+            V::ContainerRef(_) | V::IndexedRef(_) => (),
+
+            ValueImpl::ClosureValue(closure) => {
+                let len = closure.captured_arguments.borrow().len();
+                for idx in (0..len).rev() {
+                    stack.push(Item::Element {
+                        rc: Rc::clone(&closure.captured_arguments),
+                        idx,
+                        depth: depth + 1,
+                    });
+                }
+            },
+
+            ValueImpl::Container(container) => {
+                use Container::*;
+                match container {
+                    Locals(rc) | Vec(rc) | Struct(rc) => {
+                        let len = rc.borrow().len();
+                        for idx in (0..len).rev() {
+                            stack.push(Item::Element {
+                                rc: Rc::clone(rc),
+                                idx,
+                                depth: depth + 1,
+                            });
+                        }
+                    },
+                    // These are leaves. No need to push.
+                    VecU8(_) | VecU64(_) | VecU128(_) | VecBool(_) | VecAddress(_) | VecU16(_)
+                    | VecU32(_) | VecU256(_) => (),
+                }
+            },
+        }
+    }
+
+    let mut stack = vec![Item::Direct { value, depth: 1 }];
+
+    while let Some(item) = stack.pop() {
+        match item {
+            Item::Direct { value, depth } => {
+                visit(value, depth)?;
+                push(value, depth, &mut stack);
+            },
+
+            Item::Element { rc, idx, depth } => {
+                let guard = rc.borrow();
+                let value = &guard[idx];
+                visit(value, depth)?;
+                push(value, depth, &mut stack);
+            },
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    // cuse super::*;
+
+    #[test]
+    fn test() {}
 }

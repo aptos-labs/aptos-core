@@ -3,84 +3,115 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Closure, Container, Value, ValueImpl},
+    values::{walk_preorder, Container, Value, ValueImpl},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use std::collections::HashSet;
 
-// TODO[agg_v2](cleanup): This is a temporary traversal which collects
-//   identifiers stored in values. We do not use ValueVisitor because
-//   we want to allow for errors. It can be optimized away.
-pub fn find_identifiers_in_value(
+/// For a given VM value, traverses it to find all delayed fields. For each delayed field, its ID
+/// is added to the set. In case of duplicates, an error is returned. Value must be serializable,
+/// i.e., do not contain references.
+pub fn find_delayed_field_ids_in_values(
     value: &Value,
     identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
-    find_identifiers_in_value_impl(&value.0, identifiers)
-}
+    walk_preorder(&value.0, |value, _| {
+        use ValueImpl as V;
 
-fn find_identifiers_in_value_impl(
-    value: &ValueImpl,
-    identifiers: &mut HashSet<u64>,
-) -> PartialVMResult<()> {
-    match value {
-        ValueImpl::U8(_)
-        | ValueImpl::U16(_)
-        | ValueImpl::U32(_)
-        | ValueImpl::U64(_)
-        | ValueImpl::U128(_)
-        | ValueImpl::U256(_)
-        | ValueImpl::Bool(_)
-        | ValueImpl::Address(_) => {},
+        match value {
+            V::DelayedFieldID { id } => {
+                if !identifiers.insert(id.as_u64()) {
+                    return Err(code_invariant_error(
+                        "Duplicated identifiers for Move value".to_string(),
+                    ));
+                }
+            },
 
-        ValueImpl::Container(c) => match c {
-            Container::Locals(_) => {
+            // Irrelevant.
+            V::U8(_)
+            | V::U16(_)
+            | V::U32(_)
+            | V::U64(_)
+            | V::U128(_)
+            | V::U256(_)
+            | V::Bool(_)
+            | V::Address(_)
+            | V::ClosureValue(_)
+            | V::Container(Container::Vec(_))
+            | V::Container(Container::Struct(_))
+            | V::Container(Container::VecU8(_))
+            | V::Container(Container::VecU16(_))
+            | V::Container(Container::VecU32(_))
+            | V::Container(Container::VecU64(_))
+            | V::Container(Container::VecU128(_))
+            | V::Container(Container::VecU256(_))
+            | V::Container(Container::VecBool(_))
+            | V::Container(Container::VecAddress(_)) => (),
+
+            // There variants should not be stored, so they are unreachable.
+            V::Invalid
+            | V::Container(Container::Locals(_))
+            | V::ContainerRef(_)
+            | V::IndexedRef(_) => {
                 return Err(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 ))
             },
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
 
-            Container::VecU8(_)
-            | Container::VecU64(_)
-            | Container::VecU128(_)
-            | Container::VecBool(_)
-            | Container::VecAddress(_)
-            | Container::VecU16(_)
-            | Container::VecU32(_)
-            | Container::VecU256(_) => {},
+pub fn check_value_depth(value: &Value, limit: u64) -> PartialVMResult<()> {
+    walk_preorder(&value.0, |value, depth| {
+        if depth > limit {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+        }
 
-            Container::Vec(v) | Container::Struct(v) => {
-                for val in v.borrow().iter() {
-                    find_identifiers_in_value_impl(val, identifiers)?;
-                }
+        use ValueImpl as V;
+        match value {
+            // Irrelevant.
+            V::U8(_)
+            | V::U16(_)
+            | V::U32(_)
+            | V::U64(_)
+            | V::U128(_)
+            | V::U256(_)
+            | V::Bool(_)
+            | V::Address(_)
+            | V::ClosureValue(_)
+            | V::DelayedFieldID { .. }
+            | V::Container(Container::Vec(_))
+            | V::Container(Container::Struct(_))
+            | V::Container(Container::VecU8(_))
+            | V::Container(Container::VecU16(_))
+            | V::Container(Container::VecU32(_))
+            | V::Container(Container::VecU64(_))
+            | V::Container(Container::VecU128(_))
+            | V::Container(Container::VecU256(_))
+            | V::Container(Container::VecBool(_))
+            | V::Container(Container::VecAddress(_)) => (),
+
+            // We should not be checking the depth for these variants: depth is only check when
+            // containers / closures are packed.
+            V::Invalid
+            | V::Container(Container::Locals(_))
+            | V::ContainerRef(_)
+            | V::IndexedRef(_) => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                ))
             },
-        },
-
-        ValueImpl::ClosureValue(Closure(_, captured)) => {
-            for val in captured.iter() {
-                find_identifiers_in_value_impl(val, identifiers)?;
-            }
-        },
-
-        ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
-            return Err(PartialVMError::new(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            ))
-        },
-
-        ValueImpl::DelayedFieldID { id } => {
-            if !identifiers.insert(id.as_u64()) {
-                return Err(code_invariant_error(
-                    "Duplicated identifiers for Move value".to_string(),
-                ));
-            }
-        },
-    }
+        }
+        Ok(())
+    })?;
     Ok(())
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::Struct};
     use claims::{assert_err, assert_ok, assert_some};
@@ -89,7 +120,7 @@ mod test {
     #[test]
     fn test_traversal_in_invalid_value() {
         let a = Value::master_signer_reference(AccountAddress::random());
-        assert_err!(find_identifiers_in_value(&a, &mut HashSet::new()));
+        assert_err!(find_delayed_field_ids_in_values(&a, &mut HashSet::new()));
     }
 
     #[test]
@@ -101,7 +132,7 @@ mod test {
         let e = Value::struct_(Struct::pack(vec![c, d]));
 
         let mut ids = HashSet::new();
-        assert_ok!(find_identifiers_in_value(&e, &mut ids));
+        assert_ok!(find_delayed_field_ids_in_values(&e, &mut ids));
         assert!(ids.is_empty())
     }
 
@@ -119,7 +150,7 @@ mod test {
         let e = Value::struct_(Struct::pack(vec![c, d]));
 
         let mut ids = HashSet::new();
-        assert_ok!(find_identifiers_in_value(&e, &mut ids));
+        assert_ok!(find_delayed_field_ids_in_values(&e, &mut ids));
         assert_eq!(ids.len(), 4);
 
         assert_some!(ids.get(&0));
@@ -135,6 +166,6 @@ mod test {
         let c = Value::struct_(Struct::pack(vec![a, b]));
 
         let mut ids = HashSet::new();
-        assert_err!(find_identifiers_in_value(&c, &mut ids));
+        assert_err!(find_delayed_field_ids_in_values(&c, &mut ids));
     }
 }
