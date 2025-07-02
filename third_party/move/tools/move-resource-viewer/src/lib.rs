@@ -457,8 +457,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
             TypeTag::Function(..) => {
-                // TODO(#15664) implement functions for fat types"
-                todo!("functions for fat types")
+                // TODO(#15664) implement functions for fat types
+                bail!("TODO: support functions for fat types")
             },
         })
     }
