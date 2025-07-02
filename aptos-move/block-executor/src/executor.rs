@@ -1287,14 +1287,16 @@ where
                     // calculation and the sum of them could be larger than the actual value we
                     // burn. Instead we use the total amount (which is the total we've burnt)
                     // minus the storage deposit (round up), to avoid over distribution.
-                    let gas_unit_available_to_distribute = total_gas_unit
-                        .saturating_sub(fee_statement.storage_fee_used().div_ceil(gas_price));
                     // We burn a fix amount of gas per gas unit.
                     let gas_price_to_burn = self.config.onchain.gas_price_to_burn();
-                    if gas_price > gas_price_to_burn && gas_unit_available_to_distribute > 0 {
-                        let fee_to_distribute =
-                            gas_unit_available_to_distribute * (gas_price - gas_price_to_burn);
-                        *amount.entry(proposer_index).or_insert(0) += fee_to_distribute;
+                    if gas_price > gas_price_to_burn {
+                        let gas_unit_available_to_distribute = total_gas_unit
+                            .saturating_sub(fee_statement.storage_fee_used().div_ceil(gas_price));
+                        if gas_unit_available_to_distribute > 0 {
+                            let fee_to_distribute =
+                                gas_unit_available_to_distribute * (gas_price - gas_price_to_burn);
+                            *amount.entry(proposer_index).or_insert(0) += fee_to_distribute;
+                        }
                     }
                 }
             }
