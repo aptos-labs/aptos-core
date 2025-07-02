@@ -1069,11 +1069,11 @@ impl ExpTranslator<'_, '_, '_> {
                         vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
-                Type::function(
-                    Type::tuple(arg_tys),
-                    Type::tuple(result_tys),
-                    self.parent.translate_abilities(abilities),
-                )
+                let ability_set = self.parent.translate_abilities(abilities);
+                if ability_set.has_key() {
+                    self.error(loc, "function types cannot have `key` ability");
+                }
+                Type::function(Type::tuple(arg_tys), Type::tuple(result_tys), ability_set)
             },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => {
