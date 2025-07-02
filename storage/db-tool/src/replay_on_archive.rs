@@ -79,11 +79,9 @@ impl Opt {
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
             error!("{} failed transactions", all_errors.len());
-            /* errors were printed as found.
             for e in all_errors {
                 error!("Failed: {}", e);
             }
-             */
             process::exit(2);
         }
         Ok(())

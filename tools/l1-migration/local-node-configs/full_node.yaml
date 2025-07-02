@@ -1,0 +1,29 @@
+base:
+    data_dir: "PATH_TO_YOUR_LOCAL_DB_FOLDER"
+    role: "full_node"
+    waypoint:
+        from_file: "PATH_TO_YOUR_WAYPOINT_FILE"
+
+execution:
+    genesis_file_location: "PATH_TO_YOUR_GENESIS_BLOB"
+
+# VFN network configuration - connects to both validator and public networks
+full_node_networks:
+    # Public network for other fullnodes
+    - listen_address: "/ip4/127.0.0.1/tcp/6180"
+      discovery_method: "onchain"
+      network_id: "public"
+    
+api:
+    enabled: true
+    address: 0.0.0.0:8081
+
+storage:
+    backup_service_address: 0.0.0.0:6186
+    rocksdb_configs:
+        enable_storage_sharding: false
+
+state_sync:
+    state_sync_driver:
+        bootstrapping_mode: ApplyTransactionOutputsFromGenesis
+        continuous_syncing_mode: ExecuteTransactionsOrApplyOutputs
