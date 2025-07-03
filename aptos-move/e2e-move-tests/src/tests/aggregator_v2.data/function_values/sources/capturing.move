@@ -1,12 +1,13 @@
 module 0x1::capturing {
     use aptos_framework::aggregator_v2::create_unbounded_aggregator;
-    use 0x1::proxy::destroy;
 
-    public entry fun capture_aggregator(account: &signer, value: u64, expected: u64) {
-        let aggregator = destroy(account);
+    public entry fun capture_aggregator() {
+        let aggregator = create_unbounded_aggregator<u64>();
+        aggregator.add(1000);
+
         let apply = |x| 0x1::function_store::fetch_and_add(aggregator, x);
-        let result = apply(value);
-        assert!(result == expected, 1);
+        let result = apply(100);
+        assert!(result == 1100, 1);
     }
 
     public entry fun to_bytes_with_captured_aggregator() {

@@ -109,6 +109,7 @@ module aptos_framework::genesis {
         execution_config::set(&aptos_framework_account, execution_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
+        stake::initialize_pending_transaction_fee(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         staking_config::initialize(
             &aptos_framework_account,

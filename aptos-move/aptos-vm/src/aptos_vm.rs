@@ -1381,7 +1381,7 @@ impl AptosVM {
                 }
 
                 let size_if_old_module_exists = module_storage
-                    .fetch_module_size_in_bytes(addr, name)?
+                    .unmetered_get_module_size(addr, name)?
                     .map(|v| v as u64);
                 if let Some(old_size) = size_if_old_module_exists {
                     gas_meter
@@ -2080,7 +2080,6 @@ impl AptosVM {
         &self,
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
-        module_storage: &impl AptosModuleStorage,
         change_set: &VMChangeSet,
         module_write_set: &ModuleWriteSet,
     ) -> PartialVMResult<()> {
@@ -2090,12 +2089,13 @@ impl AptosVM {
         );
 
         // All Move executions satisfy the read-before-write property. Thus, we need to read each
-        // access path that the write set is going to update.
-        for write in module_write_set.writes().values() {
-            // It is sufficient to simply get the size in order to enforce read-before-write.
-            module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
-                .map_err(|e| e.to_partial())?;
+        // access path that the write set is going to update (because the write set comes directly
+        // form the transaction payload).
+        for state_key in module_write_set.writes().keys() {
+            executor_view.read_state_value(state_key).map_err(|err| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(format!("Cannot read module at {:?}: {:?}", state_key, err))
+            })?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;
@@ -2153,7 +2153,6 @@ impl AptosVM {
         self.read_change_set(
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
-            code_storage,
             &change_set,
             &module_write_set,
         )
@@ -2191,7 +2190,9 @@ impl AptosVM {
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
         );
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -2199,7 +2200,7 @@ impl AptosVM {
                 vec![],
                 args,
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2272,7 +2273,8 @@ impl AptosVM {
                 .as_move_value(),
         ];
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         session
             .execute_function_bypass_visibility(
@@ -2281,7 +2283,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())
@@ -2336,7 +2338,8 @@ impl AptosVM {
             MoveValue::Vector(amounts),
         ];
 
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         let output = match session
             .execute_function_bypass_visibility(
@@ -2345,7 +2348,7 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 module_storage,
             )
             .map(|_return_vals| ())

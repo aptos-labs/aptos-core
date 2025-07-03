@@ -285,16 +285,13 @@ mod dbtool_tests {
         backup_dir: PathBuf,
         old_db_dir: PathBuf,
         new_db_dir: PathBuf,
-        force_sharding: bool,
     ) -> (Runtime, String) {
         use aptos_config::config::{
             RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             NO_OP_STORAGE_PRUNER_CONFIG,
         };
-        use aptos_db::utils::iterators::PrefixedStateValueIterator;
         use aptos_db_indexer::utils::PrefixedStateValueIterator as IndexerPrefixedStateValueIterator;
         use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-        use itertools::zip_eq;
         let db = test_execution_with_storage_impl_inner(false, old_db_dir.as_path());
         let (rt, port) = start_local_backup_service(Arc::clone(&db));
         let server_addr = format!(" http://localhost:{}", port);
@@ -446,132 +443,77 @@ mod dbtool_tests {
             "--local-fs-dir".to_string(),
             backup_dir.as_path().to_str().unwrap().to_string(),
         ];
-        if force_sharding {
-            let additional_args = vec!["--enable-storage-sharding", "--enable-state-indices"]
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
-            restore_args.extend(additional_args);
-        }
+        let additional_args = vec!["--enable-storage-sharding", "--enable-state-indices"]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        restore_args.extend(additional_args);
         rt.block_on(DBTool::try_parse_from(restore_args).unwrap().run())
             .unwrap();
-
-        // verify the new DB has the same data as the original DB
-        let db_config = if !force_sharding {
-            RocksdbConfigs::default()
-        } else {
-            RocksdbConfigs {
-                enable_storage_sharding: true,
-                ..Default::default()
-            }
-        };
 
         // assert the kv are the same in db and new_db
         // current all the kv are still stored in the ledger db
         //
 
-        if !force_sharding {
-            let (_ledger_db, tree_db, state_kv_db) =
-                AptosDB::open_dbs(&StorageDirPaths::from_path(new_db_dir), db_config, false, 0)
-                    .unwrap();
-            for ver in start..=end {
-                let new_iter = PrefixedStateValueIterator::new(
-                    &state_kv_db,
-                    StateKeyPrefix::new(AccessPath, b"".to_vec()),
-                    None,
-                    ver,
-                )
-                .unwrap();
+        let internal_indexer_db =
+            InternalIndexerDBService::get_indexer_db_for_restore(new_db_dir.as_path()).unwrap();
 
-                let old_iter = db
-                    .deref()
-                    .get_prefixed_state_value_iterator(
-                        &StateKeyPrefix::new(AccessPath, b"".to_vec()),
-                        None,
-                        ver,
-                    )
-                    .unwrap();
+        let aptos_db: Arc<dyn DbReader> = Arc::new(
+            AptosDB::open(
+                StorageDirPaths::from_path(new_db_dir),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs::default(),
+                false,
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                1000,
+                Some(internal_indexer_db.clone()),
+            )
+            .unwrap(),
+        );
 
-                zip_eq(new_iter, old_iter).for_each(|(new, old)| {
-                    let (new_key, new_value) = new.unwrap();
-                    let (old_key, old_value) = old.unwrap();
-                    assert_eq!(new_key, old_key);
-                    assert_eq!(new_value, old_value);
-                });
-                // first snapshot tree not recovered
-                assert!(
-                    tree_db.get_root_hash(0).is_err() || tree_db.get_leaf_count(0).unwrap() == 0,
-                    "tree at version 0 should not be restored"
-                );
-                // second snapshot tree recovered
-                let second_snapshot_version: Version = 13;
-                assert!(
-                    tree_db.get_root_hash(second_snapshot_version).is_ok(),
-                    "root hash at version {} doesn't exist",
-                    second_snapshot_version,
-                );
-            }
+        // Only state key at and by the snapshot version are restored in internal indexer
+        let snapshot_version = if start == 0 {
+            0
+        } else if start > 0 && start < 15 {
+            1
         } else {
-            let internal_indexer_db =
-                InternalIndexerDBService::get_indexer_db_for_restore(new_db_dir.as_path()).unwrap();
+            15
+        };
 
-            let aptos_db: Arc<dyn DbReader> = Arc::new(
-                AptosDB::open(
-                    StorageDirPaths::from_path(new_db_dir),
-                    false,
-                    NO_OP_STORAGE_PRUNER_CONFIG,
-                    db_config,
-                    false,
-                    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
-                    1000,
-                    Some(internal_indexer_db.clone()),
-                )
-                .unwrap(),
-            );
+        let new_iter = IndexerPrefixedStateValueIterator::new(
+            aptos_db.clone(),
+            internal_indexer_db.get_inner_db_ref(),
+            StateKeyPrefix::new(AccessPath, b"".to_vec()),
+            None,
+            snapshot_version,
+        )
+        .unwrap();
 
-            // Only state key at and by the snapshot version are restored in internal indexer
-            let snapshot_version = if start == 0 {
-                0
-            } else if start > 0 && start < 15 {
-                1
-            } else {
-                15
-            };
-
-            let new_iter = IndexerPrefixedStateValueIterator::new(
-                aptos_db.clone(),
-                internal_indexer_db.get_inner_db_ref(),
-                StateKeyPrefix::new(AccessPath, b"".to_vec()),
+        let old_iter = db
+            .deref()
+            .get_prefixed_state_value_iterator(
+                &StateKeyPrefix::new(AccessPath, b"".to_vec()),
                 None,
                 snapshot_version,
             )
             .unwrap();
 
-            let old_iter = db
-                .deref()
-                .get_prefixed_state_value_iterator(
-                    &StateKeyPrefix::new(AccessPath, b"".to_vec()),
-                    None,
-                    snapshot_version,
-                )
-                .unwrap();
+        // collect all the keys in the new_iter
+        let mut new_keys = new_iter.map(|e| e.unwrap().0).collect::<Vec<_>>();
+        new_keys.sort();
+        let mut old_keys = old_iter.map(|e| e.unwrap().0).collect::<Vec<_>>();
+        old_keys.sort();
+        assert_eq!(new_keys, old_keys);
 
-            // collect all the keys in the new_iter
-            let mut new_keys = new_iter.map(|e| e.unwrap().0).collect::<Vec<_>>();
-            new_keys.sort();
-            let mut old_keys = old_iter.map(|e| e.unwrap().0).collect::<Vec<_>>();
-            old_keys.sort();
-            assert_eq!(new_keys, old_keys);
-
-            let ledger_version = aptos_db.get_latest_ledger_info_version().unwrap();
-            for ver in start..=ledger_version {
-                let old_block_res = db.get_block_info_by_version(ver);
-                let new_block_res = aptos_db.get_block_info_by_version(ver);
-                let (old_block_version, old_block_height, _) = old_block_res.unwrap();
-                let (new_block_version, new_block_height, _) = new_block_res.unwrap();
-                assert_eq!(old_block_version, new_block_version);
-                assert_eq!(old_block_height, new_block_height);
-            }
+        let ledger_version = aptos_db.get_latest_ledger_info_version().unwrap();
+        for ver in start..=ledger_version {
+            let old_block_res = db.get_block_info_by_version(ver);
+            let new_block_res = aptos_db.get_block_info_by_version(ver);
+            let (old_block_version, old_block_height, _) = old_block_res.unwrap();
+            let (new_block_version, new_block_height, _) = new_block_res.unwrap();
+            assert_eq!(old_block_version, new_block_version);
+            assert_eq!(old_block_height, new_block_height);
         }
 
         (rt, server_addr)
@@ -589,7 +531,6 @@ mod dbtool_tests {
             PathBuf::from(backup_dir.path()),
             PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
-            false,
         );
         let backup_size = dir_size(backup_dir.path());
         let db_size = dir_size(new_db_dir.path());
@@ -614,7 +555,6 @@ mod dbtool_tests {
             PathBuf::from(backup_dir.path()),
             PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
-            false,
         );
         rt.shutdown_timeout(Duration::from_secs(1));
     }
@@ -633,7 +573,6 @@ mod dbtool_tests {
             PathBuf::from(backup_dir.path()),
             PathBuf::from(old_db_dir.path()),
             PathBuf::from(new_db_dir.path()),
-            false,
         );
         // boostrap a historical DB starting from version 1 to version 18
         // This only replays the txn from txn 17 to 18
@@ -655,38 +594,6 @@ mod dbtool_tests {
             .run(),
         )
         .unwrap();
-        rt.shutdown_timeout(Duration::from_secs(1));
-    }
-
-    #[test]
-    fn test_restore_with_sharded_db() {
-        let backup_dir = TempPath::new();
-        backup_dir.create_as_dir().unwrap();
-        let new_db_dir = TempPath::new();
-        let old_db_dir = TempPath::new();
-
-        let (rt, _) = db_restore_test_setup(
-            0,
-            16,
-            PathBuf::from(backup_dir.path()),
-            PathBuf::from(old_db_dir.path()),
-            PathBuf::from(new_db_dir.path()),
-            true,
-        );
-        let backup_size = dir_size(backup_dir.path());
-        let db_size = dir_size(new_db_dir.path());
-        let old_db_size = dir_size(old_db_dir.path());
-        println!(
-            "backup size: {}, old db size: {}, new db size: {}",
-            backup_size, old_db_size, db_size
-        );
-
-        println!(
-            "backup size: {:?}, old db size: {:?}, new db size: {:?}",
-            backup_dir.path(),
-            old_db_dir.path(),
-            new_db_dir.path()
-        );
         rt.shutdown_timeout(Duration::from_secs(1));
     }
 

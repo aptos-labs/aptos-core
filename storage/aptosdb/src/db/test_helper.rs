@@ -21,8 +21,8 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ReplayProtector, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionToCommit, Version,
+        PersistedAuxiliaryInfo, ReplayProtector, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionToCommit, Version,
     },
     write_set::TransactionWrite,
 };
@@ -181,6 +181,8 @@ prop_compose! {
                     state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
                     placeholder_txn_info.status().clone(),
+                    // TODO(grao): Consider making a real one?
+                    None,
                 );
                 txn_accumulator = txn_accumulator.append(&[txn_info.hash()]);
                 txn.set_transaction_info(txn_info);
@@ -928,6 +930,17 @@ pub fn verify_committed_transactions(
         group_ordered_txns_by_account(txns_to_commit),
         ledger_info,
     );
+}
+
+pub fn put_persisted_auxiliary_info(
+    db: &AptosDB,
+    version: Version,
+    persisted_info: &[PersistedAuxiliaryInfo],
+) {
+    db.ledger_db
+        .persisted_auxiliary_info_db()
+        .commit_auxiliary_info(version, persisted_info)
+        .unwrap()
 }
 
 pub fn put_transaction_infos(

@@ -160,6 +160,6 @@ fn test_large_types() {
     );
     assert_eq!(
         result.unwrap_err().major_status(),
-        StatusCode::CONSTRAINT_NOT_SATISFIED,
+        StatusCode::TOO_MANY_TYPE_NODES,
     );
 }

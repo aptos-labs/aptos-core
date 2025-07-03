@@ -210,7 +210,9 @@ impl VMStatus {
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
                     | StatusCode::STORAGE_LIMIT_REACHED
-                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS
+                    | StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS
+                    | StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
                 ..
             }
             | VMStatus::Error {
@@ -218,7 +220,9 @@ impl VMStatus {
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
                     | StatusCode::STORAGE_LIMIT_REACHED
-                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS
+                    | StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS
+                    | StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
                 ..
             } => Ok(KeptVMStatus::MiscellaneousError),
 
@@ -884,12 +888,17 @@ pub enum StatusCode {
     STRUCT_VARIANT_MISMATCH = 4038,
     // An unimplemented functionality in the VM.
     UNIMPLEMENTED_FUNCTIONALITY = 4039,
+    // Modules are cyclic (module A uses module B which uses module A). Detected at runtime in case
+    // module loading is performed lazily.
+    RUNTIME_CYCLIC_MODULE_DEPENDENCY = 4040,
+    // Returned when a function value is trying to capture a delayed field. This is not allowed
+    // because layouts for values with delayed fields are not serializable.
+    UNABLE_TO_CAPTURE_DELAYED_FIELDS = 4041,
 
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4040,
-    RESERVED_RUNTIME_ERROR_2 = 4041,
-    RESERVED_RUNTIME_ERROR_3 = 4042,
-    RESERVED_RUNTIME_ERROR_4 = 4043,
+    RESERVED_RUNTIME_ERROR_1 = 4042,
+    RESERVED_RUNTIME_ERROR_2 = 4043,
+    RESERVED_RUNTIME_ERROR_3 = 4044,
 
     // A reserved status to represent an unknown vm status.
     // this is u64::MAX, but we can't pattern match on that, so put the hardcoded value in

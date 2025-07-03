@@ -249,8 +249,8 @@ pub enum VerifiedEvent {
 }
 
 #[cfg(test)]
-#[path = "round_manager_test.rs"]
-mod round_manager_test;
+#[path = "round_manager_tests/mod.rs"]
+mod round_manager_tests;
 
 #[cfg(feature = "fuzzing")]
 #[path = "round_manager_fuzzing.rs"]
@@ -797,14 +797,13 @@ impl RoundManager {
     /// 2. Create a regular proposal by adding QC and failed_authors to the opt block
     /// 3. Process the proposal using exsiting logic
     async fn process_opt_proposal(&mut self, opt_block_data: OptBlockData) -> anyhow::Result<()> {
-        if self
-            .block_store
-            .get_block_for_round(opt_block_data.round())
-            .is_some()
-        {
-            // ignore the opt proposal if we have already received the proposal
-            return Ok(());
-        }
+        ensure!(
+            self.block_store
+                .get_block_for_round(opt_block_data.round())
+                .is_none(),
+            "Proposal has already been processed for round: {}",
+            opt_block_data.round()
+        );
         let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
         ensure!(
             hqc.certified_block().round() + 1 == opt_block_data.round(),

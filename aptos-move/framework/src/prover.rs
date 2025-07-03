@@ -8,6 +8,7 @@ use codespan_reporting::{
     term::termcolor::{ColorChoice, StandardStream},
 };
 use log::{info, LevelFilter};
+use move_compiler_v2::Experiment;
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -148,6 +149,12 @@ impl ProverOptions {
         let now = Instant::now();
         let for_test = self.for_test;
         let benchmark = self.benchmark;
+        let mut experiments_vec = experiments.to_vec();
+        // If `filter` is `some` then only the files filtered for are primary targets.
+        // This interferes with the package visibility check in the function checker.
+        if self.filter.is_some() {
+            experiments_vec.push(Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string());
+        };
         let mut model = build_model(
             dev_mode,
             package_path,
@@ -158,7 +165,7 @@ impl ProverOptions {
             language_version,
             skip_attribute_checks,
             known_attributes.clone(),
-            experiments.to_vec(),
+            experiments_vec,
         )?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;

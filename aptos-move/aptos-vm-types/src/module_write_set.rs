@@ -102,8 +102,15 @@ impl ModuleWriteSet {
         module_storage: &'a impl ModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.writes.iter_mut().map(move |(key, write)| {
+            // The unmetered access to module size is fine because:
+            //
+            // INVARIANT:
+            //   If there is a write to the module at key K, it means the module at K has been read
+            //   (in order to perform backward-compatibility checks) if it existed.
+            //   If module at K previously did not exist, the read of previous size returns None.
+            //   Because module with key K has been read, it must have been loaded and metered.
             let prev_size = module_storage
-                .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+                .unmetered_get_module_size(write.module_address(), write.module_name())
                 .map_err(|e| e.to_partial())?
                 .unwrap_or(0) as u64;
             Ok(WriteOpInfo {

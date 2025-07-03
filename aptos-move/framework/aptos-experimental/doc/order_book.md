@@ -16,7 +16,7 @@ types of pending orders are supported.
 3. Orders: This is a BigOrderMap of order id to order details.
 
 
--  [Struct `OrderRequest`](#0x7_order_book_OrderRequest)
+-  [Enum `OrderRequest`](#0x7_order_book_OrderRequest)
 -  [Enum `OrderBook`](#0x7_order_book_OrderBook)
 -  [Enum `OrderType`](#0x7_order_book_OrderType)
 -  [Struct `TestMetadata`](#0x7_order_book_TestMetadata)
@@ -54,13 +54,21 @@ types of pending orders are supported.
 
 <a id="0x7_order_book_OrderRequest"></a>
 
-## Struct `OrderRequest`
+## Enum `OrderRequest`
 
 
 
-<pre><code><b>struct</b> <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -76,12 +84,6 @@ types of pending orders are supported.
 </dd>
 <dt>
 <code>account_order_id: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>&gt;</code>
 </dt>
 <dd>
 
@@ -105,7 +107,7 @@ types of pending orders are supported.
 
 </dd>
 <dt>
-<code>is_buy: bool</code>
+<code>is_bid: bool</code>
 </dt>
 <dd>
 
@@ -124,6 +126,10 @@ types of pending orders are supported.
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -165,6 +171,12 @@ types of pending orders are supported.
 </dd>
 <dt>
 <code>pending_orders: <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>ascending_id_generator: <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a></code>
 </dt>
 <dd>
 
@@ -275,15 +287,6 @@ types of pending orders are supported.
 ## Constants
 
 
-<a id="0x7_order_book_U256_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_U256_MAX">U256_MAX</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-</code></pre>
-
-
-
 <a id="0x7_order_book_EORDER_ALREADY_EXISTS"></a>
 
 
@@ -338,13 +341,22 @@ types of pending orders are supported.
 
 
 
+<a id="0x7_order_book_E_REINSERT_ORDER_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 7;
+</code></pre>
+
+
+
 <a id="0x7_order_book_new_order_request"></a>
 
 ## Function `new_order_request`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64, unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>&gt;, price: u64, orig_size: u64, remaining_size: u64, is_buy: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -356,22 +368,20 @@ types of pending orders are supported.
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     account_order_id: u64,
-    unique_priority_idx: Option&lt;UniqueIdxType&gt;,
     price: u64,
     orig_size: u64,
     remaining_size: u64,
-    is_buy: bool,
+    is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M
 ): <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt; {
-    <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a> {
+    OrderRequest::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         account_order_id,
-        unique_priority_idx,
         price,
         orig_size,
         remaining_size,
-        is_buy,
+        is_bid,
         trigger_condition,
         metadata
     }
@@ -401,7 +411,8 @@ types of pending orders are supported.
     OrderBook::V1 {
         orders: new_default_big_ordered_map(),
         active_orders: new_active_order_book(),
-        pending_orders: new_pending_order_book_index()
+        pending_orders: new_pending_order_book_index(),
+        ascending_id_generator: new_ascending_id_generator()
     }
 }
 </code></pre>
@@ -436,22 +447,15 @@ this is a TODO for now.
     <b>let</b> order_with_state = self.orders.remove(&order_id);
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
     <b>if</b> (is_active) {
-        <b>let</b> (_, unique_priority_idx, bid_price, _orig_size, _size, is_buy, _, _) =
-            order.destroy_order();
-        self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_buy);
+        <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
+        <b>let</b> (_, bid_price, _orig_size, _size, is_bid, _, _) = order.destroy_order();
+        self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
     } <b>else</b> {
-        <b>let</b> (
-            _,
-            unique_priority_idx,
-            _bid_price,
-            _orig_size,
-            _size,
-            is_buy,
-            trigger_condition,
-            _
-        ) = order.destroy_order();
+        <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
+        <b>let</b> (_, _bid_price, _orig_size, _size, is_bid, trigger_condition, _) =
+            order.destroy_order();
         self.pending_orders.cancel_pending_order(
-            trigger_condition.destroy_some(), unique_priority_idx, is_buy
+            trigger_condition.destroy_some(), unique_priority_idx, is_bid
         );
     };
     <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
@@ -469,7 +473,7 @@ this is a TODO for now.
 Checks if the order is a taker order i.e., matched immediatedly with the active order book.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, is_buy: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
 </code></pre>
 
 
@@ -480,14 +484,14 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    price: u64,
-    is_buy: bool,
+    price: Option&lt;u64&gt;,
+    is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;
 ): bool {
     <b>if</b> (trigger_condition.is_some()) {
         <b>return</b> <b>false</b>;
     };
-    <b>return</b> self.active_orders.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(price, is_buy)
+    <b>return</b> self.active_orders.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(price, is_bid)
 }
 </code></pre>
 
@@ -520,12 +524,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
     };
 
     <b>let</b> order_id = new_order_id_type(order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.account_order_id);
-    <b>let</b> unique_priority_idx =
-        <b>if</b> (order_req.unique_priority_idx.is_some()) {
-            order_req.unique_priority_idx.destroy_some()
-        } <b>else</b> {
-            generate_unique_idx_fifo_tiebraker()
-        };
+    <b>let</b> ascending_idx = self.ascending_id_generator.generate_tie_breaker();
 
     <b>assert</b>!(
         !self.orders.contains(&order_id),
@@ -535,11 +534,11 @@ else it is added to the active order book. The API aborts if its not a maker ord
     <b>let</b> order =
         new_order(
             order_id,
-            unique_priority_idx,
+            ascending_idx,
             order_req.price,
             order_req.orig_size,
             order_req.remaining_size,
-            order_req.is_buy,
+            order_req.is_bid,
             order_req.trigger_condition,
             order_req.metadata
         );
@@ -547,9 +546,9 @@ else it is added to the active order book. The API aborts if its not a maker ord
     self.active_orders.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
         order_id,
         order_req.price,
-        unique_priority_idx,
+        ascending_idx,
         order_req.remaining_size,
-        order_req.is_buy
+        order_req.is_bid
     );
 }
 </code></pre>
@@ -567,7 +566,7 @@ but the clearinghouse fails to settle all or part of the order. If the order doe
 it is added to the order book, if it exists, it's size is updated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_reinsert_maker_order">reinsert_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_reinsert_maker_order">reinsert_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;, original_order: <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -577,10 +576,24 @@ it is added to the order book, if it exists, it's size is updated.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_reinsert_maker_order">reinsert_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;, original_order: Order&lt;M&gt;
 ) {
-    <b>assert</b>!(order_req.trigger_condition.is_none(), <a href="order_book.md#0x7_order_book_E_NOT_ACTIVE_ORDER">E_NOT_ACTIVE_ORDER</a>);
     <b>let</b> order_id = new_order_id_type(order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.account_order_id);
+
+    <b>assert</b>!(&original_order.get_order_id() == &order_id, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(
+        original_order.get_orig_size() == order_req.orig_size,
+        <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>
+    );
+    // TODO check what should the rule be for remaining_size. check test_maker_order_reinsert_not_exists unit test.
+    // <b>assert</b>!(
+    //     original_order.<a href="order_book.md#0x7_order_book_get_remaining_size">get_remaining_size</a>() &gt;= order_req.remaining_size,
+    //     <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>
+    // );
+    <b>assert</b>!(original_order.get_price() == order_req.price, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(original_order.is_bid() == order_req.is_bid, <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+
+    <b>assert</b>!(order_req.trigger_condition.is_none(), <a href="order_book.md#0x7_order_book_E_NOT_ACTIVE_ORDER">E_NOT_ACTIVE_ORDER</a>);
     <b>if</b> (!self.orders.contains(&order_id)) {
         <b>return</b> self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(order_req);
     };
@@ -589,9 +602,9 @@ it is added to the order book, if it exists, it's size is updated.
     self.orders.add(order_id, order_with_state);
     self.active_orders.increase_order_size(
         order_req.price,
-        order_req.unique_priority_idx.destroy_some(),
+        original_order.get_unique_priority_idx(),
         order_req.remaining_size,
-        order_req.is_buy
+        order_req.is_bid
     );
 }
 </code></pre>
@@ -619,20 +632,15 @@ it is added to the order book, if it exists, it's size is updated.
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> order_id = new_order_id_type(order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.account_order_id);
-    <b>let</b> unique_priority_idx =
-        <b>if</b> (order_req.unique_priority_idx.is_some()) {
-            order_req.unique_priority_idx.destroy_some()
-        } <b>else</b> {
-            generate_unique_idx_fifo_tiebraker()
-        };
+    <b>let</b> ascending_idx = self.ascending_id_generator.generate_tie_breaker();
     <b>let</b> order =
         new_order(
             order_id,
-            unique_priority_idx,
+            ascending_idx,
             order_req.price,
             order_req.orig_size,
             order_req.remaining_size,
-            order_req.is_buy,
+            order_req.is_bid,
             order_req.trigger_condition,
             order_req.metadata
         );
@@ -642,8 +650,8 @@ it is added to the order book, if it exists, it's size is updated.
     self.pending_orders.<a href="order_book.md#0x7_order_book_place_pending_maker_order">place_pending_maker_order</a>(
         order_id,
         order_req.trigger_condition.destroy_some(),
-        unique_priority_idx,
-        order_req.is_buy
+        ascending_idx,
+        order_req.is_bid
     );
 }
 </code></pre>
@@ -660,7 +668,7 @@ Returns a single match for a taker order. It is responsibility of the caller to 
 API to ensure that the order is a taker order before calling this API, otherwise it will abort.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, size: u64, is_buy: bool): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -671,11 +679,11 @@ API to ensure that the order is a taker order before calling this API, otherwise
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    price: u64,
+    price: Option&lt;u64&gt;,
     size: u64,
-    is_buy: bool
+    is_bid: bool
 ): SingleOrderMatch&lt;M&gt; {
-    <b>let</b> result = self.active_orders.get_single_match_result(price, size, is_buy);
+    <b>let</b> result = self.active_orders.get_single_match_result(price, size, is_bid);
     <b>let</b> (order_id, matched_size, remaining_size) =
         result.destroy_active_matched_order();
     <b>let</b> order_with_state = self.orders.remove(&order_id);
@@ -713,15 +721,19 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, account_order_id: u64, size_delta: u64
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    account_order_id: u64,
+    size_delta: u64
 ) {
     <b>let</b> order_id = new_order_id_type(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, account_order_id);
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
     <b>let</b> order_with_state = self.orders.remove(&order_id);
     order_with_state.decrease_remaining_size(size_delta);
     <b>if</b> (order_with_state.<a href="order_book.md#0x7_order_book_is_active_order">is_active_order</a>()) {
-        <b>let</b> order = order_with_state.get_order_from_state();
-        self.active_orders.<a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>(
+        <b>let</b> order = order_with_state.get_order_from_state();self
+            .active_orders
+            .<a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>(
             order.get_price(),
             order_with_state.get_unique_priority_idx_from_state(),
             size_delta,
@@ -916,7 +928,7 @@ Removes and returns the orders that are ready to be executed based on the curren
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, is_buy: bool, slippage_pct: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_pct: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -926,9 +938,9 @@ Removes and returns the orders that are ready to be executed based on the curren
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, is_buy: bool, slippage_pct: u64
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, is_bid: bool, slippage_pct: u64
 ): Option&lt;u64&gt; {
-    self.active_orders.<a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>(is_buy, slippage_pct)
+    self.active_orders.<a href="order_book.md#0x7_order_book_get_slippage_price">get_slippage_price</a>(is_bid, slippage_pct)
 }
 </code></pre>
 
@@ -993,16 +1005,15 @@ Removes and returns the orders that are ready to be executed based on the time c
     <b>let</b> match_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> remainig_size = order_req.remaining_size;
     <b>while</b> (remainig_size &gt; 0) {
-        <b>if</b> (!self.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(order_req.price, order_req.is_buy, order_req.trigger_condition)) {
+        <b>if</b> (!self.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_req.price), order_req.is_bid, order_req.trigger_condition)) {
             self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
-                <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a> {
+                OrderRequest::V1 {
                     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
                     account_order_id: order_req.account_order_id,
-                    unique_priority_idx: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
                     price: order_req.price,
                     orig_size: order_req.orig_size,
                     remaining_size: remainig_size,
-                    is_buy: order_req.is_buy,
+                    is_bid: order_req.is_bid,
                     trigger_condition: order_req.trigger_condition,
                     metadata: order_req.metadata
                 }
@@ -1011,7 +1022,7 @@ Removes and returns the orders that are ready to be executed based on the time c
         };
         <b>let</b> match_result =
             self.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(
-                order_req.price, remainig_size, order_req.is_buy
+                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_req.price), remainig_size, order_req.is_bid
             );
         <b>let</b> matched_size = match_result.get_matched_size();
         match_results.push_back(match_result);

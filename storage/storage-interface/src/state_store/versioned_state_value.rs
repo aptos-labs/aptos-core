@@ -49,6 +49,20 @@ impl StateUpdateRef<'_> {
                     hot_since_version: self.version,
                 },
             },
+            BaseStateOp::Eviction { prev_slot } => match prev_slot {
+                StateSlot::HotVacant { .. } => StateSlot::ColdVacant,
+                StateSlot::HotOccupied {
+                    value_version,
+                    value,
+                    ..
+                } => StateSlot::ColdOccupied {
+                    value_version,
+                    value,
+                },
+                StateSlot::ColdVacant | StateSlot::ColdOccupied { .. } => {
+                    unreachable!("only hot slots can be evicted")
+                },
+            },
         }
     }
 
