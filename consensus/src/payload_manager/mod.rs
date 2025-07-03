@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload},
@@ -29,6 +30,15 @@ pub trait TPayloadManager: Send + Sync {
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, author: Author, timestamp: u64);
+
+    /// Check if the block contains any inline transactions that need
+    /// to be denied (e.g., due to block transaction filtering).
+    /// This is only used when processing block proposals.
+    fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()>;
 
     /// Check if the transactions corresponding are available. This is specific to payload
     /// manager implementations. For optimistic quorum store, we only check if optimistic
