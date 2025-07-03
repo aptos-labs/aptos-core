@@ -618,4 +618,12 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
             },
         }
     }
+
+    fn max_value_nest_depth(&self) -> Option<u64> {
+        let vm_config = self.module_storage.runtime_environment().vm_config();
+        vm_config
+            .enable_depth_checks
+            .then_some(vm_config.max_value_nest_depth)
+            .flatten()
+    }
 }

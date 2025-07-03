@@ -59,7 +59,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
 };
 use std::{
     cell::RefCell,
@@ -1173,15 +1173,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 // values with unique identifiers with the same type layout.
                 // The values are stored in aggregators multi-version data structure,
                 // see the actual trait implementation for more details.
-                let patched_value = ValueSerDeContext::new()
-                    .with_delayed_fields_replacement(&mapping)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .deserialize(bytes.as_ref(), layout)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("Failed to deserialize resource during id replacement")
-                    })?;
+                let patched_value =
+                    ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+                        .with_delayed_fields_replacement(&mapping)
+                        .with_func_args_deserialization(&function_value_extension)
+                        .deserialize(bytes.as_ref(), layout)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Failed to deserialize resource during id replacement")
+                        })?;
 
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_value_extension)
                     .serialize(&patched_value, layout)?
@@ -1206,7 +1207,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
         let function_value_extension = self.as_function_value_extension();
-        let value = ValueSerDeContext::new()
+        let value = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
@@ -1218,7 +1219,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             })?;
 
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
-        let patched_bytes = ValueSerDeContext::new()
+        let patched_bytes = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_delayed_fields_replacement(&mapping)
             .with_func_args_deserialization(&function_value_extension)
             .serialize(&value, layout)?
@@ -2541,7 +2542,7 @@ mod test {
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
         StateValue::new_legacy(
-            ValueSerDeContext::new()
+            ValueSerDeContext::new(None)
                 .serialize(value, layout)
                 .unwrap()
                 .unwrap()

@@ -18,10 +18,10 @@ module aptos_experimental::market_test_utils {
         Market
     };
 
-    public fun place_maker_order_and_verify<M: store + copy + drop>(
+    public fun place_order_and_verify<M: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
-        price: u64,
+        limit_price: Option<u64>,
         size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
@@ -32,18 +32,30 @@ module aptos_experimental::market_test_utils {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): u64 {
         let user_addr = signer::address_of(user);
-        market.place_order(
-            user,
-            price,
-            size,
-            is_bid, // is_bid
-            time_in_force, // order_type
-            option::none(), // trigger_condition
-            metadata,
-            1000,
-            true,
-            callbacks
-        );
+        if (limit_price.is_some()) {
+            market.place_limit_order(
+                user,
+                limit_price.destroy_some(),
+                size,
+                is_bid, // is_bid
+                time_in_force, // order_type
+                option::none(), // trigger_condition
+                metadata,
+                1000,
+                true,
+                callbacks
+            );
+        } else {
+            market.place_market_order(
+                user,
+                size,
+                is_bid, // is_buy
+                metadata,
+                1000,
+                true,
+                callbacks
+            );
+        };
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
         if (!is_cancelled) {
             assert!(events.length() == 1);
@@ -59,7 +71,7 @@ module aptos_experimental::market_test_utils {
             size,
             size,
             size,
-            price,
+            limit_price,
             is_bid,
             is_taker,
             order_status_open()
@@ -80,7 +92,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 0, // Remaining size is always 0 when the order is cancelled
                 size,
-                price,
+                limit_price,
                 is_bid,
                 is_taker,
                 order_status_cancelled()
@@ -92,7 +104,7 @@ module aptos_experimental::market_test_utils {
     public fun place_taker_order<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        taker_price: u64,
+        taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
@@ -108,18 +120,30 @@ module aptos_experimental::market_test_utils {
                 max_fills.destroy_some()
             };
         // Taker order will be immediately match in the same transaction
-        market.place_order(
-            taker,
-            taker_price,
-            size,
-            is_bid, // is_bid
-            time_in_force, // order_type
-            option::none(), // trigger_condition
-            metadata,
-            max_fills,
-            true,
-            callbacks
-        );
+        if (taker_price.is_some()) {
+            market.place_limit_order(
+                taker,
+                taker_price.destroy_some(),
+                size,
+                is_bid, // is_bid
+                time_in_force, // order_type
+                option::none(), // trigger_condition
+                metadata,
+                max_fills,
+                true,
+                callbacks
+            );
+        } else {
+            market.place_market_order(
+                taker,
+                size,
+                is_bid, // is_bid
+                metadata,
+                max_fills,
+                true,
+                callbacks
+            );
+        };
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
@@ -143,7 +167,7 @@ module aptos_experimental::market_test_utils {
     public fun place_taker_order_and_verify_fill<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        taker_price: u64,
+        limit_price: Option<u64>,
         size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
@@ -163,7 +187,7 @@ module aptos_experimental::market_test_utils {
             place_taker_order(
                 market,
                 taker,
-                taker_price,
+                limit_price,
                 size,
                 is_bid,
                 time_in_force,
@@ -177,7 +201,7 @@ module aptos_experimental::market_test_utils {
             market,
             taker,
             order_id, // taker_order_id
-            taker_price,
+            limit_price,
             size,
             is_bid,
             fill_sizes,
@@ -198,7 +222,7 @@ module aptos_experimental::market_test_utils {
         user: &signer,
         is_taker: bool,
         order_id: u64,
-        price: u64,
+        price: Option<u64>,
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
@@ -227,7 +251,7 @@ module aptos_experimental::market_test_utils {
         market: &mut Market<M>,
         taker: &signer,
         taker_order_id: u64,
-        taker_price: u64,
+        taker_price: Option<u64>,
         size: u64,
         is_bid: bool,
         fill_sizes: vector<u64>,
@@ -273,7 +297,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 size - taker_total_fill,
                 fill_size,
-                fill_price,
+                option::some(fill_price),
                 is_bid,
                 true,
                 order_status_filled()
@@ -287,7 +311,7 @@ module aptos_experimental::market_test_utils {
                 maker_orig_size,
                 maker_remaining_size - fill_size,
                 fill_size,
-                fill_price,
+                option::some(fill_price),
                 !is_bid,
                 false,
                 order_status_filled()

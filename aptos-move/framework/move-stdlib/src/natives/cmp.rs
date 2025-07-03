@@ -47,8 +47,8 @@ fn native_compare(
 
     let cost = CMP_COMPARE_BASE
         + CMP_COMPARE_PER_ABS_VAL_UNIT
-            * (context.abs_val_size_dereferenced(&args[0])
-                + context.abs_val_size_dereferenced(&args[1]));
+            * (context.abs_val_size_dereferenced(&args[0])?
+                + context.abs_val_size_dereferenced(&args[1])?);
     context.charge(cost)?;
 
     let ordering = args[0].compare(&args[1])?;
