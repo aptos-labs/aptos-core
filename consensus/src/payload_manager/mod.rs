@@ -17,6 +17,8 @@ mod quorum_store_payload_manager;
 
 pub use co_payload_manager::ConsensusObserverPayloadManager;
 pub use direct_mempool_payload_manager::DirectMempoolPayloadManager;
+#[cfg(test)]
+pub use quorum_store_payload_manager::TQuorumStoreCommitNotifier;
 pub use quorum_store_payload_manager::{QuorumStoreCommitNotifier, QuorumStorePayloadManager};
 
 /// A trait that defines the interface for a payload manager. The payload manager is responsible for
