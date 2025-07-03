@@ -286,7 +286,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -363,7 +363,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -385,8 +385,9 @@ where
 
         let cost = EQ_BASE
             + EQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }
@@ -397,8 +398,9 @@ where
 
         let cost = NEQ_BASE
             + NEQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }

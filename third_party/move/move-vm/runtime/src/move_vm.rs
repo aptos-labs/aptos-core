@@ -25,7 +25,7 @@ use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::borrow::Borrow;
@@ -179,7 +179,8 @@ fn deserialize_arg(
     }
 
     let function_value_extension = module_storage.as_function_value_extension();
-    ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(&function_value_extension)
         .deserialize(arg.borrow(), &layout)
         .ok_or_else(deserialization_error)
@@ -259,7 +260,8 @@ fn serialize_return_value(
     }
 
     let function_value_extension = module_storage.as_function_value_extension();
-    let bytes = ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    let bytes = ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&value, &layout)?
         .ok_or_else(serialization_error)?;
