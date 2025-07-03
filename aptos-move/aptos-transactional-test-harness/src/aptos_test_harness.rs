@@ -58,7 +58,10 @@ use move_transactional_test_runner::{
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
 use move_vm_runtime::{move_vm::SerializedReturnValues, AsFunctionValueExtension};
-use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1031,8 +1034,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let environment = AptosEnvironment::new(&self.storage);
         let code_storage = self.storage.as_aptos_code_storage(&environment);
-        ValueSerDeContext::new()
-            .with_func_args_deserialization(&code_storage.as_function_value_extension())
+
+        let function_value_extension = code_storage.as_function_value_extension();
+        ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+            .with_func_args_deserialization(&function_value_extension)
             .deserialize(bytes, layout)
     }
 }
