@@ -19,7 +19,6 @@ module aptos_experimental::order_book {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         OrderWithState,
-        new_order_id_type,
         new_order,
         new_order_with_state,
         new_single_order_match,
@@ -37,7 +36,7 @@ module aptos_experimental::order_book {
         new_pending_order_book_index
     };
     #[test_only]
-    use aptos_experimental::order_book_types::{tp_trigger_condition, UniqueIdxType};
+    use aptos_experimental::order_book_types::{new_order_id_type, tp_trigger_condition, UniqueIdxType};
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EPOST_ONLY_FILLED: u64 = 2;
@@ -45,7 +44,8 @@ module aptos_experimental::order_book {
     const EINVALID_INACTIVE_ORDER_STATE: u64 = 5;
     const EINVALID_ADD_SIZE_TO_ORDER: u64 = 6;
     const E_NOT_ACTIVE_ORDER: u64 = 7;
-    const E_REINSERT_ORDER_MISMATCH: u64 = 7;
+    const E_REINSERT_ORDER_MISMATCH: u64 = 8;
+    const EORDER_CREATOR_MISMATCH: u64 = 9;
 
     enum OrderRequest<M: store + copy + drop> has copy, drop {
         V1 {
@@ -107,14 +107,17 @@ module aptos_experimental::order_book {
     }
 
     /// Cancels an order from the order book. If the order is active, it is removed from the active order book else
-    /// it is removed from the pending order book. The API doesn't abort if the order is not found in the order book -
-    /// this is a TODO for now.
+    /// it is removed from the pending order book.
+    /// If order doesn't exist, it aborts with EORDER_NOT_FOUND.
+    ///
+    /// `order_creator` is passed to only verify order cancellation is authorized correctly
     public fun cancel_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_id: OrderIdType
-    ): Option<Order<M>> {
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+    ): Order<M> {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
         let (order, is_active) = order_with_state.destroy_order_from_state();
+        assert!(order_creator == order.get_account(), EORDER_CREATOR_MISMATCH);
         if (is_active) {
             let unique_priority_idx = order.get_unique_priority_idx();
             let (_account, _order_id, bid_price, _orig_size, _size, is_bid, _, _) =
@@ -136,7 +139,7 @@ module aptos_experimental::order_book {
                 trigger_condition.destroy_some(), unique_priority_idx, is_bid
             );
         };
-        return option::some(order)
+        return order
     }
 
     /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
@@ -286,16 +289,18 @@ module aptos_experimental::order_book {
     /// if the size delta is greater than or equal to the remaining size of the order. Please note that the API will abort and
     /// not cancel the order if the size delta is equal to the remaining size of the order, to avoid unintended
     /// cancellation of the order. Please use the `cancel_order` API to cancel the order.
+    ///
+    /// `order_creator` is passed to only verify order cancellation is authorized correctly
     public fun decrease_order_size<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_id: OrderIdType, size_delta: u64
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType, size_delta: u64
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
+        assert!(order_creator == order_with_state.get_order_from_state().get_account(), EORDER_CREATOR_MISMATCH);
         order_with_state.decrease_remaining_size(size_delta);
         if (order_with_state.is_active_order()) {
-            let order = order_with_state.get_order_from_state();self
-                .active_orders
-                .decrease_order_size(
+            let order = order_with_state.get_order_from_state();
+            self.active_orders.decrease_order_size(
                 order.get_price(),
                 order_with_state.get_unique_priority_idx_from_state(),
                 size_delta,
@@ -403,12 +408,13 @@ module aptos_experimental::order_book {
         option::some(self.orders.borrow(&order_id).get_unique_priority_idx_from_state())
     }
 
+    #[test_only]
     public fun place_order_and_get_matches<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
     ): vector<SingleOrderMatch<M>> {
         let match_results = vector::empty();
-        let remainig_size = order_req.remaining_size;
-        while (remainig_size > 0) {
+        let remaining_size = order_req.remaining_size;
+        while (remaining_size > 0) {
             if (!self.is_taker_order(option::some(order_req.price), order_req.is_bid, order_req.trigger_condition)) {
                 self.place_maker_order(
                     OrderRequest::V1 {
@@ -416,7 +422,7 @@ module aptos_experimental::order_book {
                         order_id: order_req.order_id,
                         price: order_req.price,
                         orig_size: order_req.orig_size,
-                        remaining_size: remainig_size,
+                        remaining_size: remaining_size,
                         is_bid: order_req.is_bid,
                         trigger_condition: order_req.trigger_condition,
                         metadata: order_req.metadata
@@ -426,11 +432,11 @@ module aptos_experimental::order_book {
             };
             let match_result =
                 self.get_single_match_for_taker(
-                    option::some(order_req.price), remainig_size, order_req.is_bid
+                    option::some(order_req.price), remaining_size, order_req.is_bid
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
-            remainig_size -= matched_size;
+            remaining_size -= matched_size;
         };
         return match_results
     }
@@ -441,7 +447,7 @@ module aptos_experimental::order_book {
     ): vector<SingleOrderMatch<M>> {
         let unique_priority_idx = self.get_unique_priority_idx(order_req.order_id);
         assert!(unique_priority_idx.is_some(), EORDER_NOT_FOUND);
-        self.cancel_order(order_req.order_id);
+        self.cancel_order(order_req.account, order_req.order_id);
         let order_req = OrderRequest::V1 {
             account: order_req.account,
             order_id: order_req.order_id,
@@ -570,7 +576,7 @@ module aptos_experimental::order_book {
         assert!(is_bid == false);
 
         // Cancel the remaining order
-        order_book.cancel_order(new_order_id_type(1));
+        order_book.cancel_order(@0xAA, new_order_id_type(1));
 
         // Verify order no longer exists
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 0);
@@ -1291,7 +1297,7 @@ module aptos_experimental::order_book {
         order_book.place_maker_order(order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
 
-        order_book.decrease_order_size(new_order_id_type(1), 700);
+        order_book.decrease_order_size(@0xAA, new_order_id_type(1), 700);
         // Verify order was decreased with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 300);
 
@@ -1307,7 +1313,7 @@ module aptos_experimental::order_book {
         };
         order_book.place_maker_order(order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(2)) == 1000);
-        order_book.decrease_order_size(new_order_id_type(2), 600);
+        order_book.decrease_order_size(@0xBB, new_order_id_type(2), 600);
         // Verify order was decreased with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(2)) == 400);
 

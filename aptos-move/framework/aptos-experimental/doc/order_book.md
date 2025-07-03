@@ -38,7 +38,6 @@ types of pending orders are supported.
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
 -  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
 -  [Function `take_ready_time_based_orders`](#0x7_order_book_take_ready_time_based_orders)
--  [Function `place_order_and_get_matches`](#0x7_order_book_place_order_and_get_matches)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -314,6 +313,15 @@ types of pending orders are supported.
 
 
 
+<a id="0x7_order_book_EORDER_CREATOR_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>: u64 = 9;
+</code></pre>
+
+
+
 <a id="0x7_order_book_EORDER_NOT_FOUND"></a>
 
 
@@ -345,7 +353,7 @@ types of pending orders are supported.
 
 
 
-<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 7;
+<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
 </code></pre>
 
 
@@ -426,11 +434,13 @@ types of pending orders are supported.
 ## Function `cancel_order`
 
 Cancels an order from the order book. If the order is active, it is removed from the active order book else
-it is removed from the pending order book. The API doesn't abort if the order is not found in the order book -
-this is a TODO for now.
+it is removed from the pending order book.
+If order doesn't exist, it aborts with EORDER_NOT_FOUND.
+
+<code>order_creator</code> is passed to only verify order cancellation is authorized correctly
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_order">cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>): <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;
 </code></pre>
 
 
@@ -440,11 +450,12 @@ this is a TODO for now.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_cancel_order">cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType
-): Option&lt;Order&lt;M&gt;&gt; {
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderIdType
+): Order&lt;M&gt; {
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
     <b>let</b> order_with_state = self.orders.remove(&order_id);
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
+    <b>assert</b>!(order_creator == order.get_account(), <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
     <b>if</b> (is_active) {
         <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
         <b>let</b> (_account, _order_id, bid_price, _orig_size, _size, is_bid, _, _) =
@@ -466,7 +477,7 @@ this is a TODO for now.
             trigger_condition.destroy_some(), unique_priority_idx, is_bid
         );
     };
-    <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
+    <b>return</b> order
 }
 </code></pre>
 
@@ -726,8 +737,10 @@ if the size delta is greater than or equal to the remaining size of the order. P
 not cancel the order if the size delta is equal to the remaining size of the order, to avoid unintended
 cancellation of the order. Please use the <code>cancel_order</code> API to cancel the order.
 
+<code>order_creator</code> is passed to only verify order cancellation is authorized correctly
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, size_delta: u64)
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, size_delta: u64)
 </code></pre>
 
 
@@ -737,15 +750,15 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType, size_delta: u64
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderIdType, size_delta: u64
 ) {
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
     <b>let</b> order_with_state = self.orders.remove(&order_id);
+    <b>assert</b>!(order_creator == order_with_state.get_order_from_state().get_account(), <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
     order_with_state.decrease_remaining_size(size_delta);
     <b>if</b> (order_with_state.<a href="order_book.md#0x7_order_book_is_active_order">is_active_order</a>()) {
-        <b>let</b> order = order_with_state.get_order_from_state();self
-            .active_orders
-            .<a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>(
+        <b>let</b> order = order_with_state.get_order_from_state();
+        self.active_orders.<a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>(
             order.get_price(),
             order_with_state.get_unique_priority_idx_from_state(),
             size_delta,
@@ -986,58 +999,6 @@ Removes and returns the orders that are ready to be executed based on the time c
         orders.push_back(order);
     });
     orders
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_place_order_and_get_matches"></a>
-
-## Function `place_order_and_get_matches`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_order_and_get_matches">place_order_and_get_matches</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_order_and_get_matches">place_order_and_get_matches</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt;
-): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrderMatch&lt;M&gt;&gt; {
-    <b>let</b> match_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>let</b> remainig_size = order_req.remaining_size;
-    <b>while</b> (remainig_size &gt; 0) {
-        <b>if</b> (!self.<a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_req.price), order_req.is_bid, order_req.trigger_condition)) {
-            self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
-                OrderRequest::V1 {
-                    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-                    order_id: order_req.order_id,
-                    price: order_req.price,
-                    orig_size: order_req.orig_size,
-                    remaining_size: remainig_size,
-                    is_bid: order_req.is_bid,
-                    trigger_condition: order_req.trigger_condition,
-                    metadata: order_req.metadata
-                }
-            );
-            <b>return</b> match_results;
-        };
-        <b>let</b> match_result =
-            self.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(
-                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_req.price), remainig_size, order_req.is_bid
-            );
-        <b>let</b> matched_size = match_result.get_matched_size();
-        match_results.push_back(match_result);
-        remainig_size -= matched_size;
-    };
-    <b>return</b> match_results
 }
 </code></pre>
 

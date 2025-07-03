@@ -1326,8 +1326,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     unsettled_size: u64,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
-    <b>let</b> maker_cancel_size = unsettled_size + maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();self
-        .<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
+    <b>let</b> maker_cancel_size = unsettled_size + maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();
+    self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
         order_id,
         maker_address,
         maker_order.get_orig_size(),
@@ -1341,7 +1341,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     );
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
     <b>if</b> (maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>() != 0) {
-        self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(order_id);
+        self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(maker_address, order_id);
     };
     callbacks.cleanup_order(
         maker_address, order_id, maker_order.is_bid(), maker_cancel_size
@@ -1815,36 +1815,33 @@ Cancels an order - this will cancel the order and emit an event for the order ca
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
-    <b>let</b> maybe_order = self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(order_id);
-    <b>if</b> (maybe_order.is_some()) {
-        <b>let</b> order = maybe_order.destroy_some();
-        <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="market.md#0x7_market_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
-        <b>let</b> (
-            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-            order_id,
-            price,
-            orig_size,
-            remaining_size,
-            is_bid,
-            _trigger_condition,
-            _metadata
-        ) = order.destroy_order();
-        callbacks.cleanup_order(
-            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_bid, remaining_size
-        );
-        self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
-            order_id,
-            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-            orig_size,
-            remaining_size,
-            remaining_size,
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(price),
-            is_bid,
-            <b>false</b>,
-            <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
-            &std::string::utf8(b"Order cancelled")
-        );
-    }
+    <b>let</b> order = self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
+    <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="market.md#0x7_market_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
+    <b>let</b> (
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        order_id,
+        price,
+        orig_size,
+        remaining_size,
+        is_bid,
+        _trigger_condition,
+        _metadata
+    ) = order.destroy_order();
+    callbacks.cleanup_order(
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_bid, remaining_size
+    );
+    self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
+        order_id,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        orig_size,
+        remaining_size,
+        remaining_size,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(price),
+        is_bid,
+        <b>false</b>,
+        <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
+        &std::string::utf8(b"Order cancelled")
+    );
 }
 </code></pre>
 
@@ -1876,7 +1873,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
-    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>(order_id, size_delta);
+    self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_decrease_order_size">decrease_order_size</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
     <b>let</b> maybe_order = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order(order_id);
     <b>assert</b>!(maybe_order.is_some(), <a href="market.md#0x7_market_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
     <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();

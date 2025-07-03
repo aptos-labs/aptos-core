@@ -881,7 +881,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_matched_size">get_matched_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_matched_size">get_matched_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -890,7 +890,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_matched_size">get_matched_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_matched_size">get_matched_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">SingleOrderMatch</a>&lt;M&gt;
 ): u64 {
     self.matched_size

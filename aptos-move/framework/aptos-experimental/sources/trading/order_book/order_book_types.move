@@ -163,7 +163,7 @@ module aptos_experimental::order_book_types {
         self.matched_size
     }
 
-    public(friend) fun get_matched_size<M: store + copy + drop>(
+    public fun get_matched_size<M: store + copy + drop>(
         self: &SingleOrderMatch<M>
     ): u64 {
         self.matched_size

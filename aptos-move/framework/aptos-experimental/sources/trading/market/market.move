@@ -450,8 +450,8 @@ module aptos_experimental::market {
         unsettled_size: u64,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
-        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();self
-            .emit_event_for_order(
+        let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
+        self.emit_event_for_order(
             order_id,
             maker_address,
             maker_order.get_orig_size(),
@@ -465,7 +465,7 @@ module aptos_experimental::market {
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size() != 0) {
-            self.order_book.cancel_order(order_id);
+            self.order_book.cancel_order(maker_address, order_id);
         };
         callbacks.cleanup_order(
             maker_address, order_id, maker_order.is_bid(), maker_cancel_size
@@ -859,36 +859,33 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
-        let maybe_order = self.order_book.cancel_order(order_id);
-        if (maybe_order.is_some()) {
-            let order = maybe_order.destroy_some();
-            assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
-            let (
-                account,
-                order_id,
-                price,
-                orig_size,
-                remaining_size,
-                is_bid,
-                _trigger_condition,
-                _metadata
-            ) = order.destroy_order();
-            callbacks.cleanup_order(
-                account, order_id, is_bid, remaining_size
-            );
-            self.emit_event_for_order(
-                order_id,
-                account,
-                orig_size,
-                remaining_size,
-                remaining_size,
-                option::some(price),
-                is_bid,
-                false,
-                market_types::order_status_cancelled(),
-                &std::string::utf8(b"Order cancelled")
-            );
-        }
+        let order = self.order_book.cancel_order(account, order_id);
+        assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
+        let (
+            account,
+            order_id,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            _trigger_condition,
+            _metadata
+        ) = order.destroy_order();
+        callbacks.cleanup_order(
+            account, order_id, is_bid, remaining_size
+        );
+        self.emit_event_for_order(
+            order_id,
+            account,
+            orig_size,
+            remaining_size,
+            remaining_size,
+            option::some(price),
+            is_bid,
+            false,
+            market_types::order_status_cancelled(),
+            &std::string::utf8(b"Order cancelled")
+        );
     }
 
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
@@ -900,7 +897,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
-        self.order_book.decrease_order_size(order_id, size_delta);
+        self.order_book.decrease_order_size(account, order_id, size_delta);
         let maybe_order = self.order_book.get_order(order_id);
         assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
         let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
