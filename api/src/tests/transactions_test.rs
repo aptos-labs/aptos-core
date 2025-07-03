@@ -4,13 +4,14 @@
 
 use crate::tests::{new_test_context, new_test_context_with_config};
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
+use aptos_config::config::{GasEstimationStaticOverride, NodeConfig, TransactionFilterConfig};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
 use aptos_sdk::types::{AccountKey, LocalAccount};
+use aptos_transaction_filters::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
@@ -1632,9 +1633,9 @@ async fn test_simulation_filter_deny() {
     let mut node_config = NodeConfig::default();
 
     // Blocklist the balance function.
-    let mut filter = node_config.api.simulation_filter.clone();
-    filter = filter.add_all_filter(false);
-    node_config.api.simulation_filter = filter;
+    let transaction_filter = TransactionFilter::empty().add_all_filter(false);
+    let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+    node_config.transaction_filters.api_filter = transaction_filter_config;
 
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
@@ -1657,10 +1658,11 @@ async fn test_simulation_filter_allow_sender() {
     let mut node_config = NodeConfig::default();
 
     // Allow the root sender only.
-    let mut filter = node_config.api.simulation_filter.clone();
-    filter = filter.add_sender_filter(true, aptos_test_root_address());
-    filter = filter.add_all_filter(false);
-    node_config.api.simulation_filter = filter;
+    let transaction_filter = TransactionFilter::empty()
+        .add_sender_filter(true, aptos_test_root_address())
+        .add_all_filter(false);
+    let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+    node_config.transaction_filters.api_filter = transaction_filter_config;
 
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
