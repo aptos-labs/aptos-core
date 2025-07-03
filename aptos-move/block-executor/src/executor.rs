@@ -733,7 +733,6 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: SchedulerWrapper,
-        num_txns: TxnIndex,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -745,8 +744,9 @@ where
             AptosModuleExtension,
         >,
         runtime_environment: &RuntimeEnvironment,
+        total_txns_to_materialize: &AtomicU32,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<bool, PanicError> {
+    ) -> Result<(), PanicError> {
         // Do a final validation for safety as a part of (parallel) post-processing.
         // Delayed fields are already validated in the sequential commit hook.
         if !Self::validate(
@@ -850,18 +850,13 @@ where
 
         let mut final_results = final_results.acquire();
 
-        let mut end_block = false;
-
         match last_input_output.take_output(txn_idx)? {
             ExecutionStatus::Success(t) => {
                 final_results[txn_idx as usize] = t;
-                if txn_idx + 1 == num_txns {
-                    end_block = true;
-                }
             },
             ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
-                end_block = true;
+                total_txns_to_materialize.store(txn_idx + 1, Ordering::SeqCst);
             },
             ExecutionStatus::Abort(_) => (),
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
@@ -869,7 +864,7 @@ where
                 panic!("Cannot be materializing with {}", msg);
             },
         };
-        Ok(end_block)
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -895,6 +890,8 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
+        num_txns_materialized: &AtomicU32,
+        total_txns_to_materialize: &AtomicU32,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns();
@@ -911,22 +908,34 @@ where
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                let end_block = self.materialize_txn_commit(
+                self.materialize_txn_commit(
                     txn_idx,
                     versioned_cache,
                     scheduler_wrapper,
-                    num_txns as u32,
                     start_shared_counter,
                     shared_counter,
                     last_input_output,
                     base_view,
                     global_module_cache,
                     runtime_environment,
+                    total_txns_to_materialize,
                     final_results,
                 )?;
 
-                if !end_block {
+                if txn_idx == num_txns as u32 {
+                    break;
+                }
+
+                let num_txns_materialized =
+                    num_txns_materialized.fetch_add(1, Ordering::SeqCst) + 1;
+                let total_txns_to_materialize = total_txns_to_materialize.load(Ordering::SeqCst);
+
+                if num_txns_materialized < total_txns_to_materialize {
                     continue;
+                } else if num_txns_materialized != total_txns_to_materialize {
+                    return Err(code_invariant_error(
+                        format!("num_txns_materialized {num_txns_materialized} should never be larger than total_txns_to_materialize {total_txns_to_materialize}."),
+                    ));
                 }
 
                 let mut outputs = final_results.acquire();
@@ -1160,6 +1169,8 @@ where
         // +1 for potential BlockEpilogue txn.
         let last_input_output = TxnLastInputOutput::new(num_txns + 1);
         let scheduler = Scheduler::new(num_txns);
+        let num_txns_materialized = AtomicU32::new(0);
+        let total_txns_to_materialize = AtomicU32::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -1180,6 +1191,8 @@ where
                         &shared_commit_state,
                         &final_results,
                         &block_epilogue_txn,
+                        &num_txns_materialized,
+                        &total_txns_to_materialize,
                         num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:
