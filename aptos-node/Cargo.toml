@@ -21,7 +21,7 @@ aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
-aptos-consensus = { workspace = true }
+aptos-consensus = { workspace = true, features = ["consensus_fuzzer"] }
 aptos-consensus-notifications = { workspace = true }
 aptos-crash-handler = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -80,6 +80,7 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 ureq = { workspace = true }
 url = { workspace = true }
+rapture = { git="https://github.com/aptos-labs/rapture/", branch="rapture-clean", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { version = "0.5.0", features = [
@@ -95,6 +96,7 @@ assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-clone
 check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
 default = []
+consensus_fuzzer = ["aptos-consensus/consensus_fuzzer", "rapture"]
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
 indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
