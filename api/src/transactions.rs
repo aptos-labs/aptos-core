@@ -17,6 +17,7 @@ use crate::{
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
         ForbiddenError, InsufficientStorageError, InternalError,
     },
+    view_function::convert_view_function_error,
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
@@ -639,10 +640,14 @@ impl TransactionsApi {
                     vec![signed_transaction.sender().to_vec()],
                     context.node_config.api.max_gas_view_function,
                 );
-                let values = output.values.map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
+                let values = output.values.map_err(|status| {
+                    let (err_string, vm_error_code) =
+                        convert_view_function_error(&status, &state_view, &context);
+                    SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
+                        anyhow::anyhow!(err_string),
                         AptosErrorCode::InvalidInput,
+                        vm_error_code,
+                        Some(&ledger_info),
                     )
                 })?;
                 let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
