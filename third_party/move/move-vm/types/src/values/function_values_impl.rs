@@ -130,6 +130,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
                 ctx: self.ctx,
                 layout: &layout,
                 value,
+                depth: self.depth + 1,
             })?
         }
         seq.end()

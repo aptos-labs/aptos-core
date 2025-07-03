@@ -2,75 +2,200 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
-use aptos_types::{
-    account_address::AccountAddress,
-    transaction::{
-        authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
-        EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionArgument,
-        TransactionExecutableRef, TransactionExtraConfig, TransactionPayload,
-        TransactionPayloadInner,
-    },
+use aptos_types::transaction::{
+    authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
+    EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionExecutableRef,
+    TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
 };
+use move_core_types::{account_address::AccountAddress, transaction_argument::TransactionArgument};
 use serde::{Deserialize, Serialize};
 
+/// A transaction filter that applies a set of rules to determine
+/// if a transaction should be allowed or denied.
+///
+/// Rules are applied in the order they are defined, and the first
+/// matching rule determines the outcome for the transaction.
+/// If no rules match, the transaction is allowed by default.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum Matcher {
-    All,                                           // Matches any transactions
-    BlockId(HashValue), // Matches transactions in a specific block (identified by block ID)
-    BlockTimeStampGreaterThan(u64), // Matches transactions in blocks with timestamps greater than the specified value
-    BlockTimeStampLessThan(u64), // Matches transactions in blocks with timestamps less than the specified value
-    TransactionId(HashValue),    // Matches a specific transaction by its ID
-    Sender(AccountAddress),      // Matches transactions sent by a specific account address
-    ModuleAddress(AccountAddress), // Matches transactions that call a module at a specific address
-    EntryFunction(AccountAddress, String, String), // Matches transactions that call a specific entry function in a module
-    BlockEpochGreaterThan(u64), // Matches transactions in blocks with epochs greater than the specified value
-    BlockEpochLessThan(u64), // Matches transactions in blocks with epochs less than the specified value
-    MatchesAllOf(Vec<Matcher>), // Matches transactions that satisfy all the provided conditions (i.e., logical AND)
-    AccountAddress(AccountAddress), // Matches transactions that involve a specific account address
-    PublicKey(AnyPublicKey),    // Matches transactions that involve a specific public key
+pub struct TransactionFilter {
+    transaction_rules: Vec<TransactionRule>,
 }
 
-impl Matcher {
-    fn matches(
+impl TransactionFilter {
+    pub fn new(transaction_rules: Vec<TransactionRule>) -> Self {
+        Self { transaction_rules }
+    }
+
+    /// Returns true iff the filter allows the transaction
+    pub fn allows_transaction(&self, signed_transaction: &SignedTransaction) -> bool {
+        // If the filter is empty, allow the transaction by default
+        if self.is_empty() {
+            return true;
+        }
+
+        // Check if any rule matches the transaction
+        for transaction_rule in &self.transaction_rules {
+            if transaction_rule.matches(signed_transaction) {
+                return match transaction_rule {
+                    TransactionRule::Allow(_) => true,
+                    TransactionRule::Deny(_) => false,
+                };
+            }
+        }
+
+        true // No rules match (allow the transaction by default)
+    }
+
+    /// Returns an empty transaction filter with no rules
+    pub fn empty() -> Self {
+        Self {
+            transaction_rules: Vec::new(),
+        }
+    }
+
+    /// Filters the given transactions and returns only those that are allowed
+    pub fn filter_transactions(
         &self,
-        block_id: Option<HashValue>,
-        block_epoch: Option<u64>,
-        block_timestamp: Option<u64>,
-        txn: &SignedTransaction,
-    ) -> bool {
+        transactions: Vec<SignedTransaction>,
+    ) -> Vec<SignedTransaction> {
+        transactions
+            .into_iter()
+            .filter(|txn| self.allows_transaction(txn))
+            .collect()
+    }
+
+    /// Returns true iff the filter is empty (i.e., has no rules)
+    pub fn is_empty(&self) -> bool {
+        self.transaction_rules.is_empty()
+    }
+}
+
+// These are useful test-only methods for creating and testing filters
+#[cfg(any(test, feature = "fuzzing"))]
+impl TransactionFilter {
+    /// Adds an account address matcher to the filter
+    pub fn add_account_address_filter(self, allow: bool, account_address: AccountAddress) -> Self {
+        let transaction_matcher = TransactionMatcher::AccountAddress(account_address);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds an all matcher to the filter (matching all transactions)
+    pub fn add_all_filter(self, allow: bool) -> Self {
+        let transaction_matcher = TransactionMatcher::All;
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds an entry function matcher to the filter
+    pub fn add_entry_function_filter(
+        self,
+        allow: bool,
+        address: AccountAddress,
+        module_name: String,
+        function: String,
+    ) -> Self {
+        let transaction_matcher = TransactionMatcher::EntryFunction(address, module_name, function);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds a module address matcher to the filter
+    pub fn add_module_address_filter(self, allow: bool, address: AccountAddress) -> Self {
+        let transaction_matcher = TransactionMatcher::ModuleAddress(address);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds a filter rule containing multiple matchers
+    pub fn add_multiple_matchers_filter(
+        mut self,
+        allow: bool,
+        transaction_matchers: Vec<TransactionMatcher>,
+    ) -> Self {
+        let transaction_rule = if allow {
+            TransactionRule::Allow(transaction_matchers)
+        } else {
+            TransactionRule::Deny(transaction_matchers)
+        };
+        self.transaction_rules.push(transaction_rule);
+
+        self
+    }
+
+    /// Adds a public key matcher to the filter
+    pub fn add_public_key_filter(self, allow: bool, public_key: AnyPublicKey) -> Self {
+        let transaction_matcher = TransactionMatcher::PublicKey(public_key);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds a sender address matcher to the filter
+    pub fn add_sender_filter(self, allow: bool, sender: AccountAddress) -> Self {
+        let transaction_matcher = TransactionMatcher::Sender(sender);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds a transaction ID matcher to the filter
+    pub fn add_transaction_id_filter(self, allow: bool, txn_id: HashValue) -> Self {
+        let transaction_matcher = TransactionMatcher::TransactionId(txn_id);
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+}
+
+/// A transaction rule that defines whether to allow or deny transactions
+/// based on a set of matchers. All matchers must match for the rule to apply.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionRule {
+    Allow(Vec<TransactionMatcher>),
+    Deny(Vec<TransactionMatcher>),
+}
+
+impl TransactionRule {
+    /// Returns true iff the rule matches the given transaction. This
+    /// requires that all matchers in the rule match the transaction.
+    fn matches(&self, signed_transaction: &SignedTransaction) -> bool {
+        let transaction_matchers = match self {
+            TransactionRule::Allow(matchers) => matchers,
+            TransactionRule::Deny(matchers) => matchers,
+        };
+        transaction_matchers
+            .iter()
+            .all(|matcher| matcher.matches(signed_transaction))
+    }
+}
+
+/// A matcher that defines the criteria for matching transactions
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionMatcher {
+    All,                                           // Matches any transaction
+    TransactionId(HashValue),                      // Matches a specific transaction by its ID
+    Sender(AccountAddress), // Matches any transaction sent by a specific account address
+    ModuleAddress(AccountAddress), // Matches any transaction that calls a module at a specific address
+    EntryFunction(AccountAddress, String, String), // Matches any transaction that calls a specific entry function in a module
+    AccountAddress(AccountAddress), // Matches any transaction that involves a specific account address
+    PublicKey(AnyPublicKey),        // Matches any transaction that involves a specific public key
+}
+
+impl TransactionMatcher {
+    /// Returns true iff the matcher matches the given transaction
+    pub(crate) fn matches(&self, signed_transaction: &SignedTransaction) -> bool {
         match self {
-            Matcher::All => true,
-            Matcher::BlockId(target_block_id) => matches_block_id(block_id, target_block_id),
-            Matcher::BlockTimeStampGreaterThan(target_timestamp) => {
-                matches_timestamp_greater_than(block_timestamp, target_timestamp)
+            TransactionMatcher::All => true,
+            TransactionMatcher::TransactionId(id) => signed_transaction.committed_hash() == *id,
+            TransactionMatcher::Sender(sender) => {
+                matches_sender_address(signed_transaction, sender)
             },
-            Matcher::BlockTimeStampLessThan(target_timestamp) => {
-                matches_timestamp_less_than(block_timestamp, target_timestamp)
+            TransactionMatcher::ModuleAddress(address) => {
+                matches_entry_function_module_address(signed_transaction, address)
             },
-            Matcher::TransactionId(id) => txn.committed_hash() == *id,
-            Matcher::Sender(sender) => matches_sender_address(txn, sender),
-            Matcher::ModuleAddress(address) => matches_entry_function_module_address(txn, address),
-            Matcher::EntryFunction(address, module_name, function) => {
-                matches_entry_function(txn, address, module_name, function)
+            TransactionMatcher::EntryFunction(address, module_name, function) => {
+                matches_entry_function(signed_transaction, address, module_name, function)
             },
-            Matcher::BlockEpochGreaterThan(target_epoch) => {
-                matches_epoch_greater_than(block_epoch, target_epoch)
+            TransactionMatcher::AccountAddress(address) => {
+                matches_sender_address(signed_transaction, address)
+                    || matches_entry_function_module_address(signed_transaction, address)
+                    || matches_multisig_address(signed_transaction, address)
+                    || matches_script_argument_address(signed_transaction, address)
+                    || matches_transaction_authenticator_address(signed_transaction, address)
             },
-            Matcher::BlockEpochLessThan(target_epoch) => {
-                matches_epoch_less_than(block_epoch, target_epoch)
-            },
-            Matcher::MatchesAllOf(matchers) => matchers
-                .iter()
-                .all(|matcher| matcher.matches(block_id, block_epoch, block_timestamp, txn)),
-            Matcher::AccountAddress(address) => {
-                matches_sender_address(txn, address)
-                    || matches_entry_function_module_address(txn, address)
-                    || matches_multisig_address(txn, address)
-                    || matches_script_argument_address(txn, address)
-                    || matches_transaction_authenticator_address(txn, address)
-            },
-            Matcher::PublicKey(public_key) => {
-                matches_transaction_authenticator_public_key(txn, public_key)
+            TransactionMatcher::PublicKey(public_key) => {
+                matches_transaction_authenticator_public_key(signed_transaction, public_key)
             },
         }
     }
@@ -188,15 +313,6 @@ fn matches_any_public_key_address(any_public_key: &AnyPublicKey, address: &Accou
     }
 }
 
-/// Returns true iff the block ID matches the target block ID.
-/// Note that a missing block ID is NOT considered a match.
-fn matches_block_id(block_id: Option<HashValue>, target_block_id: &HashValue) -> bool {
-    match block_id {
-        Some(block_id) => block_id == *target_block_id,
-        None => false,
-    }
-}
-
 /// Returns true iff the transaction's entry function matches the given account address, module name, and function name
 fn matches_entry_function(
     signed_transaction: &SignedTransaction,
@@ -261,24 +377,6 @@ fn matches_entry_function_module_address(
     }
 }
 
-/// Returns true iff the block epoch is greater than the target epoch.
-/// Note that a missing block epoch is NOT considered a match.
-fn matches_epoch_greater_than(block_epoch: Option<u64>, target_epoch: &u64) -> bool {
-    match block_epoch {
-        Some(block_epoch) => block_epoch > *target_epoch,
-        None => false,
-    }
-}
-
-/// Returns true iff the block epoch is less than the target epoch.
-/// Note that a missing block epoch is NOT considered a match.
-fn matches_epoch_less_than(block_epoch: Option<u64>, target_epoch: &u64) -> bool {
-    match block_epoch {
-        Some(block_epoch) => block_epoch < *target_epoch,
-        None => false,
-    }
-}
-
 /// Returns true iff the transaction's multisig address matches the given account address
 fn matches_multisig_address(
     signed_transaction: &SignedTransaction,
@@ -329,24 +427,6 @@ fn matches_script_argument_address(
 /// Returns true iff the transaction's sender matches the given account address
 fn matches_sender_address(signed_transaction: &SignedTransaction, sender: &AccountAddress) -> bool {
     signed_transaction.sender() == *sender
-}
-
-/// Returns true iff the block timestamp is greater than the target timestamp.
-/// Note that a missing block timestamp is NOT considered a match.
-fn matches_timestamp_greater_than(block_timestamp: Option<u64>, target_timestamp: &u64) -> bool {
-    match block_timestamp {
-        Some(block_timestamp) => block_timestamp > *target_timestamp,
-        None => false,
-    }
-}
-
-/// Returns true iff the block timestamp is less than the target timestamp.
-/// Note that a missing block timestamp is NOT considered a match.
-fn matches_timestamp_less_than(block_timestamp: Option<u64>, target_timestamp: &u64) -> bool {
-    match block_timestamp {
-        Some(block_timestamp) => block_timestamp < *target_timestamp,
-        None => false,
-    }
 }
 
 /// Returns true iff the transaction's authenticator contains the given account address
@@ -433,225 +513,6 @@ fn matches_transaction_authenticator_public_key(
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum Rule {
-    Allow(Matcher),
-    Deny(Matcher),
-}
-
-impl Rule {
-    pub fn matcher(&self) -> &Matcher {
-        match self {
-            Rule::Allow(matcher) => matcher,
-            Rule::Deny(matcher) => matcher,
-        }
-    }
-}
-
-enum EvalResult {
-    Allow,
-    Deny,
-    NoMatch,
-}
-
-impl Rule {
-    fn eval(
-        &self,
-        block_id: Option<HashValue>,
-        block_epoch: Option<u64>,
-        block_timestamp: Option<u64>,
-        txn: &SignedTransaction,
-    ) -> EvalResult {
-        match self {
-            Rule::Allow(matcher) => {
-                if matcher.matches(block_id, block_epoch, block_timestamp, txn) {
-                    EvalResult::Allow
-                } else {
-                    EvalResult::NoMatch
-                }
-            },
-            Rule::Deny(matcher) => {
-                if matcher.matches(block_id, block_epoch, block_timestamp, txn) {
-                    EvalResult::Deny
-                } else {
-                    EvalResult::NoMatch
-                }
-            },
-        }
-    }
-}
-
-/// A filter that can be used to allow or deny transactions from being executed. It contains a
-/// set of rules that are evaluated one by one in the order of declaration. If a rule matches,
-/// the transaction is either allowed or denied depending on the rule. If no rule matches,
-/// the transaction is allowed.
-///
-/// For example, a filter might look like this:
-///             rules:
-///                 - Allow:
-///                     Sender: f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a
-///                 - Allow:
-///                     MatchesAllOf:
-///                         - Sender: 0xcd3357a925307983f7fbf1a433e87e49eda93fbb94d0d31974e68b5d60e09f3a
-///                         - BlockEpochGreaterThan: 10
-///                 - Allow:
-///                     ModuleAddress: "0000000000000000000000000000000000000000000000000000000000000001"
-///                 - Allow:
-///                     EntryFunction:
-///                         - "0000000000000000000000000000000000000000000000000000000000000002"
-///                         - test
-///                         - check
-///                 - Allow:
-///                     EntryFunction:
-///                         - "0000000000000000000000000000000000000000000000000000000000000002"
-///                         - test
-///                         - new
-///                 - Deny: All
-/// This filter allows transactions with the following properties:
-/// - Sender with address f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a.
-/// - Sender with address cd3357a925307983f7fbf1a433e87e49eda93fbb94d0d31974e68b5d60e09f3a, and
-///   block epoch greater than 10.
-/// - Transactions for the module with address 0000000000000000000000000000000000000000000000000000000000000001.
-/// - Transactions that call the entry function test::check or test::new from the module with
-///   address 0000000000000000000000000000000000000000000000000000000000000002.
-/// All other transactions are denied.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Filter {
-    rules: Vec<Rule>,
-}
-
-impl Filter {
-    pub fn empty() -> Self {
-        Self { rules: vec![] }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.rules.is_empty()
-    }
-
-    fn add_match_rule(mut self, allow: bool, matcher: Matcher) -> Self {
-        if allow {
-            self.rules.push(Rule::Allow(matcher));
-        } else {
-            self.rules.push(Rule::Deny(matcher));
-        }
-        self
-    }
-
-    pub fn add_account_address_filter(self, allow: bool, account_address: AccountAddress) -> Self {
-        let matcher = Matcher::AccountAddress(account_address);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_all_filter(self, allow: bool) -> Self {
-        let matcher = Matcher::All;
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_block_id_filter(self, allow: bool, block_id: HashValue) -> Self {
-        let matcher = Matcher::BlockId(block_id);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_block_timestamp_greater_than_filter(self, allow: bool, timestamp: u64) -> Self {
-        let matcher = Matcher::BlockTimeStampGreaterThan(timestamp);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_block_timestamp_less_than_filter(self, allow: bool, timestamp: u64) -> Self {
-        let matcher = Matcher::BlockTimeStampLessThan(timestamp);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_transaction_id_filter(self, allow: bool, txn_id: HashValue) -> Self {
-        let matcher = Matcher::TransactionId(txn_id);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_sender_filter(self, allow: bool, sender: AccountAddress) -> Self {
-        let matcher = Matcher::Sender(sender);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_module_address_filter(self, allow: bool, address: AccountAddress) -> Self {
-        let matcher = Matcher::ModuleAddress(address);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_entry_function_filter(
-        self,
-        allow: bool,
-        address: AccountAddress,
-        module_name: String,
-        function: String,
-    ) -> Self {
-        let matcher = Matcher::EntryFunction(address, module_name, function);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_block_epoch_greater_than_filter(self, allow: bool, epoch: u64) -> Self {
-        let matcher = Matcher::BlockEpochGreaterThan(epoch);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_block_epoch_less_than_filter(self, allow: bool, epoch: u64) -> Self {
-        let matcher = Matcher::BlockEpochLessThan(epoch);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_matches_all_of_filter(self, allow: bool, matchers: Vec<Matcher>) -> Self {
-        let matcher = Matcher::MatchesAllOf(matchers);
-        self.add_match_rule(allow, matcher)
-    }
-
-    pub fn add_public_key_filter(self, allow: bool, public_key: AnyPublicKey) -> Self {
-        let matcher = Matcher::PublicKey(public_key);
-        self.add_match_rule(allow, matcher)
-    }
-
-    /// Determines if the filter allows a transaction (unassociated with any block)
-    pub fn allows(&self, txn: &SignedTransaction) -> bool {
-        self.evaluate_rules(None, None, None, txn)
-    }
-
-    /// Determines if the filter allows a transaction (associated with
-    /// a specific block ID, epoch, and timestamp).
-    pub fn allows_in_block(
-        &self,
-        block_id: HashValue,
-        block_epoch: u64,
-        block_timestamp: u64,
-        txn: &SignedTransaction,
-    ) -> bool {
-        self.evaluate_rules(
-            Some(block_id),
-            Some(block_epoch),
-            Some(block_timestamp),
-            txn,
-        )
-    }
-
-    /// Determines if the filter allows a transaction by evaluating the rule
-    /// set. Rules are applied in order and the first rule that matches is
-    /// used. If no rule matches, the transaction is allowed.
-    fn evaluate_rules(
-        &self,
-        block_id: Option<HashValue>,
-        block_epoch: Option<u64>,
-        block_timestamp: Option<u64>,
-        txn: &SignedTransaction,
-    ) -> bool {
-        for rule in &self.rules {
-            match rule.eval(block_id, block_epoch, block_timestamp, txn) {
-                EvalResult::Allow => return true,
-                EvalResult::Deny => return false,
-                EvalResult::NoMatch => continue,
-            }
-        }
-        true
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -670,18 +531,6 @@ mod test {
         },
     };
     use rand::thread_rng;
-
-    fn create_raw_transaction() -> RawTransaction {
-        RawTransaction::new(
-            AccountAddress::random(),
-            0,
-            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
-            0,
-            0,
-            0,
-            ChainId::new(10),
-        )
-    }
 
     #[test]
     fn test_matches_account_authenticator_address() {
@@ -765,94 +614,6 @@ mod test {
 
         // Verify that the public key matches the target address
         verify_matches_public_key_address(&public_key, &target_address, true);
-    }
-
-    #[test]
-    fn test_matches_block_id() {
-        // Create a block ID
-        let block_id = HashValue::random();
-
-        // Verify that the block ID matches itself
-        verify_matches_block_id(Some(block_id), &block_id, true);
-
-        // Verify that a different block ID does not match
-        let different_block_id = HashValue::random();
-        verify_matches_block_id(Some(block_id), &different_block_id, false);
-
-        // Verify that a missing block ID does not match
-        verify_matches_block_id(None, &block_id, false);
-    }
-
-    #[test]
-    fn test_matches_epoch_greater_than() {
-        // Create an epoch
-        let epoch = 10;
-
-        // Verify that a greater epoch matches
-        verify_matches_epoch_greater_than(Some(epoch + 1), &epoch, true);
-
-        // Verify that an equal epoch does not match
-        verify_matches_epoch_greater_than(Some(epoch), &epoch, false);
-
-        // Verify that a lesser epoch does not match
-        verify_matches_epoch_greater_than(Some(epoch - 1), &epoch, false);
-
-        // Verify that a missing epoch does not match
-        verify_matches_epoch_greater_than(None, &epoch, false);
-    }
-
-    #[test]
-    fn test_matches_epoch_less_than() {
-        // Create an epoch
-        let epoch = 10;
-
-        // Verify that a lesser epoch matches
-        verify_matches_epoch_less_than(Some(epoch - 1), &epoch, true);
-
-        // Verify that an equal epoch does not match
-        verify_matches_epoch_less_than(Some(epoch), &epoch, false);
-
-        // Verify that a greater epoch does not match
-        verify_matches_epoch_less_than(Some(epoch + 1), &epoch, false);
-
-        // Verify that a missing epoch does not match
-        verify_matches_epoch_less_than(None, &epoch, false);
-    }
-
-    #[test]
-    fn test_matches_timestamp_greater_than() {
-        // Create a timestamp
-        let timestamp = 100;
-
-        // Verify that a greater timestamp matches
-        verify_matches_timestamp_greater_than(Some(timestamp + 1), &timestamp, true);
-
-        // Verify that an equal timestamp does not match
-        verify_matches_timestamp_greater_than(Some(timestamp), &timestamp, false);
-
-        // Verify that a lesser timestamp does not match
-        verify_matches_timestamp_greater_than(Some(timestamp - 1), &timestamp, false);
-
-        // Verify that a missing timestamp does not match
-        verify_matches_timestamp_greater_than(None, &timestamp, false);
-    }
-
-    #[test]
-    fn test_matches_timestamp_less_than() {
-        // Create a timestamp
-        let timestamp = 100;
-
-        // Verify that a lesser timestamp matches
-        verify_matches_timestamp_less_than(Some(timestamp - 1), &timestamp, true);
-
-        // Verify that an equal timestamp does not match
-        verify_matches_timestamp_less_than(Some(timestamp), &timestamp, false);
-
-        // Verify that a greater timestamp does not match
-        verify_matches_timestamp_less_than(Some(timestamp + 1), &timestamp, false);
-
-        // Verify that a missing timestamp does not match
-        verify_matches_timestamp_less_than(None, &timestamp, false);
     }
 
     #[test]
@@ -1110,10 +871,25 @@ mod test {
         );
     }
 
+    /// Creates and returns a raw transaction
+    fn create_raw_transaction() -> RawTransaction {
+        RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        )
+    }
+
+    /// Generates and returns a random Ed25519 private key
     fn get_random_private_key() -> Ed25519PrivateKey {
         Ed25519PrivateKey::generate(&mut thread_rng())
     }
 
+    /// Verifies that the given account authenticator contains the expected address
     fn verify_matches_account_auth_address(
         account_authenticator: &AccountAuthenticator,
         address: &AccountAddress,
@@ -1123,6 +899,7 @@ mod test {
         assert_eq!(matches, result);
     }
 
+    /// Verifies that the given account authenticator contains the expected public key
     fn verify_matches_account_auth_public_key(
         account_authenticator: &AccountAuthenticator,
         any_public_key: &AnyPublicKey,
@@ -1133,29 +910,7 @@ mod test {
         assert_eq!(matches, result);
     }
 
-    fn verify_matches_block_id(
-        block_id: Option<HashValue>,
-        target_block_id: &HashValue,
-        matches: bool,
-    ) {
-        let result = matches_block_id(block_id, target_block_id);
-        assert_eq!(matches, result);
-    }
-
-    fn verify_matches_epoch_greater_than(
-        block_epoch: Option<u64>,
-        target_epoch: &u64,
-        matches: bool,
-    ) {
-        let result = matches_epoch_greater_than(block_epoch, target_epoch);
-        assert_eq!(matches, result);
-    }
-
-    fn verify_matches_epoch_less_than(block_epoch: Option<u64>, target_epoch: &u64, matches: bool) {
-        let result = matches_epoch_less_than(block_epoch, target_epoch);
-        assert_eq!(matches, result);
-    }
-
+    /// Verifies that the given public key contains the target address
     fn verify_matches_public_key_address(
         any_public_key: &AnyPublicKey,
         address: &AccountAddress,
@@ -1165,24 +920,7 @@ mod test {
         assert_eq!(matches, result);
     }
 
-    fn verify_matches_timestamp_greater_than(
-        block_timestamp: Option<u64>,
-        target_timestamp: &u64,
-        matches: bool,
-    ) {
-        let result = matches_timestamp_greater_than(block_timestamp, target_timestamp);
-        assert_eq!(matches, result);
-    }
-
-    fn verify_matches_timestamp_less_than(
-        block_timestamp: Option<u64>,
-        target_timestamp: &u64,
-        matches: bool,
-    ) {
-        let result = matches_timestamp_less_than(block_timestamp, target_timestamp);
-        assert_eq!(matches, result);
-    }
-
+    /// Verifies that the given transaction authenticator contains the expected address
     fn verify_matches_transaction_auth_address(
         signed_transaction: &SignedTransaction,
         address: &AccountAddress,
@@ -1192,6 +930,7 @@ mod test {
         assert_eq!(matches, result);
     }
 
+    /// Verifies that the given transaction authenticator contains the expected public key
     fn verify_matches_transaction_auth_public_key(
         signed_transaction: &SignedTransaction,
         any_public_key: &AnyPublicKey,

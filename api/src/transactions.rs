@@ -581,12 +581,12 @@ impl TransactionsApi {
             let ledger_info = context.get_latest_ledger_info()?;
             let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
 
-            // Confirm the simulation filter allows the transaction
-            if !context
-                .node_config
-                .api
-                .simulation_filter
-                .allows(&signed_transaction)
+            // Confirm the API simulation filter allows the transaction
+            let api_filter = &context.node_config.transaction_filters.api_filter;
+            if api_filter.is_enabled()
+                && !api_filter
+                    .transaction_filter()
+                    .allows_transaction(&signed_transaction)
             {
                 return Err(SubmitTransactionError::forbidden_with_code(
                     "Transaction not allowed by simulation filter",

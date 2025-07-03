@@ -9,12 +9,12 @@ use crate::{
     transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::common::Round;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_transactions_filter::transaction_filter::TransactionFilter;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -54,7 +54,7 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     write_mutex: AsyncMutex<LogicalTime>,
-    transaction_filter: Arc<TransactionFilter>,
+    txn_filter_config: Arc<BlockTransactionFilterConfig>,
     state: RwLock<Option<MutableState>>,
     enable_pre_commit: bool,
 }
@@ -64,7 +64,7 @@ impl ExecutionProxy {
         executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        txn_filter: TransactionFilter,
+        txn_filter_config: BlockTransactionFilterConfig,
         enable_pre_commit: bool,
     ) -> Self {
         Self {
@@ -72,7 +72,7 @@ impl ExecutionProxy {
             txn_notifier,
             state_sync_notifier,
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
-            transaction_filter: Arc::new(txn_filter),
+            txn_filter_config: Arc::new(txn_filter_config),
             state: RwLock::new(None),
             enable_pre_commit,
         }
@@ -96,7 +96,7 @@ impl ExecutionProxy {
 
         let block_preparer = Arc::new(BlockPreparer::new(
             payload_manager.clone(),
-            self.transaction_filter.clone(),
+            self.txn_filter_config.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
         ));
