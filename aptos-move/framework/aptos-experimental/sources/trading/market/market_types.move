@@ -91,7 +91,7 @@ module aptos_experimental::market_types {
             // settle_trade_f arguments: taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size
             settle_trade_f:  |address, address, u64, u64, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
             // validate_settlement_update_f arguments: account, is_taker, is_long, price, size
-            validate_order_placement_f: |address, u64, bool, bool, u64, u64, M| bool has drop + copy,
+            validate_order_placement_f: |address, u64, bool, bool, Option<u64>, u64, M| bool has drop + copy,
             // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
             place_maker_order_f: |address, u64, bool, u64, u64, M| has drop + copy,
             // cleanup_order_f arguments: account, order_id, is_bid, remaining_size
@@ -117,7 +117,7 @@ module aptos_experimental::market_types {
         // settle_trade_f arguments: taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size
         settle_trade_f: |address, address, u64, u64, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
-        validate_order_placement_f: |address, u64, bool, bool, u64, u64, M| bool has drop + copy,
+        validate_order_placement_f: |address, u64, bool, bool, Option<u64>, u64, M| bool has drop + copy,
         place_maker_order_f: |address, u64, bool, u64, u64, M| has drop + copy,
         cleanup_order_f: |address, u64, bool, u64| has drop + copy,
         decrease_order_size_f: |address, u64, bool, u64, u64| has drop + copy,
@@ -164,7 +164,7 @@ module aptos_experimental::market_types {
         order_id: u64,
         is_taker: bool,
         is_bid: bool,
-        price: u64,
+        price: Option<u64>,
         size: u64,
         order_metadata: M): bool {
         (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, size, order_metadata)
