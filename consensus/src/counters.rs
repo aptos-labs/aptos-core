@@ -1254,6 +1254,15 @@ pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the number of rejected proposals due to denied inline transactions
+pub static REJECTED_PROPOSAL_DENY_TXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_rejected_proposal_deny_txn_count",
+        "Count of the number of rejected proposals due to denied inline transactions"
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of txns to be executed in a block.
 pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
