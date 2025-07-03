@@ -65,6 +65,30 @@ impl BlockTransactionFilter {
         }
     }
 
+    /// Identifies the transactions in the given block that are denied by the filter.
+    /// Note: this returns the inverse of `filter_block_transactions`.
+    pub fn get_denied_block_transactions(
+        &self,
+        block_id: HashValue,
+        block_author: Option<AccountAddress>,
+        block_epoch: u64,
+        block_timestamp_usecs: u64,
+        transactions: Vec<SignedTransaction>,
+    ) -> Vec<SignedTransaction> {
+        transactions
+            .into_iter()
+            .filter(|txn| {
+                !self.allows_transaction(
+                    block_id,
+                    block_author,
+                    block_epoch,
+                    block_timestamp_usecs,
+                    txn,
+                )
+            })
+            .collect()
+    }
+
     /// Filters the transactions in the given block and returns only those that are allowed
     pub fn filter_block_transactions(
         &self,
