@@ -282,7 +282,7 @@ Order time in force
 
 </dd>
 <dt>
-<code>validate_order_placement_f: |(<b>address</b>, u64, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop</code>
+<code>validate_order_placement_f: |(<b>address</b>, u64, bool, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, u64, M)|bool <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
 
@@ -608,7 +608,7 @@ Order time in force
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, u64, bool, bool, u64, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, u64, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, u64, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, u64, bool, u64, u64)| <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, u64, bool, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, u64, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, u64, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, u64, bool, u64, u64)| <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
 </code></pre>
 
 
@@ -621,7 +621,7 @@ Order time in force
     // settle_trade_f arguments: taker, maker, taker_order_id, maker_order_id, fill_id, is_taker_long, price, size
     settle_trade_f: |<b>address</b>, <b>address</b>, u64, u64, u64, bool, u64, u64, M, M| <a href="market_types.md#0x7_market_types_SettleTradeResult">SettleTradeResult</a> <b>has</b> drop + <b>copy</b>,
     // validate_settlement_update_f arguments: accoun, is_taker, is_long, price, size
-    validate_order_placement_f: |<b>address</b>, u64, bool, bool, u64, u64, M| bool <b>has</b> drop + <b>copy</b>,
+    validate_order_placement_f: |<b>address</b>, u64, bool, bool, Option&lt;u64&gt;, u64, M| bool <b>has</b> drop + <b>copy</b>,
     place_maker_order_f: |<b>address</b>, u64, bool, u64, u64, M| <b>has</b> drop + <b>copy</b>,
     cleanup_order_f: |<b>address</b>, u64, bool, u64| <b>has</b> drop + <b>copy</b>,
     decrease_order_size_f: |<b>address</b>, u64, bool, u64, u64| <b>has</b> drop + <b>copy</b>,
@@ -753,7 +753,7 @@ Order time in force
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_validate_order_placement">validate_order_placement</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: u64, is_taker: bool, is_bid: bool, price: u64, size: u64, order_metadata: M): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_validate_order_placement">validate_order_placement</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: u64, is_taker: bool, is_bid: bool, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64, order_metadata: M): bool
 </code></pre>
 
 
@@ -768,7 +768,7 @@ Order time in force
     order_id: u64,
     is_taker: bool,
     is_bid: bool,
-    price: u64,
+    price: Option&lt;u64&gt;,
     size: u64,
     order_metadata: M): bool {
     (self.validate_order_placement_f)(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_taker, is_bid, price, size, order_metadata)
