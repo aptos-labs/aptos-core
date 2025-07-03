@@ -2640,14 +2640,69 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ViewFunctionError {
+    // This is to represent errors are from a MoveAbort and has error info from the module metadata to display.
+    // The ExecutionStatus is used to construct the error message in the same way as MoveAborts for entry functions.
+    MoveAbort(ExecutionStatus, Option<StatusCode>),
+    // This is a generic error message that takes in a string and display it in the error response.
+    ErrorMessage(String, Option<StatusCode>),
+}
+
+impl std::fmt::Display for ViewFunctionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ViewFunctionError::MoveAbort(status, vm_status) => {
+                write!(
+                    f,
+                    "Execution status: {:?}, VM status: {:?}",
+                    status, vm_status
+                )
+            },
+            ViewFunctionError::ErrorMessage(msg, vm_status) => {
+                write!(f, "Error: {}, VM status: {:?}", msg, vm_status)
+            },
+        }
+    }
+}
+
 pub struct ViewFunctionOutput {
-    pub values: Result<Vec<Vec<u8>>>,
+    pub values: Result<Vec<Vec<u8>>, ViewFunctionError>,
     pub gas_used: u64,
 }
 
 impl ViewFunctionOutput {
-    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+    pub fn new(values: Result<Vec<Vec<u8>>, ViewFunctionError>, gas_used: u64) -> Self {
         Self { values, gas_used }
+    }
+
+    pub fn new_ok(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
+        Self {
+            values: Ok(values),
+            gas_used,
+        }
+    }
+
+    pub fn new_error_message(
+        message: String,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::ErrorMessage(message, vm_status)),
+            gas_used,
+        }
+    }
+
+    pub fn new_move_abort_error(
+        status: ExecutionStatus,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::MoveAbort(status, vm_status)),
+            gas_used,
+        }
     }
 }
 
