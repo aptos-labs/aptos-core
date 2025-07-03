@@ -1,6 +1,6 @@
 [package]
-name = "aptos-transactions-filter"
-description = "The transaction filter for filtering Aptos transactions based on various criteria."
+name = "aptos-transaction-filters"
+description = "The transaction filters used by various Aptos components."
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -22,3 +22,6 @@ serde_yaml = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
+
+[features]
+fuzzing = []

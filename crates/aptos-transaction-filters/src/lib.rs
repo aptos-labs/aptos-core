@@ -3,5 +3,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod batch_transaction_filter;
+pub mod block_transaction_filter;
 pub mod transaction_filter;
-pub mod transaction_matcher;
+
+#[cfg(test)]
+mod tests;
