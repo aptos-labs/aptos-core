@@ -1,0 +1,545 @@
+processed 1 task
+
+task 0 'publish'. lines 1-179:
+Error: compilation errors:
+ warning: Unused value of parameter `var0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var0`), or binding to `_`
+   ┌─ TEMPFILE:30:27
+   │
+30 │     public fun function1( var0: &mut Enum1, var1: &mut Enum1, var2: &mut Enum1, var3: &mut Enum1) { /* _block0 */
+   │                           ^^^^
+
+warning: Unused value of parameter `var1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var1`), or binding to `_`
+   ┌─ TEMPFILE:30:45
+   │
+30 │     public fun function1( var0: &mut Enum1, var1: &mut Enum1, var2: &mut Enum1, var3: &mut Enum1) { /* _block0 */
+   │                                             ^^^^
+
+warning: Unused value of parameter `var2`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var2`), or binding to `_`
+   ┌─ TEMPFILE:30:63
+   │
+30 │     public fun function1( var0: &mut Enum1, var1: &mut Enum1, var2: &mut Enum1, var3: &mut Enum1) { /* _block0 */
+   │                                                               ^^^^
+
+warning: Unused value of parameter `var3`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var3`), or binding to `_`
+   ┌─ TEMPFILE:30:81
+   │
+30 │     public fun function1( var0: &mut Enum1, var1: &mut Enum1, var2: &mut Enum1, var3: &mut Enum1) { /* _block0 */
+   │                                                                                 ^^^^
+
+warning: Unused value of parameter `var15`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var15`), or binding to `_`
+   ┌─ TEMPFILE:32:72
+   │
+32 │     public fun function2( var12: &Enum0, var13: Struct0, var14: Enum1, var15: Struct0, var16: | u32 | has copy+drop): u8 { /* _block1 */
+   │                                                                        ^^^^^
+
+warning: Unused value of parameter `var16`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var16`), or binding to `_`
+   ┌─ TEMPFILE:32:88
+   │
+32 │     public fun function2( var12: &Enum0, var13: Struct0, var14: Enum1, var15: Struct0, var16: | u32 | has copy+drop): u8 { /* _block1 */
+   │                                                                                        ^^^^^
+
+warning: Unused value of parameter `var17`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var17`), or binding to `_`
+   ┌─ TEMPFILE:33:43
+   │
+33 │         *( &( Enum0::Variant1 { field5: | var17: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var18: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block2 */
+   │                                           ^^^^^
+
+warning: Unused value of parameter `var18`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var18`), or binding to `_`
+   ┌─ TEMPFILE:33:152
+   │
+33 │         *( &( Enum0::Variant1 { field5: | var17: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var18: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block2 */
+   │                                                                                                                                                        ^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var19` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var19`), or renaming to `_`
+   ┌─ TEMPFILE:39:25
+   │
+39 │         let var19 = *( &( false));
+   │                         ^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var24` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var24`), or renaming to `_`
+   ┌─ TEMPFILE:42:17
+   │
+42 │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var20` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var20`), or renaming to `_`
+   ┌─ TEMPFILE:45:17
+   │
+45 │                 Enum1::Variant2 {field6: var20, field7: var21,} => { /* _block13 */
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var21` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var21`), or renaming to `_`
+   ┌─ TEMPFILE:45:17
+   │
+45 │                 Enum1::Variant2 {field6: var20, field7: var21,} => { /* _block13 */
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var38` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var38`), or renaming to `_`
+   ┌─ TEMPFILE:47:29
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var39` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var39`), or renaming to `_`
+   ┌─ TEMPFILE:47:29
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var42`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var42`), or binding to `_`
+   ┌─ TEMPFILE:47:82
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                                                                                  ^^^^^
+
+warning: Unused value of parameter `var43`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var43`), or binding to `_`
+   ┌─ TEMPFILE:47:95
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                                                                                               ^^^^^
+
+warning: Unused value of parameter `var44`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var44`), or binding to `_`
+   ┌─ TEMPFILE:47:111
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                                                                                                               ^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var35` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var35`), or renaming to `_`
+   ┌─ TEMPFILE:47:80
+   │
+47 │                             Enum1::Variant3 {field8: var38, field9: var39,} => | var42: bool, var43: Struct1, var44: Enum0 | { /* _block18 */ ( 18858u16 ^ 18170u16)},
+   │                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var36` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var36`), or renaming to `_`
+   ┌─ TEMPFILE:48:29
+   │
+48 │                             Enum1::Variant2 {field6: var36, ..} => { /* _block19 */
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var48`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var48`), or binding to `_`
+   ┌─ TEMPFILE:49:39
+   │
+49 │                                     | var48: bool, var49: Struct1, var50: Enum0 | { /* _block20 */ 39966u16}
+   │                                       ^^^^^
+
+warning: Unused value of parameter `var49`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var49`), or binding to `_`
+   ┌─ TEMPFILE:49:52
+   │
+49 │                                     | var48: bool, var49: Struct1, var50: Enum0 | { /* _block20 */ 39966u16}
+   │                                                    ^^^^^
+
+warning: Unused value of parameter `var50`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var50`), or binding to `_`
+   ┌─ TEMPFILE:49:68
+   │
+49 │                                     | var48: bool, var49: Struct1, var50: Enum0 | { /* _block20 */ 39966u16}
+   │                                                                    ^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var35` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var35`), or renaming to `_`
+   ┌─ TEMPFILE:49:37
+   │
+49 │                                     | var48: bool, var49: Struct1, var50: Enum0 | { /* _block20 */ 39966u16}
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var59`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var59`), or binding to `_`
+   ┌─ TEMPFILE:52:39
+   │
+52 │                                     | var59: bool, var60: Struct1, var61: Enum0 | { /* _block24 */ 6707u16}
+   │                                       ^^^^^
+
+warning: Unused value of parameter `var60`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var60`), or binding to `_`
+   ┌─ TEMPFILE:52:52
+   │
+52 │                                     | var59: bool, var60: Struct1, var61: Enum0 | { /* _block24 */ 6707u16}
+   │                                                    ^^^^^
+
+warning: Unused value of parameter `var61`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var61`), or binding to `_`
+   ┌─ TEMPFILE:52:68
+   │
+52 │                                     | var59: bool, var60: Struct1, var61: Enum0 | { /* _block24 */ 6707u16}
+   │                                                                    ^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var35` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var35`), or renaming to `_`
+   ┌─ TEMPFILE:52:37
+   │
+52 │                                     | var59: bool, var60: Struct1, var61: Enum0 | { /* _block24 */ 6707u16}
+   │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var67` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var67`), or renaming to `_`
+   ┌─ TEMPFILE:56:29
+   │
+56 │                             Enum1::Variant4 {field11: var67, ..} => { /* _block29 */
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var22` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var22`), or renaming to `_`
+   ┌─ TEMPFILE:63:17
+   │
+63 │                 Enum1::Variant3 {field8: var22, field9: var23,} => match ( *( &( Enum1::Variant3 { field8: 69980731u32, field9: 65010u32}))) {
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var23` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var23`), or renaming to `_`
+   ┌─ TEMPFILE:63:17
+   │
+63 │                 Enum1::Variant3 {field8: var22, field9: var23,} => match ( *( &( Enum1::Variant3 { field8: 69980731u32, field9: 65010u32}))) {
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var70` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var70`), or renaming to `_`
+   ┌─ TEMPFILE:64:25
+   │
+64 │                         Enum1::Variant3 {field8: var70, ..} => &mut ( var14),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var69` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var69`), or renaming to `_`
+   ┌─ TEMPFILE:65:25
+   │
+65 │                         Enum1::Variant2 {field7: var69, ..} => &mut ( var14),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:67:42
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │                                   ------------- previously mutably borrowed here
+    │ ╭──────────────────'
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 67 │ │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
+    │ │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────' conflicting reference used here
+
+error: cannot transfer mutable value since it is borrowed
+   ┌─ TEMPFILE:67:42
+   │
+67 │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
+   │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                          │              │
+   │                                          │              previously mutably borrowed here
+   │                                          transfer attempted here
+
+error: cannot transfer mutable value since it is borrowed
+   ┌─ TEMPFILE:67:42
+   │
+67 │                                 let () = ( function1) ( &mut ( var14), &mut ( Enum1::Variant2 { field6: 2733676076u32, field7: 662338862u32}), &mut ( var14), &mut ( var14));
+   │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                          │                                                                                                     │
+   │                                          │                                                                                                     previously mutably borrowed here
+   │                                          transfer attempted here
+
+warning: This assignment/binding to the left-hand-side variable `var77` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var77`), or renaming to `_`
+   ┌─ TEMPFILE:68:45
+   │
+68 │                                 let var77 = Enum1::Variant2 { field6: ( 1027423549u32 - 15677u32), field7: ( 1027423549u32 - 15677u32)};
+   │                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var82` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var82`), or renaming to `_`
+   ┌─ TEMPFILE:74:17
+   │
+74 │                 Enum1::Variant4 {field10: var82, field11: var83,} => match ( Enum1::Variant4 { field10: ( 2560137368u32 * 6296u32), field11: ( 2560137368u32 * 6296u32)}) {
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var83` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var83`), or renaming to `_`
+   ┌─ TEMPFILE:74:17
+   │
+74 │                 Enum1::Variant4 {field10: var82, field11: var83,} => match ( Enum1::Variant4 { field10: ( 2560137368u32 * 6296u32), field11: ( 2560137368u32 * 6296u32)}) {
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var88` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var88`), or renaming to `_`
+   ┌─ TEMPFILE:75:25
+   │
+75 │                         Enum1::Variant4 {field10: var88, field11: var89,} => { /* _block42 */
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var89` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var89`), or renaming to `_`
+   ┌─ TEMPFILE:75:25
+   │
+75 │                         Enum1::Variant4 {field10: var88, field11: var89,} => { /* _block42 */
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var84` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var84`), or renaming to `_`
+   ┌─ TEMPFILE:78:25
+   │
+78 │                         Enum1::Variant2 {field6: var84, field7: var85,} => &mut ( Enum1::Variant2 { field6: 537516388u32, field7: 3026101499u32}),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var85` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var85`), or renaming to `_`
+   ┌─ TEMPFILE:78:25
+   │
+78 │                         Enum1::Variant2 {field6: var84, field7: var85,} => &mut ( Enum1::Variant2 { field6: 537516388u32, field7: 3026101499u32}),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var86` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var86`), or renaming to `_`
+   ┌─ TEMPFILE:79:25
+   │
+79 │                         Enum1::Variant3 {field8: var86, field9: var87,} => &mut ( Enum1::Variant2 { field6: 791621423u32, field7: 791621423u32}),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var87` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var87`), or renaming to `_`
+   ┌─ TEMPFILE:79:25
+   │
+79 │                         Enum1::Variant3 {field8: var86, field9: var87,} => &mut ( Enum1::Variant2 { field6: 791621423u32, field7: 791621423u32}),
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var78` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var78`), or renaming to `_`
+   ┌─ TEMPFILE:81:17
+   │
+81 │                 Enum1::Variant2 {field6: var78, field7: var79,} => { /* _block44 */
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var79` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var79`), or renaming to `_`
+   ┌─ TEMPFILE:81:17
+   │
+81 │                 Enum1::Variant2 {field6: var78, field7: var79,} => { /* _block44 */
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var117` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var117`), or renaming to `_`
+   ┌─ TEMPFILE:82:29
+   │
+82 │                         let Struct0(var117, ..) = match ( Enum0::Variant1 { field5: | var121: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var122: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block47 */
+   │                             ^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var121`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var121`), or binding to `_`
+   ┌─ TEMPFILE:82:87
+   │
+82 │                         let Struct0(var117, ..) = match ( Enum0::Variant1 { field5: | var121: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var122: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block47 */
+   │                                                                                       ^^^^^^
+
+warning: Unused value of parameter `var122`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var122`), or binding to `_`
+   ┌─ TEMPFILE:82:197
+   │
+82 │                         let Struct0(var117, ..) = match ( Enum0::Variant1 { field5: | var121: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var122: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block47 */
+   │                                                                                                                                                                                                     ^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var141` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var141`), or renaming to `_`
+    ┌─ TEMPFILE:98:38
+    │  
+ 98 │                           let var141 = ( *( &( Struct1 {field2: 157u8, field3:  Struct0 (true,true,),})) !=
+    │ ╭──────────────────────────────────────^
+ 99 │ │                             Struct1 {
+100 │ │                                 field2: ( 100u8 & 47u8),
+101 │ │                                 field3:  Struct0 (
+    · │
+104 │ │                             }
+105 │ │                         );
+    │ ╰─────────────────────────^
+
+warning: This assignment/binding to the left-hand-side variable `var143` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var143`), or renaming to `_`
+    ┌─ TEMPFILE:106:29
+    │
+106 │                         let Struct0(var143, ..) = match ( Enum0::Variant1 { field5: | var147: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var148: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block52 */
+    │                             ^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var147`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var147`), or binding to `_`
+    ┌─ TEMPFILE:106:87
+    │
+106 │                         let Struct0(var143, ..) = match ( Enum0::Variant1 { field5: | var147: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var148: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block52 */
+    │                                                                                       ^^^^^^
+
+warning: Unused value of parameter `var148`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var148`), or binding to `_`
+    ┌─ TEMPFILE:106:197
+    │
+106 │                         let Struct0(var143, ..) = match ( Enum0::Variant1 { field5: | var147: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var148: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block52 */
+    │                                                                                                                                                                                                     ^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var150` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var150`), or renaming to `_`
+    ┌─ TEMPFILE:112:41
+    │
+112 │                                     let Struct0(var150, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var153` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var153`), or renaming to `_`
+    ┌─ TEMPFILE:115:41
+    │
+115 │                                     let Struct0(var153, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var156` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var156`), or renaming to `_`
+    ┌─ TEMPFILE:118:41
+    │
+118 │                                     let Struct0(var156, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var159` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var159`), or renaming to `_`
+    ┌─ TEMPFILE:126:41
+    │
+126 │                                     let Struct0(var159, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var162` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var162`), or renaming to `_`
+    ┌─ TEMPFILE:129:41
+    │
+129 │                                     let Struct0(var162, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var165` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var165`), or renaming to `_`
+    ┌─ TEMPFILE:132:41
+    │
+132 │                                     let Struct0(var165, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: Unused value of parameter `var169`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var169`), or binding to `_`
+    ┌─ TEMPFILE:140:61
+    │
+140 │                         match ( Enum0::Variant1 { field5: | var169: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var170: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block57 */
+    │                                                             ^^^^^^
+
+warning: Unused value of parameter `var170`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var170`), or binding to `_`
+    ┌─ TEMPFILE:140:171
+    │
+140 │                         match ( Enum0::Variant1 { field5: | var169: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop, var170: | (| | has copy+drop), (| | has copy+drop), (| | has copy+drop), (| | has copy+drop) | has copy+drop | { /* _block57 */
+    │                                                                                                                                                                           ^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var172` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var172`), or renaming to `_`
+    ┌─ TEMPFILE:146:41
+    │
+146 │                                     let Struct0(var172, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var175` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var175`), or renaming to `_`
+    ┌─ TEMPFILE:149:41
+    │
+149 │                                     let Struct0(var175, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var178` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var178`), or renaming to `_`
+    ┌─ TEMPFILE:152:41
+    │
+152 │                                     let Struct0(var178, ..) = Struct0 (
+    │                                         ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var80` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var80`), or renaming to `_`
+    ┌─ TEMPFILE:160:17
+    │
+160 │                 Enum1::Variant3 {field8: var80, field9: var81,} => { /* _block59 */
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var81` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var81`), or renaming to `_`
+    ┌─ TEMPFILE:160:17
+    │
+160 │                 Enum1::Variant3 {field8: var80, field9: var81,} => { /* _block59 */
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var181` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var181`), or renaming to `_`
+    ┌─ TEMPFILE:161:29
+    │
+161 │                         let Struct0(var181, var182) = var13;
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var182` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var182`), or renaming to `_`
+    ┌─ TEMPFILE:161:29
+    │
+161 │                         let Struct0(var181, var182) = var13;
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var183` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var183`), or renaming to `_`
+    ┌─ TEMPFILE:162:42
+    │
+162 │                         let var183 = *( &( Enum0::Variant0 { field4: false}));
+    │                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var184` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var184`), or renaming to `_`
+    ┌─ TEMPFILE:163:38
+    │
+163 │                         let var184 = 1867244186u32;
+    │                                      ^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var187` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var187`), or renaming to `_`
+    ┌─ TEMPFILE:164:29
+    │
+164 │                         let Struct0(.., var187) = var13;
+    │                             ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `var190` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_var190`), or renaming to `_`
+    ┌─ TEMPFILE:167:50
+    │
+167 │                                     let var190 = Enum1::Variant2 { field6: ( 2084683531u32 >> 19u8), field7: 2881938354u32};
+    │                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:40:18
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │                                   ------------- previously mutably borrowed here
+    │ ╭──────────────────^
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────^ transfer attempted here
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:40:18
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │                                   ------------- previously mutably borrowed here
+    │ ╭──────────────────^
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 64 │ │                         Enum1::Variant3 {field8: var70, ..} => &mut ( var14),
+    │ │                                                                ------------- previously mutably borrowed here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────^ transfer attempted here
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:40:18
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │                                   ------------- previously mutably borrowed here
+    │ ╭──────────────────^
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 64 │ │                         Enum1::Variant3 {field8: var70, ..} => &mut ( var14),
+    │ │                                                                ------------- previously mutably borrowed here
+    · │
+ 76 │ │                                 &mut ( var14)
+    │ │                                 ------------- previously mutably borrowed here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────^ transfer attempted here
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:40:18
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │                                   ------------- previously mutably borrowed here
+    │ ╭──────────────────^
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 76 │ │                                 &mut ( var14)
+    │ │                                 ------------- previously mutably borrowed here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────^ transfer attempted here
+
+error: cannot transfer mutable value since it is borrowed
+    ┌─ TEMPFILE:40:18
+    │  
+ 40 │           let () = ( function1) ( &mut ( var14),
+    │ ╭──────────────────^
+ 41 │ │             match ( Enum1::Variant4 { field10: ( ( 3226759902u32 + 19457u32) | 653762092u32), field11: *( &( 1822826693u32))}) {
+ 42 │ │                 Enum1::Variant4 {field10: var24, ..} => { /* _block6 */
+ 43 │ │                     &mut ( Enum1::Variant2 { field6: 710633453u32, field7: 1761791860u32})
+    · │
+ 76 │ │                                 &mut ( var14)
+    │ │                                 ------------- previously mutably borrowed here
+    · │
+174 │ │             &mut ( var14)
+175 │ │         );
+    │ ╰─────────^ transfer attempted here
+
+
