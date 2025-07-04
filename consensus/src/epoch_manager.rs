@@ -958,9 +958,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
         
         #[cfg(feature = "consensus_fuzzer")]
-        let epoch_state_copy = epoch_state.clone();
-        #[cfg(feature = "consensus_fuzzer")]
-        let safety_rules_container_new = safety_rules_container.clone();
+        {
+            let epoch_state_copy = epoch_state.clone();
+            let safety_rules_container_new = safety_rules_container.clone();
+        }
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),

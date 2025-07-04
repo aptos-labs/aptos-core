@@ -7,39 +7,32 @@ use aptos_infallible::{checked, Mutex};
 use std::thread;
 use aptos_logger::info;
 
-#[cfg(feature = "consensus_fuzzer")]
 pub trait StateModelLike: Send + Sync {
     fn on_new_msg(&mut self, msg: &ConsensusMsg);
     fn current_state(&self) -> String;
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 pub trait FuzzHook: Send + Sync {
     fn start_active_fuzzer(&self, network: NetworkSender, state_model: Arc<Mutex<Box<dyn StateModelLike>>>, safety_rules: Arc<Mutex<MetricsSafetyRules>>, author: Author);
     fn mutate_consensus_msg(&self, msg: crate::network_interface::ConsensusMsg) -> ConsensusMsg;
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 static mut GLOBAL_FUZZ_HOOK: Option<Box<dyn FuzzHook>> = None;
 
-#[cfg(feature = "consensus_fuzzer")]
 static GLOBAL_STATE_MODEL: OnceLock<Arc<Mutex<Box<dyn StateModelLike>>>> = OnceLock::new();
 
-#[cfg(feature = "consensus_fuzzer")]
 pub fn register_state_model(model: Box<dyn StateModelLike>) {
     GLOBAL_STATE_MODEL
         .set(Arc::new(Mutex::new(model)))
         .unwrap_or_else(|_| panic!("StateModel already registered"));
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 pub fn register_fuzz_hook(hook: Box<dyn FuzzHook>) {
     unsafe {
         GLOBAL_FUZZ_HOOK = Some(hook);
     }
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 pub fn run_fuzzer(copy_network: NetworkSender,
     state_model: Arc<Mutex<Box<dyn StateModelLike>>>,
     safety_rules_container_new: Arc<Mutex<MetricsSafetyRules>>,
@@ -59,7 +52,6 @@ pub fn run_fuzzer(copy_network: NetworkSender,
     }
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 pub fn consensus_msg_mutate(msg: crate::network_interface::ConsensusMsg) -> ConsensusMsg{
     unsafe {
         if let Some(ref h) = GLOBAL_FUZZ_HOOK {
@@ -69,7 +61,6 @@ pub fn consensus_msg_mutate(msg: crate::network_interface::ConsensusMsg) -> Cons
     }
 }
 
-#[cfg(feature = "consensus_fuzzer")]
 pub fn get_state_model_arc() -> Option<Arc<Mutex<Box<dyn StateModelLike>>>> {
     GLOBAL_STATE_MODEL.get().cloned()
-}
+} 
