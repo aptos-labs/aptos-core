@@ -367,7 +367,7 @@ module aptos_experimental::active_order_book {
     #[test_only]
     struct TestOrder has copy, drop {
         account: address,
-        account_order_id: u64,
+        order_id: OrderIdType,
         price: u64,
         size: u64,
         unique_idx: UniqueIdxType,
@@ -382,11 +382,7 @@ module aptos_experimental::active_order_book {
         while (remaining_size > 0) {
             if (!self.is_taker_order(option::some(order.price), order.is_bid)) {
                 self.place_maker_order(
-                    new_order_id_type(order.account, order.account_order_id),
-                    order.price,
-                    order.unique_idx,
-                    order.size,
-                    order.is_bid
+                    order.order_id, order.price, order.unique_idx, order.size, order.is_bid
                 );
                 return result;
             };
@@ -412,7 +408,7 @@ module aptos_experimental::active_order_book {
             active_order_book.place_test_order(
                 TestOrder {
                     account: @0xAA,
-                    account_order_id: 0,
+                    order_id: new_order_id_type(0),
                     price: 200,
                     size: 1000,
                     unique_idx: new_unique_idx_type(0),
@@ -428,7 +424,7 @@ module aptos_experimental::active_order_book {
             active_order_book.place_test_order(
                 TestOrder {
                     account: @0xAA,
-                    account_order_id: 1,
+                    order_id: new_order_id_type(1),
                     price: 100,
                     size: 1000,
                     unique_idx: new_unique_idx_type(1),
@@ -448,7 +444,7 @@ module aptos_experimental::active_order_book {
             active_order_book.place_test_order(
                 TestOrder {
                     account: @0xAA,
-                    account_order_id: 2,
+                    order_id: new_order_id_type(2),
                     price: 150,
                     size: 100,
                     unique_idx: new_unique_idx_type(2),
@@ -466,7 +462,7 @@ module aptos_experimental::active_order_book {
             active_order_book.place_test_order(
                 TestOrder {
                     account: @0xAA,
-                    account_order_id: 3,
+                    order_id: new_order_id_type(3),
                     price: 175,
                     size: 100,
                     unique_idx: new_unique_idx_type(3),
@@ -487,7 +483,7 @@ module aptos_experimental::active_order_book {
             active_order_book.place_test_order(
                 TestOrder {
                     account: @0xAA,
-                    account_order_id: 4,
+                    order_id: new_order_id_type(4),
                     price: 160,
                     size: 50,
                     unique_idx: new_unique_idx_type(4),
@@ -502,7 +498,7 @@ module aptos_experimental::active_order_book {
             match_result
                 == vector[
                     new_active_matched_order(
-                        new_order_id_type(@0xAA, 2),
+                        new_order_id_type(2),
                         50, // matched size
                         50 // remaining size
                     )
@@ -520,7 +516,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 1,
+                order_id: new_order_id_type(1),
                 price: 100,
                 size: 50,
                 unique_idx: new_unique_idx_type(1),
@@ -531,7 +527,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 2,
+                order_id: new_order_id_type(2),
                 price: 150,
                 size: 100,
                 unique_idx: new_unique_idx_type(2),
@@ -542,7 +538,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 3,
+                order_id: new_order_id_type(3),
                 price: 200,
                 size: 150,
                 unique_idx: new_unique_idx_type(3),
@@ -577,7 +573,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 1,
+                order_id: new_order_id_type(1),
                 price: 200,
                 size: 50,
                 unique_idx: new_unique_idx_type(1),
@@ -588,7 +584,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 2,
+                order_id: new_order_id_type(2),
                 price: 150,
                 size: 100,
                 unique_idx: new_unique_idx_type(2),
@@ -599,7 +595,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 3,
+                order_id: new_order_id_type(3),
                 price: 100,
                 size: 150,
                 unique_idx: new_unique_idx_type(3),
@@ -634,7 +630,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 1,
+                order_id: new_order_id_type(1),
                 price: 101,
                 size: 50,
                 unique_idx: new_unique_idx_type(1),
@@ -645,7 +641,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 2,
+                order_id: new_order_id_type(2),
                 price: 102,
                 size: 100,
                 unique_idx: new_unique_idx_type(2),
@@ -656,7 +652,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 3,
+                order_id: new_order_id_type(3),
                 price: 103,
                 size: 150,
                 unique_idx: new_unique_idx_type(3),
@@ -668,7 +664,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 4,
+                order_id: new_order_id_type(4),
                 price: 99,
                 size: 50,
                 unique_idx: new_unique_idx_type(4),
@@ -679,7 +675,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 5,
+                order_id: new_order_id_type(5),
                 price: 98,
                 size: 100,
                 unique_idx: new_unique_idx_type(5),

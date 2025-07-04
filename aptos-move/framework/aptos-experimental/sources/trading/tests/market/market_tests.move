@@ -21,12 +21,10 @@ module aptos_experimental::market_tests {
     use aptos_experimental::market_types::{
         good_till_cancelled,
         post_only,
-        immediate_or_cancel,
+        immediate_or_cancel
     };
-    use aptos_experimental::market::{
-        new_market,
-        new_market_config
-    };
+    use aptos_experimental::market::{new_market, new_market_config};
+    use aptos_experimental::order_book_types::OrderIdType;
 
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
@@ -240,14 +238,8 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker2_addr) == 0);
 
         // Ensure the post only order was posted to the order book
-        assert!(
-            market.get_remaining_size(signer::address_of(maker1), maker_order_id)
-                == 1000000
-        );
-        assert!(
-            market.get_remaining_size(signer::address_of(maker2), maker2_order_id)
-                == 1000000
-        );
+        assert!(market.get_remaining_size(maker_order_id) == 1000000);
+        assert!(market.get_remaining_size(maker2_order_id) == 1000000);
 
         // Verify that the maker order is still active
         assert!(clearinghouse_test::order_exists(maker_order_id));
@@ -313,9 +305,7 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(taker_addr) == 0);
 
         // Ensure the post only order was not posted in the order book
-        assert!(
-            market.get_remaining_size(signer::address_of(taker), taker_order_id) == 0
-        );
+        assert!(market.get_remaining_size(taker_order_id) == 0);
         // Verify that the taker order is not active
         assert!(!clearinghouse_test::order_exists(taker_order_id));
         // The maker order should still be active
@@ -390,12 +380,8 @@ module aptos_experimental::market_tests {
         assert!(!clearinghouse_test::order_exists(maker_order_id));
         assert!(!clearinghouse_test::order_exists(taker_order_id));
 
-        assert!(
-            market.get_remaining_size(signer::address_of(taker), taker_order_id) == 0
-        );
-        assert!(
-            market.get_remaining_size(signer::address_of(maker), maker_order_id) == 0
-        );
+        assert!(market.get_remaining_size(taker_order_id) == 0);
+        assert!(market.get_remaining_size(maker_order_id) == 0);
         market.destroy_market()
     }
 
@@ -502,12 +488,8 @@ module aptos_experimental::market_tests {
         assert!(!clearinghouse_test::order_exists(maker_order_id));
         assert!(!clearinghouse_test::order_exists(taker_order_id));
 
-        assert!(
-            market.get_remaining_size(signer::address_of(taker), taker_order_id) == 0
-        );
-        assert!(
-            market.get_remaining_size(signer::address_of(maker), maker_order_id) == 0
-        );
+        assert!(market.get_remaining_size(taker_order_id) == 0);
+        assert!(market.get_remaining_size(maker_order_id) == 0);
         market.destroy_market()
     }
 
@@ -609,13 +591,8 @@ module aptos_experimental::market_tests {
         assert!(!clearinghouse_test::order_exists(taker_order_id));
         // The maker order should still be active
         assert!(clearinghouse_test::order_exists(maker_order_id));
-        assert!(
-            market.get_remaining_size(signer::address_of(maker), maker_order_id)
-                == 1000000
-        );
-        assert!(
-            market.get_remaining_size(signer::address_of(taker), taker_order_id) == 0
-        );
+        assert!(market.get_remaining_size(maker_order_id) == 1000000);
+        assert!(market.get_remaining_size(taker_order_id) == 0);
         market.destroy_market()
     }
 
@@ -735,12 +712,12 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(taker_addr) == 500000); // Short 0.5 BTC
 
         // Verify maker order fully filled
-        assert!(market.get_remaining_size(maker_addr, maker_order_id) == 0);
+        assert!(market.get_remaining_size(maker_order_id) == 0);
         assert!(!clearinghouse_test::order_exists(maker_order_id));
 
         // Taker order partially filled
         assert!(
-            market.get_remaining_size(taker_addr, taker_order_id) == 500000 // 0.5 BTC remaining
+            market.get_remaining_size(taker_order_id) == 500000 // 0.5 BTC remaining
         );
         assert!(clearinghouse_test::order_exists(taker_order_id));
 
@@ -769,7 +746,7 @@ module aptos_experimental::market_tests {
 
         // Place several maker order with small sizes.
         let i = 1;
-        let maker_order_ids = vector::empty<u64>();
+        let maker_order_ids = vector::empty<OrderIdType>();
         let expected_fill_sizes = vector::empty<u64>();
         let fill_prices = vector::empty<u64>();
         let maker_orig_sizes = vector::empty<u64>();
@@ -891,7 +868,7 @@ module aptos_experimental::market_tests {
                 &test_market_callbacks_with_taker_cancelled()
             );
         // Make sure the maker order is reinserted
-        assert!(market.get_remaining_size(maker_addr, maker_order_id) == 1500000);
+        assert!(market.get_remaining_size(maker_order_id) == 1500000);
         assert!(clearinghouse_test::order_exists(maker_order_id));
         assert!(!clearinghouse_test::order_exists(taker_order_id));
         market.destroy_market()
