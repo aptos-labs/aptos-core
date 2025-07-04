@@ -630,7 +630,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 1,
+                order_id: new_order_id_type(1),
                 price: 200,
                 size: 50,
                 unique_idx: new_unique_idx_type(1),
@@ -641,7 +641,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 2,
+                order_id: new_order_id_type(2),
                 price: 200,
                 size: 100,
                 unique_idx: new_unique_idx_type(2),
@@ -650,10 +650,10 @@ module aptos_experimental::active_order_book {
         );
 
         // Get single match for sell order of size 25 < first order size 50
-        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(200, 10).destroy_active_matched_order();
+        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(option::some(200), 10).destroy_active_matched_order();
 
         // Assert that the matched order is the first order
-        assert!(order_id == new_order_id_type(@0xAA, 1));
+        assert!(order_id == new_order_id_type(1));
 
         // Assert that the matched size is 10
         assert!(matched_size == 10);
@@ -662,10 +662,10 @@ module aptos_experimental::active_order_book {
         assert!(remaining_size == 40);
 
         // Get single match for sell order of size 100 > first order size 50
-        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(200, 100).destroy_active_matched_order();
+        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_sell_order(option::some(200), 100).destroy_active_matched_order();
 
         // Assert that the matched order is the first order
-        assert!(order_id == new_order_id_type(@0xAA, 1));
+        assert!(order_id == new_order_id_type(1));
 
         // Assert that the matched size is 40 which is the remaining size of the first order
         assert!(matched_size == 40);
@@ -684,7 +684,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 1,
+                order_id: new_order_id_type(1),
                 price: 200,
                 size: 50,
                 unique_idx: new_unique_idx_type(1),
@@ -695,7 +695,7 @@ module aptos_experimental::active_order_book {
         active_order_book.place_test_order(
             TestOrder {
                 account: @0xAA,
-                account_order_id: 2,
+                order_id: new_order_id_type(2),
                 price: 200,
                 size: 100,
                 unique_idx: new_unique_idx_type(2),
@@ -704,10 +704,10 @@ module aptos_experimental::active_order_book {
         );
 
         // Get single match for buy order of size 25 < first order size 50
-        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(200, 10).destroy_active_matched_order();
+        let (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(option::some(200), 10).destroy_active_matched_order();
 
         // Assert that the matched order is the first order
-        assert!(order_id == new_order_id_type(@0xAA, 1));
+        assert!(order_id == new_order_id_type(1));
 
         // Assert that the matched size is 10
         assert!(matched_size == 10);
@@ -716,10 +716,10 @@ module aptos_experimental::active_order_book {
         assert!(remaining_size == 40);
 
         // Get single match for buy order of size 100 > first order size 50
-        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(200, 100).destroy_active_matched_order();
+        (order_id, matched_size, remaining_size) = active_order_book.get_single_match_for_buy_order(option::some(200), 100).destroy_active_matched_order();
 
         // Assert that the matched order is the first order
-        assert!(order_id == new_order_id_type(@0xAA, 1));
+        assert!(order_id == new_order_id_type(1));
 
         // Assert that the matched size is 40 which is the remaining size of the first order
         assert!(matched_size == 40);
