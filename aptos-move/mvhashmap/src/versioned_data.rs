@@ -258,6 +258,10 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
         let mut accumulator: Option<Result<DeltaOp, ()>> = None;
         while let Some((idx, entry)) = iter.next_back() {
             if entry.is_estimate() {
+                debug_assert!(
+                    maybe_reader_incarnation.is_none(),
+                    "Entry must not be marked as estimate for BlockSTMv2"
+                );
                 // Found a dependency.
                 return Err(Dependency(
                     idx.idx().expect("May not depend on storage version"),
