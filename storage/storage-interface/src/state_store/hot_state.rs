@@ -17,11 +17,11 @@ where
     /// Additional entries resulted from previous speculative execution.
     overlay: Arc<LayeredMap<K, SpeculativeLRUEntry<K>>>,
     /// The new entries from the current execution.
-    pending: HashMap<K, SpeculativeLRUEntry<K>>,
+    pub pending: HashMap<K, SpeculativeLRUEntry<K>>,
     /// Points to the latest entry. `None` if empty.
-    head: Option<K>,
+    pub head: Option<K>,
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<K>,
+    pub tail: Option<K>,
 }
 
 impl<K, V> LRUUpdater<K, V>
