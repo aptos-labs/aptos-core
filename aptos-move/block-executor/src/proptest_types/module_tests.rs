@@ -119,6 +119,7 @@ fn execute_module_tests(
                     &txn_provider,
                     &state_view,
                     Some(&all_module_ids),
+                    false,
                 );
 
                 BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)

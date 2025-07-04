@@ -14,8 +14,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        ValueWithLayout, Version,
+        Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion,
+        TxnIndex, ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -87,20 +87,24 @@ pub(crate) enum DataRead<V> {
     /// Read resolved an aggregatorV1 delta to a value.
     /// TODO[agg_v1](cleanup): deprecate.
     Resolved(u128),
+    // CAUTION: when adding a new variant here, it must be ensured that compare
+    // data reads implements a comparison (o.w. unreachable arm will be hit).
 }
 
-// Represents the result of comparing DataReads ('self' and 'other').
-#[derive(Debug)]
-enum DataReadComparison {
-    // Information in 'self' DataRead contains information about the kind of the
-    // 'other' DataRead, and is consistent with 'other'.
-    Contains,
-    // Information in 'self' DataRead contains information about the kind of the
-    // 'other' DataRead, but is inconsistent with 'other'.
-    Inconsistent,
-    // All information about the kind of 'other' is not contained in 'self' kind.
-    // For example, exists does not provide enough information about metadata.
-    Insufficient,
+impl<V> DataRead<V> {
+    // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
+    // (e.g. versioned read implies metadata and existence information, and
+    // metadata information implies existence information).
+    fn get_kind(&self) -> ReadKind {
+        use DataRead::*;
+        match self {
+            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
+            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
+            Metadata(_) => ReadKind::Metadata,
+            ResourceSize(_) => ReadKind::ResourceSize,
+            Exists(_) => ReadKind::Exists,
+        }
+    }
 }
 
 impl<V: TransactionWrite> DataRead<V> {
@@ -118,49 +122,6 @@ impl<V: TransactionWrite> DataRead<V> {
             }
         }
         false
-    }
-
-    // Assigns highest rank to Versioned / Resolved, then Metadata, then Exists.
-    // (e.g. versioned read implies metadata and existence information, and
-    // metadata information implies existence information).
-    fn get_kind(&self) -> ReadKind {
-        use DataRead::*;
-        match self {
-            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
-            MetadataAndResourceSize(_, _) => ReadKind::MetadataAndResourceSize,
-            Metadata(_) => ReadKind::Metadata,
-            ResourceSize(_) => ReadKind::ResourceSize,
-            Exists(_) => ReadKind::Exists,
-        }
-    }
-
-    // A convenience method, since the same key can be read in different modes, producing
-    // different DataRead / ReadKinds. Returns true if self has >= kind than other, i.e.
-    // contains more or equal information, and is consistent with the information in other.
-    fn contains(&self, other: &DataRead<V>) -> DataReadComparison {
-        let self_kind = self.get_kind();
-        let other_kind = other.get_kind();
-
-        if self_kind == other_kind {
-            // Optimization to avoid unnecessary clone in convert_to. Has been optimized
-            // because contains is called during validation.
-            if self == other {
-                DataReadComparison::Contains
-            } else {
-                DataReadComparison::Inconsistent
-            }
-        } else {
-            match self.convert_to(&other_kind) {
-                Some(value) => {
-                    if &value == other {
-                        DataReadComparison::Contains
-                    } else {
-                        DataReadComparison::Inconsistent
-                    }
-                },
-                None => DataReadComparison::Insufficient,
-            }
-        }
     }
 
     fn value_size(v: &Arc<V>) -> Option<u64> {
@@ -283,6 +244,149 @@ impl<V: TransactionWrite> DataRead<V> {
             ValueWithLayout::Exchanged(v, layout) => {
                 DataRead::Versioned(version, v.clone(), layout)
             },
+        }
+    }
+}
+
+// Represents the result of comparing DataReads ('self' and 'other').
+#[derive(Debug)]
+enum DataReadComparison {
+    // Information in 'self' DataRead contains information about the kind of the
+    // 'other' DataRead, and is consistent with 'other'.
+    Contains,
+    // Information in 'self' DataRead contains information about the kind of the
+    // 'other' DataRead, but is inconsistent with 'other'.
+    Inconsistent,
+    // All information about the kind of 'other' is not contained in 'self' kind.
+    // For example, exists does not provide enough information about metadata.
+    Insufficient,
+}
+
+struct DataReadComparator {
+    // If set, BlockSTM V2 is enabled.
+    blockstm_v2_incarnation: Option<Incarnation>,
+}
+
+impl DataReadComparator {
+    fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
+        Self {
+            blockstm_v2_incarnation,
+        }
+    }
+
+    fn data_read_equals<V: PartialEq>(&self, v1: &DataRead<V>, v2: &DataRead<V>) -> bool {
+        match (v1, v2) {
+            (
+                DataRead::Versioned(v1_version, v1_value, v1_layout),
+                DataRead::Versioned(v2_version, v2_value, v2_layout),
+            ) => {
+                if v1_version == v2_version {
+                    true
+                } else {
+                    // TODO(BlockSTMv2): Like in MVDataMap, we assume data reads are not equal if both layouts
+                    // are set, in order to avoid expensive equality checks. This should be compensated here
+                    // by the above early return if versions are equal (for both V1 and V2 BlockSTM).
+                    self.blockstm_v2_incarnation.is_some()
+                        && v1_layout.is_none()
+                        && v2_layout.is_none()
+                        && v1_value == v2_value
+                }
+            },
+            (DataRead::Metadata(v1_metadata), DataRead::Metadata(v2_metadata)) => {
+                v1_metadata == v2_metadata
+            },
+            (DataRead::Exists(v1_exists), DataRead::Exists(v2_exists)) => v1_exists == v2_exists,
+            (DataRead::Resolved(v1_resolved), DataRead::Resolved(v2_resolved)) => {
+                v1_resolved == v2_resolved
+            },
+            (
+                DataRead::MetadataAndResourceSize(v1_metadata, v1_size),
+                DataRead::MetadataAndResourceSize(v2_metadata, v2_size),
+            ) => v1_metadata == v2_metadata && v1_size == v2_size,
+            (DataRead::ResourceSize(v1_size), DataRead::ResourceSize(v2_size)) => {
+                v1_size == v2_size
+            },
+            (
+                DataRead::Versioned(_, _, _),
+                DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Resolved(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::MetadataAndResourceSize(_, _),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Metadata(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::ResourceSize(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::ResourceSize(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::Exists(_),
+            )
+            | (
+                DataRead::Exists(_),
+                DataRead::Versioned(_, _, _)
+                | DataRead::Resolved(_)
+                | DataRead::MetadataAndResourceSize(_, _)
+                | DataRead::Metadata(_)
+                | DataRead::ResourceSize(_),
+            ) => false,
+        }
+    }
+
+    // A convenience method, since the same key can be read in different modes, producing
+    // different DataRead / ReadKinds. Returns true if self has >= kind than other, i.e.
+    // contains more or equal information, and is consistent with the information in other.
+    fn compare_data_reads<V: TransactionWrite + PartialEq>(
+        &self,
+        self_read: &DataRead<V>,
+        other_read: &DataRead<V>,
+    ) -> DataReadComparison {
+        let self_kind = self_read.get_kind();
+        let other_kind = other_read.get_kind();
+
+        if self_kind == other_kind {
+            // Optimization to avoid unnecessary clone in convert_to (because contains
+            // method is called during validation).
+            if self.data_read_equals(self_read, other_read) {
+                DataReadComparison::Contains
+            } else {
+                DataReadComparison::Inconsistent
+            }
+        } else {
+            match self_read.convert_to(&other_kind) {
+                Some(value) => {
+                    if self.data_read_equals(&value, other_read) {
+                        DataReadComparison::Contains
+                    } else {
+                        DataReadComparison::Inconsistent
+                    }
+                },
+                None => DataReadComparison::Insufficient,
+            }
         }
     }
 }
@@ -441,8 +545,6 @@ pub enum CacheRead<T> {
 /// resolution from MVHashMap/storage should be captured. This enforces an invariant that
 /// 'capture_read' will never be called with a read that can be resolved from the already
 /// captured variant (e.g. Size, Metadata, or exists if SizeAndMetadata is already captured).
-#[derive(Derivative)]
-#[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
@@ -462,6 +564,31 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     /// Set if the invariant on CapturedReads intended use is violated. Leads to an alert
     /// and sequential execution fallback.
     incorrect_use: bool,
+
+    data_read_comparator: DataReadComparator,
+}
+
+impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
+    #[allow(deprecated)]
+    pub(crate) fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
+        Self {
+            data_reads: HashMap::new(),
+            group_reads: HashMap::new(),
+            delayed_field_reads: HashMap::new(),
+            deprecated_module_reads: Vec::new(),
+            module_reads: hashbrown::HashMap::new(),
+            delayed_field_speculative_failure: false,
+            non_delayed_field_speculative_failure: false,
+            incorrect_use: false,
+            data_read_comparator: DataReadComparator::new(blockstm_v2_incarnation),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -524,9 +651,10 @@ where
     // Required usage pattern: if existing entry contains enough information to
     // deduce the read, update_entry should not be called by the caller (i.e.
     // the need to cache the read must already be established).
-    fn update_entry<Q, V: TransactionWrite>(
+    fn update_entry<Q, V: TransactionWrite + PartialEq>(
         entry: Entry<Q, DataRead<V>>,
         read: DataRead<V>,
+        data_read_comparator: &DataReadComparator,
     ) -> UpdateResult {
         match entry {
             Vacant(e) => {
@@ -550,7 +678,7 @@ where
                 }
 
                 // In all other cases, new read must have more information.
-                match read.contains(existing_read) {
+                match data_read_comparator.compare_data_reads(&read, existing_read) {
                     DataReadComparison::Contains => {
                         *existing_read = read;
                         UpdateResult::Updated
@@ -653,9 +781,17 @@ where
         let ret = match maybe_tag {
             Some(tag) => {
                 let group = self.group_reads.entry(state_key).or_default();
-                Self::update_entry(group.inner_reads.entry(tag), read)
+                Self::update_entry(
+                    group.inner_reads.entry(tag),
+                    read,
+                    &self.data_read_comparator,
+                )
             },
-            None => Self::update_entry(self.data_reads.entry(state_key), read),
+            None => Self::update_entry(
+                self.data_reads.entry(state_key),
+                read,
+                &self.data_read_comparator,
+            ),
         };
 
         match ret {
@@ -779,15 +915,18 @@ where
         use MVDataError::*;
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
+            // We use fetch_data even with BlockSTMv2, because we don't want to record reads.
             match data_map.fetch_data(k, idx_to_validate) {
                 Ok(Versioned(version, v)) => {
                     matches!(
-                        DataRead::from_value_with_layout(version, v).contains(r),
+                        self.data_read_comparator
+                            .compare_data_reads(&DataRead::from_value_with_layout(version, v), r),
                         DataReadComparison::Contains
                     )
                 },
                 Ok(Resolved(value)) => matches!(
-                    DataRead::Resolved(value).contains(r),
+                    self.data_read_comparator
+                        .compare_data_reads(&DataRead::Resolved(value), r),
                     DataReadComparison::Contains
                 ),
                 // Dependency implies a validation failure, and if the original read were to
@@ -875,7 +1014,10 @@ where
                 match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
                     Ok((version, v)) => {
                         matches!(
-                            DataRead::from_value_with_layout(version, v).contains(r),
+                            self.data_read_comparator.compare_data_reads(
+                                &DataRead::from_value_with_layout(version, v),
+                                r,
+                            ),
                             DataReadComparison::Contains
                         )
                     },
@@ -884,8 +1026,10 @@ where
                             Arc::<T::Value>::new(TransactionWrite::from_state_value(None));
                         assert!(sentinel_deletion.is_deletion());
                         matches!(
-                            DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None)
-                                .contains(r),
+                            self.data_read_comparator.compare_data_reads(
+                                &DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None),
+                                r,
+                            ),
                             DataReadComparison::Contains
                         )
                     },
@@ -1068,6 +1212,7 @@ mod test {
     use test_case::test_case;
 
     // Macro to reduce code duplication for CapturedReads type parameters
+    // TODO(BlockSTMv2): Test w. BlockSTMv2 data read comparator.
     macro_rules! test_captured_reads {
         (update_entry, $entry:expr, $read:expr) => {
             CapturedReads::<
@@ -1076,7 +1221,7 @@ mod test {
                 MockDeserializedCode,
                 MockVerifiedCode,
                 MockExtension,
-            >::update_entry($entry, $read)
+            >::update_entry($entry, $read, &DataReadComparator::new(None))
         };
         (new) => {
             CapturedReads::<
@@ -1085,7 +1230,7 @@ mod test {
                 MockDeserializedCode,
                 MockVerifiedCode,
                 MockExtension,
-            >::new()
+            >::new(None)
         };
     }
 
@@ -1212,33 +1357,55 @@ mod test {
 
     macro_rules! assert_inconsistent_same_kind {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_ne!($x, $y);
             assert_ne!($y, $x);
-            assert_matches!($x.contains(&$y), DataReadComparison::Inconsistent);
-            assert_matches!($y.contains(&$x), DataReadComparison::Inconsistent);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Inconsistent
+            );
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$y, &$x),
+                DataReadComparison::Inconsistent
+            );
         }};
     }
 
     macro_rules! assert_inconsistent_downcast {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_ne!($x, $y);
             assert_ne!($y, $x);
-            assert_matches!($x.contains(&$y), DataReadComparison::Inconsistent);
-            assert_matches!($y.contains(&$x), DataReadComparison::Insufficient);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Inconsistent
+            );
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$y, &$x),
+                DataReadComparison::Insufficient
+            );
         }};
     }
 
     macro_rules! assert_contains {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_some_eq!($x.convert_to(&$y.get_kind()), $y);
-            assert_matches!($x.contains(&$y), DataReadComparison::Contains);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Contains
+            );
         }};
     }
 
     macro_rules! assert_insufficient {
         ($x:expr, $y:expr) => {{
+            let data_read_comparator = DataReadComparator::new(None);
             assert_none!($x.convert_to(&$y.get_kind()));
-            assert_matches!($x.contains(&$y), DataReadComparison::Insufficient);
+            assert_matches!(
+                data_read_comparator.compare_data_reads(&$x, &$y),
+                DataReadComparison::Insufficient
+            );
         }};
     }
 
