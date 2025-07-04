@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "consensus_fuzzer"), forbid(unsafe_code))]
 
 //! Consensus for the Aptos Core blockchain
 //!
@@ -46,6 +46,8 @@ pub mod quorum_store;
 mod rand;
 #[cfg(feature = "consensus_fuzzer")]
 pub mod rand;
+#[cfg(feature = "consensus_fuzzer")]
+pub mod rapture_hook;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;

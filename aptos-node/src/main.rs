@@ -11,7 +11,15 @@ use clap::Parser;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+#[cfg(feature = "consensus_fuzzer")]
+fn init_fuzzing_hooks() {
+    rapture::init_state_model(); // register StateModel 
+    rapture::init_fuzzer_hook(); // register FuzzHook
+}
+
 fn main() {
+    #[cfg(feature = "consensus_fuzzer")]
+    init_fuzzing_hooks();
     // Check that we are not including any Move test natives
     aptos_vm::natives::assert_no_test_natives(ERROR_MSG_BAD_FEATURE_FLAGS);
 
