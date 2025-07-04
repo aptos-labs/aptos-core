@@ -4,6 +4,7 @@
 use crate::{
     metrics::TIMER,
     state_store::{
+        hot_state::LRUUpdater,
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -20,16 +21,39 @@ use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        hot_state::{LRUEntry, SpeculativeLRUEntry},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage,
         StateViewId,
     },
     transaction::Version,
+    write_set::BaseStateOp,
 };
 use arr_macro::arr;
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
+
+#[derive(Debug)]
+pub struct HotStateMeta {
+    pub lru_state: MapLayer<StateKey, SpeculativeLRUEntry<StateKey>>,
+    pub latest: Option<StateKey>,
+    pub oldest: Option<StateKey>,
+    pub num_items: usize,
+}
+
+impl HotStateMeta {
+    fn new() -> Self {
+        Self {
+            lru_state: MapLayer::new_family("hot_state_meta"),
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
 
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
@@ -42,6 +66,8 @@ pub struct State {
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    /// Metadata (the linked list) for the LRU.
+    pub hot_state_meta: Arc<HotStateMeta>,
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -50,11 +76,13 @@ impl State {
     pub fn new_with_updates(
         version: Option<Version>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_meta: Arc<HotStateMeta>,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_meta,
             usage,
         }
     }
@@ -63,6 +91,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
+            Arc::new(HotStateMeta::new()),
             usage,
         )
     }
@@ -92,7 +121,7 @@ impl State {
         self.clone().into_delta(base.clone())
     }
 
-    pub fn into_delta(self, base: State) -> StateDelta {
+    pub(crate) fn into_delta(self, base: State) -> StateDelta {
         StateDelta::new(base, self)
     }
 
@@ -100,20 +129,24 @@ impl State {
         Arc::ptr_eq(&self.shards, &rhs.shards)
     }
 
-    pub fn is_descendant_of(&self, rhs: &State) -> bool {
+    pub(crate) fn is_descendant_of(&self, rhs: &State) -> bool {
         self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
-    pub fn update(
+    fn update<'kv>(
         &self,
+        persisted_hot_state: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
         persisted: &State,
-        updates: &BatchedStateUpdateRefs,
+        batched_updates: &BatchedStateUpdateRefs,
+        per_version_updates: Vec<&[(&'kv StateKey, StateUpdateRef<'kv>)]>,
         state_cache: &ShardedStateCache,
     ) -> Self {
+        assert_eq!(per_version_updates.len(), NUM_STATE_SHARDS);
+
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
-        assert_eq!(self.next_version(), updates.first_version);
+        assert_eq!(self.next_version(), batched_updates.first_version);
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
         //    updates between the cached version and the persisted version are potentially
         //    missed during the usage calculation.
@@ -131,7 +164,7 @@ impl State {
         let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = (
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
-            updates.shards.as_slice(),
+            batched_updates.shards.as_slice(),
         )
             .into_par_iter()
             .map(|(cache, overlay, updates)| {
@@ -150,7 +183,65 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        println!("per version updates: {per_version_updates:?}");
+
+        let head = self.hot_state_meta.latest.clone();
+        let tail = self.hot_state_meta.oldest.clone();
+        println!("head: {head:?}, tail: {tail:?}");
+
+        let hot_overlay = Arc::new(
+            self.hot_state_meta
+                .lru_state
+                .view_layers_after(&persisted.hot_state_meta.lru_state),
+        );
+        let mut updater =
+            LRUUpdater::new(persisted_hot_state, Arc::clone(&hot_overlay), head, tail);
+
+        for (shard_id, shard) in per_version_updates.into_iter().enumerate() {
+            println!("shard id: {shard_id}. per version updates: {shard:?}");
+            for (key, update) in shard {
+                // We need to decide whether to put this update inside the LRU. It should go in
+                // unless it's an eviction.
+                match update.state_op {
+                    BaseStateOp::Creation(_)
+                    | BaseStateOp::Modification(_)
+                    | BaseStateOp::Deletion(_)
+                    | BaseStateOp::MakeHot { .. } => {
+                        // Construct the writes such that the key goes to the front of the LRU.
+                        updater.insert((*key).clone());
+                        println!(
+                            "after insertion: head: {:?}, tail: {:?}, cache: {:?}",
+                            updater.head, updater.tail, updater.pending
+                        );
+                    },
+                    BaseStateOp::Eviction { .. } => {
+                        // Construct the writes such that the key is removed from the LRU.
+                        // Maybe assert that this key is always around the tail.
+                        updater.delete(key);
+                        println!(
+                            "after eviction: head: {:?}, tail: {:?}, cache: {:?}",
+                            updater.head, updater.tail, updater.pending
+                        );
+                    },
+                }
+            }
+        }
+
+        let hot_updates: Vec<_> = updater.pending.into_iter().collect();
+        let new_hot = hot_overlay.new_layer(&hot_updates);
+        let hot_state_meta = Arc::new(HotStateMeta {
+            lru_state: new_hot,
+            latest: updater.head,
+            oldest: updater.tail,
+            num_items: self.hot_state_meta.num_items,
+        });
+
+        State::new_with_updates(
+            batched_updates.last_version(),
+            shards,
+            hot_state_meta,
+            usage,
+        )
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -234,14 +325,28 @@ impl LedgerState {
     /// have already been recorded.
     pub fn update_with_memorized_reads(
         &self,
+        persisted_hot_view: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
         persisted_snapshot: &State,
         updates: &StateUpdateRefs,
         reads: &ShardedStateCache,
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
-            self.latest().update(persisted_snapshot, updates, reads)
+        let last_checkpoint = if let Some(u) = &updates.for_last_checkpoint {
+            let mut per_version = Vec::new();
+            for i in 0..NUM_STATE_SHARDS {
+                let s = &updates.per_version.shards[i];
+                let p = s.partition_point(|x| x.1.version < u.next_version());
+                println!("shard id: {i}. s.len(): {}. p: {p}", s.len());
+                per_version.push(&s[..p]);
+            }
+            self.latest().update(
+                Arc::clone(&persisted_hot_view),
+                persisted_snapshot,
+                u,
+                per_version,
+                reads,
+            )
         } else {
             self.last_checkpoint.clone()
         };
@@ -251,8 +356,20 @@ impl LedgerState {
         } else {
             &last_checkpoint
         };
-        let latest = if let Some(updates) = &updates.for_latest {
-            base_of_latest.update(persisted_snapshot, updates, reads)
+        let latest = if let Some(u) = &updates.for_latest {
+            let mut per_version = Vec::new();
+            for i in 0..NUM_STATE_SHARDS {
+                let s = &updates.per_version.shards[i];
+                let p = s.partition_point(|x| x.1.version < u.first_version());
+                per_version.push(&s[p..]);
+            }
+            base_of_latest.update(
+                persisted_hot_view,
+                persisted_snapshot,
+                u,
+                per_version,
+                reads,
+            )
         } else {
             base_of_latest.clone()
         };
@@ -272,13 +389,14 @@ impl LedgerState {
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             reader,
-            hot_state,
+            Arc::clone(&hot_state),
             persisted_snapshot.clone(),
             self.latest().clone(),
         );
         state_view.prime_cache(updates)?;
 
         let updated = self.update_with_memorized_reads(
+            hot_state,
             persisted_snapshot,
             updates,
             state_view.memorized_reads(),
