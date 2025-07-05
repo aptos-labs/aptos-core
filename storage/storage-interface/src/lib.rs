@@ -20,6 +20,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
+        state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
@@ -100,7 +101,7 @@ impl From<aptos_secure_net::Error> for Error {
 macro_rules! delegate_read {
     ($(
         $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+        fn $name:ident(&self $(, $arg: ident : $ty: ty)* $(,)?) -> $return_type:ty;
     )+) => {
         $(
             $(#[$($attr)*])*
@@ -398,7 +399,12 @@ pub trait DbReader: Send + Sync {
         /// Used by the Db-bootstrapper.
         fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 
-        fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)>;
+        fn get_persisted_state(
+            &self,
+        ) -> Result<(
+            Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
+            State,
+        )>;
 
         fn get_persisted_state_summary(&self) -> Result<StateSummary>;
 

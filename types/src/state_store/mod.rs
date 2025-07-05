@@ -17,6 +17,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 pub mod errors;
+pub mod hot_state;
 pub mod state_key;
 pub mod state_slot;
 pub mod state_storage_usage;
@@ -74,6 +75,21 @@ pub trait TStateView {
     /// Checks if a state keyed by the given state key exists.
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
         self.get_state_value(state_key).map(|opt| opt.is_some())
+    }
+
+    /// Number of free slots in hot state. `None` for views that do not implement hot state.
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        None
+    }
+
+    fn hot_state_contains(&self, _state_key: &Self::Key) -> bool {
+        false
+    }
+
+    /// Returns the oldest key if `state_key` is `None`. Else returns the key that's just a little
+    /// bit newer, i.e. the next candidate for eviction.
+    fn get_next_old_key(&self, _state_key: Option<&Self::Key>) -> Option<Self::Key> {
+        None
     }
 }
 
