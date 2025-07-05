@@ -96,7 +96,7 @@ pub struct CachedStateView {
     speculative: StateDelta,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
-    hot: Arc<dyn HotStateView>,
+    hot: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
@@ -130,7 +130,7 @@ impl CachedStateView {
     pub fn new_impl(
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-        hot_state: Arc<dyn HotStateView>,
+        hot_state: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
         persisted_state: State,
         state: State,
     ) -> Self {
@@ -140,7 +140,7 @@ impl CachedStateView {
     pub fn new_with_config(
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-        hot_state: Arc<dyn HotStateView>,
+        hot_state: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
         persisted_state: State,
         state: State,
     ) -> Self {
@@ -218,7 +218,7 @@ impl CachedStateView {
         let ret = if let Some(slot) = self.speculative.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_speculative"]);
             slot
-        } else if let Some(slot) = self.hot.get_state_slot(state_key)? {
+        } else if let Some(slot) = self.hot.get_state_slot(state_key) {
             COUNTER.inc_with(&["sv_hit_hot"]);
             slot
         } else if let Some(base_version) = self.base_version() {

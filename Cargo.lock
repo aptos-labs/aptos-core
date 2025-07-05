@@ -4123,6 +4123,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-experimental-layered-map",
  "aptos-metrics-core",
  "aptos-scratchpad",
@@ -4133,6 +4134,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
+ "maplit",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",

@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-drop-helper = { workspace = true }
 aptos-experimental-layered-map = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-scratchpad = { workspace = true }
@@ -36,6 +37,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
+maplit = { workspace = true }
 
 [features]
 default = []
