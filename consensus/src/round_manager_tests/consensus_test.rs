@@ -199,6 +199,8 @@ fn new_round_on_quorum_cert() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -259,6 +261,8 @@ fn vote_on_successful_proposal() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let node = &mut nodes[0];
 
@@ -305,6 +309,8 @@ fn delay_proposal_processing_in_sync_only() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let node = &mut nodes[0];
 
@@ -371,6 +377,8 @@ fn no_vote_on_old_proposal() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
@@ -429,6 +437,8 @@ fn no_vote_on_mismatch_round() {
         None,
         None,
         None,
+        None,
+        false,
     )
     .pop()
     .unwrap();
@@ -492,9 +502,11 @@ fn sync_info_carried_on_timeout_vote() {
         1,
         None,
         None,
+        None,
         Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
+        false,
     );
     let mut node = nodes.pop().unwrap();
 
@@ -560,6 +572,8 @@ fn no_vote_on_invalid_proposer() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let incorrect_proposer = nodes.pop().unwrap();
     let mut node = nodes.pop().unwrap();
@@ -628,6 +642,8 @@ fn new_round_on_timeout_certificate() {
         None,
         None,
         None,
+        None,
+        false,
     )
     .pop()
     .unwrap();
@@ -706,6 +722,8 @@ fn reject_invalid_failed_authors() {
         None,
         None,
         None,
+        None,
+        false,
     )
     .pop()
     .unwrap();
@@ -802,6 +820,8 @@ fn response_on_block_retrieval() {
         None,
         None,
         None,
+        None,
+        false,
     )
     .pop()
     .unwrap();
@@ -922,6 +942,8 @@ fn recover_on_restart() {
         None,
         None,
         None,
+        None,
+        false,
     )
     .pop()
     .unwrap();
@@ -996,9 +1018,11 @@ fn nil_vote_on_timeout() {
         1,
         None,
         None,
+        None,
         Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -1043,9 +1067,11 @@ fn timeout_round_on_timeout() {
         1,
         None,
         None,
+        None,
         Some(local_config),
         None,
         None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -1079,9 +1105,11 @@ fn vote_resent_on_timeout() {
         1,
         None,
         None,
+        None,
         Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
+        false,
     );
     let node = &mut nodes[0];
     timed_block_on(&runtime, async {
@@ -1124,9 +1152,11 @@ fn timeout_sent_on_timeout_after_vote() {
         1,
         None,
         None,
+        None,
         Some(local_config),
         None,
         None,
+        false,
     );
     let node = &mut nodes[0];
     timed_block_on(&runtime, async {
@@ -1167,6 +1197,8 @@ fn sync_on_partial_newer_sync_info() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let mut node = nodes.pop().unwrap();
     runtime.spawn(playground.start());
@@ -1229,9 +1261,11 @@ fn safety_rules_crash() {
         1,
         None,
         None,
+        None,
         Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
+        false,
     );
     let mut node = nodes.pop().unwrap();
     runtime.spawn(playground.start());
@@ -1310,9 +1344,11 @@ fn echo_timeout() {
         4,
         None,
         None,
+        None,
         Some(config_with_round_timeout_msg_disabled()),
         None,
         None,
+        false,
     );
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
@@ -1370,6 +1406,8 @@ fn echo_round_timeout_msg() {
         None,
         None,
         None,
+        None,
+        false,
     );
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
@@ -1428,6 +1466,8 @@ fn no_next_test() {
         None,
         None,
         None,
+        None,
+        false,
     );
     runtime.spawn(playground.start());
 
@@ -1465,6 +1505,8 @@ fn commit_pipeline_test() {
         None,
         None,
         None,
+        None,
+        false,
     );
     runtime.spawn(playground.start());
     let behind_node = 6;
@@ -1506,6 +1548,8 @@ fn block_retrieval_test() {
         None,
         None,
         None,
+        None,
+        false,
     );
     runtime.spawn(playground.start());
 
@@ -1573,6 +1617,8 @@ fn block_retrieval_timeout_test() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let timeout_config = playground.timeout_config();
     runtime.spawn(playground.start());
@@ -1667,6 +1713,8 @@ pub fn forking_retrieval_test() {
         None,
         None,
         None,
+        None,
+        false,
     );
     runtime.spawn(playground.start());
 
