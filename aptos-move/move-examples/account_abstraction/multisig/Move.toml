@@ -1,0 +1,10 @@
+[package]
+name = "AAmultisig"
+version = "0.0.0"
+
+[addresses]
+aa = "0xcafe"
+
+[dependencies]
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-stdlib", rev = "mainnet" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
