@@ -1,0 +1,75 @@
+
+Diagnostics:
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+  ┌─ tests/checking-lang-v2.2/bug_16938.move:4:9
+  │
+4 │     fun f<T>() {
+  │         ^
+  │
+  = `f<T>` uses `f<|T|>` at tests/checking-lang-v2.2/bug_16938.move:5
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:10:16
+   │
+10 │     public fun foo<T>(): || {
+   │                ^^^
+   │
+   = `foo<T>` uses `bar<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:11
+   = `bar<|&T|>` uses `foo<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:15
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:14:9
+   │
+14 │     fun bar<T>() {
+   │         ^^^
+   │
+   = `bar<T>` uses `foo<T>` at tests/checking-lang-v2.2/bug_16938.move:15
+   = `foo<T>` uses `bar<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:11
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:25:16
+   │
+25 │     public fun foo<T>(): ||(||) {
+   │                ^^^
+   │
+   = `foo<T>` uses `bar<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:26
+   = `bar<|&T|>` uses `maker<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:30
+   = `maker<|&T|>` uses `foo<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:34
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:29:9
+   │
+29 │     fun bar<T>(): || {
+   │         ^^^
+   │
+   = `bar<T>` uses `maker<T>` at tests/checking-lang-v2.2/bug_16938.move:30
+   = `maker<T>` uses `foo<T>` at tests/checking-lang-v2.2/bug_16938.move:34
+   = `foo<T>` uses `bar<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:26
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:33:9
+   │
+33 │     fun maker<T>(): ||(||(||)) {
+   │         ^^^^^
+   │
+   = `maker<T>` uses `foo<T>` at tests/checking-lang-v2.2/bug_16938.move:34
+   = `foo<T>` uses `bar<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:26
+   = `bar<|&T|>` uses `maker<|&T|>` at tests/checking-lang-v2.2/bug_16938.move:30
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:44:16
+   │
+44 │     public fun foo<T>(): || {
+   │                ^^^
+   │
+   = `foo<T>` uses `bar<||(T, T)>` at tests/checking-lang-v2.2/bug_16938.move:45
+   = `bar<||(T, T)>` uses `foo<||(||(T, T))>` at tests/checking-lang-v2.2/bug_16938.move:49
+
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
+   ┌─ tests/checking-lang-v2.2/bug_16938.move:48:9
+   │
+48 │     fun bar<T>() {
+   │         ^^^
+   │
+   = `bar<T>` uses `foo<||T>` at tests/checking-lang-v2.2/bug_16938.move:49
+   = `foo<||T>` uses `bar<||(||T, ||T)>` at tests/checking-lang-v2.2/bug_16938.move:45
