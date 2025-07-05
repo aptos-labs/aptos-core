@@ -116,6 +116,7 @@ module aptos_experimental::market {
         parent: address,
         market: address,
         order_id: u128,
+        client_order_id: Option<u64>,
         user: address,
         /// Original size of the order
         orig_size: u64,
@@ -260,6 +261,9 @@ module aptos_experimental::market {
     /// order as possible as taker order and cancel the rest.
     /// - trigger_condition: The trigger condition
     /// - metadata: The metadata for the order. This can be any type that the clearing house implementation supports.
+    /// - client_order_id: The client order id for the order. This is an optional field that can be specified by the client
+    ///   is solely used for their own tracking of the order. client order id doesn't have semantic meaning and
+    ///   is not be inspected by the orderbook internally.
     /// - max_fill_limit: The maximum fill limit for the order. This is the maximum number of fills to trigger for this order.
     /// This knob is present to configure maximum amount of gas any order placement transaction might consume and avoid
     /// hitting the maximum has limit of the blockchain.
@@ -278,6 +282,7 @@ module aptos_experimental::market {
         time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
+        client_order_id: Option<u64>,
         max_fill_limit: u64,
         emit_cancel_on_fill_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
@@ -292,6 +297,7 @@ module aptos_experimental::market {
             trigger_condition,
             metadata,
             option::none(), // order_id
+            client_order_id,
             max_fill_limit,
             emit_cancel_on_fill_limit,
             true,
@@ -306,6 +312,7 @@ module aptos_experimental::market {
         orig_size: u64,
         is_bid: bool,
         metadata: M,
+        client_order_id: Option<u64>,
         max_fill_limit: u64,
         emit_cancel_on_fill_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
@@ -320,6 +327,7 @@ module aptos_experimental::market {
             option::none(), // trigger_condition
             metadata,
             option::none(), // order_id
+            client_order_id,
             max_fill_limit,
             emit_cancel_on_fill_limit,
             true,
@@ -340,6 +348,7 @@ module aptos_experimental::market {
     fun emit_event_for_order<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         user: address,
         orig_size: u64,
         remaining_size: u64,
@@ -357,6 +366,7 @@ module aptos_experimental::market {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    client_order_id,
                     user,
                     orig_size,
                     remaining_size,
@@ -383,6 +393,7 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         emit_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
@@ -392,6 +403,7 @@ module aptos_experimental::market {
                 user_addr,
                 limit_price,
                 order_id,
+                client_order_id,
                 orig_size,
                 remaining_size,
                 fill_sizes,
@@ -406,6 +418,7 @@ module aptos_experimental::market {
         if (emit_order_open) {
             self.emit_event_for_order(
                 order_id,
+                client_order_id,
                 user_addr,
                 orig_size,
                 remaining_size,
@@ -419,12 +432,18 @@ module aptos_experimental::market {
         };
 
         callbacks.place_maker_order(
-            user_addr, order_id, is_bid, limit_price.destroy_some(), remaining_size, metadata
+            user_addr,
+            order_id,
+            is_bid,
+            limit_price.destroy_some(),
+            remaining_size,
+            metadata
         );
         self.order_book.place_maker_order(
             new_order_request(
                 user_addr,
                 order_id,
+                client_order_id,
                 limit_price.destroy_some(),
                 orig_size,
                 remaining_size,
@@ -444,6 +463,7 @@ module aptos_experimental::market {
     fun cancel_maker_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         maker_order: &Order<M>,
+        client_order_id: Option<u64>,
         maker_address: address,
         order_id: OrderIdType,
         maker_cancellation_reason: String,
@@ -453,6 +473,7 @@ module aptos_experimental::market {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
         self.emit_event_for_order(
             order_id,
+            client_order_id,
             maker_address,
             maker_order.get_orig_size(),
             0,
@@ -477,6 +498,7 @@ module aptos_experimental::market {
         user_addr: address,
         limit_price: Option<u64>,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         orig_size: u64,
         size_delta: u64,
         fill_sizes: vector<u64>,
@@ -488,6 +510,7 @@ module aptos_experimental::market {
     ): OrderMatchResult {
         self.emit_event_for_order(
             order_id,
+            client_order_id,
             user_addr,
             orig_size,
             0,
@@ -518,6 +541,7 @@ module aptos_experimental::market {
         is_bid: bool,
         metadata: M,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         callbacks: &MarketClearinghouseCallbacks<M>,
         fill_sizes: &mut vector<u64>
     ): Option<OrderCancellationReason> {
@@ -529,6 +553,7 @@ module aptos_experimental::market {
         if (!self.config.allow_self_trade && maker_order.get_account() == user_addr) {
             self.cancel_maker_order_internal(
                 &maker_order,
+                maker_order.get_client_order_id(),
                 maker_order.get_account(),
                 maker_order.get_order_id(),
                 std::string::utf8(b"Disallowed self trading"),
@@ -560,6 +585,7 @@ module aptos_experimental::market {
                 // Event for taker fill
             self.emit_event_for_order(
                 order_id,
+                client_order_id,
                 user_addr,
                 orig_size,
                 *remaining_size,
@@ -573,6 +599,7 @@ module aptos_experimental::market {
             // Event for maker fill
             self.emit_event_for_order(
                 maker_order.get_order_id(),
+                maker_order.get_client_order_id(),
                 maker_order.get_account(),
                 maker_order.get_orig_size(),
                 maker_order.get_remaining_size() + unsettled_maker_size,
@@ -593,6 +620,7 @@ module aptos_experimental::market {
                 user_addr,
                 price,
                 order_id,
+                client_order_id,
                 orig_size,
                 *remaining_size,
                 *fill_sizes,
@@ -609,6 +637,7 @@ module aptos_experimental::market {
                     new_order_request(
                         maker_order.get_account(),
                         maker_order.get_order_id(),
+                        maker_order.get_client_order_id(),
                         maker_order.get_price(),
                         maker_order.get_orig_size(),
                         unsettled_maker_size,
@@ -624,6 +653,7 @@ module aptos_experimental::market {
         if (maker_cancellation_reason.is_some()) {
             self.cancel_maker_order_internal(
                 &maker_order,
+                maker_order.get_client_order_id(),
                 maker_order.get_account(),
                 maker_order.get_order_id(),
                 maker_cancellation_reason.destroy_some(),
@@ -658,6 +688,7 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         order_id: Option<OrderIdType>,
+        client_order_id: Option<u64>,
         max_fill_limit: u64,
         cancel_on_fill_limit: bool,
         emit_taker_order_open: bool,
@@ -691,6 +722,7 @@ module aptos_experimental::market {
                 user_addr,
                 limit_price,
                 order_id,
+                client_order_id,
                 orig_size,
                 0, // 0 because order was never placed
                 vector[],
@@ -705,6 +737,7 @@ module aptos_experimental::market {
         if (emit_taker_order_open) {
             self.emit_event_for_order(
                 order_id,
+                client_order_id,
                 user_addr,
                 orig_size,
                 remaining_size,
@@ -728,6 +761,7 @@ module aptos_experimental::market {
                 trigger_condition,
                 metadata,
                 order_id,
+                client_order_id,
                 false,
                 callbacks
             );
@@ -740,6 +774,7 @@ module aptos_experimental::market {
                 user_addr,
                 limit_price,
                 order_id,
+                client_order_id,
                 orig_size,
                 remaining_size,
                 vector[],
@@ -761,6 +796,7 @@ module aptos_experimental::market {
                     is_bid,
                     metadata,
                     order_id,
+                    client_order_id,
                     callbacks,
                     &mut fill_sizes
                 );
@@ -788,6 +824,7 @@ module aptos_experimental::market {
                         user_addr,
                         limit_price,
                         order_id,
+                        client_order_id,
                         orig_size,
                         remaining_size,
                         fill_sizes,
@@ -810,6 +847,7 @@ module aptos_experimental::market {
                         trigger_condition,
                         metadata,
                         order_id,
+                        client_order_id,
                         true, // emit_order_open
                         callbacks
                     );
@@ -822,6 +860,7 @@ module aptos_experimental::market {
                         user_addr,
                         limit_price,
                         order_id,
+                        client_order_id,
                         orig_size,
                         remaining_size,
                         fill_sizes,
@@ -864,6 +903,7 @@ module aptos_experimental::market {
         let (
             account,
             order_id,
+            client_order_id,
             price,
             orig_size,
             remaining_size,
@@ -876,6 +916,7 @@ module aptos_experimental::market {
         );
         self.emit_event_for_order(
             order_id,
+            client_order_id,
             account,
             orig_size,
             remaining_size,
@@ -905,6 +946,7 @@ module aptos_experimental::market {
         let (
             user,
             order_id,
+            client_order_id,
             price,
             orig_size,
             remaining_size,
@@ -918,6 +960,7 @@ module aptos_experimental::market {
 
         self.emit_event_for_order(
             order_id,
+            client_order_id,
             user,
             orig_size,
             remaining_size,
@@ -988,6 +1031,7 @@ module aptos_experimental::market {
     public fun verify_order_event(
         self: OrderEvent,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         market: address,
         user: address,
         orig_size: u64,
@@ -999,6 +1043,7 @@ module aptos_experimental::market {
         status: OrderStatus
     ) {
         assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.client_order_id == client_order_id);
         assert!(self.market == market);
         assert!(self.user == user);
         assert!(self.orig_size == orig_size);
