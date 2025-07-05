@@ -692,7 +692,7 @@ module aptos_experimental::market {
         max_fill_limit: u64,
         cancel_on_fill_limit: bool,
         emit_taker_order_open: bool,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M>,
     ): OrderMatchResult {
         assert!(
             orig_size > 0 && remaining_size > 0,
