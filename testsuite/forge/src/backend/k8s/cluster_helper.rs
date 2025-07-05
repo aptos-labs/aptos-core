@@ -498,64 +498,6 @@ pub async fn check_persistent_volumes(
     Ok(())
 }
 
-/// Get the existing helm values for a release
-fn get_default_helm_release_values_from_cluster(
-    helm_release_name: &str,
-) -> Result<serde_yaml::Value> {
-    let status_args = [
-        "status",
-        helm_release_name,
-        "--namespace",
-        "default",
-        "-o",
-        "yaml",
-    ];
-    info!("{:?}", status_args);
-    let raw_helm_values = Command::new(HELM_BIN)
-        .args(status_args)
-        .output()
-        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
-
-    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
-    let j: serde_yaml::Value = serde_yaml::from_str(&helm_values).map_err(|e| {
-        format_err!(
-            "Failed to deserialize helm values. Check if release {} exists: {}",
-            helm_release_name,
-            e
-        )
-    })?;
-    // get .config or anyhow bail!
-    let config = j
-        .get("config")
-        .ok_or_else(|| anyhow!("Failed to get helm values"))?;
-    Ok(config.clone())
-}
-
-/// Merges two YAML values in place, with `b` taking precedence over `a`
-/// This simulates helm's behavior of merging default values (values.yaml) with overridden values specified (-f file or --set)
-/// Source: https://stackoverflow.com/questions/67727239/how-to-combine-including-nested-array-values-two-serde-yamlvalue-objects
-fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
-    match (a, b) {
-        (a @ &mut serde_yaml::Value::Mapping(_), serde_yaml::Value::Mapping(b)) => {
-            let a = a.as_mapping_mut().unwrap();
-            for (k, v) in b {
-                if v.is_sequence() && a.contains_key(&k) && a[&k].is_sequence() {
-                    let mut _b = a.get(&k).unwrap().as_sequence().unwrap().to_owned();
-                    _b.append(&mut v.as_sequence().unwrap().to_owned());
-                    a[&k] = serde_yaml::Value::from(_b);
-                    continue;
-                }
-                if !a.contains_key(&k) {
-                    a.insert(k.to_owned(), v.to_owned());
-                } else {
-                    merge_yaml(&mut a[&k], v);
-                }
-            }
-        },
-        (a, b) => *a = b,
-    }
-}
-
 /// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
 /// Returns all validators and fullnodes by collecting the running nodes
 pub async fn install_testnet_resources(
@@ -578,16 +520,8 @@ pub async fn install_testnet_resources(
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
-    // get existing helm values from the cluster
-    // if the release doesn't exist, return an empty mapping, which may work, especially as we move away from this pattern and instead having default values baked into the deployer
-    let mut aptos_node_helm_values =
-        get_default_helm_release_values_from_cluster(APTOS_NODE_HELM_RELEASE_NAME)
-            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
-    let mut genesis_helm_values =
-        get_default_helm_release_values_from_cluster(GENESIS_HELM_RELEASE_NAME)
-            .unwrap_or_else(|_| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()));
 
-    let aptos_node_helm_values_override = construct_node_helm_values_from_input(
+    let mut aptos_node_helm_values = construct_node_helm_values_from_input(
         node_helm_config_fn,
         fs::read_to_string(get_node_default_helm_path())
             .expect("Not able to read default value file"),
@@ -599,7 +533,7 @@ pub async fn install_testnet_resources(
         enable_haproxy,
     )?;
 
-    let genesis_helm_values_override = construct_genesis_helm_values_from_input(
+    let mut genesis_helm_values = construct_genesis_helm_values_from_input(
         genesis_helm_config_fn,
         kube_namespace.clone(),
         new_era.clone(),
@@ -612,17 +546,10 @@ pub async fn install_testnet_resources(
         "aptos_node_helm_values: {}",
         serde_yaml::to_string(&aptos_node_helm_values).unwrap()
     );
-    info!(
-        "aptos_node_helm_values_override: {}",
-        serde_yaml::to_string(&aptos_node_helm_values_override).unwrap()
-    );
-
-    merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
-    merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
 
     info!(
-        "aptos_node_helm_values after override: {}",
-        serde_yaml::to_string(&aptos_node_helm_values).unwrap(),
+        "genesis_helm_values: {}",
+        serde_yaml::to_string(&genesis_helm_values).unwrap()
     );
 
     // disable uploading genesis to blob storage since indexer requires it in the cluster
@@ -1286,46 +1213,5 @@ labels:
             "foo".to_string(),
             time_since_the_epoch
         ));
-    }
-
-    #[test]
-    fn test_merge_yaml_values() {
-        let yaml1 = r#"
-        foo:
-          bar: 1
-          baz:
-            qux: hello
-        "#;
-
-        let yaml2 = r#"
-        foo:
-          bar: 2
-          baz:
-            quux: world
-        extra: something
-        "#;
-
-        let mut value1: serde_yaml::Value = serde_yaml::from_str(yaml1).unwrap();
-        let value2: serde_yaml::Value = serde_yaml::from_str(yaml2).unwrap();
-
-        let merged_with_serde_merge_tmerge: serde_yaml::Value =
-            serde_merge::tmerge(&mut value1, &value2).unwrap();
-        merge_yaml(&mut value1, value2); // this is an in-place merge
-        let merged_with_crate = value1;
-
-        let expected: serde_yaml::Value = serde_yaml::from_str(
-            r#"
-        foo:
-          bar: 2
-          baz:
-            qux: hello
-            quux: world
-        extra: something
-        "#,
-        )
-        .unwrap();
-
-        assert_ne!(merged_with_serde_merge_tmerge, expected);
-        assert_eq!(merged_with_crate, expected);
     }
 }
