@@ -6207,6 +6207,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c48f0051a4b4c5e0b6d365cd04af53aeaa209e3cc15ec2cdb69e73cc87fbd0dc"
 dependencies = [
  "memchr",
+ "regex-automata 0.4.6",
  "serde",
 ]
 
@@ -11843,6 +11844,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-asm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "codespan",
+ "codespan-reporting",
+ "either",
+ "legacy-move-compiler",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-core-types",
+ "pom",
+]
+
+[[package]]
 name = "move-ast-generator-tests"
 version = "0.1.0"
 dependencies = [
@@ -14287,6 +14306,15 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash",
+]
+
+[[package]]
+name = "pom"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c972d8f86e943ad532d0b04e8965a749ad1d18bb981a9c7b3ae72fe7fd7744b"
+dependencies = [
+ "bstr 1.9.0",
 ]
 
 [[package]]
