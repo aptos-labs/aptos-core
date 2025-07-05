@@ -5,6 +5,7 @@
 
 mod almost_swapped;
 mod blocks_in_conditions;
+mod find_unnecessary_casts;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -23,10 +24,11 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
     vec![
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
-        Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
+        Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
         Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
