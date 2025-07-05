@@ -28,7 +28,7 @@ module aptos_experimental::order_book {
         TriggerCondition,
         SingleOrderMatch,
         Order,
-        AscendingIdGenerator
+        AscendingIdGenerator, AccountClientOrderId, new_account_client_order_id
     };
     use aptos_experimental::active_order_book::{ActiveOrderBook, new_active_order_book};
     use aptos_experimental::pending_order_book_index::{
@@ -64,6 +64,7 @@ module aptos_experimental::order_book {
     enum OrderBook<M: store + copy + drop> has store {
         V1 {
             orders: BigOrderedMap<OrderIdType, OrderWithState<M>>,
+            client_order_ids: BigOrderedMap<AccountClientOrderId, OrderIdType>,
             active_orders: ActiveOrderBook,
             pending_orders: PendingOrderBookIndex,
             ascending_id_generator: AscendingIdGenerator
@@ -104,6 +105,7 @@ module aptos_experimental::order_book {
         OrderBook::V1 {
             orders: new_default_big_ordered_map(),
             active_orders: new_active_order_book(),
+            client_order_ids: new_default_big_ordered_map(),
             pending_orders: new_pending_order_book_index(),
             ascending_id_generator: new_ascending_id_generator()
         }
@@ -123,15 +125,20 @@ module aptos_experimental::order_book {
         assert!(order_creator == order.get_account(), EORDER_CREATOR_MISMATCH);
         if (is_active) {
             let unique_priority_idx = order.get_unique_priority_idx();
-            let (_account, _order_id, _client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
+            let (account, _order_id, client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
                 order.destroy_order();
             self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
+            if (client_order_id.is_some()) {
+                self.client_order_ids.remove(&new_account_client_order_id(
+                    account, client_order_id.destroy_some()
+                ));
+            };
         } else {
             let unique_priority_idx = order.get_unique_priority_idx();
             let (
                 _account,
                 _order_id,
-                _client_order_id,
+                client_order_id,
                 _bid_price,
                 _orig_size,
                 _size,
@@ -142,8 +149,35 @@ module aptos_experimental::order_book {
             self.pending_orders.cancel_pending_order(
                 trigger_condition.destroy_some(), unique_priority_idx, is_bid
             );
+            if (client_order_id.is_some()) {
+                self.client_order_ids.remove(&new_account_client_order_id(
+                    order.get_account(), client_order_id.destroy_some()
+                ));
+            };
         };
         return order
+    }
+
+    public fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_creator: address, client_order_id: u64
+    ): Option<Order<M>> {
+        let account_client_order_id = new_account_client_order_id(
+            order_creator, client_order_id
+        );
+        if (!self.client_order_ids.contains(&account_client_order_id)) {
+            return option::none();
+        };
+        let order_id = self.client_order_ids.borrow(&account_client_order_id);
+        option::some(self.cancel_order(order_creator, *order_id))
+    }
+
+    public fun client_order_id_exists<M: store + copy + drop>(
+        self: &OrderBook<M>, order_creator: address, client_order_id: u64
+    ): bool {
+        let account_client_order_id = new_account_client_order_id(
+            order_creator, client_order_id
+        );
+        self.client_order_ids.contains(&account_client_order_id)
     }
 
     /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
@@ -190,6 +224,12 @@ module aptos_experimental::order_book {
                 order_req.metadata
             );
         self.orders.add(order_req.order_id, new_order_with_state(order, true));
+        if (order_req.client_order_id.is_some()) {
+            self.client_order_ids.add(
+                new_account_client_order_id(order_req.account, order_req.client_order_id.destroy_some()),
+                order_req.order_id
+            );
+        };
         self.active_orders.place_maker_order(
             order_req.order_id,
             order_req.price,
@@ -287,6 +327,13 @@ module aptos_experimental::order_book {
             self.orders.add(order_id, order_with_state);
         };
         let (order, is_active) = order_with_state.destroy_order_from_state();
+        if (remaining_size == 0 && order.get_client_order_id().is_some()) {
+            self.client_order_ids.remove(
+                &new_account_client_order_id(
+                    order.get_account(),
+                    order.get_client_order_id().destroy_some()
+                ));
+        };
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
         new_single_order_match(order, matched_size)
     }
@@ -395,11 +442,13 @@ module aptos_experimental::order_book {
     public fun destroy_order_book<M: store + copy + drop>(self: OrderBook<M>) {
         let OrderBook::V1 {
             orders,
+            client_order_ids,
             active_orders,
             pending_orders,
             ascending_id_generator: _
         } = self;
         orders.destroy(|_v| {});
+        client_order_ids.destroy(|_v| {});
         active_orders.destroy_active_order_book();
         pending_orders.destroy_pending_order_book_index();
     }
@@ -1199,7 +1248,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
-            client_order_id: option::none(),
+            client_order_id: option::some(1),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1209,6 +1258,8 @@ module aptos_experimental::order_book {
         };
         order_book.place_maker_order(order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
+
+        assert!(order_book.client_order_id_exists(@0xAA, 1));
 
         // Taker order
         let order_req = OrderRequest::V1 {
@@ -1225,6 +1276,8 @@ module aptos_experimental::order_book {
 
         let match_results = order_book.place_order_and_get_matches(order_req);
         assert!(total_matched_size(&match_results) == 100);
+
+        assert!(order_book.client_order_id_exists(@0xAA, 1));
 
         let (matched_order, _) = match_results[0].destroy_single_order_match();
         let (
@@ -1251,6 +1304,7 @@ module aptos_experimental::order_book {
             metadata
         };
         order_book.reinsert_maker_order(order_req, matched_order);
+        assert!(order_book.client_order_id_exists(@0xAA, 1));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 950);
         order_book.destroy_order_book();
@@ -1264,7 +1318,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
-            client_order_id: option::none(),
+            client_order_id: option::some(1),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1288,8 +1342,12 @@ module aptos_experimental::order_book {
             metadata: TestMetadata {}
         };
 
+        assert!(order_book.client_order_id_exists(@0xAA, 1));
+
         let match_results = order_book.place_order_and_get_matches(order_req);
         assert!(total_matched_size(&match_results) == 1000);
+
+        assert!(!order_book.client_order_id_exists(@0xAA, 1));
 
         let (matched_order, _) = match_results[0].destroy_single_order_match();
         let (
@@ -1316,6 +1374,7 @@ module aptos_experimental::order_book {
             metadata
         };
         order_book.reinsert_maker_order(order_req, matched_order);
+        assert!(!order_book.client_order_id_exists(@0xAA, 1));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 500);
         order_book.destroy_order_book();

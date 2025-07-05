@@ -143,7 +143,8 @@ module aptos_experimental::market {
         PositionUpdateViolation,
         ReduceOnlyViolation,
         ClearinghouseSettleViolation,
-        MaxFillLimitViolation
+        MaxFillLimitViolation,
+        DuplicateClientOrderIdViolation,
     }
 
     struct OrderMatchResult has drop {
@@ -708,6 +709,23 @@ module aptos_experimental::market {
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
         let is_taker_order =
             self.order_book.is_taker_order(limit_price, is_bid, trigger_condition);
+
+        if (emit_taker_order_open) {
+            self.emit_event_for_order(
+                order_id,
+                client_order_id,
+                user_addr,
+                orig_size,
+                remaining_size,
+                orig_size,
+                limit_price,
+                is_bid,
+                is_taker_order,
+                market_types::order_status_open(),
+                &std::string::utf8(b"")
+            );
+        };
+
         if (
             !callbacks.validate_order_placement(
                 user_addr,
@@ -727,28 +745,35 @@ module aptos_experimental::market {
                 0, // 0 because order was never placed
                 vector[],
                 is_bid,
-                true, // is_taker
+                is_taker_order, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
                 std::string::utf8(b"Position Update violation"),
                 callbacks
             );
         };
 
-        if (emit_taker_order_open) {
-            self.emit_event_for_order(
-                order_id,
-                client_order_id,
+        if (client_order_id.is_some()) {
+            if (self.order_book.client_order_id_exists(
                 user_addr,
-                orig_size,
-                remaining_size,
-                orig_size,
-                limit_price,
-                is_bid,
-                is_taker_order,
-                market_types::order_status_open(),
-                &std::string::utf8(b"")
-            );
+                client_order_id.destroy_some()
+            )) {
+                return self.cancel_order_internal(
+                    user_addr,
+                    limit_price,
+                    order_id,
+                    client_order_id,
+                    orig_size,
+                    remaining_size,
+                    vector[],
+                    is_bid,
+                    is_taker_order, // is_taker
+                    OrderCancellationReason::DuplicateClientOrderIdViolation,
+                    std::string::utf8(b"Duplicate client order id"),
+                    callbacks
+                );
+            };
         };
+
         if (!is_taker_order) {
             return self.place_maker_order_internal(
                 user_addr,
@@ -890,6 +915,28 @@ module aptos_experimental::market {
         }
     }
 
+    public fun cancel_order_with_client_id<M: store + copy + drop>(
+        self: &mut Market<M>,
+        user: &signer,
+        client_order_id: u64,
+        callbacks: &MarketClearinghouseCallbacks<M>
+    ) {
+        let order = self.order_book.try_cancel_order_with_client_order_id(
+            signer::address_of(user), client_order_id,
+        );
+        if (order.is_some()) {
+            // Order is already placed in the order book, so we can cancel it
+            return self.cancel_order_helper(
+                order.destroy_some(),
+                callbacks
+            );
+        };
+        // Order is not placed yet, so we add the order for pre-cancellation
+
+    }
+
+
+
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
     public fun cancel_order<M: store + copy + drop>(
         self: &mut Market<M>,
@@ -900,6 +947,14 @@ module aptos_experimental::market {
         let account = signer::address_of(user);
         let order = self.order_book.cancel_order(account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
+        self.cancel_order_helper(order, callbacks);
+    }
+
+    fun cancel_order_helper<M: store + copy + drop>(
+        self: &mut Market<M>,
+        order: Order<M>,
+        callbacks: &MarketClearinghouseCallbacks<M>
+    ) {
         let (
             account,
             order_id,
@@ -928,6 +983,7 @@ module aptos_experimental::market {
             &std::string::utf8(b"Order cancelled")
         );
     }
+
 
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
     public fun decrease_order_size<M: store + copy + drop>(
