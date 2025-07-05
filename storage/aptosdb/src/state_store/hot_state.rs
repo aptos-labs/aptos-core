@@ -9,8 +9,8 @@ use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{state_key::StateKey, state_slot::StateSlot, StateViewResult};
-use dashmap::DashMap;
+use aptos_types::state_store::{hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot};
+use dashmap::{mapref::one::Ref, DashMap};
 use std::sync::{
     mpsc::{Receiver, SyncSender, TryRecvError},
     Arc,
@@ -21,10 +21,7 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 #[derive(Debug)]
 struct Entry<K, V> {
     data: V,
-    /// The key that is slightly newer than the current entry. `None` for the newest entry.
-    prev: Option<K>,
-    /// The key that is slightly older than the current entry. `None` for the oldest entry.
-    next: Option<K>,
+    lru: LRUEntry<K>,
 }
 
 #[derive(Debug)]
@@ -59,14 +56,18 @@ where
         }
     }
 
-    fn get(&self, key: &K) -> Option<V> {
-        self.inner.get(key).map(|val| val.data.clone())
+    fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
+        self.inner.get(key)
     }
 }
 
 impl HotStateView for HotStateBase<StateKey, StateSlot> {
-    fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<Option<StateSlot>> {
-        Ok(self.get(state_key))
+    fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
+        self.get(state_key).map(|e| e.data.clone())
+    }
+
+    fn get_lru_entry(&self, state_key: &StateKey) -> Option<LRUEntry<StateKey>> {
+        self.get(state_key).map(|e| e.lru.clone())
     }
 }
 
@@ -217,7 +218,7 @@ impl Committer {
 
         let mut updater = LRUUpdater::new(Arc::clone(&self.base), &mut self.head, &mut self.tail);
         for (key, slot) in all_updates {
-            let has_old_entry = if let Some(old_slot) = self.base.get(&key) {
+            let has_old_entry = if let Some(old_slot) = self.base.get_state_slot(&key) {
                 self.total_key_bytes -= key.size();
                 self.total_value_bytes -= old_slot.size();
                 true
@@ -328,33 +329,33 @@ where
             None => return None,
         };
 
-        match &old_entry.prev {
+        match &old_entry.lru.prev {
             Some(prev_key) => {
                 let mut prev_entry = self
                     .base
                     .inner
                     .get_mut(prev_key)
                     .expect("The previous key must exist");
-                prev_entry.next = old_entry.next.clone();
+                prev_entry.lru.next = old_entry.lru.next.clone();
             },
             None => {
                 // There is no newer entry. The current key was the head.
-                *self.head = old_entry.next.clone();
+                *self.head = old_entry.lru.next.clone();
             },
         }
 
-        match &old_entry.next {
+        match &old_entry.lru.next {
             Some(next_key) => {
                 let mut next_entry = self
                     .base
                     .inner
                     .get_mut(next_key)
                     .expect("The next key must exist.");
-                next_entry.prev = old_entry.prev;
+                next_entry.lru.prev = old_entry.lru.prev;
             },
             None => {
                 // There is no older entry. The current key was the tail.
-                *self.tail = old_entry.prev;
+                *self.tail = old_entry.lru.prev;
             },
         }
 
@@ -370,12 +371,14 @@ where
                     // the new entry below.
                     let mut old_head_entry =
                         self.base.inner.get_mut(&head).expect("Head must exist.");
-                    old_head_entry.prev = Some(key.clone());
+                    old_head_entry.lru.prev = Some(key.clone());
                 }
                 let entry = Entry {
                     data: value,
-                    prev: None,
-                    next: Some(head),
+                    lru: LRUEntry {
+                        prev: None,
+                        next: Some(head),
+                    },
                 };
                 self.base.inner.insert(key.clone(), entry);
                 *self.head = Some(key);
@@ -383,8 +386,10 @@ where
             None => {
                 let entry = Entry {
                     data: value,
-                    prev: None,
-                    next: None,
+                    lru: LRUEntry {
+                        prev: None,
+                        next: None,
+                    },
                 };
                 self.base.inner.insert(key.clone(), entry);
                 *self.head = Some(key.clone());
@@ -419,10 +424,10 @@ where
         let mut current_key = self.head.clone();
         while let Some(key) = current_key {
             let entry = self.base.inner.get(&key).unwrap();
-            assert_eq!(entry.prev, keys.last().cloned());
+            assert_eq!(entry.lru.prev, keys.last().cloned());
             keys.push(key);
             values.push(entry.data.clone());
-            current_key = entry.next.clone();
+            current_key = entry.lru.next.clone();
         }
         itertools::zip_eq(keys, values).collect()
     }

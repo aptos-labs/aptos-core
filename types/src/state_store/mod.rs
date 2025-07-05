@@ -17,6 +17,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 pub mod errors;
+pub mod hot_state;
 pub mod state_key;
 pub mod state_slot;
 pub mod state_storage_usage;
