@@ -69,6 +69,7 @@ module 0xABCD::order_book_example {
                     order_book::new_order_request(
                         account,
                         order_id,
+                        option::none(),
                         price,
                         orig_size,
                         remaining_size,

@@ -57,6 +57,7 @@ module aptos_experimental::order_book_types {
         V1 {
             order_id: OrderIdType,
             account: address,
+            client_order_id: Option<u64>, // for client to track orders
             unique_priority_idx: UniqueIdxType,
             price: u64,
             orig_size: u64,
@@ -133,6 +134,7 @@ module aptos_experimental::order_book_types {
         order_id: OrderIdType,
         account: address,
         unique_priority_idx: UniqueIdxType,
+        client_order_id: Option<u64>,
         price: u64,
         orig_size: u64,
         size: u64,
@@ -144,6 +146,7 @@ module aptos_experimental::order_book_types {
             order_id,
             account,
             unique_priority_idx,
+            client_order_id,
             price,
             orig_size,
             remaining_size: size,
@@ -282,6 +285,10 @@ module aptos_experimental::order_book_types {
         self.orig_size
     }
 
+    public fun get_client_order_id<M: store + copy + drop>(self: &Order<M>): Option<u64> {
+        self.client_order_id
+    }
+
     public fun destroy_order_from_state<M: store + copy + drop>(
         self: OrderWithState<M>
     ): (Order<M>, bool) {
@@ -294,10 +301,11 @@ module aptos_experimental::order_book_types {
 
     public fun destroy_order<M: store + copy + drop>(
         self: Order<M>
-    ): (address, OrderIdType, u64, u64, u64, bool, Option<TriggerCondition>, M) {
+    ): (address, OrderIdType, Option<u64>, u64, u64, u64, bool, Option<TriggerCondition>, M) {
         let Order::V1 {
             order_id,
             account,
+            client_order_id,
             unique_priority_idx: _,
             price,
             orig_size,
@@ -306,10 +314,10 @@ module aptos_experimental::order_book_types {
             trigger_condition,
             metadata
         } = self;
-
         (
             account,
             order_id,
+            client_order_id,
             price,
             orig_size,
             remaining_size,

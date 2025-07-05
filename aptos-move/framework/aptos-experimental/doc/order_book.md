@@ -88,6 +88,12 @@ types of pending orders are supported.
 
 </dd>
 <dt>
+<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>price: u64</code>
 </dt>
 <dd>
@@ -364,7 +370,7 @@ types of pending orders are supported.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -376,6 +382,7 @@ types of pending orders are supported.
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     order_id: OrderIdType,
+    client_order_id: Option&lt;u64&gt;,
     price: u64,
     orig_size: u64,
     remaining_size: u64,
@@ -386,6 +393,7 @@ types of pending orders are supported.
     OrderRequest::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
+        client_order_id,
         price,
         orig_size,
         remaining_size,
@@ -458,7 +466,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
     <b>assert</b>!(order_creator == order.get_account(), <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
     <b>if</b> (is_active) {
         <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
-        <b>let</b> (_account, _order_id, bid_price, _orig_size, _size, is_bid, _, _) =
+        <b>let</b> (_account, _order_id, _client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
             order.destroy_order();
         self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
     } <b>else</b> {
@@ -466,6 +474,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
         <b>let</b> (
             _account,
             _order_id,
+            _client_order_id,
             _bid_price,
             _orig_size,
             _size,
@@ -555,6 +564,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.order_id,
             order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
             ascending_idx,
+            order_req.client_order_id,
             order_req.price,
             order_req.orig_size,
             order_req.remaining_size,
@@ -664,6 +674,7 @@ it is added to the order book, if it exists, it's size is updated.
             order_id,
             order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
             ascending_idx,
+            order_req.client_order_id,
             order_req.price,
             order_req.orig_size,
             order_req.remaining_size,
