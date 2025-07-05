@@ -1616,11 +1616,13 @@ where
             "Output must have same size as input."
         );
 
+        let mut count = 0;
         for (i, output) in outputs.iter().enumerate() {
             // TODO(grao): Also include other transactions that is "Keep" if we are confident
             // that we successfully charge enough gas amount as it appears in the FeeStatement
             // for every corner cases.
             if !output.is_success() {
+                error!("skip {i}th txn in block {block_id:?}");
                 continue;
             }
             let txn = signature_verified_block.get_txn(i as TxnIndex);
@@ -1647,11 +1649,23 @@ where
                             let fee_to_distribute =
                                 gas_unit_available_to_distribute * (gas_price - gas_price_to_burn);
                             *amount.entry(proposer_index).or_insert(0) += fee_to_distribute;
+                            count += 1;
+                        } else {
+                            error!("no unit available to distribute for {i}th txn.");
                         }
+                    } else {
+                        panic!("wrong gas price");
                     }
+                } else {
+                    unreachable!("Must have ephemeral info.");
+                }
+            } else {
+                if i != 0 {
+                    error!("failed to convert {i}th txn as user txn.");
                 }
             }
         }
+        error!("Calculated fee {amount:?} for {count} transactions in block {block_id:?}.");
         Transaction::block_epilogue_v1(
             block_id,
             block_end_info.to_persistent(),

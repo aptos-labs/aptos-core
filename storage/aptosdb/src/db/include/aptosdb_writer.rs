@@ -250,6 +250,8 @@ impl AptosDB {
                     .unwrap()
             });
             s.spawn(|_| {
+                let version = chunk.first_version + chunk.transactions.len() as u64 - 1;
+                info!("{version}: {:?}", chunk.transactions.last().unwrap());
                 self.ledger_db
                     .transaction_db()
                     .commit_transactions(
