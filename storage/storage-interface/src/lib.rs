@@ -100,7 +100,7 @@ impl From<aptos_secure_net::Error> for Error {
 macro_rules! delegate_read {
     ($(
         $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+        fn $name:ident(&self $(, $arg: ident : $ty: ty)* $(,)?) -> $return_type:ty;
     )+) => {
         $(
             $(#[$($attr)*])*
