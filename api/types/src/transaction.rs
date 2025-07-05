@@ -193,11 +193,22 @@ pub struct TransactionSummary {
     pub replay_protector: ReplayProtector,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum ReplayProtector {
     Nonce(U64),
     SequenceNumber(U64),
+}
+
+impl fmt::Debug for ReplayProtector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReplayProtector::Nonce(nonce) => write!(f, "Nonce({})", nonce),
+            ReplayProtector::SequenceNumber(sequence_number) => {
+                write!(f, "SequenceNumber({})", sequence_number)
+            },
+        }
+    }
 }
 
 /// Enum of the different types of transactions in Aptos
