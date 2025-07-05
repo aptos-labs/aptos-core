@@ -10,7 +10,7 @@ use aptos_transaction_generator_lib::{
     entry_point_trait::EntryPointTrait,
     entry_points::EntryPointTransactionGenerator,
     workflow_delegator::{StageTracking, WorkflowKind, WorkflowTxnGeneratorCreator},
-    ReliableTransactionSubmitter, RootAccountHandle,
+    ReliableTransactionSubmitter, ReplayProtectionType, RootAccountHandle,
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -30,6 +30,7 @@ impl WorkflowKind for TokenWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator {
         match self {
             TokenWorkflowKind::CreateMintBurn {
@@ -48,17 +49,20 @@ impl WorkflowKind for TokenWorkflowKind {
                         mint_entry_point.pre_built_packages(),
                         mint_entry_point.package_name(),
                         Some(40_0000_0000),
+                        replay_protection_type,
                     )
                     .await,
                 );
 
                 let workers: Vec<Box<dyn UserModuleTransactionGenerator>> = vec![
-                    Box::new(EntryPointTransactionGenerator::new_singleton(Box::new(
-                        mint_entry_point,
-                    ))),
-                    Box::new(EntryPointTransactionGenerator::new_singleton(Box::new(
-                        burn_entry_point,
-                    ))),
+                    Box::new(EntryPointTransactionGenerator::new_singleton(
+                        Box::new(mint_entry_point),
+                        replay_protection_type,
+                    )),
+                    Box::new(EntryPointTransactionGenerator::new_singleton(
+                        Box::new(burn_entry_point),
+                        replay_protection_type,
+                    )),
                 ];
 
                 WorkflowTxnGeneratorCreator::new_staged_with_account_pool(
@@ -72,6 +76,7 @@ impl WorkflowKind for TokenWorkflowKind {
                     root_account,
                     txn_executor,
                     stage_tracking,
+                    replay_protection_type,
                 )
                 .await
             },

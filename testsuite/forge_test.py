@@ -157,6 +157,7 @@ def fake_context(
             cargo_args=["--cargo-arg"],
             forge_cli_args=["--forge-cli-arg"],
             test_args=["--test-arg"],
+            forge_replay_protection_type="sequence_number",
         ),
         aws_account_num="123",
         aws_region="banana-east-1",

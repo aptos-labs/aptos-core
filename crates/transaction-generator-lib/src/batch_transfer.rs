@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
+use crate::{ObjectPool, ReplayProtectionType, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -16,6 +16,7 @@ pub struct BatchTransferTransactionGenerator {
     send_amount: u64,
     txn_factory: TransactionFactory,
     all_addresses: Arc<ObjectPool<AccountAddress>>,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl BatchTransferTransactionGenerator {
@@ -25,6 +26,7 @@ impl BatchTransferTransactionGenerator {
         send_amount: u64,
         txn_factory: TransactionFactory,
         all_addresses: Arc<ObjectPool<AccountAddress>>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             rng,
@@ -32,6 +34,7 @@ impl BatchTransferTransactionGenerator {
             send_amount,
             txn_factory,
             all_addresses,
+            replay_protection_type,
         }
     }
 }
@@ -47,14 +50,16 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
             let receivers = self
                 .all_addresses
                 .clone_from_pool(self.batch_size, &mut self.rng);
-            requests.push(
-                account.sign_with_transaction_builder(self.txn_factory.payload(
-                    aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
-                        self.send_amount;
-                        self.batch_size
-                    ]),
-                )),
-            );
+            let mut txn_builder =
+                self.txn_factory
+                    .payload(aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
+                    self.send_amount;
+                    self.batch_size
+                ]));
+            if let ReplayProtectionType::Nonce = self.replay_protection_type {
+                txn_builder = txn_builder.upgrade_payload(true, true);
+            }
+            requests.push(account.sign_with_transaction_builder(txn_builder));
         }
 
         requests
@@ -66,6 +71,7 @@ pub struct BatchTransferTransactionGeneratorCreator {
     amount: u64,
     all_addresses: Arc<ObjectPool<AccountAddress>>,
     batch_size: usize,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl BatchTransferTransactionGeneratorCreator {
@@ -74,12 +80,14 @@ impl BatchTransferTransactionGeneratorCreator {
         amount: u64,
         all_addresses: Arc<ObjectPool<AccountAddress>>,
         batch_size: usize,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             txn_factory,
             amount,
             all_addresses,
             batch_size,
+            replay_protection_type,
         }
     }
 }
@@ -92,6 +100,7 @@ impl TransactionGeneratorCreator for BatchTransferTransactionGeneratorCreator {
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),
+            self.replay_protection_type,
         ))
     }
 }
