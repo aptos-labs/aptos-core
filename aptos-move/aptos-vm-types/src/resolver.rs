@@ -170,6 +170,7 @@ pub trait StateStorageView {
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, V>:
     TResourceView<Key = K, Layout = L>
+    + TResourceGroupView<GroupKey = K, ResourceTag = T, Layout = L>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView<Key = K>
@@ -178,6 +179,7 @@ pub trait TExecutorView<K, T, L, V>:
 
 impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
     A: TResourceView<Key = K, Layout = L>
+        + TResourceGroupView<GroupKey = K, ResourceTag = T, Layout = L>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView<Key = K>
@@ -197,6 +199,28 @@ impl<T> ResourceGroupView for T where
     T: TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
 {
 }
+
+/// A trait that includes all requirements of TExecutorView except for TResourceGroupView.
+/// This is used to bound the generic parameter of StorageAdapter.
+pub trait TExecutorViewWithoutGroupView<K, T, L, V>:
+    TResourceView<Key = K, Layout = L>
+    + TAggregatorV1View<Identifier = K>
+    + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+    + StateStorageView<Key = K>
+{
+}
+
+impl<A, K, T, L, V> TExecutorViewWithoutGroupView<K, T, L, V> for A where
+    A: TResourceView<Key = K, Layout = L>
+        + TAggregatorV1View<Identifier = K>
+        + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
+        + StateStorageView<Key = K>
+{
+}
+
+pub trait ExecutorViewWithoutGroupView: TExecutorViewWithoutGroupView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
+
+impl<T> ExecutorViewWithoutGroupView for T where T: TExecutorViewWithoutGroupView<StateKey, StructTag, MoveTypeLayout, WriteOp> {}
 
 /// Direct implementations for StateView.
 impl<S> TResourceView for S
