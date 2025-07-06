@@ -8,7 +8,7 @@ metadata:
     run: some-label
 spec:
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 10Ti

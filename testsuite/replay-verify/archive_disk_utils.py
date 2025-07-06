@@ -522,7 +522,7 @@ def create_one_pvc_from_snapshot(
             "labels": {"run": f"{label}"},
         },
         "spec": {
-            "accessModes": ["ReadOnlyMany"],
+            "accessModes": ["ReadWriteOnce"],
             "resources": {"requests": {"storage": storage_size}},
             "storageClassName": STORAGE_CLASS,
             "volumeMode": "Filesystem",
