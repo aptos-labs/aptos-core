@@ -1062,10 +1062,12 @@ install_libudev-dev
 
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
-  if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-    pip3 install pre-commit
-  else
+  if [[ "$PACKAGE_MANAGER == brew" ]]; then
+    install_pkg pre-commit "$PACKAGE_MANAGER"
+  elif [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
+  else
+    pip3 install pre-commit
   fi
 
   # For now best effort install, will need to improve later
