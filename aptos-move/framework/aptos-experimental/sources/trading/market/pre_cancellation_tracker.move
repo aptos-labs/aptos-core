@@ -93,8 +93,6 @@ module aptos_experimental::pre_cancellation_tracker {
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL
             && !tracker.order_ids_with_expiration.is_empty()) {
             let (front_k, _) = tracker.order_ids_with_expiration.borrow_front();
-            // We garbage collect a nonce after it has expired and the NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS
-            // seconds have passed.
             if (front_k.expiration_time < current_time) {
                 tracker.order_ids_with_expiration.pop_front();
                 tracker.account_order_ids.remove(&front_k.account_order_id);
@@ -222,6 +220,8 @@ module aptos_experimental::pre_cancellation_tracker {
             assert!(!is_cancelled, 200 + j);
             j += 1;
         };
+        assert!(tracker.order_ids_with_expiration.is_empty());
+        assert!(tracker.account_order_ids.is_empty());
         destroy_tracker(tracker);
     }
 }
