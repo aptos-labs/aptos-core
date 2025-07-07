@@ -28,9 +28,9 @@ proptest! {
             .expect_create_from_serialization_data()
             .returning(move |data| Ok(Box::new(mock::MockAbstractFunction::new_from_data(data))));
 
-        let ctx = ValueSerDeContext::new().with_func_args_deserialization(&ext_mock);
+        let ctx = ValueSerDeContext::new(None).with_func_args_deserialization(&ext_mock);
         let blob = ctx.serialize(&value, &layout).unwrap().expect("must serialize");
-        let value_deserialized = ValueSerDeContext::new().with_func_args_deserialization(&ext_mock).deserialize(&blob, &layout).expect("must deserialize");
+        let value_deserialized = ValueSerDeContext::new(None).with_func_args_deserialization(&ext_mock).deserialize(&blob, &layout).expect("must deserialize");
         assert!(value.equals(&value_deserialized).unwrap());
 
         let move_value = value.as_move_value(&layout);
