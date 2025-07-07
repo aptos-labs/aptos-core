@@ -223,10 +223,18 @@ module aptos_experimental::active_order_book {
     ): bool {
         if (is_bid) {
             let best_ask_price = self.best_ask_price();
-            best_ask_price.is_some() && (price.is_none() || price.destroy_some() >= best_ask_price.destroy_some())
+            best_ask_price.is_some()
+                && (
+                    price.is_none()
+                        || price.destroy_some() >= best_ask_price.destroy_some()
+                )
         } else {
             let best_bid_price = self.best_bid_price();
-            best_bid_price.is_some() && (price.is_none() || price.destroy_some() <= best_bid_price.destroy_some())
+            best_bid_price.is_some()
+                && (
+                    price.is_none()
+                        || price.destroy_some() <= best_bid_price.destroy_some()
+                )
         }
     }
 
@@ -265,7 +273,9 @@ module aptos_experimental::active_order_book {
     ): ActiveMatchedOrder {
         let (smallest_key, smallest_value) = self.sells.borrow_front();
         if (price.is_some()) {
-            assert!(price.destroy_some() >= smallest_key.price, EINTERNAL_INVARIANT_BROKEN);
+            assert!(
+                price.destroy_some() >= smallest_key.price, EINTERNAL_INVARIANT_BROKEN
+            );
         };
         single_match_with_current_active_order(
             size,
@@ -280,7 +290,9 @@ module aptos_experimental::active_order_book {
     ): ActiveMatchedOrder {
         let (largest_key, largest_value) = self.buys.borrow_back();
         if (price.is_some()) {
-            assert!(price.destroy_some() <= largest_key.price, EINTERNAL_INVARIANT_BROKEN);
+            assert!(
+                price.destroy_some() <= largest_key.price, EINTERNAL_INVARIANT_BROKEN
+            );
         };
         single_match_with_current_active_order(
             size,

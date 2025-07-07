@@ -51,6 +51,7 @@ module aptos_experimental::order_book {
         V1 {
             account: address,
             order_id: OrderIdType,
+            client_order_id: Option<u64>,
             price: u64,
             orig_size: u64,
             remaining_size: u64,
@@ -78,6 +79,7 @@ module aptos_experimental::order_book {
     public fun new_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
+        client_order_id: Option<u64>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -88,6 +90,7 @@ module aptos_experimental::order_book {
         OrderRequest::V1 {
             account,
             order_id,
+            client_order_id,
             price,
             orig_size,
             remaining_size,
@@ -120,7 +123,7 @@ module aptos_experimental::order_book {
         assert!(order_creator == order.get_account(), EORDER_CREATOR_MISMATCH);
         if (is_active) {
             let unique_priority_idx = order.get_unique_priority_idx();
-            let (_account, _order_id, bid_price, _orig_size, _size, is_bid, _, _) =
+            let (_account, _order_id, _client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
                 order.destroy_order();
             self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
         } else {
@@ -128,6 +131,7 @@ module aptos_experimental::order_book {
             let (
                 _account,
                 _order_id,
+                _client_order_id,
                 _bid_price,
                 _orig_size,
                 _size,
@@ -177,6 +181,7 @@ module aptos_experimental::order_book {
                 order_req.order_id,
                 order_req.account,
                 ascending_idx,
+                order_req.client_order_id,
                 order_req.price,
                 order_req.orig_size,
                 order_req.remaining_size,
@@ -246,6 +251,7 @@ module aptos_experimental::order_book {
                 order_id,
                 order_req.account,
                 ascending_idx,
+                order_req.client_order_id,
                 order_req.price,
                 order_req.orig_size,
                 order_req.remaining_size,
@@ -420,9 +426,10 @@ module aptos_experimental::order_book {
                     OrderRequest::V1 {
                         account: order_req.account,
                         order_id: order_req.order_id,
+                        client_order_id: order_req.client_order_id,
                         price: order_req.price,
                         orig_size: order_req.orig_size,
-                        remaining_size: remaining_size,
+                        remaining_size,
                         is_bid: order_req.is_bid,
                         trigger_condition: order_req.trigger_condition,
                         metadata: order_req.metadata
@@ -451,6 +458,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: order_req.account,
             order_id: order_req.order_id,
+            client_order_id: order_req.client_order_id,
             price: order_req.price,
             orig_size: order_req.orig_size,
             remaining_size: order_req.remaining_size,
@@ -470,12 +478,13 @@ module aptos_experimental::order_book {
         let i = 0;
         while (i < ready_orders.length()) {
             let order = ready_orders[i];
-            let (account, order_id, price, orig_size, remaining_size, is_bid, _, metadata) =
+            let (account, order_id, client_order_id, price, orig_size, remaining_size, is_bid, _, metadata) =
 
                 order.destroy_order();
             let order_req = OrderRequest::V1 {
                 account,
                 order_id,
+                client_order_id,
                 price,
                 orig_size,
                 remaining_size,
@@ -515,6 +524,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::some(1),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -529,13 +539,14 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, client_order_id, price, orig_size, size, is_bid, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
         assert!(orig_size == 1000);
         assert!(size == 1000);
         assert!(is_bid == false);
+        assert!(client_order_id == option::some(1));
 
         // Place a matching buy order for partial fill
         let match_results =
@@ -543,6 +554,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::some(2),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -568,12 +580,13 @@ module aptos_experimental::order_book {
         // Verify original order still exists but with reduced size
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_, _, price, orig_size, size, is_bid, _, _) = order.destroy_order();
+        let (_, _, client_order_id, price, orig_size, size, is_bid, _, _) = order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
         assert!(orig_size == 1000);
         assert!(size == 600);
         assert!(is_bid == false);
+        assert!(client_order_id == option::some(1));
 
         // Cancel the remaining order
         order_book.cancel_order(@0xAA, new_order_id_type(1));
@@ -595,6 +608,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 101,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -610,6 +624,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -626,6 +641,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(3),
+                    client_order_id: option::none(),
                     price: 101,
                     orig_size: 500,
                     remaining_size: 500,
@@ -659,6 +675,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::some(1),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -675,6 +692,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::some(2),
                     price: 99,
                     orig_size: 500,
                     remaining_size: 500,
@@ -691,6 +709,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::some(3),
                     price: 99,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -710,6 +729,7 @@ module aptos_experimental::order_book {
         assert!(order.get_order_id() == new_order_id_type(2));
         assert!(matched_size == 500);
         assert!(order.get_orig_size() == 500);
+        assert!(order.get_client_order_id() == option::some(2));
         assert!(order.get_remaining_size() == 0); // Fully filled
 
         order_book.destroy_order_book();
@@ -726,6 +746,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 101,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -741,6 +762,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -757,6 +779,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(3),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -780,6 +803,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -796,6 +820,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -824,6 +849,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(3),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -851,7 +877,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -872,6 +898,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 500,
                     remaining_size: 500,
@@ -889,6 +916,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 800,
                     remaining_size: 800,
@@ -919,7 +947,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(2);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -940,6 +968,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -958,6 +987,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -995,6 +1025,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(3),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -1032,7 +1063,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -1053,6 +1084,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xAA,
                     order_id: new_order_id_type(1),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 1000,
                     remaining_size: 1000,
@@ -1071,6 +1103,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(2),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 400,
                     remaining_size: 400,
@@ -1109,6 +1142,7 @@ module aptos_experimental::order_book {
                 OrderRequest::V1 {
                     account: @0xBB,
                     order_id: new_order_id_type(3),
+                    client_order_id: option::none(),
                     price: 100,
                     orig_size: 300,
                     remaining_size: 300,
@@ -1147,7 +1181,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -1165,6 +1199,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1179,6 +1214,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xBB,
             order_id: new_order_id_type(2),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 100,
             remaining_size: 100,
@@ -1194,6 +1230,7 @@ module aptos_experimental::order_book {
         let (
             _account,
             _order_id,
+            _client_order_id,
             price,
             orig_size,
             _remaining_size,
@@ -1205,6 +1242,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::none(),
             price,
             orig_size,
             remaining_size: 50,
@@ -1226,6 +1264,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1240,6 +1279,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xBB,
             order_id: new_order_id_type(2),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1255,6 +1295,7 @@ module aptos_experimental::order_book {
         let (
             _account,
             _order_id,
+            _client_order_id,
             price,
             orig_size,
             _remaining_size,
@@ -1266,6 +1307,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::none(),
             price,
             orig_size,
             remaining_size: 500,
@@ -1287,6 +1329,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1304,6 +1347,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xBB,
             order_id: new_order_id_type(2),
+            client_order_id: option::none(),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,

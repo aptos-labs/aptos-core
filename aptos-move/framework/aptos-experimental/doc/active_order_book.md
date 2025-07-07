@@ -571,10 +571,18 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 ): bool {
     <b>if</b> (is_bid) {
         <b>let</b> best_ask_price = self.<a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>();
-        best_ask_price.is_some() && (price.is_none() || price.destroy_some() &gt;= best_ask_price.destroy_some())
+        best_ask_price.is_some()
+            && (
+                price.is_none()
+                    || price.destroy_some() &gt;= best_ask_price.destroy_some()
+            )
     } <b>else</b> {
         <b>let</b> best_bid_price = self.<a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>();
-        best_bid_price.is_some() && (price.is_none() || price.destroy_some() &lt;= best_bid_price.destroy_some())
+        best_bid_price.is_some()
+            && (
+                price.is_none()
+                    || price.destroy_some() &lt;= best_bid_price.destroy_some()
+            )
     }
 }
 </code></pre>
@@ -653,7 +661,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 ): ActiveMatchedOrder {
     <b>let</b> (smallest_key, smallest_value) = self.sells.borrow_front();
     <b>if</b> (price.is_some()) {
-        <b>assert</b>!(price.destroy_some() &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+        <b>assert</b>!(
+            price.destroy_some() &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
+        );
     };
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,
@@ -688,7 +698,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 ): ActiveMatchedOrder {
     <b>let</b> (largest_key, largest_value) = self.buys.borrow_back();
     <b>if</b> (price.is_some()) {
-        <b>assert</b>!(price.destroy_some() &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+        <b>assert</b>!(
+            price.destroy_some() &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
+        );
     };
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,

@@ -1,6 +1,7 @@
 #[test_only]
 module aptos_experimental::market_tests {
     use std::option;
+    use std::option::Option;
     use std::signer;
     use std::vector;
     use aptos_experimental::clearinghouse_test;
@@ -77,6 +78,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[2000000],
                 vector[2000000],
                 &mut event_store,
@@ -102,6 +104,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[2000000],
                 vector[1000000],
                 &mut event_store,
@@ -166,6 +169,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[1000000],
                 vector[1000000],
                 &mut event_store,
@@ -318,7 +322,7 @@ module aptos_experimental::market_tests {
         market_signer: &signer,
         maker: &signer,
         taker: &signer,
-        is_market_order: bool,
+        is_market_order: bool
     ) {
         // Setup accounts
         let market = new_market(
@@ -347,11 +351,12 @@ module aptos_experimental::market_tests {
             );
 
         // Taker order will be immediately match in the same transaction
-        let limit_price = if (is_market_order) {
-            option::none() // Market order has no price
-        } else {
-            option::some(1000) // Limit price for limit order
-        };
+        let limit_price =
+            if (is_market_order) {
+                option::none() // Market order has no price
+            } else {
+                option::some(1000) // Limit price for limit order
+            };
         let taker_order_id =
             place_taker_order_and_verify_fill(
                 &mut market,
@@ -364,6 +369,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[1000000],
                 vector[1000000],
                 &mut event_store,
@@ -394,13 +400,7 @@ module aptos_experimental::market_tests {
         maker: &signer,
         taker: &signer
     ) {
-        test_order_full_match(
-            admin,
-            market_signer,
-            maker,
-            taker,
-            false
-        );
+        test_order_full_match(admin, market_signer, maker, taker, false);
     }
 
     #[test(
@@ -455,11 +455,12 @@ module aptos_experimental::market_tests {
             );
 
         // Taker order is IOC, which will partially match and remaining will be cancelled
-        let limit_price = if (is_market_order) {
-            option::none() // Market order has no price
-        } else {
-            option::some(1000) // Limit price for limit order
-        };
+        let limit_price =
+            if (is_market_order) {
+                option::none() // Market order has no price
+            } else {
+                option::some(1000) // Limit price for limit order
+            };
         let taker_order_id =
             place_taker_order_and_verify_fill(
                 &mut market,
@@ -472,6 +473,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[1000000],
                 vector[1000000],
                 &mut event_store,
@@ -563,11 +565,12 @@ module aptos_experimental::market_tests {
             );
 
         // Taker order is IOC, which will not be matched and should be cancelled
-        let limit_price = if (is_market_order) {
-            option::none() // Market order has no price
-        } else {
-            option::some(1200) // Limit price for limit order
-        };
+        let limit_price =
+            if (is_market_order) {
+                option::none() // Market order has no price
+            } else {
+                option::some(1200) // Limit price for limit order
+            };
         let taker_order_id =
             place_order_and_verify(
                 &mut market,
@@ -596,7 +599,6 @@ module aptos_experimental::market_tests {
         market.destroy_market()
     }
 
-
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
     )]
@@ -615,13 +617,9 @@ module aptos_experimental::market_tests {
         );
     }
 
-    #[test(
-        admin = @0x1, market_signer = @0x123, taker = @0x789
-    )]
+    #[test(admin = @0x1, market_signer = @0x123, taker = @0x789)]
     public fun test_market_order_no_match(
-        admin: &signer,
-        market_signer: &signer,
-        taker: &signer
+        admin: &signer, market_signer: &signer, taker: &signer
     ) {
         // Setup accounts
         let market = new_market(
@@ -698,6 +696,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[500000],
                 vector[500000],
                 &mut event_store,
@@ -750,6 +749,7 @@ module aptos_experimental::market_tests {
         let expected_fill_sizes = vector::empty<u64>();
         let fill_prices = vector::empty<u64>();
         let maker_orig_sizes = vector::empty<u64>();
+        let maker_client_order_ids = vector::empty<Option<u64>>();
         while (i < 6) {
             let maker_order_id =
                 place_order_and_verify(
@@ -766,6 +766,7 @@ module aptos_experimental::market_tests {
                     &test_market_callbacks()
                 );
             maker_order_ids.push_back(maker_order_id);
+            maker_client_order_ids.push_back(option::none());
             expected_fill_sizes.push_back(10000 * i);
             maker_orig_sizes.push_back(10000 * i);
             fill_prices.push_back(1000 - i);
@@ -788,6 +789,7 @@ module aptos_experimental::market_tests {
                 fill_prices,
                 maker_addr,
                 maker_order_ids,
+                maker_client_order_ids,
                 maker_orig_sizes,
                 maker_orig_sizes,
                 &mut event_store,
@@ -859,6 +861,7 @@ module aptos_experimental::market_tests {
                 vector[1000],
                 maker_addr,
                 vector[maker_order_id],
+                vector[option::none()],
                 vector[2000000],
                 vector[2000000],
                 &mut event_store,
@@ -931,6 +934,7 @@ module aptos_experimental::market_tests {
             place_taker_order(
                 &mut market,
                 maker1,
+                option::none(),
                 option::some(1000),
                 1000000,
                 false,
@@ -946,6 +950,7 @@ module aptos_experimental::market_tests {
             maker1,
             false,
             maker1_order_id,
+            option::none(),
             option::some(1001),
             2000000,
             0,
@@ -958,6 +963,7 @@ module aptos_experimental::market_tests {
             &mut market,
             maker1,
             taker_order_id,
+            option::none(),
             option::some(1000),
             1000000,
             false,
@@ -965,6 +971,7 @@ module aptos_experimental::market_tests {
             vector[1000],
             maker2_addr,
             vector[maker2_order_id],
+            vector[option::none()],
             vector[2000000],
             vector[2000000],
             &mut event_store,
@@ -1032,6 +1039,7 @@ module aptos_experimental::market_tests {
             place_taker_order(
                 &mut market,
                 maker1,
+                option::some(1),
                 option::some(1000),
                 1000000,
                 false,
@@ -1046,6 +1054,7 @@ module aptos_experimental::market_tests {
             &mut market,
             maker1,
             taker_order_id,
+            option::some(1),
             option::some(1001),
             1000000,
             false,
@@ -1053,6 +1062,7 @@ module aptos_experimental::market_tests {
             vector[1001],
             maker1_addr,
             vector[maker1_order_id],
+            vector[option::none()],
             vector[2000000],
             vector[2000000],
             &mut event_store,
@@ -1117,6 +1127,7 @@ module aptos_experimental::market_tests {
         place_taker_order(
             &mut market,
             maker1,
+            option::none(),
             option::some(1001),
             1000000,
             false,
@@ -1132,6 +1143,7 @@ module aptos_experimental::market_tests {
             maker1,
             false,
             maker1_order_id,
+            option::none(),
             option::some(1001),
             2000000,
             0,
