@@ -919,14 +919,14 @@ impl Generator {
         self.add_stm(stm)
     }
 
-    /// Mark the given label as reached and close all blocks affected by this.
+    /// Mark the given label as reached and close all blocks effected by this.
     /// Once a label is reached, it cannot be referenced after this point
     /// with a forward jump.
     ///
     /// A block is closed under the following conditions:
     /// 1. It's a loop header and the reached label is not part of the loop blocks
     /// 2. Its break label is set to one of the reached labels.
-    /// 3. It has an unbound break label and is enclosed by a block as in (1)
+    /// 2. It has an unbound break label and is enclosed by a block as in (1)
     fn label_reached(&mut self, ctx: &Context, label: Label) {
         self.unreached_labels.remove(&label);
         if DEBUG {
