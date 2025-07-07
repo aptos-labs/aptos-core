@@ -356,6 +356,9 @@ impl<'a> Context<'a> {
     }
 
     /// Helper function to detect if a label substitution creates a cycle.
+    /// Attention about a tricky part: label1 -> label2 has not been added into label_subst.
+    /// Our idea: add label1 as a pretend destination of substitution, and check if starting from
+    /// label2 we can reach label1 recursively.
     fn cyclic_label_subst_detected(
         label1: Label,
         label2: Label,
@@ -369,7 +372,7 @@ impl<'a> Context<'a> {
         visited.insert(label1);
         let mut target = label2;
         while let Some(s) = label_subst.get(&target) {
-            if !visited.insert(target) {
+            if !visited.insert(*s) {
                 return true;
             }
             target = *s;
@@ -1471,30 +1474,24 @@ impl IfElseTransformer<'_> {
         let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
         let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
         let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, inner_rest) = self.builder.match_if_break_list(inner_body.clone())?;
-        // When getting the else branch, do not match exits as there are better treated with
-        // if without else.
-        let else_branch = self.builder.extract_terminated_prefix(
-            &default_loc,
-            inner_rest,
-            1,
-            /*allow_exit*/ false,
-        )?;
+        let (cond, else_branch) = self.builder.match_if_break_list(inner_body.clone())?;
 
-        // Check whether the inner 'loop' is not a loop header
+        // Make sure the inner loop is not a loop header
         self.check_no_loop_header(*inner_id)?;
-
-        // Check whether else-branch is not referencing the inner loop
+        // Make sure the else branch does not refer to inner loop
         if else_branch.branches_to(0..1) {
             return None;
         }
-        // Create result
+        // Decrease the nesting level of LoopCont expressions
+        // since we will eliminate the inner loop
         let else_branch = else_branch.rewrite_loop_nest(-1);
+
         let then_branch = self.builder.seq(&default_loc, then_branch);
+
         Some(self.builder.if_else(
             cond.clone(),
-            self.builder.push_loop_block_into(then_branch),
-            self.builder.push_loop_block_into(else_branch),
+            self.builder.loop_(then_branch),
+            self.builder.loop_(else_branch),
         ))
     }
 
