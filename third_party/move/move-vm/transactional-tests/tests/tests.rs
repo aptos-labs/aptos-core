@@ -75,7 +75,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "paranoid-mode-only",
             runner: Arc::new(SkipBytecodeVerifierRunner),
-            experiments: &[],
+            experiments: &[("access-use-function-check", false)],
             language_version: LanguageVersion::latest(),
             // Verifier config is irrelevant here, because we disable verifier for these tests.
             // Importantly, paranoid checks are enabled.
