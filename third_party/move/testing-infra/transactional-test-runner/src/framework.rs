@@ -38,11 +38,13 @@ use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::values::Value;
+use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
     io::Write,
     path::Path,
+    str::FromStr,
 };
 use tempfile::NamedTempFile;
 
@@ -209,6 +211,28 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
+                // It is possible that a module gets republished. In this case, we need to filter
+                // existing pre-compiled dependencies to remove old module. Because we do not know
+                // in advance the module we are compiling, we need to see if the module matches the
+                // one already compiled. This special case is sufficient for testing, and in case
+                // match is not found, compiler should complain when seeing a duplicate symbol.
+                let deps = state
+                    .source_files()
+                    .filter_map(|(dep_id, path)| {
+                        let re =
+                            Regex::new(r"module\s+(0x[0-9a-fA-F]+::[A-Za-z]\w*)\s*\{").unwrap();
+                        let code = std::fs::read_to_string(data_path).unwrap();
+                        if let Some(id) = re
+                            .captures(code.trim())
+                            .and_then(|c| ModuleId::from_str(&c[1]).ok())
+                        {
+                            id.ne(dep_id).then(|| path.to_owned())
+                        } else {
+                            Some(path.to_owned())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
                 let (unit, opt_model, warnings_opt) = match run_config {
                     // Run the V2 compiler if requested
                     TestRunConfig::CompilerV2 {
@@ -218,7 +242,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
@@ -290,7 +314,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &state
+                            .source_files()
+                            .map(|(_, path)| path)
+                            .cloned()
+                            .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
@@ -621,10 +649,10 @@ impl<'a> CompiledState<'a> {
         self.modules.values().map(|pmod| &pmod.module)
     }
 
-    pub fn source_files(&self) -> impl Iterator<Item = &String> {
+    pub fn source_files(&self) -> impl Iterator<Item = (&ModuleId, &String)> {
         self.modules
             .iter()
-            .filter_map(|(_, pmod)| Some(&pmod.source_file.as_ref()?.0))
+            .filter_map(|(id, pmod)| Some((id, &pmod.source_file.as_ref()?.0)))
     }
 
     pub fn add_with_source_file(

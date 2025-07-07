@@ -497,11 +497,8 @@ impl AptosVM {
             }
         }
 
-        let txn_status = TransactionStatus::from_vm_status(
-            error_vm_status.clone(),
-            self.features()
-                .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-        );
+        let txn_status =
+            TransactionStatus::from_vm_status(error_vm_status.clone(), self.features());
 
         match txn_status {
             TransactionStatus::Keep(status) => {
@@ -2451,11 +2448,8 @@ impl AptosVM {
                         );
                     },
                 }
-                let txn_status = TransactionStatus::from_vm_status(
-                    vm_status.clone(),
-                    vm.features()
-                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-                );
+                let txn_status =
+                    TransactionStatus::from_vm_status(vm_status.clone(), vm.features());
                 let execution_status = match txn_status {
                     TransactionStatus::Keep(status) => status,
                     _ => ExecutionStatus::MiscellaneousError(Some(vm_status.status_code())),

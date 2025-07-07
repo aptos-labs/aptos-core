@@ -37,4 +37,4 @@ move-unit-test = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-testing = []
+testing = ["move-vm-types/testing"]

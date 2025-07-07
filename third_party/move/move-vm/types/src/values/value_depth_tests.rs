@@ -197,9 +197,11 @@ where
     let v = MockFunction::closure(ClosureMask::empty(), vec![], vec![]);
     assert_ok!(f(&v, &v, 1));
 
-    let v = MockFunction::closure(ClosureMask::new_for_leading(1), vec![Value::u8(0)], vec![
-        MoveTypeLayout::U8,
-    ]);
+    let v = MockFunction::closure(
+        ClosureMask::new_for_leading(1).expect("Capturing one argument should not fail"),
+        vec![Value::u8(0)],
+        vec![MoveTypeLayout::U8],
+    );
     let err = assert_err!(f(&v, &v, 1));
     assert_eq!(err.major_status(), StatusCode::VM_MAX_VALUE_DEPTH_REACHED);
 
@@ -235,9 +237,11 @@ where
     let v = MockFunction::closure(ClosureMask::empty(), vec![], vec![]);
     assert_ok!(f(&v, 1));
 
-    let v = MockFunction::closure(ClosureMask::new_for_leading(1), vec![Value::u8(0)], vec![
-        MoveTypeLayout::U8,
-    ]);
+    let v = MockFunction::closure(
+        ClosureMask::new_for_leading(1).expect("Capturing one argument should not fail"),
+        vec![Value::u8(0)],
+        vec![MoveTypeLayout::U8],
+    );
     let err = assert_err!(f(&v, 1));
     assert_eq!(err.major_status(), StatusCode::VM_MAX_VALUE_DEPTH_REACHED);
 }
