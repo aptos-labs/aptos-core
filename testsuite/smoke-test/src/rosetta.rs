@@ -39,7 +39,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
     on_chain_config::{GasScheduleV2, OnChainRandomnessConfig},
-    transaction::SignedTransaction,
+    transaction::{SignedTransaction, TransactionExecutableRef},
 };
 use serde_json::json;
 use std::{
@@ -1293,9 +1293,9 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    // Question[Orderless]: This will also inclue multisig transactions with entry function payloads. Is it okay?
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_operator_address: AccountAddress = match (
                             *payload.module().address(),
@@ -1343,9 +1343,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_voter_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1416,9 +1415,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_operator_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1450,9 +1448,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_operator_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1504,9 +1501,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_operator_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1553,9 +1549,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_operator_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1592,9 +1587,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_staker_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1631,9 +1625,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_pool_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1689,9 +1682,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_pool_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
@@ -1745,9 +1737,8 @@ async fn parse_operations(
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
-                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
-                        ref payload,
-                    ) = txn.payload()
+                    if let Ok(TransactionExecutableRef::EntryFunction(payload)) =
+                        txn.executable_ref()
                     {
                         let actual_pool_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();

@@ -8,8 +8,8 @@ use crate::{
         CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator,
     },
     publishing::publish_util::Package,
-    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowProgress,
+    ObjectPool, ReliableTransactionSubmitter, ReplayProtectionType, RootAccountHandle,
+    TransactionGenerator, TransactionGeneratorCreator, WorkflowProgress,
 };
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_sdk::{
@@ -36,6 +36,7 @@ pub trait WorkflowKind: std::fmt::Debug + Sync + Send + CloneWorkflowKind {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> WorkflowTxnGeneratorCreator;
 }
 
@@ -124,6 +125,7 @@ struct WorkflowTxnGenerator {
     stage: StageTracking,
     generators: Vec<Box<dyn TransactionGenerator>>,
     stage_switch_conditions: Vec<StageSwitchCondition>,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl WorkflowTxnGenerator {
@@ -131,11 +133,13 @@ impl WorkflowTxnGenerator {
         stage: StageTracking,
         generators: Vec<Box<dyn TransactionGenerator>>,
         stage_switch_conditions: Vec<StageSwitchCondition>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             stage,
             generators,
             stage_switch_conditions,
+            replay_protection_type,
         }
     }
 }
@@ -202,7 +206,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 
         sample!(
             SampleRate::Duration(Duration::from_secs(2)),
-            info!("Cur stage: {}, stage switch conditions: {:?}", stage, self.stage_switch_conditions);
+            info!("Cur stage: {}, stage switch conditions: {:?}, replay protection type: {:?}", stage, self.stage_switch_conditions, self.replay_protection_type);
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
@@ -266,6 +270,7 @@ pub struct WorkflowTxnGeneratorCreator {
     stage: StageTracking,
     creators: Vec<Box<dyn TransactionGeneratorCreator>>,
     stage_switch_conditions: Vec<StageSwitchCondition>,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl WorkflowTxnGeneratorCreator {
@@ -273,11 +278,13 @@ impl WorkflowTxnGeneratorCreator {
         stage: StageTracking,
         creators: Vec<Box<dyn TransactionGeneratorCreator>>,
         stage_switch_conditions: Vec<StageSwitchCondition>,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         Self {
             stage,
             creators,
             stage_switch_conditions,
+            replay_protection_type,
         }
     }
 
@@ -292,6 +299,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         stage_tracking: StageTracking,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         let created_pool = Arc::new(ObjectPool::new());
 
@@ -307,6 +315,7 @@ impl WorkflowTxnGeneratorCreator {
             Some(created_pool.clone()),
             num_accounts,
             creation_balance,
+            replay_protection_type,
         )));
 
         let mut prev_pool = created_pool;
@@ -334,6 +343,7 @@ impl WorkflowTxnGeneratorCreator {
                     txn_factory.clone(),
                     packages.clone(),
                     delegation_worker,
+                    replay_protection_type,
                 )),
                 prev_pool.clone(),
                 Some(next_pool.clone()),
@@ -349,7 +359,12 @@ impl WorkflowTxnGeneratorCreator {
             prev_pool = next_pool;
         }
 
-        Self::new(stage_tracking, creators, stage_switch_conditions)
+        Self::new(
+            stage_tracking,
+            creators,
+            stage_switch_conditions,
+            replay_protection_type,
+        )
     }
 
     pub async fn create_workload(
@@ -362,6 +377,7 @@ impl WorkflowTxnGeneratorCreator {
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
+        replay_protection_type: ReplayProtectionType,
     ) -> Self {
         assert_eq!(num_modules, 1, "Only one module is supported for now");
 
@@ -390,6 +406,7 @@ impl WorkflowTxnGeneratorCreator {
                 txn_executor,
                 num_modules,
                 stage_tracking,
+                replay_protection_type,
             )
             .await
     }
@@ -404,6 +421,7 @@ impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
                 .map(|c| c.create_transaction_generator())
                 .collect(),
             self.stage_switch_conditions.clone(),
+            self.replay_protection_type,
         ))
     }
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::txn_emitter::generate_traffic;
-use aptos_forge::{NodeExt, Swarm, TransactionType};
+use aptos_forge::{NodeExt, ReplayProtectionType, Swarm, TransactionType};
 use aptos_types::PeerId;
 use std::time::Duration;
 
@@ -28,6 +28,7 @@ pub async fn generate_traffic_and_assert_committed(
                 non_conflicting: false,
                 use_fa_transfer: true,
             },
+            ReplayProtectionType::SequenceNumber,
             70,
         ),
         (
@@ -36,6 +37,7 @@ pub async fn generate_traffic_and_assert_committed(
                 max_account_working_set: 1_000_000,
                 creation_balance: 5_000_000,
             },
+            ReplayProtectionType::SequenceNumber,
             20,
         ),
     ]])

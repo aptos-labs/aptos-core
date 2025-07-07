@@ -6,7 +6,7 @@ use crate::{
     create_account_transaction,
     entry_point_trait::MultiSigConfig,
     publishing::{entry_point_trait::EntryPointTrait, publish_util::Package},
-    ReliableTransactionSubmitter, RootAccountHandle,
+    ReliableTransactionSubmitter, ReplayProtectionType, RootAccountHandle,
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -19,19 +19,27 @@ use std::{borrow::Borrow, sync::Arc};
 pub struct EntryPointTransactionGenerator {
     entry_points: Arc<Vec<(Box<dyn EntryPointTrait>, usize)>>,
     total_weight: usize,
+    replay_protection_type: ReplayProtectionType,
 }
 
 impl EntryPointTransactionGenerator {
-    pub fn new_singleton(entry_point: Box<dyn EntryPointTrait>) -> Self {
-        Self::new(vec![(entry_point, 1)])
+    pub fn new_singleton(
+        entry_point: Box<dyn EntryPointTrait>,
+        replay_protection_type: ReplayProtectionType,
+    ) -> Self {
+        Self::new(vec![(entry_point, 1)], replay_protection_type)
     }
 
-    pub fn new(entry_points: Vec<(Box<dyn EntryPointTrait>, usize)>) -> Self {
+    pub fn new(
+        entry_points: Vec<(Box<dyn EntryPointTrait>, usize)>,
+        replay_protection_type: ReplayProtectionType,
+    ) -> Self {
         let total_weight = entry_points.iter().map(|(_, weight)| weight).sum();
 
         Self {
             entry_points: Arc::new(entry_points),
             total_weight,
+            replay_protection_type,
         }
     }
 
@@ -74,7 +82,11 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                     Some(rng),
                     Some(&publisher.address()),
                 );
-                result.push(publisher.sign_with_transaction_builder(txn_factory.payload(payload)))
+                let mut txn_builder = txn_factory.payload(payload);
+                if let ReplayProtectionType::Nonce = self.replay_protection_type {
+                    txn_builder = txn_builder.upgrade_payload(true, true);
+                }
+                result.push(publisher.sign_with_transaction_builder(txn_builder));
             }
         }
         result
@@ -118,6 +130,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                                         to.address(),
                                         txn_factory,
                                         0,
+                                        self.replay_protection_type,
                                     )
                                 })
                                 .collect::<Vec<_>>(),
@@ -130,35 +143,40 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             });
         }
 
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
-            let entry_point_idx = Self::pick_random(&entry_points, total_weight, rng);
-            let entry_point = &entry_points[entry_point_idx].0;
+        Arc::new(
+            move |account, package, publisher, txn_factory, rng, replay_protection_type| {
+                let entry_point_idx = Self::pick_random(&entry_points, total_weight, rng);
+                let entry_point = &entry_points[entry_point_idx].0;
 
-            let payload = entry_point.create_payload(
-                package,
-                entry_point.module_name(),
-                Some(rng),
-                Some(&publisher.address()),
-            );
-            let builder = txn_factory.payload(payload);
+                let payload = entry_point.create_payload(
+                    package,
+                    entry_point.module_name(),
+                    Some(rng),
+                    Some(&publisher.address()),
+                );
+                let mut builder = txn_factory.payload(payload);
+                if let ReplayProtectionType::Nonce = replay_protection_type {
+                    builder = builder.upgrade_payload(true, true);
+                }
 
-            Some(match entry_point.multi_sig_additional_num() {
-                MultiSigConfig::None => account.sign_with_transaction_builder(builder),
-                MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
-                    additional_signers[entry_point_idx]
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .collect(),
-                    builder,
-                ),
-                MultiSigConfig::Publisher => {
-                    account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
-                },
-                MultiSigConfig::FeePayerPublisher => {
-                    account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
-                },
-            })
-        })
+                Some(match entry_point.multi_sig_additional_num() {
+                    MultiSigConfig::None => account.sign_with_transaction_builder(builder),
+                    MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
+                        additional_signers[entry_point_idx]
+                            .as_ref()
+                            .unwrap()
+                            .iter()
+                            .collect(),
+                        builder,
+                    ),
+                    MultiSigConfig::Publisher => {
+                        account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
+                    },
+                    MultiSigConfig::FeePayerPublisher => {
+                        account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
+                    },
+                })
+            },
+        )
     }
 }
