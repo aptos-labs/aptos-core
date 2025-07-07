@@ -231,10 +231,30 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         publisher_balance: Option<u64>,
     ) -> Vec<(Package, LocalAccount)> {
+        Self::publish_packages(
+            init_txn_factory,
+            root_account,
+            txn_executor,
+            num_modules,
+            pre_built,
+            &[package_name],
+            publisher_balance,
+        ).await.into_iter().map(|(packages, account)| (packages.into_iter().next().unwrap(), account)).collect::<Vec<_>>()
+    }
+
+    pub async fn publish_packages(
+        init_txn_factory: TransactionFactory,
+        root_account: &dyn RootAccountHandle,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        num_modules: usize,
+        pre_built: &'static dyn PreBuiltPackages,
+        package_names: &[&str],
+        publisher_balance: Option<u64>,
+    ) -> Vec<(Vec<Package>, LocalAccount)> {
         let mut rng = StdRng::from_entropy();
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
-        let mut package_handler = PackageHandler::new(pre_built, package_name);
+        let mut package_handlers = package_names.iter().map(|package_name| PackageHandler::new(pre_built, *package_name)).collect::<Vec<_>>();
         let mut packages = Vec::new();
 
         let publisher_balance = publisher_balance.unwrap_or(
@@ -255,14 +275,18 @@ impl CustomModulesDelegationGeneratorCreator {
                 publisher_balance,
             ));
 
-            let package = package_handler.pick_package(&mut rng, publisher.address());
-            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
-                requests_publish.push(
-                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
-                );
+            let mut cur_packages = vec![];
+            for package_handler in package_handlers.iter_mut() {
+                let package = package_handler.pick_package(&mut rng, publisher.address());
+                for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
+                    requests_publish.push(
+                        publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
+                    );
+                }
+                cur_packages.push(package);
             }
 
-            packages.push((package, publisher));
+            packages.push((cur_packages, publisher));
         }
         info!("Creating {} publisher accounts", requests_create.len());
         // all publishers are created from root account, split it up.
@@ -280,14 +304,14 @@ impl CustomModulesDelegationGeneratorCreator {
         }
 
         info!(
-            "Publishing {} copies of package {}",
+            "Publishing {} copies of packages {:?}",
             requests_publish.len(),
-            package_name
+            package_names
         );
         txn_executor
             .execute_transactions(&requests_publish)
             .await
-            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
+            .inspect_err(|err| error!("Failed to publish test packages {:?}: {:#}", package_names, err))
             .unwrap();
 
         info!("Done publishing {} packages", packages.len());
