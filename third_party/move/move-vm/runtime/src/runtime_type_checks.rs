@@ -79,6 +79,18 @@ pub(crate) trait RuntimeTypeCheck {
         }
     }
 
+    /// Checks if the caller can pack a function as a closure.
+    fn check_pack_closure_visibility(
+        caller: &LoadedFunction,
+        function: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if caller.module_id() == function.module_id() {
+            return Ok(());
+        }
+        // Same visibility rules as for regular cross-contract calls should apply.
+        Self::check_cross_module_regular_call_visibility(caller, function)
+    }
+
     /// Performs a runtime check of the caller is allowed to call a cross-module callee. Applies
     /// only on regular static calls (no dynamic dispatch!), with caller and callee being coming
     /// from different modules.
