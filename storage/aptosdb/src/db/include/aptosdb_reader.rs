@@ -4,6 +4,7 @@
 use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
 };
+use aptos_types::transaction::PersistedAuxiliaryInfo;
 use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
 
 impl DbReader for AptosDB {

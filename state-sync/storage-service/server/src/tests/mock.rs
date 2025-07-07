@@ -42,7 +42,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, TransactionListWithProof,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionWithProof, Version,
     },
     PeerId,
@@ -354,6 +354,12 @@ mock! {
         fn get_epoch_snapshot_prune_window(&self) -> aptos_storage_interface::Result<usize>;
 
         fn is_state_merkle_pruner_enabled(&self) -> aptos_storage_interface::Result<bool>;
+
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<PersistedAuxiliaryInfo>>>>;
     }
 }
 

@@ -6,7 +6,7 @@ use aptos_config::config::{
 };
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
 use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
-use aptos_types::transaction::{PersistedAuxiliaryInfo, TransactionStatus, TransactionToCommit};
+use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use std::default::Default;
 
 impl AptosDB {
