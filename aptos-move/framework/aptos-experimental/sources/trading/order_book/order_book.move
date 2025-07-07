@@ -274,6 +274,8 @@ module aptos_experimental::order_book {
             original_order.get_orig_size() == order_req.orig_size,
             E_REINSERT_ORDER_MISMATCH
         );
+        assert!(original_order.get_client_order_id() == order_req.client_order_id,
+            E_REINSERT_ORDER_MISMATCH);
         // TODO check what should the rule be for remaining_size. check test_maker_order_reinsert_not_exists unit test.
         // assert!(
         //     original_order.get_remaining_size() >= order_req.remaining_size,
