@@ -140,6 +140,7 @@ mod captured_reads;
 mod code_cache;
 pub mod code_cache_global;
 pub mod code_cache_global_manager;
+mod cold_validation;
 pub(crate) mod combinatorial_tests;
 pub mod counters;
 pub mod errors;

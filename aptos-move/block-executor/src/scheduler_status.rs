@@ -700,6 +700,34 @@ impl ExecutionStatuses {
             .lock()
             .incarnation()
     }
+
+    // If the txn is executing or executed, it might require module validation when a
+    // lower txn that published a module is committed. The validation requirement applies
+    // to the specific incarnation that is returned (i.e. if the incarnation gets aborted
+    // before the validation is performed, then validation can be safely skipped). While
+    // executing, a txn's read-set is only stored locally and can't be validated by other
+    // workers. In this case, the boolean is set to true indicating that the caller may
+    // want to call [ExecutionStatuses::add_module_validation_requirement] (which will
+    // records the requirement to be performed after the execution finishes, but such
+    // logic can also be implemented by the caller). If the incarnation is already
+    // executed, then the boolean is set to false.
+    //
+    // # Returns
+    // - `Some((incarnation, is_executing))` if the txn requires module validation
+    // - `None` if the txn is not executing / executed.
+    pub(crate) fn requires_module_validation(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<(Incarnation, bool)> {
+        let status = &self.statuses[txn_idx as usize];
+        let status_guard = status.status_with_incarnation.lock();
+
+        match status_guard.status {
+            SchedulingStatus::Executing => Some((status_guard.incarnation(), true)),
+            SchedulingStatus::Executed => Some((status_guard.incarnation(), false)),
+            SchedulingStatus::PendingScheduling | SchedulingStatus::Aborted => None,
+        }
+    }
 }
 
 // Private interfaces.
