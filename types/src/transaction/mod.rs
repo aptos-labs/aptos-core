@@ -61,6 +61,7 @@ use crate::{
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     keyless::FederatedKeylessPublicKey,
+    on_chain_config::{FeatureFlag, Features},
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
@@ -1492,10 +1493,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
+    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -1505,7 +1506,7 @@ impl TransactionStatus {
             },
             Err(code) => {
                 if code.status_type() == StatusType::InvariantViolation
-                    && charge_invariant_violation
+                    && features.is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)
                 {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
                 } else {
@@ -1621,37 +1622,6 @@ impl Default for TransactionAuxiliaryData {
 }
 
 impl TransactionAuxiliaryData {
-    pub fn from_vm_status(vm_status: &VMStatus) -> Self {
-        let detail_error_message = match vm_status.clone().keep_or_discard() {
-            Ok(KeptVMStatus::MiscellaneousError) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, None))
-            },
-            Ok(KeptVMStatus::ExecutionFailure {
-                location: _,
-                function: _,
-                code_offset: _,
-                message,
-            }) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, message))
-            },
-            Err(status_code) => {
-                // emulate the behavior of
-                if status_code.status_type() == StatusType::InvariantViolation {
-                    Some(VMErrorDetail::new(status_code, None))
-                } else {
-                    None
-                }
-            },
-            _ => None,
-        };
-
-        Self::V1(TransactionAuxiliaryDataV1 {
-            detail_error_message,
-        })
-    }
-
     pub fn get_detail_error_message(&self) -> Option<&VMErrorDetail> {
         match self {
             Self::V1(data) => data.detail_error_message.as_ref(),
