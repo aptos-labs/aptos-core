@@ -231,31 +231,9 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         publisher_balance: Option<u64>,
     ) -> Vec<(Package, LocalAccount)> {
-        Self::publish_packages(
-            init_txn_factory,
-            root_account,
-            txn_executor,
-            num_modules,
-            pre_built,
-            &[package_name],
-            publisher_balance,
-        ).await.into_iter().map(|(packages, account)| (packages.into_iter().next().unwrap(), account)).collect::<Vec<_>>()
-    }
-
-    pub async fn publish_packages(
-        init_txn_factory: TransactionFactory,
-        root_account: &dyn RootAccountHandle,
-        txn_executor: &dyn ReliableTransactionSubmitter,
-        num_modules: usize,
-        pre_built: &'static dyn PreBuiltPackages,
-        package_names: &[&str],
-        publisher_balance: Option<u64>,
-    ) -> Vec<(Vec<Package>, LocalAccount)> {
         let mut rng = StdRng::from_entropy();
         let mut requests_create = Vec::with_capacity(num_modules);
-        let mut requests_publish = Vec::with_capacity(num_modules);
-        let mut package_handlers = package_names.iter().map(|package_name| PackageHandler::new(pre_built, *package_name)).collect::<Vec<_>>();
-        let mut packages = Vec::new();
+        let mut accounts = Vec::new();
 
         let publisher_balance = publisher_balance.unwrap_or(
             4 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
@@ -275,19 +253,9 @@ impl CustomModulesDelegationGeneratorCreator {
                 publisher_balance,
             ));
 
-            let mut cur_packages = vec![];
-            for package_handler in package_handlers.iter_mut() {
-                let package = package_handler.pick_package(&mut rng, publisher.address());
-                for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
-                    requests_publish.push(
-                        publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
-                    );
-                }
-                cur_packages.push(package);
-            }
-
-            packages.push((cur_packages, publisher));
+            accounts.push(publisher);
         }
+
         info!("Creating {} publisher accounts", requests_create.len());
         // all publishers are created from root account, split it up.
         for req_chunk in requests_create.chunks(100) {
@@ -303,15 +271,43 @@ impl CustomModulesDelegationGeneratorCreator {
                 .unwrap();
         }
 
+        let packages = Self::publish_package_to_accounts(init_txn_factory, txn_executor, pre_built, package_name, accounts).await;
+
+        packages.into_iter().zip(accounts.into_iter()).collect()
+    }
+
+    pub async fn publish_package_to_accounts(
+        init_txn_factory: TransactionFactory,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        pre_built: &'static dyn PreBuiltPackages,
+        package_name: &str,
+        accounts: &[LocalAccount],
+    ) -> Vec<Package> {
+        let mut rng = StdRng::from_entropy();
+        let mut requests_publish = Vec::with_capacity(accounts.len());
+        let mut package_handler = PackageHandler::new(pre_built, package_name);
+        let mut packages = Vec::new();
+
+        for publisher in accounts {
+            let package = package_handler.pick_package(&mut rng, publisher.address());
+            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
+                requests_publish.push(
+                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
+                );
+            }
+
+            packages.push(package);
+        }
+
         info!(
-            "Publishing {} copies of packages {:?}",
+            "Publishing {} copies of package {}",
             requests_publish.len(),
-            package_names
+            package_name
         );
         txn_executor
             .execute_transactions(&requests_publish)
             .await
-            .inspect_err(|err| error!("Failed to publish test packages {:?}: {:#}", package_names, err))
+            .inspect_err(|err| error!("Failed to publish test package {}: {:#}", package_name, err))
             .unwrap();
 
         info!("Done publishing {} packages", packages.len());
