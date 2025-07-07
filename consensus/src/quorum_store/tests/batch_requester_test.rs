@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::Author,
-    proof_of_store::{BatchId, ProofOfStore, SignedBatchInfo},
+    proof_of_store::{ProofOfStore, SignedBatchInfo},
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -19,6 +19,7 @@ use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    quorum_store::BatchId,
     validator_signer::ValidatorSigner,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };

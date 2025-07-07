@@ -392,7 +392,7 @@ fn compare_values_and_layouts<
     } else {
         // Layouts pass validation only if they are both None. Otherwise, validation pessimistically
         // fails. This is a simple logic that avoids potentially costly layout comparisons.
-        prev_value == new_value && prev_maybe_layout.is_none() && new_maybe_layout.is_none()
+        prev_maybe_layout.is_none() && new_maybe_layout.is_none() && prev_value == new_value
     }
     // TODO(BlockSTMv2): optimize layout validation (potentially based on size, or by having
     // a more efficient representation. Optimizing value validation by having a configurable
@@ -500,6 +500,8 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         }
     }
 
+    // This method can also be used from BlockSTMv2 flow, e.g. during post-commit
+    // final validation for safety, as it avoids making any dependency records.
     pub fn fetch_data<Q>(
         &self,
         key: &Q,

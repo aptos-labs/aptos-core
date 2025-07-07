@@ -1048,6 +1048,12 @@ impl MultiKey {
         );
 
         ensure!(
+            public_keys.len() <= MAX_NUM_OF_SIGS, // This max number of signatures is also the max number of public keys.
+            "The number of public keys is greater than {}.",
+            MAX_NUM_OF_SIGS
+        );
+
+        ensure!(
             public_keys.len() >= signatures_required as usize,
             "The number of public keys is smaller than the number of required signatures, {} < {}",
             public_keys.len(),
@@ -2088,5 +2094,22 @@ mod tests {
         let signed_txn = maul_raw_groth16_txn(pk, sig, raw_txn);
 
         assert!(signed_txn.verify_signature().is_err());
+    }
+
+    #[test]
+    fn test_multi_key_with_33_keys_fails() {
+        let mut keys = Vec::new();
+        for _ in 0..33 {
+            let private_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+            let public_key = private_key.public_key();
+            keys.push(AnyPublicKey::ed25519(public_key));
+        }
+
+        let result = MultiKey::new(keys, 3);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "The number of public keys is greater than 32."
+        );
     }
 }

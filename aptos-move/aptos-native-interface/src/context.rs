@@ -10,7 +10,7 @@ use aptos_gas_schedule::{
     NativeGasParameters,
 };
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::VMResult;
+use move_binary_format::errors::{PartialVMResult, VMResult};
 use move_core_types::{
     gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
 };
@@ -122,14 +122,14 @@ impl SafeNativeContext<'_, '_, '_, '_> {
     }
 
     /// Computes the abstract size of the input value.
-    pub fn abs_val_size(&self, val: &Value) -> AbstractValueSize {
+    pub fn abs_val_size(&self, val: &Value) -> PartialVMResult<AbstractValueSize> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size(val, self.gas_feature_version)
     }
 
     /// Computes the abstract size of the input value.
-    pub fn abs_val_size_dereferenced(&self, val: &Value) -> AbstractValueSize {
+    pub fn abs_val_size_dereferenced(&self, val: &Value) -> PartialVMResult<AbstractValueSize> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size_dereferenced(val, self.gas_feature_version)
@@ -143,6 +143,20 @@ impl SafeNativeContext<'_, '_, '_, '_> {
     /// Returns the current gas feature version.
     pub fn gas_feature_version(&self) -> u64 {
         self.gas_feature_version
+    }
+
+    pub fn max_value_nest_depth(&self) -> Option<u64> {
+        self.module_storage()
+            .runtime_environment()
+            .vm_config()
+            .enable_depth_checks
+            .then(|| {
+                self.module_storage()
+                    .runtime_environment()
+                    .vm_config()
+                    .max_value_nest_depth
+            })
+            .flatten()
     }
 
     /// Returns a reference to the struct representing on-chain features.

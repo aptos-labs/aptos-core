@@ -14,9 +14,6 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10000))]
     #[test]
     fn serializer_round_trip((layout, value) in layout_and_value_strategy()) {
-        println!("layout: {:?}", layout);
-        println!("value: {:?}", value);
-
         // Set up mock function extension for function value serialization
         let mut ext_mock = MockFunctionValueExtension::new();
         ext_mock
