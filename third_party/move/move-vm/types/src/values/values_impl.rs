@@ -16,14 +16,16 @@ use move_binary_format::{
     errors::*,
     file_format::{Constant, SignatureToken, VariantIndex},
 };
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+use move_core_types::value::{MoveStruct, MoveValue};
 use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     gas_algebra::AbstractMemorySize,
     u256,
     value::{
-        self, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue, MASTER_ADDRESS_FIELD_OFFSET,
-        MASTER_SIGNER_VARIANT, PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
+        self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
+        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
 };
@@ -4702,9 +4704,51 @@ impl GlobalValue {
 #[cfg(feature = "fuzzing")]
 pub mod prop {
     use super::*;
+    use crate::values::function_values_impl::mock;
     #[allow(unused_imports)]
-    use move_core_types::value::{MoveStruct, MoveValue};
+    use move_core_types::{
+        ability::AbilitySet,
+        function::ClosureMask,
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
+        value::{MoveStruct, MoveValue},
+    };
     use proptest::{collection::vec, prelude::*};
+
+    fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
+        use move_core_types::language_storage::{FunctionTag, StructTag};
+        use proptest::prelude::any;
+
+        let leaf = prop_oneof![
+            1 => Just(TypeTag::Bool),
+            1 => Just(TypeTag::U8),
+            1 => Just(TypeTag::U16),
+            1 => Just(TypeTag::U32),
+            1 => Just(TypeTag::U64),
+            1 => Just(TypeTag::U128),
+            1 => Just(TypeTag::U256),
+            1 => Just(TypeTag::Address),
+            1 => Just(TypeTag::Signer),
+        ];
+
+        prop_oneof![
+            3 => leaf.clone(), // Direct leaf types at top level
+            2 => leaf.clone().prop_recursive(4, 16, 2, |inner| {
+                prop_oneof![
+                    1 => inner.clone().prop_map(|ty| TypeTag::Vector(Box::new(ty))),
+                    1 => any::<StructTag>().prop_map(|struct_tag| {
+                         TypeTag::Struct(Box::new(struct_tag))
+                     }),
+                ]
+            }),
+            1 => (vec(leaf.clone(), 0..=2), vec(leaf, 0..=2), any::<AbilitySet>()).prop_map(|(args, results, abilities)| {
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: args.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
+                    results: results.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
+                    abilities,
+                }))
+            }),
+        ]
+    }
 
     pub fn value_strategy_with_layout(layout: &MoveTypeLayout) -> impl Strategy<Value = Value> {
         use MoveTypeLayout as L;
@@ -4787,14 +4831,23 @@ pub mod prop {
                     })
                     .boxed(),
             },
-            L::Struct(struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => struct_layout
-                // TODO(#13806): do we need to have a strategy for different variants?
-                .fields(Some(variants.len().wrapping_sub(1))) // choose last variant
-                .iter()
-                .map(value_strategy_with_layout)
-                .collect::<Vec<_>>()
-                .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
-                .boxed(),
+            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+                // Randomly choose a variant index
+                let variant_count = variants.len();
+                let variants = variants.clone();
+                (0..variant_count as u16)
+                    .prop_flat_map(move |variant_tag| {
+                        let variant_layouts = variants[variant_tag as usize].clone();
+                        variant_layouts
+                            .iter()
+                            .map(value_strategy_with_layout)
+                            .collect::<Vec<_>>()
+                            .prop_map(move |vals| {
+                                Value::struct_(Struct::pack_variant(variant_tag, vals))
+                            })
+                    })
+                    .boxed()
+            },
 
             L::Struct(struct_layout) => struct_layout
                 .fields(None)
@@ -4805,11 +4858,41 @@ pub mod prop {
                 .boxed(),
 
             L::Function => {
-                // TODO(#15664): not clear how to generate closure values, we'd need
-                //   some test functions for this, and generate `AbstractFunction` impls.
-                //   As we do not generate function layouts in the first place, we can bail
-                //   out here
-                unreachable!("unexpected function layout")
+                (
+                    "[a-z][a-z0-9_]{0,8}",
+                    any::<u8>().prop_map(|bits| ClosureMask::new((bits % 16) as u64)),
+                )
+                    .prop_flat_map(|(name, mask)| {
+                        let num_captured = mask.captured_count() as usize;
+
+                        // Generate random type arguments (0-3 type args)
+                        let ty_args_strategy = vec(type_tag_strategy(), 0..=3);
+
+                        // Generate random layouts for each captured value
+                        let captured_layouts_strategy = vec(layout_strategy(), num_captured);
+
+                        (ty_args_strategy, captured_layouts_strategy).prop_flat_map(
+                            move |(ty_args, captured_layouts)| {
+                                // Then recursively generate values matching those layouts
+                                let name = name.clone();
+                                let captured_strategies = captured_layouts
+                                    .iter()
+                                    .map(value_strategy_with_layout)
+                                    .collect::<Vec<_>>();
+
+                                captured_strategies.prop_map(move |captured_values| {
+                                    let fun = mock::MockAbstractFunction::new(
+                                        &name,
+                                        ty_args.clone(),
+                                        mask,
+                                        captured_layouts.clone(),
+                                    );
+                                    Value::closure(Box::new(fun), captured_values)
+                                })
+                            },
+                        )
+                    })
+                    .boxed()
             },
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
@@ -4821,6 +4904,7 @@ pub mod prop {
     pub fn layout_strategy() -> impl Strategy<Value = MoveTypeLayout> {
         use MoveTypeLayout as L;
 
+        // Non-recursive leafs
         let leaf = prop_oneof![
             1 => Just(L::U8),
             1 => Just(L::U16),
@@ -4832,13 +4916,21 @@ pub mod prop {
             1 => Just(L::Address),
         ];
 
-        leaf.prop_recursive(8, 32, 2, |inner| {
-            prop_oneof![
-                1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
-                1 => vec(inner, 0..1).prop_map(|f_layouts| {
-                     L::Struct(MoveStructLayout::new(f_layouts))}),
-            ]
-        })
+        // Return a random layout strategy
+        prop_oneof![
+            1 => leaf.clone(),
+            // Recursive leafs are 4x more likely than non-recursive leafs
+            4 => leaf.prop_recursive(8, 32, 2, |inner| {
+                prop_oneof![
+                    1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
+                    1 => vec(inner.clone(), 0..=5).prop_map(|f_layouts| {
+                            L::Struct(MoveStructLayout::new(f_layouts))}),
+                    1 => vec(vec(inner, 0..=3), 1..=4).prop_map(|variant_layouts| {
+                            L::Struct(MoveStructLayout::new_variants(variant_layouts))}),
+                ]
+            }),
+            2 => Just(L::Function),
+        ]
     }
 
     pub fn layout_and_value_strategy() -> impl Strategy<Value = (MoveTypeLayout, Value)> {
@@ -4849,8 +4941,10 @@ pub mod prop {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
+        use crate::values::function_values_impl::mock::MockAbstractFunction;
         use MoveTypeLayout as L;
 
         if let L::Native(kind, layout) = layout {
@@ -4927,11 +5021,39 @@ impl ValueImpl {
                 }
             },
 
+            (L::Function, ValueImpl::ClosureValue(closure)) => {
+                use better_any::TidExt;
+                use move_core_types::function::MoveClosure;
+
+                // Downcast to MockAbstractFunction to access data directly
+                if let Some(mock_fun) = closure.0.downcast_ref::<MockAbstractFunction>() {
+                    let move_closure = MoveClosure {
+                        module_id: mock_fun.data.module_id.clone(),
+                        fun_id: mock_fun.data.fun_id.clone(),
+                        ty_args: mock_fun.data.ty_args.clone(),
+                        mask: mock_fun.data.mask,
+                        captured: closure
+                            .1
+                            .iter()
+                            .zip(mock_fun.data.captured_layouts.iter())
+                            .map(|(captured_val, layout)| {
+                                (layout.clone(), captured_val.as_move_value(layout))
+                            })
+                            .collect(),
+                    };
+                    MoveValue::closure(move_closure)
+                } else {
+                    // Fallback for unknown function types
+                    panic!("Cannot convert unknown function type to MoveValue")
+                }
+            },
+
             (layout, val) => panic!("Cannot convert value {:?} as {:?}", val, layout),
         }
     }
 }
 
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl Value {
     // TODO: Consider removing this API, or at least it should return a Result!
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
