@@ -261,34 +261,14 @@ impl<'a> Context<'a> {
         // Build a label substitution for stubs.
         let mut label_subst = BTreeMap::new();
 
-<<<<<<< HEAD
-=======
-        let label_subst_loop_detected = |label1: Label, label2: Label, label_subset: BTreeMap<Label, Label>| {
-            let mut visited = BTreeSet::new();
-            visited.insert(label1);
-            let mut target = label2;
-            while let Some(s) = label_subset.get(&target) {
-                if !visited.insert(target) {
-                    return true;
-                }
-                target = *s;
-            }
-            false
-        };
-
->>>>>>> 99315d5acb (backup)
         for blk_id in self.forward_cfg.blocks() {
             let block_code = self.code_for_block(blk_id);
             if block_code.len() == 2 {
                 if let (Bytecode::Label(_, label1), Bytecode::Jump(_, label2)) =
                     (&block_code[0], &block_code[1])
                 {
-<<<<<<< HEAD
                     // When only a substitution does not create a cycle, we add it.
                     if !Self::cyclic_label_subst_detected(*label1, *label2, &label_subst) {
-=======
-                    if label_subst_loop_detected(*label1, *label2, label_subst.clone()) {
->>>>>>> 99315d5acb (backup)
                         label_subst.insert(*label1, *label2);
                     }
                 }
@@ -934,8 +914,13 @@ impl Generator {
         }
 
         // Create a loop and add to parent
+        // We cannot use ctx.builder.loop_(), because it runs optimizations that
+        //   may skip creating the loop.
+        // Why we cannot skip creating the loop:
+        //   we rely on nested levels to match break/continue with loops!
         let body = ctx.builder.seq(&self.current_loc(ctx), stms);
-        let stm = ctx.builder.loop_(body);
+        let node_id = self.new_node_id(ctx, Type::unit());
+        let stm = ExpData::Loop(node_id, body).into_exp();
         self.add_stm(stm)
     }
 
@@ -1025,15 +1010,7 @@ impl Generator {
                 Operation::Closure(*mid, *fid, *closure_mask),
                 srcs,
             ),
-<<<<<<< HEAD
             Invoke => self.gen_invoke(ctx, dests, srcs),
-=======
-            Invoke =>  self.gen_invoke(
-                ctx,
-                dests,
-                srcs
-            ),
->>>>>>> 99315d5acb (backup)
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
