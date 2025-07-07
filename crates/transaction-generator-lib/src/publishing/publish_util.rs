@@ -308,10 +308,15 @@ fn update(
             .expect("ModuleId for self must exists");
         let original_address_idx = module_handle.address.0;
         let original_address = new_module.address_identifiers[original_address_idx as usize];
-        let _ = std::mem::replace(
-            &mut new_module.address_identifiers[original_address_idx as usize],
-            publisher,
-        );
+
+        for i in 0..new_module.address_identifiers.len() {
+            if (new_module.address_identifiers[i] == original_address) {
+                let _ = std::mem::replace(
+                    &mut new_module.address_identifiers[i],
+                    publisher,
+                );
+            }
+        }
 
         for constant in new_module.constant_pool.iter_mut() {
             if constant.type_ == SignatureToken::Address
