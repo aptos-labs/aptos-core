@@ -378,6 +378,9 @@ pub(crate) fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.enable_optimistic_proposal_tx = true;
+        }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
             config

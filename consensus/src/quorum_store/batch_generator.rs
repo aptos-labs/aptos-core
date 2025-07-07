@@ -14,12 +14,12 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchId, BatchInfo},
+    proof_of_store::BatchInfo,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{quorum_store::BatchId, transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{

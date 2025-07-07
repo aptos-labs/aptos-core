@@ -43,6 +43,10 @@ pub struct VerifierConfig {
     pub enable_enum_types: bool,
     pub enable_resource_access_control: bool,
     pub enable_function_values: bool,
+    /// Maximum number of function return values.
+    pub max_function_return_values: Option<usize>,
+    /// Maximum depth of a type node.
+    pub max_type_depth: Option<usize>,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -242,6 +246,9 @@ impl Default for VerifierConfig {
             enable_enum_types: true,
             enable_resource_access_control: true,
             enable_function_values: true,
+
+            max_function_return_values: None,
+            max_type_depth: None,
         }
     }
 }
@@ -265,7 +272,7 @@ impl VerifierConfig {
             max_basic_blocks: Some(1024),
             max_basic_blocks_in_script: Some(1024),
             max_value_stack_size: 1024,
-            max_type_nodes: Some(256),
+            max_type_nodes: Some(128),
             max_push_size: Some(10000),
             max_struct_definitions: Some(200),
             max_fields_in_struct: Some(30),
@@ -287,6 +294,9 @@ impl VerifierConfig {
             enable_enum_types: true,
             enable_resource_access_control: true,
             enable_function_values: true,
+
+            max_function_return_values: Some(128),
+            max_type_depth: Some(20),
         }
     }
 }

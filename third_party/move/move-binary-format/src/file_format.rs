@@ -2698,7 +2698,7 @@ pub enum Bytecode {
 
     #[group = "closure"]
     #[description = r#"
-        `CallClosure(|t1..tn|r has a)` evalutes a closure of the given function type,
+        `CallClosure(|t1..tn|r has a)` evaluates a closure of the given function type,
         taking the captured arguments and mixing in the provided ones on the stack.
 
         On top of the stack is the closure being evaluated, underneath the arguments:

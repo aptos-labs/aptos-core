@@ -165,21 +165,6 @@ impl Clone for ValueType {
     }
 }
 
-impl Arbitrary for ValueType {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        vec(any::<u8>(), 17)
-            .prop_map(|mut v| {
-                let use_value = v[0] < 128;
-                v.resize(16, 0);
-                ValueType::from_value(v, use_value)
-            })
-            .boxed()
-    }
-}
-
 impl ValueType {
     pub(crate) fn new(
         bytes: Option<Bytes>,
@@ -279,6 +264,13 @@ pub(crate) struct TransactionGenParams {
     /// mock execution behavior regardless of the incarnation, while value > 1 may lead to "dynamic",
     /// i.e. different behavior when executing different incarnations of the transaction.
     incarnation_alternatives: usize,
+    // TODO(BlockSTMv2): add a parameter to control the range of possible values, which is
+    // necessary to better cover value validation in BlockSTMv2. Currently, certain bugs can
+    // only be discovered by fixed behavior (incarnation_alternatives = 1) tests, since they
+    // write the same value with a different version (incarnation number). This change should
+    // be coupled with the refactor of mock incarnation generation to make sure it does not
+    // interfere with other logic, such as allowing deletions or deltas (which currently are
+    // hackily determined by the bits of the value).
 }
 
 #[derive(Arbitrary, Debug, Clone)]
@@ -497,6 +489,17 @@ impl<
 
     fn user_txn_bytes_len(&self) -> usize {
         0
+    }
+
+    fn from_txn(txn: aptos_types::transaction::Transaction) -> Self {
+        match txn {
+            aptos_types::transaction::Transaction::StateCheckpoint(_)
+            | aptos_types::transaction::Transaction::BlockEpilogue(_) => {
+                let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 0);
+                Self::from_behavior(behaivor)
+            },
+            _ => unreachable!(),
+        }
     }
 }
 

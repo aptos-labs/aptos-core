@@ -270,6 +270,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string(),
+            description: "Treat all package functions with same address as visible (currently necessary for prover in filter mode)"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -318,6 +324,7 @@ impl Experiment {
     pub const STOP_BEFORE_FILE_FORMAT: &'static str = "stop-before-file-format";
     pub const STOP_BEFORE_STACKLESS_BYTECODE: &'static str = "stop-before-stackless-bytecode";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNSAFE_PACKAGE_VISIBILITY: &'static str = "unsafe-package-visibility";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";

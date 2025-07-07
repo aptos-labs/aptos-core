@@ -81,7 +81,14 @@ impl<'a> LimitsVerifier<'a> {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS)
                         .at_index(IndexKind::FunctionHandle, idx as u16));
                 }
+            }
+            if let Some(limit) = config.max_function_return_values {
+                if self.resolver.signature_at(function_handle.return_).0.len() > limit {
+                    return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS)
+                        .at_index(IndexKind::FunctionHandle, idx as u16));
+                }
             };
+            // Note: the size of `attributes` is limited by the deserializer.
         }
         Ok(())
     }
@@ -122,24 +129,58 @@ impl<'a> LimitsVerifier<'a> {
         config: &VerifierConfig,
         ty: &SignatureToken,
     ) -> PartialVMResult<()> {
-        if let Some(max) = &config.max_type_nodes {
-            // Structs and Parameters can expand to an unknown number of nodes, therefore
-            // we give them a higher size weight here.
-            const STRUCT_SIZE_WEIGHT: usize = 4;
-            const PARAM_SIZE_WEIGHT: usize = 4;
-            let mut size = 0;
-            for t in ty.preorder_traversal() {
-                // Notice that the preorder traversal will iterate all type instantiations, so we
-                // why we can ignore them below.
-                match t {
-                    SignatureToken::Struct(..) | SignatureToken::StructInstantiation(..) => {
-                        size += STRUCT_SIZE_WEIGHT
-                    },
-                    SignatureToken::TypeParameter(..) => size += PARAM_SIZE_WEIGHT,
-                    _ => size += 1,
+        if config.max_type_nodes.is_none()
+            && config.max_function_parameters.is_none()
+            && config.max_function_return_values.is_none()
+            && config.max_type_depth.is_none()
+        {
+            // If no type-related limits are set, we do not need to verify the type nodes.
+            return Ok(());
+        }
+        // Structs and Parameters can expand to an unknown number of nodes, therefore
+        // we give them a higher size weight here.
+        const STRUCT_SIZE_WEIGHT: usize = 4;
+        const PARAM_SIZE_WEIGHT: usize = 4;
+        let mut type_size = 0;
+        for (token, depth) in ty.preorder_traversal_with_depth() {
+            if let Some(limit) = config.max_type_depth {
+                if depth > limit {
+                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
             }
-            if size > *max {
+            match token {
+                SignatureToken::Struct(..) | SignatureToken::StructInstantiation(..) => {
+                    type_size += STRUCT_SIZE_WEIGHT
+                },
+                SignatureToken::TypeParameter(..) => type_size += PARAM_SIZE_WEIGHT,
+                SignatureToken::Function(params, ret, _) => {
+                    if let Some(limit) = config.max_function_parameters {
+                        if params.len() > limit {
+                            return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS));
+                        }
+                    }
+                    if let Some(limit) = config.max_function_return_values {
+                        if ret.len() > limit {
+                            return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS));
+                        }
+                    }
+                },
+                SignatureToken::Bool
+                | SignatureToken::U8
+                | SignatureToken::U16
+                | SignatureToken::U32
+                | SignatureToken::U64
+                | SignatureToken::U128
+                | SignatureToken::U256
+                | SignatureToken::Address
+                | SignatureToken::Signer
+                | SignatureToken::Vector(_)
+                | SignatureToken::Reference(_)
+                | SignatureToken::MutableReference(_) => type_size += 1,
+            }
+        }
+        if let Some(limit) = config.max_type_nodes {
+            if type_size > limit {
                 return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
             }
         }

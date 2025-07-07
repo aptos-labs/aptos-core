@@ -242,6 +242,11 @@ impl ForgeConfig {
             // override consensus observer refresh latency
             helm_values["fullnode"]["config"]["consensus_observer"]
                 ["subscription_peer_change_interval_ms"] = 5_000.into();
+
+            // enable opt proposal
+            // TODO(ibalajiarun):
+            // helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
+            //     true.into();
         }))
     }
 

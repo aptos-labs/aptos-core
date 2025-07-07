@@ -19,7 +19,7 @@ use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
 use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
-    value_serde::{ValueSerDeContext, ValueToIdentifierMapping},
+    value_serde::{FunctionValueExtension, ValueSerDeContext, ValueToIdentifierMapping},
     value_traversal::find_identifiers_in_value,
     values::Value,
 };
@@ -116,7 +116,7 @@ where
         //   See if can cache identifiers in advance, or combine it with
         //   deserialization.
         let function_value_extension = self.as_function_value_extension();
-        let value = ValueSerDeContext::new()
+        let value = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
