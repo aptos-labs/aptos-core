@@ -2277,6 +2277,7 @@ impl Frame {
                                 vec![],
                             )
                             .map(Rc::new)?;
+                        RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
@@ -2316,6 +2317,7 @@ impl Frame {
                                 ty_args,
                             )
                             .map(Rc::new)?;
+                        RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
