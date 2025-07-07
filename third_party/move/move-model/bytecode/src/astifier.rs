@@ -914,13 +914,8 @@ impl Generator {
         }
 
         // Create a loop and add to parent
-        // We cannot use ctx.builder.loop_(), because it runs optimizations that
-        //   may skip creating the loop.
-        // Why we cannot skip creating the loop:
-        //   we rely on nested levels to match break/continue with loops!
         let body = ctx.builder.seq(&self.current_loc(ctx), stms);
-        let node_id = self.new_node_id(ctx, Type::unit());
-        let stm = ExpData::Loop(node_id, body).into_exp();
+        let stm = ctx.builder.loop_(body);
         self.add_stm(stm)
     }
 
