@@ -271,7 +271,14 @@ impl CustomModulesDelegationGeneratorCreator {
                 .unwrap();
         }
 
-        let packages = Self::publish_package_to_accounts(init_txn_factory, txn_executor, pre_built, package_name, &accounts).await;
+        let packages = Self::publish_package_to_accounts(
+            init_txn_factory,
+            txn_executor,
+            pre_built,
+            package_name,
+            &accounts,
+        )
+        .await;
 
         packages.into_iter().zip(accounts.into_iter()).collect()
     }

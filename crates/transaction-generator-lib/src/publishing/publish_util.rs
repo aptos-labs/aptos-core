@@ -100,13 +100,7 @@ impl PackageHandler {
                 (tracker.publishers.len() - 1, false)
             },
         };
-        let mut package = tracker.package.update(
-            tracker.publishers[idx].publisher,
-            0,
-            // TODO cleanup.
-            // unnecessary to have indices for module published under different accout,
-            // they can all be named the same
-        );
+        let mut package = tracker.package.update(tracker.publishers[idx].publisher);
         if self.is_simple {
             if version {
                 update_simple_move_version(package.get_mut_module("simple"));
@@ -205,14 +199,14 @@ impl Package {
     }
 
     // Given an "original" package, updates all modules with the given publisher.
-    pub fn update(&self, publisher: AccountAddress, suffix: u64) -> Self {
+    pub fn update(&self, publisher: AccountAddress) -> Self {
         match self {
             Self::Simple {
                 modules,
                 metadata,
                 script,
             } => {
-                let (new_modules, metadata) = update(modules, metadata, publisher, suffix);
+                let (new_modules, metadata) = update(modules, metadata, publisher);
                 Self::Simple {
                     modules: new_modules,
                     metadata,
@@ -297,24 +291,17 @@ fn update(
     modules: &[(String, CompiledModule, u32)],
     metadata: &PackageMetadata,
     publisher: AccountAddress,
-    suffix: u64,
 ) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
     let mut new_modules = Vec::new();
+    let original_address = get_module_address(&modules[0].1);
     for (original_name, module, binary_format_version) in modules {
+        assert_eq!(original_address, get_module_address(module));
+
         let mut new_module = module.clone();
-        let module_handle = new_module
-            .module_handles
-            .get(module.self_handle_idx().0 as usize)
-            .expect("ModuleId for self must exists");
-        let original_address_idx = module_handle.address.0;
-        let original_address = new_module.address_identifiers[original_address_idx as usize];
 
         for i in 0..new_module.address_identifiers.len() {
-            if (new_module.address_identifiers[i] == original_address) {
-                let _ = std::mem::replace(
-                    &mut new_module.address_identifiers[i],
-                    publisher,
-                );
+            if new_module.address_identifiers[i] == original_address {
+                let _ = std::mem::replace(&mut new_module.address_identifiers[i], publisher);
             }
         }
 
@@ -326,20 +313,6 @@ fn update(
             }
         }
 
-        if suffix > 0 {
-            for module_handle in &new_module.module_handles {
-                if module_handle.address.0 == original_address_idx {
-                    let mut new_name =
-                        new_module.identifiers[module_handle.name.0 as usize].to_string();
-                    new_name.push('_');
-                    new_name.push_str(suffix.to_string().as_str());
-                    let _ = std::mem::replace(
-                        &mut new_module.identifiers[module_handle.name.0 as usize],
-                        Identifier::new(new_name).expect("Identifier must be legal"),
-                    );
-                }
-            }
-        }
         if let Some(mut metadata) = get_metadata_from_compiled_code(&new_module) {
             metadata
                 .struct_attributes
@@ -378,15 +351,21 @@ fn update(
         new_modules.push((original_name.clone(), new_module, *binary_format_version));
     }
     let mut metadata = metadata.clone();
-    if suffix > 0 {
-        for module in &mut metadata.modules {
-            let mut new_name = module.name.clone();
-            new_name.push('_');
-            new_name.push_str(suffix.to_string().as_str());
-            module.name = new_name;
+    for dep in &mut metadata.deps {
+        if dep.account == original_address {
+            dep.account = publisher;
         }
     }
     (new_modules, metadata)
+}
+
+fn get_module_address(module: &CompiledModule) -> AccountAddress {
+    let module_handle = module
+        .module_handles
+        .get(module.self_handle_idx().0 as usize)
+        .expect("ModuleId for self must exists");
+    let original_address_idx = module_handle.address.0;
+    module.address_identifiers[original_address_idx as usize]
 }
 
 //
