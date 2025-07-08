@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, scheduler::ArmedLock, scheduler_status::ExecutionStatuses};
+use crate::{
+    cold_validation::{ColdValidationRequirements, ValidationRequirement},
+    counters,
+    scheduler::ArmedLock,
+    scheduler_status::ExecutionStatuses,
+};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
@@ -9,6 +14,7 @@ use aptos_vm_logging::clear_speculative_txn_logs;
 use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use fail::fail_point;
+use move_core_types::language_storage::ModuleId;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
@@ -57,7 +63,7 @@ Key Responsibilities:
         transactions have been executed at least once. This is used to intelligently
         defer the first re-execution of a transaction until all preceding transactions
         have produced their initial speculative writes.
-    -   **`min_not_scheduled_idx`**: An optimization that tracks the minimum transaction
+    -   **`min_never_scheduled_idx`**: An optimization that tracks the minimum transaction
         index that has not yet been scheduled. This is currently used to identify maximum
         range of the interval that may require a traversal for module read validation
         (after a committed txn that publishes a module), but can be generally useful for
@@ -365,7 +371,7 @@ pub(crate) struct ExecutionQueueManager {
     /// Stores the minimum transaction index that has not yet been popped from the
     /// `execution_queue`. This serves as an upper bound for transactions that have not
     /// been executed yet and provides an indication of scheduling progress.
-    min_not_scheduled_idx: CachePadded<AtomicU32>,
+    min_never_scheduled_idx: CachePadded<AtomicU32>,
     /// Holds the indices of transactions currently scheduled for execution.
     /// Using a `BTreeSet` ensures that transactions are generally processed in an
     /// order (ascending by index by default when popping via `pop_first()`), which is
@@ -379,7 +385,7 @@ impl ExecutionQueueManager {
     pub(crate) fn new(num_txns: TxnIndex) -> Self {
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(0)),
-            min_not_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
+            min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new((0..num_txns).collect()),
         }
     }
@@ -387,14 +393,14 @@ impl ExecutionQueueManager {
     fn pop_next(&self) -> Option<TxnIndex> {
         let ret = self.execution_queue.lock().pop_first();
         if let Some(idx) = ret {
-            self.min_not_scheduled_idx
+            self.min_never_scheduled_idx
                 .fetch_max(idx + 1, Ordering::Relaxed);
         }
         ret
     }
 
-    fn min_not_scheduled_idx(&self) -> TxnIndex {
-        self.min_not_scheduled_idx.load(Ordering::Relaxed)
+    fn min_never_scheduled_idx(&self) -> TxnIndex {
+        self.min_never_scheduled_idx.load(Ordering::Relaxed)
     }
 
     // Note: the method must be performed while holding the idx-th status lock.
@@ -420,7 +426,7 @@ impl ExecutionQueueManager {
     pub(crate) fn new_for_test(executed_once_max_idx: u32) -> Self {
         Self {
             executed_once_max_idx: CachePadded::new(AtomicU32::new(executed_once_max_idx)),
-            min_not_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
+            min_never_scheduled_idx: CachePadded::new(AtomicU32::new(0)),
             execution_queue: Mutex::new(BTreeSet::new()),
         }
     }
@@ -440,7 +446,7 @@ impl ExecutionQueueManager {
 /// This enum defines the instructions passed from [SchedulerV2::next_task] to an executor
 /// (worker thread) to direct its activity.
 #[derive(PartialEq, Debug)]
-pub(crate) enum TaskKind {
+pub(crate) enum TaskKind<'a> {
     /// Instructs the worker to execute a specific `(TxnIndex, Incarnation)` of a transaction.
     /// The incarnation number starts at 0 for the first execution attempt and increments
     /// with each subsequent re-execution (after an abort).
@@ -450,6 +456,8 @@ pub(crate) enum TaskKind {
     /// sequential client-side commit hook has been performed. The post-commit processing
     /// itself is assumed to be parallelizable and typically involves finalization or cleanup steps.
     PostCommitProcessing(TxnIndex),
+    /// The module ids for which validation is required for txns in [from_idx_incl, to_idx_excl).
+    ModuleValidation(TxnIndex, Incarnation, &'a BTreeSet<ModuleId>),
     /// Signals that no specific task (like `Execute` or `PostCommitProcessing`) is immediately
     /// available from the scheduler. The worker should typically call [SchedulerV2::next_task]
     /// again soon, possibly after a brief pause or yielding, to check for new work.
@@ -510,9 +518,14 @@ pub(crate) struct SchedulerV2 {
     /// or a timeout). This signals workers to stop processing tasks.
     is_halted: CachePadded<AtomicBool>,
 
+    /// Manages any uncommon validation requirements necessary before txns can be committed.
+    /// For example, when a txn publishes a module, higher txns must have their module
+    /// accesses validated since the reads are not covered by the normal (push) validation.
+    cold_validation_requirements: CachePadded<ColdValidationRequirements<ModuleId>>,
+
     /// An armed lock used to serialize access to the critical section where sequential commit
-    /// hooks are dispatched ([SchedulerV2::start_commit]). It helps manage
-    /// contention with the arming mechanism.
+    /// hooks are dispatched ([SchedulerV2::start_commit]). It helps manage contention with
+    /// the arming mechanism.
     queueing_commits_lock: CachePadded<ArmedLock>,
     /// A concurrent queue holding the indices of transactions that have been committed and
     /// are ready for their parallel post-commit processing phase.
@@ -543,6 +556,9 @@ impl SchedulerV2 {
             next_to_commit_idx: CachePadded::new(AtomicU32::new(0)),
             is_done: CachePadded::new(AtomicBool::new(false)),
             is_halted: CachePadded::new(AtomicBool::new(false)),
+            cold_validation_requirements: CachePadded::new(ColdValidationRequirements::new(
+                num_txns,
+            )),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             post_commit_processing_queue: CachePadded::new(ConcurrentQueue::<TxnIndex>::bounded(
                 num_txns as usize,
@@ -592,36 +608,44 @@ impl SchedulerV2 {
     pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
         // Relaxed ordering due to armed lock acq-rel.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
-
         assert!(next_to_commit_idx <= self.num_txns);
-        if next_to_commit_idx > 0 {
-            // Since the commit hooks lock is held by caller during this method and while performing
-            // the hook itself, the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
-            // call to start_commit that must have increased the index did not set the status, while
-            // PENDING_COMMIT_HOOK means the caller never successfully followed the hook by the
-            // end_commit call (should only happen in error scenarios).
-            let prev_committed_marker =
-                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
-            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
-                return Err(code_invariant_error(format!(
-                    "Trying to get commit hook for {}, but previous index marker {} != {} (COMMITTED)",
-                    next_to_commit_idx, prev_committed_marker, CommitMarkerFlag::Committed as u8,
-                )));
-            };
-        }
 
         if self.is_halted() || next_to_commit_idx == self.num_txns {
             // All sequential commit hooks are already dispatched.
             return Ok(None);
         }
 
+        let incarnation = self.txn_statuses.incarnation(next_to_commit_idx);
         if self.txn_statuses.is_executed(next_to_commit_idx) {
+            self.commit_marker_invariant_check(next_to_commit_idx)?;
+
             // All prior transactions are committed and the latest incarnation of the transaction
             // at next_to_commit_idx has finished but has not been aborted. If any of its reads was
             // incorrect, it would have been invalidated by the respective transaction's last
             // (committed) (re-)execution, and led to an abort in the corresponding finish execution
             // (which, inductively, must occur before the transaction is committed). Hence, it
             // must also be safe to commit the current transaction.
+            //
+            // The only exception is if there are unsatisfied cold validation requirements,
+            // blocking the commit. These may not yet be scheduled for validation, or deferred
+            // until after the txn finished execution, whereby deferral happens before txn status
+            // becomes Executed, while validation and unblocking happens after.
+            if self
+                .cold_validation_requirements
+                .is_commit_blocked(next_to_commit_idx, incarnation)
+            {
+                // May not commit a txn with an unsatisfied validation requirement. This will be
+                // more rare than !is_executed in the common case, hence the order of checks.
+                return Ok(None);
+            }
+            // The check might have passed after the validation requirement has been fulfilled.
+            // Yet, if validation failed, the status would be aborted before removing the block,
+            // which would increase the incarnation number. It is also important to note that
+            // blocking happens during sequential commit hook, while holding the lock (which is
+            // also held here), hence before the call of this method.
+            if incarnation != self.txn_statuses.incarnation(next_to_commit_idx) {
+                return Ok(None);
+            }
 
             if self.committed_marker[next_to_commit_idx as usize]
                 .swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
@@ -727,38 +751,22 @@ impl SchedulerV2 {
     /// This provides an indication of how far along the scheduler is in dispatching
     /// initial execution tasks.
     ///
-    /// The value is retrieved from [ExecutionQueueManager::min_not_scheduled_idx].
+    /// The value is retrieved from [ExecutionQueueManager::min_never_scheduled_idx].
     ///
     /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater
     /// than `num_txns`).
-    #[allow(dead_code)]
-    pub(crate) fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
+    pub(crate) fn min_never_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
         let ret = self
             .txn_statuses
             .get_execution_queue_manager()
-            .min_not_scheduled_idx();
+            .min_never_scheduled_idx();
         if ret > self.num_txns {
             return Err(code_invariant_error(format!(
-                "min_not_scheduled_idx: {} > num_txns: {}",
+                "min_never_scheduled_idx: {} > num_txns: {}",
                 ret, self.num_txns
             )));
         }
         Ok(ret)
-    }
-
-    fn pop_post_commit_task(&self) -> Result<Option<TxnIndex>, PanicError> {
-        match self.post_commit_processing_queue.pop() {
-            Ok(txn_idx) => {
-                if txn_idx == self.num_txns - 1 {
-                    self.is_done.store(true, Ordering::SeqCst);
-                }
-                Ok(Some(txn_idx))
-            },
-            Err(PopError::Empty) => Ok(None),
-            Err(PopError::Closed) => {
-                Err(code_invariant_error("Commit queue should never be closed"))
-            },
-        }
     }
 
     /// Fetches the next task for a worker thread.
@@ -773,10 +781,11 @@ impl SchedulerV2 {
     /// 3.  **`Done` (if halted)**: If the `post_commit_processing_queue` is empty and
     ///     [SchedulerV2::is_halted] is true, returns `TaskKind::Done`.
     /// 4.  **`Execute`**: Attempts to pop a `txn_idx` from the main `execution_queue` via
-    ///     `[ExecutionQueueManager::pop_next]` (accessed through `txn_statuses`). If successful,
+    ///     [ExecutionQueueManager::pop_next] (accessed through `txn_statuses`). If successful,
     ///     it then calls [SchedulerV2::start_executing] to mark the transaction as `Executing`
     ///     and get its current incarnation. If [SchedulerV2::start_executing] returns
-    ///     `Some(incarnation)`, it returns `TaskKind::Execute(txn_idx, incarnation)`.
+    ///     `Some(incarnation)`, it returns `TaskKind::Execute(txn_idx, incarnation)`. If
+    ///     [SchedulerV2::start_executing] returns `None`, it returns `TaskKind::NextTask`.
     /// 5.  **`NextTask`**: If none of the above yield a task (e.g., queues are empty, no work
     ///     to start), it returns `TaskKind::NextTask`, indicating the worker should try again.
     ///
@@ -784,9 +793,13 @@ impl SchedulerV2 {
     ///
     /// TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     /// We can also have different versions (e.g. for testing) of next_task.
-    pub(crate) fn next_task(&self) -> Result<TaskKind, PanicError> {
+    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind, PanicError> {
         if self.is_done() {
             return Ok(TaskKind::Done);
+        }
+
+        if let Some(cold_validation_task) = self.handle_cold_validation_requirements(worker_id)? {
+            return Ok(cold_validation_task);
         }
 
         match self.pop_post_commit_task()? {
@@ -844,7 +857,7 @@ impl SchedulerV2 {
     pub(crate) fn finish_execution<'a>(
         &'a self,
         abort_manager: AbortManager<'a>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Option<BTreeSet<ModuleId>>, PanicError> {
         let (txn_idx, incarnation, invalidated_set) = abort_manager.take();
 
         if incarnation > 0 {
@@ -860,12 +873,15 @@ impl SchedulerV2 {
         let mut stall_propagation_queue: BTreeSet<usize> = BTreeSet::new();
         for (txn_idx, maybe_incarnation) in invalidated_set {
             if let Some(incarnation) = maybe_incarnation {
-                self.txn_statuses.finish_abort(txn_idx, incarnation, true)?;
+                self.txn_statuses
+                    .finish_abort(txn_idx, incarnation, false)?;
                 stall_propagation_queue.insert(txn_idx as usize);
             }
         }
 
-        if self.txn_statuses.finish_execution(txn_idx, incarnation)? {
+        let maybe_module_validation_requirements =
+            self.txn_statuses.finish_execution(txn_idx, incarnation)?;
+        if maybe_module_validation_requirements.is_some() {
             stall_propagation_queue.insert(txn_idx as usize);
 
             if txn_idx == 0
@@ -887,7 +903,7 @@ impl SchedulerV2 {
         // Handle recursive propagation of add / remove stall.
         self.propagate(stall_propagation_queue)?;
 
-        Ok(())
+        Ok(maybe_module_validation_requirements)
     }
 
     /// Sets the scheduler to a halted state.
@@ -941,53 +957,210 @@ impl SchedulerV2 {
     // (1) when processing dependencies (if the heuristics determines the txn is better to be
     // speculatively aborted, e.g. since it is low priority and likely to be invalidated.
     // Since the status must be Executing, we do not bother with propagating add / remove stall.
-    // BlockSTMv2: Consider adding this functionality.
-    // (2) when aborting due to aggregator or delayed field invalidation that happens during
-    // the sequential commit hook - in this case, the immediate re-execution is about to follow.
-    // However, we need to distinguish the case (2) to make sure that an execution task is not
-    // added to the scheduler's execution queue (the caller will re-execute itself).
-    // In this case, add_to_schedule is false.
+    // TODO(BlockSTMv2): Consider adding this functionality.
+    // (2) when re-executing a txn during commit, i.e. due to a delayed field invalidation or
+    // for applying certain outputs of module publishing txn to the shared data structures.
+    // In this case, the caller needs to re-execute the txn itself, and start_next_incarnation
+    // parameter is set to true. This ensures the status was Executed, and atomically turns into
+    // Executing bypassing PendingScheduling to make sure it is not assigned to a different worker
+    // by the scheduler / QueueingCommitManager.
     // (3) The module validation pass can cause invalidation, which requires aborting.
     pub(crate) fn direct_abort(
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        add_to_schedule: bool,
+        start_next_incarnation: bool,
     ) -> Result<bool, PanicError> {
         if self.txn_statuses.start_abort(txn_idx, incarnation)? {
             self.txn_statuses
-                .finish_abort(txn_idx, incarnation, add_to_schedule)?;
-            if !add_to_schedule {
-                let executing_incarnation = self.start_executing(txn_idx)?;
-                if Some(incarnation + 1) != executing_incarnation {
-                    return Err(code_invariant_error(format!(
-                        "SchedulerV2: self-abort for {} incarnation {} started executing with wrong incarnation {:?}",
-                        txn_idx,
-                        incarnation,
-                        executing_incarnation,
-                    )));
-                }
-            }
+                .finish_abort(txn_idx, incarnation, start_next_incarnation)?;
             return Ok(true);
         }
 
-        // TODO(BlockSTMv2): Add better documentation and/or revise flows once all
-        // caller logic is landed. For now it seems that !add_to_schedule is correlated
-        // by the caller needing a guarantee that start_abort must succeed (such as when
-        // direct abort is called from sequential commit hook).
-        if !add_to_schedule {
+        if start_next_incarnation {
             return Err(code_invariant_error(format!(
-                "SchedulerV2: self-abort with !add_to_schedule failed for {} {}",
+                "SchedulerV2: self-abort with start_next_incarnation failed for {} {}",
                 txn_idx, incarnation
             )));
         }
 
         Ok(false)
     }
+
+    pub(crate) fn record_validation_requirements(
+        &self,
+        worker_id: u32,
+        txn_idx: TxnIndex,
+        module_ids: BTreeSet<ModuleId>,
+    ) -> Result<(), PanicError> {
+        if worker_id >= self.num_workers {
+            return Err(code_invariant_error(format!(
+                "Worker ID {} must be less than the number of workers {}",
+                worker_id, self.num_workers
+            )));
+        }
+        if txn_idx >= self.num_txns {
+            return Err(code_invariant_error(format!(
+                "Txn index {} must be less than the number of transactions {}",
+                txn_idx, self.num_txns
+            )));
+        }
+
+        let min_never_scheduled_idx = self.min_never_scheduled_idx()?;
+        if txn_idx >= min_never_scheduled_idx {
+            return Err(code_invariant_error(format!(
+                "Calling txn idx {} must be less than min_never_scheduled_idx {}",
+                txn_idx, min_never_scheduled_idx
+            )));
+        }
+        self.cold_validation_requirements.record_requirements(
+            worker_id,
+            txn_idx,
+            min_never_scheduled_idx,
+            module_ids,
+        )
+    }
+
+    /// Called from the executor when validation requirement has been fulfilled.
+    pub(crate) fn finish_cold_validation_requirement(
+        &self,
+        worker_id: u32,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        was_deferred: bool,
+    ) -> Result<(), PanicError> {
+        if was_deferred {
+            self.cold_validation_requirements
+                .deferred_requirements_completed(txn_idx, incarnation)?;
+        } else {
+            self.cold_validation_requirements
+                .validation_requirement_processed(worker_id, txn_idx, incarnation, false)?;
+        }
+        Ok(())
+    }
 }
 
 /// Private interfaces
 impl SchedulerV2 {
+    // TODO(BlockSTMv2): Tests for SchedulerV2 handling of cold validation requirements.
+    // (currently covered by cold validation tests & proptests).
+    fn handle_cold_validation_requirements(
+        &self,
+        worker_id: u32,
+    ) -> Result<Option<TaskKind>, PanicError> {
+        if !self
+            .cold_validation_requirements
+            .is_dedicated_worker(worker_id)
+        {
+            return Ok(None);
+        }
+
+        if let Some((
+            txn_idx,
+            incarnation,
+            ValidationRequirement {
+                requirements: modules_to_validate,
+                is_deferred,
+            },
+        )) = self
+            .cold_validation_requirements
+            .get_validation_requirement_to_process(
+                worker_id,
+                // Heuristic formula for when the cold validation requirement should be
+                // processed, based on the distance from the last committed index, and
+                // increasing linearly with the number of workers. If a requirement is for
+                // a txn with an index higher than the computed threshold, then the worker
+                // prioritizes other tasks, with additional benefit that when an incarnation
+                // aborts, its requirements become outdated and no need to be processed.
+                self.next_to_commit_idx.load(Ordering::Relaxed)
+                    + self.num_workers as TxnIndex * 3
+                    + 4,
+                &self.txn_statuses,
+            )?
+        {
+            if is_deferred {
+                let defer_outcome = self.txn_statuses.defer_module_validation(
+                    txn_idx,
+                    incarnation,
+                    modules_to_validate,
+                )?;
+
+                if defer_outcome == Some(false) {
+                    // defer call did not succeed because the incarnation had finished execution.
+                    // Ask the caller (the dedicated worker) to process the requirements normally.
+                    return Ok(Some(TaskKind::ModuleValidation(
+                        txn_idx,
+                        incarnation,
+                        modules_to_validate,
+                    )));
+                }
+
+                self.cold_validation_requirements
+                    .validation_requirement_processed(
+                        worker_id,
+                        txn_idx,
+                        incarnation,
+                        // When the defer call was not successful because the requirements were no
+                        // longer relevant, validation_still_needed parameter must be passed as false.
+                        defer_outcome == Some(true),
+                    )?;
+            } else {
+                // Cheap check for whether the requirement is already outdated.
+                if self
+                    .txn_statuses
+                    .already_started_abort(txn_idx, incarnation)
+                {
+                    self.cold_validation_requirements
+                        .validation_requirement_processed(worker_id, txn_idx, incarnation, false)?;
+                } else {
+                    return Ok(Some(TaskKind::ModuleValidation(
+                        txn_idx,
+                        incarnation,
+                        modules_to_validate,
+                    )));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    // Called when considering committing a txn. At this point, the commit hooks lock is held by
+    // the caller, and the marker here should be 'COMMITTED'. NOT_COMMITTED means the previous
+    // call to [SchedulerV2::start_commit] that increased the index did not set the status,
+    // while PENDING_COMMIT_HOOK would imply the caller never made the end_commit call
+    // (should only happen in error scenarios).
+    fn commit_marker_invariant_check(
+        &self,
+        next_to_commit_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
+        if next_to_commit_idx > 0 {
+            let prev_committed_marker =
+                self.committed_marker[next_to_commit_idx as usize - 1].load(Ordering::Relaxed);
+            if prev_committed_marker != CommitMarkerFlag::Committed as u8 {
+                return Err(code_invariant_error(format!(
+                    "Trying to get commit hook for {}, but previous index marker {} != {} (COMMITTED)",
+                    next_to_commit_idx, prev_committed_marker, CommitMarkerFlag::Committed as u8,
+                )));
+            };
+        }
+        Ok(())
+    }
+
+    fn pop_post_commit_task(&self) -> Result<Option<TxnIndex>, PanicError> {
+        match self.post_commit_processing_queue.pop() {
+            Ok(txn_idx) => {
+                if txn_idx == self.num_txns - 1 {
+                    self.is_done.store(true, Ordering::SeqCst);
+                }
+                Ok(Some(txn_idx))
+            },
+            Err(PopError::Empty) => Ok(None),
+            Err(PopError::Closed) => {
+                Err(code_invariant_error("Commit queue should never be closed"))
+            },
+        }
+    }
+
     /// Propagates stall or unstall signals recursively through the dependency graph.
     ///
     /// This method processes a `stall_propagation_queue` containing transaction indices
@@ -1196,7 +1369,10 @@ mod tests {
                     0,
                 ),
                 ExecutionStatus::new_for_test(
-                    StatusWithIncarnation::new_for_test(SchedulingStatus::Executing, 1),
+                    StatusWithIncarnation::new_for_test(
+                        SchedulingStatus::Executing(BTreeSet::new()),
+                        1,
+                    ),
                     0,
                 ),
                 ExecutionStatus::new_for_test(
@@ -1266,7 +1442,10 @@ mod tests {
                 // indices. Only 4 should be add to execution queue, as 2 and 3 do
                 // not require execution. All should be added to propagation queue.
                 ExecutionStatus::new_for_test(
-                    StatusWithIncarnation::new_for_test(SchedulingStatus::Executing, 1),
+                    StatusWithIncarnation::new_for_test(
+                        SchedulingStatus::Executing(BTreeSet::new()),
+                        1,
+                    ),
                     1,
                 ),
                 ExecutionStatus::new_for_test(
@@ -1591,7 +1770,13 @@ mod tests {
             );
 
             // Commit hook needs to complete for next one to be dispatched.
-            assert_err!(scheduler.start_commit());
+            if i != num_txns - 1 {
+                // The check for commit flag is after next_to_commit_idx = num_txns
+                // check which returns Ok(None).
+                assert_err!(scheduler.start_commit());
+            } else {
+                assert_none!(scheduler.start_commit().unwrap());
+            }
             assert_ok!(scheduler.end_commit(i));
             assert_eq!(
                 scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
@@ -1611,7 +1796,7 @@ mod tests {
 
         for i in 1..num_txns {
             assert!(!scheduler.is_done());
-            assert_ok_eq!(scheduler.next_task(), TaskKind::PostCommitProcessing(i));
+            assert_ok_eq!(scheduler.next_task(0), TaskKind::PostCommitProcessing(i));
         }
         assert!(scheduler.is_done());
     }
@@ -1629,7 +1814,7 @@ mod tests {
         stall_and_add_dependency(&scheduler, 3, 6, 1);
         stall_and_add_dependency(&scheduler, 6, 9, 1);
         assert_ok_eq!(scheduler.txn_statuses.start_abort(6, 0), true);
-        assert_ok!(scheduler.txn_statuses.finish_abort(6, 0, true));
+        assert_ok!(scheduler.txn_statuses.finish_abort(6, 0, false));
 
         assert_ok!(scheduler.propagate(BTreeSet::from([3])));
 
@@ -1655,7 +1840,7 @@ mod tests {
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
         assert_none!(scheduler.start_commit().unwrap());
         // Next task should start executing (0, 0).
-        assert_ok_eq!(scheduler.next_task(), TaskKind::Execute(0, 0));
+        assert_ok_eq!(scheduler.next_task(0), TaskKind::Execute(0, 0));
         assert_none!(scheduler.start_commit().unwrap());
         // After execution is finished, commit hook can be dispatched.
         assert_ok!(scheduler.finish_execution(AbortManager::new(0, 0, &scheduler)));
@@ -1671,22 +1856,30 @@ mod tests {
             CommitMarkerFlag::CommitStarted as u8
         );
 
+        // Ok(None) because txn 1 has not finished execution yet.
+        assert_none!(scheduler.start_commit().unwrap());
+        scheduler.next_to_commit_idx.store(0, Ordering::Relaxed);
+        // But calling it again with index 0 would lead to an error.
         assert_err!(scheduler.start_commit());
+
         scheduler.next_to_commit_idx.store(3, Ordering::Relaxed);
-        assert_err!(scheduler.start_commit());
-        scheduler.committed_marker[2].store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
+        // Execution status is checked first, so start_commit returns Ok(None).
+
         assert_none!(scheduler.start_commit().unwrap());
 
         *scheduler.txn_statuses.get_status_mut(3) = ExecutionStatus::new_for_test(
             StatusWithIncarnation::new_for_test(SchedulingStatus::Executed, 5),
             1,
         );
+        // Now it is an error because the commit flag of txn 2 is not Committed.
+        assert_err!(scheduler.start_commit());
+        scheduler.committed_marker[2].store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
         assert!(scheduler.txn_statuses.get_status(3).is_stalled());
         assert_eq!(
             scheduler.committed_marker[3].load(Ordering::Relaxed),
             CommitMarkerFlag::NotCommitted as u8
         );
-        // Should commit despite being currently stalled.
+        // No longer an error, but should commit despite being currently stalled.
         assert_some_eq!(scheduler.start_commit().unwrap(), (3, 5));
 
         scheduler.next_to_commit_idx.store(10, Ordering::Relaxed);
@@ -1771,7 +1964,7 @@ mod tests {
                             scheduler.commit_hooks_unlock();
                         }
 
-                        match scheduler.next_task().unwrap() {
+                        match scheduler.next_task(0).unwrap() {
                             TaskKind::Execute(txn_idx, incarnation) => {
                                 assert!(incarnation < 2);
 
@@ -1799,7 +1992,7 @@ mod tests {
                                                 assert_ok!(scheduler.txn_statuses.finish_abort(
                                                     txn_idx,
                                                     incarnation,
-                                                    true
+                                                    false
                                                 ));
                                             }
                                         };
@@ -1824,6 +2017,9 @@ mod tests {
                                 assert!(scheduler.txn_statuses.is_executed(txn_idx));
                             },
                             TaskKind::NextTask => {},
+                            TaskKind::ModuleValidation(_, _, _) => {
+                                unreachable!("Module validation task should not be scheduled");
+                            },
                             TaskKind::Done => {
                                 break;
                             },
