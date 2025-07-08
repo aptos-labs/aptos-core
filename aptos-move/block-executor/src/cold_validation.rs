@@ -155,7 +155,7 @@ pub(crate) struct ColdValidationRequirements<R: Clone + Ord> {
     /// If dedicated worker is not yet assigned, the caller takes on the responsibility.
     /// Pending requirements are processsed by the dedicated worker and transformed into
     /// active requirements (but this is done later and off the commit sequential path).
-    pending_requirements: Mutex<Vec<PendingRequirement<R>>>,
+    pending_requirements: CachePadded<Mutex<Vec<PendingRequirement<R>>>>,
 
     /// No cache padding since these are accessed less frequently and by the designated
     /// worker. Note: It is important to make sure there are no dangling references.
@@ -171,7 +171,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             deferred_requirements_status: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicU32::new(0)))
                 .collect(),
-            pending_requirements: Mutex::new(Vec::new()),
+            pending_requirements: CachePadded::new(Mutex::new(Vec::new())),
             active_requirements: ExplicitSyncWrapper::new(ActiveRequirements {
                 requirements: BTreeSet::new(),
                 versions: BTreeMap::new(),
@@ -781,10 +781,10 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
             let txn_configs: BTreeMap<TxnIndex, (SchedulingStatus, Incarnation)> = [
-                (2, (SchedulingStatus::Executing, 3)),
+                (2, (SchedulingStatus::Executing(vec![]), 3)),
                 (3, (SchedulingStatus::Executed, 1)),
                 (5, (SchedulingStatus::Executed, 2)),
-                (6, (SchedulingStatus::Executing, 1)),
+                (6, (SchedulingStatus::Executing(vec![]), 1)),
                 (7, (SchedulingStatus::Executed, 2)),
             ]
             .into_iter()
@@ -865,7 +865,7 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
             let statuses = create_execution_statuses_with_txns(
                 10,
-                [(4, (SchedulingStatus::Executing, 1))]
+                [(4, (SchedulingStatus::Executing(vec![]), 1))]
                     .into_iter()
                     .collect(),
             );
@@ -980,7 +980,7 @@ mod tests {
                 15,
                 [
                     (6, (SchedulingStatus::Executed, 1)),
-                    (9, (SchedulingStatus::Executing, 2)),
+                    (9, (SchedulingStatus::Executing(vec![]), 2)),
                 ]
                 .into_iter()
                 .collect(),
