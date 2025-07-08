@@ -975,7 +975,7 @@ dependencies = [
  "futures-channel",
  "hex",
  "itertools 0.13.0",
- "lru 0.7.8",
+ "lru",
  "maplit",
  "mini-moka",
  "mirai-annotations",
@@ -1233,7 +1233,7 @@ dependencies = [
  "hex",
  "indicatif 0.15.0",
  "itertools 0.13.0",
- "lru 0.7.8",
+ "lru",
  "move-core-types",
  "once_cell",
  "ouroboros",
@@ -1774,7 +1774,7 @@ dependencies = [
  "hex",
  "ipnet",
  "iprange",
- "lru 0.9.0",
+ "lru",
  "once_cell",
  "poem",
  "poem-openapi",
@@ -4659,7 +4659,7 @@ dependencies = [
  "hex",
  "itertools 0.13.0",
  "jsonwebtoken 8.3.0",
- "lru 0.7.8",
+ "lru",
  "move-binary-format",
  "move-core-types",
  "move-model",
@@ -4713,7 +4713,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bcs 0.1.4",
- "lru 0.7.8",
+ "lru",
  "move-core-types",
  "tokio",
 ]
@@ -9032,6 +9032,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9841,6 +9847,11 @@ name = "hashbrown"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash",
+]
 
 [[package]]
 name = "hashers"
@@ -11487,20 +11498,11 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.8"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e999beba7b6e8345721bd280141ed958096a2e4abdf74f67ff4ce49b4b54e47a"
+checksum = "86ea4e65087ff52f3862caff188d489f1fab49a0cb09e01b2e3f1a617b10aaed"
 dependencies = [
- "hashbrown 0.12.3",
-]
-
-[[package]]
-name = "lru"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e7d46de488603ffdd5f30afbc64fbba2378214a2c3a2fb83abf3d33126df17"
-dependencies = [
- "hashbrown 0.13.2",
+ "hashbrown 0.15.3",
 ]
 
 [[package]]
@@ -12679,7 +12681,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "legacy-move-compiler",
- "lru 0.7.8",
+ "lru",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -18717,7 +18719,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.37.27",
+ "rustix 0.38.28",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",
