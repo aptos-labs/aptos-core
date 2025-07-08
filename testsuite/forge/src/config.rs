@@ -6,7 +6,11 @@ use crate::{
     success_criteria::{MetricsThreshold, SuccessCriteria, SystemMetricsThreshold},
     *,
 };
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
+use aptos_config::config::{
+    ExecutionBackpressureGasLimitConfig, ExecutionBackpressureLookbackConfig,
+    ExecutionBackpressureMetric, ExecutionBackpressureTxnLimitConfig, NodeConfig,
+    OverrideNodeConfig,
+};
 use aptos_framework::ReleaseBundle;
 use std::{num::NonZeroUsize, sync::Arc};
 
@@ -244,9 +248,17 @@ impl ForgeConfig {
                 ["subscription_peer_change_interval_ms"] = 5_000.into();
 
             // enable opt proposal
-            // TODO(ibalajiarun):
-            // helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
-            //     true.into();
+            helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
+                true.into();
+
+            let mut txn_limit_backpressure = ExecutionBackpressureTxnLimitConfig::default();
+            txn_limit_backpressure.lookback_config.target_block_time_ms = 60;
+            let mut gas_limit_backpressure = ExecutionBackpressureGasLimitConfig::default();
+            gas_limit_backpressure.lookback_config.target_block_time_ms = 60;
+            helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
+                ["txn_limit"] = serde_yaml::to_value(&txn_limit_backpressure).unwrap();
+            helm_values["validator"]["config"]["consensus"]["execution_backpressure"]["gas_limit"] =
+                serde_yaml::to_value(&gas_limit_backpressure).unwrap();
         }))
     }
 
