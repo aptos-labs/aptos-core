@@ -5,6 +5,7 @@ module aptos_experimental::clearinghouse_test {
     use std::signer;
     use aptos_std::table;
     use aptos_std::table::Table;
+    use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::market_types::{
         SettleTradeResult,
         new_settle_trade_result,
@@ -30,8 +31,8 @@ module aptos_experimental::clearinghouse_test {
 
     struct GlobalState has key {
         user_positions: Table<address, Position>,
-        open_orders: Table<u64, bool>,
-        maker_order_calls: Table<u64, bool>
+        open_orders: Table<OrderIdType, bool>,
+        maker_order_calls: Table<OrderIdType, bool>
     }
 
     public(package) fun initialize(admin: &signer) {
@@ -49,7 +50,7 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(package) fun validate_order_placement(order_id: u64): bool acquires GlobalState {
+    public(package) fun validate_order_placement(order_id: OrderIdType): bool acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),
@@ -102,7 +103,7 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none())
     }
 
-    public(package) fun place_maker_order(order_id: u64) acquires GlobalState {
+    public(package) fun place_maker_order(order_id: OrderIdType) acquires GlobalState {
         let maker_order_calls =
             &mut borrow_global_mut<GlobalState>(@0x1).maker_order_calls;
         assert!(
@@ -112,12 +113,12 @@ module aptos_experimental::clearinghouse_test {
         maker_order_calls.add(order_id, true);
     }
 
-    public(package) fun is_maker_order_called(order_id: u64): bool acquires GlobalState {
+    public(package) fun is_maker_order_called(order_id: OrderIdType): bool acquires GlobalState {
         let maker_order_calls = &borrow_global<GlobalState>(@0x1).maker_order_calls;
         maker_order_calls.contains(order_id)
     }
 
-    public(package) fun cleanup_order(order_id: u64) acquires GlobalState {
+    public(package) fun cleanup_order(order_id: OrderIdType) acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             open_orders.contains(order_id),
@@ -126,7 +127,7 @@ module aptos_experimental::clearinghouse_test {
         open_orders.remove(order_id);
     }
 
-    public(package) fun order_exists(order_id: u64): bool acquires GlobalState {
+    public(package) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {
         let open_orders = &borrow_global<GlobalState>(@0x1).open_orders;
         open_orders.contains(order_id)
     }
@@ -147,7 +148,7 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, _taker_order_id, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
+            |taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
             | { settle_trade(taker, maker, size, is_taker_long) },
             |_account, order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
                 validate_order_placement(order_id)
@@ -167,7 +168,7 @@ module aptos_experimental::clearinghouse_test {
     public(package) fun test_market_callbacks_with_taker_cancelled():
         MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, maker, _taker_order_id, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
+            |taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
             | {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },

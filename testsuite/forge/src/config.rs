@@ -239,13 +239,14 @@ impl ForgeConfig {
             helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
             helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
 
-            // enable optqs
-            helm_values["validator"]["config"]["consensus"]["quorum_store"]
-                ["enable_opt_quorum_store"] = true.into();
-
             // override consensus observer refresh latency
             helm_values["fullnode"]["config"]["consensus_observer"]
                 ["subscription_peer_change_interval_ms"] = 5_000.into();
+
+            // enable opt proposal
+            // TODO(ibalajiarun):
+            // helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
+            //     true.into();
         }))
     }
 

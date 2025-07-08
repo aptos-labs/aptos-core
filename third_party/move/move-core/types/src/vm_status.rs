@@ -192,7 +192,10 @@ impl VMStatus {
 
     /// Returns `Ok` with a recorded status if it should be kept, `Err` of the error code if it
     /// should be discarded
-    pub fn keep_or_discard(self) -> Result<KeptVMStatus, DiscardedVMStatus> {
+    pub fn keep_or_discard(
+        self,
+        function_values_enabled: bool,
+    ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
             VMStatus::MoveAbort(location, code) => Ok(KeptVMStatus::MoveAbort(location, code)),
@@ -204,6 +207,17 @@ impl VMStatus {
                 status_code: StatusCode::OUT_OF_GAS,
                 ..
             } => Ok(KeptVMStatus::OutOfGas),
+
+            // Note: this is feature gated because the status was not propagated out before and was
+            // mapped to execution error at function ... at offset ..., etc.
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
+                ..
+            }
+            | VMStatus::Error {
+                status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
+                ..
+            } if function_values_enabled => Ok(KeptVMStatus::MiscellaneousError),
 
             VMStatus::ExecutionFailure {
                 status_code:

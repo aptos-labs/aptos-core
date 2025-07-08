@@ -16,7 +16,9 @@ use aptos_types::{
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
-use move_vm_types::loaded_data::runtime_types::TypeBuilder;
+use move_vm_types::{
+    loaded_data::runtime_types::TypeBuilder, values::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+};
 use once_cell::sync::OnceCell;
 
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
@@ -142,12 +144,21 @@ pub fn aptos_prod_vm_config(
         256
     };
 
-    VMConfig {
+    // Value runtime depth checks have been introduced together with function values and are only
+    // enabled when the function values are enabled. Previously, checks were performed over types
+    // to bound the value depth (checking the size of a packed struct type bounds the value), but
+    // this no longer applies once function values are enabled. With function values, types can be
+    // shallow while the value can be deeply nested, thanks to captured arguments not visible in a
+    // type. Hence, depth checks have been adjusted to operate on values.
+    let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
+
+    let config = VMConfig {
         verifier_config,
         deserializer_config,
         paranoid_type_checks,
         check_invariant_in_swap_loc,
-        max_value_nest_depth: Some(128),
+        // Note: if updating, make sure the constant is in-sync.
+        max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
         layout_max_size,
         layout_max_depth: 128,
         // 5000 limits type tag total size < 5000 bytes and < 50 nodes.
@@ -161,7 +172,17 @@ pub fn aptos_prod_vm_config(
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
-    }
+        enable_depth_checks,
+    };
+
+    // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
+    // assertion as it ensures the constant value is set correctly.
+    assert_eq!(
+        config.max_value_nest_depth,
+        Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH)
+    );
+
+    config
 }
 
 /// A collection of on-chain randomness API configs that VM needs to be aware of.

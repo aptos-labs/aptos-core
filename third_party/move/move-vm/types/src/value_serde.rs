@@ -31,6 +31,9 @@ pub trait FunctionValueExtension {
         &self,
         fun: &dyn AbstractFunction,
     ) -> PartialVMResult<SerializedFunctionData>;
+
+    /// Returns the maximum allowed nesting depth of a VM value.
+    fn max_value_nest_depth(&self) -> Option<u64>;
 }
 
 /// An extension to (de)serializer to lookup information about delayed fields.
@@ -92,16 +95,18 @@ pub struct ValueSerDeContext<'a> {
     pub(crate) function_extension: Option<FunctionValueExtensionWithContext<'a>>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
     pub(crate) legacy_signer: bool,
+    /// Maximum allowed depth of a VM value. Enforced by serializer.
+    pub(crate) max_value_nested_depth: Option<u64>,
 }
 
 impl<'a> ValueSerDeContext<'a> {
     /// Default (de)serializer that disallows delayed fields.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(max_value_nested_depth: Option<u64>) -> Self {
         Self {
             function_extension: None,
             delayed_fields_extension: None,
             legacy_signer: false,
+            max_value_nested_depth,
         }
     }
 
@@ -137,7 +142,18 @@ impl<'a> ValueSerDeContext<'a> {
             function_extension: self.function_extension.clone(),
             delayed_fields_extension: None,
             legacy_signer: self.legacy_signer,
+            max_value_nested_depth: self.max_value_nested_depth,
         }
+    }
+
+    pub(crate) fn check_depth(&self, depth: u64) -> PartialVMResult<()> {
+        if self
+            .max_value_nested_depth
+            .map_or(false, |max_depth| depth > max_depth)
+        {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+        }
+        Ok(())
     }
 
     /// Custom (de)serializer such that:
@@ -178,6 +194,7 @@ impl<'a> ValueSerDeContext<'a> {
             ctx: &self,
             layout,
             value: &value.0,
+            depth: 1,
         };
 
         match bcs::to_bytes(&value).ok() {
@@ -207,6 +224,7 @@ impl<'a> ValueSerDeContext<'a> {
             ctx: &self,
             layout,
             value: &value.0,
+            depth: 1,
         };
         bcs::serialized_size(&value).map_err(|e| {
             PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(

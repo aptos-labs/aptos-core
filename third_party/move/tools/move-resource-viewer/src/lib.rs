@@ -372,11 +372,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         sig: &SignatureToken,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatType> {
-        let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
-            toks.iter()
-                .map(|tok| self.resolve_signature(module, tok, limit))
-                .collect::<anyhow::Result<Vec<_>>>()
-        };
         Ok(match sig {
             SignatureToken::Bool => FatType::Bool,
             SignatureToken::U8 => FatType::U8,
@@ -391,6 +386,39 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
             },
             SignatureToken::Function(args, results, abilities) => {
+                let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
+                    toks.iter()
+                        .map(|tok| {
+                            // Function type can have references as immediate argument or return
+                            // types.
+                            Ok(match tok {
+                                SignatureToken::Reference(t) => FatType::Reference(Box::new(
+                                    self.resolve_signature(module, t, limit)?,
+                                )),
+                                SignatureToken::MutableReference(t) => FatType::MutableReference(
+                                    Box::new(self.resolve_signature(module, t, limit)?),
+                                ),
+                                SignatureToken::Bool
+                                | SignatureToken::U8
+                                | SignatureToken::U64
+                                | SignatureToken::U128
+                                | SignatureToken::Address
+                                | SignatureToken::Signer
+                                | SignatureToken::Vector(_)
+                                | SignatureToken::Function(_, _, _)
+                                | SignatureToken::Struct(_)
+                                | SignatureToken::StructInstantiation(_, _)
+                                | SignatureToken::TypeParameter(_)
+                                | SignatureToken::U16
+                                | SignatureToken::U32
+                                | SignatureToken::U256 => {
+                                    self.resolve_signature(module, tok, limit)?
+                                },
+                            })
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()
+                };
+
                 FatType::Function(Box::new(FatFunctionType {
                     args: resolve_slice(args, limit)?,
                     results: resolve_slice(results, limit)?,
@@ -402,7 +430,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
-                let args = resolve_slice(toks, limit)?;
+                let args = toks
+                    .iter()
+                    .map(|tok| self.resolve_signature(module, tok, limit))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
                 FatType::Struct(Box::new(
                     struct_ty
                         .subst(&args, limit)

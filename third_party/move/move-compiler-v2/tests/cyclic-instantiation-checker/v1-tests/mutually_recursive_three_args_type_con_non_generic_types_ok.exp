@@ -1,31 +1,31 @@
 
 Diagnostics:
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:4:9
   │
 4 │     fun f<T1, T2, T3>() {
   │         ^
   │
-  = `f<T1, T2, T3>` calls `g<T2, T3, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
-  = `g<T2, T3, T1>` calls `h<T2, T3, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9
-  = `h<T2, T3, S<T1>>` calls `f<T2, bool, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
+  = `f<T1, T2, T3>` uses `g<T2, T3, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
+  = `g<T2, T3, T1>` uses `h<T2, T3, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9
+  = `h<T2, T3, S<T1>>` uses `f<T2, bool, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
 
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:8:9
   │
 8 │     fun g<T1, T2, T3>() {
   │         ^
   │
-  = `g<T1, T2, T3>` calls `h<T1, T2, S<T3>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9
-  = `h<T1, T2, S<T3>>` calls `f<T1, bool, S<T3>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
-  = `f<T1, bool, S<T3>>` calls `g<bool, S<T3>, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
+  = `g<T1, T2, T3>` uses `h<T1, T2, S<T3>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9
+  = `h<T1, T2, S<T3>>` uses `f<T1, bool, S<T3>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
+  = `f<T1, bool, S<T3>>` uses `g<bool, S<T3>, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
 
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:12:9
    │
 12 │     fun h<T1, T2, T3>() {
    │         ^
    │
-   = `h<T1, T2, T3>` calls `f<T1, bool, T3>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
-   = `f<T1, bool, T3>` calls `g<bool, T3, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
-   = `g<bool, T3, T1>` calls `h<bool, T3, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9
+   = `h<T1, T2, T3>` uses `f<T1, bool, T3>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:14
+   = `f<T1, bool, T3>` uses `g<bool, T3, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:5
+   = `g<bool, T3, T1>` uses `h<bool, T3, S<T1>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_three_args_type_con_non_generic_types_ok.move:9

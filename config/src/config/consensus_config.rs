@@ -223,16 +223,16 @@ impl Default for ConsensusConfig {
             // increase uncontrollably, and we know when to go to state sync.
             // Considering block gas limit and pipeline backpressure should keep number of blocks
             // in the pipline very low, we can keep this limit pretty low, too.
-            vote_back_pressure_limit: 7,
+            vote_back_pressure_limit: 12,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
                     lookback_config: ExecutionBackpressureLookbackConfig {
                         num_blocks_to_look_at: 18,
-                        min_block_time_ms_to_activate: 100,
+                        min_block_time_ms_to_activate: 50,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Percentile(0.5),
-                        target_block_time_ms: 90,
+                        target_block_time_ms: 60,
                     },
                     min_calibrated_txns_per_block: 8,
                 }),
@@ -242,7 +242,7 @@ impl Default for ConsensusConfig {
                         min_block_time_ms_to_activate: 10,
                         min_blocks_to_activate: 4,
                         metric: ExecutionBackpressureMetric::Mean,
-                        target_block_time_ms: 90,
+                        target_block_time_ms: 60,
                     },
                     block_execution_overhead_ms: 10,
                     min_calibrated_block_gas_limit: 2000,

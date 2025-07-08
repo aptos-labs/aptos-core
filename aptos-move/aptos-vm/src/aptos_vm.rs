@@ -29,7 +29,6 @@ use crate::{
     },
     VMBlockExecutor, VMValidator,
 };
-use anyhow::anyhow;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -498,11 +497,8 @@ impl AptosVM {
             }
         }
 
-        let txn_status = TransactionStatus::from_vm_status(
-            error_vm_status.clone(),
-            self.features()
-                .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-        );
+        let txn_status =
+            TransactionStatus::from_vm_status(error_vm_status.clone(), self.features());
 
         match txn_status {
             TransactionStatus::Keep(status) => {
@@ -2392,13 +2388,21 @@ impl AptosVM {
         let vm_gas_params = match vm.gas_params(&log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+                return ViewFunctionOutput::new_error_message(
+                    format!("{}", err),
+                    Some(err.status_code()),
+                    0,
+                )
             },
         };
         let storage_gas_params = match vm.storage_gas_params(&log_context) {
             Ok(gas_params) => gas_params.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+                return ViewFunctionOutput::new_error_message(
+                    format!("{}", err),
+                    Some(err.status_code()),
+                    0,
+                )
             },
         };
 
@@ -2428,7 +2432,36 @@ impl AptosVM {
         let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
         match execution_result {
             Ok(result) => ViewFunctionOutput::new(Ok(result), gas_used),
-            Err(e) => ViewFunctionOutput::new(Err(e), gas_used),
+            Err(e) => {
+                let vm_status = e.clone().into_vm_status();
+                match vm_status {
+                    VMStatus::MoveAbort(_, _) => {},
+                    _ => {
+                        let message = e
+                            .message()
+                            .map(|m| m.to_string())
+                            .unwrap_or_else(|| e.to_string());
+                        return ViewFunctionOutput::new_error_message(
+                            message,
+                            Some(vm_status.status_code()),
+                            gas_used,
+                        );
+                    },
+                }
+                let txn_status =
+                    TransactionStatus::from_vm_status(vm_status.clone(), vm.features());
+                let execution_status = match txn_status {
+                    TransactionStatus::Keep(status) => status,
+                    _ => ExecutionStatus::MiscellaneousError(Some(vm_status.status_code())),
+                };
+                let status_with_abort_info =
+                    vm.inject_abort_info_if_available(&module_storage, execution_status);
+                ViewFunctionOutput::new_move_abort_error(
+                    status_with_abort_info,
+                    Some(vm_status.status_code()),
+                    gas_used,
+                )
+            },
         }
     }
 
@@ -2448,7 +2481,7 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
         module_storage: &impl AptosModuleStorage,
-    ) -> anyhow::Result<Vec<Vec<u8>>> {
+    ) -> Result<Vec<Vec<u8>>, VMError> {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
@@ -2463,17 +2496,18 @@ impl AptosVM {
             &func,
             metadata.as_ref().map(Arc::as_ref),
             vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+        )
+        .map_err(|e| e.finish(Location::Module(module_id)))?;
+
+        let result = session.execute_loaded_function(
+            func,
+            arguments,
+            gas_meter,
+            &mut traversal_context,
+            module_storage,
         )?;
 
-        Ok(session
-            .execute_loaded_function(
-                func,
-                arguments,
-                gas_meter,
-                &mut traversal_context,
-                module_storage,
-            )
-            .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
+        Ok(result
             .return_values
             .into_iter()
             .map(|(bytes, _ty)| bytes)
