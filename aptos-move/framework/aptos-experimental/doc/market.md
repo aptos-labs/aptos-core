@@ -1744,7 +1744,7 @@ of fill limit violation  in the previous transaction and the order is just a con
         <b>if</b> (taker_cancellation_reason.is_some()) {
             <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
                 order_id,
-                remaining_size,
+                remaining_size: 0, // 0 because the order is cancelled
                 cancel_reason: taker_cancellation_reason,
                 fill_sizes
             }
