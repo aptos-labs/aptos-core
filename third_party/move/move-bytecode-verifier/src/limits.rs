@@ -164,6 +164,7 @@ impl<'a> LimitsVerifier<'a> {
                             return Err(PartialVMError::new(StatusCode::TOO_MANY_PARAMETERS));
                         }
                     }
+                    type_size += 1;
                 },
                 SignatureToken::Bool
                 | SignatureToken::U8
