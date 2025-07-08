@@ -310,7 +310,8 @@ fn update(
         let original_address = new_module.address_identifiers[original_address_idx as usize];
 
         for i in 0..new_module.address_identifiers.len() {
-            if (new_module.address_identifiers[i] == original_address) {
+            if new_module.address_identifiers[i] == original_address {
+                println!("Replacing at index {}: {} with {}", i, new_module.address_identifiers[i], publisher);
                 let _ = std::mem::replace(
                     &mut new_module.address_identifiers[i],
                     publisher,

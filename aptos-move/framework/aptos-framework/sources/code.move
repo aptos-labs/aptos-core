@@ -91,7 +91,7 @@ module aptos_framework::code {
     const EMODULE_MISSING: u64 = 0x4;
 
     /// Dependency could not be resolved to any published package.
-    const EPACKAGE_DEP_MISSING: u64 = 0x5;
+    const EPACKAGE_DEP_MISSING_ANY_CODE: u64 = 0x5;
 
     /// A dependency cannot have a weaker upgrade policy.
     const EDEP_WEAKER_POLICY: u64 = 0x6;
@@ -110,6 +110,9 @@ module aptos_framework::code {
 
     /// Current permissioned signer cannot publish codes.
     const ENO_CODE_PERMISSION: u64 = 0xB;
+
+    /// Dependency could not be resolved to any published package.
+    const EPACKAGE_DEP_MISSING_NEEDED_MODULE: u64 = 0xC;
 
     struct CodePublishingPermission has copy, drop, store {}
 
@@ -301,7 +304,7 @@ module aptos_framework::code {
         let deps = &pack.deps;
         vector::for_each_ref(deps, |dep| {
             let dep: &PackageDep = dep;
-            assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
+            assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING_ANY_CODE));
             if (is_policy_exempted_address(dep.account)) {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
                 let account: address = dep.account;
@@ -337,7 +340,7 @@ module aptos_framework::code {
                         false
                     }
                 });
-                assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
+                assert!(found, error::not_found(EPACKAGE_DEP_MISSING_NEEDED_MODULE));
             };
         });
         allowed_module_deps
