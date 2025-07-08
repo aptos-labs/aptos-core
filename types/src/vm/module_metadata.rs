@@ -27,7 +27,7 @@ use move_model::{
     model::StructEnv,
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::BTreeMap, env, str::FromStr, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, num::NonZeroUsize, str::FromStr, sync::Arc};
 use thiserror::Error;
 
 pub mod prelude {
@@ -187,7 +187,7 @@ impl KnownAttribute {
     }
 }
 
-const METADATA_CACHE_SIZE: usize = 1024;
+const METADATA_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1024).unwrap();
 
 thread_local! {
     static V1_METADATA_CACHE: RefCell<LruCache<Vec<u8>, Option<Arc<RuntimeModuleMetadataV1>>>> = RefCell::new(LruCache::new(METADATA_CACHE_SIZE));

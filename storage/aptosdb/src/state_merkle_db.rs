@@ -42,6 +42,7 @@ use arr_macro::arr;
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
@@ -62,10 +63,10 @@ pub struct StateMerkleDb {
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     enable_sharding: bool,
-    enable_cache: bool,
     // shard_id -> cache.
     version_caches: HashMap<Option<u8>, VersionedNodeCache>,
-    lru_cache: LruNodeCache,
+    // `None` means the cache is not enabled.
+    lru_cache: Option<LruNodeCache>,
 }
 
 impl StateMerkleDb {
@@ -73,19 +74,18 @@ impl StateMerkleDb {
         db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
+        // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
+        // hacky, need to revisit.
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
-        // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
-        // hacky, need to revisit.
-        let enable_cache = max_nodes_per_lru_cache_shard > 0;
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
             version_caches.insert(Some(i as u8), VersionedNodeCache::new());
         }
-        let lru_cache = LruNodeCache::new(max_nodes_per_lru_cache_shard);
+        let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
         if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
@@ -99,7 +99,6 @@ impl StateMerkleDb {
                 state_merkle_metadata_db: Arc::clone(&db),
                 state_merkle_db_shards: arr![Arc::clone(&db); 16],
                 enable_sharding: false,
-                enable_cache,
                 version_caches,
                 lru_cache,
             });
@@ -109,7 +108,6 @@ impl StateMerkleDb {
             db_paths,
             state_merkle_db_config,
             readonly,
-            enable_cache,
             version_caches,
             lru_cache,
         )
@@ -517,15 +515,15 @@ impl StateMerkleDb {
     }
 
     pub(crate) fn cache_enabled(&self) -> bool {
-        self.enable_cache
+        self.lru_cache.is_some()
     }
 
     pub(crate) fn version_caches(&self) -> &HashMap<Option<u8>, VersionedNodeCache> {
         &self.version_caches
     }
 
-    pub(crate) fn lru_cache(&self) -> &LruNodeCache {
-        &self.lru_cache
+    pub(crate) fn lru_cache(&self) -> Option<&LruNodeCache> {
+        self.lru_cache.as_ref()
     }
 
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
@@ -559,9 +557,8 @@ impl StateMerkleDb {
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
         readonly: bool,
-        enable_cache: bool,
         version_caches: HashMap<Option<u8>, VersionedNodeCache>,
-        lru_cache: LruNodeCache,
+        lru_cache: Option<LruNodeCache>,
     ) -> Result<Self> {
         let state_merkle_metadata_db_path = Self::metadata_db_path(
             db_paths.state_merkle_db_metadata_root_path(),
@@ -603,7 +600,6 @@ impl StateMerkleDb {
             state_merkle_metadata_db,
             state_merkle_db_shards,
             enable_sharding: true,
-            enable_cache,
             version_caches,
             lru_cache,
         };
@@ -786,7 +782,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 .observe(start_time.elapsed().as_secs_f64());
             return Ok(node_opt);
         }
-        let node_opt = if let Some(node_cache) = self
+        if let Some(node_cache) = self
             .version_caches
             .get(&node_key.get_shard_id())
             .unwrap()
@@ -796,24 +792,29 @@ impl TreeReader<StateKey> for StateMerkleDb {
             NODE_CACHE_SECONDS
                 .with_label_values(&[tag, "versioned_cache_hit"])
                 .observe(start_time.elapsed().as_secs_f64());
-            node
-        } else if let Some(node) = self.lru_cache.get(node_key) {
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "lru_cache_hit"])
-                .observe(start_time.elapsed().as_secs_f64());
-            Some(node)
-        } else {
-            let node_opt = self
-                .db_by_key(node_key)
-                .get::<JellyfishMerkleNodeSchema>(node_key)?;
-            if let Some(node) = &node_opt {
-                self.lru_cache.put(node_key.clone(), node.clone());
+            return Ok(node);
+        }
+
+        if let Some(lru_cache) = &self.lru_cache {
+            if let Some(node) = lru_cache.get(node_key) {
+                NODE_CACHE_SECONDS
+                    .with_label_values(&[tag, "lru_cache_hit"])
+                    .observe(start_time.elapsed().as_secs_f64());
+                return Ok(Some(node));
             }
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "cache_miss"])
-                .observe(start_time.elapsed().as_secs_f64());
-            node_opt
-        };
+        }
+
+        let node_opt = self
+            .db_by_key(node_key)
+            .get::<JellyfishMerkleNodeSchema>(node_key)?;
+        if let Some(lru_cache) = &self.lru_cache {
+            if let Some(node) = &node_opt {
+                lru_cache.put(node_key.clone(), node.clone());
+            }
+        }
+        NODE_CACHE_SECONDS
+            .with_label_values(&[tag, "cache_miss"])
+            .observe(start_time.elapsed().as_secs_f64());
         Ok(node_opt)
     }
 
