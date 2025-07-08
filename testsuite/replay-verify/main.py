@@ -20,6 +20,7 @@ from testsuite import forge
 from archive_disk_utils import (
     TESTNET_SNAPSHOT_NAME,
     MAINNET_SNAPSHOT_NAME,
+    create_replay_verify_pvcs_from_existing,
     create_replay_verify_pvcs_from_snapshot,
     get_kubectl_credentials,
 )
@@ -494,6 +495,53 @@ class ReplayScheduler:
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
 
+    def create_all_required_pvcs(self) -> None:
+        snapshot_name = (
+            TESTNET_SNAPSHOT_NAME
+            if self.network == Network.TESTNET
+            else MAINNET_SNAPSHOT_NAME
+        )
+        pvc = self.create_one_pvc_from_snapshot(snapshot_name)
+        self.pvcs = [pvc]
+        # Wait for the PVC to be bound before creating other PVCs
+        bound_status = self.get_pvc_bound_status()
+        while not bound_status[0]:
+            logger.info(f"Waiting for the PVC {pvc} to be bound...")
+            time.sleep(QUERY_DELAY)
+            bound_status = self.get_pvc_bound_status()
+        self.create_pvc_from_existing(snapshot_name, pvc)
+
+    def create_one_pvc_from_snapshot(self, snapshot_name: str) -> str:
+        # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
+        # would be computed from the number of shards and the expected run time of the replay-verify
+        # run. However, for simplicity, we set the TTL to 3 hours.
+        pvc_ttl = 5 * 60 * 60  # 3 hours
+        pvcs = create_replay_verify_pvcs_from_snapshot(
+            self.id,
+            snapshot_name,
+            self.namespace,
+            1,  # only create one PVC
+            self.get_label(),
+            pvc_ttl,
+        )
+        assert len(pvcs) == 1, "failed to create the PVC"
+        return pvcs[0]
+
+    # Creates a pvc by cloning an existing pvc
+    def create_pvc_from_existing(self, original_snapshot_name: str, existing_pvc: str):
+        pvc_ttl = 5 * 60 * 60
+        pvcs = create_replay_verify_pvcs_from_existing(
+            self.id,
+            original_snapshot_name,
+            existing_pvc,
+            self.config.pvc_number,
+            self.namespace,
+            self.get_label(),
+            pvc_ttl,
+        )
+        assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
+        self.pvcs = pvcs
+
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_fixed(RETRY_DELAY),
@@ -743,7 +791,7 @@ if __name__ == "__main__":
         scheduler.cleanup()
         exit(0)
     else:
-        scheduler.create_pvc_from_snapshot()
+        scheduler.create_all_required_pvcs()
         try:
             start_time = time.time()
             scheduler.schedule(from_scratch=True)
