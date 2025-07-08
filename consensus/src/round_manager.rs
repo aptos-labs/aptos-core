@@ -79,7 +79,7 @@ use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, Sin
 use lru::LruCache;
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
+    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration, num::NonZeroUsize,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -338,7 +338,7 @@ impl RoundManager {
             jwk_consensus_config,
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
-            blocks_with_broadcasted_fast_shares: LruCache::new(5),
+            blocks_with_broadcasted_fast_shares: LruCache::new(NonZeroUsize::new(5).unwrap()),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
