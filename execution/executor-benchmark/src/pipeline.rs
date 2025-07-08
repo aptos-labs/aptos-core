@@ -242,6 +242,7 @@ where
                     &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_with_limit_name,
                     vec![],
                     serialize_values(&args),
+                    current_parent_id,
                 );
                 let mut current_block_txns = ScheduledTxnsHandler::handle_ready_txns_result(res)
                     .into_iter()

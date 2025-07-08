@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::HashValue;
 use aptos_logger::error;
 use aptos_types::{
     state_store::StateView,
@@ -51,6 +52,7 @@ impl ScheduledTxnsHandler {
     pub fn get_ready_txns(
         state_view: &impl StateView,
         block_timestamp_ms: u64,
+        block_id: HashValue,
     ) -> Vec<ScheduledTransactionInfoWithKey> {
         let res = AptosVM::execute_system_function_no_gas_meter(
             state_view,
@@ -58,6 +60,7 @@ impl ScheduledTxnsHandler {
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_name,
             vec![],
             vec![bcs::to_bytes(&block_timestamp_ms).expect("Failed to serialize block timestamp")],
+            block_id,
         );
         Self::handle_ready_txns_result(res)
     }

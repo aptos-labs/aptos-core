@@ -2403,6 +2403,7 @@ impl AptosVM {
         function_name: &Identifier,
         type_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        block_id: HashValue,
     ) -> Result<Vec<Vec<u8>>, VMStatus> {
         // Create VM instance with environment
         let env = AptosEnvironment::new(state_view);
@@ -2410,7 +2411,7 @@ impl AptosVM {
 
         // Create a new session
         let resolver = state_view.as_move_resolver();
-        let mut session = vm.new_session(&resolver, SessionId::Void, None);
+        let mut session = vm.new_session(&resolver, SessionId::system_txn(block_id), None);
 
         // Set up gas meter and traversal context
         let mut gas_meter = UnmeteredGasMeter;

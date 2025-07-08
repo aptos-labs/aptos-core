@@ -639,7 +639,11 @@ impl PipelineBuilder {
             if let Ok(state_view) =
                 executor.state_view_ready_sched_txns(block.id(), block.parent_id())
             {
-                ScheduledTxnsHandler::get_ready_txns(&state_view, block.timestamp_usecs() / 1000)
+                ScheduledTxnsHandler::get_ready_txns(
+                    &state_view,
+                    block.timestamp_usecs() / 1000,
+                    block.id(),
+                )
             } else {
                 vec![]
             }
