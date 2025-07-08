@@ -454,12 +454,22 @@ Current permissioned signer cannot publish codes.
 
 
 
-<a id="0x1_code_EPACKAGE_DEP_MISSING"></a>
+<a id="0x1_code_EPACKAGE_DEP_MISSING_ANY_CODE"></a>
 
 Dependency could not be resolved to any published package.
 
 
-<pre><code><b>const</b> <a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>: u64 = 5;
+<pre><code><b>const</b> <a href="code.md#0x1_code_EPACKAGE_DEP_MISSING_ANY_CODE">EPACKAGE_DEP_MISSING_ANY_CODE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x1_code_EPACKAGE_DEP_MISSING_NEEDED_MODULE"></a>
+
+Dependency could not be resolved to any published package.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_EPACKAGE_DEP_MISSING_NEEDED_MODULE">EPACKAGE_DEP_MISSING_NEEDED_MODULE</a>: u64 = 12;
 </code></pre>
 
 
@@ -924,7 +934,7 @@ is passed on to the native layer to verify that bytecode dependencies are actual
     <b>let</b> deps = &pack.deps;
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(deps, |dep| {
         <b>let</b> dep: &<a href="code.md#0x1_code_PackageDep">PackageDep</a> = dep;
-        <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(dep.<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>));
+        <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(dep.<a href="account.md#0x1_account">account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING_ANY_CODE">EPACKAGE_DEP_MISSING_ANY_CODE</a>));
         <b>if</b> (<a href="code.md#0x1_code_is_policy_exempted_address">is_policy_exempted_address</a>(dep.<a href="account.md#0x1_account">account</a>)) {
             // Allow all modules from this <b>address</b>, by using "" <b>as</b> a wildcard in the <a href="code.md#0x1_code_AllowedDep">AllowedDep</a>
             <b>let</b> <a href="account.md#0x1_account">account</a>: <b>address</b> = dep.<a href="account.md#0x1_account">account</a>;
@@ -960,7 +970,7 @@ is passed on to the native layer to verify that bytecode dependencies are actual
                     <b>false</b>
                 }
             });
-            <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>));
+            <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING_NEEDED_MODULE">EPACKAGE_DEP_MISSING_NEEDED_MODULE</a>));
         };
     });
     allowed_module_deps
