@@ -3,6 +3,7 @@
 
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
+use std::num::NonZeroUsize;
 
 /// Cache for already verified modules. Since loader V1 uses such a cache to not perform repeated
 /// verifications, possibly even across blocks, for comparative performance we need to have it as
@@ -16,7 +17,9 @@ impl VerifiedModuleCache {
 
     /// Returns new empty verified module cache.
     pub(crate) fn empty() -> Self {
-        Self(Mutex::new(lru::LruCache::new(Self::VERIFIED_CACHE_SIZE)))
+        Self(Mutex::new(lru::LruCache::new(
+            NonZeroUsize::new(Self::VERIFIED_CACHE_SIZE).unwrap(),
+        )))
     }
 
     /// Returns true if the module hash is contained in the cache. For tests, the cache is treated

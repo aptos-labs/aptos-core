@@ -6,7 +6,7 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_types::{nibble::nibble_path::NibblePath, transaction::Version};
 use lru::LruCache;
-use std::fmt;
+use std::{fmt, num::NonZeroUsize};
 
 const NUM_SHARDS: usize = 256;
 
@@ -24,7 +24,7 @@ impl LruNodeCache {
     pub fn new(max_nodes_per_shard: usize) -> Self {
         Self {
             // `arr!()` doesn't allow a const in place of the integer literal
-            shards: arr_macro::arr![Mutex::new(LruCache::new(max_nodes_per_shard)); 256],
+            shards: arr_macro::arr![Mutex::new(LruCache::new(NonZeroUsize::new(max_nodes_per_shard).expect("LRU capacity must be non zero."))); 256],
         }
     }
 
