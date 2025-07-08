@@ -251,6 +251,7 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                         &def_handle.type_parameters,
                     )
                 {
+                    panic!("type_mismatch 17"); //
                     return Err(verification_error(
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::StructHandle,
@@ -281,6 +282,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
             .module_id_for_handle(context.resolver.module_handle_at(function_handle.module));
         let function_name = context.resolver.identifier_at(function_handle.name);
         let owner_module = safe_unwrap!(context.dependency_map.get(&owner_module_id));
+        println!("Checking {:?} {:?}", owner_module_id, function_name);
         match context
             .func_id_to_index_map
             .get(&(owner_module_id.clone(), function_name.to_owned()))
@@ -292,6 +294,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     &function_handle.type_parameters,
                     &def_handle.type_parameters,
                 ) {
+                    panic!("type_mismatch 16"); //
                     return Err(verification_error(
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::FunctionHandle,
@@ -311,6 +314,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     },
                 };
 
+                println!("checking params");
                 compare_cross_module_signatures(
                     context,
                     &handle_params.0,
@@ -332,6 +336,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                     },
                 };
 
+                println!("checking return");
                 compare_cross_module_signatures(
                     context,
                     &handle_return.0,
@@ -463,7 +468,7 @@ fn compare_cross_module_signatures(
     def_module: &CompiledModule,
 ) -> PartialVMResult<()> {
     if handle_sig.len() != def_sig.len() {
-        return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH));
+        panic!("type_mismatch 15: {:?} vs {:?}", handle_sig, def_sig); // return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH));
     }
     for (handle_type, def_type) in handle_sig.iter().zip(def_sig) {
         compare_types(context, handle_type, def_type, def_module)?;
@@ -501,7 +506,7 @@ fn compare_types(
             if handle_ab == def_ab {
                 Ok(())
             } else {
-                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
+                panic!("type_mismatch 14"); // Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
             }
         },
         (SignatureToken::Struct(idx1), SignatureToken::Struct(idx2)) => {
@@ -520,7 +525,7 @@ fn compare_types(
         },
         (SignatureToken::TypeParameter(idx1), SignatureToken::TypeParameter(idx2)) => {
             if idx1 != idx2 {
-                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
+                panic!("type_mismatch 13"); // Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
             } else {
                 Ok(())
             }
@@ -540,7 +545,7 @@ fn compare_types(
         | (SignatureToken::TypeParameter(_), _)
         | (SignatureToken::U16, _)
         | (SignatureToken::U32, _)
-        | (SignatureToken::U256, _) => Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)),
+        | (SignatureToken::U256, _) => panic!("type_mismatch 12"), // Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)),
     }
 }
 
@@ -563,6 +568,7 @@ fn compare_structs(
     let def_struct_name = def_module.identifier_at(def_struct_handle.name);
 
     if module_id != def_module_id || struct_name != def_struct_name {
+        panic!("type_mismatch 11"); //
         Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
     } else {
         Ok(())

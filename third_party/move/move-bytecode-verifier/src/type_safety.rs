@@ -583,7 +583,7 @@ fn borrow_vector_element(
 
     // check index
     if operand_idx != ST::U64 {
-        return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+        panic!("type_mismatch 10"); // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
     }
 
     // check vector and update stack
@@ -591,7 +591,7 @@ fn borrow_vector_element(
     // operand. (No co-variance.)
     let element_type = match get_vector_element_type(operand_vec, mut_ref_only) {
         Some(ty) if declared_element_type == &ty => ty,
-        _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+        _ => panic!("type_mismatch 8"), // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
     };
     let element_ref_type = if mut_ref_only {
         ST::MutableReference(Box::new(element_type))
@@ -1140,7 +1140,7 @@ fn verify_instr(
                 let operand_type = safe_unwrap!(verifier.stack.pop());
                 // The operand type must be assignable to the element type.
                 if !element_type.is_assignable_from(&operand_type) {
-                    return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+                    panic!("type_mismatch 9"); // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
                 }
             }
             verifier
@@ -1156,7 +1156,7 @@ fn verify_instr(
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, ST::U64)?;
                 },
-                _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+                _ => panic!("type_mismatch 7"), // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
         },
 
@@ -1175,12 +1175,12 @@ fn verify_instr(
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             // The operand type must be assignable to the declared element type.
             if !declared_element_type.is_assignable_from(&operand_elem) {
-                return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+                panic!("type_mismatch 6"); // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             match get_vector_element_type(operand_vec, true) {
                 // Derived and declared element types must be equal.
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
-                _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+                _ => panic!("type_mismatch 5"), // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
         },
 
@@ -1192,7 +1192,7 @@ fn verify_instr(
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, derived_element_type)?;
                 },
-                _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+                _ => panic!("type_mismatch 4"), // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
         },
 
@@ -1200,7 +1200,7 @@ fn verify_instr(
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             if operand_vec != ST::Vector(Box::new(declared_element_type.clone())) {
-                return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+                panic!("type_mismatch 3"); // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             for _ in 0..*num {
                 verifier.push(meter, declared_element_type.clone())?;
@@ -1212,13 +1212,13 @@ fn verify_instr(
             let operand_idx1 = safe_unwrap!(verifier.stack.pop());
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             if operand_idx1 != ST::U64 || operand_idx2 != ST::U64 {
-                return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+                panic!("type_mismatch 2"); // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand_vec, true) {
                 // Derived and declared element types must be equal
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
-                _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+                _ => panic!("type_mismatch 1"), // return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
         },
         Bytecode::CastU16 => {
