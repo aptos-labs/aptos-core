@@ -102,7 +102,7 @@ async fn handler_thread(
         std::sync::mpsc::Sender<Result<Option<StateValue>>>,
     )>,
 ) {
-    const M: usize = 1024 * 1024;
+    const M: NonZeroUsize = NonZeroUsize::new(1024 * 1024).unwrap();
     let cache = Arc::new(Mutex::new(LruCache::<
         (StateKey, Version),
         Option<StateValue>,

@@ -187,7 +187,7 @@ impl KnownAttribute {
     }
 }
 
-const METADATA_CACHE_SIZE: usize = 1024;
+const METADATA_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(1024).unwrap();
 
 thread_local! {
     static V1_METADATA_CACHE: RefCell<LruCache<Vec<u8>, Option<Arc<RuntimeModuleMetadataV1>>>> = RefCell::new(LruCache::new(NonZeroUsize::new(METADATA_CACHE_SIZE).unwrap()));

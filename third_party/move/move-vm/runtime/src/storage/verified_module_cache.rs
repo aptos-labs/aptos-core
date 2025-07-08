@@ -13,7 +13,7 @@ pub(crate) struct VerifiedModuleCache(Mutex<lru::LruCache<[u8; 32], ()>>);
 
 impl VerifiedModuleCache {
     /// Maximum size of the cache. When modules are cached, they can skip re-verification.
-    const VERIFIED_CACHE_SIZE: usize = 100_000;
+    const VERIFIED_CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(100_000).unwrap();
 
     /// Returns new empty verified module cache.
     pub(crate) fn empty() -> Self {
