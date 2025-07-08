@@ -45,7 +45,9 @@ impl MemoryRatelimitChecker {
     pub fn new(args: MemoryRatelimitCheckerConfig) -> Self {
         Self {
             max_requests_per_day: args.max_requests_per_day,
-            ip_to_requests_today: Mutex::new(LruCache::new(args.max_entries_in_map)),
+            ip_to_requests_today: Mutex::new(LruCache::new(
+                NonZeroUsize::new(args.max_entries_in_map).expect("LRU capacity must be non zero."),
+            )),
             current_day: AtomicU64::new(days_since_tap_epoch(get_current_time_secs())),
         }
     }

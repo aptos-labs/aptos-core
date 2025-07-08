@@ -20,6 +20,7 @@ use lru::LruCache;
 use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
+    num::NonZeroUsize,
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -105,7 +106,7 @@ async fn handler_thread(
     let cache = Arc::new(Mutex::new(LruCache::<
         (StateKey, Version),
         Option<StateValue>,
-    >::new(M)));
+    >::new(NonZeroUsize::new(M).unwrap())));
     loop {
         let (key, version, sender) =
             if let Some((key, version, sender)) = thread_receiver.recv().await {
