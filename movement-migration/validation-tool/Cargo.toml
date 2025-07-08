@@ -1,0 +1,33 @@
+[package]
+name = "validation-tool"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-db = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+clap = { workspace = true }
+either = { workspace = true }
+serde_json = { workspace = true }
+move-core-types = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tar = { workspace = true }
+tempfile = { workspace = true }
+xz2 = { workspace = true }
