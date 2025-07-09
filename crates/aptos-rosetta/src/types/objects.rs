@@ -73,7 +73,7 @@ static SET_OPERATOR_EVENT_TAG: Lazy<TypeTag> =
 static UPDATE_VOTER_EVENT_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateVoter").unwrap());
 static DISTRIBUTE_STAKING_REWARDS_TAG: Lazy<TypeTag> =
-    Lazy::new(|| parse_type_tag("0x1::stake::DistributeRewards").unwrap());
+    Lazy::new(|| parse_type_tag("0x1::staking_contract::Distribute").unwrap());
 static UPDATE_COMMISSION_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateCommission").unwrap());
 
@@ -978,7 +978,9 @@ impl Transaction {
 
             // For storage fee refund
             if let Some(user_txn) = maybe_user_txn {
-                let fee_events = get_fee_statement_from_event(&events);
+                let fee_events = get_fee_statement_from_event(&events)
+                    .into_iter()
+                    .filter(|event| event.storage_fee_refund() > 0);
                 for event in fee_events {
                     operations.push(Operation::deposit(
                         operation_index,
