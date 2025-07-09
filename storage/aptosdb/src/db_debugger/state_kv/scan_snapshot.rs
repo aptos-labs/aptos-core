@@ -9,7 +9,7 @@ use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_schemadb::ReadOptions;
 use aptos_storage_interface::Result;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::state_key::ShardedKey, transaction::Version};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
