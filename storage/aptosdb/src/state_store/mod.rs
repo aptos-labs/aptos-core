@@ -65,7 +65,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::{prefix::StateKeyPrefix, ShardedKey, StateKey},
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{

@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::state_key::StateKey,
+    state_store::state_key::{ShardedKey, StateKey},
     transaction::Version,
     write_set::{BaseStateOp, WriteSet},
 };
