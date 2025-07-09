@@ -7,9 +7,14 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_view::hot_state_view::HotStateView,
+    state::State, state_view::hot_state_view::HotStateView, NUM_STATE_SHARDS,
 };
-use aptos_types::state_store::{hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot};
+use aptos_types::state_store::{
+    hot_state::LRUEntry,
+    state_key::{ShardedKey, StateKey},
+    state_slot::StateSlot,
+};
+use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 use std::sync::{
     mpsc::{Receiver, SyncSender, TryRecvError},
@@ -22,6 +27,33 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 struct Entry<K, V> {
     data: V,
     lru: LRUEntry<K>,
+}
+
+#[derive(Debug)]
+struct Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    inner: DashMap<K, Entry<K, V>>,
+}
+
+impl<K, V> Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn new(max_items: usize) -> Self {
+        Self {
+            inner: DashMap::with_capacity(max_items),
+        }
+    }
+
+    fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
+        self.inner.get(key)
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 #[derive(Debug)]
@@ -39,12 +71,12 @@ where
     #[allow(dead_code)] // TODO(HotState): not enforced for now
     max_single_value_bytes: usize,
 
-    inner: DashMap<K, Entry<K, V>>,
+    shards: [Shard<K, V>; NUM_STATE_SHARDS],
 }
 
 impl<K, V> HotStateBase<K, V>
 where
-    K: Eq + std::hash::Hash,
+    K: Eq + std::hash::Hash + ShardedKey,
     V: Clone,
 {
     fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
@@ -52,12 +84,17 @@ where
             max_items,
             max_bytes,
             max_single_value_bytes,
-            inner: DashMap::with_capacity(max_items),
+            shards: arr![Shard::new(max_items); 16],
         }
     }
 
     fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
-        self.inner.get(key)
+        let shard = key.get_shard_id();
+        self.shards[shard].get(key)
+    }
+
+    fn len(&self) -> usize {
+        self.shards.iter().map(|s| s.len()).sum()
     }
 }
 
@@ -127,9 +164,9 @@ pub struct Committer {
     total_key_bytes: usize,
     total_value_bytes: usize,
     /// Points to the newest entry. `None` if empty.
-    head: Option<StateKey>,
+    head: [Option<StateKey>; NUM_STATE_SHARDS],
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<StateKey>,
+    tail: [Option<StateKey>; NUM_STATE_SHARDS],
 }
 
 impl Committer {
@@ -147,8 +184,8 @@ impl Committer {
             rx,
             total_key_bytes: 0,
             total_value_bytes: 0,
-            head: None,
-            tail: None,
+            head: arr![None; 16],
+            tail: arr![None; 16],
         }
     }
 
@@ -159,7 +196,7 @@ impl Committer {
             self.commit(&to_commit);
             *self.committed.lock() = to_commit;
 
-            GAUGE.set_with(&["hot_state_items"], self.base.inner.len() as i64);
+            GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
         }
@@ -289,8 +326,8 @@ where
     K: Eq + std::hash::Hash,
 {
     base: Arc<HotStateBase<K, V>>,
-    head: &'a mut Option<K>,
-    tail: &'a mut Option<K>,
+    head: &'a mut [Option<K>],
+    tail: &'a mut [Option<K>],
 }
 
 impl<'a, K, V> LRUUpdater<'a, K, V>
@@ -300,8 +337,8 @@ where
 {
     fn new(
         base: Arc<HotStateBase<K, V>>,
-        head: &'a mut Option<K>,
-        tail: &'a mut Option<K>,
+        head: &'a mut [Option<K>],
+        tail: &'a mut [Option<K>],
     ) -> Self {
         Self { base, head, tail }
     }
