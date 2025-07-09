@@ -44,7 +44,7 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             versions_seen += 1;
 
             for (key, write_op) in update_iter.into_iter() {
-                shards[key.get_shard_id() as usize].push((key, StateUpdateRef {
+                shards[key.get_shard_id()].push((key, StateUpdateRef {
                     version,
                     state_op: write_op,
                 }));
