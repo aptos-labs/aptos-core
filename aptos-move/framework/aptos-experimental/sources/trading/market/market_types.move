@@ -33,6 +33,15 @@ module aptos_experimental::market_types {
         }
     }
 
+    #[test_only]
+    public fun time_in_force_to_index(self: &TimeInForce): u8 {
+        match (self) {
+            GTC => 0,
+            POST_ONLY => 1,
+            IOC => 2,
+        }
+    }
+
     public fun good_till_cancelled(): TimeInForce {
         TimeInForce::GTC
     }
