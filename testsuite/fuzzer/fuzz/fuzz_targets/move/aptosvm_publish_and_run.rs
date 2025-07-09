@@ -120,7 +120,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // reject bad modules fast
         let mut module_code: Vec<u8> = vec![];
         m.serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
-            .map_err(|_| Corpus::Keep)?;
+            .map_err(|_| Corpus::Reject)?;
         let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
             .map_err(|_| Corpus::Reject)?;
         move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
@@ -138,7 +138,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // reject bad scripts fast
         let mut script_code: Vec<u8> = vec![];
         s.serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-            .map_err(|_| Corpus::Keep)?;
+            .map_err(|_| Corpus::Reject)?;
         let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
             .map_err(|_| Corpus::Reject)?;
         move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(|e| {
@@ -368,7 +368,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let status = match tdbg!(res.status()) {
         TransactionStatus::Keep(status) => status,
         TransactionStatus::Discard(e) => {
-            if e.status_type() == StatusType::InvariantViolation {
+            if e.status_type() == StatusType::InvariantViolation
+                || e.status_type() == StatusType::Unknown
+            {
                 panic!("invariant violation {:?}", e);
             }
             return Err(Corpus::Keep);
@@ -380,8 +382,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
                 if e.status_type() == StatusType::InvariantViolation
-                    && *e != StatusCode::TYPE_RESOLUTION_FAILURE
-                    && *e != StatusCode::STORAGE_ERROR
+                    || e.status_type() == StatusType::Unknown
+                        && *e != StatusCode::TYPE_RESOLUTION_FAILURE
+                        && *e != StatusCode::STORAGE_ERROR
                 {
                     panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
                 }

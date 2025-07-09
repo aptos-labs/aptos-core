@@ -7,7 +7,10 @@ NIGHTLY_VERSION="nightly-2025-04-03"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 # "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip"
-CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip")
+CORPUS_ZIPS=(
+    "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip"
+    "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip"
+)
 
 # This save time excluding some features needed only for specific targets
 # Downside: fuzzers which require  specific features need to recompile all dependencies

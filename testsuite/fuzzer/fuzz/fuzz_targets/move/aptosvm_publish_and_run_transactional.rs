@@ -29,7 +29,6 @@ use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
-    time::Instant,
 };
 mod utils;
 use fuzzer::{ExecVariant, RunnableStateWithOperations};
@@ -49,8 +48,6 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 });
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
-
-const EXECUTION_TIME_GAS_RATIO: u8 = 100;
 
 // List of known false positive messages for invariant violations
 // If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
@@ -177,10 +174,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 tdbg!("serializing script");
                 _script
                     .serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-                    .map_err(|e| {
-                        println!("Script serialization error: {:?}", e);
-                        Corpus::Keep
-                    })?;
+                    .map_err(|_| Corpus::Reject)?;
                 tdbg!("deserializing script");
                 let s_de =
                     CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
@@ -205,10 +199,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         // reject bad modules fast
         let mut module_code: Vec<u8> = vec![];
         m.serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
-            .map_err(|e| {
-                println!("Module serialization error: {:?}", e);
-                Corpus::Keep
-            })?;
+            .map_err(|_| Corpus::Reject)?;
         let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
             .map_err(|_| Corpus::Reject)?;
         move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
@@ -225,7 +216,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     }
 
     tdbg!("topologically ordering modules");
-    // topologically order modules {
+    // topologically order modules
     let all_modules = dep_modules.clone();
     let map = all_modules
         .into_iter()
@@ -236,7 +227,6 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         let mut visited = HashSet::new();
         sort_by_deps(&map, &mut order, id.clone(), &mut visited)?;
     }
-    // }
 
     tdbg!("grouping same address modules in packages");
     // group same address modules in packages. keep local ordering.
@@ -383,86 +373,48 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         .collect::<Result<Vec<SignedTransaction>, Corpus>>()?;
 
     // exec tx
+    // Note: one tx per block.
     tdbg!("exec start");
-    let mut old_res = None;
-    const N_EXTRA_RERUNS: usize = 0;
-    #[allow(clippy::reversed_empty_ranges)]
-    for _ in 0..N_EXTRA_RERUNS {
-        let res = vm.execute_block(txs.clone());
-        if let Some(old_res) = old_res {
-            assert!(old_res == res);
-        }
-        old_res = Some(res);
-    }
+    for tx in txs.iter() {
+        let res = vm
+            .execute_block(vec![tx.clone()])
+            .map_err(|e| {
+                check_for_invariant_violation(e);
+                Corpus::Keep
+            })?
+            .pop()
+            .expect("expect 1 output");
 
-    let now = Instant::now();
-    let res = vm.execute_block(txs.clone());
-    let elapsed = now.elapsed();
-
-    // check main execution as well
-    if let Some(old_res) = old_res {
-        assert!(old_res == res);
-    }
-    let res = res
-        .map_err(|e| {
-            check_for_invariant_violation(e);
-            Corpus::Keep
-        })?
-        .pop()
-        .expect("expect 1 output");
-    tdbg!("exec end");
-
-    // if error exit gracefully
-    let status = match tdbg!(res.status()) {
-        TransactionStatus::Keep(status) => status,
-        TransactionStatus::Discard(e) => {
-            if e.status_type() == StatusType::InvariantViolation {
-                panic!("invariant violation {:?}", e);
-            }
-            return Err(Corpus::Keep);
-        },
-        _ => return Err(Corpus::Keep),
-    };
-    match tdbg!(status) {
-        ExecutionStatus::Success => (),
-        ExecutionStatus::MiscellaneousError(e) => {
-            if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation
-                    && *e != StatusCode::TYPE_RESOLUTION_FAILURE
-                    && *e != StatusCode::STORAGE_ERROR
-                {
-                    panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
+        // if error exit gracefully
+        let status = match tdbg!(res.status()) {
+            TransactionStatus::Keep(status) => status,
+            TransactionStatus::Discard(e) => {
+                if e.status_type() == StatusType::InvariantViolation {
+                    panic!("invariant violation {:?}", e);
                 }
-            }
-            return Err(Corpus::Keep);
-        },
-        _ => return Err(Corpus::Keep),
-    };
-
-    let fee = res.try_extract_fee_statement().unwrap().unwrap();
-
-    // EXECUTION_TIME_GAS_RATIO is a ratio between execution time and gas used. If the ratio is higher than EXECUTION_TIME_GAS_ratio, we consider the gas usage as unexpected.
-    // EXPERIMENTAL: This very sensible to excution enviroment, e.g. local run, OSS-Fuzz. It may cause false positive. Real data from production does not apply to this ratio.
-    // We only want to catch big unexpected gas usage.
-    if ((elapsed.as_millis() / (fee.execution_gas_used() + fee.io_gas_used()) as u128)
-        > EXECUTION_TIME_GAS_RATIO as u128)
-        && !is_coverage_enabled()
-    {
-        if std::env::var("DEBUG").is_ok() {
-            tdbg!(
-                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
-                elapsed,
-                fee.execution_gas_used() + fee.io_gas_used()
-            );
-            tdbg!("Transaction: {:?}", txs.first());
-        } else {
-            panic!(
-                "Potential unexpected gas usage detected. Execution time: {:?}, Gas burned: {:?}",
-                elapsed,
-                fee.execution_gas_used() + fee.io_gas_used()
-            );
-        }
+                return Err(Corpus::Keep);
+            },
+            _ => return Err(Corpus::Keep),
+        };
+        match tdbg!(status) {
+            ExecutionStatus::Success | ExecutionStatus::OutOfGas => {
+                vm.apply_write_set(res.write_set())
+            },
+            ExecutionStatus::MiscellaneousError(e) => {
+                if let Some(e) = e {
+                    if e.status_type() == StatusType::InvariantViolation
+                        && *e != StatusCode::TYPE_RESOLUTION_FAILURE
+                        && *e != StatusCode::STORAGE_ERROR
+                    {
+                        panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
+                    }
+                }
+                return Err(Corpus::Keep);
+            },
+            _ => return Err(Corpus::Keep),
+        };
     }
+    tdbg!("exec end");
 
     Ok(())
 }
