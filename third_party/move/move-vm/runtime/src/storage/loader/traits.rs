@@ -21,6 +21,15 @@ use move_vm_types::{
 };
 use std::{rc::Rc, sync::Arc};
 
+pub trait ModuleLoader {
+    fn load_module(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        id: &ModuleId,
+    ) -> VMResult<Option<Arc<Module>>>;
+}
+
 /// Provides access to struct definitions.
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     /// Returns true if the current loader is lazy, and false otherwise.
@@ -219,6 +228,7 @@ impl<T> ClosureLoader for T where T: InstantiatedFunctionLoader {}
 pub trait Loader:
     ClosureLoader
     + FunctionDefinitionLoader
+    + ModuleLoader
     + ModuleMetadataLoader
     + NativeModuleLoader
     + StructDefinitionLoader

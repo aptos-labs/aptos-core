@@ -141,6 +141,10 @@ where
         &self.vm_gas_params
     }
 
+    fn storage_gas_params(&self) -> &StorageGasParameters {
+        &self.storage_gas_params
+    }
+
     fn io_pricing(&self) -> &IoPricing {
         &self.storage_gas_params.io_pricing
     }

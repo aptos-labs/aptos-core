@@ -545,7 +545,7 @@ where
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
     #[allow(dead_code)]
-    pub(crate) module_storage: &'a dyn ModuleStorage,
+    pub module_storage: &'a dyn ModuleStorage,
 }
 
 pub trait AsFunctionValueExtension {

@@ -4271,8 +4271,11 @@ dependencies = [
 name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
+ "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-native-interface",
+ "aptos-types",
+ "aptos-vm-types",
  "better_any",
  "bytes",
  "move-binary-format",
@@ -4697,6 +4700,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml 0.8.26",
+ "smallvec",
  "strum 0.27.1",
  "strum_macros 0.27.1",
  "thiserror",
@@ -4795,6 +4799,7 @@ dependencies = [
  "hex",
  "itertools 0.13.0",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-unit-test",
  "move-vm-metrics",
@@ -4959,6 +4964,7 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-genesis",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "fail",
  "move-binary-format",
  "move-core-types",

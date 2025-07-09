@@ -19,6 +19,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension,
     native_functions,
     native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
@@ -147,6 +148,20 @@ const HANDLE_FIELD_INDEX: usize = 0;
 
 // =========================================================================================
 // Implementation of Native Table Context
+
+impl<'a> VersionControlledNativeExtension for NativeTableContext<'a> {
+    fn undo(&mut self) {
+        unreachable!("Irrelevant for this Move extension")
+    }
+
+    fn save(&mut self) {
+        unreachable!("Irrelevant for this Move extension")
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        unreachable!("Irrelevant for this Move extension")
+    }
+}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an

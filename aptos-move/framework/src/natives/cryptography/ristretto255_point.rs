@@ -22,6 +22,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
+use move_vm_runtime::native_extensions::VersionControlledNativeExtension;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Reference, StructRef, Value, VectorRef},
@@ -81,6 +82,20 @@ const HANDLE_FIELD_INDEX: usize = 0;
 //
 // Implementation of Native RistrettoPoint Context
 //
+
+impl VersionControlledNativeExtension for NativeRistrettoPointContext {
+    fn undo(&mut self) {
+        // No-op: nothing to undo.
+    }
+
+    fn save(&mut self) {
+        // No-op: nothing to save.
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.point_data.borrow_mut().points.clear();
+    }
+}
 
 impl NativeRistrettoPointContext {
     /// Create a new instance of a native RistrettoPoint context. This must be passed in via an

@@ -66,10 +66,11 @@ fn initialize_harness(
     if resource_group_charge_as_sum_enabled {
         harness.enable_features(
             vec![FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET],
-            vec![],
+            vec![FeatureFlag::APTOS_VM_V2],
         );
     } else {
         harness.enable_features(vec![], vec![
+            FeatureFlag::APTOS_VM_V2,
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }

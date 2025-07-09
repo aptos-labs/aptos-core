@@ -51,7 +51,7 @@ impl LayoutWithDelayedFields {
 
 /// Converts runtime types to type layouts. The layout construction may load modules, and so, the
 /// functions may also charge gas.
-pub(crate) struct LayoutConverter<'a, T> {
+pub struct LayoutConverter<'a, T> {
     struct_definition_loader: &'a T,
 }
 
@@ -60,7 +60,7 @@ where
     T: StructDefinitionLoader,
 {
     /// Creates a new layout converter with access to struct definition loader.
-    pub(crate) fn new(struct_definition_loader: &'a T) -> Self {
+    pub fn new(struct_definition_loader: &'a T) -> Self {
         Self {
             struct_definition_loader,
         }
@@ -72,7 +72,7 @@ where
     }
 
     /// Returns the layout of a type, as well as a flag if it contains delayed fields or not.
-    pub(crate) fn type_to_type_layout_with_delayed_fields(
+    pub fn type_to_type_layout_with_delayed_fields(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,

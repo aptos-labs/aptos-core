@@ -17,7 +17,6 @@ use aptos_vm_types::{
     storage::{space_pricing::DiskSpacePricing, StorageGasParameters},
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use move_vm_runtime::ModuleStorage;
 
 /// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
@@ -50,7 +49,6 @@ pub(crate) fn check_gas(
     gas_params: &AptosGasParameters,
     gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl ModuleStorage,
     txn_metadata: &TransactionMetadata,
     features: &Features,
     is_approved_gov_script: bool,
@@ -184,12 +182,8 @@ pub(crate) fn check_gas(
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
     let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
-    if crate::aptos_vm::should_create_account_resource(
-        txn_metadata,
-        features,
-        resolver,
-        module_storage,
-    )? && (gas_unit_price != 0 || !features.is_default_account_resource_enabled())
+    if crate::aptos_vm::should_create_account_resource(txn_metadata, features, resolver)?
+        && (gas_unit_price != 0 || !features.is_default_account_resource_enabled())
     {
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);

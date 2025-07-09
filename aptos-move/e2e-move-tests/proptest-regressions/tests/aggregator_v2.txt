@@ -6,3 +6,5 @@
 # everyone who runs the test benefits from these saved cases.
 cc a8f570394fd4cd6dccbec4f0f8a866f365ac76eac32cb0e8a1665f3d09f06c80 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }
 cc 07867126077957c66868496c7da8cc18cceef9cd74547fa6b1b0952f78069917 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: EnabledOnly, block_split: Whole }
+cc 97b33162ecd1e664a4b90bfb889361255d8608dd2572a43aaa54648600a47bf6 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }
+cc 429527686ef9b62e3f69d112b489f67ee208991d1584ce3b898f1c4bb9a9013c # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }

@@ -2,7 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
+use crate::{
+    aptos_vm::{AptosVM, AptosVmWrapper},
+    block_executor::AptosTransactionOutput,
+    data_cache::StorageAdapter,
+    v2::AptosVMv2,
+};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -21,9 +26,10 @@ use aptos_vm_types::{
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_vm_runtime::dispatch_loader;
 
 pub struct AptosExecutorTask {
-    vm: AptosVM,
+    vm: AptosVmWrapper,
     id: StateViewId,
 }
 
@@ -34,7 +40,11 @@ impl ExecutorTask for AptosExecutorTask {
     type Txn = SignatureVerifiedTransaction;
 
     fn init(environment: &AptosEnvironment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new(environment, state_view);
+        let vm = if environment.features().is_aptos_vm_v2_enabled() {
+            AptosVmWrapper::V2(AptosVMv2::new(environment))
+        } else {
+            AptosVmWrapper::V1(AptosVM::new(environment, state_view))
+        };
         let id = state_view.id();
         Self { vm, id }
     }
@@ -57,11 +67,38 @@ impl ExecutorTask for AptosExecutorTask {
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
-        let resolver = self.vm.as_move_resolver_with_group_view(view);
-        match self
-            .vm
-            .execute_single_transaction(txn, &resolver, view, &log_context, auxiliary_info)
-        {
+        let result = match &self.vm {
+            AptosVmWrapper::V1(vm) => {
+                let resolver = vm.as_move_resolver_with_group_view(view);
+                vm.execute_single_transaction(txn, &resolver, view, &log_context, auxiliary_info)
+            },
+            AptosVmWrapper::V2(vm) => {
+                // TODO(aptos-vm-v2):
+                //   Pass executor view directly here, so we can access groups via dedicated APIs.
+                let resolver = StorageAdapter::new_with_config(
+                    view,
+                    vm.environment.gas_feature_version(),
+                    vm.environment.features(),
+                    Some(view),
+                );
+                let result = dispatch_loader!(view, loader, {
+                    vm.execute_single_transaction(
+                        txn,
+                        &resolver,
+                        &loader,
+                        view,
+                        &log_context,
+                        auxiliary_info,
+                    )
+                });
+                result.map(|o| {
+                    // TODO(aptos-vm-v2): Double-check this against the V1 flow.
+                    (VMStatus::Executed, o)
+                })
+            },
+        };
+
+        match result {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
                     speculative_trace!(
@@ -96,6 +133,7 @@ impl ExecutorTask for AptosExecutorTask {
             // execute_single_transaction only returns an error when transactions that should never fail
             // (BlockMetadataTransaction and GenesisTransaction) return an error themselves.
             Err(err) => {
+                println!("Error recorded during execution: {err}");
                 if err.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         err.message().cloned().unwrap_or_default(),
