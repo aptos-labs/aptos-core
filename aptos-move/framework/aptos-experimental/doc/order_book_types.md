@@ -7,6 +7,7 @@
 
 
 -  [Struct `OrderIdType`](#0x7_order_book_types_OrderIdType)
+-  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
@@ -25,6 +26,7 @@
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `new_active_matched_order`](#0x7_order_book_types_new_active_matched_order)
 -  [Function `destroy_active_matched_order`](#0x7_order_book_types_destroy_active_matched_order)
+-  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
 -  [Function `new_order`](#0x7_order_book_types_new_order)
 -  [Function `new_single_order_match`](#0x7_order_book_types_new_single_order_match)
 -  [Function `get_active_matched_size`](#0x7_order_book_types_get_active_matched_size)
@@ -82,6 +84,39 @@
 <dl>
 <dt>
 <code>order_id: u128</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_order_book_types_AccountClientOrderId"></a>
+
+## Struct `AccountClientOrderId`
+
+
+
+<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>client_order_id: u64</code>
 </dt>
 <dd>
 
@@ -788,6 +823,32 @@
 
 </details>
 
+<a id="0x7_order_book_types_new_account_client_order_id"></a>
+
+## Function `new_account_client_order_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64
+): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
+    <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_new_order"></a>
 
 ## Function `new_order`
@@ -1473,7 +1534,9 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
-): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M) {
+): (
+    <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M
+) {
     <b>let</b> Order::V1 {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,

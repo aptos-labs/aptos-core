@@ -951,7 +951,7 @@ module aptos_experimental::market {
         }
     }
 
-    public fun pre_cancel_order<M: store + copy + drop>(
+    public fun cancel_order_with_client_id<M: store + copy + drop>(
         self: &mut Market<M>,
         user: &signer,
         client_order_id: u64,

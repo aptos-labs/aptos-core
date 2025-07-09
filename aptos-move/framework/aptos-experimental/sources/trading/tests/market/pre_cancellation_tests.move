@@ -14,7 +14,7 @@ module aptos_experimental::pre_cancellation_tests {
     use aptos_experimental::market_types::{
         good_till_cancelled,
     };
-    use aptos_experimental::market::{new_market, new_market_config, pre_cancel_order};
+    use aptos_experimental::market::{new_market, new_market_config, cancel_order_with_client_id};
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
 
@@ -34,7 +34,7 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        market.pre_cancel_order(maker1, 1000, &test_market_callbacks());
+        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
@@ -119,7 +119,7 @@ module aptos_experimental::pre_cancellation_tests {
             );
         assert!(market.get_remaining_size(order_id) == 2000000);
         // Pre-cancel the order after it has been placed
-        market.pre_cancel_order(maker1, 1000, &test_market_callbacks());
+        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
         verify_cancel_event(
             &mut market,
             maker1,
@@ -153,7 +153,7 @@ module aptos_experimental::pre_cancellation_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
-        market.pre_cancel_order(maker1, 1000, &test_market_callbacks());
+        market.cancel_order_with_client_id(maker1, 1000, &test_market_callbacks());
         let _ =
             place_order_and_verify(
                 &mut market,
