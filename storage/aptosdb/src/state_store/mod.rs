@@ -958,7 +958,7 @@ impl StateStore {
         enable_sharding: bool,
     ) -> Result<()> {
         values.iter().for_each(|((key, version), value)| {
-            let shard_id = key.get_shard_id() as usize;
+            let shard_id = key.get_shard_id();
             assert!(
                 shard_id < NUM_STATE_SHARDS,
                 "Invalid shard id: {}",

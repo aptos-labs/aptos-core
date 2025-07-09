@@ -64,7 +64,7 @@ pub struct StateMerkleDb {
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     enable_sharding: bool,
     // shard_id -> cache.
-    version_caches: HashMap<Option<u8>, VersionedNodeCache>,
+    version_caches: HashMap<Option<usize>, VersionedNodeCache>,
     // `None` means the cache is not enabled.
     lru_cache: Option<LruNodeCache>,
 }
@@ -83,7 +83,7 @@ impl StateMerkleDb {
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
-            version_caches.insert(Some(i as u8), VersionedNodeCache::new());
+            version_caches.insert(Some(i), VersionedNodeCache::new());
         }
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
         if !sharding {
@@ -128,7 +128,7 @@ impl StateMerkleDb {
                 .into_par_iter()
                 .enumerate()
                 .for_each(|(shard_id, batch)| {
-                    self.db_shard(shard_id as u8)
+                    self.db_shard(shard_id)
                         .write_schemas(batch)
                         .unwrap_or_else(|err| {
                             panic!("Failed to commit state merkle shard {shard_id}: {err}")
@@ -190,11 +190,8 @@ impl StateMerkleDb {
         if sharding {
             for shard_id in 0..NUM_STATE_SHARDS {
                 state_merkle_db
-                    .db_shard(shard_id as u8)
-                    .create_checkpoint(Self::db_shard_path(
-                        cp_root_path.as_ref(),
-                        shard_id as u8,
-                    ))?;
+                    .db_shard(shard_id)
+                    .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id))?;
             }
         }
 
@@ -209,15 +206,15 @@ impl StateMerkleDb {
         Arc::clone(&self.state_merkle_metadata_db)
     }
 
-    pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
-        &self.state_merkle_db_shards[shard_id as usize]
+    pub(crate) fn db_shard(&self, shard_id: usize) -> &DB {
+        &self.state_merkle_db_shards[shard_id]
     }
 
-    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
-        Arc::clone(&self.state_merkle_db_shards[shard_id as usize])
+    pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
+        Arc::clone(&self.state_merkle_db_shards[shard_id])
     }
 
-    pub(crate) fn db(&self, shard_id: Option<u8>) -> &DB {
+    pub(crate) fn db(&self, shard_id: Option<usize>) -> &DB {
         if let Some(shard_id) = shard_id {
             self.db_shard(shard_id)
         } else {
@@ -264,14 +261,14 @@ impl StateMerkleDb {
 
     pub fn batch_put_value_set_for_shard(
         &self,
-        shard_id: u8,
+        shard_id: usize,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(Node, TreeUpdateBatch<StateKey>)> {
         JellyfishMerkleTree::new(self).batch_put_value_set_for_shard(
-            shard_id,
+            shard_id as u8,
             value_set,
             node_hashes,
             persisted_version,
@@ -309,7 +306,7 @@ impl StateMerkleDb {
     fn create_jmt_commit_batch_for_shard(
         &self,
         version: Version,
-        shard_id: Option<u8>,
+        shard_id: Option<usize>,
         tree_update_batch: &TreeUpdateBatch<StateKey>,
         previous_epoch_ending_version: Option<Version>,
     ) -> Result<RawBatch> {
@@ -351,7 +348,7 @@ impl StateMerkleDb {
 
     pub(crate) fn put_progress(
         version: Option<Version>,
-        shard_id: Option<u8>,
+        shard_id: Option<usize>,
         batch: &mut impl WriteBatch,
     ) -> Result<()> {
         let key = if let Some(shard_id) = shard_id {
@@ -415,7 +412,7 @@ impl StateMerkleDb {
     /// Assumes 16 shards in total for now.
     pub fn merklize_value_set_for_shard(
         &self,
-        shard_id: u8,
+        shard_id: usize,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
@@ -518,7 +515,7 @@ impl StateMerkleDb {
         self.lru_cache.is_some()
     }
 
-    pub(crate) fn version_caches(&self) -> &HashMap<Option<u8>, VersionedNodeCache> {
+    pub(crate) fn version_caches(&self) -> &HashMap<Option<usize>, VersionedNodeCache> {
         &self.version_caches
     }
 
@@ -533,8 +530,8 @@ impl StateMerkleDb {
         )
     }
 
-    pub(crate) fn num_shards(&self) -> u8 {
-        NUM_STATE_SHARDS as u8
+    pub(crate) fn num_shards(&self) -> usize {
+        NUM_STATE_SHARDS
     }
 
     pub(crate) fn hack_num_real_shards(&self) -> usize {
@@ -557,7 +554,7 @@ impl StateMerkleDb {
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
         readonly: bool,
-        version_caches: HashMap<Option<u8>, VersionedNodeCache>,
+        version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
     ) -> Result<Self> {
         let state_merkle_metadata_db_path = Self::metadata_db_path(
@@ -580,16 +577,12 @@ impl StateMerkleDb {
         let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
-                let db = Self::open_shard(
-                    shard_root_path,
-                    shard_id as u8,
-                    &state_merkle_db_config,
-                    readonly,
-                )
-                .unwrap_or_else(|e| {
-                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
-                });
+                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
+                let db =
+                    Self::open_shard(shard_root_path, shard_id, &state_merkle_db_config, readonly)
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                        });
                 Arc::new(db)
             })
             .collect::<Vec<_>>()
@@ -620,7 +613,7 @@ impl StateMerkleDb {
 
     fn open_shard<P: AsRef<Path>>(
         db_root_path: P,
-        shard_id: u8,
+        shard_id: usize,
         state_merkle_db_config: &RocksdbConfig,
         readonly: bool,
     ) -> Result<DB> {
@@ -656,7 +649,7 @@ impl StateMerkleDb {
         })
     }
 
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: u8) -> PathBuf {
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
         let shard_sub_path = format!("shard_{}", shard_id);
         db_root_path
             .as_ref()
@@ -715,14 +708,14 @@ impl StateMerkleDb {
     fn get_rightmost_leaf_in_single_shard(
         &self,
         version: Version,
-        shard_id: u8,
+        shard_id: usize,
     ) -> Result<Option<(NodeKey, LeafNode)>> {
         assert!(
-            shard_id < NUM_STATE_SHARDS as u8,
+            shard_id < NUM_STATE_SHARDS,
             "Invalid shard_id: {}",
             shard_id
         );
-        let shard_db = self.state_merkle_db_shards[shard_id as usize].clone();
+        let shard_db = self.state_merkle_db_shards[shard_id].clone();
         // The encoding of key and value in DB looks like:
         //
         // | <-------------- key --------------> | <- value -> |
@@ -825,7 +818,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         // Search from right to left to find the first leaf node.
         for shard_id in shards.rev() {
             if let Some((node_key, leaf_node)) =
-                self.get_rightmost_leaf_in_single_shard(version, shard_id as u8)?
+                self.get_rightmost_leaf_in_single_shard(version, shard_id)?
             {
                 return Ok(Some((node_key, leaf_node)));
             }
@@ -846,8 +839,7 @@ impl TreeWriter<StateKey> for StateMerkleDb {
         jmt_shard_batches.resize_with(NUM_STATE_SHARDS, SchemaBatch::new);
         node_batch.iter().try_for_each(|(node_key, node)| {
             if let Some(shard_id) = node_key.get_shard_id() {
-                jmt_shard_batches[shard_id as usize]
-                    .put::<JellyfishMerkleNodeSchema>(node_key, node)
+                jmt_shard_batches[shard_id].put::<JellyfishMerkleNodeSchema>(node_key, node)
             } else {
                 top_level_batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
             }
