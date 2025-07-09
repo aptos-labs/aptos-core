@@ -19,19 +19,19 @@ module aptos_experimental::ristretto255_twisted_elgamal {
 
     /// A Twisted ElGamal ciphertext, consisting of two Ristretto255 points.
     struct Ciphertext has drop {
-        left: RistrettoPoint,   // v * G + r * H
-        right: RistrettoPoint,  // r * Y
+        left: RistrettoPoint, // v * G + r * H
+        right: RistrettoPoint // r * Y
     }
 
     /// A compressed Twisted ElGamal ciphertext, consisting of two compressed Ristretto255 points.
     struct CompressedCiphertext has store, copy, drop {
         left: CompressedRistretto,
-        right: CompressedRistretto,
+        right: CompressedRistretto
     }
 
     /// A Twisted ElGamal public key, represented as a compressed Ristretto255 point.
     struct CompressedPubkey has store, copy, drop {
-        point: CompressedRistretto,
+        point: CompressedRistretto
     }
 
     //
@@ -43,9 +43,7 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<CompressedPubkey> {
         let point = ristretto255::new_compressed_point_from_bytes(bytes);
         if (point.is_some()) {
-            let pk = CompressedPubkey {
-                point: point.extract()
-            };
+            let pk = CompressedPubkey { point: point.extract() };
             std::option::some(pk)
         } else {
             std::option::none()
@@ -80,10 +78,12 @@ module aptos_experimental::ristretto255_twisted_elgamal {
         let right_point = ristretto255::new_point_from_bytes(bytes_right);
 
         if (left_point.is_some() && right_point.is_some()) {
-            std::option::some(Ciphertext {
-                left: left_point.extract(),
-                right: right_point.extract()
-            })
+            std::option::some(
+                Ciphertext {
+                    left: left_point.extract(),
+                    right: right_point.extract()
+                }
+            )
         } else {
             std::option::none()
         }
@@ -93,33 +93,30 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun new_ciphertext_no_randomness(val: &Scalar): Ciphertext {
         Ciphertext {
             left: ristretto255::basepoint_mul(val),
-            right: ristretto255::point_identity(),
+            right: ristretto255::point_identity()
         }
     }
 
     /// Constructs a Twisted ElGamal ciphertext from two `RistrettoPoint`s.
-    public fun ciphertext_from_points(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
-        Ciphertext {
-            left,
-            right,
-        }
+    public fun ciphertext_from_points(
+        left: RistrettoPoint, right: RistrettoPoint
+    ): Ciphertext {
+        Ciphertext { left, right }
     }
 
     /// Constructs a Twisted ElGamal ciphertext from two compressed Ristretto255 points.
     public fun ciphertext_from_compressed_points(
-        left: CompressedRistretto,
-        right: CompressedRistretto
+        left: CompressedRistretto, right: CompressedRistretto
     ): CompressedCiphertext {
-        CompressedCiphertext {
-            left,
-            right,
-        }
+        CompressedCiphertext { left, right }
     }
 
     /// Serializes a Twisted ElGamal ciphertext into its byte representation.
     public fun ciphertext_to_bytes(ct: &Ciphertext): vector<u8> {
         let bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
-        bytes.append(ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right)));
+        bytes.append(
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right))
+        );
         bytes
     }
 
@@ -138,7 +135,7 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun compress_ciphertext(ct: &Ciphertext): CompressedCiphertext {
         CompressedCiphertext {
             left: ristretto255::point_compress(&ct.left),
-            right: ristretto255::point_compress(&ct.right),
+            right: ristretto255::point_compress(&ct.right)
         }
     }
 
@@ -146,7 +143,7 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun decompress_ciphertext(ct: &CompressedCiphertext): Ciphertext {
         Ciphertext {
             left: ristretto255::point_decompress(&ct.left),
-            right: ristretto255::point_decompress(&ct.right),
+            right: ristretto255::point_decompress(&ct.right)
         }
     }
 
@@ -154,12 +151,14 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun ciphertext_add(lhs: &Ciphertext, rhs: &Ciphertext): Ciphertext {
         Ciphertext {
             left: ristretto255::point_add(&lhs.left, &rhs.left),
-            right: ristretto255::point_add(&lhs.right, &rhs.right),
+            right: ristretto255::point_add(&lhs.right, &rhs.right)
         }
     }
 
     /// Adds two ciphertexts homomorphically, updating the first ciphertext in place.
-    public fun ciphertext_add_assign(lhs: &mut Ciphertext, rhs: &Ciphertext) {
+    public fun ciphertext_add_assign(
+        lhs: &mut Ciphertext, rhs: &Ciphertext
+    ) {
         ristretto255::point_add_assign(&mut lhs.left, &rhs.left);
         ristretto255::point_add_assign(&mut lhs.right, &rhs.right);
     }
@@ -168,12 +167,14 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun ciphertext_sub(lhs: &Ciphertext, rhs: &Ciphertext): Ciphertext {
         Ciphertext {
             left: ristretto255::point_sub(&lhs.left, &rhs.left),
-            right: ristretto255::point_sub(&lhs.right, &rhs.right),
+            right: ristretto255::point_sub(&lhs.right, &rhs.right)
         }
     }
 
     /// Subtracts one ciphertext from another homomorphically, updating the first ciphertext in place.
-    public fun ciphertext_sub_assign(lhs: &mut Ciphertext, rhs: &Ciphertext) {
+    public fun ciphertext_sub_assign(
+        lhs: &mut Ciphertext, rhs: &Ciphertext
+    ) {
         ristretto255::point_sub_assign(&mut lhs.left, &rhs.left);
         ristretto255::point_sub_assign(&mut lhs.right, &rhs.right);
     }
@@ -182,14 +183,14 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     public fun ciphertext_clone(c: &Ciphertext): Ciphertext {
         Ciphertext {
             left: ristretto255::point_clone(&c.left),
-            right: ristretto255::point_clone(&c.right),
+            right: ristretto255::point_clone(&c.right)
         }
     }
 
     /// Compares two ciphertexts for equality, returning `true` if they encrypt the same value and randomness.
     public fun ciphertext_equals(lhs: &Ciphertext, rhs: &Ciphertext): bool {
-        ristretto255::point_equals(&lhs.left, &rhs.left) &&
-            ristretto255::point_equals(&lhs.right, &rhs.right)
+        ristretto255::point_equals(&lhs.left, &rhs.left)
+            && ristretto255::point_equals(&lhs.right, &rhs.right)
     }
 
     /// Returns the `RistrettoPoint` in the ciphertext that contains the encrypted value in the exponent.
@@ -208,14 +209,15 @@ module aptos_experimental::ristretto255_twisted_elgamal {
         let sk_invert = ristretto255::scalar_invert(sk);
 
         if (sk_invert.is_some()) {
-            let point = ristretto255::point_mul(
-                &ristretto255::hash_to_point_base(),
-                &sk_invert.extract()
-            );
+            let point =
+                ristretto255::point_mul(
+                    &ristretto255::hash_to_point_base(),
+                    &sk_invert.extract()
+                );
 
-            std::option::some(CompressedPubkey {
-                point: ristretto255::point_compress(&point)
-            })
+            std::option::some(
+                CompressedPubkey { point: ristretto255::point_compress(&point) }
+            )
         } else {
             std::option::none()
         }
@@ -232,13 +234,15 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     ): Ciphertext {
         Ciphertext {
             left: ristretto255::double_scalar_mul(v, point1, r, point2),
-            right: ristretto255::point_mul(&pubkey_to_point(pubkey), r),
+            right: ristretto255::point_mul(&pubkey_to_point(pubkey), r)
         }
     }
 
     #[test_only]
     /// Constructs a ciphertext `(v * G + r * H, r * Y)` using the Ristretto255 basepoint `G` and a secondary basepoint `H`.
-    public fun new_ciphertext_with_basepoint(v: &Scalar, r: &Scalar, pubkey: &CompressedPubkey): Ciphertext {
+    public fun new_ciphertext_with_basepoint(
+        v: &Scalar, r: &Scalar, pubkey: &CompressedPubkey
+    ): Ciphertext {
         Ciphertext {
             left: ristretto255::double_scalar_mul(
                 v,
@@ -246,7 +250,7 @@ module aptos_experimental::ristretto255_twisted_elgamal {
                 r,
                 &ristretto255::hash_to_point_base()
             ),
-            right: ristretto255::point_mul(&pubkey_to_point(pubkey), r),
+            right: ristretto255::point_mul(&pubkey_to_point(pubkey), r)
         }
     }
 

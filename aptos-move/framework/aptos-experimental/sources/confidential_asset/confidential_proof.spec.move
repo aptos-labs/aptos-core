@@ -1,2 +1,1 @@
-spec aptos_experimental::confidential_proof {
-}
+spec aptos_experimental::confidential_proof {}
