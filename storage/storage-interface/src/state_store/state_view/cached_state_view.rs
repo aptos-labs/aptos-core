@@ -59,8 +59,8 @@ impl ShardedStateCache {
         }
     }
 
-    fn shard(&self, shard_id: u8) -> &StateCacheShard {
-        &self.shards[shard_id as usize]
+    fn shard(&self, shard_id: usize) -> &StateCacheShard {
+        &self.shards[shard_id]
     }
 
     pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateSlot> {
