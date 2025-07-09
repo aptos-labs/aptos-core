@@ -7,10 +7,18 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_view::hot_state_view::HotStateView,
+    state::State, state_view::hot_state_view::HotStateView, NUM_STATE_SHARDS,
 };
-use aptos_types::state_store::{hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot};
-use dashmap::{mapref::one::Ref, DashMap};
+use aptos_types::state_store::{
+    hot_state::LRUEntry,
+    state_key::{ShardedKey, StateKey},
+    state_slot::StateSlot,
+};
+use arr_macro::arr;
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
 use std::sync::{
     mpsc::{Receiver, SyncSender, TryRecvError},
     Arc,
@@ -22,6 +30,49 @@ const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 struct Entry<K, V> {
     data: V,
     lru: LRUEntry<K>,
+}
+
+#[derive(Debug)]
+struct Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    inner: DashMap<K, Entry<K, V>>,
+}
+
+impl<K, V> Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn new(max_items: usize) -> Self {
+        Self {
+            inner: DashMap::with_capacity(max_items),
+        }
+    }
+
+    fn contains_key(&self, key: &K) -> bool {
+        self.inner.contains_key(key)
+    }
+
+    fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
+        self.inner.get(key)
+    }
+
+    fn get_mut(&self, key: &K) -> Option<RefMut<K, Entry<K, V>>> {
+        self.inner.get_mut(key)
+    }
+
+    fn insert(&self, key: K, entry: Entry<K, V>) {
+        self.inner.insert(key, entry);
+    }
+
+    fn remove(&self, key: &K) -> Option<(K, Entry<K, V>)> {
+        self.inner.remove(key)
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 #[derive(Debug)]
@@ -39,12 +90,12 @@ where
     #[allow(dead_code)] // TODO(HotState): not enforced for now
     max_single_value_bytes: usize,
 
-    inner: DashMap<K, Entry<K, V>>,
+    shards: [Shard<K, V>; NUM_STATE_SHARDS],
 }
 
 impl<K, V> HotStateBase<K, V>
 where
-    K: Eq + std::hash::Hash,
+    K: Eq + std::hash::Hash + ShardedKey,
     V: Clone,
 {
     fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
@@ -52,12 +103,17 @@ where
             max_items,
             max_bytes,
             max_single_value_bytes,
-            inner: DashMap::with_capacity(max_items),
+            shards: arr![Shard::new(max_items); 16],
         }
     }
 
     fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
-        self.inner.get(key)
+        let shard = key.get_shard_id();
+        self.shards[shard].get(key)
+    }
+
+    fn len(&self) -> usize {
+        self.shards.iter().map(|s| s.len()).sum()
     }
 }
 
@@ -127,9 +183,9 @@ pub struct Committer {
     total_key_bytes: usize,
     total_value_bytes: usize,
     /// Points to the newest entry. `None` if empty.
-    head: Option<StateKey>,
+    head: [Option<StateKey>; NUM_STATE_SHARDS],
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<StateKey>,
+    tail: [Option<StateKey>; NUM_STATE_SHARDS],
 }
 
 impl Committer {
@@ -147,8 +203,8 @@ impl Committer {
             rx,
             total_key_bytes: 0,
             total_value_bytes: 0,
-            head: None,
-            tail: None,
+            head: arr![None; 16],
+            tail: arr![None; 16],
         }
     }
 
@@ -159,7 +215,7 @@ impl Committer {
             self.commit(&to_commit);
             *self.committed.lock() = to_commit;
 
-            GAUGE.set_with(&["hot_state_items"], self.base.inner.len() as i64);
+            GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
         }
@@ -263,6 +319,7 @@ impl Committer {
                 self.total_value_bytes -= slot.size();
             }
 
+            /*
             let head = self
                 .head
                 .as_ref()
@@ -280,6 +337,7 @@ impl Committer {
                 (latest_version - max_evicted_version) as i64,
             );
             COUNTER.inc_with_by(&["hot_state_evict"], evicted.len() as u64);
+            */
         }
     }
 }
@@ -289,88 +347,96 @@ where
     K: Eq + std::hash::Hash,
 {
     base: Arc<HotStateBase<K, V>>,
-    head: &'a mut Option<K>,
-    tail: &'a mut Option<K>,
+    head: &'a mut [Option<K>],
+    tail: &'a mut [Option<K>],
 }
 
 impl<'a, K, V> LRUUpdater<'a, K, V>
 where
-    K: Clone + std::fmt::Debug + Eq + std::hash::Hash,
+    K: Clone + std::fmt::Debug + Eq + std::hash::Hash + ShardedKey,
     V: Clone + std::fmt::Debug,
 {
     fn new(
         base: Arc<HotStateBase<K, V>>,
-        head: &'a mut Option<K>,
-        tail: &'a mut Option<K>,
+        head: &'a mut [Option<K>],
+        tail: &'a mut [Option<K>],
     ) -> Self {
         Self { base, head, tail }
     }
 
     fn insert(&mut self, key: K, value: V) {
-        if self.base.inner.contains_key(&key) {
-            self.delete(&key);
+        let shard_id = key.get_shard_id();
+        if self.base.shards[shard_id].contains_key(&key) {
+            self.delete_shard(shard_id, &key);
         }
-        self.insert_to_front(key, value);
+        self.insert_to_front_shard(shard_id, key, value);
     }
 
     /// Deletes and returns the oldest entry.
-    fn delete_lru(&mut self) -> Option<(K, V)> {
-        let key = match &self.tail {
+    fn delete_lru_shard(&mut self, shard_id: usize) -> Option<(K, V)> {
+        let key = match &self.tail[shard_id] {
             Some(k) => k.clone(),
             None => return None,
         };
-        let value = self.delete(&key).expect("Tail must exist.");
+        let value = self.delete_shard(shard_id, &key).expect("Tail must exist.");
         Some((key, value))
     }
 
     fn delete(&mut self, key: &K) -> Option<V> {
-        let old_entry = match self.base.inner.remove(key) {
+        self.delete_shard(key.get_shard_id(), key)
+    }
+
+    fn delete_shard(&mut self, shard_id: usize, key: &K) -> Option<V> {
+        debug_assert_eq!(key.get_shard_id(), shard_id);
+        let shard = &self.base.shards[shard_id];
+        let head = &mut self.head[shard_id];
+        let tail = &mut self.tail[shard_id];
+
+        let old_entry = match shard.remove(key) {
             Some((_k, e)) => e,
             None => return None,
         };
 
         match &old_entry.lru.prev {
             Some(prev_key) => {
-                let mut prev_entry = self
-                    .base
-                    .inner
+                let mut prev_entry = shard
                     .get_mut(prev_key)
                     .expect("The previous key must exist");
                 prev_entry.lru.next = old_entry.lru.next.clone();
             },
             None => {
                 // There is no newer entry. The current key was the head.
-                *self.head = old_entry.lru.next.clone();
+                *head = old_entry.lru.next.clone();
             },
         }
 
         match &old_entry.lru.next {
             Some(next_key) => {
-                let mut next_entry = self
-                    .base
-                    .inner
-                    .get_mut(next_key)
-                    .expect("The next key must exist.");
+                let mut next_entry = shard.get_mut(next_key).expect("The next key must exist.");
                 next_entry.lru.prev = old_entry.lru.prev;
             },
             None => {
                 // There is no older entry. The current key was the tail.
-                *self.tail = old_entry.lru.prev;
+                *tail = old_entry.lru.prev;
             },
         }
 
         Some(old_entry.data)
     }
 
-    fn insert_to_front(&mut self, key: K, value: V) {
-        assert_eq!(self.head.is_some(), self.tail.is_some());
-        match self.head.take() {
+    fn insert_to_front_shard(&mut self, shard_id: usize, key: K, value: V) {
+        debug_assert_eq!(key.get_shard_id(), shard_id);
+        let shard = &self.base.shards[shard_id];
+        let head = &mut self.head[shard_id];
+        let tail = &mut self.tail[shard_id];
+        assert_eq!(head.is_some(), tail.is_some());
+
+        match head.take() {
             Some(head) => {
                 {
                     // Release the reference to the old entry ASAP to avoid deadlock when inserting
                     // the new entry below.
-                    let mut old_head_entry =
-                        self.base.inner.get_mut(&head).expect("Head must exist.");
+                    let mut old_head_entry = shard.get_mut(&head).expect("Head must exist.");
                     old_head_entry.lru.prev = Some(key.clone());
                 }
                 let entry = Entry {
@@ -380,8 +446,8 @@ where
                         next: Some(head),
                     },
                 };
-                self.base.inner.insert(key.clone(), entry);
-                *self.head = Some(key);
+                shard.insert(key.clone(), entry);
+                *head = Some(key);
             },
             None => {
                 let entry = Entry {
@@ -391,9 +457,9 @@ where
                         next: None,
                     },
                 };
-                self.base.inner.insert(key.clone(), entry);
-                *self.head = Some(key.clone());
-                *self.tail = Some(key);
+                shard.insert(key.clone(), entry);
+                *head = Some(key.clone());
+                *tail = Some(key);
             },
         }
     }
