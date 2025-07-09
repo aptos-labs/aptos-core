@@ -735,6 +735,43 @@ impl TransactionExecutableRef<'_> {
     pub fn is_entry_function(&self) -> bool {
         matches!(self, Self::EntryFunction(_))
     }
+
+    /// Returns serialized payload for multisig transactions. Fails when:
+    ///   - Payload is a script (not supported, hence [StatusCode::FEATURE_UNDER_GATING] is
+    ///     returned).
+    ///   - Entry function or empty payload fails to serialize (invariant violation).
+    pub fn get_provided_payload_bytes(&self, features: &Features) -> Result<Vec<u8>, VMStatus> {
+        let invariant_violation_error =
+            |msg| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, Some(msg));
+
+        match self {
+            TransactionExecutableRef::EntryFunction(entry_func) => {
+                let payload = MultisigTransactionPayload::EntryFunction((*entry_func).clone());
+                bcs::to_bytes(&payload).map_err(|err| {
+                    invariant_violation_error(format!(
+                        "Failed to serialize multisig entry function payload: {err:?}"
+                    ))
+                })
+            },
+            TransactionExecutableRef::Empty => {
+                // Default to empty bytes if payload is not provided.
+                if features.is_abort_if_multisig_payload_mismatch_enabled() {
+                    Ok(vec![])
+                } else {
+                    bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| {
+                        invariant_violation_error(
+                            "Failed to serialize empty bytes for empty multisig payload"
+                                .to_string(),
+                        )
+                    })
+                }
+            },
+            TransactionExecutableRef::Script(_) => Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Multisig transaction does not support script payloads".to_string()),
+            )),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]

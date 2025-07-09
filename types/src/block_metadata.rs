@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::account_config;
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
@@ -54,9 +55,9 @@ impl BlockMetadata {
         self.id
     }
 
-    pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+    pub fn get_prologue_move_args(self) -> Vec<MoveValue> {
         vec![
-            MoveValue::Signer(signer),
+            MoveValue::Signer(account_config::reserved_vm_address()),
             MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
             MoveValue::U64(self.epoch),
             MoveValue::U64(self.round),

@@ -20,3 +20,17 @@ impl MoveStructType for ConcurrentSupplyResource {
 }
 
 impl MoveResource for ConcurrentSupplyResource {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SupplyResource {
+    pub current: u128,
+    // Option in Move is a vector.
+    pub maximum: Vec<u128>,
+}
+
+impl MoveStructType for SupplyResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungible_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Supply");
+}
+
+impl MoveResource for SupplyResource {}

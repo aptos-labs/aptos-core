@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
@@ -279,12 +279,15 @@ impl SharedTestingConfig {
                     MoveVM::execute_loaded_function(
                         function,
                         args,
-                        &mut data_cache,
+                        &mut MoveVmDataCacheAdapter::new(
+                            &mut data_cache,
+                            &self.starting_storage_state,
+                            &loader,
+                        ),
                         &mut gas_meter,
                         &mut traversal_context,
                         &mut extensions,
                         &loader,
-                        &self.starting_storage_state,
                     )
                 })
         });
