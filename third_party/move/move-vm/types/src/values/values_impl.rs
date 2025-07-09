@@ -260,6 +260,18 @@ enum GlobalValueImpl {
 #[derive(Debug)]
 pub struct GlobalValue(GlobalValueImpl);
 
+/// Trait to represent copyable values so that [GlobalValue] can support copy-on-write. Note that
+/// we explicitly do not implement [Clone].
+pub trait Copyable: Sized {
+    fn clone_value(&self) -> PartialVMResult<Self>;
+}
+
+impl Copyable for GlobalValue {
+    fn clone_value(&self) -> PartialVMResult<Self> {
+        unimplemented!()
+    }
+}
+
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
 #[derive(Debug)]
@@ -3457,6 +3469,10 @@ impl GlobalValue {
 
     pub fn into_effect(self) -> Option<Op<Value>> {
         self.0.into_effect().map(|op| op.map(Value))
+    }
+
+    pub fn effect(&self) -> Option<Op<&Value>> {
+        unimplemented!()
     }
 
     pub fn into_effect_with_layout(

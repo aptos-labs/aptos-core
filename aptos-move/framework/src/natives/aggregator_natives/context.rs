@@ -13,6 +13,7 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetad
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_runtime::native_extensions::VersionControlledNativeExtension;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
@@ -54,6 +55,21 @@ pub struct NativeAggregatorContext<'a> {
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
 }
 
+impl<'a> VersionControlledNativeExtension for NativeAggregatorContext<'a> {
+    fn undo(&mut self) {
+        self.aggregator_v1_data.borrow_mut().undo();
+    }
+
+    fn save(&mut self) {
+        self.aggregator_v1_data.borrow_mut().save();
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_hash = *txn_hash;
+        self.aggregator_v1_data.borrow_mut().update();
+    }
+}
+
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
@@ -78,6 +94,16 @@ impl<'a> NativeAggregatorContext<'a> {
         self.txn_hash
     }
 
+    pub fn materialize(
+        &self,
+        new_slot_metadata: &Option<StateValueMetadata>,
+    ) -> PartialVMResult<()> {
+        self.aggregator_v1_data
+            .borrow_mut()
+            .materialize(self.aggregator_v1_resolver, new_slot_metadata)?;
+        Ok(())
+    }
+
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
     pub fn into_change_set(self) -> PartialVMResult<AggregatorChangeSet> {
@@ -86,12 +112,18 @@ impl<'a> NativeAggregatorContext<'a> {
             delayed_field_data,
             ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
-
         let mut aggregator_v1_changes = BTreeMap::new();
 
         // First, process all writes and deltas.
-        for (id, aggregator) in aggregators {
+        for (id, aggregator_slot) in aggregator_v1_data.into_inner().into() {
+            let aggregator = match aggregator_slot.unpack() {
+                Some(aggregator) => aggregator,
+                None => {
+                    aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
+                    continue;
+                },
+            };
+
             let (value, state, limit, history) = aggregator.into();
 
             let change = match state {
@@ -110,11 +142,6 @@ impl<'a> NativeAggregatorContext<'a> {
                 },
             };
             aggregator_v1_changes.insert(id.0, change);
-        }
-
-        // Additionally, do not forget to delete destroyed values from storage.
-        for id in destroyed_aggregators {
-            aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
@@ -164,7 +191,7 @@ mod test {
     use aptos_types::delayed_fields::{
         calculate_width_for_integer_embedded_string, SnapshotToStringFormula,
     };
-    use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
+    use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn get_test_resolver_v1() -> FakeAggregatorView {
         let mut state_view = FakeAggregatorView::default();
@@ -214,10 +241,11 @@ mod test {
             .unwrap()
             .add(200));
 
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500));
-        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500)));
+        assert_ok!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800)));
+        assert_err!(aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800)));
     }
 
     #[test]

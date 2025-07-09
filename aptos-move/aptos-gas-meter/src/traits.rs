@@ -263,4 +263,14 @@ pub trait AptosGasMeter: MoveGasMeter {
             .inject_balance(extra_balance)
             .map_err(|e| e.finish(Location::Undefined))
     }
+
+    /// Checks if the gas meter's internal counters are consistent.
+    fn check_consistency(&self) -> VMResult<()> {
+        if self.feature_version() >= 12 {
+            if let Err(err) = self.algebra().check_consistency() {
+                return Err(err.finish(Location::Undefined));
+            }
+        }
+        Ok(())
+    }
 }
