@@ -324,8 +324,9 @@ module aptos_experimental::order_book {
         );
         order_with_state.decrease_remaining_size(size_delta);
         if (order_with_state.is_active_order()) {
-            let order = order_with_state.get_order_from_state();
-            self.active_orders.decrease_order_size(
+            let order = order_with_state.get_order_from_state();self
+                .active_orders
+                .decrease_order_size(
                 order.get_price(),
                 order_with_state.get_unique_priority_idx_from_state(),
                 size_delta,
@@ -441,7 +442,9 @@ module aptos_experimental::order_book {
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
             if (!self.is_taker_order(
-                option::some(order_req.price), order_req.is_bid, order_req.trigger_condition
+                option::some(order_req.price),
+                order_req.is_bid,
+                order_req.trigger_condition
             )) {
                 self.place_maker_order(
                     OrderRequest::V1 {
