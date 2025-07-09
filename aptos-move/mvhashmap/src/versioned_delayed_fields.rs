@@ -518,17 +518,11 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// before given idx are in Value state.
     ///
     /// Must be called for each transaction index, in order.
-    pub fn try_commit(
-        &self,
-        idx_to_commit: TxnIndex,
-        ids: Vec<K>,
-        is_appended_epilogue: bool,
-    ) -> Result<(), CommitError> {
+    pub fn try_commit(&self, idx_to_commit: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
         // we may not need to return values here, we can just read them.
         use DelayedApplyEntry::*;
 
-        if !is_appended_epilogue && idx_to_commit != self.next_idx_to_commit.load(Ordering::SeqCst)
-        {
+        if idx_to_commit != self.next_idx_to_commit.load(Ordering::SeqCst) {
             return Err(CommitError::CodeInvariantError(
                 "idx_to_commit must be next_idx_to_commit".to_string(),
             ));
@@ -652,15 +646,11 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             versioned_value.insert_final_value(idx_to_commit, new_entry);
         }
 
-        // Should be guaranteed, as this is the only function modifying the idx,
-        // and value is checked at the start.
         // Need to assert, because if not matching we are in an inconsistent state.
-        if !is_appended_epilogue {
-            assert_eq!(
-                idx_to_commit,
-                self.next_idx_to_commit.fetch_add(1, Ordering::SeqCst)
-            );
-        }
+        assert_eq!(
+            idx_to_commit,
+            self.next_idx_to_commit.fetch_add(1, Ordering::SeqCst)
+        );
 
         Ok(())
     }
@@ -707,6 +697,18 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     .map_err(MVDelayedFieldsError::from_panic_or)
             },
         }
+    }
+
+    pub fn remove_all_at_or_after_for_epilogue(
+        &self,
+        txn_idx: TxnIndex,
+        epilogue_txn_idx: TxnIndex,
+    ) {
+        for mut entry in self.values.iter_mut() {
+            entry.value_mut().versioned_map.split_off(&txn_idx);
+        }
+        self.next_idx_to_commit
+            .store(epilogue_txn_idx, Ordering::SeqCst);
     }
 }
 
