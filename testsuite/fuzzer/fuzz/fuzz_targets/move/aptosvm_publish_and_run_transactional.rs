@@ -53,11 +53,6 @@ const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-byte
 // If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
 const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
 
-#[inline(always)]
-fn is_coverage_enabled() -> bool {
-    cfg!(coverage_enabled) || std::env::var("LLVM_PROFILE_FILE").is_ok()
-}
-
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation {
         let is_known_false_positive = e.message().map_or(false, |msg| {
