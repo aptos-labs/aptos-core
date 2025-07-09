@@ -1332,7 +1332,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
-            client_order_id: option::none(),
+            client_order_id: option::some(1),
             price,
             orig_size,
             remaining_size: 50,
@@ -1370,7 +1370,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xBB,
             order_id: new_order_id_type(2),
-            client_order_id: option::none(),
+            client_order_id: option::some(1),
             price: 100,
             orig_size: 1000,
             remaining_size: 1000,
@@ -1402,7 +1402,7 @@ module aptos_experimental::order_book {
         let order_req = OrderRequest::V1 {
             account: @0xAA,
             order_id: new_order_id_type(1),
-            client_order_id: option::none(),
+            client_order_id: option::some(1),
             price,
             orig_size,
             remaining_size: 500,
@@ -1411,7 +1411,7 @@ module aptos_experimental::order_book {
             metadata
         };
         order_book.reinsert_maker_order(order_req, matched_order);
-        assert!(!order_book.client_order_id_exists(@0xAA, 1));
+        assert!(order_book.client_order_id_exists(@0xAA, 1));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 500);
         order_book.destroy_order_book();
