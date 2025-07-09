@@ -66,7 +66,7 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
 
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -92,7 +92,7 @@ module aptos_experimental::market_tests {
         assert!(clearinghouse_test::order_exists(maker_order_id));
         assert!(!clearinghouse_test::order_exists(taker_order_id));
 
-        let taker_order_id2 =
+        let (taker_order_id2, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -157,7 +157,7 @@ module aptos_experimental::market_tests {
                 &test_market_callbacks()
             );
 
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -357,7 +357,7 @@ module aptos_experimental::market_tests {
             } else {
                 option::some(1000) // Limit price for limit order
             };
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -461,7 +461,7 @@ module aptos_experimental::market_tests {
             } else {
                 option::some(1000) // Limit price for limit order
             };
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -684,7 +684,7 @@ module aptos_experimental::market_tests {
             );
 
         // Taker order that will fully consume maker order but still have remaining size
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -777,7 +777,7 @@ module aptos_experimental::market_tests {
         // Order not matched yet, so the balance should not change
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -849,7 +849,7 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker_addr) == 0);
         assert!(get_position_size(taker_addr) == 0);
 
-        let taker_order_id =
+        let (taker_order_id, result) =
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
@@ -870,6 +870,9 @@ module aptos_experimental::market_tests {
                 new_test_order_metadata(),
                 &test_market_callbacks_with_taker_cancelled()
             );
+        // Make sure the taker was cancelled
+        assert!(result.get_remaining_size_from_result() == 0);
+        assert!(result.get_cancel_reason().is_some());
         // Make sure the maker order is reinserted
         assert!(market.get_remaining_size(maker_order_id) == 1500000);
         assert!(clearinghouse_test::order_exists(maker_order_id));
@@ -930,7 +933,7 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker1_addr) == 0);
 
         // This should result in a self match order which should be cancelled and maker2 order should be filled
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order(
                 &mut market,
                 maker1,
@@ -1035,7 +1038,7 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker1_addr) == 0);
 
         // This should result in a self match order which should be matched against self.
-        let taker_order_id =
+        let (taker_order_id, _) =
             place_taker_order(
                 &mut market,
                 maker1,
