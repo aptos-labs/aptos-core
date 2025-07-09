@@ -2798,6 +2798,18 @@ impl AptosVM {
             MoveValue::Signer(txn.sender_handle),
             txn.key.as_move_value(),
         ];
+
+        /* todo: check if we indeed need this
+        let user_txn_ctx = UserTransactionContext::new(
+            txn.sender_handle,
+            [].to_vec(),
+            txn.sender_handle,
+            txn.max_gas_amount,
+            txn.gas_unit_price_charged,
+            1, // todo: need to get this from somewhere
+            None,
+            None,
+        );*/
         let mut session =
             self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
         let user_func_status = session.execute_function_bypass_visibility(

@@ -49,14 +49,8 @@ module aptos_framework::scheduled_txns {
 
     const U64_MAX: u64 = 18446744073709551615;
 
-    /// Conversion factor between our time granularity (100ms) and microseconds
-    const MICRO_CONVERSION_FACTOR: u64 = 100000;
-
-    /// Conversion factor between our time granularity (100ms) and milliseconds
-    const MILLI_CONVERSION_FACTOR: u64 = 100;
-
-    /// If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will abort the txn
-    const EXPIRY_DELTA_DEFAULT: u64 = 100;
+    /// If we cannot schedule in 10s, we will abort the txn
+    const EXPIRY_DELTA_DEFAULT: u64 = 10 * 1000;
 
     /// The maximum number of scheduled transactions that can be run in a block
     const GET_READY_TRANSACTIONS_LIMIT: u64 = 100;
@@ -109,14 +103,14 @@ module aptos_framework::scheduled_txns {
     }
 
     /// First sorted in ascending order of time, then on gas priority, and finally on txn_id
-    /// gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
     /// The goal is to have fixed (less variable) size 'key', 'val' entries in BigOrderedMap, hence we use txn_id
     /// as a key. That is we have "{time, gas_priority, txn_id} -> ScheduledTxn" instead of
     /// "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
     /// Note: ScheduledTxn is still variable size though due to its closure.
     struct ScheduleMapKey has copy, drop, store {
-        /// UTC timestamp in the granularity of 100ms
+        /// UTC timestamp ms
         time: u64,
+        /// gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
         gas_priority: u64,
         /// SHA3-256
         txn_id: u256
@@ -136,7 +130,7 @@ module aptos_framework::scheduled_txns {
         // todo: check if this is secure
         gas_fee_deposit_store_signer_cap: account::SignerCapability,
         stop_scheduling: bool,
-        /// If we cannot schedule in expiry_delta * time granularity(100ms), we will abort the txn
+        /// If run within the expiry_delta (from the time txn is expected to run), we will abort the txn
         expiry_delta: u64
     }
 
@@ -157,8 +151,19 @@ module aptos_framework::scheduled_txns {
     }
 
     #[event]
+    struct TransactionScheduledEvent has drop, store {
+        scheduled_txn_time: u64,
+        scheduled_txn_hash: u256,
+        sender_addr: address,
+        scheduled_time_ms: u64,
+        max_gas_amount: u64,
+        max_gas_unit_price: u64,
+    }
+
+    #[event]
     struct TransactionFailedEvent has drop, store {
-        key: ScheduleMapKey,
+        scheduled_txn_time: u64,
+        scheduled_txn_hash: u256,
         sender_addr: address,
         cancelled_txn_code: CancelledTxnCode
     }
@@ -260,7 +265,8 @@ module aptos_framework::scheduled_txns {
             cancel_internal(account_addr, key, deposit_amt, delete_ref);
             event::emit(
                 TransactionFailedEvent {
-                    key,
+                    scheduled_txn_time: key.time,
+                    scheduled_txn_hash: key.txn_id,
                     sender_addr: account_addr,
                     cancelled_txn_code: CancelledTxnCode::Shutdown
                 }
@@ -330,8 +336,8 @@ module aptos_framework::scheduled_txns {
         );
 
         // Only schedule txns in the future
-        let txn_time = txn.scheduled_time_ms / MILLI_CONVERSION_FACTOR; // Round down to the nearest 100ms
-        let block_time = timestamp::now_microseconds() / MICRO_CONVERSION_FACTOR;
+        let txn_time = txn.scheduled_time_ms;
+        let block_time = timestamp::now_microseconds() / 1000;
         assert!(txn_time > block_time, error::invalid_argument(EINVALID_TIME));
 
         assert!(
@@ -387,6 +393,18 @@ module aptos_framework::scheduled_txns {
             sender,
             gas_deposit_store_addr,
             txn.max_gas_amount * txn.max_gas_unit_price
+        );
+
+        // Emit event that txn has been scheduled; for now indexer wants to consume this
+        event::emit(
+            TransactionScheduledEvent {
+                scheduled_txn_time: txn_time,
+                scheduled_txn_hash: txn_id,
+                sender_addr: txn.sender_addr,
+                scheduled_time_ms: txn.scheduled_time_ms,
+                max_gas_amount: txn.max_gas_amount,
+                max_gas_unit_price: txn.max_gas_unit_price
+            }
         );
 
         key
@@ -476,13 +494,13 @@ module aptos_framework::scheduled_txns {
 
     /// Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
     fun get_ready_transactions(
-        timestamp_ms: u64
+        block_timestamp_ms: u64
     ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
-        get_ready_transactions_with_limit(timestamp_ms, GET_READY_TRANSACTIONS_LIMIT)
+        get_ready_transactions_with_limit(block_timestamp_ms, GET_READY_TRANSACTIONS_LIMIT)
     }
 
     fun get_ready_transactions_with_limit(
-        timestamp_ms: u64, limit: u64
+        block_timestamp_ms: u64, limit: u64
     ): vector<ScheduledTransactionInfoWithKey> acquires ScheduleQueue, AuxiliaryData, ToRemoveTbl, ScheduledTransactionContainer {
         remove_txns();
         // If scheduling is shutdown, we cannot schedule any more transactions
@@ -492,7 +510,6 @@ module aptos_framework::scheduled_txns {
         };
 
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-        let block_time = timestamp_ms / MILLI_CONVERSION_FACTOR;
         let scheduled_txns = vector::empty<ScheduledTransactionInfoWithKey>();
         let count = 0;
         let txns_to_expire = vector::empty<KeyAndTxnInfo>();
@@ -500,7 +517,7 @@ module aptos_framework::scheduled_txns {
         let iter = queue.schedule_map.new_begin_iter();
         while (!iter.iter_is_end(&queue.schedule_map) && count < limit) {
             let key = iter.iter_borrow_key();
-            if (key.time > block_time) {
+            if (key.time > block_timestamp_ms) {
                 break;
             };
             let txn_obj = iter.iter_borrow(&queue.schedule_map);
@@ -516,7 +533,7 @@ module aptos_framework::scheduled_txns {
                 key: *key
             };
 
-            if ((block_time - key.time) > aux_data.expiry_delta) {
+            if ((block_timestamp_ms - key.time) > aux_data.expiry_delta) {
                 let (_, delete_ref) = move_scheduled_transaction_container(txn_obj);
                 let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
                 txns_to_expire.push_back(
@@ -542,7 +559,8 @@ module aptos_framework::scheduled_txns {
             cancel_internal(account_addr, key, deposit_amt, delete_ref);
             event::emit(
                 TransactionFailedEvent {
-                    key,
+                    scheduled_txn_time: key.time,
+                    scheduled_txn_hash: key.txn_id,
                     sender_addr: account_addr,
                     cancelled_txn_code: CancelledTxnCode::Expired
                 }
@@ -626,7 +644,8 @@ module aptos_framework::scheduled_txns {
     ) {
         event::emit(
             TransactionFailedEvent {
-                key,
+                scheduled_txn_time: key.time,
+                scheduled_txn_hash: key.txn_id,
                 sender_addr,
                 cancelled_txn_code: CancelledTxnCode::Failed
             }
@@ -807,7 +826,7 @@ module aptos_framework::scheduled_txns {
 
         // try expiring a txn by getting it late
         let expired_time =
-            schedule_time2 + EXPIRY_DELTA_DEFAULT * MILLI_CONVERSION_FACTOR + 1000;
+            schedule_time2 + EXPIRY_DELTA_DEFAULT + 1000;
         assert!(
             get_ready_transactions(expired_time).length() == 0,
             get_ready_transactions(expired_time).length()

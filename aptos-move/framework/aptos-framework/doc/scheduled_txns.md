@@ -14,6 +14,7 @@
 -  [Resource `AuxiliaryData`](#0x1_scheduled_txns_AuxiliaryData)
 -  [Resource `ToRemoveTbl`](#0x1_scheduled_txns_ToRemoveTbl)
 -  [Enum `CancelledTxnCode`](#0x1_scheduled_txns_CancelledTxnCode)
+-  [Struct `TransactionScheduledEvent`](#0x1_scheduled_txns_TransactionScheduledEvent)
 -  [Struct `TransactionFailedEvent`](#0x1_scheduled_txns_TransactionFailedEvent)
 -  [Struct `ShutdownEvent`](#0x1_scheduled_txns_ShutdownEvent)
 -  [Struct `KeyAndTxnInfo`](#0x1_scheduled_txns_KeyAndTxnInfo)
@@ -247,7 +248,6 @@ We pass around only needed info
 ## Struct `ScheduleMapKey`
 
 First sorted in ascending order of time, then on gas priority, and finally on txn_id
-gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
 The goal is to have fixed (less variable) size 'key', 'val' entries in BigOrderedMap, hence we use txn_id
 as a key. That is we have "{time, gas_priority, txn_id} -> ScheduledTxn" instead of
 "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
@@ -268,13 +268,13 @@ Note: ScheduledTxn is still variable size though due to its closure.
 <code>time: u64</code>
 </dt>
 <dd>
- UTC timestamp in the granularity of 100ms
+ UTC timestamp ms
 </dd>
 <dt>
 <code>gas_priority: u64</code>
 </dt>
 <dd>
-
+ gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
 </dd>
 <dt>
 <code>txn_id: u256</code>
@@ -347,7 +347,7 @@ Signer for the store for gas fee deposits
 <code>expiry_delta: u64</code>
 </dt>
 <dd>
- If we cannot schedule in expiry_delta * time granularity(100ms), we will abort the txn
+ If run within the expiry_delta (from the time txn is expected to run), we will abort the txn
 </dd>
 </dl>
 
@@ -446,6 +446,64 @@ Signer for the store for gas fee deposits
 
 </details>
 
+<a id="0x1_scheduled_txns_TransactionScheduledEvent"></a>
+
+## Struct `TransactionScheduledEvent`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionScheduledEvent">TransactionScheduledEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>scheduled_txn_time: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scheduled_txn_hash: u256</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sender_addr: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scheduled_time_ms: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_gas_amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_gas_unit_price: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_scheduled_txns_TransactionFailedEvent"></a>
 
 ## Struct `TransactionFailedEvent`
@@ -464,7 +522,13 @@ Signer for the store for gas fee deposits
 
 <dl>
 <dt>
-<code>key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a></code>
+<code>scheduled_txn_time: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scheduled_txn_hash: u256</code>
 </dt>
 <dd>
 
@@ -591,16 +655,6 @@ Signer for the store for gas fee deposits
 ## Constants
 
 
-<a id="0x1_scheduled_txns_MICRO_CONVERSION_FACTOR"></a>
-
-Conversion factor between our time granularity (100ms) and microseconds
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>: u64 = 100000;
-</code></pre>
-
-
-
 <a id="0x1_scheduled_txns_AVG_SCHED_TXN_SIZE"></a>
 
 The average size of a scheduled transaction to provide an estimate of leaf nodes of BigOrderedMap
@@ -683,10 +737,10 @@ Scheduling is stopped
 
 <a id="0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT"></a>
 
-If we cannot schedule in 100 * time granularity (10s, i.e 100 blocks), we will abort the txn
+If we cannot schedule in 10s, we will abort the txn
 
 
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a>: u64 = 100;
+<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRY_DELTA_DEFAULT">EXPIRY_DELTA_DEFAULT</a>: u64 = 10000;
 </code></pre>
 
 
@@ -716,16 +770,6 @@ Max size of a scheduled transaction; 1MB for now as we are bounded by the slot s
 
 
 <pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MAX_SCHED_TXN_SIZE">MAX_SCHED_TXN_SIZE</a>: u64 = 1048576;
-</code></pre>
-
-
-
-<a id="0x1_scheduled_txns_MILLI_CONVERSION_FACTOR"></a>
-
-Conversion factor between our time granularity (100ms) and milliseconds
-
-
-<pre><code><b>const</b> <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>: u64 = 100;
 </code></pre>
 
 
@@ -897,7 +941,8 @@ Stop, remove and refund all scheduled txns; can be called only by the framework
         <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt, delete_ref);
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
-                key,
+                scheduled_txn_time: key.time,
+                scheduled_txn_hash: key.txn_id,
                 sender_addr: account_addr,
                 cancelled_txn_code: CancelledTxnCode::Shutdown
             }
@@ -1026,8 +1071,8 @@ Insert a scheduled transaction into the queue. ScheduleMapKey is returned to use
     );
 
     // Only schedule txns in the future
-    <b>let</b> txn_time = txn.scheduled_time_ms / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>; // Round down <b>to</b> the nearest 100ms
-    <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / <a href="scheduled_txns.md#0x1_scheduled_txns_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>;
+    <b>let</b> txn_time = txn.scheduled_time_ms;
+    <b>let</b> block_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() / 1000;
     <b>assert</b>!(txn_time &gt; block_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_TIME">EINVALID_TIME</a>));
 
     <b>assert</b>!(
@@ -1083,6 +1128,18 @@ Insert a scheduled transaction into the queue. ScheduleMapKey is returned to use
         sender,
         gas_deposit_store_addr,
         txn.max_gas_amount * txn.max_gas_unit_price
+    );
+
+    // Emit <a href="event.md#0x1_event">event</a> that txn <b>has</b> been scheduled; for now indexer wants <b>to</b> consume this
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionScheduledEvent">TransactionScheduledEvent</a> {
+            scheduled_txn_time: txn_time,
+            scheduled_txn_hash: txn_id,
+            sender_addr: txn.sender_addr,
+            scheduled_time_ms: txn.scheduled_time_ms,
+            max_gas_amount: txn.max_gas_amount,
+            max_gas_unit_price: txn.max_gas_unit_price
+        }
     );
 
     key
@@ -1279,7 +1336,7 @@ in the schedule_map.
 Gets txns due to be run; also expire txns that could not be run for a while (mostly due to low gas priority)
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(timestamp_ms: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(block_timestamp_ms: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
 </code></pre>
 
 
@@ -1289,9 +1346,9 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions">get_ready_transactions</a>(
-    timestamp_ms: u64
+    block_timestamp_ms: u64
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">ScheduledTransactionContainer</a> {
-    <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(timestamp_ms, <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>)
+    <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(block_timestamp_ms, <a href="scheduled_txns.md#0x1_scheduled_txns_GET_READY_TRANSACTIONS_LIMIT">GET_READY_TRANSACTIONS_LIMIT</a>)
 }
 </code></pre>
 
@@ -1305,7 +1362,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 
 
 
-<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(timestamp_ms: u64, limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(block_timestamp_ms: u64, limit: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">scheduled_txns::ScheduledTransactionInfoWithKey</a>&gt;
 </code></pre>
 
 
@@ -1315,7 +1372,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
 
 
 <pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_get_ready_transactions_with_limit">get_ready_transactions_with_limit</a>(
-    timestamp_ms: u64, limit: u64
+    block_timestamp_ms: u64, limit: u64
 ): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt; <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionContainer">ScheduledTransactionContainer</a> {
     <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>();
     // If scheduling is shutdown, we cannot schedule <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more transactions
@@ -1325,7 +1382,6 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     };
 
     <b>let</b> queue = <b>borrow_global</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-    <b>let</b> block_time = timestamp_ms / <a href="scheduled_txns.md#0x1_scheduled_txns_MILLI_CONVERSION_FACTOR">MILLI_CONVERSION_FACTOR</a>;
     <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt;();
     <b>let</b> count = 0;
     <b>let</b> txns_to_expire = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_KeyAndTxnInfo">KeyAndTxnInfo</a>&gt;();
@@ -1333,7 +1389,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     <b>let</b> iter = queue.schedule_map.new_begin_iter();
     <b>while</b> (!iter.iter_is_end(&queue.schedule_map) && count &lt; limit) {
         <b>let</b> key = iter.iter_borrow_key();
-        <b>if</b> (key.time &gt; block_time) {
+        <b>if</b> (key.time &gt; block_timestamp_ms) {
             <b>break</b>;
         };
         <b>let</b> txn_obj = iter.iter_borrow(&queue.schedule_map);
@@ -1349,7 +1405,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
             key: *key
         };
 
-        <b>if</b> ((block_time - key.time) &gt; aux_data.expiry_delta) {
+        <b>if</b> ((block_timestamp_ms - key.time) &gt; aux_data.expiry_delta) {
             <b>let</b> (_, delete_ref) = <a href="scheduled_txns.md#0x1_scheduled_txns_move_scheduled_transaction_container">move_scheduled_transaction_container</a>(txn_obj);
             <b>let</b> deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
             txns_to_expire.push_back(
@@ -1375,7 +1431,8 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
         <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(account_addr, key, deposit_amt, delete_ref);
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
-                key,
+                scheduled_txn_time: key.time,
+                scheduled_txn_hash: key.txn_id,
                 sender_addr: account_addr,
                 cancelled_txn_code: CancelledTxnCode::Expired
             }
@@ -1539,7 +1596,8 @@ Called by the executor when the scheduled transaction is run
 ) {
     <a href="event.md#0x1_event_emit">event::emit</a>(
         <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionFailedEvent">TransactionFailedEvent</a> {
-            key,
+            scheduled_txn_time: key.time,
+            scheduled_txn_hash: key.txn_id,
             sender_addr,
             cancelled_txn_code: CancelledTxnCode::Failed
         }
