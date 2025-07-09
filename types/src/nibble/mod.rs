@@ -39,6 +39,12 @@ impl From<Nibble> for u8 {
     }
 }
 
+impl From<Nibble> for usize {
+    fn from(nibble: Nibble) -> Self {
+        Self::from(nibble.0)
+    }
+}
+
 impl fmt::LowerHex for Nibble {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)

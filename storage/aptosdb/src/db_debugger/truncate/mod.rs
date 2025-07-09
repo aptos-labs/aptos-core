@@ -338,7 +338,7 @@ mod test {
 
             if sharding_config.enable_storage_sharding {
                 let state_merkle_db = Arc::new(state_merkle_db);
-                for i in 0..NUM_STATE_SHARDS as u8 {
+                for i in 0..NUM_STATE_SHARDS {
                     let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueByKeyHashSchema>().unwrap();
                     kv_shard_iter.seek_to_first();
                     for item in kv_shard_iter {
