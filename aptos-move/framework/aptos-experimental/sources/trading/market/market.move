@@ -803,7 +803,7 @@ module aptos_experimental::market {
             if (taker_cancellation_reason.is_some()) {
                 return OrderMatchResult {
                     order_id,
-                    remaining_size,
+                    remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
                     fill_sizes
                 }
