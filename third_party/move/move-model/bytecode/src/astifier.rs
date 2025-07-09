@@ -1429,12 +1429,22 @@ struct IfElseTransformer<'a> {
 
 impl ExpRewriterFunctions for IfElseTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        if let Some(result) = self.try_make_if_else(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else if let Some(result) = self.try_make_if(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else {
-            self.rewrite_exp_descent(exp)
+        let mut old_exp = exp;
+        loop {
+            let new_exp = if let Some(result) = self.try_make_if_else(old_exp.clone()) {
+                self.rewrite_exp_descent(result)
+            } else if let Some(result) = self.try_make_nested_if(old_exp.clone()) {
+                self.rewrite_exp_descent(result)
+            } else {
+                self.rewrite_exp_descent(old_exp.clone())
+            };
+            // keep applying rewrites until a fixed point is reached
+            if new_exp == old_exp {
+                return old_exp;
+            } else {
+                // Continue rewriting with the new expression
+                old_exp = new_exp;
+            }
         }
     }
 }
@@ -1539,6 +1549,74 @@ impl IfElseTransformer<'_> {
             then_branch,
             self.builder.nop(&default_loc),
         ))
+    }
+
+    /// Attempts to create nested if from the given expression.
+    /// This transforms the pattern below
+    ///
+    /// ```move
+    ///   loop { // no loop header
+    ///     <begin_branch> // does not reference loops
+    ///     ( if (c_i) break; <then_branch_i>)+
+    ///     <end_branch> // does not reference loops
+    ///     break|abort|return|continue
+    ///   }
+    ///
+    /// ==>
+    ///   <begin_branch>
+    ///   if (!c_1) {
+    ///      <then_branch_1>
+    ///      if (!c_2){
+    ///         <then_branch_2>
+    ///         if (!c_3) {
+    ///            <then_branch_3>
+    ///            ...
+    ///         }
+    ///      }
+    ///   }
+    ///   <end_branch> where loop_nest -= 1
+    /// ```
+    fn try_make_nested_if(&self, exp: Exp) -> Option<Exp> {
+
+        // Make sure the expression is a loop
+        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
+
+        print!("[Debug:] trying to match nested-if in loop {:?}\n\n", body);
+
+        // Make sure the loop is not a loop header
+        self.check_no_loop_header(*loop_id)?;
+
+        // Match the pattern as described above
+        let mut nested_if = self.builder.match_nested_if_in_loop(body.clone())?;
+        let last_branch = nested_if.pop()?;
+
+        let node_id = exp.node_id();
+        let default_loc = self.builder.env().get_node_loc(node_id);
+        // Make sure the last branch ensures to exit the loop
+        let last_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            last_branch.clone(),
+            0,
+            /*allow_exit*/ true,
+        )?;
+         if last_branch.branches_to(0..1) {
+                    return None;
+        }
+        print!("[Debug:] nested-if pattern found {:?}\n", nested_if);
+        let mut last_branch = last_branch.rewrite_loop_nest(-1);
+        print!("[Debug:] last branch found {:?}\n\n", last_branch);
+        let mut new_body = self.builder.nop(&default_loc);
+        while nested_if.len() > 1 {
+            let cond = nested_if.pop()?;
+            new_body = self.builder.if_else(
+                self.builder.not(cond),
+                self.builder.seq(&default_loc, vec![last_branch, new_body]),
+                self.builder.nop(&default_loc),
+            );
+            last_branch = nested_if.pop()?;
+        }
+
+        Some(self.builder.seq(&default_loc, vec![last_branch, new_body]))
     }
 
     fn check_no_loop_header(&self, node_id: NodeId) -> Option<()> {

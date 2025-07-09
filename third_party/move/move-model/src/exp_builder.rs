@@ -253,6 +253,55 @@ impl<'a> ExpBuilder<'a> {
         cond.map(|c| (c, exp))
     }
 
+    /// Attempts to extract a sequence of if-break-branch
+    ///
+    /// ```move
+    /// branch0 // does not refer to inner loop
+    /// if (c1) break;
+    /// branch1 // does not refer to inner loop
+    /// if (c2) break;
+    /// branch2 // does not refer to inner loop
+    /// ...
+    /// branch_n // we allow the last branch to refer to inner loop; any caller should be aware of this
+    /// ```
+    ///
+    /// This will return the results as a vector <[seq(branch0), c1, seq(branch1), c2, seq(branch2), ...]>
+    pub fn match_nested_if_in_loop(&self, mut exp: Exp) -> Option<Vec<Exp>> {
+        let default_loc = self.env.get_node_loc(exp.node_id());
+        // Vector to track the nested-if sequence
+        let mut nested_if = vec![];
+        // Vector to track the current sequence of expressions
+        let mut cur_seq = vec![];
+
+        loop {
+            let (first, rest) = self.extract_first(exp.clone());
+            // Found a if-break
+            if let Some(c) = self.match_if_loop_cont(first.clone(), 0, false) {
+                // Create a new `seq` statment with exps in `cur_seq` and cleans up `cur_seq`
+                let seq = self.seq(&default_loc, std::mem::take(&mut cur_seq));
+                // Make sure the seq does not refer to the inner loop
+                if seq.branches_to(0..1) {
+                    return None;
+                }
+                nested_if.push(seq);
+                nested_if.push(c);
+            } else {
+                // Not an if-break, so we add it to the current sequence
+                cur_seq.push(first);
+            };
+            // No more exps to process
+            if rest.is_empty() {
+                break;
+            }
+            exp = self.seq(&default_loc, rest)
+        }
+
+        // Do not forget to add the last sequence
+        let seq = self.seq(&default_loc, cur_seq.clone());
+        nested_if.push(seq);
+        Some(nested_if)
+    }
+
     pub fn new_node_id(&self, loc: Loc, ty: Type) -> NodeId {
         self.env.new_node(loc, ty)
     }

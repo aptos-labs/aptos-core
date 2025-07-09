@@ -22,44 +22,45 @@ module 0x99::cfg_opt_complex {
         let _t1;
         let _t2;
         let _t5;
-        'l1: loop {
+        'l0: loop {
             if (!((self is Institution) && (&self.admin is Superuser))) {
                 {
-                    while (self is Institution) {
+                    if (self is Institution) {
                         _t5 = &self.admin;
-                        if (!(_t5 is User)) break;
-                        _t2 = &_t5._0;
-                        if (*_t2 > 10) break;
-                        break
+                        if (_t5 is User) {
+                            _t2 = &_t5._0;
+                            if (!(*_t2 > 10)) ()
+                        }
                     };
-                    'l0: loop {
-                        while (self is Institution) {
+                    loop {
+                        if (self is Institution) {
                             _t5 = &self.admin;
-                            if (!(_t5 is User)) break;
-                            if (!(*&_t5._0 <= 10)) break;
-                            break 'l0
+                            if (_t5 is User) {
+                                if (*&_t5._0 <= 10) break}
                         };
                         _t1 = self;
-                        while (_t1 is Person) {
+                        if (_t1 is Person) {
                             _t2 = &_t1.id;
-                            if (!(*_t2 > 10)) break;
-                            _t3 = *_t2;
-                            break 'l1
+                            if (*_t2 > 10) {
+                                _t3 = *_t2;
+                                break 'l0
+                            }
                         };
                         if (_t1 is Institution) {
                             _t3 = *&_t1.id;
-                            break 'l1
+                            break 'l0
                         };
                         _t3 = 0;
-                        break 'l1
+                        break 'l0
                     };
                     _t1 = self;
-                    'l2: loop {
-                        while (_t1 is Person) {
+                    loop {
+                        if (_t1 is Person) {
                             _t2 = &_t1.id;
-                            if (!(*_t2 > 10)) break;
-                            _t6 = *_t2;
-                            break 'l2
+                            if (*_t2 > 10) {
+                                _t6 = *_t2;
+                                break
+                            }
                         };
                         if (_t1 is Institution) {
                             _t6 = *&_t1.id;
@@ -72,12 +73,13 @@ module 0x99::cfg_opt_complex {
                     break
                 };
                 _t1 = self;
-                'l3: loop {
-                    while (_t1 is Person) {
+                loop {
+                    if (_t1 is Person) {
                         _t2 = &_t1.id;
-                        if (!(*_t2 > 10)) break;
-                        _t6 = *_t2;
-                        break 'l3
+                        if (*_t2 > 10) {
+                            _t6 = *_t2;
+                            break
+                        }
                     };
                     if (_t1 is Institution) {
                         _t6 = *&_t1.id;
@@ -89,12 +91,13 @@ module 0x99::cfg_opt_complex {
                 _t3 = *_t2 + _t6;
                 break
             };
-            'l4: loop {
-                while (self is Person) {
+            loop {
+                if (self is Person) {
                     _t2 = &self.id;
-                    if (!(*_t2 > 10)) break;
-                    _t8 = *_t2;
-                    break 'l4
+                    if (*_t2 > 10) {
+                        _t8 = *_t2;
+                        break
+                    }
                 };
                 if (self is Institution) {
                     _t8 = *&self.id;

@@ -28,7 +28,8 @@ module 0x99::noexit_loops {
         loop continue
     }
     fun f14(p: bool, q: bool) {
-        if (p && q) loop continue;
+        if (p) {
+            if (q) loop continue};
     }
     fun f15() {
         let _t0;
