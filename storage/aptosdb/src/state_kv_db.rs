@@ -28,7 +28,10 @@ use aptos_schemadb::{
 };
 use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::{ShardedKey, StateKey},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use arr_macro::arr;

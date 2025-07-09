@@ -214,10 +214,6 @@ impl StateKey {
         &self.0.deserialized
     }
 
-    pub fn get_shard_id(&self) -> usize {
-        usize::from(self.crypto_hash_ref().nibble(0))
-    }
-
     pub fn is_aptos_code(&self) -> bool {
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => {
@@ -283,6 +279,16 @@ impl PartialOrd for StateKey {
 impl Ord for StateKey {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.deserialized.cmp(&other.0.deserialized)
+    }
+}
+
+pub trait ShardedKey {
+    fn get_shard_id(&self) -> usize;
+}
+
+impl ShardedKey for StateKey {
+    fn get_shard_id(&self) -> usize {
+        self.crypto_hash_ref().nibble(0) as usize
     }
 }
 
