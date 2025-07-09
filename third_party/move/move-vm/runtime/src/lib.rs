@@ -44,12 +44,17 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
+    loader::{
+        eager::EagerLoader,
+        lazy::LazyLoader,
+        traits::{Loader, ModuleMetadataLoader},
+    },
     module_storage::{
         ambassador_impl_ModuleStorage, AsFunctionValueExtension, FunctionValueExtensionAdapter,
         ModuleStorage,
     },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
+    ty_layout_converter::LayoutConverter,
 };
 
 #[macro_export]

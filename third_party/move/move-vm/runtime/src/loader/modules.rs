@@ -549,6 +549,10 @@ impl Module {
         self.single_signature_token_map.get(&idx).unwrap()
     }
 
+    pub fn compiled_module(&self) -> Arc<CompiledModule> {
+        self.module.clone()
+    }
+
     pub fn get_function(&self, function_name: &IdentStr) -> VMResult<Arc<Function>> {
         Ok(self
             .function_map
