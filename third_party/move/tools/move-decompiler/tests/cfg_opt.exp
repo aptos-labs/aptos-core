@@ -23,7 +23,9 @@ module 0x99::cfg_opt_complex {
         let _t2;
         let _t5;
         'l0: loop {
-            if (!((self is Institution) && (&self.admin is Superuser))) {
+            loop {
+                if (self is Institution) {
+                    if (&self.admin is Superuser) break};
                 {
                     if (self is Institution) {
                         _t5 = &self.admin;
@@ -70,7 +72,7 @@ module 0x99::cfg_opt_complex {
                         break
                     };
                     _t3 = _t6 + 5;
-                    break
+                    break 'l0
                 };
                 _t1 = self;
                 loop {
@@ -89,7 +91,7 @@ module 0x99::cfg_opt_complex {
                     break
                 };
                 _t3 = *_t2 + _t6;
-                break
+                break 'l0
             };
             loop {
                 if (self is Person) {
@@ -115,15 +117,23 @@ module 0x99::cfg_opt_complex {
 
 module 0x99::cfg_opt_simple {
     fun test1(x: u64, y: u64): u64 {
-        loop {
-            if (x > 1 || y > 2) loop y = y + 1 else break;
+        'l0: loop {
+            loop {
+                if (!(x > 1)) {
+                    if (!(y > 2)) break 'l0};
+                y = y + 1
+            };
             break
         };
         x + 1 + y
     }
     fun test2(x: u64, y: u64): u64 {
-        loop {
-            if (x > 1 || y > 2) loop y = y + 1 else break;
+        'l0: loop {
+            loop {
+                if (!(x > 1)) {
+                    if (!(y > 2)) break 'l0};
+                y = y + 1
+            };
             break
         };
         x + y

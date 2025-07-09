@@ -217,6 +217,19 @@ impl<'a> ExpBuilder<'a> {
         }
     }
 
+    pub fn match_if_then_break(&self, exp: Exp) -> Option<(Exp, Exp)> {
+        let node_id = exp.node_id();
+        let default_loc = self.env().get_node_loc(node_id);
+        match exp.as_ref() {
+            ExpData::IfElse(_, cond, if_true, if_false)
+            if if_false.is_unit_exp() && self.extract_terminated_prefix(&default_loc, if_true.clone(), 0, true).is_some()
+            => {
+                Some((cond.clone(), if_true.clone()))
+            },
+            _ => None,
+        }
+    }
+
     pub fn match_if_loop_cont(&self, exp: Exp, nest: usize, is_continue: bool) -> Option<Exp> {
         let (cond, if_true) = self.match_if(exp)?;
         if if_true.is_loop_cont(Some(nest), is_continue) {
@@ -256,38 +269,36 @@ impl<'a> ExpBuilder<'a> {
     /// Attempts to extract a sequence of if-break-branch
     ///
     /// ```move
-    /// branch0 // does not refer to inner loop
-    /// if (c1) break;
-    /// branch1 // does not refer to inner loop
-    /// if (c2) break;
-    /// branch2 // does not refer to inner loop
-    /// ...
-    /// branch_n // we allow the last branch to refer to inner loop; any caller should be aware of this
+    /// branch_0
+    /// if (c_1) break;
+    /// branch_1
+    /// if (c_2) break;
+    /// branch_2
+    /// if (c_n) break;
+    /// branch_n
     /// ```
     ///
     /// This will return the results as a vector <[seq(branch0), c1, seq(branch1), c2, seq(branch2), ...]>
-    pub fn match_nested_if_in_loop(&self, mut exp: Exp) -> Option<Vec<Exp>> {
+    pub fn match_if_break_branch_list(&self, mut exp: Exp) -> Option<Vec<Exp>> {
         let default_loc = self.env.get_node_loc(exp.node_id());
-        // Vector to track the nested-if sequence
-        let mut nested_if = vec![];
-        // Vector to track the current sequence of expressions
-        let mut cur_seq = vec![];
+        // Vector to track the if-break-branch list
+        let mut if_branch_list = vec![];
+        // Vector to track the current sequence of expressions that represent a branch
+        let mut cur_branch = vec![];
 
         loop {
             let (first, rest) = self.extract_first(exp.clone());
             // Found a if-break
             if let Some(c) = self.match_if_loop_cont(first.clone(), 0, false) {
-                // Create a new `seq` statment with exps in `cur_seq` and cleans up `cur_seq`
-                let seq = self.seq(&default_loc, std::mem::take(&mut cur_seq));
-                // Make sure the seq does not refer to the inner loop
-                if seq.branches_to(0..1) {
-                    return None;
-                }
-                nested_if.push(seq);
-                nested_if.push(c);
+                // Queue `cur_branch` (the branch before the if-break)
+                // Meanwhile clean up `cur_branch`
+                let seq = self.seq(&default_loc, std::mem::take(&mut cur_branch));
+                if_branch_list.push(seq);
+                // Queue the condition
+                if_branch_list.push(c);
             } else {
                 // Not an if-break, so we add it to the current sequence
-                cur_seq.push(first);
+                cur_branch.push(first);
             };
             // No more exps to process
             if rest.is_empty() {
@@ -297,9 +308,65 @@ impl<'a> ExpBuilder<'a> {
         }
 
         // Do not forget to add the last sequence
-        let seq = self.seq(&default_loc, cur_seq.clone());
-        nested_if.push(seq);
-        Some(nested_if)
+        let seq = self.seq(&default_loc, cur_branch.clone());
+        if_branch_list.push(seq);
+        Some(if_branch_list)
+    }
+
+    /// Attempts to extract a sequence of if-then-branch-else-branch
+    ///
+    /// ```move
+    /// branch_0
+    /// if (c_1) {
+    ///     then_branch1
+    /// }
+    /// else_branch_1
+    /// if (c_2) {
+    ///     then_branch2
+    /// }
+    /// else_branch_2
+    /// if (c_n) {
+    ///     then_branch_n
+    /// }
+    /// else_branch_n
+    /// ```
+    ///
+    /// This will return the results as a vector <[seq(branch0), c1, seq(then_branch1), seq(else_branch1), c2, seq(then_branch2), seq(else_branch2), ...]>
+    pub fn match_if_branch_break_branch_list(&self, mut exp: Exp) -> Option<Vec<Exp>> {
+        let default_loc = self.env.get_node_loc(exp.node_id());
+        // Vector to track the if-then-else list
+        let mut if_else_list = vec![];
+        // Vector to track the current sequence of expressions that represent an else-branch
+        let mut cur_branch = vec![];
+
+        loop {
+            let (first, rest) = self.extract_first(exp.clone());
+            // Found a if-then
+            if let Some((c, if_true)) = self.match_if_then_break(first.clone()) {
+                // Queue `cur_branch` (the else-branch before the if-then)
+                // Meanwhile clean up `cur_branch`
+                let seq = self.seq(&default_loc, std::mem::take(&mut cur_branch));
+                if_else_list.push(seq);
+                // Queue the condition
+                if_else_list.push(c);
+                // Queue the then-branch
+                // The then-branch should already be a sequence (or a single expression)
+                if_else_list.push(if_true);
+            } else {
+                // Not an if-branch, so we add it to the current sequence
+                cur_branch.push(first);
+            };
+            // No more exps to process
+            if rest.is_empty() {
+                break;
+            }
+            exp = self.seq(&default_loc, rest)
+        }
+
+        // Do not forget to add the last sequence
+        let seq = self.seq(&default_loc, cur_branch.clone());
+        if_else_list.push(seq);
+        Some(if_else_list)
     }
 
     pub fn new_node_id(&self, loc: Loc, ty: Type) -> NodeId {

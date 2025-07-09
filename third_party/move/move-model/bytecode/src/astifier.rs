@@ -1431,9 +1431,9 @@ impl ExpRewriterFunctions for IfElseTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         let mut old_exp = exp;
         loop {
-            let new_exp = if let Some(result) = self.try_make_if_else(old_exp.clone()) {
+            let new_exp = if let Some(result) = self.try_make_if(old_exp.clone()) {
                 self.rewrite_exp_descent(result)
-            } else if let Some(result) = self.try_make_nested_if(old_exp.clone()) {
+            } else if let Some(result) = self.try_make_if_else(old_exp.clone()) {
                 self.rewrite_exp_descent(result)
             } else {
                 self.rewrite_exp_descent(old_exp.clone())
@@ -1442,7 +1442,6 @@ impl ExpRewriterFunctions for IfElseTransformer<'_> {
             if new_exp == old_exp {
                 return old_exp;
             } else {
-                // Continue rewriting with the new expression
                 old_exp = new_exp;
             }
         }
@@ -1450,173 +1449,222 @@ impl ExpRewriterFunctions for IfElseTransformer<'_> {
 }
 
 impl IfElseTransformer<'_> {
-    /// Attempts to create an if-then-else from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator. Here, with 'does not branch out of a loop' we mean
-    /// that an expressions does not contain any unbound break or
-    /// continue statements which point outside the given loop:
-    ///
-    /// ```move
-    /// loop {
-    ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <else-branch> // no reference to inner loop
-    ///     break[1]
-    ///   }
-    ///   <then-branch>
-    /// }
-    /// ==>
-    /// if (c1 || .. || cn) {
-    ///   loop {
-    ///     <then-branch>
-    ///   }
-    /// else {
-    ///   loop {
-    ///     <else-branch> where loop_nest -= 1
-    ///   }
-    /// }
-    /// ```
-    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
-        let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
-        let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
-        let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, else_branch) = self.builder.match_if_break_list(inner_body.clone())?;
-
-        // Make sure the inner loop is not a loop header
-        self.check_no_loop_header(*inner_id)?;
-        // Make sure the else branch does not refer to inner loop
-        if else_branch.branches_to(0..1) {
-            return None;
-        }
-        // Decrease the nesting level of LoopCont expressions
-        // since we will eliminate the inner loop
-        let else_branch = else_branch.rewrite_loop_nest(-1);
-
-        let then_branch = self.builder.seq(&default_loc, then_branch);
-
-        Some(self.builder.if_else(
-            cond.clone(),
-            self.builder.loop_(then_branch),
-            self.builder.loop_(else_branch),
-        ))
-    }
-
-    /// Attempts to create an if-then (without else) from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator:
-    ///
-    /// ```move
-    ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <then-branch> // does not reference loop
-    ///     break|abort|return|continue
-    ///   }
-    ///
-    /// ==>
-    ///
-    ///   if (!(c1 || .. || cn)) {
-    ///     <then-branch> where loop_nest -= 1
-    ///   }
-    /// ```
-    fn try_make_if(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
-        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, rest) = self.builder.match_if_break_list(body.clone())?;
-        let then_branch = self.builder.extract_terminated_prefix(
-            &default_loc,
-            rest,
-            0,
-            /*allow_exit*/ true,
-        )?;
-
-        // Check conditions
-        self.check_no_loop_header(*loop_id)?;
-        if then_branch.branches_to(0..1) {
-            return None;
-        }
-
-        // Construct result
-        let then_branch = then_branch.rewrite_loop_nest(-1);
-        Some(self.builder.if_else(
-            self.builder.not(cond),
-            then_branch,
-            self.builder.nop(&default_loc),
-        ))
-    }
-
-    /// Attempts to create nested if from the given expression.
+    /// Attempts to create `if-then` from the given expression.
     /// This transforms the pattern below
     ///
     /// ```move
     ///   loop { // no loop header
-    ///     <begin_branch> // does not reference loops
-    ///     ( if (c_i) break; <then_branch_i>)+
-    ///     <end_branch> // does not reference loops
+    ///     <begin_branch> // does not reference current loop
+    ///     if (c_1) break;
+    ///     then_branch_1 // does not reference current loop
+    ///     if (c_2) break;
+    ///     then_branch_2 // does not reference current loop
+    ///     ...
+    ///    if (c_n)
+    ///     <end_branch> // does not reference current loop
     ///     break|abort|return|continue
     ///   }
-    ///
     /// ==>
     ///   <begin_branch>
     ///   if (!c_1) {
     ///      <then_branch_1>
     ///      if (!c_2){
     ///         <then_branch_2>
-    ///         if (!c_3) {
-    ///            <then_branch_3>
-    ///            ...
+    ///         ...
+    ///         if (!c_n) {
+    ///            <end_branch> where loop_nest -= 1
     ///         }
     ///      }
     ///   }
-    ///   <end_branch> where loop_nest -= 1
     /// ```
-    fn try_make_nested_if(&self, exp: Exp) -> Option<Exp> {
-
+    ///
+    fn try_make_if(&self, exp: Exp) -> Option<Exp> {
         // Make sure the expression is a loop
         let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
-
-        print!("[Debug:] trying to match nested-if in loop {:?}\n\n", body);
-
         // Make sure the loop is not a loop header
         self.check_no_loop_header(*loop_id)?;
 
         // Match the pattern as described above
-        let mut nested_if = self.builder.match_nested_if_in_loop(body.clone())?;
-        let last_branch = nested_if.pop()?;
+        // Note: `nested_if` ALWAYS follows the format of [<begin_branch>, c_1, <then_branch_1>, c_2, <then_branch_2>, ..., c_n, <end_branch>],
+        let mut nested_if = self.builder.match_if_break_branch_list(body.clone())?;
+        let end_branch = nested_if.pop()?;
 
         let node_id = exp.node_id();
         let default_loc = self.builder.env().get_node_loc(node_id);
-        // Make sure the last branch ensures to exit the loop
-        let last_branch = self.builder.extract_terminated_prefix(
+        // Make sure the `end-branch` always exits the loop
+        let end_branch = self.builder.extract_terminated_prefix(
             &default_loc,
-            last_branch.clone(),
+            end_branch.clone(),
             0,
             /*allow_exit*/ true,
         )?;
-         if last_branch.branches_to(0..1) {
-                    return None;
+        // Make sure the `end-branch` does not branch-back-to/break the loop header
+        if end_branch.branches_to(0..1) {
+            return None;
         }
-        print!("[Debug:] nested-if pattern found {:?}\n", nested_if);
-        let mut last_branch = last_branch.rewrite_loop_nest(-1);
-        print!("[Debug:] last branch found {:?}\n\n", last_branch);
+
+        // recursively assemble a nested-if expression
+        //   - start from the `end-branch`
+        //     - put the `end-branch` as the true branch of `if(!c_n)`, forming `if(!c_n) { <end-branch> }`
+        //     - put the new `if` expression as the `new_body`
+        //   - continue with an upper-level branch, say `branch_n-1`
+        //     - put the `branch_n-1` and previous `new_body` as the true branch of `if(!c_n-1)`, forming `if(!c_n-1) { <branch_n-1>; new_body }`
+        //     - put the new `if` expression as the `new_body`
+        //   - repeat until we reach the `begin_branch`
+        let mut cur_branch = end_branch.rewrite_loop_nest(-1);
         let mut new_body = self.builder.nop(&default_loc);
         while nested_if.len() > 1 {
             let cond = nested_if.pop()?;
             new_body = self.builder.if_else(
                 self.builder.not(cond),
-                self.builder.seq(&default_loc, vec![last_branch, new_body]),
+                self.builder.seq(&default_loc, vec![cur_branch, new_body]),
                 self.builder.nop(&default_loc),
             );
-            last_branch = nested_if.pop()?;
+            cur_branch = nested_if.pop()?;
+
+            // get the terminated prefix of `cur_branch` or fallback to the original
+            cur_branch = self.builder.extract_terminated_prefix(
+                &default_loc,
+                cur_branch.clone(),
+                0,
+                /*allow_exit*/ true,
+            ).unwrap_or(cur_branch);
+
+            // make sure the `cur_branch` does not branch-back-to/break the loop header
+            if cur_branch.branches_to(0..1) {
+                return None;
+            }
+            // in case the `cur_branch` branches to an outer loop
+            cur_branch = cur_branch.rewrite_loop_nest(-1);
         }
 
-        Some(self.builder.seq(&default_loc, vec![last_branch, new_body]))
+        Some(self.builder.seq(&default_loc, vec![cur_branch, new_body]))
+    }
+
+    /// Attempts to create `if-then-else` from the given expression.
+    /// This transforms the pattern below
+    ///
+    /// ```move
+    ///   loop { // no loop header
+    ///     <begin_branch> // does not reference current loop
+    ///     if (c_1) {
+    ///         then_branch_1 // does not reference current loop
+    ///         break;
+    ///     }
+    ///     else_branch_1 // does not reference current loop
+    ///     if (c_2) {
+    ///         then_branch_2 // does not reference current loop
+    ///         break;
+    ///     }
+    ///     else_branch_2 // does not reference current loop
+    ///     ...
+    ///     if (c_n) {
+    ///        then_branch_n // does not reference current loop
+    ///        break;
+    ///     }
+    ///     <end_branch> // does not reference current loop
+    ///     break|abort|return|continue
+    /// ==>
+    ///   <begin_branch>
+    ///   if (c_1) {
+    ///      <then_branch_1>
+    ///   } else {
+    ///       <else_branch_1>
+    ///       if (c_2) {
+    ///           <then_branch_2>
+    ///       } else {
+    ///           <else_branch_2>
+    ///           ...
+    ///           if (c_n) {
+    ///              then_branch_n
+    ///           } else {
+    ///              <end_branch> where loop_nest -= 1
+    ///           }
+    ///       }
+    ///   }
+    /// ```
+    ///
+    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
+        // Make sure the expression is a loop
+        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
+        // Make sure the loop is not a loop header
+        self.check_no_loop_header(*loop_id)?;
+
+        // Match the pattern as described above
+        // Note: `if_else_list` ALWAYS follows the format of
+        //   <[seq(begin_branch), c1, seq(then_branch1), seq(else_branch1), c2, seq(then_branch2), seq(else_branch2), ... cn, seq(then_branch_n), seq(end_branch)]>
+        let mut if_else_list = self.builder.match_if_branch_break_branch_list(body.clone())?;
+        let end_branch = if_else_list.pop()?;
+
+        let node_id = exp.node_id();
+        let default_loc = self.builder.env().get_node_loc(node_id);
+        // Make sure the `end-branch` always exits the loop
+        let end_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            end_branch.clone(),
+            0,
+            /*allow_exit*/ true,
+        )?;
+        // Make sure the `end-branch` does not branch-back-to/break the loop header
+        if end_branch.branches_to(0..1) {
+            return None;
+        }
+
+        // recursively assemble a nested-if-else expression
+        //   - start from the `end-branch`
+        //     - put the `end-branch` as the true branch of `if(!c_n)`, forming `if(!c_n) { <end-branch> }`
+        //     - put the new `if` expression as the `new_body`
+        //   - continue with an upper-level branch, say `branch_n-1`
+        //     - put the `branch_n-1` and previous `new_body` as the true branch of `if(!c_n-1)`, forming `if(!c_n-1) { <branch_n-1>; new_body }`
+        //     - put the new `if` expression as the `new_body`
+        //   - repeat until we reach the `begin_branch`
+        let mut else_branch = end_branch.rewrite_loop_nest(-1);
+        let mut new_body = self.builder.nop(&default_loc);
+
+        while if_else_list.len() > 2 {
+            let mut then_branch = if_else_list.pop()?;
+            let cond = if_else_list.pop()?;
+
+            // get the terminated prefix of `then_branch`
+            then_branch = self.builder.extract_terminated_prefix(
+                &default_loc,
+                then_branch.clone(),
+                0,
+                /*allow_exit*/ true,
+            ).expect("then_branch must be terminated");
+
+            // make sure the `then_branch` does not branch-back-to/break the loop header
+            if then_branch.branches_to(0..1) {
+                return None;
+            }
+
+            then_branch = then_branch.rewrite_loop_nest(-1);
+
+            new_body = self.builder.if_else(
+                cond,
+                then_branch,
+                self.builder.seq(&default_loc, vec![else_branch, new_body])
+            );
+            else_branch = if_else_list.pop()?;
+
+            // get the terminated prefix of `else_branch` or fallback to the original
+            else_branch = self.builder.extract_terminated_prefix(
+                &default_loc,
+                else_branch.clone(),
+                0,
+                /*allow_exit*/ true,
+            ).unwrap_or(else_branch);
+
+            // make sure the `else_branch` does not branch-back-to/break the loop header
+            if else_branch.branches_to(0..1) {
+                return None;
+            }
+            // in case the `else_branch` branches to an outer loop
+            else_branch = else_branch.rewrite_loop_nest(-1);
+        }
+
+        // Add the ``begin_branch`` to the top of the expression
+        Some(self.builder.seq(&default_loc, vec![else_branch, new_body]))
     }
 
     fn check_no_loop_header(&self, node_id: NodeId) -> Option<()> {
