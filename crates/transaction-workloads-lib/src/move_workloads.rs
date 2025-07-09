@@ -265,6 +265,12 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    InitExistenceCheck,
+    ExistenceCheck {
+        // Modifications enforce serialization, workload should parallelize to the factor of 1/modify_frequency
+        modify_frequency: f64,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -320,7 +326,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
-            EntryPoints::OrderBook { .. } => "experimental_usecases",
+            EntryPoints::OrderBook { .. } | EntryPoints::InitExistenceCheck | EntryPoints::ExistenceCheck { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -402,6 +408,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::InitExistenceCheck | EntryPoints::ExistenceCheck { .. } => "existence",
         }
     }
 
@@ -866,6 +873,15 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::InitExistenceCheck => get_payload_void(module_id, ident_str!("create").to_owned()),
+            EntryPoints::ExistenceCheck { modify_frequency } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                if rng.gen_bool(*modify_frequency) {
+                    get_payload_void(module_id, ident_str!("modify").to_owned())
+                } else {
+                    get_payload_void(module_id, ident_str!("check").to_owned())
+                }
+            },
         }
     }
 
@@ -897,6 +913,7 @@ impl EntryPointTrait for EntryPoints {
                     milestone_every: *milestone_every,
                 }))
             },
+            EntryPoints::ExistenceCheck { .. } => Some(Box::new(EntryPoints::InitExistenceCheck)),
             _ => None,
         }
     }
@@ -917,6 +934,7 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => MultiSigConfig::Publisher,
+            EntryPoints::InitExistenceCheck => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -987,6 +1005,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::InitExistenceCheck => AutomaticArgs::Signer,
+            EntryPoints::ExistenceCheck { .. } => AutomaticArgs::None,
         }
     }
 }
