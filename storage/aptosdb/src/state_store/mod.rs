@@ -958,7 +958,7 @@ impl StateStore {
         enable_sharding: bool,
     ) -> Result<()> {
         values.iter().for_each(|((key, version), value)| {
-            let shard_id = key.get_shard_id() as usize;
+            let shard_id = key.get_shard_id();
             assert!(
                 shard_id < NUM_STATE_SHARDS,
                 "Invalid shard id: {}",
@@ -1088,7 +1088,7 @@ impl StateStore {
         let mut keys: Vec<aptos_jellyfish_merkle::node_type::NodeKey> =
             all_rows.into_iter().map(|(k, _v)| k).collect();
         if self.state_merkle_db.sharding_enabled() {
-            for i in 0..NUM_STATE_SHARDS as u8 {
+            for i in 0..NUM_STATE_SHARDS {
                 let mut iter =
                     self.state_merkle_db
                         .db_shard(i)

@@ -154,7 +154,7 @@ fn collect_per_version_sharded_state_values(c: &mut Criterion, write_sets: &[Wri
                 .map(|write_set| {
                     let mut ret = empty_shards::<Vec<_>>();
                     for (k, v) in write_set.state_update_refs() {
-                        ret[k.get_shard_id() as usize].push((k, v));
+                        ret[k.get_shard_id()].push((k, v));
                     }
                     ret
                 })
@@ -170,7 +170,7 @@ fn collect_per_version_sharded_state_values(c: &mut Criterion, write_sets: &[Wri
                 .map(|write_set| {
                     let mut ret = empty_shards::<Vec<_>>();
                     for (k, v) in write_set.state_update_refs() {
-                        ret[k.get_shard_id() as usize].push((k, v));
+                        ret[k.get_shard_id()].push((k, v));
                     }
                     ret
                 })
@@ -185,7 +185,7 @@ fn collect_per_version_sharded_state_values(c: &mut Criterion, write_sets: &[Wri
                 .map(|write_set| {
                     let mut ret = empty_shards::<Vec<_>>();
                     for (k, v) in write_set.state_updates_cloned() {
-                        ret[k.get_shard_id() as usize].push((k, v));
+                        ret[k.get_shard_id()].push((k, v));
                     }
                     ret
                 })
@@ -201,7 +201,7 @@ fn collect_per_version_sharded_state_values(c: &mut Criterion, write_sets: &[Wri
                 .map(|write_set| {
                     let mut ret = empty_shards::<HashMap<_, _>>();
                     for (k, v) in write_set.state_update_refs() {
-                        ret[k.get_shard_id() as usize].insert(k, v);
+                        ret[k.get_shard_id()].insert(k, v);
                     }
                     ret
                 })
@@ -217,7 +217,7 @@ fn collect_per_version_sharded_state_values(c: &mut Criterion, write_sets: &[Wri
                 .map(|write_set| {
                     let mut ret = empty_shards::<HashMap<_, _>>();
                     for (k, v) in write_set.state_update_refs() {
-                        ret[k.get_shard_id() as usize].insert(k, v);
+                        ret[k.get_shard_id()].insert(k, v);
                     }
                     ret
                 })
@@ -236,7 +236,7 @@ fn collect_sharded_per_version_state_value_refs(c: &mut Criterion, write_sets: &
 
             write_sets.iter().enumerate().for_each(|(idx, write_set)| {
                 for (k, v) in write_set.state_update_refs() {
-                    ret[k.get_shard_id() as usize][idx].push((k, v));
+                    ret[k.get_shard_id()][idx].push((k, v));
                 }
             });
             ret
@@ -254,7 +254,7 @@ fn collect_sharded_per_version_state_value_refs(c: &mut Criterion, write_sets: &
                 .for_each(|(shard_id, shard)| {
                     write_sets.iter().enumerate().for_each(|(idx, write_set)| {
                         for (k, v) in write_set.state_update_refs() {
-                            if k.get_shard_id() == shard_id as u8 {
+                            if k.get_shard_id() == shard_id {
                                 shard[idx].push((k, v));
                             }
                         }
@@ -271,7 +271,7 @@ fn collect_sharded_per_version_state_value_refs(c: &mut Criterion, write_sets: &
 
             write_sets.iter().enumerate().for_each(|(idx, write_set)| {
                 for (k, v) in write_set.state_update_refs() {
-                    ret[k.get_shard_id() as usize][idx].insert(k, v);
+                    ret[k.get_shard_id()][idx].insert(k, v);
                 }
             });
             ret
@@ -289,7 +289,7 @@ fn collect_sharded_state_updates_with_version(c: &mut Criterion, write_sets: &[W
                 arr![Vec::with_capacity(write_sets.len()); 16];
             write_sets.iter().enumerate().for_each(|(idx, write_set)| {
                 for (k, v) in write_set.state_update_refs() {
-                    ret[k.get_shard_id() as usize].push((first_version + idx as Version, k, v));
+                    ret[k.get_shard_id()].push((first_version + idx as Version, k, v));
                 }
             });
 
@@ -420,7 +420,7 @@ fn collect_state_update_maps(c: &mut Criterion, write_sets: &[WriteSet]) {
         .map(|write_set| {
             let mut ret = empty_shards::<Vec<_>>();
             for (k, v) in write_set.state_update_refs() {
-                ret[k.get_shard_id() as usize].push((k, v));
+                ret[k.get_shard_id()].push((k, v));
             }
             ret
         })
@@ -467,7 +467,7 @@ fn collect_state_update_maps(c: &mut Criterion, write_sets: &[WriteSet]) {
         let mut ret = arr![Vec::with_capacity(write_sets.len()); 16];
         write_sets.iter().enumerate().for_each(|(idx, write_set)| {
             for (k, v) in write_set.state_update_refs() {
-                ret[k.get_shard_id() as usize].push((first_version + idx as Version, k, v));
+                ret[k.get_shard_id()].push((first_version + idx as Version, k, v));
             }
         });
         ret

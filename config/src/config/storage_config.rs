@@ -444,7 +444,7 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
-    pub fn state_kv_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.state_kv_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
@@ -456,13 +456,13 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
-    pub fn state_merkle_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn state_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.state_merkle_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
     }
 
-    pub fn hot_state_kv_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn hot_state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.hot_state_kv_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
@@ -518,8 +518,8 @@ impl ShardedDbPaths {
         self.metadata_path.as_ref()
     }
 
-    fn shard_path(&self, shard_id: u8) -> Option<&PathBuf> {
-        self.shard_paths[shard_id as usize].as_ref()
+    fn shard_path(&self, shard_id: usize) -> Option<&PathBuf> {
+        self.shard_paths[shard_id].as_ref()
     }
 }
 
