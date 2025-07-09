@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{AptosMoveResolver, SessionExt},
+    v2::AptosSession,
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
 use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::LoadedFunction;
@@ -30,8 +29,7 @@ pub fn determine_is_view(
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
 pub(crate) fn validate_view_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    session: &mut impl AptosSession,
     args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
     func: &LoadedFunction,
@@ -58,7 +56,6 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        module_storage,
         func.param_tys(),
         args,
         func.ty_args(),

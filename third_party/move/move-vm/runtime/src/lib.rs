@@ -47,6 +47,7 @@ pub use storage::{
     loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
     module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
+    ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
 };
 
 #[macro_export]

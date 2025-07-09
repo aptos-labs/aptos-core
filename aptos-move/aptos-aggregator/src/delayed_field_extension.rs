@@ -14,6 +14,7 @@ use aptos_types::{
         SnapshotToStringFormula,
     },
     error::{code_invariant_error, expect_ok, PanicOr},
+    vm::versioning::{VersionController, VersionedSlot},
 };
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
@@ -30,11 +31,28 @@ fn get_delayed_field_value_from_storage(
 /// removed), what are their states, etc. per single transaction).
 #[derive(Default)]
 pub struct DelayedFieldData {
-    // All aggregator instances that exist in the current transaction.
-    delayed_fields: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    /// Stores the current version of data and controls saves/undos.
+    version_controller: VersionController,
+    /// All delayed field changes.
+    ///
+    /// Note: because delayed fields are not materialized, we use () for materialized value in the
+    /// slot.
+    delayed_fields: BTreeMap<DelayedFieldID, VersionedSlot<DelayedChange<DelayedFieldID>, ()>>,
 }
 
 impl DelayedFieldData {
+    /// Records an undo request for the data. All undoing will be done lazily when aggregators are
+    /// actually accessed.
+    pub fn undo(&mut self) {
+        self.version_controller.undo();
+    }
+
+    /// Records a save request for the data. All saving will be done lazily when aggregators are
+    /// actually accessed.
+    pub fn save(&mut self) {
+        self.version_controller.save();
+    }
+
     pub fn try_add_delta(
         &mut self,
         id: DelayedFieldID,
@@ -58,6 +76,7 @@ impl DelayedFieldData {
             return Ok(false);
         }
 
+        let current_version = self.version_controller.current_version();
         match self.delayed_fields.entry(id) {
             Entry::Vacant(entry) => {
                 let result = resolver.delayed_field_try_add_delta_outcome(
@@ -67,15 +86,18 @@ impl DelayedFieldData {
                     max_value,
                 )?;
                 if result && apply_delta {
-                    entry.insert(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
-                        delta: DeltaWithMax::new(input, max_value),
-                    }));
+                    entry.insert(VersionedSlot::new(
+                        DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
+                            delta: DeltaWithMax::new(input, max_value),
+                        }),
+                        current_version,
+                    ));
                 }
                 Ok(result)
             },
             Entry::Occupied(mut entry) => {
                 let math = BoundedMath::new(max_value);
-                match entry.get_mut() {
+                match entry.get_mut().latest_mut(current_version)? {
                     DelayedChange::Create(DelayedFieldValue::Aggregator(value)) => {
                         match math.unsigned_add_delta(*value, &input) {
                             Ok(new_value) => {
@@ -118,45 +140,61 @@ impl DelayedFieldData {
     /// state, with a zero-initialized value.
     pub fn create_new_aggregator(&mut self, id: DelayedFieldID) {
         let aggregator = DelayedChange::Create(DelayedFieldValue::Aggregator(0));
-        self.delayed_fields.insert(id, aggregator);
+        let current_version = self.version_controller.current_version();
+        // TODO: Assert no eviction?
+        self.delayed_fields
+            .insert(id, VersionedSlot::new(aggregator, current_version));
     }
 
     /// Implements logic for doing a read on DelayedField.
     fn read_value(
-        &self,
+        &mut self,
         id: DelayedFieldID,
         resolver: &dyn DelayedFieldResolver,
         read_position: ReadPosition,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        match self.delayed_fields.get(&id) {
-            Some(DelayedChange::Create(value)) => {
-                match read_position {
-                    ReadPosition::BeforeCurrentTxn => {
-                        Err(code_invariant_error(
-                            "Asking for aggregator value BeforeCurrentTxn that was created in this transaction",
-                        ).into())
+        match self.delayed_fields.get_mut(&id) {
+            Some(slot) => {
+                let current_version = self.version_controller.current_version();
+                match slot.latest(current_version) {
+                    DelayedChange::Create(value) => {
+                        match read_position {
+                            ReadPosition::BeforeCurrentTxn => {
+                                Err(code_invariant_error(
+                                    "Asking for aggregator value BeforeCurrentTxn that was created in this transaction",
+                                ).into())
+                            },
+                            ReadPosition::AfterCurrentTxn => {
+                                // If aggregator knows the value, return it.
+                                Ok(value.clone())
+                            },
+                        }
                     },
-                    ReadPosition::AfterCurrentTxn => {
-                        // If aggregator knows the value, return it.
-                        Ok(value.clone())
+                    DelayedChange::Apply(apply) => {
+                        // TODO: avoid clone, need to fix multiple mut borrows here.
+                        let apply = apply.clone();
+                        let value = match apply.get_apply_base_id_option() {
+                            Some(base_id) => match base_id {
+                                ApplyBase::Previous(base_id) => self.read_value(
+                                    base_id,
+                                    resolver,
+                                    ReadPosition::BeforeCurrentTxn,
+                                ),
+                                ApplyBase::Current(base_id) => self.read_value(
+                                    base_id,
+                                    resolver,
+                                    ReadPosition::AfterCurrentTxn,
+                                ),
+                            },
+                            None => get_delayed_field_value_from_storage(&id, resolver),
+                        }?;
+                        match read_position {
+                            ReadPosition::BeforeCurrentTxn => Ok(value),
+                            ReadPosition::AfterCurrentTxn => {
+                                Ok(expect_ok(apply.apply_to_base(value))?)
+                            },
+                        }
                     },
-                }
-            },
-            Some(DelayedChange::Apply(apply)) => {
-                let value = apply.get_apply_base_id_option().map_or_else(
-                    || get_delayed_field_value_from_storage(&id, resolver),
-                    |base_id| match base_id {
-                        ApplyBase::Previous(base_id) => {
-                            self.read_value(base_id, resolver, ReadPosition::BeforeCurrentTxn)
-                        },
-                        ApplyBase::Current(base_id) => {
-                            self.read_value(base_id, resolver, ReadPosition::AfterCurrentTxn)
-                        },
-                    },
-                )?;
-                match read_position {
-                    ReadPosition::BeforeCurrentTxn => Ok(value),
-                    ReadPosition::AfterCurrentTxn => Ok(expect_ok(apply.apply_to_base(value))?),
                 }
             },
             None => get_delayed_field_value_from_storage(&id, resolver),
@@ -164,7 +202,7 @@ impl DelayedFieldData {
     }
 
     pub fn read_aggregator(
-        &self,
+        &mut self,
         id: DelayedFieldID,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<u128> {
@@ -180,24 +218,35 @@ impl DelayedFieldData {
         width: u32,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
-        let aggregator = self.delayed_fields.get(&aggregator_id);
+        let aggregator = self.delayed_fields.get_mut(&aggregator_id);
 
         let change = match aggregator {
-            // If aggregator is in Create state, we don't need to depend on it, and can just take the value.
-            Some(DelayedChange::Create(DelayedFieldValue::Aggregator(value))) => {
-                DelayedChange::Create(DelayedFieldValue::Snapshot(*value))
-            },
-            Some(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta { delta, .. })) => {
-                if max_value != delta.max_value {
-                    return Err(code_invariant_error(
-                        "Tried to snapshot an aggregator with a different max value",
-                    )
-                    .into());
+            Some(slot) => {
+                let current_version = self.version_controller.current_version();
+                match slot.latest(current_version) {
+                    // If aggregator is in Create state, we don't need to depend on it, and can just take the value.
+                    DelayedChange::Create(DelayedFieldValue::Aggregator(value)) => {
+                        DelayedChange::Create(DelayedFieldValue::Snapshot(*value))
+                    },
+                    DelayedChange::Apply(DelayedApplyChange::AggregatorDelta { delta, .. }) => {
+                        if max_value != delta.max_value {
+                            return Err(code_invariant_error(
+                                "Tried to snapshot an aggregator with a different max value",
+                            )
+                            .into());
+                        }
+                        DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
+                            base_aggregator: aggregator_id,
+                            delta: *delta,
+                        })
+                    },
+                    _ => {
+                        return Err(code_invariant_error(
+                            "Tried to snapshot a non-aggregator delayed field",
+                        )
+                        .into())
+                    },
                 }
-                DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
-                    base_aggregator: aggregator_id,
-                    delta: *delta,
-                })
             },
             None => DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
                 base_aggregator: aggregator_id,
@@ -206,16 +255,12 @@ impl DelayedFieldData {
                     max_value,
                 },
             }),
-            _ => {
-                return Err(code_invariant_error(
-                    "Tried to snapshot a non-aggregator delayed field",
-                )
-                .into())
-            },
         };
 
         let snapshot_id = resolver.generate_delayed_field_id(width);
-        self.delayed_fields.insert(snapshot_id, change);
+        let current_version = self.version_controller.current_version();
+        self.delayed_fields
+            .insert(snapshot_id, VersionedSlot::new(change, current_version));
         Ok(snapshot_id)
     }
 
@@ -228,7 +273,9 @@ impl DelayedFieldData {
         let change = DelayedChange::Create(DelayedFieldValue::Snapshot(value));
         let snapshot_id = resolver.generate_delayed_field_id(width);
 
-        self.delayed_fields.insert(snapshot_id, change);
+        let current_version = self.version_controller.current_version();
+        self.delayed_fields
+            .insert(snapshot_id, VersionedSlot::new(change, current_version));
         snapshot_id
     }
 
@@ -245,7 +292,9 @@ impl DelayedFieldData {
         let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
         let snapshot_id = resolver.generate_delayed_field_id(width);
 
-        self.delayed_fields.insert(snapshot_id, change);
+        let current_version = self.version_controller.current_version();
+        self.delayed_fields
+            .insert(snapshot_id, VersionedSlot::new(change, current_version));
         Ok(snapshot_id)
     }
 
@@ -276,7 +325,6 @@ impl DelayedFieldData {
         suffix: Vec<u8>,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
-        let snapshot = self.delayed_fields.get(&snapshot_id);
         // cast shouldn't fail because we assert on low limit for prefix and suffix before this call.
         let width = u32::try_from(calculate_width_for_integer_embedded_string(
             prefix.len() + suffix.len(),
@@ -285,33 +333,57 @@ impl DelayedFieldData {
         .map_err(|_| code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32"))?;
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 
-        let change = match snapshot {
-            // If snapshot is in Create state, we don't need to depend on it, and can just take the value.
-            Some(DelayedChange::Create(DelayedFieldValue::Snapshot(value))) => {
-                DelayedChange::Create(DelayedFieldValue::Derived(formula.apply_to(*value)))
+        let change = match self.delayed_fields.get_mut(&snapshot_id) {
+            Some(slot) => {
+                let current_version = self.version_controller.current_version();
+                match slot.latest(current_version) {
+                    // If snapshot is in Create state, we don't need to depend on it, and can just take the value.
+                    DelayedChange::Create(DelayedFieldValue::Snapshot(value)) => {
+                        DelayedChange::Create(DelayedFieldValue::Derived(formula.apply_to(*value)))
+                    },
+                    DelayedChange::Apply(DelayedApplyChange::SnapshotDelta { .. }) => {
+                        DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                            base_snapshot: snapshot_id,
+                            formula,
+                        })
+                    },
+                    _ => {
+                        return Err(code_invariant_error(
+                            "Tried to string_concat a non-snapshot delayed field",
+                        )
+                        .into())
+                    },
+                }
             },
-            Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDelta { .. })) | None => {
-                DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
-                    base_snapshot: snapshot_id,
-                    formula,
-                })
-            },
-            _ => {
-                return Err(code_invariant_error(
-                    "Tried to string_concat a non-snapshot delayed field",
-                )
-                .into())
-            },
+            None => DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                base_snapshot: snapshot_id,
+                formula,
+            }),
         };
 
         let new_id = resolver.generate_delayed_field_id(width);
-        self.delayed_fields.insert(new_id, change);
+        let current_version = self.version_controller.current_version();
+        self.delayed_fields
+            .insert(new_id, VersionedSlot::new(change, current_version));
         Ok(new_id)
     }
 
     /// Unpacks aggregator data.
     pub fn into(self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        let current_version = self.version_controller.current_version();
         self.delayed_fields
+            .into_iter()
+            .map(|(id, mut slot)| (id, slot.take_latest(current_version)))
+            .collect()
+    }
+
+    pub fn take_latest(&mut self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        let mut changes = BTreeMap::new();
+        let current_version = self.version_controller.current_version();
+        for (id, slot) in self.delayed_fields.iter_mut() {
+            changes.insert(*id, slot.take_latest(current_version));
+        }
+        changes
     }
 }
 
@@ -336,10 +408,14 @@ mod test {
     }
 
     fn get_agg<'a>(
-        d: &'a DelayedFieldData,
+        d: &'a mut DelayedFieldData,
         id: &DelayedFieldID,
     ) -> &'a DelayedChange<DelayedFieldID> {
-        d.delayed_fields.get(id).expect("Get aggregator failed")
+        let current_version = d.version_controller.current_version();
+        d.delayed_fields
+            .get_mut(id)
+            .expect("Get aggregator failed")
+            .latest(current_version)
     }
 
     #[test]
@@ -352,7 +428,7 @@ mod test {
         data.create_new_aggregator(id);
 
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
         );
         assert_ok_eq!(
@@ -360,7 +436,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(0))
         );
 
@@ -369,7 +445,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
         );
 
@@ -378,7 +454,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(100))
         );
 
@@ -387,7 +463,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
         assert_ok_eq!(
@@ -395,7 +471,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::<DelayedFieldID>::Create(DelayedFieldValue::Aggregator(50))
         );
         assert_ok_eq!(
@@ -403,7 +479,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &DelayedChange::Create(DelayedFieldValue::Aggregator(50))
         );
         assert_ok_eq!(data.read_aggregator(id, &resolver), 50);
@@ -450,7 +526,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(400, max_value)
         );
 
@@ -459,7 +535,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(400, max_value)
         );
 
@@ -468,7 +544,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(-70, max_value)
         );
 
@@ -524,7 +600,7 @@ mod test {
             true
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
 
@@ -533,7 +609,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
 
@@ -542,7 +618,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
 
@@ -551,7 +627,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
 
@@ -560,7 +636,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
 
@@ -569,7 +645,7 @@ mod test {
             false
         );
         assert_eq!(
-            get_agg(&data, &id),
+            get_agg(&mut data, &id),
             &aggregator_delta_change(300, max_value)
         );
     }
