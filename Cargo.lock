@@ -741,6 +741,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "scopeguard",
  "test-case",
 ]
 
@@ -16914,6 +16915,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-api-types",
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-cached-packages",
