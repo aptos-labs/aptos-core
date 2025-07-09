@@ -1028,6 +1028,11 @@ module aptos_experimental::market {
     }
 
     #[test_only]
+    public fun get_client_order_id_from_event(self: OrderEvent): Option<u64> {
+        self.client_order_id
+    }
+
+    #[test_only]
     public fun verify_order_event(
         self: OrderEvent,
         order_id: OrderIdType,
