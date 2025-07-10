@@ -1259,7 +1259,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ): <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
     // Validate that the order is valid from position management perspective
-    <b>if</b> (time_in_force == <a href="market_types.md#0x7_market_types_immediate_or_cancel">market_types::immediate_or_cancel</a>() || limit_price.is_none()) {
+    <b>if</b> (time_in_force == <a href="market_types.md#0x7_market_types_immediate_or_cancel">market_types::immediate_or_cancel</a>()
+        || limit_price.is_none()) {
         <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
             user_addr,
             limit_price,
@@ -1744,7 +1745,7 @@ of fill limit violation  in the previous transaction and the order is just a con
         <b>if</b> (taker_cancellation_reason.is_some()) {
             <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
                 order_id,
-                remaining_size,
+                remaining_size: 0, // 0 because the order is cancelled
                 cancel_reason: taker_cancellation_reason,
                 fill_sizes
             }

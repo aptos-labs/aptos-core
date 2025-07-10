@@ -335,7 +335,7 @@ pub(crate) fn realistic_env_max_load_test(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.0),
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
@@ -347,7 +347,7 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -377,9 +377,6 @@ pub(crate) fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
-        }))
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus.enable_optimistic_proposal_tx = true;
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds

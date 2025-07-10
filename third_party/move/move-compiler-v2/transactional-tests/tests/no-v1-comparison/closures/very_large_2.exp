@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-21:
+Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::Module0'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0xcafe::Module0,
+    indices: [],
+    offsets: [],
+}

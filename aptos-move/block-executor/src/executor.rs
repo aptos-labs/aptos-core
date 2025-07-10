@@ -68,6 +68,7 @@ use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use num_cpus;
 use rayon::ThreadPool;
+use scopeguard::defer;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -554,7 +555,6 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        is_appended_epilogue: bool,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
             .read_set(txn_idx)
@@ -565,11 +565,10 @@ where
 
         if execution_still_valid {
             if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
-                if let Err(e) = versioned_cache.delayed_fields().try_commit(
-                    txn_idx,
-                    delayed_field_ids.collect(),
-                    is_appended_epilogue,
-                ) {
+                if let Err(e) = versioned_cache
+                    .delayed_fields()
+                    .try_commit(txn_idx, delayed_field_ids.collect())
+                {
                     match e {
                         CommitError::ReExecutionNeeded(_) => {
                             execution_still_valid = false;
@@ -620,12 +619,7 @@ where
         let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
-        if !Self::validate_and_commit_delayed_fields(
-            txn_idx,
-            versioned_cache,
-            last_input_output,
-            false,
-        )? {
+        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
 
@@ -659,7 +653,6 @@ where
                 txn_idx,
                 versioned_cache,
                 last_input_output,
-                false,
             )
             .unwrap_or(false)
             {
@@ -1000,8 +993,11 @@ where
         block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
         num_txns_materialized: &AtomicU32,
         total_txns_to_materialize: &AtomicU32,
+        num_running_workers: &AtomicU32,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+        defer!( num_running_workers.fetch_sub(1, Ordering::SeqCst); );
+
         let num_txns = block.num_txns();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(environment, base_view);
@@ -1046,6 +1042,10 @@ where
                     ));
                 }
 
+                while num_running_workers.load(Ordering::SeqCst) > 1 {
+                    std::hint::spin_loop();
+                }
+
                 let mut outputs = final_results.acquire();
                 let has_reconfig = outputs
                     .iter()
@@ -1061,6 +1061,13 @@ where
                     if let Some(block_id) =
                         transaction_slice_metadata.append_state_checkpoint_to_block()
                     {
+                        // There could be some txns skipped, we need to make sure the values in
+                        // mvhashmap with corresponding indices are properly cleared.
+                        versioned_cache.remove_all_at_or_after_for_epilogue(
+                            num_txns_materialized,
+                            num_txns as u32,
+                        );
+
                         let txn = self.gen_block_epilogue(
                             block_id,
                             block,
@@ -1097,7 +1104,6 @@ where
                             num_txns as u32,
                             versioned_cache,
                             last_input_output,
-                            true,
                         ) != Ok(true)
                         {
                             return Err(code_invariant_error(
@@ -1509,6 +1515,7 @@ where
         let scheduler = Scheduler::new(num_txns);
         let num_txns_materialized = AtomicU32::new(0);
         let total_txns_to_materialize = AtomicU32::new(num_txns);
+        let num_running_workers = AtomicU32::new(num_workers as u32);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -1531,6 +1538,7 @@ where
                         &block_epilogue_txn,
                         &num_txns_materialized,
                         &total_txns_to_materialize,
+                        &num_running_workers,
                         num_workers,
                     ) {
                         // If there are multiple errors, they all get logged:

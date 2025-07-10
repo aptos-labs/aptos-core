@@ -398,7 +398,8 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
-        if (time_in_force == market_types::immediate_or_cancel() || limit_price.is_none()) {
+        if (time_in_force == market_types::immediate_or_cancel()
+            || limit_price.is_none()) {
             return self.cancel_order_internal(
                 user_addr,
                 limit_price,
@@ -803,7 +804,7 @@ module aptos_experimental::market {
             if (taker_cancellation_reason.is_some()) {
                 return OrderMatchResult {
                     order_id,
-                    remaining_size,
+                    remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
                     fill_sizes
                 }
@@ -1025,6 +1026,11 @@ module aptos_experimental::market {
     #[test_only]
     public fun get_order_id_from_event(self: OrderEvent): OrderIdType {
         new_order_id_type(self.order_id)
+    }
+
+    #[test_only]
+    public fun get_client_order_id_from_event(self: OrderEvent): Option<u64> {
+        self.client_order_id
     }
 
     #[test_only]

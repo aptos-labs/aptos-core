@@ -51,8 +51,10 @@ mainnet:
     11648867: 11648867_token_v1_burn_event
     178179220: 178179220_token_v1_mutate_event
     141135867: 141135867_token_v1_offer
-    97963136: 97963136_token_v2_cancel_offer
-    84023785: 84023785_token_v2_claim_offer
+    3020266695: 3020266695_token_v1_offer_module_event
+    97963136: 97963136_token_v1_cancel_offer
+    2819452713: 2819452713_token_v1_cancel_offer_module_event
+    84023785: 84023785_token_v1_claim_offer
     999930475: 999930475_token_v2_concurrent_mint
     537250181: 537250181_token_v2_fixed_supply_mint
     325355235: 325355235_token_v2_unlimited_supply_mint

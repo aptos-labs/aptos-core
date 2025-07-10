@@ -438,7 +438,7 @@ mod tests {
     use super::{HotStateBase, LRUUpdater};
     use lru::LruCache;
     use proptest::{collection::vec, option, prelude::*};
-    use std::sync::Arc;
+    use std::{num::NonZeroUsize, sync::Arc};
 
     const MAX_BYTES: usize = 10000;
     const MAX_SINGLE_VALUE_BYTES: usize = 100;
@@ -458,7 +458,7 @@ mod tests {
             let mut tail = None;
 
             let mut updater = LRUUpdater::new(base, &mut head, &mut tail);
-            let mut cache = LruCache::new(max_items);
+            let mut cache = LruCache::new(NonZeroUsize::new(max_items).unwrap());
 
             for (key, value_opt) in updates {
                 match value_opt {

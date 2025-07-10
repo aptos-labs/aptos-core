@@ -12,9 +12,9 @@ module aptos_experimental::market_test_utils {
         TimeInForce,
         MarketClearinghouseCallbacks
     };
-    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{OrderIdType, Order};
 
-    use aptos_experimental::market::{OrderEvent, Market};
+    use aptos_experimental::market::{OrderEvent, Market, OrderMatchResult};
 
     public fun place_order_and_verify<M: store + copy + drop>(
         market: &mut Market<M>,
@@ -115,7 +115,7 @@ module aptos_experimental::market_test_utils {
         max_fills: Option<u64>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderIdType {
+    ): (OrderIdType, OrderMatchResult) {
         let taker_addr = signer::address_of(taker);
         let max_fills =
             if (max_fills.is_none()) { 1000 }
@@ -123,32 +123,33 @@ module aptos_experimental::market_test_utils {
                 max_fills.destroy_some()
             };
         // Taker order will be immediately match in the same transaction
-        if (taker_price.is_some()) {
-            market.place_limit_order(
-                taker,
-                taker_price.destroy_some(),
-                size,
-                is_bid, // is_bid
-                time_in_force, // order_type
-                option::none(), // trigger_condition
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            );
-        } else {
-            market.place_market_order(
-                taker,
-                size,
-                is_bid, // is_bid
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            );
-        };
+        let result =
+            if (taker_price.is_some()) {
+                market.place_limit_order(
+                    taker,
+                    taker_price.destroy_some(),
+                    size,
+                    is_bid, // is_bid
+                    time_in_force, // order_type
+                    option::none(), // trigger_condition
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            } else {
+                market.place_market_order(
+                    taker,
+                    size,
+                    is_bid, // is_bid
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            };
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
@@ -167,7 +168,7 @@ module aptos_experimental::market_test_utils {
             true,
             order_status_open()
         );
-        order_id
+        (order_id, result)
     }
 
     public fun place_taker_order_and_verify_fill<M: store + copy + drop>(
@@ -189,8 +190,8 @@ module aptos_experimental::market_test_utils {
         max_fills: Option<u64>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
-    ): OrderIdType {
-        let order_id =
+    ): (OrderIdType, OrderMatchResult) {
+        let (order_id, result) =
             place_taker_order(
                 market,
                 taker,
@@ -224,7 +225,7 @@ module aptos_experimental::market_test_utils {
             is_cancelled
         );
 
-        order_id
+        (order_id, result)
     }
 
     public fun verify_cancel_event<M: store + copy + drop>(
