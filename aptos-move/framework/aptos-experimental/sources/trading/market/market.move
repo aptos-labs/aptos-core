@@ -546,25 +546,26 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>,
         fill_sizes: &mut vector<u64>
     ): Option<OrderCancellationReason> {
-        let result = self.order_book
-            .get_single_match_for_taker(price, *remaining_size, is_bid);
-        let (
-            maker_order, maker_matched_size
-        ) = result.destroy_single_order_match();
-        if (!self.config.allow_self_trade && maker_order.get_account() == user_addr) {
-            self.cancel_maker_order_internal(
-                &maker_order,
-                maker_order.get_client_order_id(),
-                maker_order.get_account(),
-                maker_order.get_order_id(),
-                std::string::utf8(b"Disallowed self trading"),
-                maker_matched_size,
-                callbacks
-            );
-            return option::none();
-        };
-        let fill_id = self.next_fill_id();
-        let settle_result = callbacks.settle_trade(
+        let result =
+            self.order_book
+                .get_single_match_for_taker(price, *remaining_size, is_bid);let (
+                maker_order, maker_matched_size
+            ) = result
+            .destroy_single_order_match();if (!self.config.allow_self_trade
+                && maker_order.get_account() == user_addr) {
+                self.cancel_maker_order_internal(
+                    &maker_order,
+                    maker_order.get_client_order_id(),
+                    maker_order.get_account(),
+                    maker_order.get_order_id(),
+                    std::string::utf8(b"Disallowed self trading"),
+                    maker_matched_size,
+                    callbacks
+                );
+                return option::none();
+            };let fill_id = self
+            .next_fill_id();let settle_result = callbacks
+            .settle_trade(
             user_addr,
             order_id,
             maker_order.get_account(),
@@ -584,21 +585,23 @@ module aptos_experimental::market {
             unsettled_maker_size -= settled_size;
             fill_sizes.push_back(settled_size);
                 // Event for taker fill
-            self.emit_event_for_order(
-                order_id,
-                client_order_id,
-                user_addr,
-                orig_size,
-                *remaining_size,
-                settled_size,
-                option::some(maker_order.get_price()),
-                is_bid,
-                true,
-                market_types::order_status_filled(),
-                &std::string::utf8(b"")
-            );
-            // Event for maker fill
-            self.emit_event_for_order(
+                self
+                .emit_event_for_order(
+                    order_id,
+                    client_order_id,
+                    user_addr,
+                    orig_size,
+                    *remaining_size,
+                    settled_size,
+                    option::some(maker_order.get_price()),
+                    is_bid,
+                    true,
+                    market_types::order_status_filled(),
+                    &std::string::utf8(b"")
+                );
+                // Event for maker fill
+                self
+                .emit_event_for_order(
                 maker_order.get_order_id(),
                 maker_order.get_client_order_id(),
                 maker_order.get_account(),
