@@ -32,10 +32,8 @@ impl ExpChecker for FindUnnecessaryCasts {
             return;
         }
 
-        let source_expr = &args[0];
         let env = function.env();
-
-        let source_type = env.get_node_type(source_expr.node_id());
+        let source_type = env.get_node_type(args[0].node_id());
         let target_type = env.get_node_type(*id);
 
         if source_type == target_type {
