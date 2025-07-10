@@ -191,7 +191,6 @@ impl LedgerDb {
                 ));
             });
             s.spawn(|_| {
-                let readonly = false;
                 persisted_auxiliary_info_db = Some(PersistedAuxiliaryInfoDb::new(Arc::new(
                     Self::open_rocksdb(
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
