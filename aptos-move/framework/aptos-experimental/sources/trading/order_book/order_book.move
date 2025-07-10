@@ -36,7 +36,11 @@ module aptos_experimental::order_book {
         new_pending_order_book_index
     };
     #[test_only]
-    use aptos_experimental::order_book_types::{new_order_id_type, tp_trigger_condition, UniqueIdxType};
+    use aptos_experimental::order_book_types::{
+        new_order_id_type,
+        tp_trigger_condition,
+        UniqueIdxType
+    };
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EPOST_ONLY_FILLED: u64 = 2;
@@ -123,8 +127,17 @@ module aptos_experimental::order_book {
         assert!(order_creator == order.get_account(), EORDER_CREATOR_MISMATCH);
         if (is_active) {
             let unique_priority_idx = order.get_unique_priority_idx();
-            let (_account, _order_id, _client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
-                order.destroy_order();
+            let (
+                _account,
+                _order_id,
+                _client_order_id,
+                bid_price,
+                _orig_size,
+                _size,
+                is_bid,
+                _,
+                _
+            ) = order.destroy_order();
             self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
         } else {
             let unique_priority_idx = order.get_unique_priority_idx();
@@ -298,11 +311,17 @@ module aptos_experimental::order_book {
     ///
     /// `order_creator` is passed to only verify order cancellation is authorized correctly
     public fun decrease_order_size<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType, size_delta: u64
+        self: &mut OrderBook<M>,
+        order_creator: address,
+        order_id: OrderIdType,
+        size_delta: u64
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
-        assert!(order_creator == order_with_state.get_order_from_state().get_account(), EORDER_CREATOR_MISMATCH);
+        assert!(
+            order_creator == order_with_state.get_order_from_state().get_account(),
+            EORDER_CREATOR_MISMATCH
+        );
         order_with_state.decrease_remaining_size(size_delta);
         if (order_with_state.is_active_order()) {
             let order = order_with_state.get_order_from_state();
@@ -421,7 +440,9 @@ module aptos_experimental::order_book {
         let match_results = vector::empty();
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
-            if (!self.is_taker_order(option::some(order_req.price), order_req.is_bid, order_req.trigger_condition)) {
+            if (!self.is_taker_order(
+                option::some(order_req.price), order_req.is_bid, order_req.trigger_condition
+            )) {
                 self.place_maker_order(
                     OrderRequest::V1 {
                         account: order_req.account,
@@ -478,9 +499,17 @@ module aptos_experimental::order_book {
         let i = 0;
         while (i < ready_orders.length()) {
             let order = ready_orders[i];
-            let (account, order_id, client_order_id, price, orig_size, remaining_size, is_bid, _, metadata) =
-
-                order.destroy_order();
+            let (
+                account,
+                order_id,
+                client_order_id,
+                price,
+                orig_size,
+                remaining_size,
+                is_bid,
+                _,
+                metadata
+            ) = order.destroy_order();
             let order_req = OrderRequest::V1 {
                 account,
                 order_id,
@@ -580,7 +609,8 @@ module aptos_experimental::order_book {
         // Verify original order still exists but with reduced size
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_, _, client_order_id, price, orig_size, size, is_bid, _, _) = order.destroy_order();
+        let (_, _, client_order_id, price, orig_size, size, is_bid, _, _) =
+            order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
         assert!(orig_size == 1000);

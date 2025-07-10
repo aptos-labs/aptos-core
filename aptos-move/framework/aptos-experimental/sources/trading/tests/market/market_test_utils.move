@@ -123,32 +123,33 @@ module aptos_experimental::market_test_utils {
                 max_fills.destroy_some()
             };
         // Taker order will be immediately match in the same transaction
-       let result =  if (taker_price.is_some()) {
-            market.place_limit_order(
-                taker,
-                taker_price.destroy_some(),
-                size,
-                is_bid, // is_bid
-                time_in_force, // order_type
-                option::none(), // trigger_condition
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            )
-        } else {
-            market.place_market_order(
-                taker,
-                size,
-                is_bid, // is_bid
-                metadata,
-                client_order_id,
-                max_fills,
-                true,
-                callbacks
-            )
-        };
+        let result =
+            if (taker_price.is_some()) {
+                market.place_limit_order(
+                    taker,
+                    taker_price.destroy_some(),
+                    size,
+                    is_bid, // is_bid
+                    time_in_force, // order_type
+                    option::none(), // trigger_condition
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            } else {
+                market.place_market_order(
+                    taker,
+                    size,
+                    is_bid, // is_bid
+                    metadata,
+                    client_order_id,
+                    max_fills,
+                    true,
+                    callbacks
+                )
+            };
 
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];

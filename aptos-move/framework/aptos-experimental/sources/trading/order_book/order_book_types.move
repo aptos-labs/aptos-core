@@ -301,7 +301,9 @@ module aptos_experimental::order_book_types {
 
     public fun destroy_order<M: store + copy + drop>(
         self: Order<M>
-    ): (address, OrderIdType, Option<u64>, u64, u64, u64, bool, Option<TriggerCondition>, M) {
+    ): (
+        address, OrderIdType, Option<u64>, u64, u64, u64, bool, Option<TriggerCondition>, M
+    ) {
         let Order::V1 {
             order_id,
             account,

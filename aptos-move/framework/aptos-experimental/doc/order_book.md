@@ -466,8 +466,17 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
     <b>assert</b>!(order_creator == order.get_account(), <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
     <b>if</b> (is_active) {
         <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
-        <b>let</b> (_account, _order_id, _client_order_id, bid_price, _orig_size, _size, is_bid, _, _) =
-            order.destroy_order();
+        <b>let</b> (
+            _account,
+            _order_id,
+            _client_order_id,
+            bid_price,
+            _orig_size,
+            _size,
+            is_bid,
+            _,
+            _
+        ) = order.destroy_order();
         self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
     } <b>else</b> {
         <b>let</b> unique_priority_idx = order.get_unique_priority_idx();
@@ -761,11 +770,17 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, order_id: OrderIdType, size_delta: u64
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
+    order_creator: <b>address</b>,
+    order_id: OrderIdType,
+    size_delta: u64
 ) {
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
     <b>let</b> order_with_state = self.orders.remove(&order_id);
-    <b>assert</b>!(order_creator == order_with_state.get_order_from_state().get_account(), <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
+    <b>assert</b>!(
+        order_creator == order_with_state.get_order_from_state().get_account(),
+        <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>
+    );
     order_with_state.decrease_remaining_size(size_delta);
     <b>if</b> (order_with_state.<a href="order_book.md#0x7_order_book_is_active_order">is_active_order</a>()) {
         <b>let</b> order = order_with_state.get_order_from_state();
