@@ -133,7 +133,7 @@ fn create_write_read_placeholder_struct() {
     let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ()> = MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
-    let r_db = mvtbl.data().fetch_data(&ap1, 5);
+    let r_db = mvtbl.data().fetch_data_no_record(&ap1, 5);
     assert_eq!(Err(Uninitialized), r_db);
 
     // Write by txn 10.
@@ -142,14 +142,14 @@ fn create_write_read_placeholder_struct() {
         .write(ap1.clone(), 10, 1, arc_value_for(10, 1), None);
 
     // Reads that should go the DB return Err(Uninitialized)
-    let r_db = mvtbl.data().fetch_data(&ap1, 9);
+    let r_db = mvtbl.data().fetch_data_no_record(&ap1, 9);
     assert_eq!(Err(Uninitialized), r_db);
     // Reads return entries from smaller txns, not txn 10.
-    let r_db = mvtbl.data().fetch_data(&ap1, 10);
+    let r_db = mvtbl.data().fetch_data_no_record(&ap1, 10);
     assert_eq!(Err(Uninitialized), r_db);
 
     // Reads for a higher txn return the entry written by txn 10.
-    let r_10 = mvtbl.data().fetch_data(&ap1, 15);
+    let r_10 = mvtbl.data().fetch_data_no_record(&ap1, 15);
     assert_eq!(
         Ok(Versioned(
             Ok((10, 1)),
@@ -170,7 +170,7 @@ fn create_write_read_placeholder_struct() {
         .add_delta(ap1.clone(), 13, delta_sub(74, u128::MAX));
 
     // Reads have to go traverse deltas until a write is found.
-    let r_sum = mvtbl.data().fetch_data(&ap1, 14);
+    let r_sum = mvtbl.data().fetch_data_no_record(&ap1, 14);
     assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
@@ -182,9 +182,9 @@ fn create_write_read_placeholder_struct() {
         .write(ap1.clone(), 8, 3, arc_value_for(8, 3), None);
 
     // Verify reads.
-    let r_12 = mvtbl.data().fetch_data(&ap1, 15);
+    let r_12 = mvtbl.data().fetch_data_no_record(&ap1, 15);
     assert_eq!(Ok(Resolved(u128_for(12, 0) - (61 + 13))), r_12);
-    let r_10 = mvtbl.data().fetch_data(&ap1, 11);
+    let r_10 = mvtbl.data().fetch_data_no_record(&ap1, 11);
     assert_eq!(
         Ok(Versioned(
             Ok((10, 1)),
@@ -192,7 +192,7 @@ fn create_write_read_placeholder_struct() {
         )),
         r_10
     );
-    let r_8 = mvtbl.data().fetch_data(&ap1, 10);
+    let r_8 = mvtbl.data().fetch_data_no_record(&ap1, 10);
     assert_eq!(
         Ok(Versioned(
             Ok((8, 3)),
@@ -205,11 +205,11 @@ fn create_write_read_placeholder_struct() {
     mvtbl.data().mark_estimate(&ap1, 10);
 
     // Read for txn 11 must observe a dependency.
-    let r_10 = mvtbl.data().fetch_data(&ap1, 11);
+    let r_10 = mvtbl.data().fetch_data_no_record(&ap1, 11);
     assert_eq!(Err(Dependency(10)), r_10);
 
     // Read for txn 12 must observe a dependency when resolving deltas at txn 11.
-    let r_11 = mvtbl.data().fetch_data(&ap1, 12);
+    let r_11 = mvtbl.data().fetch_data_no_record(&ap1, 12);
     assert_eq!(Err(Dependency(10)), r_11);
 
     // Delete the entry written by 10, write to a different ap.
@@ -219,7 +219,7 @@ fn create_write_read_placeholder_struct() {
         .write(ap2.clone(), 10, 2, arc_value_for(10, 2), None);
 
     // Read by txn 11 no longer observes entry from txn 10.
-    let r_8 = mvtbl.data().fetch_data(&ap1, 11);
+    let r_8 = mvtbl.data().fetch_data_no_record(&ap1, 11);
     assert_eq!(
         Ok(Versioned(
             Ok((8, 3)),
@@ -235,7 +235,7 @@ fn create_write_read_placeholder_struct() {
     mvtbl
         .data()
         .write(ap3.clone(), 20, 4, arc_value_for(20, 4), None);
-    let r_5 = mvtbl.data().fetch_data(&ap2, 10);
+    let r_5 = mvtbl.data().fetch_data_no_record(&ap2, 10);
     assert_eq!(
         Ok(Versioned(
             Ok((5, 0)),
@@ -243,7 +243,7 @@ fn create_write_read_placeholder_struct() {
         )),
         r_5
     );
-    let r_20 = mvtbl.data().fetch_data(&ap3, 21);
+    let r_20 = mvtbl.data().fetch_data_no_record(&ap3, 21);
     assert_eq!(
         Ok(Versioned(
             Ok((20, 4)),
@@ -259,14 +259,14 @@ fn create_write_read_placeholder_struct() {
 
     // Reads from ap1 and ap3 go to db.
     match_unresolved(
-        mvtbl.data().fetch_data(&ap1, 30),
+        mvtbl.data().fetch_data_no_record(&ap1, 30),
         SignedU128::Negative((61 + 13) - 11),
     );
-    let r_db = mvtbl.data().fetch_data(&ap3, 30);
+    let r_db = mvtbl.data().fetch_data_no_record(&ap3, 30);
     assert_eq!(Err(Uninitialized), r_db);
 
     // Read entry by txn 10 at ap2.
-    let r_10 = mvtbl.data().fetch_data(&ap2, 15);
+    let r_10 = mvtbl.data().fetch_data_no_record(&ap2, 15);
     assert_eq!(
         Ok(Versioned(
             Ok((10, 2)),
@@ -278,7 +278,7 @@ fn create_write_read_placeholder_struct() {
     // Both delta-write and delta-delta application failures are detected.
     mvtbl.data().add_delta(ap1.clone(), 30, delta_add(30, 32));
     mvtbl.data().add_delta(ap1.clone(), 31, delta_add(31, 32));
-    let r_33 = mvtbl.data().fetch_data(&ap1, 33);
+    let r_33 = mvtbl.data().fetch_data_no_record(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
     let val = arc_value_for(10, 3);
@@ -288,7 +288,7 @@ fn create_write_read_placeholder_struct() {
     mvtbl
         .data()
         .add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));
-    let r_31 = mvtbl.data().fetch_data(&ap2, 31);
+    let r_31 = mvtbl.data().fetch_data_no_record(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);
 }
 
@@ -304,7 +304,7 @@ fn materialize_delta_shortcut() {
     vd.add_delta(ap.clone(), 8, delta_add(20, limit));
     vd.add_delta(ap.clone(), 11, delta_add(30, limit));
 
-    match_unresolved(vd.fetch_data(&ap, 10), SignedU128::Positive(30));
+    match_unresolved(vd.fetch_data_no_record(&ap, 10), SignedU128::Positive(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
         DeltaOp::new(SignedU128::Positive(30), limit, DeltaHistory {
@@ -326,16 +326,16 @@ fn materialize_delta_shortcut() {
 
     // With base set, commit delta should now succeed.
     assert_ok_eq!(vd.materialize_delta(&ap, 8), 35);
-    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
+    assert_eq!(vd.fetch_data_no_record(&ap, 10), Ok(Resolved(35)));
 
     // Make sure shortcut is committed by adding a delta at a lower txn idx
     // and ensuring tha fetch_data output no longer changes.
     vd.add_delta(ap.clone(), 6, delta_add(15, limit));
-    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
+    assert_eq!(vd.fetch_data_no_record(&ap, 10), Ok(Resolved(35)));
 
     // However, if we add a delta at txn_idx = 9, it should have an effect.
     vd.add_delta(ap.clone(), 9, delta_add(15, limit));
-    assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(50)));
+    assert_eq!(vd.fetch_data_no_record(&ap, 10), Ok(Resolved(50)));
 }
 
 #[test]

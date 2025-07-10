@@ -231,7 +231,7 @@ where
             abort_manager.invalidate_dependencies(
                 versioned_cache
                     .data()
-                    .remove_v2::<_, false>(&key, idx_to_execute),
+                    .remove_v2::<_, false>(&key, idx_to_execute)?,
             )?;
         }
 
@@ -591,6 +591,7 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    /// TODO(BlockSTMv2): Change the signature to use shared_sync_params.
     #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txn(
         &self,
@@ -1348,6 +1349,53 @@ where
         Ok(())
     }
 
+    /// Common finalization logic for both BlockSTM and BlockSTMv2 parallel execution.
+    /// Handles commit task validation, error checking, state updates, and cleanup.
+    fn finalize_parallel_execution(
+        &self,
+        shared_maybe_error: &AtomicBool,
+        has_remaining_commit_tasks: bool,
+        final_results: ExplicitSyncWrapper<Vec<E::Output>>,
+        block_epilogue_txn: Option<Transaction>,
+        mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        scheduler: impl Send + 'static,
+        last_input_output: TxnLastInputOutput<T, E::Output, E::Error>,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<E::Output>, ()> {
+        // Check for errors or remaining commit tasks before any side effects.
+        let mut has_error = shared_maybe_error.load(Ordering::SeqCst);
+        if !has_error && has_remaining_commit_tasks {
+            alert!("[BlockSTM]: commit tasks not drained after parallel execution");
+            shared_maybe_error.store(true, Ordering::Relaxed);
+            has_error = true;
+        }
+
+        if has_error {
+            // Does not hurt to asynchronously drop even in the error case.
+            DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+            return Err(());
+        }
+
+        // Update state counters & insert verified modules into cache (safe after error check).
+        counters::update_state_counters(versioned_cache.stats(), true);
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(versioned_cache.take_modules_iter())
+            .map_err(|err| {
+                alert!("[BlockSTM] Encountered panic error: {:?}", err);
+            })?;
+
+        // Explicit async drops
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+        // Return final result
+        Ok(BlockOutput::new(
+            final_results.into_inner(),
+            block_epilogue_txn,
+        ))
+    }
+
     #[allow(dead_code)]
     pub(crate) fn execute_transactions_parallel_v2(
         &self,
@@ -1388,7 +1436,7 @@ where
 
         let shared_maybe_error = AtomicBool::new(false);
         let last_input_output = TxnLastInputOutput::new(num_txns);
-        let mut versioned_cache = MVHashMap::new();
+        let versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
@@ -1433,32 +1481,16 @@ where
         });
         drop(timer);
 
-        if !shared_maybe_error.load(Ordering::SeqCst)
-            && !scheduler.post_commit_processing_queue_is_empty()
-        {
-            // No error is recorded, parallel execution workers are done, but there is still
-            // a post commit processing task remaining. Commit tasks must be drained before workers
-            // exit, hence we log an error and fallback to sequential execution.
-            alert!("[BlockSTMv2] error: commit tasks not drained after parallel execution");
-
-            shared_maybe_error.store(true, Ordering::Relaxed);
-        }
-
-        counters::update_state_counters(versioned_cache.stats(), true);
-        module_cache_manager_guard
-            .module_cache_mut()
-            .insert_verified(versioned_cache.take_modules_iter())
-            .map_err(|err| {
-                alert!("[BlockSTM] Encountered panic error: {:?}", err);
-            })?;
-
-        // Explicit async drops.
-        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-
-        // TODO(BlockSTMv2): handle block epilogue txn and add block_end_info.
-        (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner(), None))
-            .ok_or(())
+        self.finalize_parallel_execution(
+            &shared_maybe_error,
+            !scheduler.post_commit_processing_queue_is_empty(),
+            final_results,
+            None, // BlockSTMv2 doesn't handle block epilogue yet.
+            versioned_cache,
+            scheduler,
+            last_input_output,
+            module_cache_manager_guard,
+        )
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -1478,7 +1510,7 @@ where
             "Must use sequential execution"
         );
 
-        let mut versioned_cache = MVHashMap::new();
+        let versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
@@ -1557,34 +1589,16 @@ where
         });
         drop(timer);
 
-        if !shared_maybe_error.load(Ordering::SeqCst) && scheduler.pop_from_commit_queue().is_ok() {
-            // No error is recorded, parallel execution workers are done, but there is
-            // still a commit task remaining. Commit tasks must be drained before workers
-            // exit, hence we log an error and fallback to sequential execution.
-            alert!("[BlockSTM] error: commit tasks not drained after parallel execution");
-
-            shared_maybe_error.store(true, Ordering::Relaxed);
-        }
-
-        counters::update_state_counters(versioned_cache.stats(), true);
-        module_cache_manager_guard
-            .module_cache_mut()
-            .insert_verified(versioned_cache.take_modules_iter())
-            .map_err(|err| {
-                alert!("[BlockSTM] Encountered panic error: {:?}", err);
-            })?;
-
-        if shared_maybe_error.load(Ordering::SeqCst) {
-            return Err(());
-        }
-
-        // Explicit async drops.
-        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-
-        Ok(BlockOutput::new(
-            final_results.into_inner(),
+        self.finalize_parallel_execution(
+            &shared_maybe_error,
+            scheduler.pop_from_commit_queue().is_ok(),
+            final_results,
             block_epilogue_txn.into_inner(),
-        ))
+            versioned_cache,
+            scheduler,
+            last_input_output,
+            module_cache_manager_guard,
+        )
     }
 
     fn gen_block_epilogue(
@@ -2160,12 +2174,21 @@ where
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                signature_verified_block,
-                base_view,
-                transaction_slice_metadata,
-                module_cache_manager_guard,
-            );
+            let parallel_result = if self.config.local.blockstm_v2 {
+                unimplemented!("BlockSTMv2 is not fully implemented");
+                // self.execute_transactions_parallel_v2(
+                //     signature_verified_block,
+                //     base_view,
+                //     module_cache_manager_guard,
+                // )
+            } else {
+                self.execute_transactions_parallel(
+                    signature_verified_block,
+                    base_view,
+                    transaction_slice_metadata,
+                    module_cache_manager_guard,
+                )
+            };
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {

@@ -314,7 +314,7 @@ where
                             } else {
                                 match map
                                     .data()
-                                    .fetch_data(&KeyType(key.clone()), idx as TxnIndex)
+                                    .fetch_data_no_record(&KeyType(key.clone()), idx as TxnIndex)
                                 {
                                     Ok(Versioned(_, v)) => {
                                         assert_value(v);
