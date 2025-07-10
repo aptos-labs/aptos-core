@@ -241,10 +241,46 @@ impl BufferItem {
                     partial_commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(
-                    local_commit_proof.data().commit_info(),
-                    commit_proof.commit_info()
-                );
+                if local_commit_proof.data().commit_info() != commit_proof.commit_info() {
+                    error!("Local result doesn't match commit decision.");
+                    for block in &executed_blocks {
+                        let result = block.compute_result();
+                        let first_version = result.execution_output.first_version;
+                        let len = result.ledger_update_output.transaction_infos.len();
+                        for (i, txn_info) in result
+                            .ledger_update_output
+                            .transaction_infos
+                            .iter()
+                            .enumerate()
+                        {
+                            error!("{}: {txn_info:?}", first_version + i as u64);
+                        }
+                        if len != 0 {
+                            error!(
+                                "{:?}",
+                                result
+                                    .execution_output
+                                    .to_commit
+                                    .transactions
+                                    .last()
+                                    .unwrap()
+                            );
+                            error!(
+                                "{:?}",
+                                result
+                                    .execution_output
+                                    .to_commit
+                                    .transaction_outputs
+                                    .last()
+                                    .unwrap()
+                            );
+                        }
+                    }
+                    assert_eq!(
+                        local_commit_proof.data().commit_info(),
+                        commit_proof.commit_info()
+                    );
+                }
                 debug!(
                     "{} advance to aggregated with commit decision",
                     commit_proof.commit_info()
