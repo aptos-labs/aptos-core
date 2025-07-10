@@ -456,11 +456,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
-<<<<<<< HEAD
-            TypeTag::Function(..) => {
-                // TODO(#15664) implement functions for fat types"
-                todo!("functions for fat types")
-=======
             TypeTag::Function(function_tag) => {
                 let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
                     tags.iter()
@@ -483,7 +478,6 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     results: convert_tags(&function_tag.results)?,
                     abilities: function_tag.abilities,
                 }))
->>>>>>> dee41276c9 ([api] Addressing function value todos (#17047))
             },
         })
     }
