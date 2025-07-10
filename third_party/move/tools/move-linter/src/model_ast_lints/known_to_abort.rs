@@ -26,7 +26,7 @@ use Operation::*;
 const DIVISION_BY_ZERO_MSG: &str = "Division by zero will abort";
 const MODULO_BY_ZERO_MSG: &str = "Modulo by zero will abort";
 const SHIFT_OVERFLOW_MSG: &str =
-    "Shift by amount greater than or equal to the type's bit width will abort";
+    "Shift by an amount greater than or equal to the type's bit width will abort"
 const CAST_OVERFLOW_MSG: &str =
     "Cast operation will abort because the value is outside the target type's range";
 
