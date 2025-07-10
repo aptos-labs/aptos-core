@@ -802,10 +802,12 @@ impl Generator {
                 },
                 if_false,
             );
+            // We need to break out from all the inner loops!
+            let nest = self.find_break_nest(ctx, if_false).expect("the newly added block must exist");
             self.used_labels.insert(if_false);
             self.add_stm(
                 ctx.builder
-                    .if_(negated_cond, ctx.builder.break_(&self.current_loc(ctx), 0)),
+                    .if_(negated_cond, ctx.builder.break_(&self.current_loc(ctx), nest)),
             );
             self.gen_jump(ctx, next_block_label, if_true)
         }

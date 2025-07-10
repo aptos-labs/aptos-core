@@ -34,7 +34,14 @@ module 0x1::simple_map {
         let _t3;
         _t3 = 0;
         {
-            while (!(!(_t3 < vector::length<Element<Key, Value>>(&self.data)) || &vector::borrow<Element<Key, Value>>(&self.data, _t3).key == key)) _t3 = _t3 + 1;
+            'l0: loop {
+                loop {
+                    if (!(_t3 < vector::length<Element<Key, Value>>(&self.data))) break 'l0;
+                    if (&vector::borrow<Element<Key, Value>>(&self.data, _t3).key == key) break 'l0;
+                    _t3 = _t3 + 1
+                };
+                break
+            };
             return option::some<u64>(_t3)
         };
         option::none<u64>()
@@ -66,9 +73,13 @@ module 0x1::simple_map {
         _t6 = _t4;
         _t7 = vector::length<Key>(&_t5);
         if (!(_t7 == vector::length<Value>(&_t6))) abort 131074;
-        while (_t7 > 0) {
-            add<Key,Value>(self, vector::pop_back<Key>(&mut _t5), vector::pop_back<Value>(&mut _t6));
-            _t7 = _t7 - 1
+        'l0: loop {
+            loop {
+                if (!(_t7 > 0)) break 'l0;
+                add<Key,Value>(self, vector::pop_back<Key>(&mut _t5), vector::pop_back<Value>(&mut _t6));
+                _t7 = _t7 - 1
+            };
+            break
         };
         vector::destroy_empty<Key>(_t5);
         vector::destroy_empty<Value>(_t6);
@@ -80,9 +91,13 @@ module 0x1::simple_map {
         _t1 = &self.data;
         _t2 = vector::empty<Key>();
         _t3 = 0;
-        while (_t3 < vector::length<Element<Key, Value>>(_t1)) {
-            vector::push_back<Key>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).key);
-            _t3 = _t3 + 1
+        'l0: loop {
+            loop {
+                if (!(_t3 < vector::length<Element<Key, Value>>(_t1))) break 'l0;
+                vector::push_back<Key>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).key);
+                _t3 = _t3 + 1
+            };
+            break
         };
         _t2
     }
@@ -93,9 +108,13 @@ module 0x1::simple_map {
         _t1 = &self.data;
         _t2 = vector::empty<Value>();
         _t3 = 0;
-        while (_t3 < vector::length<Element<Key, Value>>(_t1)) {
-            vector::push_back<Value>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).value);
-            _t3 = _t3 + 1
+        'l0: loop {
+            loop {
+                if (!(_t3 < vector::length<Element<Key, Value>>(_t1))) break 'l0;
+                vector::push_back<Value>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).value);
+                _t3 = _t3 + 1
+            };
+            break
         };
         _t2
     }
@@ -130,11 +149,15 @@ module 0x1::simple_map {
         vector::reverse<Element<Key, Value>>(&mut _t3);
         _t4 = _t3;
         _t5 = vector::length<Element<Key, Value>>(&_t4);
-        while (_t5 > 0) {
-            Element<Key,Value>{key: _t21,value: _t22} = vector::pop_back<Element<Key, Value>>(&mut _t4);
-            vector::push_back<Key>(&mut _t1, _t21);
-            vector::push_back<Value>(&mut _t2, _t22);
-            _t5 = _t5 - 1
+        'l0: loop {
+            loop {
+                if (!(_t5 > 0)) break 'l0;
+                Element<Key,Value>{key: _t21,value: _t22} = vector::pop_back<Element<Key, Value>>(&mut _t4);
+                vector::push_back<Key>(&mut _t1, _t21);
+                vector::push_back<Value>(&mut _t2, _t22);
+                _t5 = _t5 - 1
+            };
+            break
         };
         vector::destroy_empty<Element<Key, Value>>(_t4);
         (_t1, _t2)
@@ -149,7 +172,14 @@ module 0x1::simple_map {
         _t4 = vector::length<Element<Key, Value>>(/*freeze*/_t3);
         _t5 = 0;
         {
-            while (!(!(_t5 < _t4) || &vector::borrow<Element<Key, Value>>(/*freeze*/_t3, _t5).key == &key)) _t5 = _t5 + 1;
+            'l0: loop {
+                loop {
+                    if (!(_t5 < _t4)) break 'l0;
+                    if (&vector::borrow<Element<Key, Value>>(/*freeze*/_t3, _t5).key == &key) break 'l0;
+                    _t5 = _t5 + 1
+                };
+                break
+            };
             vector::push_back<Element<Key, Value>>(_t3, Element<Key,Value>{key: key,value: value});
             vector::swap<Element<Key, Value>>(_t3, _t5, _t4);
             Element<Key,Value>{key: _t34,value: _t35} = vector::pop_back<Element<Key, Value>>(_t3);

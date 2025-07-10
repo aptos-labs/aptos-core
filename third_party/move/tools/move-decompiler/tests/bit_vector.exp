@@ -17,7 +17,14 @@ module 0x1::bit_vector {
         _t2 = start_index;
         loop {
             {
-                while (_t2 < *&self.length && is_index_set(self, _t2)) _t2 = _t2 + 1;
+                'l0: loop {
+                    loop {
+                        if (!(_t2 < *&self.length)) break 'l0;
+                        if (!is_index_set(self, _t2)) break 'l0;
+                        _t2 = _t2 + 1
+                    };
+                    break
+                };
                 break
             };
             break
@@ -31,9 +38,13 @@ module 0x1::bit_vector {
         if (!(length < 1024)) abort 131073;
         _t1 = 0;
         _t2 = 0x1::vector::empty<bool>();
-        while (_t1 < length) {
-            0x1::vector::push_back<bool>(&mut _t2, false);
-            _t1 = _t1 + 1
+        'l0: loop {
+            loop {
+                if (!(_t1 < length)) break 'l0;
+                0x1::vector::push_back<bool>(&mut _t2, false);
+                _t1 = _t1 + 1
+            };
+            break
         };
         BitVector{length: length,bit_field: _t2}
     }
@@ -45,7 +56,7 @@ module 0x1::bit_vector {
         let _t4;
         let _t3;
         let _t2;
-        'l0: loop {
+        'l1: loop {
             loop {
                 if (amount >= *&self.length) {
                     _t2 = &mut self.bit_field;
@@ -55,20 +66,32 @@ module 0x1::bit_vector {
                     _t3 = amount;
                     break
                 };
-                while (_t3 < _t4) {
-                    *0x1::vector::borrow_mut<bool>(_t2, _t3) = false;
+                'l0: loop {
+                    loop {
+                        if (!(_t3 < _t4)) break 'l0;
+                        *0x1::vector::borrow_mut<bool>(_t2, _t3) = false;
+                        _t3 = _t3 + 1
+                    };
+                    break
+                };
+                break 'l1
+            };
+            'l2: loop {
+                loop {
+                    if (!(_t3 < *&self.length)) break 'l2;
+                    if (is_index_set(/*freeze*/self, _t3)) set(self, _t3 - amount) else unset(self, _t3 - amount);
                     _t3 = _t3 + 1
                 };
-                break 'l0
-            };
-            while (_t3 < *&self.length) {
-                if (is_index_set(/*freeze*/self, _t3)) set(self, _t3 - amount) else unset(self, _t3 - amount);
-                _t3 = _t3 + 1
+                break
             };
             _t3 = *&self.length - amount;
-            while (_t3 < *&self.length) {
-                unset(self, _t3);
-                _t3 = _t3 + 1
+            'l3: loop {
+                loop {
+                    if (!(_t3 < *&self.length)) break 'l3;
+                    unset(self, _t3);
+                    _t3 = _t3 + 1
+                };
+                break
             };
             break
         };

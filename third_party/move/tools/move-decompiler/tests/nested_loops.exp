@@ -10,15 +10,18 @@ module 0x99::nested_loops {
         _t1 = 0;
         _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 10)) break;
-            _t0 = _t0 + 1;
-            _t3 = _t1;
-            _t4 = false;
-            loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
-                if (!(_t3 < 10)) continue 'l0;
-                _t0 = _t0 + 1
+            'l1: loop {
+                if (_t2) _t1 = _t1 + 1 else _t2 = true;
+                if (!(_t1 < 10)) break 'l0;
+                _t0 = _t0 + 1;
+                _t3 = _t1;
+                _t4 = false;
+                loop {
+                    if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                    if (!(_t3 < 10)) continue 'l1;
+                    _t0 = _t0 + 1
+                };
+                break
             };
             break
         };
@@ -33,19 +36,22 @@ module 0x99::nested_loops {
         _t1 = 0;
         _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 5)) break;
-            _t0 = _t0 + 1;
-            _t3 = _t1;
             'l1: loop {
-                if (!(_t3 < 10)) continue 'l0;
+                if (_t2) _t1 = _t1 + 1 else _t2 = true;
+                if (!(_t1 < 5)) break 'l0;
                 _t0 = _t0 + 1;
-                _t4 = _t3;
-                _t3 = _t3 + 1;
-                loop {
+                _t3 = _t1;
+                'l2: loop {
+                    if (!(_t3 < 10)) continue 'l1;
                     _t0 = _t0 + 1;
-                    if (_t4 > 10) continue 'l1;
-                    _t4 = _t4 + 1
+                    _t4 = _t3;
+                    _t3 = _t3 + 1;
+                    loop {
+                        _t0 = _t0 + 1;
+                        if (_t4 > 10) continue 'l2;
+                        _t4 = _t4 + 1
+                    };
+                    break
                 };
                 break
             };
@@ -60,12 +66,15 @@ module 0x99::nested_loops {
         _t1 = 0;
         _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 5)) break;
-            _t0 = _t0 + 1;
-            loop {
-                if (!(_t0 < 5)) continue 'l0;
-                _t0 = _t0 + 10
+            'l1: loop {
+                if (_t2) _t1 = _t1 + 1 else _t2 = true;
+                if (!(_t1 < 5)) break 'l0;
+                _t0 = _t0 + 1;
+                loop {
+                    if (!(_t0 < 5)) continue 'l1;
+                    _t0 = _t0 + 10
+                };
+                break
             };
             break
         };
@@ -79,16 +88,19 @@ module 0x99::nested_loops {
         _t0 = 0;
         _t1 = 0;
         'l0: loop {
-            _t0 = _t0 + 1;
-            _t2 = 0;
-            if (_t0 > 3) break;
-            _t3 = 0;
-            _t4 = false;
-            loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
-                if (!(_t3 < 5)) continue 'l0;
-                _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+            'l1: loop {
+                _t0 = _t0 + 1;
+                _t2 = 0;
+                if (_t0 > 3) break 'l0;
+                _t3 = 0;
+                _t4 = false;
+                loop {
+                    if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                    if (!(_t3 < 5)) continue 'l1;
+                    _t2 = _t2 + 1;
+                    _t1 = _t1 + 1
+                };
+                break
             };
             break
         };
@@ -100,13 +112,16 @@ module 0x99::nested_loops {
         _t0 = 0;
         _t1 = 0;
         'l0: loop {
-            _t0 = _t0 + 1;
-            _t2 = 0;
-            if (_t0 > 3) break;
-            loop {
-                _t2 = _t2 + 1;
-                _t1 = _t1 + 1;
-                if (_t2 > 7) continue 'l0
+            'l1: loop {
+                _t0 = _t0 + 1;
+                _t2 = 0;
+                if (_t0 > 3) break 'l0;
+                loop {
+                    _t2 = _t2 + 1;
+                    _t1 = _t1 + 1;
+                    if (_t2 > 7) continue 'l1
+                };
+                break
             };
             break
         };
@@ -118,13 +133,16 @@ module 0x99::nested_loops {
         _t0 = 0;
         _t1 = 0;
         'l0: loop {
-            _t0 = _t0 + 1;
-            _t2 = 0;
-            if (_t0 > 3) break;
-            loop {
-                if (!(_t2 < 7)) continue 'l0;
-                _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+            'l1: loop {
+                _t0 = _t0 + 1;
+                _t2 = 0;
+                if (_t0 > 3) break 'l0;
+                loop {
+                    if (!(_t2 < 7)) continue 'l1;
+                    _t2 = _t2 + 1;
+                    _t1 = _t1 + 1
+                };
+                break
             };
             break
         };
@@ -135,13 +153,17 @@ module 0x99::nested_loops {
         let _t0;
         _t0 = 0;
         _t1 = 0;
-        'l0: while (_t0 < 3) {
-            _t0 = _t0 + 1;
-            _t2 = 0;
-            loop {
-                if (!(_t2 < 7)) continue 'l0;
-                _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+        'l0: loop {
+            'l1: loop {
+                if (!(_t0 < 3)) break 'l0;
+                _t0 = _t0 + 1;
+                _t2 = 0;
+                loop {
+                    if (!(_t2 < 7)) continue 'l1;
+                    _t2 = _t2 + 1;
+                    _t1 = _t1 + 1
+                };
+                break
             };
             break
         };
@@ -158,21 +180,24 @@ module 0x99::nested_loops {
         _t1 = 0;
         _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 10)) break;
-            _t0 = _t0 + 1;
-            _t3 = _t1;
-            _t4 = false;
             'l1: loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
-                if (!(_t3 < 10)) continue 'l0;
+                if (_t2) _t1 = _t1 + 1 else _t2 = true;
+                if (!(_t1 < 10)) break 'l0;
                 _t0 = _t0 + 1;
-                _t5 = _t3;
-                _t6 = false;
-                loop {
-                    if (_t6) _t5 = _t5 + 1 else _t6 = true;
-                    if (!(_t5 < 10)) continue 'l1;
-                    _t0 = _t0 + 1
+                _t3 = _t1;
+                _t4 = false;
+                'l2: loop {
+                    if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                    if (!(_t3 < 10)) continue 'l1;
+                    _t0 = _t0 + 1;
+                    _t5 = _t3;
+                    _t6 = false;
+                    loop {
+                        if (_t6) _t5 = _t5 + 1 else _t6 = true;
+                        if (!(_t5 < 10)) continue 'l2;
+                        _t0 = _t0 + 1
+                    };
+                    break
                 };
                 break
             };
@@ -187,19 +212,22 @@ module 0x99::nested_loops {
         _t0 = 0;
         _t1 = 0;
         'l0: loop {
-            _t0 = _t0 + 1;
-            _t2 = _t1;
-            if (_t1 > 10) break;
-            _t1 = _t1 + 1;
             'l1: loop {
                 _t0 = _t0 + 1;
-                _t3 = _t2;
-                if (_t2 > 10) continue 'l0;
-                _t2 = _t2 + 1;
-                loop {
+                _t2 = _t1;
+                if (_t1 > 10) break 'l0;
+                _t1 = _t1 + 1;
+                'l2: loop {
                     _t0 = _t0 + 1;
-                    if (_t3 > 10) continue 'l1;
-                    _t3 = _t3 + 1
+                    _t3 = _t2;
+                    if (_t2 > 10) continue 'l1;
+                    _t2 = _t2 + 1;
+                    loop {
+                        _t0 = _t0 + 1;
+                        if (_t3 > 10) continue 'l2;
+                        _t3 = _t3 + 1
+                    };
+                    break
                 };
                 break
             };
@@ -213,19 +241,23 @@ module 0x99::nested_loops {
         let _t0;
         _t0 = 0;
         _t1 = 0;
-        'l0: while (_t1 < 10) {
-            _t0 = _t0 + 1;
-            _t2 = _t1;
-            _t1 = _t1 + 1;
+        'l0: loop {
             'l1: loop {
-                if (!(_t2 < 10)) continue 'l0;
+                if (!(_t1 < 10)) break 'l0;
                 _t0 = _t0 + 1;
-                _t3 = _t2;
-                _t2 = _t2 + 1;
-                loop {
-                    if (!(_t3 < 10)) continue 'l1;
+                _t2 = _t1;
+                _t1 = _t1 + 1;
+                'l2: loop {
+                    if (!(_t2 < 10)) continue 'l1;
                     _t0 = _t0 + 1;
-                    _t3 = _t3 + 1
+                    _t3 = _t2;
+                    _t2 = _t2 + 1;
+                    loop {
+                        if (!(_t3 < 10)) continue 'l2;
+                        _t0 = _t0 + 1;
+                        _t3 = _t3 + 1
+                    };
+                    break
                 };
                 break
             };

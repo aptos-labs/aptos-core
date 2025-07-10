@@ -26,12 +26,12 @@ module 0x99::cfg_opt_complex {
             loop {
                 if (self is Institution) {
                     if (&self.admin is Superuser) break};
-                {
+                loop {
                     if (self is Institution) {
                         _t5 = &self.admin;
                         if (_t5 is User) {
                             _t2 = &_t5._0;
-                            if (!(*_t2 > 10)) ()
+                            if (*_t2 > 10) break
                         }
                     };
                     loop {
