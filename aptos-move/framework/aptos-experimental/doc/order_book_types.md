@@ -1473,7 +1473,9 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
-): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M) {
+): (
+    <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M
+) {
     <b>let</b> Order::V1 {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,

@@ -39,6 +39,8 @@ mod network;
 #[cfg(test)]
 mod permissioned_delegation;
 #[cfg(test)]
+mod priority_fee;
+#[cfg(test)]
 mod randomness;
 #[cfg(test)]
 mod rest_api;

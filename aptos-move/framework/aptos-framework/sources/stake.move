@@ -493,6 +493,21 @@ module aptos_framework::stake {
         exists<StakePool>(addr)
     }
 
+    #[view]
+    /// Returns the pending transaction fee that is accumulated in current epoch.
+    public fun get_pending_transaction_fee(): vector<u64> acquires PendingTransactionFee {
+        let result = vector::empty();
+        let fee_table = &borrow_global<PendingTransactionFee>(@aptos_framework).pending_fee_by_validator;
+        let num_validators = fee_table.compute_length();
+        let i = 0;
+        while (i < num_validators) {
+            result.push_back(fee_table.borrow(&i).read());
+            i = i + 1;
+        };
+
+        result
+    }
+
     /// Initialize validator set to the core resource account.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
