@@ -399,7 +399,9 @@ module aptos_experimental::active_order_book {
                 return result;
             };
             let match_result =
-                self.get_single_match_result(option::some(order.price), remaining_size, order.is_bid);
+                self.get_single_match_result(
+                    option::some(order.price), remaining_size, order.is_bid
+                );
             remaining_size -= match_result.get_active_matched_size();
             result.push_back(match_result);
         };
