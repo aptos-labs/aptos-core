@@ -227,14 +227,15 @@ pub(crate) fn get_sched_txn_output(
     module_storage: &impl AptosModuleStorage,
     change_set_configs: &ChangeSetConfigs,
     fee_statement: FeeStatement,
+    txn_status: TransactionStatus,
 ) -> Result<VMOutput, VMStatus> {
     let change_set = session.finish(change_set_configs, module_storage)?;
 
     Ok(VMOutput::new(
         change_set,
-        ModuleWriteSet::empty(), // todo: is this empty always? If so, do we explicitly limit the sched txn ?
+        ModuleWriteSet::empty(),
         fee_statement,
-        TransactionStatus::Keep(ExecutionStatus::Success),
+        txn_status,
     ))
 }
 
@@ -2799,19 +2800,21 @@ impl AptosVM {
             txn.key.as_move_value(),
         ];
 
-        /* todo: check if we indeed need this
         let user_txn_ctx = UserTransactionContext::new(
             txn.sender_handle,
             [].to_vec(),
             txn.sender_handle,
             txn.max_gas_amount,
             txn.gas_unit_price_charged,
-            1, // todo: need to get this from somewhere
+            self.chain_id().id(),
             None,
             None,
-        );*/
-        let mut session =
-            self.new_session(resolver, SessionId::scheduled_txn(txn.key.hash()), None);
+        );
+        let mut session = self.new_session(
+            resolver,
+            SessionId::scheduled_txn(txn.key.hash()),
+            Some(user_txn_ctx),
+        );
         let user_func_status = session.execute_function_bypass_visibility(
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
             &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
@@ -2821,8 +2824,30 @@ impl AptosVM {
             traversal_context,
             code_storage,
         );
-        match user_func_status {
-            Ok(_) => {},
+        let txn_status = match user_func_status {
+            Ok(_) => {
+                let maybe_publish_request = session.extract_publish_request();
+                if maybe_publish_request.is_some() {
+                    warn!(
+                        "Scheduled transaction user function execution published a module, which is not allowed; Txn id {:?}",
+                        txn.key.txn_id
+                    );
+                    let error_vm_status = VMStatus::error(
+                        StatusCode::INVALID_MODULE_PUBLISHER,
+                        Some(
+                            "Scheduled transaction user function execution published a module"
+                                .to_string(),
+                        ),
+                    );
+                    TransactionStatus::from_vm_status(
+                        error_vm_status,
+                        self.features()
+                            .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                    )
+                } else {
+                    TransactionStatus::Keep(ExecutionStatus::Success)
+                }
+            },
             Err(err) => {
                 // If the user function execution fails, we return the error status and an empty output.
                 let error_vm_status = err.into_vm_status();
@@ -2854,6 +2879,7 @@ impl AptosVM {
                         unreachable!("We can't retry scheduled transactions");
                     },
                 }
+                txn_status
             },
         };
 
@@ -2901,6 +2927,7 @@ impl AptosVM {
             code_storage,
             &self.storage_gas_params(log_context)?.change_set_configs,
             fee_statement,
+            txn_status,
         )?;
 
         Ok((VMStatus::Executed, output))
