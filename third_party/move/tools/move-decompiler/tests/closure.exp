@@ -23,14 +23,7 @@ module 0x99::basic_struct {
     }
     fun test(f: &||(u64)): u64 {
         let _t1;
-        loop {
-            if (f == f) {
-                _t1 = 1;
-                break
-            };
-            _t1 = 2;
-            break
-        };
+        if (f == f) _t1 = 1 else _t1 = 2;
         _t1
     }
     public fun test_driver(acc: &signer) {

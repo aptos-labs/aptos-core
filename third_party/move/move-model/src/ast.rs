@@ -1252,6 +1252,37 @@ impl ExpData {
         branches
     }
 
+    /// A customizable version of `branches_to`, allowing to
+    /// specify how a `continue` or `break` refers to which loop(s).
+    pub fn customizable_branches_to<F>(&self, condition: F) -> bool
+    where
+        F: Fn(usize, usize, bool) -> bool,
+    {
+        let mut loop_nest = 0;
+        let mut branches = false;
+        let mut visitor = |post: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(_, _) => {
+                    if post {
+                        loop_nest -= 1
+                    } else {
+                        loop_nest += 1
+                    }
+                },
+                ExpData::LoopCont(_, nest, cond)
+                    if condition(loop_nest, *nest, *cond) =>
+                {
+                    branches = true;
+                    return false; // found a reference, exit visit early
+                },
+                _ => {},
+            }
+            true
+        };
+        self.visit_pre_post(&mut visitor);
+        branches
+    }
+
     /// Compute the bindings of break/continue expressions to the associated loop. This
     /// returns two maps: the first maps loop ids to the ids of the loop-cont statements,
     /// together with whether they are break or continue. The 2nd maps loop-cont ids
