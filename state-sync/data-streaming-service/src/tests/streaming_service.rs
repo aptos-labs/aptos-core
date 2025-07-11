@@ -23,7 +23,7 @@ use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_time_service::TimeService;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{TransactionListWithProof, TransactionOutputListWithProofV2},
 };
 use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
@@ -1763,7 +1763,7 @@ async fn verify_continuous_output_notifications(
                             next_expected_epoch,
                             next_expected_version,
                             ledger_info_with_sigs,
-                            outputs_with_proofs,
+                            TransactionOutputListWithProofV2::new_from_v1(outputs_with_proofs),
                         );
 
                     // Update the next expected version and epoch
@@ -1874,7 +1874,7 @@ async fn verify_continuous_transaction_or_output_notifications(
                             next_expected_epoch,
                             next_expected_version,
                             ledger_info_with_sigs,
-                            outputs_with_proofs,
+                            TransactionOutputListWithProofV2::new_from_v1(outputs_with_proofs),
                         );
 
                     // Update the next expected version and epoch
@@ -1904,18 +1904,23 @@ fn verify_continuous_outputs_with_proof(
     expected_epoch: u64,
     expected_version: u64,
     ledger_info_with_sigs: LedgerInfoWithSignatures,
-    outputs_with_proofs: TransactionOutputListWithProof,
+    outputs_with_proofs: TransactionOutputListWithProofV2,
 ) -> (u64, u64) {
     // Verify the ledger info epoch matches the expected epoch
     let ledger_info = ledger_info_with_sigs.ledger_info();
     assert_eq!(ledger_info.epoch(), expected_epoch);
 
     // Verify the output start version matches the expected version
-    let first_output_version = outputs_with_proofs.first_transaction_output_version;
+    let first_output_version = outputs_with_proofs
+        .get_output_list_with_proof()
+        .first_transaction_output_version;
     assert_eq!(Some(expected_version), first_output_version);
 
     // Calculate the next expected version
-    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+    let num_outputs = outputs_with_proofs
+        .get_output_list_with_proof()
+        .transactions_and_outputs
+        .len() as u64;
     let next_expected_version = expected_version + num_outputs;
 
     // Update epochs if we've hit the epoch end

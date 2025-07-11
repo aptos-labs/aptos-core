@@ -20,7 +20,7 @@ use aptos_storage_service_types::{
     responses::{CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse},
     StorageServiceError,
 };
-use aptos_types::transaction::TransactionListWithProof;
+use aptos_types::transaction::{TransactionListWithProof, TransactionListWithProofV2};
 use claims::{assert_err, assert_matches, assert_ok};
 use maplit::hashset;
 use rand::{rngs::OsRng, Rng};
@@ -182,7 +182,7 @@ async fn bad_peer_is_eventually_banned_internal() {
             .get_transactions_with_proof(100, 50, 100, false, response_timeout_ms)
             .await
             .unwrap();
-        assert_eq!(response.payload, TransactionListWithProof::new_empty());
+        assert_eq!(response.payload, TransactionListWithProofV2::new_empty());
     }
 }
 

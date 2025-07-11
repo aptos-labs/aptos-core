@@ -31,13 +31,13 @@ use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
 use aptos_storage_service_types::{
-    responses::TransactionOrOutputListWithProof, Epoch, StorageServiceMessage,
+    responses::TransactionOrOutputListWithProofV2, Epoch, StorageServiceMessage,
 };
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     PeerId,
 };
 use async_trait::async_trait;
@@ -283,7 +283,7 @@ mock! {
             known_version: Version,
             known_epoch: Epoch,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
         async fn get_new_transactions_with_proof(
             &self,
@@ -291,7 +291,7 @@ mock! {
             known_epoch: Epoch,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
         async fn get_new_transactions_or_outputs_with_proof(
             &self,
@@ -299,7 +299,7 @@ mock! {
             known_epoch: Epoch,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
         async fn get_number_of_states(
             &self,
@@ -321,7 +321,7 @@ mock! {
             start_version: Version,
             end_version: Version,
             request_timeout_ms: u64,
-        ) -> Result<Response<TransactionOutputListWithProof>>;
+        ) -> Result<Response<TransactionOutputListWithProofV2>>;
 
         async fn get_transactions_with_proof(
             &self,
@@ -330,7 +330,7 @@ mock! {
             end_version: Version,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<TransactionListWithProof>>;
+        ) -> Result<Response<TransactionListWithProofV2>>;
 
         async fn get_transactions_or_outputs_with_proof(
             &self,
@@ -339,27 +339,27 @@ mock! {
             end_version: Version,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<TransactionOrOutputListWithProof>>;
+        ) -> Result<Response<TransactionOrOutputListWithProofV2>>;
 
         async fn subscribe_to_transaction_outputs_with_proof(
             &self,
             subscription_request_metadata: SubscriptionRequestMetadata,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
         async fn subscribe_to_transactions_with_proof(
             &self,
             subscription_request_metadata: SubscriptionRequestMetadata,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
         async fn subscribe_to_transactions_or_outputs_with_proof(
             &self,
             subscription_request_metadata: SubscriptionRequestMetadata,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
     }
 }
 

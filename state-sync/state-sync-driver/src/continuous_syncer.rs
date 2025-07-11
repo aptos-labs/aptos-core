@@ -223,7 +223,7 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(transaction_outputs_with_proof.clone()),
                         payload_start_version,
                     )
                     .await?;

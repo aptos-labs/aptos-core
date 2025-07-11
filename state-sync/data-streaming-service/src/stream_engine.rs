@@ -2186,7 +2186,7 @@ fn create_data_notification(
             StreamEngine::ContinuousTransactionStreamEngine(_) => {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     target_ledger_info,
-                    transactions_output_chunk,
+                    transactions_output_chunk.clone(),
                 )
             },
             _ => invalid_response_type!(client_response_type),

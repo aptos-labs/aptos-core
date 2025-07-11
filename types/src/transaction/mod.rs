@@ -2129,7 +2129,7 @@ impl TransactionListWithProof {
         }
     }
 
-    /// A convenience function to create an empty proof. Mostly used for tests.
+    /// A convenience function to create an empty proof
     pub fn new_empty() -> Self {
         Self::new(
             vec![],
@@ -2217,6 +2217,18 @@ pub enum TransactionListWithProofV2 {
 impl TransactionListWithProofV2 {
     pub fn new(transaction_list_with_auxiliary_infos: TransactionListWithAuxiliaryInfos) -> Self {
         Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos)
+    }
+
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_empty())
+    }
+
+    /// A convenience function to create a v2 list from a v1 list
+    pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_from_v1(
+            transaction_list_with_proof,
+        ))
     }
 
     /// Returns a reference to the inner transaction list with proof
@@ -2312,7 +2324,7 @@ impl TransactionOutputListWithProof {
         }
     }
 
-    /// A convenience function to create an empty proof. Mostly used for tests.
+    /// A convenience function to create an empty proof
     pub fn new_empty() -> Self {
         Self::new(vec![], None, TransactionInfoListWithProof::new_empty())
     }
@@ -2433,6 +2445,22 @@ impl TransactionOutputListWithProofV2 {
         Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
     }
 
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_empty(),
+        )
+    }
+
+    /// A convenience function to create a v2 output list from a v1 list
+    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_from_v1(
+                transaction_output_list_with_proof,
+            ),
+        )
+    }
+
     /// Returns a reference to the inner transaction output list with proof
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
@@ -2476,7 +2504,7 @@ impl TransactionOutputListWithAuxiliaryInfos {
 
     /// A convenience function to create a v2 output list from a
     /// v1 list. In this case, all auxiliary infos are set to None.
-    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+    fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
         let num_transaction_infos = transaction_output_list_with_proof
             .proof
             .transaction_infos
