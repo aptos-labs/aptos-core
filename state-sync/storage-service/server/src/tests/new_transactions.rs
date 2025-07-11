@@ -7,8 +7,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_storage_service_types::requests::{
-    DataRequest, GetNewTransactionDataWithProofRequest, NewTransactionsWithProofRequest,
-    StorageServiceRequest, TransactionData, TransactionDataRequestType,
+    DataRequest, NewTransactionsWithProofRequest, StorageServiceRequest,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
@@ -491,14 +490,12 @@ async fn get_new_transactions_with_proof_for_peer(
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     // Create the data request
     let data_request = if use_request_v2 {
-        let transaction_data_request_type =
-            TransactionDataRequestType::TransactionData(TransactionData { include_events });
-        DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::get_new_transaction_data_with_proof(
             known_version,
             known_epoch,
-            max_response_bytes: 0,
-        })
+            include_events,
+            0,
+        )
     } else {
         DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
             known_version,
