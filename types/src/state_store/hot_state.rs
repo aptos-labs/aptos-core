@@ -10,7 +10,7 @@ pub struct LRUEntry<K> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SpeculativeLRUEntry<K> {
-    Existing(LRUEntry<K>),
+pub enum SpeculativeLRUEntry<V> {
+    Existing(V),
     Deleted,
 }
