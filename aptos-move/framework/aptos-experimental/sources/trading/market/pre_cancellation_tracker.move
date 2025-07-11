@@ -18,12 +18,12 @@ module aptos_experimental::pre_cancellation_tracker {
     struct PreCancellationTracker has store {
         pre_cancellation_window_micros: u64,
         // Map of order IDs with expiration time to a boolean indicating if the order is active.
-        order_ids_with_expiration: BigOrderedMap<OrderIdWithExpiration, bool>,
+        expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
         // Map of order Ids to their corresponding expiration time.
         account_order_ids: BigOrderedMap<AccountClientOrderId, u64>
     }
 
-    struct OrderIdWithExpiration has copy, drop, store {
+    struct ExpirationAndOrderId has copy, drop, store {
         expiration_time: u64,
         account_order_id: AccountClientOrderId
     }
@@ -31,7 +31,7 @@ module aptos_experimental::pre_cancellation_tracker {
     public fun new_pre_cancellation_tracker(expiration_time_micros: u64): PreCancellationTracker {
         PreCancellationTracker {
             pre_cancellation_window_micros: expiration_time_micros,
-            order_ids_with_expiration: big_ordered_map::new_with_reusable(),
+            expiration_with_order_ids: big_ordered_map::new_with_reusable(),
             account_order_ids: big_ordered_map::new_with_reusable()
         }
     }
@@ -48,18 +48,18 @@ module aptos_experimental::pre_cancellation_tracker {
             // we update the expiration time.
             let expiration_time = tracker.account_order_ids.remove(&account_order_id);
             let order_id_with_expiration =
-                OrderIdWithExpiration { expiration_time, account_order_id };
+                ExpirationAndOrderId { expiration_time, account_order_id };
             // If the mapping exists, then we remove the order ID with its expiration time.
-            tracker.order_ids_with_expiration.remove(&order_id_with_expiration);
+            tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
         };
         let current_time = aptos_std::timestamp::now_microseconds();
         let expiration_time = current_time + tracker.pre_cancellation_window_micros;
-        let order_id_with_expiration = OrderIdWithExpiration {
+        let order_id_with_expiration = ExpirationAndOrderId {
             expiration_time,
             account_order_id
         };
         tracker.account_order_ids.add(account_order_id, expiration_time);
-        tracker.order_ids_with_expiration.add(order_id_with_expiration, true);
+        tracker.expiration_with_order_ids.add(order_id_with_expiration, true);
     }
 
     public fun is_pre_cancelled(
@@ -69,17 +69,17 @@ module aptos_experimental::pre_cancellation_tracker {
     ): bool {
         garbage_collect(tracker);
         let account_order_id = new_account_client_order_id(account, client_order_id);
-        let current_time = aptos_std::timestamp::now_microseconds();
-        if (tracker.account_order_ids.contains(&account_order_id)) {
-            let expiration_time =
-                tracker.account_order_ids.get(&account_order_id).destroy_some();
+        let expiration_time_option = tracker.account_order_ids.get(&account_order_id);
+        if (expiration_time_option.is_some()) {
+            let current_time = aptos_std::timestamp::now_microseconds();
+            let expiration_time = expiration_time_option.destroy_some();
             if (current_time > expiration_time) {
                 // This is possible as garbage collection may not be able to garbage collect all expired orders
                 // in a single call.
                 tracker.account_order_ids.remove(&account_order_id);
                 let order_id_with_expiration =
-                    OrderIdWithExpiration { expiration_time, account_order_id };
-                tracker.order_ids_with_expiration.remove(&order_id_with_expiration);
+                    ExpirationAndOrderId { expiration_time, account_order_id };
+                tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
             } else {
                 return true; // Order ID already exists with a valid expiration time.
             }
@@ -91,10 +91,10 @@ module aptos_experimental::pre_cancellation_tracker {
         let i = 0;
         let current_time = aptos_std::timestamp::now_microseconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL
-            && !tracker.order_ids_with_expiration.is_empty()) {
-            let (front_k, _) = tracker.order_ids_with_expiration.borrow_front();
+            && !tracker.expiration_with_order_ids.is_empty()) {
+            let (front_k, _) = tracker.expiration_with_order_ids.borrow_front();
             if (front_k.expiration_time < current_time) {
-                tracker.order_ids_with_expiration.pop_front();
+                tracker.expiration_with_order_ids.pop_front();
                 tracker.account_order_ids.remove(&front_k.account_order_id);
             } else {
                 break;
@@ -109,7 +109,7 @@ module aptos_experimental::pre_cancellation_tracker {
         // In production, the tracker will be garbage collected automatically.
         let PreCancellationTracker {
             pre_cancellation_window_micros: _,
-            order_ids_with_expiration,
+            expiration_with_order_ids: order_ids_with_expiration,
             account_order_ids
         } = tracker;
         order_ids_with_expiration.destroy(|_v| {});
@@ -220,7 +220,7 @@ module aptos_experimental::pre_cancellation_tracker {
             assert!(!is_cancelled, 200 + j);
             j += 1;
         };
-        assert!(tracker.order_ids_with_expiration.is_empty());
+        assert!(tracker.expiration_with_order_ids.is_empty());
         assert!(tracker.account_order_ids.is_empty());
         destroy_tracker(tracker);
     }

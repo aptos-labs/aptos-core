@@ -89,7 +89,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `cancel_order_internal`](#0x7_market_cancel_order_internal)
 -  [Function `settle_single_trade`](#0x7_market_settle_single_trade)
 -  [Function `place_order_with_order_id`](#0x7_market_place_order_with_order_id)
--  [Function `pre_cancel_order`](#0x7_market_pre_cancel_order)
+-  [Function `cancel_order_with_client_id`](#0x7_market_cancel_order_with_client_id)
 -  [Function `cancel_order`](#0x7_market_cancel_order)
 -  [Function `cancel_order_helper`](#0x7_market_cancel_order_helper)
 -  [Function `decrease_order_size`](#0x7_market_decrease_order_size)
@@ -1934,13 +1934,13 @@ of fill limit violation  in the previous transaction and the order is just a con
 
 </details>
 
-<a id="0x7_market_pre_cancel_order"></a>
+<a id="0x7_market_cancel_order_with_client_id"></a>
 
-## Function `pre_cancel_order`
+## Function `cancel_order_with_client_id`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_pre_cancel_order">pre_cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, client_order_id: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_cancel_order_with_client_id">cancel_order_with_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, client_order_id: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1949,7 +1949,7 @@ of fill limit violation  in the previous transaction and the order is just a con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_pre_cancel_order">pre_cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_cancel_order_with_client_id">cancel_order_with_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;,
     user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     client_order_id: u64,
