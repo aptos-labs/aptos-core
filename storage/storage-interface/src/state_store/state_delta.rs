@@ -4,7 +4,11 @@
 use crate::state_store::{state::State, NUM_STATE_SHARDS};
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_slot::StateSlot},
+    state_store::{
+        hot_state::{LRUEntry, SpeculativeLRUEntry},
+        state_key::StateKey,
+        state_slot::{StateSlot, HOT_STATE_MAX_ITEMS},
+    },
     transaction::Version,
 };
 use itertools::Itertools;
@@ -22,6 +26,7 @@ pub struct StateDelta {
     pub base: State,
     pub current: State,
     pub shards: Arc<[LayeredMap<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    pub lru: Arc<LayeredMap<StateKey, SpeculativeLRUEntry<StateKey>>>,
 }
 
 impl StateDelta {
@@ -39,10 +44,18 @@ impl StateDelta {
                 .expect("Known to be 16 shards."),
         );
 
+        let lru = Arc::new(
+            current
+                .hot_state_meta
+                .lru_state
+                .view_layers_after(&base.hot_state_meta.lru_state),
+        );
+
         Self {
             base,
             current,
             shards,
+            lru,
         }
     }
 
@@ -58,5 +71,35 @@ impl StateDelta {
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         self.shards[state_key.get_shard_id()].get(state_key)
+    }
+
+    pub fn num_hot_items(&self) -> usize {
+        self.current.hot_state_meta.num_items
+    }
+
+    pub fn num_free_hot_slots(&self) -> usize {
+        HOT_STATE_MAX_ITEMS - self.num_hot_items()
+    }
+
+    pub fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        match self.lru.get(state_key) {
+            Some(SpeculativeLRUEntry::Existing(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn get_lru_entry(
+        &self,
+        state_key: &StateKey,
+    ) -> Option<SpeculativeLRUEntry<StateKey>> {
+        self.lru.get(state_key)
+    }
+
+    pub fn get_oldest_key(&self) -> Option<StateKey> {
+        self.current.hot_state_meta.oldest.clone()
+    }
+
+    pub fn get_newest_key(&self) -> Option<StateKey> {
+        self.current.hot_state_meta.latest.clone()
     }
 }

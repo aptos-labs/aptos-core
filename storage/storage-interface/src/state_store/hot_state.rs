@@ -17,11 +17,12 @@ where
     /// Additional entries resulted from previous speculative execution.
     overlay: Arc<LayeredMap<K, SpeculativeLRUEntry<K>>>,
     /// The new entries from the current execution.
-    pending: HashMap<K, SpeculativeLRUEntry<K>>,
+    pub pending: HashMap<K, SpeculativeLRUEntry<K>>,
     /// Points to the latest entry. `None` if empty.
-    head: Option<K>,
+    pub head: Option<K>,
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<K>,
+    pub tail: Option<K>,
+    pub num_entries_changed: isize,
 }
 
 impl<K, V> HotStateLRU<K, V>
@@ -41,6 +42,7 @@ where
             pending: HashMap::new(),
             head,
             tail,
+            num_entries_changed: 0,
         }
     }
 
@@ -50,6 +52,7 @@ where
     }
 
     fn insert_as_head(&mut self, key: K) {
+        self.num_entries_changed += 1;
         match self.head.take() {
             Some(head) => {
                 let mut old_head_entry = self.expect_entry(&head);
@@ -82,6 +85,7 @@ where
             Some(e) => e,
             None => return,
         };
+        self.num_entries_changed -= 1;
 
         match &old_entry.prev {
             Some(prev_key) => {
