@@ -24,7 +24,14 @@ module 0x99::noexit_loops {
     }
     fun f13(cond: bool) {
         let _t2;
-        if (cond) _t2 = 0 else _t2 = 1;
+        loop {
+            if (cond) {
+                _t2 = 0;
+                break
+            };
+            _t2 = 1;
+            break
+        };
         loop continue
     }
     fun f14(p: bool, q: bool) {
