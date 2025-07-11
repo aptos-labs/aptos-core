@@ -26,6 +26,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
+    panic,
     path::PathBuf,
     process,
     sync::{atomic::AtomicU64, Arc},
@@ -134,9 +135,27 @@ struct Verifier {
 
 impl Verifier {
     pub fn new(config: &Opt) -> Result<Self> {
+        // Open in write mode to create any new DBs necessary.
+        {
+            if let Err(e) = panic::catch_unwind(|| {
+                AptosDB::open(
+                    StorageDirPaths::from_path(config.db_dir.as_path()),
+                    false,
+                    NO_OP_STORAGE_PRUNER_CONFIG,
+                    config.rocksdb_opt.clone().into(),
+                    false,
+                    BUFFERED_STATE_TARGET_ITEMS,
+                    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                    None,
+                )
+            }) {
+                warn!("Unable to open AptosDB in write mode: {:?}", e);
+            };
+        }
+
         let aptos_db = AptosDB::open(
             StorageDirPaths::from_path(config.db_dir.as_path()),
-            true,
+            false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             config.rocksdb_opt.clone().into(),
             false,
