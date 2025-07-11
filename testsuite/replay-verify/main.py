@@ -98,13 +98,13 @@ class ReplayConfig:
             self.pvc_number = 35
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            self.timeout_secs = 5400
+            self.timeout_secs = 9000
         else:
             self.concurrent_replayer = 20
             self.pvc_number = 49
             self.min_range_size = 10_000
             self.range_size = 2_000_000
-            self.timeout_secs = 3600
+            self.timeout_secs = 9000
 
 
 class WorkerPod:
