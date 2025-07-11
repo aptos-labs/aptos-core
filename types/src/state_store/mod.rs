@@ -76,6 +76,30 @@ pub trait TStateView {
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
         self.get_state_value(state_key).map(|opt| opt.is_some())
     }
+
+    /// Number of free slots in hot state. `None` for views that do not implement hot state.
+    fn num_free_hot_slots(&self) -> Option<[usize; 16]> {
+        println!("default implementation");
+        None
+    }
+
+    fn get_shard_id(&self, _state_key: &Self::Key) -> usize {
+        unimplemented!();
+    }
+
+    fn hot_state_contains(&self, _state_key: &Self::Key) -> bool {
+        false
+    }
+
+    /// Returns the oldest key if `state_key` is `None`. Else returns the key that's just a little
+    /// bit newer, i.e. the next candidate for eviction.
+    fn get_next_old_key(
+        &self,
+        _shard_id: usize,
+        _state_key: Option<&Self::Key>,
+    ) -> Option<Self::Key> {
+        None
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
@@ -126,6 +150,26 @@ where
 
     fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
         self.deref().get_state_value(state_key)
+    }
+
+    fn num_free_hot_slots(&self) -> Option<[usize; 16]> {
+        self.deref().num_free_hot_slots()
+    }
+
+    fn get_shard_id(&self, state_key: &K) -> usize {
+        self.deref().get_shard_id(state_key)
+    }
+
+    fn hot_state_contains(&self, state_key: &Self::Key) -> bool {
+        self.deref().hot_state_contains(state_key)
+    }
+
+    fn get_next_old_key(
+        &self,
+        shard_id: usize,
+        state_key: Option<&Self::Key>,
+    ) -> Option<Self::Key> {
+        self.deref().get_next_old_key(shard_id, state_key)
     }
 }
 

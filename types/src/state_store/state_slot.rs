@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{hot_state::LRUEntry, state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -20,6 +20,7 @@ pub enum StateSlot {
     ColdVacant,
     HotVacant {
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
     ColdOccupied {
         value_version: Version,
@@ -29,6 +30,7 @@ pub enum StateSlot {
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
 }
 
@@ -36,7 +38,9 @@ impl StateSlot {
     fn maybe_update_cold_state(&self, min_version: Version) -> Option<Option<&StateValue>> {
         match self {
             ColdVacant => Some(None),
-            HotVacant { hot_since_version } => {
+            HotVacant {
+                hot_since_version, ..
+            } => {
                 if *hot_since_version >= min_version {
                     // TODO(HotState): revisit after the hot state is exclusive with the cold state
                     // Can't tell if there was a deletion to the cold state here, not much harm to
@@ -55,7 +59,7 @@ impl StateSlot {
             | HotOccupied {
                 value_version,
                 value,
-                hot_since_version: _,
+                ..
             } => {
                 if *value_version >= min_version {
                     // an update happened at or after min_version, need to update
@@ -108,6 +112,10 @@ impl StateSlot {
         }
     }
 
+    pub fn is_hot(&self) -> bool {
+        !self.is_cold()
+    }
+
     pub fn is_cold(&self) -> bool {
         match self {
             ColdVacant | ColdOccupied { .. } => true,
@@ -153,4 +161,61 @@ impl StateSlot {
             },
         }
     }
+
+    pub fn prev(&self) -> Option<StateKey> {
+        match self {
+            HotVacant { lru_info, .. } => lru_info.prev.clone(),
+            HotOccupied { lru_info, .. } => lru_info.prev.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn next(&self) -> Option<StateKey> {
+        match self {
+            HotVacant { lru_info, .. } => lru_info.next.clone(),
+            HotOccupied { lru_info, .. } => lru_info.next.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn set_prev(&mut self, prev: Option<StateKey>) {
+        match self {
+            HotVacant { lru_info, .. } => lru_info.prev = prev,
+            HotOccupied { lru_info, .. } => lru_info.prev = prev,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn set_next(&mut self, next: Option<StateKey>) {
+        match self {
+            HotVacant { lru_info, .. } => lru_info.next = next,
+            HotOccupied { lru_info, .. } => lru_info.next = next,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn to_cold(self) -> Self {
+        assert!(self.is_hot());
+        match self {
+            HotVacant { .. } => ColdVacant,
+            HotOccupied {
+                value_version,
+                value,
+                ..
+            } => ColdOccupied {
+                value_version,
+                value,
+            },
+            _ => unreachable!(),
+        }
+    }
 }
+
+// 4 GiB
+pub const HOT_STATE_MAX_BYTES: usize = 4 * 1024 * 1024 * 1024;
+
+// 4 million items
+pub const HOT_STATE_MAX_ITEMS: usize = 1000; // 4_000_000;
+
+// 10KB, worst case the hot state still caches 400K items
+pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;

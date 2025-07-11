@@ -16,11 +16,15 @@ use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
     /// Converting to Vec to Box<[]> to release over-allocated memory during construction
     /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
+    /// TODO(wqfish): check if this is deterministic, i.e. if the order within one
+    /// version/transaction is deterministic.
+    /// Note(wqfish): this is the flattened write sets.
     pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
 }
 
@@ -97,6 +101,7 @@ impl BatchedStateUpdateRefs<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
     /// Batched updates (updates for the same keys are merged) from the

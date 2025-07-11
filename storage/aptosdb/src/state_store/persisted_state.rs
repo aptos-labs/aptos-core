@@ -9,6 +9,12 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::state_store::{
+    state_key::StateKey,
+    state_slot::{
+        StateSlot, HOT_STATE_MAX_BYTES, HOT_STATE_MAX_ITEMS, HOT_STATE_MAX_SINGLE_VALUE_BYTES,
+    },
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -18,19 +24,13 @@ pub struct PersistedState {
 }
 
 impl PersistedState {
-    // 4 GiB
-    const HOT_STATE_MAX_BYTES: usize = 4 * 1024 * 1024 * 1024;
-    // 4 million items
-    const HOT_STATE_MAX_ITEMS: usize = 4_000_000;
-    // 10KB, worst case the hot state still caches 400K items
-    const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
     const MAX_PENDING_DROPS: usize = 8;
 
     pub fn new_empty() -> Self {
         Self::new_empty_with_config(
-            Self::HOT_STATE_MAX_ITEMS,
-            Self::HOT_STATE_MAX_BYTES,
-            Self::HOT_STATE_MAX_SINGLE_VALUE_BYTES,
+            HOT_STATE_MAX_ITEMS,
+            HOT_STATE_MAX_BYTES,
+            HOT_STATE_MAX_SINGLE_VALUE_BYTES,
         )
     }
 
@@ -60,7 +60,12 @@ impl PersistedState {
         self.summary.lock().clone()
     }
 
-    pub fn get_state(&self) -> (Arc<dyn HotStateView>, State) {
+    pub fn get_state(
+        &self,
+    ) -> (
+        Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
+        State,
+    ) {
         self.hot_state.get_committed()
     }
 

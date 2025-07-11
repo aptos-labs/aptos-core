@@ -220,7 +220,12 @@ impl DbReader for StateDb {
 }
 
 impl DbReader for StateStore {
-    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
+    fn get_persisted_state(
+        &self,
+    ) -> Result<(
+        Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
+        State,
+    )> {
         Ok(self.persisted_state.get_state())
     }
 
