@@ -12,7 +12,14 @@ module 0x1::vector {
         let _t2;
         _t2 = 0;
         {
-            while (!(!(_t2 < length<Element>(self)) || borrow<Element>(self, _t2) == e)) _t2 = _t2 + 1;
+            'l0: loop {
+                loop {
+                    if (!(_t2 < length<Element>(self))) break 'l0;
+                    if (borrow<Element>(self, _t2) == e) break 'l0;
+                    _t2 = _t2 + 1
+                };
+                break
+            };
             return true
         };
         false
@@ -21,7 +28,14 @@ module 0x1::vector {
         let _t2;
         _t2 = 0;
         {
-            while (!(!(_t2 < length<Element>(self)) || borrow<Element>(self, _t2) == e)) _t2 = _t2 + 1;
+            'l0: loop {
+                loop {
+                    if (!(_t2 < length<Element>(self))) break 'l0;
+                    if (borrow<Element>(self, _t2) == e) break 'l0;
+                    _t2 = _t2 + 1
+                };
+                break
+            };
             return (true, _t2)
         };
         (false, 0)
@@ -33,9 +47,13 @@ module 0x1::vector {
         let _t3;
         if (!(step > 0)) abort 131075;
         _t3 = empty<u64>();
-        while (start < end) {
-            push_back<u64>(&mut _t3, start);
-            start = start + step
+        'l0: loop {
+            loop {
+                if (!(start < end)) break 'l0;
+                push_back<u64>(&mut _t3, start);
+                start = start + step
+            };
+            break
         };
         _t3
     }
@@ -49,9 +67,13 @@ module 0x1::vector {
     public fun reverse_append<Element>(self: &mut vector<Element>, other: vector<Element>) {
         let _t2;
         _t2 = length<Element>(&other);
-        while (_t2 > 0) {
-            push_back<Element>(self, pop_back<Element>(&mut other));
-            _t2 = _t2 - 1
+        'l0: loop {
+            loop {
+                if (!(_t2 > 0)) break 'l0;
+                push_back<Element>(self, pop_back<Element>(&mut other));
+                _t2 = _t2 - 1
+            };
+            break
         };
         destroy_empty<Element>(other);
     }
@@ -60,9 +82,13 @@ module 0x1::vector {
         _t3 = length<Element>(/*freeze*/self);
         if (!(i <= _t3)) abort 131072;
         push_back<Element>(self, e);
-        while (i < _t3) {
-            swap<Element>(self, i, _t3);
-            i = i + 1
+        'l0: loop {
+            loop {
+                if (!(i < _t3)) break 'l0;
+                swap<Element>(self, i, _t3);
+                i = i + 1
+            };
+            break
         };
     }
     public fun is_empty<Element>(self: &vector<Element>): bool {
@@ -72,9 +98,13 @@ module 0x1::vector {
         let _t2;
         _t2 = length<Element>(/*freeze*/self);
         if (i >= _t2) abort 131072;
-        while (i < _t2 - 1) {
-            i = i + 1;
-            swap<Element>(self, i, i)
+        'l0: loop {
+            loop {
+                if (!(i < _t2 - 1)) break 'l0;
+                i = i + 1;
+                swap<Element>(self, i, i)
+            };
+            break
         };
         pop_back<Element>(self)
     }
@@ -84,19 +114,25 @@ module 0x1::vector {
         let _t8;
         let _t7;
         (_t7,_t8) = index_of<Element>(/*freeze*/self, val);
-        if (_t7) {
-            _t12 = empty<Element>();
-            push_back<Element>(&mut _t12, remove<Element>(self, _t8));
-            _t3 = _t12
-        } else _t3 = empty<Element>();
+        loop {
+            if (_t7) {
+                _t12 = empty<Element>();
+                push_back<Element>(&mut _t12, remove<Element>(self, _t8));
+                _t3 = _t12;
+                break
+            };
+            _t3 = empty<Element>();
+            break
+        };
         _t3
     }
     public fun reverse_slice<Element>(self: &mut vector<Element>, left: u64, right: u64) {
         if (!(left <= right)) abort 131073;
-        {
+        'l0: loop {
             if (!(left == right)) {
                 right = right - 1;
-                while (left < right) {
+                loop {
+                    if (!(left < right)) break 'l0;
                     swap<Element>(self, left, right);
                     left = left + 1;
                     right = right - 1
@@ -123,12 +159,23 @@ module 0x1::vector {
     public fun slice<Element: copy>(self: &vector<Element>, start: u64, end: u64): vector<Element> {
         let _t4;
         let _t3;
-        if (start <= end) _t3 = end <= length<Element>(self) else _t3 = false;
+        loop {
+            if (start <= end) {
+                _t3 = end <= length<Element>(self);
+                break
+            };
+            _t3 = false;
+            break
+        };
         if (!_t3) abort 131076;
         _t4 = empty<Element>();
-        while (start < end) {
-            push_back<Element>(&mut _t4, *borrow<Element>(self, start));
-            start = start + 1
+        'l0: loop {
+            loop {
+                if (!(start < end)) break 'l0;
+                push_back<Element>(&mut _t4, *borrow<Element>(self, start));
+                start = start + 1
+            };
+            break
         };
         _t4
     }
@@ -149,9 +196,13 @@ module 0x1::vector {
         _t2 = length<Element>(/*freeze*/self);
         if (!(new_len <= _t2)) abort 131072;
         _t3 = empty<Element>();
-        while (new_len < _t2) {
-            push_back<Element>(&mut _t3, pop_back<Element>(self));
-            _t2 = _t2 - 1
+        'l0: loop {
+            loop {
+                if (!(new_len < _t2)) break 'l0;
+                push_back<Element>(&mut _t3, pop_back<Element>(self));
+                _t2 = _t2 - 1
+            };
+            break
         };
         _t3
     }
