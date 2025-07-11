@@ -364,12 +364,11 @@ impl<'a> Context<'a> {
         if label1 == label2 {
             return true;
         }
-
-        let mut visited = BTreeSet::new();
-        visited.insert(label1);
+        // starting from `label2`, recursively replace the label and see if we go back to `label1`.
+        // why no endless iteration: label_subst has no cycles!
         let mut target = label2;
         while let Some(s) = label_subst.get(&target) {
-            if !visited.insert(target) {
+            if *s == label1 {
                 return true;
             }
             target = *s;
@@ -799,11 +798,15 @@ impl Generator {
                 },
                 if_false,
             );
+            // We need to break out from all the inner loops!
+            let nest = self
+                .find_break_nest(ctx, if_false)
+                .expect("the newly added block must exist");
             self.used_labels.insert(if_false);
-            self.add_stm(
-                ctx.builder
-                    .if_(negated_cond, ctx.builder.break_(&self.current_loc(ctx), 0)),
-            );
+            self.add_stm(ctx.builder.if_(
+                negated_cond,
+                ctx.builder.break_(&self.current_loc(ctx), nest),
+            ));
             self.gen_jump(ctx, next_block_label, if_true)
         }
     }
@@ -1426,9 +1429,7 @@ struct IfElseTransformer<'a> {
 
 impl ExpRewriterFunctions for IfElseTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        if let Some(result) = self.try_make_if_else(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else if let Some(result) = self.try_make_if(exp.clone()) {
+        if let Some(result) = self.try_make_if(exp.clone()) {
             self.rewrite_exp_descent(result)
         } else {
             self.rewrite_exp_descent(exp)
@@ -1437,67 +1438,6 @@ impl ExpRewriterFunctions for IfElseTransformer<'_> {
 }
 
 impl IfElseTransformer<'_> {
-    /// Attempts to create an if-then-else from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator. Here, with 'does not branch out of a loop' we mean
-    /// that an expressions does not contain any unbound break or
-    /// continue statements which point outside the given loop:
-    ///
-    /// ```move
-    /// loop {
-    ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <else-branch> // no reference to inner loop
-    ///     break[1]
-    ///   }
-    ///   <then-branch>
-    /// }
-    /// ==>
-    /// if (c1 || .. || cn) {
-    ///   loop {
-    ///     <then-branch>
-    ///   }
-    /// else {
-    ///   loop {
-    ///     <else-branch> where loop_nest -= 1
-    ///   }
-    /// }
-    /// ```
-    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
-        let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
-        let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
-        let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, inner_rest) = self.builder.match_if_break_list(inner_body.clone())?;
-        // When getting the else branch, do not match exits as there are better treated with
-        // if without else.
-        let else_branch = self.builder.extract_terminated_prefix(
-            &default_loc,
-            inner_rest,
-            1,
-            /*allow_exit*/ false,
-        )?;
-
-        // Check whether the inner 'loop' is not a loop header
-        self.check_no_loop_header(*inner_id)?;
-
-        // Check whether else-branch is not referencing the inner loop
-        if else_branch.branches_to(0..1) {
-            return None;
-        }
-        // Create result
-        let else_branch = else_branch.rewrite_loop_nest(-1);
-        let then_branch = self.builder.seq(&default_loc, then_branch);
-        Some(self.builder.if_else(
-            cond.clone(),
-            self.builder.push_loop_block_into(then_branch),
-            self.builder.push_loop_block_into(else_branch),
-        ))
-    }
-
     /// Attempts to create an if-then (without else) from the given expression.
     /// This recognizes the pattern below, as produced by the AST
     /// generator:
