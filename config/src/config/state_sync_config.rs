@@ -395,6 +395,8 @@ impl Default for AptosLatencyFilteringConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    /// Whether transaction data v2 is enabled
+    pub enable_transaction_data_v2: bool,
     /// The aptos data poller config for the data client
     pub data_poller_config: AptosDataPollerConfig,
     /// The aptos data multi-fetch config for the data client
@@ -415,6 +417,8 @@ pub struct AptosDataClientConfig {
     pub max_num_output_reductions: u64,
     /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
     pub max_optimistic_fetch_lag_secs: u64,
+    /// Maximum number of bytes to send in a single response
+    pub max_response_bytes: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
@@ -438,6 +442,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            enable_transaction_data_v2: false, // TODO: flip this once V2 data is enabled
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             ignore_low_score_peers: true,
@@ -446,7 +451,8 @@ impl Default for AptosDataClientConfig {
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 20, // 20 seconds
-            max_response_timeout_ms: 60_000,   // 60 seconds
+            max_response_bytes: MAX_MESSAGE_SIZE as u64,
+            max_response_timeout_ms: 60_000, // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
