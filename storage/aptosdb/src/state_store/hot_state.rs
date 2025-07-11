@@ -113,6 +113,9 @@ where
 }
 
 impl HotStateView for HotStateBase<StateKey, StateSlot> {
+    type Key = StateKey;
+    type Value = StateSlot;
+
     fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         let shard_id = state_key.get_shard_id();
         self.get_from_shard(shard_id, state_key)
@@ -159,7 +162,12 @@ impl HotState {
         *self.committed.lock() = state
     }
 
-    pub fn get_committed(&self) -> (Arc<dyn HotStateView>, State) {
+    pub fn get_committed(
+        &self,
+    ) -> (
+        Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
+        State,
+    ) {
         let state = self.committed.lock().clone();
         let base = self.base.clone();
 
