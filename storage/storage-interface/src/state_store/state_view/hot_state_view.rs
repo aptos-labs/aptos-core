@@ -10,8 +10,6 @@ pub trait HotStateView: Send + Sync {
     type Value;
 
     fn get_state_slot(&self, state_key: &Self::Key) -> Option<Self::Value>;
-
-    fn get_lru_entry(&self, state_key: &Self::Key) -> Option<LRUEntry<Self::Key>>;
 }
 
 pub struct EmptyHotState;
@@ -21,10 +19,6 @@ impl HotStateView for EmptyHotState {
     type Value = StateSlot;
 
     fn get_state_slot(&self, _state_key: &StateKey) -> Option<StateSlot> {
-        None
-    }
-
-    fn get_lru_entry(&self, _state_key: &StateKey) -> Option<LRUEntry<StateKey>> {
         None
     }
 }
