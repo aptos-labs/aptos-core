@@ -58,6 +58,8 @@ module aptos_experimental::market {
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_std::table;
+    use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
         pre_cancel_order_for_tracker, is_pre_cancelled
@@ -92,6 +94,8 @@ module aptos_experimental::market {
     const EINVALID_LIQUIDATION: u64 = 11;
     const ENOT_ORDER_CREATOR: u64 = 12;
 
+    const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
+
     enum Market<M: store + copy + drop> has store {
         V1 {
             /// Address of the parent object that created this market
@@ -104,7 +108,10 @@ module aptos_experimental::market {
             next_fill_id: u64,
             config: MarketConfig,
             order_book: OrderBook<M>,
-            pre_cancellation_tracker: PreCancellationTracker,
+            /// Pre cancellation tracker for the market, it is wrapped inside a table
+            /// as otherwise any insertion/deletion from the tracker would cause conflict
+            /// with the order book.
+            pre_cancellation_tracker: Table<u8, PreCancellationTracker>,
         }
     }
 
@@ -217,6 +224,11 @@ module aptos_experimental::market {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
         let pre_cancellation_window = config.pre_cancellation_window_micros;
+        let pre_cancellation_tracker = table::new();
+        pre_cancellation_tracker.add(
+            PRE_CANCELLATION_TRACKER_KEY,
+            new_pre_cancellation_tracker(pre_cancellation_window)
+        );
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
@@ -224,9 +236,7 @@ module aptos_experimental::market {
             next_fill_id: 0,
             config,
             order_book: new_order_book(),
-            pre_cancellation_tracker: new_pre_cancellation_tracker(
-                pre_cancellation_window
-            )
+            pre_cancellation_tracker,
         }
     }
 
@@ -387,7 +397,7 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta,
                     price,
-                    is_bid: is_bid,
+                    is_bid,
                     is_taker,
                     status,
                     details: *details
@@ -787,7 +797,7 @@ module aptos_experimental::market {
             };
 
             if (is_pre_cancelled(
-                &mut self.pre_cancellation_tracker,
+                self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY),
                 user_addr,
                 client_order_id.destroy_some()
             )) {
@@ -964,7 +974,7 @@ module aptos_experimental::market {
             return self.cancel_order_helper(order.destroy_some(), callbacks);
         };
         pre_cancel_order_for_tracker(
-            &mut self.pre_cancellation_tracker,
+            self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY),
             user,
             client_order_id,
         );
@@ -1095,7 +1105,8 @@ module aptos_experimental::market {
             pre_cancellation_tracker,
         } = self;
         let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_micros: _ } = config;
-        destroy_tracker(pre_cancellation_tracker);
+        destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
+        pre_cancellation_tracker.drop_unchecked();
         order_book.destroy_order_book()
     }
 
