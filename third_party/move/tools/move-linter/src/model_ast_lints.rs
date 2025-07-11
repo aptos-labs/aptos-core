@@ -5,6 +5,7 @@
 
 mod almost_swapped;
 mod blocks_in_conditions;
+mod empty_range;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -23,6 +24,7 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
     vec![
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<empty_range::EmptyRange>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
