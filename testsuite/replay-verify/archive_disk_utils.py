@@ -34,6 +34,9 @@ CLUSTER_NAME = "devinfra-usce1-0"
 NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
+DEFAULT_PVC_ACCESS_MODE = "ReadWriteOnce"
+SNAPSHOT_DISK_SIZE = "12Ti"  # Default disk size for snapshots
+
 
 def get_region_from_zone(zone: str) -> str:
     return zone.rsplit("-", 1)[0]
@@ -508,7 +511,11 @@ def create_one_pvc_from_snapshot(
     config.load_kube_config()
     api_instance = client.CoreV1Api()
     # testnet and mainnet disk size could be different
-    storage_size = "12Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "12Ti"
+    storage_size = (
+        SNAPSHOT_DISK_SIZE
+        if TESTNET_SNAPSHOT_NAME in snapshot_name
+        else SNAPSHOT_DISK_SIZE
+    )
     # Define the PVC manifest
     pvc_manifest = {
         "apiVersion": "v1",
@@ -522,7 +529,7 @@ def create_one_pvc_from_snapshot(
             "labels": {"run": f"{label}"},
         },
         "spec": {
-            "accessModes": ["ReadWriteOnce"],
+            "accessModes": [DEFAULT_PVC_ACCESS_MODE],
             "resources": {"requests": {"storage": storage_size}},
             "storageClassName": STORAGE_CLASS,
             "volumeMode": "Filesystem",
