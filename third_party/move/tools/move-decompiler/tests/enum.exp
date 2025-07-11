@@ -1,0 +1,145 @@
+
+module 0x99::enum_complex {
+    enum Admin has drop {
+        Superuser,
+        User {
+            _0: u64,
+        }
+    }
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: Admin,
+        }
+    }
+    fun admin_id(self: &Entity): u64 {
+        let _t7;
+        let _t6;
+        let _t5;
+        let _t4;
+        let _t3;
+        let _t1;
+        let _t2;
+        if (self is Institution) _t2 = &self.admin is Superuser else _t2 = false;
+        loop {
+            if (!_t2) {
+                if (self is Institution) {
+                    _t1 = &self.admin;
+                    if (_t1 is User) {
+                        _t3 = &_t1._0;
+                        if (*_t3 > 10) {
+                            _t4 = self;
+                            loop {
+                                if (_t4 is Person) {
+                                    _t3 = &_t4.id;
+                                    if (*_t3 > 10) {
+                                        _t5 = *_t3;
+                                        break
+                                    }
+                                };
+                                if (_t4 is Institution) {
+                                    _t5 = *&_t4.id;
+                                    break
+                                };
+                                _t5 = 0;
+                                break
+                            };
+                            _t6 = *_t3 + _t5;
+                            break
+                        }
+                    }
+                };
+                if (self is Institution) {
+                    _t1 = &self.admin;
+                    if (_t1 is User) {
+                        if (*&_t1._0 <= 10) {
+                            _t4 = self;
+                            loop {
+                                if (_t4 is Person) {
+                                    _t3 = &_t4.id;
+                                    if (*_t3 > 10) {
+                                        _t5 = *_t3;
+                                        break
+                                    }
+                                };
+                                if (_t4 is Institution) {
+                                    _t5 = *&_t4.id;
+                                    break
+                                };
+                                _t5 = 0;
+                                break
+                            };
+                            _t6 = _t5 + 5;
+                            break
+                        }}
+                };
+                _t4 = self;
+                if (_t4 is Person) {
+                    _t3 = &_t4.id;
+                    if (*_t3 > 10) {
+                        _t6 = *_t3;
+                        break
+                    }
+                };
+                if (_t4 is Institution) {
+                    _t6 = *&_t4.id;
+                    break
+                };
+                _t6 = 0;
+                break
+            };
+            loop {
+                if (self is Person) {
+                    _t3 = &self.id;
+                    if (*_t3 > 10) {
+                        _t7 = *_t3;
+                        break
+                    }
+                };
+                if (self is Institution) {
+                    _t7 = *&self.id;
+                    break
+                };
+                _t7 = 0;
+                break
+            };
+            _t6 = 1 + _t7;
+            break
+        };
+        _t6
+    }
+}
+
+module 0x99::enum_simple {
+    enum Shape {
+        Circle {
+            radius: u64,
+        }
+        Rectangle {
+            width: u64,
+            height: u64,
+        }
+    }
+    fun destroy_empty(self: Shape): bool {
+        let _t15;
+        let _t14;
+        let _t2;
+        let _t8;
+        let _t1;
+        _t1 = &self;
+        if (_t1 is Circle) {
+            Shape::Circle{radius: _t8} = self;
+            _t2 = true
+        } else if (_t1 is Rectangle) {
+            Shape::Rectangle{width: _t14,height: _t15} = self;
+            _t2 = false
+        } else abort 14566554180833181697;
+        _t2
+    }
+    fun example_destroy_shapes() {
+        ()
+    }
+}
