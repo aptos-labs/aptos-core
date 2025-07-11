@@ -35,7 +35,7 @@ concurrent-queue = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 derivative = { workspace = true }
-fail = { workspace = true }
+fail = { workspace = true, features = ["failpoints"] }
 hashbrown = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
@@ -67,6 +67,7 @@ test-case = { workspace = true }
 [features]
 testing = []
 fuzzing = ["criterion", "proptest", "proptest-derive"]
+failpoints = ["fail/failpoints"]
 
 [[bench]]
 name = "scheduler_benches"
