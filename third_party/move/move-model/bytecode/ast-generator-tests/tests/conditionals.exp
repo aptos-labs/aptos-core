@@ -122,26 +122,20 @@ loop {
 return _t1
 
 --- If-Transformed Generated AST
-loop {
-  if c {
-    _t1: u8 = 1;
-    break
-  };
-  _t1: u8 = 2;
-  break
+if c {
+  _t1: u8 = 1
+} else {
+  _t1: u8 = 2
 };
 return _t1
 
 --- Var-Bound Generated AST
 {
   let _t1: u8;
-  loop {
-    if c {
-      _t1: u8 = 1;
-      break
-    };
-    _t1: u8 = 2;
-    break
+  if c {
+    _t1: u8 = 1
+  } else {
+    _t1: u8 = 2
   };
   return _t1
 }
@@ -233,34 +227,28 @@ loop {
 return _t2
 
 --- If-Transformed Generated AST
-loop {
-  if Not(c) {
-    _t2: u8 = 3;
-    break
-  };
+if c {
   if d {
-    _t2: u8 = 1;
-    break
-  };
-  _t2: u8 = 2;
-  break
+    _t2: u8 = 1
+  } else {
+    _t2: u8 = 2
+  }
+} else {
+  _t2: u8 = 3
 };
 return _t2
 
 --- Var-Bound Generated AST
 {
   let _t2: u8;
-  loop {
-    if Not(c) {
-      _t2: u8 = 3;
-      break
-    };
+  if c {
     if d {
-      _t2: u8 = 1;
-      break
-    };
-    _t2: u8 = 2;
-    break
+      _t2: u8 = 1
+    } else {
+      _t2: u8 = 2
+    }
+  } else {
+    _t2: u8 = 3
   };
   return _t2
 }
@@ -324,26 +312,20 @@ loop {
 return _t1
 
 --- If-Transformed Generated AST
-loop {
-  if c {
-    _t1: u64 = 1;
-    break
-  };
-  _t1: u64 = 2;
-  break
+if c {
+  _t1: u64 = 1
+} else {
+  _t1: u64 = 2
 };
 return _t1
 
 --- Var-Bound Generated AST
 {
   let _t1: u64;
-  loop {
-    if c {
-      _t1: u64 = 1;
-      break
-    };
-    _t1: u64 = 2;
-    break
+  if c {
+    _t1: u64 = 1
+  } else {
+    _t1: u64 = 2
   };
   return _t1
 }
@@ -433,34 +415,28 @@ loop {
 return _t2
 
 --- If-Transformed Generated AST
-loop {
-  if c {
-    _t2: u8 = 1;
-    break
-  };
+if c {
+  _t2: u8 = 1
+} else {
   if d {
-    _t2: u8 = 2;
-    break
-  };
-  _t2: u8 = 3;
-  break
+    _t2: u8 = 2
+  } else {
+    _t2: u8 = 3
+  }
 };
 return _t2
 
 --- Var-Bound Generated AST
 {
   let _t2: u8;
-  loop {
-    if c {
-      _t2: u8 = 1;
-      break
-    };
+  if c {
+    _t2: u8 = 1
+  } else {
     if d {
-      _t2: u8 = 2;
-      break
-    };
-    _t2: u8 = 3;
-    break
+      _t2: u8 = 2
+    } else {
+      _t2: u8 = 3
+    }
   };
   return _t2
 }
@@ -569,13 +545,10 @@ return _t1
 --- If-Transformed Generated AST
 x: u64 = Add(x, x);
 x: u64 = Mul(x, x);
-loop {
-  if Gt(x, 0) {
-    _t1: u64 = Add(x, 1);
-    break
-  };
-  _t1: u64 = Sub(x, 1);
-  break
+if Gt(x, 0) {
+  _t1: u64 = Add(x, 1)
+} else {
+  _t1: u64 = Sub(x, 1)
 };
 return _t1
 
@@ -584,13 +557,10 @@ return _t1
   let _t1: u64;
   x: u64 = Add(x, x);
   x: u64 = Mul(x, x);
-  loop {
-    if Gt(x, 0) {
-      _t1: u64 = Add(x, 1);
-      break
-    };
-    _t1: u64 = Sub(x, 1);
-    break
+  if Gt(x, 0) {
+    _t1: u64 = Add(x, 1)
+  } else {
+    _t1: u64 = Sub(x, 1)
   };
   return _t1
 }
@@ -605,72 +575,29 @@ module 0x815::m {
     }
     fun if_else_1(c: bool): u8 {
         let _t1;
-        loop {
-            if (c) {
-                _t1 = 1u8;
-                break
-            };
-            _t1 = 2u8;
-            break
-        };
+        if (c) _t1 = 1u8 else _t1 = 2u8;
         _t1
     }
     fun if_else_2(c: bool, d: bool): u8 {
         let _t2;
-        loop {
-            if (!c) {
-                _t2 = 3u8;
-                break
-            };
-            if (d) {
-                _t2 = 1u8;
-                break
-            };
-            _t2 = 2u8;
-            break
-        };
+        if (c) if (d) _t2 = 1u8 else _t2 = 2u8 else _t2 = 3u8;
         _t2
     }
     fun if_else_3(c: bool): u64 {
         let _t1;
-        loop {
-            if (c) {
-                _t1 = 1;
-                break
-            };
-            _t1 = 2;
-            break
-        };
+        if (c) _t1 = 1 else _t1 = 2;
         _t1
     }
     fun if_else_if(c: bool, d: bool): u8 {
         let _t2;
-        loop {
-            if (c) {
-                _t2 = 1u8;
-                break
-            };
-            if (d) {
-                _t2 = 2u8;
-                break
-            };
-            _t2 = 3u8;
-            break
-        };
+        if (c) _t2 = 1u8 else if (d) _t2 = 2u8 else _t2 = 3u8;
         _t2
     }
     fun if_else_with_shared_exp(x: u64): u64 {
         let _t1;
         x = x + x;
         x = x * x;
-        loop {
-            if (x > 0) {
-                _t1 = x + 1;
-                break
-            };
-            _t1 = x - 1;
-            break
-        };
+        if (x > 0) _t1 = x + 1 else _t1 = x - 1;
         _t1
     }
 }
