@@ -46,6 +46,8 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
         None,
         None,
         None,
+        None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
@@ -227,9 +229,11 @@ fn assert_process_proposal_result(
         None,
         Some(OnChainConsensusConfig::default_for_genesis()),
         None,
+        None,
         randomness_config,
         jwk_consensus_config,
         validator_set,
+        false,
     );
 
     let node = &mut nodes[0];
@@ -294,9 +298,11 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
             vtxn: vtxn_config,
             window_size: DEFAULT_WINDOW_SIZE,
         }),
+        None,
         Some(local_config),
         Some(randomness_config),
         None,
+        false,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();

@@ -40,9 +40,11 @@ fn test_opt_proposal_proposed_no_failures() {
         1,
         None,
         None,
+        None,
         Some(config_with_opt_proposal_enabled()),
         None,
         None,
+        false,
     );
     let genesis = nodes[0].block_store.ordered_root();
 
@@ -93,9 +95,11 @@ fn test_normal_proposal_after_opt_proposal_timeout() {
         1,
         None,
         None,
+        None,
         Some(config_with_opt_proposal_enabled()),
         None,
         None,
+        false,
     );
     let genesis = nodes[0].block_store.ordered_root();
 
@@ -167,9 +171,11 @@ fn test_one_proposal_per_round_honest_proposer() {
         1,
         None,
         None,
+        None,
         Some(config_with_opt_proposal_enabled()),
         None,
         None,
+        false,
     );
     let genesis = nodes[0].block_store.ordered_root();
     let node = &mut nodes[0];
@@ -264,9 +270,11 @@ fn test_process_either_optimistic_or_normal_proposal() {
         1,
         None,
         None,
+        None,
         Some(config_with_opt_proposal_enabled()),
         None,
         None,
+        false,
     );
     let genesis = nodes[0].block_store.ordered_root();
     let node = &mut nodes[0];
