@@ -24,8 +24,8 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     transaction_validation,
     verifier::{
-        event_validation, native_validation, resource_groups, transaction_arg_validation,
-        view_function,
+        event_validation, native_validation, resource_groups, script_validation,
+        transaction_arg_validation, view_function,
     },
     VMBlockExecutor, VMValidator,
 };
@@ -56,7 +56,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
@@ -66,7 +66,6 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
         TimedFeatureFlag, TimedFeatures,
     },
-    randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
@@ -112,7 +111,6 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
-    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -232,7 +230,7 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 
 /// Checks if a given transaction is a governance proposal by checking if it has one of the
 /// approved execution hashes.
-fn is_approved_gov_script(
+pub(crate) fn is_approved_gov_script(
     resolver: &impl ConfigStorage,
     txn: &SignedTransaction,
     txn_metadata: &TransactionMetadata,
@@ -800,7 +798,7 @@ impl AptosVM {
 
         // Check that unstable bytecode cannot be executed on mainnet and verify events.
         let script = func.owner_as_script()?;
-        self.reject_unstable_bytecode_for_script(script)?;
+        script_validation::reject_unstable_bytecode_for_script(script, self.chain_id())?;
         event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
         let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1078,39 +1076,8 @@ impl AptosVM {
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
-        let invariant_violation_error = || {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("MultiSig transaction error".to_string())
-                .finish(Location::Undefined)
-        };
-        let provided_payload = match executable {
-            TransactionExecutableRef::EntryFunction(entry_func) => {
-                // TODO[Orderless]: For backward compatibility reasons, still using `MultisigTransactionPayload` here.
-                // Find a way to deprecate this.
-                bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
-                    entry_func.clone(),
-                ))
-                .map_err(|_| invariant_violation_error())?
-            },
-            TransactionExecutableRef::Empty => {
-                // Default to empty bytes if payload is not provided.
-                if self
-                    .features()
-                    .is_abort_if_multisig_payload_mismatch_enabled()
-                {
-                    vec![]
-                } else {
-                    bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
-                }
-            },
-            TransactionExecutableRef::Script(_) => {
-                let s = VMStatus::error(
-                    StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support script payload".to_string()),
-                );
-                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
-            },
-        };
+        let provided_payload = executable.get_provided_payload_bytes(self.features())?;
+
         // Failures here will be propagated back.
         let payload_bytes: Vec<Vec<u8>> = session
             .execute(|session| {
@@ -1544,20 +1511,6 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
-    pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
-        if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata(script) {
-                if metadata.unstable {
-                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
-                        .with_message("script marked unstable cannot be run on mainnet".to_string())
-                        .finish(Location::Script));
                 }
             }
         }
@@ -2182,9 +2135,7 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata), None);
 
-        let args = serialize_values(
-            &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
-        );
+        let args = serialize_values(&block_metadata.get_prologue_move_args());
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2234,40 +2185,7 @@ impl AptosVM {
             None,
         );
 
-        let block_metadata_with_randomness = match block_metadata_ext {
-            BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(v1) => v1,
-        };
-
-        let BlockMetadataWithRandomness {
-            id,
-            epoch,
-            round,
-            proposer,
-            previous_block_votes_bitvec,
-            failed_proposer_indices,
-            timestamp_usecs,
-            randomness,
-        } = block_metadata_with_randomness;
-
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
+        let args = block_metadata_ext.get_prologue_move_args();
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
