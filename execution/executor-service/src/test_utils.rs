@@ -44,8 +44,8 @@ fn generate_non_conflicting_sender_receiver(
     rng: &mut KeyGen,
     state_store: &impl SimulationStateStore,
 ) -> (AccountData, AccountData) {
-    let sender = AccountData::new_from_seed(rng, 3_000_000_000, 0);
-    let receiver = AccountData::new_from_seed(rng, 3_000_000_000, 0);
+    let sender = AccountData::new_from_seed(rng, 3_000_000_000, Some(0));
+    let receiver = AccountData::new_from_seed(rng, 3_000_000_000, Some(0));
     state_store.add_account_data(&sender).unwrap();
     state_store.add_account_data(&receiver).unwrap();
     (sender, receiver)
