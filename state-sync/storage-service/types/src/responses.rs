@@ -27,7 +27,10 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, Version,
+    },
 };
 use num_traits::{PrimInt, Zero};
 #[cfg(test)]
@@ -144,6 +147,32 @@ pub enum DataResponse {
     TransactionsWithProof(TransactionListWithProof),
     NewTransactionsOrOutputsWithProof((TransactionOrOutputListWithProof, LedgerInfoWithSignatures)),
     TransactionsOrOutputsWithProof(TransactionOrOutputListWithProof),
+
+    // All the responses listed below are for transaction data v2 (i.e., transactions with auxiliary information).
+    // TODO: eventually we should deprecate all the old response types.
+    TransactionDataWithProof(TransactionDataWithProofResponse),
+    NewTransactionDataWithProof(NewTransactionDataWithProofResponse),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionDataWithProofResponse {
+    pub transaction_data_response_type: TransactionDataResponseType,
+    pub transaction_list_with_proof: Option<TransactionListWithProofV2>,
+    pub transaction_output_list_with_proof: Option<TransactionOutputListWithProofV2>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct NewTransactionDataWithProofResponse {
+    pub transaction_data_response_type: TransactionDataResponseType,
+    pub transaction_list_with_proof: Option<TransactionListWithProofV2>,
+    pub transaction_output_list_with_proof: Option<TransactionOutputListWithProofV2>,
+    pub ledger_info_with_signatures: LedgerInfoWithSignatures,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum TransactionDataResponseType {
+    TransactionData,
+    TransactionOutputData,
 }
 
 impl DataResponse {
@@ -161,6 +190,26 @@ impl DataResponse {
             Self::TransactionsWithProof(_) => "transactions_with_proof",
             Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
             Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
+
+            // Transaction data v2 responses (transactions with auxiliary data)
+            Self::TransactionDataWithProof(response) => {
+                match response.transaction_data_response_type {
+                    TransactionDataResponseType::TransactionData => "transactions_with_proof_v2",
+                    TransactionDataResponseType::TransactionOutputData => {
+                        "transaction_outputs_with_proof_v2"
+                    },
+                }
+            },
+            Self::NewTransactionDataWithProof(response) => {
+                match response.transaction_data_response_type {
+                    TransactionDataResponseType::TransactionData => {
+                        "new_transactions_with_proof_v2"
+                    },
+                    TransactionDataResponseType::TransactionOutputData => {
+                        "new_transaction_outputs_with_proof_v2"
+                    },
+                }
+            },
         }
     }
 }

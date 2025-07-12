@@ -10,7 +10,10 @@ use aptos_config::network_id::PeerNetworkId;
 use aptos_metrics_core::HistogramVec;
 use aptos_storage_service_types::{
     requests::{DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest},
-    responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
+    responses::{
+        DataResponse, NewTransactionDataWithProofResponse, StorageServerSummary,
+        StorageServiceResponse,
+    },
 };
 use aptos_time_service::TimeService;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
@@ -144,6 +147,17 @@ pub fn notify_peer_of_new_data<T: StorageReaderInterface>(
                         "Failed to get a transaction or output response for peer!".into(),
                     ));
                 }
+            },
+            Ok(DataResponse::TransactionDataWithProof(transaction_data_with_proof)) => {
+                DataResponse::NewTransactionDataWithProof(NewTransactionDataWithProofResponse {
+                    transaction_data_response_type: transaction_data_with_proof
+                        .transaction_data_response_type,
+                    transaction_list_with_proof: transaction_data_with_proof
+                        .transaction_list_with_proof,
+                    transaction_output_list_with_proof: transaction_data_with_proof
+                        .transaction_output_list_with_proof,
+                    ledger_info_with_signatures: target_ledger_info,
+                })
             },
             data_response => {
                 return Err(Error::UnexpectedErrorEncountered(format!(
