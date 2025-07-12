@@ -303,4 +303,13 @@ module 0x42::TestSome {
             <= 0);
     }
 
+    public fun get_ballots(ballots: &mut Ballots<u64>): &mut Ballot<u64> {
+        &mut ballots.ballots[0]
+    }
+
+    spec get_ballots {
+        let index = choose min i in range (ballots.ballots) where ballots.ballots[i].ballot_id.counter == 0;
+        ensures true;
+    }
+
 }

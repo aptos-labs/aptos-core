@@ -54,6 +54,7 @@ const TABLE_ARRAY_THEORY: &[u8] = include_bytes!("prelude/table-array-theory.bpl
 
 // TODO use named addresses
 const BCS_MODULE: &str = "0x1::bcs";
+const FROM_BCS_MODULE: &str = "0x1::from_bcs";
 const EVENT_MODULE: &str = "0x1::event";
 const CMP_MODULE: &str = "0x1::cmp";
 
@@ -318,6 +319,8 @@ pub fn add_prelude(
 
     let bcs_instances = filter_native_ensure_one_inst(BCS_MODULE);
     context.insert("bcs_instances", &bcs_instances);
+    let from_bcs_instances = filter_native_ensure_one_inst(FROM_BCS_MODULE);
+    context.insert("from_bcs_instances", &from_bcs_instances);
     let event_instances = filter_native_ensure_one_inst(EVENT_MODULE);
     context.insert("event_instances", &event_instances);
 

@@ -616,6 +616,23 @@ axiom (forall v: int :: {$1_bcs_serialize'address'(v)}
 {% endmacro hash_module %}
 
 
+{# FROM_BCS
+   ====
+#}
+
+{% macro from_bcs_module(instance) %}
+{%- set S = "'" ~ instance.suffix ~ "'" -%}
+{%- set T = instance.name -%}
+
+procedure $1_from_bcs_from_bytes{{S}}(v: Vec int) returns (res: {{T}});
+
+function $1_from_bcs_$from_bytes{{S}}(v: Vec int): {{T}};
+axiom (forall v: Vec int :: {$1_from_bcs_deserialize{{S}}(v)}
+     ( var r := $1_from_bcs_$from_bytes{{S}}(v); r == $1_from_bcs_deserialize{{S}}(v) ));
+
+{% endmacro from_bcs_module %}
+
+
 {# Event Module
    ============
 #}

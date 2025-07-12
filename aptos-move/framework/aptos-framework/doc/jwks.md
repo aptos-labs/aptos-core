@@ -59,7 +59,20 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `remove_jwk`](#0x1_jwks_remove_jwk)
 -  [Function `apply_patch`](#0x1_jwks_apply_patch)
 -  [Specification](#@Specification_1)
+    -  [Function `patch_federated_jwks`](#@Specification_1_patch_federated_jwks)
+    -  [Function `update_federated_jwk_set`](#@Specification_1_update_federated_jwk_set)
+    -  [Function `get_patched_jwk`](#@Specification_1_get_patched_jwk)
+    -  [Function `try_get_patched_jwk`](#@Specification_1_try_get_patched_jwk)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
+    -  [Function `set_patches`](#@Specification_1_set_patches)
+    -  [Function `upsert_into_observed_jwks`](#@Specification_1_upsert_into_observed_jwks)
+    -  [Function `remove_issuer_from_observed_jwks`](#@Specification_1_remove_issuer_from_observed_jwks)
+    -  [Function `regenerate_patched_jwks`](#@Specification_1_regenerate_patched_jwks)
+    -  [Function `try_get_jwk_by_issuer`](#@Specification_1_try_get_jwk_by_issuer)
+    -  [Function `try_get_jwk_by_id`](#@Specification_1_try_get_jwk_by_id)
+    -  [Function `remove_issuer`](#@Specification_1_remove_issuer)
+    -  [Function `remove_jwk`](#@Specification_1_remove_jwk)
+    -  [Function `apply_patch`](#@Specification_1_apply_patch)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -1907,6 +1920,70 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 ## Specification
 
 
+<a id="@Specification_1_patch_federated_jwks"></a>
+
+### Function `patch_federated_jwks`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_patch_federated_jwks">patch_federated_jwks</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_update_federated_jwk_set"></a>
+
+### Function `update_federated_jwk_set`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="jwks.md#0x1_jwks_update_federated_jwk_set">update_federated_jwk_set</a>(jwk_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, iss: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, kid_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, alg_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, e_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, n_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_patched_jwk"></a>
+
+### Function `get_patched_jwk`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_get_patched_jwk">get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_try_get_patched_jwk"></a>
+
+### Function `try_get_patched_jwk`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_try_get_patched_jwk">try_get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
 <a id="@Specification_1_on_new_epoch"></a>
 
 ### Function `on_new_epoch`
@@ -1921,6 +1998,153 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 <pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
 <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;;
 <b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_set_patches"></a>
+
+### Function `set_patches`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_set_patches">set_patches</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_upsert_into_observed_jwks"></a>
+
+### Function `upsert_into_observed_jwks`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_into_observed_jwks">upsert_into_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, provider_jwks_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_issuer_from_observed_jwks"></a>
+
+### Function `remove_issuer_from_observed_jwks`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer_from_observed_jwks">remove_issuer_from_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_regenerate_patched_jwks"></a>
+
+### Function `regenerate_patched_jwks`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_try_get_jwk_by_issuer"></a>
+
+### Function `try_get_jwk_by_issuer`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_try_get_jwk_by_id"></a>
+
+### Function `try_get_jwk_by_id`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_id">try_get_jwk_by_id</a>(provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_issuer"></a>
+
+### Function `remove_issuer`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result) &lt;==&gt; (<b>forall</b> jwk: <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> <b>where</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>).entries, jwk): jwk.issuer != issuer);
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result) ==&gt; <b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>) == <a href="jwks.md#0x1_jwks">jwks</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(result) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>).entries, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result));
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_jwk"></a>
+
+### Function `remove_jwk`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_jwk">remove_jwk</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
+</code></pre>
+
+
+
+<a id="@Specification_1_apply_patch"></a>
+
+### Function `apply_patch`
+
+
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, patch: <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 80;
 </code></pre>
 
 

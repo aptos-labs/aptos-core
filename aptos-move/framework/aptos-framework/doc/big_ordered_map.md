@@ -110,6 +110,7 @@ allowing cleaner iterator APIs.
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `allocate_spare_slots`](#@Specification_1_allocate_spare_slots)
     -  [Function `is_empty`](#@Specification_1_is_empty)
+    -  [Function `compute_length`](#@Specification_1_compute_length)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `upsert`](#@Specification_1_upsert)
     -  [Function `remove`](#@Specification_1_remove)
@@ -3359,6 +3360,24 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
 
 <pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_compute_length"></a>
+
+### Function `compute_length`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_compute_length">compute_length</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
 </code></pre>
 
 

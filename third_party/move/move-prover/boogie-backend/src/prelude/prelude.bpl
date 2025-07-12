@@ -1209,6 +1209,18 @@ procedure {:inline 1} $1_Signature_ed25519_verify(
 
 
 // ==================================================================================
+// Native from_bcs::from_bytes
+
+{%- for instance in from_bcs_instances %}
+
+// ----------------------------------------------------------------------------------
+// Native FROM_BCS implementation for element type `{{instance.suffix}}`
+
+{{ native::from_bcs_module(instance=instance) -}}
+{%- endfor %}
+
+
+// ==================================================================================
 // Native Event module
 
 {% set emit_generic_event = true %}
