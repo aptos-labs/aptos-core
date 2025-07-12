@@ -1491,6 +1491,36 @@ module aptos_framework::fungible_asset {
     }
 
     #[test_only]
+    public fun generate_mint_ref_for_test(metadata: Object<Metadata>): MintRef {
+        MintRef { metadata }
+    }
+
+    #[test_only]
+    public fun generate_burn_ref_for_test(metadata: Object<Metadata>): BurnRef {
+        BurnRef { metadata }
+    }
+
+    #[test_only]
+    public fun generate_transfer_ref_for_test(metadata: Object<Metadata>): TransferRef {
+        TransferRef { metadata }
+    }
+
+    #[test_only]
+    public fun generate_mutate_metadata_ref_for_test(metadata: Object<Metadata>): MutateMetadataRef {
+        MutateMetadataRef { metadata }
+    }
+
+    #[test_only]
+    public fun generate_raw_balance_ref_for_test(metadata: Object<Metadata>): RawBalanceRef {
+        RawBalanceRef { metadata }
+    }
+
+    #[test_only]
+    public fun generate_raw_supply_ref_for_test(metadata: Object<Metadata>): RawSupplyRef {
+        RawSupplyRef { metadata }
+    }
+
+    #[test_only]
     use aptos_framework::timestamp;
 
     #[test(creator = @0xcafe)]
@@ -1580,6 +1610,7 @@ module aptos_framework::fungible_asset {
         assert!(decimals(metadata) == 0, 10);
         assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
         assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
+
     }
 
     #[test(creator = @0xcafe)]
@@ -1978,6 +2009,58 @@ module aptos_framework::fungible_asset {
         deposit(aaron_store, fa);
 
         permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_generate_refs_for_test_basic_flow(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance, Metadata {
+        let (_, _, _, _, test_token) = create_fungible_asset(creator);
+        let metadata = test_token;
+
+        let mint_ref = generate_mint_ref_for_test(metadata);
+        let transfer_ref = generate_transfer_ref_for_test(metadata);
+        let burn_ref = generate_burn_ref_for_test(metadata);
+        let mutate_metadata_ref = generate_mutate_metadata_ref_for_test(metadata);
+
+        let creator_store = create_test_store(creator, metadata);
+        let aaron_store = create_test_store(aaron, metadata);
+
+        assert!(supply(test_token) == option::some(0), 1);
+        // Mint
+        let fa = mint(&mint_ref, 100);
+        assert!(supply(test_token) == option::some(100), 2);
+        // Deposit
+        deposit(creator_store, fa);
+        // Withdraw
+        let fa = withdraw(creator, creator_store, 80);
+        assert!(supply(test_token) == option::some(100), 3);
+        deposit(aaron_store, fa);
+        // Burn
+        burn_from(&burn_ref, aaron_store, 30);
+        assert!(supply(test_token) == option::some(70), 4);
+        // Transfer
+        transfer(creator, creator_store, aaron_store, 10);
+        assert!(balance(creator_store) == 10, 5);
+        assert!(balance(aaron_store) == 60, 6);
+
+        set_frozen_flag(&transfer_ref, aaron_store, true);
+        assert!(is_frozen(aaron_store), 7);
+        // Mutate Metadata
+        mutate_metadata(
+            &mutate_metadata_ref,
+            option::some(string::utf8(b"mutated_name")),
+            option::some(string::utf8(b"m_symbol")),
+            option::none(),
+            option::none(),
+            option::none()
+        );
+        assert!(name(metadata) == string::utf8(b"mutated_name"), 8);
+        assert!(symbol(metadata) == string::utf8(b"m_symbol"), 9);
+        assert!(decimals(metadata) == 0, 10);
+        assert!(icon_uri(metadata) == string::utf8(b"http://www.example.com/favicon.ico"), 11);
+        assert!(project_uri(metadata) == string::utf8(b"http://www.example.com"), 12);
     }
 
     #[deprecated]
