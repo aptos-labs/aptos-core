@@ -156,28 +156,6 @@ impl<'a> ExpBuilder<'a> {
         }
     }
 
-    /// Pushes a loop block close to the point where it matters, i.e. where there is
-    /// another loop or a break/continue.
-    pub fn push_loop_block_into(&self, exp: Exp) -> Exp {
-        match exp.as_ref() {
-            ExpData::Loop(..) | ExpData::LoopCont(..) => self.loop_(exp),
-            ExpData::Sequence(id, elems) => {
-                if let Some(i) = elems
-                    .iter()
-                    .position(|e| matches!(e.as_ref(), ExpData::Loop(..) | ExpData::LoopCont(..)))
-                {
-                    let mut new_elems = elems[0..i].to_vec();
-                    let default_loc = self.env().get_node_loc(*id);
-                    new_elems.push(self.loop_(self.seq(&default_loc, elems[i..].to_vec())));
-                    self.seq(&default_loc, new_elems)
-                } else {
-                    exp
-                }
-            },
-            _ => exp,
-        }
-    }
-
     pub fn unfold(&self, substitution: &BTreeMap<Symbol, Exp>, exp: Exp) -> Exp {
         ExpData::rewrite(exp, &mut |e: Exp| {
             if let ExpData::LocalVar(_, name) = e.as_ref() {

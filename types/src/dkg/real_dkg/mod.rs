@@ -9,7 +9,9 @@ use crate::{
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, bail, ensure, Context};
+#[cfg(any(test, feature = "testing"))]
+use aptos_crypto::Uniform;
 use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
@@ -19,10 +21,15 @@ use aptos_dkg::{
     },
 };
 use fixed::types::U64F64;
+use move_core_types::account_address::AccountAddress;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, sync::Arc, time::Instant};
+use std::{
+    collections::{BTreeSet, HashSet},
+    sync::Arc,
+    time::Instant,
+};
 
 pub mod rounding;
 
@@ -272,6 +279,50 @@ impl DKGTrait for RealDKG {
         }
     }
 
+    /// Perform extra necessary checks missing in `verify_transcript`.
+    ///
+    /// Additionally:
+    /// - (needed in block proposal validation) if `check_voting_power`,
+    ///   also check if the dealer set specified in the transcript has enough voting power;
+    /// - (needed in peer transcript verification) if `ensures_single_dealer` is set,
+    ///   also check if the dealer set specified in the transcript only contains the peer.
+    fn verify_transcript_extra(
+        trx: &Self::Transcript,
+        verifier: &ValidatorVerifier,
+        checks_voting_power: bool,
+        ensures_single_dealer: Option<AccountAddress>,
+    ) -> anyhow::Result<()> {
+        let all_validator_addrs = verifier.get_ordered_account_addresses();
+        let main_trx_dealers = trx.main.get_dealers();
+        let mut dealer_set = HashSet::with_capacity(main_trx_dealers.len());
+        for dealer in main_trx_dealers.iter() {
+            if let Some(dealer_addr) = all_validator_addrs.get(dealer.id) {
+                dealer_set.insert(*dealer_addr);
+            } else {
+                bail!("invalid dealer idx");
+            }
+        }
+        ensure!(main_trx_dealers.len() == dealer_set.len());
+        if ensures_single_dealer.is_some() {
+            let expected_dealer_set: HashSet<AccountAddress> =
+                ensures_single_dealer.into_iter().collect();
+            ensure!(expected_dealer_set == dealer_set);
+        }
+
+        if checks_voting_power {
+            verifier
+                .check_voting_power(dealer_set.iter(), true)
+                .context("not enough power")?;
+        }
+
+        if let Some(fast_trx) = &trx.fast {
+            ensure!(fast_trx.get_dealers() == main_trx_dealers);
+            ensure!(trx.main.get_dealt_public_key() == fast_trx.get_dealt_public_key());
+        }
+        Ok(())
+    }
+
+    /// NOTE: this is used in VM.
     fn verify_transcript(
         params: &Self::PublicParams,
         trx: &Self::Transcript,
@@ -451,6 +502,81 @@ impl DKGTrait for RealDKG {
     }
 }
 
+impl RealDKG {
+    #[cfg(any(test, feature = "testing"))]
+    pub fn sample_secret_and_generate_transcript<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        pub_params: &<RealDKG as DKGTrait>::PublicParams,
+        my_index: u64,
+        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript {
+        let secret = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        Self::generate_transcript(rng, pub_params, &secret, my_index, sk)
+    }
+
+    /// The same dealer deals twice and aggregates the transcripts.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn deal_twice_and_aggregate<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        pub_params: &<RealDKG as DKGTrait>::PublicParams,
+        my_index: u64,
+        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript {
+        let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let mut trx_0 = Self::generate_transcript(rng, pub_params, &secret_0, my_index, sk);
+        let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let trx_1 = Self::generate_transcript(rng, pub_params, &secret_1, my_index, sk);
+        Self::aggregate_transcripts(pub_params, &mut trx_0, trx_1);
+        assert_eq!(2, trx_0.main.get_dealers().len());
+        trx_0
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn generate_transcript_for_inconsistent_secrets<R: CryptoRng + RngCore>(
+        rng: &mut R,
+        pub_params: &<RealDKG as DKGTrait>::PublicParams,
+        my_index: u64,
+        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+    ) -> <RealDKG as DKGTrait>::Transcript {
+        let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
+        let my_index = my_index as usize;
+        let my_addr = pub_params.session_metadata.dealer_validator_set[my_index].addr;
+        let aux = (pub_params.session_metadata.dealer_epoch, my_addr);
+
+        let wtrx = WTrx::deal(
+            &pub_params.pvss_config.wconfig,
+            &pub_params.pvss_config.pp,
+            sk,
+            &pub_params.pvss_config.eks,
+            &secret_0,
+            &aux,
+            &Player { id: my_index },
+            rng,
+        );
+        // transcript for fast path
+        let fast_wtrx = pub_params
+            .pvss_config
+            .fast_wconfig
+            .as_ref()
+            .map(|fast_wconfig| {
+                WTrx::deal(
+                    fast_wconfig,
+                    &pub_params.pvss_config.pp,
+                    sk,
+                    &pub_params.pvss_config.eks,
+                    &secret_1,
+                    &aux,
+                    &Player { id: my_index },
+                    rng,
+                )
+            });
+        Transcripts {
+            main: wtrx,
+            fast: fast_wtrx,
+        }
+    }
+}
 pub fn maybe_dk_from_bls_sk(
     sk: &PrivateKey,
 ) -> anyhow::Result<<WTrx as Transcript>::DecryptPrivKey> {

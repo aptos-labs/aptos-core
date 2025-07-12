@@ -25,7 +25,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{BORROW_MUT_NAME, BORROW_NAME},
+    well_known::{BORROW_MUT_NAME, BORROW_NAME, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -1049,6 +1049,9 @@ impl ExpTranslator<'_, '_, '_> {
                 if inner.is_reference() {
                     self.error(loc, "reference to a reference is not allowed");
                 }
+                if inner.is_tuple() {
+                    self.error(loc, "reference to a tuple is not allowed");
+                }
                 Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(inner))
             },
             Fun(args, result, abilities) => {
@@ -1066,11 +1069,11 @@ impl ExpTranslator<'_, '_, '_> {
                         vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
-                Type::function(
-                    Type::tuple(arg_tys),
-                    Type::tuple(result_tys),
-                    self.parent.translate_abilities(abilities),
-                )
+                let ability_set = self.parent.translate_abilities(abilities);
+                if ability_set.has_key() {
+                    self.error(loc, "function types cannot have `key` ability");
+                }
+                Type::function(Type::tuple(arg_tys), Type::tuple(result_tys), ability_set)
             },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => {
@@ -3705,26 +3708,48 @@ impl ExpTranslator<'_, '_, '_> {
             ) else {
                 return self.new_error_exp();
             };
+            let instantiated_param_types = param_types
+                .iter()
+                .map(|t| t.instantiate(&instantiation))
+                .collect::<Vec<_>>();
+            let instantiated_result_type = result_type.instantiate(&instantiation);
             let fun_type = self.fresh_type_var_constr(
                 loc.clone(),
                 WideningOrder::LeftToRight,
                 Constraint::SomeFunctionValue(
-                    Type::tuple(
-                        param_types
-                            .iter()
-                            .map(|t| t.instantiate(&instantiation))
-                            .collect(),
-                    ),
-                    result_type.instantiate(&instantiation),
+                    Type::tuple(instantiated_param_types.clone()),
+                    instantiated_result_type.clone(),
                 ),
             );
             let fun_type = self.check_type(loc, &fun_type, expected_type, context);
 
-            let id = self.env().new_node(loc.clone(), fun_type);
-            self.env().set_node_instantiation(id, instantiation);
+            let id = self.env().new_node(loc.clone(), fun_type.clone());
+            self.env().set_node_instantiation(id, instantiation.clone());
+
+            // Special-case handling for functions that are bytecode instructions in the `std::vector` module.
+            if global_var_sym.module_name.addr() == &self.env().get_stdlib_address()
+                && global_var_sym.module_name.name() == self.symbol_pool().make(VECTOR_MODULE)
+            {
+                let function_name = global_var_sym
+                    .symbol
+                    .display(self.symbol_pool())
+                    .to_string();
+                if VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&function_name.as_str()) {
+                    return self.translate_special_function_name(
+                        module_id,
+                        fun_id,
+                        loc,
+                        id,
+                        instantiated_param_types,
+                        instantiated_result_type,
+                        instantiation,
+                    );
+                }
+            }
+
             return ExpData::Call(
                 id,
-                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
                 vec![],
             );
         }
@@ -3738,6 +3763,49 @@ impl ExpTranslator<'_, '_, '_> {
         self.error(loc, &format!("undeclared `{}`", qualified_display));
 
         self.new_error_exp()
+    }
+
+    /// Translates a special function name, such as `std::vector::empty`, for which
+    /// there is no corresponding function definition in the module, and so a closure
+    /// cannot directly refer to it.
+    /// Instead, we wrap such names in a lambda. Eg., say there is a special function
+    /// `fun foo(x: T1, y: T2)`, then then expression `foo` --> `|p__0, p__1| foo(p__0, p__1)`.
+    fn translate_special_function_name(
+        &mut self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        loc: &Loc,
+        id: NodeId,
+        instantiated_param_types: Vec<Type>,
+        instantiated_result_type: Type,
+        instantiation: Vec<Type>,
+    ) -> ExpData {
+        let (params, args): (Vec<_>, Vec<_>) = instantiated_param_types
+            .iter()
+            .enumerate()
+            .map(|(i, param_ty)| {
+                let symbol = self.symbol_pool().make(format!("p__{}", i).as_str());
+                let param_id = self.new_node_id_with_type_loc(param_ty, loc);
+                let arg_id = self.new_node_id_with_type_loc(param_ty, loc);
+                (
+                    Pattern::Var(param_id, symbol),
+                    ExpData::LocalVar(arg_id, symbol).into_exp(),
+                )
+            })
+            .unzip();
+        let pattern = if params.len() == 1 {
+            // to mimic what happens when translating a lambda
+            params[0].clone()
+        } else {
+            let pattern_id =
+                self.new_node_id_with_type_loc(&Type::Tuple(instantiated_param_types), loc);
+            Pattern::Tuple(pattern_id, params)
+        };
+        let body_id = self.new_node_id_with_type_loc(&instantiated_result_type, loc);
+        self.set_node_instantiation(body_id, instantiation);
+        let body =
+            ExpData::Call(body_id, Operation::MoveFunction(module_id, fun_id), args).into_exp();
+        ExpData::Lambda(id, pattern, body, LambdaCaptureKind::Default, None)
     }
 
     /// Creates an expression for a constant, checking the expected type.

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{new_test_context, new_test_context_with_db_sharding_and_internal_indexer};
+use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, ValidCryptoMaterial};
 use aptos_sdk::types::LocalAccount;
@@ -44,8 +44,7 @@ fn matches_event_details(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn test_event_v2_translation_coin_deposit_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
@@ -157,8 +156,7 @@ async fn test_event_v2_translation_coin_deposit_event() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn test_event_v2_translation_coin_withdraw_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Start with the MODULE_EVENT_MIGRATION feature disabled
     context.disable_feature(MODULE_EVENT_MIGRATION).await;
@@ -278,8 +276,7 @@ async fn test_event_v2_translation_coin_withdraw_event() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn test_event_v2_translation_account_coin_register_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -421,8 +418,7 @@ fn rotate_authentication_key_payload(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_event_v2_translation_account_key_rotation_event() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -531,8 +527,7 @@ async fn test_event_v2_translation_account_key_rotation_event() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_event_v2_translation_token_objects() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
@@ -684,8 +679,7 @@ async fn test_event_v2_translation_token_objects() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_event_v2_translation_token_v1() {
-    let context =
-        &mut new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
+    let context = &mut new_test_context(current_function_name!());
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;

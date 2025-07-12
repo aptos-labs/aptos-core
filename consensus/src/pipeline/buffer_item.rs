@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters, pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType,
-};
+use crate::{counters, pipeline::hashable::Hashable};
 use anyhow::anyhow;
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -22,7 +20,7 @@ use aptos_types::{
 };
 use futures::future::BoxFuture;
 use itertools::zip_eq;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::time::Instant;
 
 fn generate_commit_ledger_info(
@@ -61,31 +59,27 @@ pub struct OrderedItem {
     // This can happen in the fast forward sync path, where we can receive the commit proof
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
-    pub callback: StateComputerCommitCallBackType,
-    pub ordered_blocks: Vec<PipelinedBlock>,
+    pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
 pub struct ExecutedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
-    pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
 pub struct SignedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub partial_commit_proof: SignatureAggregator<LedgerInfo>,
-    pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
 }
 
 pub struct AggregatedItem {
-    pub executed_blocks: Vec<PipelinedBlock>,
+    pub executed_blocks: Vec<Arc<PipelinedBlock>>,
     pub commit_proof: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
 }
 
 pub enum BufferItem {
@@ -101,19 +95,17 @@ impl Hashable for BufferItem {
     }
 }
 
-pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<PipelinedBlock>>>;
+pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<Arc<PipelinedBlock>>>>;
 
 impl BufferItem {
     pub fn new_ordered(
-        ordered_blocks: Vec<PipelinedBlock>,
+        ordered_blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
-        callback: StateComputerCommitCallBackType,
         unverified_votes: HashMap<Author, CommitVote>,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
             unverified_votes,
             commit_proof: None,
-            callback,
             ordered_blocks,
             ordered_proof,
         }))
@@ -122,7 +114,7 @@ impl BufferItem {
     // pipeline functions
     pub fn advance_to_executed_or_aggregated(
         self,
-        executed_blocks: Vec<PipelinedBlock>,
+        executed_blocks: Vec<Arc<PipelinedBlock>>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
         order_vote_enabled: bool,
@@ -133,7 +125,6 @@ impl BufferItem {
                     ordered_blocks,
                     commit_proof,
                     unverified_votes,
-                    callback,
                     ordered_proof,
                 } = *ordered_item;
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
@@ -164,7 +155,6 @@ impl BufferItem {
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks,
                         commit_proof,
-                        callback,
                     }))
                 } else {
                     let commit_ledger_info = generate_commit_ledger_info(
@@ -188,13 +178,11 @@ impl BufferItem {
                         Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks,
                             commit_proof,
-                            callback,
                         }))
                     } else {
                         Self::Executed(Box::new(ExecutedItem {
                             executed_blocks,
                             partial_commit_proof,
-                            callback,
                             commit_info,
                             ordered_proof,
                         }))
@@ -212,7 +200,6 @@ impl BufferItem {
             Self::Executed(executed_item) => {
                 let ExecutedItem {
                     executed_blocks,
-                    callback,
                     partial_commit_proof,
                     ..
                 } = *executed_item;
@@ -230,7 +217,6 @@ impl BufferItem {
 
                 Self::Signed(Box::new(SignedItem {
                     executed_blocks,
-                    callback,
                     partial_commit_proof,
                     commit_vote,
                     rb_handle: None,
@@ -252,7 +238,6 @@ impl BufferItem {
             Self::Signed(signed_item) => {
                 let SignedItem {
                     executed_blocks,
-                    callback,
                     partial_commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
@@ -266,14 +251,12 @@ impl BufferItem {
                 );
                 Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
-                    callback,
                     commit_proof,
                 }))
             },
             Self::Executed(executed_item) => {
                 let ExecutedItem {
                     executed_blocks,
-                    callback,
                     commit_info,
                     ..
                 } = *executed_item;
@@ -284,7 +267,6 @@ impl BufferItem {
                 );
                 Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
-                    callback,
                     commit_proof,
                 }))
             },
@@ -332,7 +314,6 @@ impl BufferItem {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: signed_item.executed_blocks,
                             commit_proof,
-                            callback: signed_item.callback,
                         }));
                     }
                 }
@@ -358,7 +339,6 @@ impl BufferItem {
                         return Self::Aggregated(Box::new(AggregatedItem {
                             executed_blocks: executed_item.executed_blocks,
                             commit_proof,
-                            callback: executed_item.callback,
                         }));
                     }
                 }
@@ -369,7 +349,7 @@ impl BufferItem {
     }
 
     // generic functions
-    pub fn get_blocks(&self) -> &Vec<PipelinedBlock> {
+    pub fn get_blocks(&self) -> &Vec<Arc<PipelinedBlock>> {
         match self {
             Self::Ordered(ordered) => &ordered.ordered_blocks,
             Self::Executed(executed) => &executed.executed_blocks,
@@ -510,8 +490,8 @@ mod test {
         (validator_signers, validator_verifier)
     }
 
-    fn create_pipelined_block() -> PipelinedBlock {
-        PipelinedBlock::new(
+    fn create_pipelined_block() -> Arc<PipelinedBlock> {
+        Arc::new(PipelinedBlock::new(
             Block::new_for_testing(
                 HashValue::random(),
                 BlockData::dummy_with_validator_txns(vec![]),
@@ -519,7 +499,7 @@ mod test {
             ),
             vec![],
             StateComputeResult::new_dummy(),
-        )
+        ))
     }
 
     fn create_valid_commit_votes(
@@ -577,7 +557,6 @@ mod test {
         let mut ordered_item = BufferItem::new_ordered(
             vec![pipelined_block.clone()],
             ordered_proof.clone(),
-            Box::new(move |_, _| {}),
             cached_commit_votes,
         );
 
@@ -682,7 +661,6 @@ mod test {
         let mut ordered_item = BufferItem::new_ordered(
             vec![pipelined_block.clone()],
             ordered_proof.clone(),
-            Box::new(move |_, _| {}),
             cached_commit_votes,
         );
 

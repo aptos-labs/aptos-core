@@ -9,8 +9,10 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
+    function::ClosureMask,
     language_storage::TypeTag,
     u256,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET},
@@ -18,7 +20,6 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    value_serde::FunctionValueExtension,
     values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -29,8 +30,8 @@ const EARGS_MISMATCH: u64 = 1;
 const EINVALID_FORMAT: u64 = 2;
 const EUNABLE_TO_FORMAT_DELAYED_FIELD: u64 = 3;
 
-struct FormatContext<'a, 'b, 'c, 'd> {
-    context: &'d mut SafeNativeContext<'a, 'b, 'c>,
+struct FormatContext<'a, 'b, 'c, 'd, 'e> {
+    context: &'e mut SafeNativeContext<'a, 'b, 'c, 'd>,
     should_charge_gas: bool,
     max_depth: usize,
     max_len: usize,
@@ -123,6 +124,59 @@ fn format_vector<'a>(
         native_format_impl(context, ty.get_layout(), val, depth + 1, out)?;
     }
     print_space_or_newline(newline, out, depth);
+    Ok(())
+}
+
+fn format_closure_captured_arguments(
+    context: &mut FormatContext,
+    mask: ClosureMask,
+    mut captured_layouts: impl Iterator<Item = impl MoveLayout>,
+    mut captured_arguments: impl Iterator<Item = Value>,
+    depth: usize,
+    newline: bool,
+    out: &mut String,
+) -> SafeNativeResult<()> {
+    if depth >= context.max_depth {
+        write!(out, " .. ").unwrap();
+        return Ok(());
+    }
+
+    let mut i = 0;
+    let mut mask = mask.bits();
+
+    while mask != 0 {
+        if i > 0 {
+            out.push(',');
+            print_space_or_newline(newline, out, depth + 1);
+        }
+        if i >= context.max_len {
+            write!(out, "..").unwrap();
+            break;
+        }
+
+        if mask & 0x1 != 0 {
+            let layout = captured_layouts.next().ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Captured layout must exist")
+            })?;
+            layout.write_name(out);
+
+            let value = captured_arguments.next().ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Captured argument must exist")
+            })?;
+            native_format_impl(context, layout.get_layout(), value, depth + 1, out)?;
+        } else {
+            write!(out, "_").unwrap();
+        }
+        mask >>= 1;
+        i += 1;
+    }
+
+    if i < context.max_len {
+        out.push(',');
+        print_space_or_newline(newline, out, depth + 1);
+        write!(out, "..").unwrap();
+    }
+
     Ok(())
 }
 
@@ -279,7 +333,7 @@ fn native_format_impl(
                 return Ok(());
             }
             if context.type_tag {
-                write!(out, "{} {{", TypeTag::from(type_.clone())).unwrap();
+                write!(out, "{} {{", type_.to_canonical_string()).unwrap();
             } else {
                 write!(out, "{} {{", type_.name.as_str()).unwrap();
             };
@@ -358,24 +412,30 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Function(_) => {
+        MoveTypeLayout::Function => {
             // Notice that we print the undecorated value representation,
             // avoiding potential loading of the function to get full
             // decorated type information.
             let (fun, args) = val.value_as::<Closure>()?.unpack();
-            let data = context
+            let captured_layouts = context
                 .context
-                .function_value_extension()
-                .get_serialization_data(fun.as_ref())?;
-            out.push_str(&fun.to_stable_string());
-            format_vector(
-                context,
-                data.captured_layouts.iter(),
-                args.collect(),
-                depth,
-                !context.single_line,
-                out,
-            )?;
+                .get_captured_layouts_for_string_utils(fun.as_ref())?
+                .ok_or_else(|| SafeNativeError::Abort {
+                    abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
+                })?;
+            out.push_str(&fun.to_canonical_string());
+            out.push('(');
+            if !captured_layouts.is_empty() {
+                format_closure_captured_arguments(
+                    context,
+                    fun.closure_mask(),
+                    captured_layouts.into_iter(),
+                    args,
+                    depth,
+                    !context.single_line,
+                    out,
+                )?;
+            }
             out.push(')');
         },
 

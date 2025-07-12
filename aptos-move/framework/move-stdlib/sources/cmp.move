@@ -41,8 +41,47 @@ module std::cmp {
     }
 
     spec compare {
-        // TODO: temporary mockup.
+        pragma intrinsic;
+    }
+
+    spec Ordering {
+        pragma intrinsic;
+    }
+
+    spec is_eq {
+        pragma intrinsic;
         pragma opaque;
+        pragma verify = false;
+    }
+
+    spec is_ne {
+        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec is_lt {
+        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec is_le {
+        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec is_gt {
+        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
+    }
+
+    spec is_ge {
+        pragma intrinsic;
+        pragma opaque;
+        pragma verify = false;
     }
 
     #[test_only]
@@ -147,4 +186,128 @@ module std::cmp {
         assert!(compare(&SomeEnum::V5 { field_5: SimpleEnum::V { field: 5}}, &SomeEnum::V5 { field_5: SimpleEnum::V { field: 3}}) is Ordering::Greater, 13);
         assert!(compare(&SomeEnum::V5 { field_5: SimpleEnum::V { field: 3}}, &SomeEnum::V5 { field_5: SimpleEnum::V { field: 5}}) is Ordering::Less, 14);
     }
+
+    #[verify_only]
+    fun test_verify_compare_preliminary_types() {
+        spec {
+            assert compare(1, 5).is_ne();
+            assert !compare(1, 5).is_eq();
+            assert compare(1, 5).is_lt();
+            assert compare(1, 5).is_le();
+            assert compare(5, 5).is_eq();
+            assert !compare(5, 5).is_ne();
+            assert !compare(5, 5).is_lt();
+            assert compare(5, 5).is_le();
+            assert !compare(7, 5).is_eq();
+            assert compare(7, 5).is_ne();
+            assert !compare(7, 5).is_lt();
+            assert !compare(7, 5).is_le();
+            assert compare(false, true).is_ne();
+            assert compare(false, true).is_lt();
+            assert compare(true, false).is_ge();
+            assert compare(true, true).is_eq();
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_compare_vectors() {
+        let empty: vector<u64> = vector[];
+        let v1 = vector[1 as u64];
+        let v8 = vector[1 as u8, 2];
+        let v32_1 = vector[1 as u32, 2, 3];
+        let v32_2 = vector[5 as u32];
+        spec {
+            assert compare(empty, v1) == Ordering::Less;
+            assert compare(empty, empty) == Ordering::Equal;
+            assert compare(v1, empty) == Ordering::Greater;
+            assert compare(v8, v8) == Ordering::Equal;
+            assert compare(v32_1, v32_2) is Ordering::Less;
+            assert compare(v32_2, v32_1) == Ordering::Greater;
+        };
+    }
+
+    #[verify_only]
+    struct SomeStruct has drop {
+        field_1: u64,
+        field_2: u64,
+    }
+
+    #[verify_only]
+    fun test_verify_compare_structs() {
+        let s1 = SomeStruct { field_1: 1, field_2: 2};
+        let s2 = SomeStruct { field_1: 1, field_2: 3};
+        let s3 = SomeStruct { field_1: 1, field_2: 1};
+        let s4 = SomeStruct { field_1: 2, field_2: 1};
+        spec {
+            assert compare(s1, s1) == Ordering::Equal;
+            assert compare(s1, s2) == Ordering::Less;
+            assert compare(s1, s3) == Ordering::Greater;
+            assert compare(s4, s1) == Ordering::Greater;
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_compare_vector_of_structs() {
+        let v1 = vector[SomeStruct { field_1: 1, field_2: 2}];
+        let v2 = vector[SomeStruct { field_1: 1, field_2: 3}];
+        spec {
+            assert compare(v1, v2) == Ordering::Less;
+            assert compare(v1, v1) == Ordering::Equal;
+        };
+    }
+
+    #[verify_only]
+    enum SomeEnum has drop {
+        V1 { field_1: u64 },
+        V2 { field_2: u64 },
+        V3 { field_3: SomeStruct },
+        V4 { field_4: vector<u64> },
+        V5 { field_5: SimpleEnum },
+    }
+
+    #[verify_only]
+    enum SimpleEnum has drop {
+        V { field: u64 },
+    }
+
+    #[verify_only]
+    fun test_verify_compare_enums() {
+        let e1 = SomeEnum::V1 { field_1: 6};
+        let e2 = SomeEnum::V2 { field_2: 1};
+        let e3 = SomeEnum::V3 { field_3: SomeStruct { field_1: 1, field_2: 2}};
+        let e4 = SomeEnum::V4 { field_4: vector[1, 2]};
+        let e5 = SomeEnum::V5 { field_5: SimpleEnum::V { field: 3}};
+        spec {
+            assert compare(e1, e1) == Ordering::Equal;
+            assert compare(e1, e2) == Ordering::Less;
+            assert compare(e2, e1) == Ordering::Greater;
+            assert compare(e3, e4) == Ordering::Less;
+            assert compare(e5, e4) == Ordering::Greater;
+        };
+    }
+
+    #[verify_only]
+    struct SomeStruct_BV has copy,drop {
+        field: u64
+    }
+
+    spec SomeStruct_BV  {
+        pragma bv=b"0";
+    }
+
+    #[verify_only]
+    fun test_compare_bv() {
+        let a = 1;
+        let b = 5;
+        let se_a = SomeStruct_BV { field: a};
+        let se_b = SomeStruct_BV { field: b};
+        let v_a = vector[a];
+        let v_b = vector[b];
+        spec {
+            assert compare(a, b) == Ordering::Less;
+            assert compare(se_a, se_b) == Ordering::Less;
+            assert compare(v_a, v_b) == Ordering::Less;
+        };
+    }
+
 }

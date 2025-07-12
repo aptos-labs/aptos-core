@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: integer type mismatch between two operands, one has type `u128` while the other one has type `u64`, consider using explicit type cast
+   ┌─ tests/sources/functional/bitwise_error_1.move:12:24
+   │
+12 │         ensures s.s == old(s.s) | i; // i needs explicit type cast
+   │                        ^^^^^^^^^^^^

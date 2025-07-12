@@ -3,19 +3,38 @@
 
 use crate::txn_provider::TxnProvider;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::BlockExecutableTransaction as Transaction;
+use aptos_types::transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction};
 
 pub struct DefaultTxnProvider<T: Transaction> {
-    pub txns: Vec<T>,
+    txns: Vec<T>,
+    auxiliary_info: Vec<AuxiliaryInfo>,
 }
 
 impl<T: Transaction> DefaultTxnProvider<T> {
-    pub fn new(txns: Vec<T>) -> Self {
-        Self { txns }
+    pub fn new(txns: Vec<T>, auxiliary_info: Vec<AuxiliaryInfo>) -> Self {
+        assert!(txns.len() == auxiliary_info.len());
+        Self {
+            txns,
+            auxiliary_info,
+        }
+    }
+
+    pub fn new_without_info(txns: Vec<T>) -> Self {
+        let len = txns.len();
+        let mut auxiliary_info = Vec::with_capacity(len);
+        auxiliary_info.resize(len, AuxiliaryInfo::new_empty());
+        Self {
+            txns,
+            auxiliary_info,
+        }
     }
 
     pub fn get_txns(&self) -> &Vec<T> {
         &self.txns
+    }
+
+    pub fn into_inner(self) -> (Vec<T>, Vec<AuxiliaryInfo>) {
+        (self.txns, self.auxiliary_info)
     }
 }
 
@@ -27,12 +46,8 @@ impl<T: Transaction> TxnProvider<T> for DefaultTxnProvider<T> {
     fn get_txn(&self, idx: TxnIndex) -> &T {
         &self.txns[idx as usize]
     }
-}
 
-impl<T: Transaction> Iterator for DefaultTxnProvider<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.txns.pop()
+    fn get_auxiliary_info(&self, idx: TxnIndex) -> &AuxiliaryInfo {
+        &self.auxiliary_info[idx as usize]
     }
 }

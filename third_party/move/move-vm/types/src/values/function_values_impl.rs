@@ -5,7 +5,7 @@ use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, V
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    function::{ClosureMask, MoveFunctionLayout, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+    function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
@@ -31,7 +31,7 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
     fn closure_mask(&self) -> ClosureMask;
     fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering>;
     fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>>;
-    fn to_stable_string(&self) -> String;
+    fn to_canonical_string(&self) -> String;
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
@@ -84,7 +84,14 @@ impl Closure {
 impl Debug for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(fun, captured) = self;
-        write!(f, "Closure({}, {:?})", fun.to_stable_string(), captured)
+        let mask = fun.closure_mask();
+
+        f.debug_struct("Closure")
+            .field("function", &fun.to_canonical_string())
+            .field("closure_mask", &mask)
+            .field("captured_count", &captured.len())
+            .field("captured_values", captured)
+            .finish()
     }
 }
 
@@ -94,7 +101,7 @@ impl Display for Closure {
         let captured = fun
             .closure_mask()
             .format_arguments(captured.iter().map(|v| v.to_string()).collect());
-        write!(f, "{}({})", fun.to_stable_string(), captured.join(", "))
+        write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
     }
 }
 
@@ -108,7 +115,7 @@ impl VMValueCast<Closure> for Value {
     }
 }
 
-impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout, Closure> {
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let Closure(fun, captured) = self.value;
         let fun_ext = self
@@ -130,17 +137,16 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveFunctionLayout
                 ctx: self.ctx,
                 layout: &layout,
                 value,
+                depth: self.depth + 1,
             })?
         }
         seq.end()
     }
 }
 
-pub(crate) struct ClosureVisitor<'c, 'l>(
-    pub(crate) DeserializationSeed<'c, &'l MoveFunctionLayout>,
-);
+pub(crate) struct ClosureVisitor<'c>(pub(crate) DeserializationSeed<'c, ()>);
 
-impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
+impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
     type Value = Closure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -167,9 +173,11 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
         let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
-        let mut captured_layouts = vec![];
-        let mut captured = vec![];
-        for _ in 0..mask.captured_count() {
+
+        let num_captured_values = mask.captured_count() as usize;
+        let mut captured_layouts = Vec::with_capacity(num_captured_values);
+        let mut captured = Vec::with_capacity(num_captured_values);
+        for _ in 0..num_captured_values {
             let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
             match seq.next_element_seed(DeserializationSeed {
                 ctx: self.0.ctx,
@@ -208,5 +216,101 @@ where
     match seq.next_element::<T>()? {
         Some(x) => Ok(x),
         None => Err(A::Error::custom("expected more elements")),
+    }
+}
+
+/// Mock AbstractFunction for testing
+/// Value:closure(AbstractFunction, [Value]) requires an AbstractFunction, which is agnostic from runtime implementation.
+/// This mock is used to test the function values system.
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+pub(crate) mod mock {
+    use super::*;
+    use better_any::{Tid, TidAble, TidExt};
+    use move_binary_format::errors::PartialVMResult;
+    use move_core_types::{
+        account_address::AccountAddress,
+        function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+        value::MoveTypeLayout,
+    };
+    use std::cmp::Ordering;
+
+    // Since Abstract functions are `Tid`, we cannot auto-mock them, so need to mock manually.
+    #[derive(Clone, Tid)]
+    pub(crate) struct MockAbstractFunction {
+        pub(crate) data: SerializedFunctionData,
+    }
+
+    impl MockAbstractFunction {
+        #[allow(dead_code)]
+        pub(crate) fn new(
+            fun_name: &str,
+            ty_args: Vec<TypeTag>,
+            mask: ClosureMask,
+            captured_layouts: Vec<MoveTypeLayout>,
+        ) -> MockAbstractFunction {
+            Self {
+                data: SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+                    module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
+                    fun_id: Identifier::new(fun_name).unwrap(),
+                    ty_args,
+                    mask,
+                    captured_layouts,
+                },
+            }
+        }
+
+        #[allow(dead_code)]
+        pub(crate) fn new_from_data(data: SerializedFunctionData) -> Self {
+            Self { data }
+        }
+    }
+
+    impl AbstractFunction for MockAbstractFunction {
+        fn closure_mask(&self) -> ClosureMask {
+            self.data.mask
+        }
+
+        fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+            // We only need equality for tests
+            let other_mock = other.downcast_ref::<MockAbstractFunction>().unwrap();
+            Ok(if self.data == other_mock.data {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            })
+        }
+
+        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            // Didn't need it in the test
+            unimplemented!("clone_dyn is not implemented for MockAbstractFunction")
+        }
+
+        fn to_canonical_string(&self) -> String {
+            // Needed for assertion failure printing
+            let ty_args_str = if self.data.ty_args.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<{}>",
+                    self.data
+                        .ty_args
+                        .iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+
+            format!(
+                "{}::{}::{}{}",
+                self.data.module_id.address(),
+                self.data.module_id.name(),
+                self.data.fun_id,
+                ty_args_str
+            )
+        }
     }
 }

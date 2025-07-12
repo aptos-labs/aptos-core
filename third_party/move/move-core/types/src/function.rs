@@ -4,7 +4,7 @@
 use crate::{
     ability::AbilitySet,
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
@@ -51,12 +51,12 @@ impl ClosureMask {
         Self(mask)
     }
 
-    pub fn new_for_leading(n: usize) -> Self {
+    pub fn new_for_leading(n: usize) -> Result<Self, String> {
         let mut mask = Self::new(0);
         for i in 0..n {
-            mask.set_captured(i)
+            mask.set_captured(i)?;
         }
-        mask
+        Ok(mask)
     }
 
     pub fn bits(&self) -> u64 {
@@ -70,9 +70,16 @@ impl ClosureMask {
     }
 
     /// Sets the ith argument to be captured
-    pub fn set_captured(&mut self, i: usize) {
-        assert!(i < Self::MAX_ARGS);
-        self.0 |= 1 << i
+    pub fn set_captured(&mut self, i: usize) -> Result<(), String> {
+        if i >= Self::MAX_ARGS {
+            return Err(format!(
+                "Captured argument index {} exceeds maximum allowed captured arguments {}",
+                i,
+                Self::MAX_ARGS
+            ));
+        }
+        self.0 |= 1 << i;
+        Ok(())
     }
 
     /// Apply a closure mask to a list of elements, returning only those
@@ -253,10 +260,9 @@ pub struct MoveClosure {
     pub captured: Vec<(MoveTypeLayout, MoveValue)>,
 }
 
-#[allow(unused)] // Currently, we do not use the expected function layout
-pub(crate) struct ClosureVisitor<'a>(pub(crate) &'a MoveFunctionLayout);
+pub(crate) struct ClosureVisitor;
 
-impl<'d> serde::de::Visitor<'d> for ClosureVisitor<'_> {
+impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
     type Value = MoveClosure;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -377,85 +383,9 @@ mod serialization_tests {
         eprintln!("{:?}", blob);
         assert_eq!(
             value,
-            MoveValue::simple_deserialize(
-                &blob,
-                // The type layout is currently ignored by the serializer, so pass in some
-                // arbitrary one
-                &MoveTypeLayout::Function(MoveFunctionLayout(vec![], vec![], AbilitySet::EMPTY))
-            )
-            .expect("deserialization must succeed"),
+            MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
+                .expect("deserialization must succeed"),
             "deserialized value not equal to original one"
         );
-    }
-}
-
-//===========================================================================================
-
-impl fmt::Display for MoveFunctionLayout {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        let fmt_list = |l: &[MoveTypeLayout]| {
-            l.iter()
-                .map(|t| t.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let MoveFunctionLayout(args, results, abilities) = self;
-        write!(
-            f,
-            "|{}|{}{}",
-            fmt_list(args),
-            fmt_list(results),
-            abilities.display_postfix()
-        )
-    }
-}
-
-impl TryInto<FunctionTag> for &MoveFunctionLayout {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<FunctionTag, Self::Error> {
-        let into_list = |ts: &[MoveTypeLayout]| {
-            ts.iter()
-                .map(|t| t.try_into())
-                .collect::<Result<Vec<TypeTag>, _>>()
-        };
-        Ok(FunctionTag {
-            args: into_list(&self.0)?,
-            results: into_list(&self.1)?,
-            abilities: self.2,
-        })
-    }
-}
-
-impl fmt::Display for MoveClosure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let MoveClosure {
-            module_id,
-            fun_id,
-            ty_args,
-            mask,
-            captured,
-        } = self;
-        let captured_str = mask
-            .format_arguments(captured.iter().map(|v| v.1.to_string()).collect())
-            .join(", ");
-        let inst_str = if ty_args.is_empty() {
-            "".to_string()
-        } else {
-            format!(
-                "<{}>",
-                ty_args
-                    .iter()
-                    .map(|t| t.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
-        };
-        write!(
-            f,
-            // this will print `a::m::f<T>(a1,_,a2,_)`
-            "{}::{}{}({})",
-            module_id, fun_id, inst_str, captured_str
-        )
     }
 }

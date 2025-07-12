@@ -20,7 +20,7 @@ use crate::{
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
@@ -302,7 +302,15 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    // Filter out any disallowed transactions
     let mut statuses = vec![];
+    let transactions =
+        filter_transactions(&smp.transaction_filter_config, transactions, &mut statuses);
+
+    // If there are no transactions left after filtering, return early
+    if transactions.is_empty() {
+        return statuses;
+    }
 
     let start_storage_read = Instant::now();
     let state_view = smp
@@ -380,6 +388,68 @@ where
     );
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
     statuses
+}
+
+/// Filters transactions based on the transaction filter configuration. Any
+/// transactions that are filtered out will have their statuses marked accordingly.
+fn filter_transactions(
+    transaction_filter_config: &TransactionFilterConfig,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
+    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+) -> Vec<(
+    SignedTransaction,
+    Option<u64>,
+    Option<BroadcastPeerPriority>,
+)> {
+    // If the filter is not enabled, return early
+    if !transaction_filter_config.is_enabled() {
+        return transactions;
+    }
+
+    // Start the filter processing timer
+    let transaction_filter_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
+        .with_label_values(&[counters::FILTER_TRANSACTIONS_LABEL])
+        .start_timer();
+
+    // Filter the transactions and update the statuses accordingly
+    let transactions = transactions
+        .into_iter()
+        .filter_map(|(transaction, account_sequence_number, priority)| {
+            if transaction_filter_config
+                .transaction_filter()
+                .allows_transaction(&transaction)
+            {
+                Some((transaction, account_sequence_number, priority))
+            } else {
+                info!(LogSchema::event_log(
+                    LogEntry::TransactionFilter,
+                    LogEvent::TransactionRejected
+                )
+                .message(&format!(
+                    "Transaction {} rejected by filter",
+                    transaction.committed_hash()
+                )));
+
+                statuses.push((
+                    transaction.clone(),
+                    (
+                        MempoolStatus::new(MempoolStatusCode::RejectedByFilter),
+                        None,
+                    ),
+                ));
+                None
+            }
+        })
+        .collect();
+
+    // Update the filter processing latency metrics
+    transaction_filter_timer.stop_and_record();
+
+    transactions
 }
 
 /// Perfoms VM validation on the transactions and inserts those that passes
@@ -707,5 +777,142 @@ pub(crate) async fn process_config_update<V, P>(
                 e
             );
         },
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_transaction_filters::transaction_filter::TransactionFilter;
+    use aptos_types::{
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, TransactionPayload},
+    };
+
+    #[test]
+    fn test_filter_transactions() {
+        // Create test transactions
+        let mut transactions = vec![];
+        for _ in 0..10 {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering enabled (the first and last transactions will be rejected)
+        let transaction_filter = TransactionFilter::empty()
+            .add_sender_filter(false, transactions[0].0.sender())
+            .add_sender_filter(false, transactions[9].0.sender());
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that the first and last transactions are filtered out
+        assert_eq!(filtered_transactions.len(), 8);
+        assert!(!filtered_transactions.contains(&transactions[0]));
+        assert!(!filtered_transactions.contains(&transactions[9]));
+
+        // Verify the filtered transaction statuses
+        assert_eq!(statuses.len(), 2);
+        verify_rejected_status(statuses[0].clone(), transactions[0].0.clone());
+        verify_rejected_status(statuses[1].clone(), transactions[9].0.clone());
+    }
+
+    #[test]
+    fn test_filter_transactions_disabled() {
+        // Create test transactions
+        let num_transactions = 10;
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering disabled
+        let transaction_filter = TransactionFilter::empty().add_all_filter(false); // Reject all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(false, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that all transactions are retained
+        assert_eq!(filtered_transactions.len(), num_transactions);
+        assert!(statuses.is_empty());
+        for transaction in transactions {
+            assert!(filtered_transactions.contains(&transaction));
+        }
+    }
+
+    #[test]
+    fn test_filter_transactions_empty() {
+        // Create test transactions
+        let num_transactions = 10;
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering enabled (the filter is empty, so no transactions will be rejected)
+        let transaction_filter = TransactionFilter::empty(); // Allow all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that all transactions are retained
+        assert_eq!(filtered_transactions.len(), num_transactions);
+        assert!(statuses.is_empty());
+        for transaction in transactions {
+            assert!(filtered_transactions.contains(&transaction));
+        }
+    }
+
+    fn create_raw_transaction() -> RawTransaction {
+        RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        )
+    }
+
+    fn create_signed_transaction() -> SignedTransaction {
+        let raw_transaction = create_raw_transaction();
+        let private_key_1 = Ed25519PrivateKey::generate_for_testing();
+        let signature = private_key_1.sign(&raw_transaction).unwrap();
+
+        SignedTransaction::new(
+            raw_transaction.clone(),
+            private_key_1.public_key(),
+            signature.clone(),
+        )
+    }
+
+    fn verify_rejected_status(
+        status: (SignedTransaction, (MempoolStatus, Option<StatusCode>)),
+        transaction: SignedTransaction,
+    ) {
+        let rejected_status = MempoolStatus::new(MempoolStatusCode::RejectedByFilter);
+        assert_eq!(status, (transaction, (rejected_status, None)));
     }
 }

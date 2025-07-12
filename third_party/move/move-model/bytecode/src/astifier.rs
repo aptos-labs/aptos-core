@@ -247,6 +247,9 @@ impl<'a> Context<'a> {
     ///    here to simplify the viewpoint on the resulting CFG.
     /// 3. There must not be stub blocks which just forward a jump, as in
     ///    `label L1; goto L2`. In this case, we substitute `L1` by `L2`.
+    ///     Given a dead loop like `loop continue`, the substitutions will
+    ///     form a cycle like L1->L2->L3--->L1. In this case, all labels will be
+    ///     substituted with the last one, L3.
     fn clean_bytecode(self) -> Vec<Bytecode> {
         // Compute # of incoming edges for each block.
         let mut incoming_count = BTreeMap::<BlockId, usize>::new();
@@ -257,22 +260,28 @@ impl<'a> Context<'a> {
         }
         // Build a label substitution for stubs.
         let mut label_subst = BTreeMap::new();
+
         for blk_id in self.forward_cfg.blocks() {
             let block_code = self.code_for_block(blk_id);
             if block_code.len() == 2 {
                 if let (Bytecode::Label(_, label1), Bytecode::Jump(_, label2)) =
                     (&block_code[0], &block_code[1])
                 {
-                    label_subst.insert(*label1, *label2);
+                    // When only a substitution does not create a cycle, we add it.
+                    if !Self::cyclic_label_subst_detected(*label1, *label2, &label_subst) {
+                        label_subst.insert(*label1, *label2);
+                    }
                 }
             }
         }
         let substitute_label = |mut label: Label| {
             let mut visited = BTreeSet::new();
             while let Some(s) = label_subst.get(&label) {
+                // This assert should always hold as we have prevented cycles
+                // when building the label_subst map.
                 assert!(
                     visited.insert(label),
-                    "unexpected cyclic label substitution"
+                    "label_subst is acyclic by construction"
                 );
                 label = *s;
             }
@@ -344,6 +353,27 @@ impl<'a> Context<'a> {
             }
         }
         result
+    }
+
+    /// Helper function to detect if a label substitution creates a cycle.
+    fn cyclic_label_subst_detected(
+        label1: Label,
+        label2: Label,
+        label_subst: &BTreeMap<Label, Label>,
+    ) -> bool {
+        if label1 == label2 {
+            return true;
+        }
+        // starting from `label2`, recursively replace the label and see if we go back to `label1`.
+        // why no endless iteration: label_subst has no cycles!
+        let mut target = label2;
+        while let Some(s) = label_subst.get(&target) {
+            if *s == label1 {
+                return true;
+            }
+            target = *s;
+        }
+        false
     }
 
     /// Helper to compute information about loops.
@@ -526,10 +556,21 @@ impl Generator {
         for header in &ctx.loop_headers {
             for after_loop_label in &ctx.after_loop_labels[header] {
                 for loop_block_label in &ctx.loop_labels[header] {
-                    top_sort.add_dependency(
-                        ctx.block_of_label(*loop_block_label),
-                        ctx.block_of_label(*after_loop_label),
-                    )
+                    // Only when the new virtual edge does not bring a loop back (without considering the back edges),
+                    // we add it!
+                    let source_block = ctx.block_of_label(*loop_block_label);
+                    let dest_block = ctx.block_of_label(*after_loop_label);
+                    let edge_filter = |from: BlockId, to: BlockId| !ctx.is_back_edge(from, to);
+                    if !ctx
+                        .forward_cfg
+                        .reachable_blocks(dest_block, edge_filter)
+                        .contains(&source_block)
+                    {
+                        top_sort.add_dependency(
+                            ctx.block_of_label(*loop_block_label),
+                            ctx.block_of_label(*after_loop_label),
+                        )
+                    }
                 }
             }
         }
@@ -757,11 +798,15 @@ impl Generator {
                 },
                 if_false,
             );
+            // We need to break out from all the inner loops!
+            let nest = self
+                .find_break_nest(ctx, if_false)
+                .expect("the newly added block must exist");
             self.used_labels.insert(if_false);
-            self.add_stm(
-                ctx.builder
-                    .if_(negated_cond, ctx.builder.break_(&self.current_loc(ctx), 0)),
-            );
+            self.add_stm(ctx.builder.if_(
+                negated_cond,
+                ctx.builder.break_(&self.current_loc(ctx), nest),
+            ));
             self.gen_jump(ctx, next_block_label, if_true)
         }
     }
@@ -953,10 +998,14 @@ impl Generator {
                 Operation::MoveFunction(*mid, *fid),
                 srcs,
             ),
-            Closure(..) | Invoke => {
-                // TODO(#15664): implement closure opcodes for astifier
-                panic!("closure operations not supported: {:?}", oper)
-            },
+            Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
+                ctx,
+                Some(inst),
+                dests,
+                Operation::Closure(*mid, *fid, *closure_mask),
+                srcs,
+            ),
+            Invoke => self.gen_invoke(ctx, dests, srcs),
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
@@ -1134,6 +1183,24 @@ impl Generator {
             self.gen_assign(ctx, dests, call)
         } else {
             self.add_stm(call)
+        }
+    }
+
+    fn gen_invoke(&mut self, ctx: &Context, dests: &[TempIndex], srcs: &[TempIndex]) {
+        let ty = Type::tuple(
+            dests
+                .iter()
+                .map(|d| ctx.target.get_local_type(*d).clone())
+                .collect(),
+        );
+        let invoke_id = self.new_node_id(ctx, ty);
+        let mut temps = self.make_temps(ctx, srcs.iter().copied());
+        let closure = temps.pop().expect("closure must be present for invoke");
+        let invoke = ExpData::Invoke(invoke_id, closure, temps);
+        if !dests.is_empty() {
+            self.gen_assign(ctx, dests, invoke)
+        } else {
+            self.add_stm(invoke)
         }
     }
 
@@ -1362,9 +1429,7 @@ struct IfElseTransformer<'a> {
 
 impl ExpRewriterFunctions for IfElseTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        if let Some(result) = self.try_make_if_else(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else if let Some(result) = self.try_make_if(exp.clone()) {
+        if let Some(result) = self.try_make_if(exp.clone()) {
             self.rewrite_exp_descent(result)
         } else {
             self.rewrite_exp_descent(exp)
@@ -1373,67 +1438,6 @@ impl ExpRewriterFunctions for IfElseTransformer<'_> {
 }
 
 impl IfElseTransformer<'_> {
-    /// Attempts to create an if-then-else from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator. Here, with 'does not branch out of a loop' we mean
-    /// that an expressions does not contain any unbound break or
-    /// continue statements which point outside the given loop:
-    ///
-    /// ```move
-    /// loop {
-    ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <else-branch> // no reference to inner loop
-    ///     break[1]
-    ///   }
-    ///   <then-branch>
-    /// }
-    /// ==>
-    /// if (c1 || .. || cn) {
-    ///   loop {
-    ///     <then-branch>
-    ///   }
-    /// else {
-    ///   loop {
-    ///     <else-branch> where loop_nest -= 1
-    ///   }
-    /// }
-    /// ```
-    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
-        let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
-        let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
-        let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, inner_rest) = self.builder.match_if_break_list(inner_body.clone())?;
-        // When getting the else branch, do not match exits as there are better treated with
-        // if without else.
-        let else_branch = self.builder.extract_terminated_prefix(
-            &default_loc,
-            inner_rest,
-            1,
-            /*allow_exit*/ false,
-        )?;
-
-        // Check whether the inner 'loop' is not a loop header
-        self.check_no_loop_header(*inner_id)?;
-
-        // Check whether else-branch is not referencing the inner loop
-        if else_branch.branches_to(0..1) {
-            return None;
-        }
-        // Create result
-        let else_branch = else_branch.rewrite_loop_nest(-1);
-        let then_branch = self.builder.seq(&default_loc, then_branch);
-        Some(self.builder.if_else(
-            cond.clone(),
-            self.builder.push_loop_block_into(then_branch),
-            self.builder.push_loop_block_into(else_branch),
-        ))
-    }
-
     /// Attempts to create an if-then (without else) from the given expression.
     /// This recognizes the pattern below, as produced by the AST
     /// generator:

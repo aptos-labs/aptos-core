@@ -51,10 +51,12 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     ConfigProvider: OnChainConfigProvider,
 {
     let node_type = NodeType::extract_from_config(config);
+    let transaction_filter_config = config.transaction_filters.mempool_filter.clone();
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
             config.mempool.clone(),
+            transaction_filter_config,
             network_client,
             db,
             validator,

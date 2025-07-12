@@ -1,0 +1,23 @@
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module c0ffee.m {
+struct S has key {
+	i: u64
+}
+
+public test(): S /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: Pack[0](S)
+	2: PackClosure#1 __lambda__1__test(S): S
+	3: CallClosure(||S)
+	4: Ret
+}
+__lambda__1__test(s: S): S /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](s: S)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

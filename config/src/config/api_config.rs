@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::transaction_filter_type::{Filter, Matcher};
 use crate::{
     config::{
         config_sanitizer::ConfigSanitizer, gas_estimation_config::GasEstimationConfig,
@@ -80,8 +79,6 @@ pub struct ApiConfig {
     pub gas_estimation: GasEstimationConfig,
     /// Periodically call gas estimation
     pub periodic_gas_estimation_ms: Option<u64>,
-    /// Configuration to filter simulation requests.
-    pub simulation_filter: Filter,
     /// Configuration to filter view function requests.
     pub view_filter: ViewFilter,
     /// Periodically log stats for view function and simulate transaction usage
@@ -139,7 +136,6 @@ impl Default for ApiConfig {
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
             periodic_gas_estimation_ms: Some(30_000),
-            simulation_filter: Filter::default(),
             view_filter: ViewFilter::default(),
             periodic_function_stats_sec: Some(60),
             wait_by_hash_timeout_ms: 1_000,
@@ -192,16 +188,6 @@ impl ConfigSanitizer for ApiConfig {
                 sanitizer_name,
                 "runtime_worker_multiplier must be greater than 0!".into(),
             ));
-        }
-
-        // We don't support Block ID based simulation filters.
-        for rule in api_config.simulation_filter.rules() {
-            if let Matcher::BlockId(_) = rule.matcher() {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "Block ID based simulation filters are not supported!".into(),
-                ));
-            }
         }
 
         // Sanitize the gas estimation config

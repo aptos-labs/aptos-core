@@ -607,6 +607,8 @@ pub struct GlobalEnv {
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
+    /// A set of types that are instantiated in cmp module.
+    pub cmp_types: RefCell<BTreeSet<Type>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -668,6 +670,7 @@ impl GlobalEnv {
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
             generated_by_v2: false,
+            cmp_types: RefCell::new(Default::default()),
         }
     }
 
@@ -1281,25 +1284,18 @@ impl GlobalEnv {
     // Comparison of Diagnostic values that tries to match program ordering so we
     // can display them to the user in a more natural order.
     fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
-        let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
-        if Ordering::Equal == labels_ordering {
-            let sev_ordering = diag1
+        GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels).then_with(|| {
+            diag1
                 .severity
                 .partial_cmp(&diag2.severity)
-                .expect("Severity provides a total ordering for valid severity enum values");
-            if Ordering::Equal == sev_ordering {
-                let message_ordering = diag1.message.cmp(&diag2.message);
-                if Ordering::Equal == message_ordering {
-                    diag1.code.cmp(&diag2.code)
-                } else {
-                    message_ordering
-                }
-            } else {
-                sev_ordering
-            }
-        } else {
-            labels_ordering
-        }
+                .expect("Severity provides a total ordering for valid severity enum values")
+                .then_with(|| {
+                    diag1
+                        .message
+                        .cmp(&diag2.message)
+                        .then_with(|| diag1.code.cmp(&diag2.code))
+                })
+        })
     }
 
     // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
@@ -1307,25 +1303,13 @@ impl GlobalEnv {
     // marking nested regions, we want the innermost region, so we order first by end of labelled
     // code region, then in reverse by start of region.
     fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
-        let file_ordering = label1.file_id.cmp(&label2.file_id);
-        if Ordering::Equal == file_ordering {
-            // First order by end of region.
-            let end1 = label1.range.end;
-            let end2 = label2.range.end;
-            let end_ordering = end1.cmp(&end2);
-            if Ordering::Equal == end_ordering {
-                let start1 = label1.range.start;
-                let start2 = label2.range.start;
-
-                // For nested regions with same end, show inner-most region first.
-                // Swap 1 and 2 in comparing starts.
-                start2.cmp(&start1)
-            } else {
-                end_ordering
-            }
-        } else {
-            file_ordering
-        }
+        label1.file_id.cmp(&label2.file_id).then_with(|| {
+            label1
+                .range
+                .end
+                .cmp(&label2.range.end)
+                .then_with(|| label2.range.start.cmp(&label1.range.start))
+        })
     }
 
     // Label comparison within a list of labels for a given diagnostic, which orders by priority
@@ -1346,12 +1330,14 @@ impl GlobalEnv {
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
         let mut sorted_labels1 = labels1.iter().collect_vec();
         sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels1_len = sorted_labels1.len();
         let mut sorted_labels2 = labels2.iter().collect_vec();
         sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels2_len = sorted_labels2.len();
         std::iter::zip(sorted_labels1, sorted_labels2)
             .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
-            .find(|r| Ordering::Equal != *r)
-            .unwrap_or(Ordering::Equal)
+            .fold(Ordering::Equal, Ordering::then)
+            .then_with(|| sorted_labels1_len.cmp(&sorted_labels2_len))
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
@@ -1362,12 +1348,8 @@ impl GlobalEnv {
     {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
-            let reported_ordering = a.1.cmp(&b.1);
-            if Ordering::Equal == reported_ordering {
-                GlobalEnv::cmp_diagnostic(&a.0, &b.0)
-            } else {
-                reported_ordering
-            }
+            a.1.cmp(&b.1)
+                .then_with(|| GlobalEnv::cmp_diagnostic(&a.0, &b.0))
         });
         for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
             !reported
@@ -2044,6 +2026,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2109,6 +2092,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 
@@ -3131,7 +3115,8 @@ impl<'env> ModuleEnv<'env> {
             return deps;
         }
         for fun_env in self.get_functions() {
-            for used_fun in fun_env.get_used_functions().expect("used functions") {
+            // We need to traverse transitive inline functions because they will be expanded during inlining.
+            for used_fun in fun_env.get_used_functions_with_transitive_inline() {
                 let used_mod_id = used_fun.module_id;
                 if self.get_id() == used_mod_id {
                     // no need to friend self
@@ -3599,8 +3584,13 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_table(&self) -> bool {
         self.is_module_in_std("table")
             || self.is_module_in_std("table_with_length")
+            || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
+    }
+
+    pub fn is_cmp(&self) -> bool {
+        self.is_module_in_std("cmp")
     }
 }
 
@@ -4393,6 +4383,9 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the used functions.
     pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used functions including ones obtained by transitively traversing used inline functions.
+    pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl FunctionData {
@@ -4420,6 +4413,7 @@ impl FunctionData {
             used_funs: None,
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 }
@@ -5099,6 +5093,29 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used functions including ones obtained by transitively traversing used inline functions
+    pub fn get_used_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(trans_used) = &*self.data.used_functions_with_transitive_inline.borrow() {
+            return trans_used.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) && f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
         set
     }
 

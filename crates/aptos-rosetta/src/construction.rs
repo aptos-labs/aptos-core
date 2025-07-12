@@ -563,7 +563,8 @@ async fn construction_parse(
                 (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                     parse_create_account_operation(sender, &type_args, &args)?
                 },
-                (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION) => {
+                (AccountAddress::ONE, PRIMARY_FUNGIBLE_STORE_MODULE, TRANSFER_FUNCTION)
+                | (AccountAddress::ONE, APTOS_ACCOUNT_MODULE, TRANSFER_FUNGIBLE_ASSETS_FUNCTION) => {
                     parse_primary_fa_transfer_operation(&server_context, sender, &type_args, &args)?
                 },
                 (AccountAddress::ONE, FUNGIBLE_ASSET_MODULE, TRANSFER_FUNCTION) => {
@@ -767,6 +768,7 @@ fn parse_account_transfer_operation(
 }
 
 /// Parses 0x1::primary_fungible_store::transfer(metadata: address, receiver: address, amount: u64)
+/// or 0x1::aptos_account::transfer_fungible_assets(metadata: address, receiver: address, amount: u64)
 fn parse_primary_fa_transfer_operation(
     server_context: &RosettaContext,
     sender: AccountAddress,

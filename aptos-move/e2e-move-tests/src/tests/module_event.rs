@@ -5,7 +5,8 @@ use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
-    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::ExecutionStatus,
+    account_address::AccountAddress, move_utils::MemberId, on_chain_config::FeatureFlag,
+    transaction::ExecutionStatus,
 };
 use claims::assert_ok;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
@@ -136,6 +137,23 @@ fn test_event_emission_not_allowed_in_scripts() {
         #[event]
         struct Event has copy, drop, store;
 
+        struct EventEmitter has key {
+          emitter: ||() has copy + store
+        }
+
+        public entry fun initialize_event_emitter(account: &signer) {
+            let event = new_event();
+            let emitter = || 0x1::event::emit<0x123::test::Event>(event);
+            let emitter = EventEmitter { emitter };
+            move_to(account, emitter);
+        }
+
+        public entry fun emit_from_stored_function() acquires EventEmitter {
+            let emitter = borrow_global<EventEmitter>(@0x123);
+            let emitter = emitter.emitter;
+            emitter();
+        }
+
         public fun new_event(): Event {
             Event
         }
@@ -159,6 +177,12 @@ fn test_event_emission_not_allowed_in_scripts() {
 
     let p1_path = builder.write_to_temp().unwrap();
     assert_success!(h.publish_package_with_options(&acc, p1_path.path(), build_options.clone()));
+    assert_success!(h.run_entry_function(
+        &acc,
+        MemberId::from_str("0x123::test::initialize_event_emitter").unwrap(),
+        vec![],
+        vec![]
+    ));
 
     let mut builder = PackageBuilder::new("P2");
     let sources = [
@@ -214,26 +238,39 @@ fn test_event_emission_not_allowed_in_scripts() {
     }
 
     let mut builder = PackageBuilder::new("P3");
-    let source = r#"
+    let sources = [
+        r#"
         script {
-            fun main() {
+            fun main_0() {
                 let f = || 0x123::test::new_event();
                 0x123::test::emit_from_callback(f);
             }
         }
-        "#;
-    builder.add_source("main.move", source);
+        "#,
+        r#"
+        script {
+            fun main_1() {
+                0x123::test::emit_from_stored_function();
+            }
+        }
+        "#,
+    ];
+    for (idx, source) in sources.iter().enumerate() {
+        builder.add_source(&format!("main_{idx}.move"), source);
+    }
     builder.add_local_dep("P1", p1_path.path().to_str().unwrap());
 
     let p3_path = builder.write_to_temp().unwrap();
     let p3_package = BuiltPackage::build(p3_path.path().to_path_buf(), build_options)
         .expect("Should be able to build a package");
 
-    let mut scripts = p3_package.extract_script_code();
-    assert_eq!(scripts.len(), 1);
+    let scripts = p3_package.extract_script_code();
+    assert_eq!(scripts.len(), 2);
 
-    let txn = h.create_script(&acc, scripts.pop().unwrap(), vec![], vec![]);
-    assert_success!(h.run_raw(txn).status().clone());
+    for script in scripts {
+        let txn = h.create_script(&acc, script, vec![], vec![]);
+        assert_success!(h.run_raw(txn).status().clone());
+    }
 }
 
 #[test]
@@ -288,6 +325,28 @@ fn test_event_emission_in_modules() {
                   };
                 };
                 f();
+            }
+        }
+        "#,
+        r#"
+        module 0x123::test5 {
+            public fun emit<T: store + drop>(x: T) {
+                0x1::event::emit<T>(x);
+            }
+        }
+        "#,
+        r#"
+        module 0x123::test6 {
+            public fun emit() {
+                0x1::event::emit<u128>(123);
+            }
+        }
+        "#,
+        r#"
+        module 0x123::test7 {
+            public fun emit() {
+                let v = 0x1::fixed_point64::create_from_raw_value(123);
+                0x1::event::emit<0x1::fixed_point64::FixedPoint64>(v);
             }
         }
         "#,

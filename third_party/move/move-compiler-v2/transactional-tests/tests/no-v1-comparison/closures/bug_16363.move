@@ -1,11 +1,11 @@
 //# publish
 module 0x42::foo {
     struct Foo<T: store> has key, drop {
-        f: ||vector<T>,
+        f: |T|vector<T>,
     }
 
     public fun make_foo<T: store>(account: &signer) {
-        let f = || std::vector::empty<T>();
+        let f = |e| std::vector::singleton<T>(e);
         move_to(account, Foo { f })
     }
 

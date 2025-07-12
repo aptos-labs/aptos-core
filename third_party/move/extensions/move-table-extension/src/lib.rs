@@ -70,7 +70,12 @@ impl TableInfo {
 
 impl Display for TableInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Table<{}, {}>", self.key_type, self.value_type)
+        writeln!(
+            f,
+            "Table<{}, {}>",
+            self.key_type.to_canonical_string(),
+            self.value_type.to_canonical_string()
+        )
     }
 }
 
@@ -703,7 +708,8 @@ fn serialize(
     layout: &MoveTypeLayout,
     val: &Value,
 ) -> PartialVMResult<Vec<u8>> {
-    ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(function_value_extension)
         .serialize(val, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
@@ -714,7 +720,8 @@ fn deserialize(
     bytes: &[u8],
     layout: &MoveTypeLayout,
 ) -> PartialVMResult<Value> {
-    ValueSerDeContext::new()
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(function_value_extension)
         .deserialize(bytes, layout)
         .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))

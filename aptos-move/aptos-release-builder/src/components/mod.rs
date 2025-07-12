@@ -693,6 +693,7 @@ impl ReleaseConfig {
 
             let mut metadata_path = base_path.to_path_buf();
             metadata_path.push("metadata");
+            metadata_path.push(&self.name);
             metadata_path.push(proposal.name.as_str());
             metadata_path.set_extension("json");
 

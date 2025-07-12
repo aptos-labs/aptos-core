@@ -37,7 +37,8 @@ pub fn verify(
         .map(|(mident, _)| mident)
         .collect::<Vec<_>>();
     let graph = dependency_graph(&module_neighbors, &imm_module_idents);
-    let graph = add_implicit_vector_dependencies(graph);
+    let graph = add_implicit_module_dependencies(graph, AccountAddress::ONE, "vector");
+    let graph = add_implicit_module_dependencies(graph, AccountAddress::ONE, "cmp");
     match petgraph_toposort(&graph, None) {
         Err(cycle_node) => {
             let cycle_ident = *cycle_node.node_id();
@@ -180,29 +181,31 @@ impl<'a> Context<'a> {
     }
 }
 
-/// If the `vector` module is present in `graph`, then add dependency edges
-/// from every module (not in the `vector` module's dependency closure) to the
-/// `vector` module. This is because modules can have implicit dependencies
-/// on the `vector` module.
-fn add_implicit_vector_dependencies(
-    mut graph: DiGraphMap<&ModuleIdent, ()>,
-) -> DiGraphMap<&ModuleIdent, ()> {
-    let vector_module = graph.nodes().find(|m| {
-        m.value.address.into_addr_bytes().into_inner() == AccountAddress::ONE
-            && m.value.module.0.value.as_str() == "vector"
+/// If the target module (`module_address::module_name`) is present in `graph`,
+/// then add dependency edges from every module (not in the target module's dependency closure)
+/// to the target module. This is used to maintain implicit dependencies introduced
+/// by the compiler between user modules and modules like `vector` or `cmp`.
+fn add_implicit_module_dependencies<'a>(
+    mut graph: DiGraphMap<&'a ModuleIdent, ()>,
+    module_address: AccountAddress,
+    module_name: &str,
+) -> DiGraphMap<&'a ModuleIdent, ()> {
+    let target_module = graph.nodes().find(|m| {
+        m.value.address.into_addr_bytes().into_inner() == module_address
+            && m.value.module.0.value.as_str() == module_name
     });
-    if let Some(vector_module) = vector_module {
-        let mut dfs = Dfs::new(&graph, vector_module);
+    if let Some(target_module) = target_module {
+        let mut dfs = Dfs::new(&graph, target_module);
         // Get the transitive closure of the `vector` module and its dependencies.
-        let mut vector_dep_closure = BTreeSet::new();
+        let mut target_dep_closure = BTreeSet::new();
         while let Some(node) = dfs.next(&graph) {
-            vector_dep_closure.insert(node);
+            target_dep_closure.insert(node);
         }
         // For every module that is not in `vector_dep_closure`, add an edge to `vector_module`.
         let all_modules = graph.nodes().collect::<Vec<_>>();
         for module in all_modules {
-            if !vector_dep_closure.contains(module) {
-                graph.add_edge(module, vector_module, ());
+            if !target_dep_closure.contains(module) {
+                graph.add_edge(module, target_module, ());
             }
         }
     }
@@ -566,8 +569,15 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         },
         E::Lambda(ll, e, _capture_kind, spec_opt) => {
             use crate::expansion::ast::TypedLValue_;
-            let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
-            lvalues(context, mapped);
+            let mapped = ll
+                .value
+                .iter()
+                .map(|sp!(_, TypedLValue_(lv, _opt_ty))| (lv, _opt_ty))
+                .collect::<Vec<_>>();
+            for (lv, opt_ty) in mapped.iter() {
+                lvalue(context, lv);
+                type_opt(context, opt_ty);
+            }
             if let Some(spec) = spec_opt {
                 exp(context, spec);
             }

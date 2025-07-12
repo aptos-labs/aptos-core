@@ -56,7 +56,9 @@ pub struct SingleRunResults {
 }
 
 pub fn default_benchmark_features() -> Features {
-    Features::default()
+    let mut features = Features::default();
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
@@ -656,7 +658,10 @@ mod tests {
         account_address::AccountAddress,
         on_chain_config::{FeatureFlag, Features},
         state_store::state_key::inner::StateKeyInner,
-        transaction::{Transaction, TransactionPayload},
+        transaction::{
+            signature_verified_transaction::into_signature_verified_block, Transaction,
+            TransactionPayload,
+        },
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use itertools::Itertools;
@@ -758,7 +763,7 @@ mod tests {
             let block_id = HashValue::random();
             vm_executor
                 .execute_and_update_state(
-                    (block_id, vec![txn.clone()]).into(),
+                    (block_id, into_signature_verified_block(vec![txn.clone()])).into(),
                     parent_block_id,
                     BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
                 )
@@ -779,7 +784,7 @@ mod tests {
         let block_id = HashValue::random();
         other_executor
             .execute_and_update_state(
-                (block_id, vec![txn]).into(),
+                (block_id, into_signature_verified_block(vec![txn])).into(),
                 parent_block_id,
                 BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -829,12 +834,12 @@ mod tests {
 
         let vm_writes = vm_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         let other_writes = other_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         for (key, value) in vm_writes.iter() {

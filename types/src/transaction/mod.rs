@@ -53,7 +53,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -61,6 +61,7 @@ use crate::{
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     keyless::FederatedKeylessPublicKey,
+    on_chain_config::{FeatureFlag, Features},
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
@@ -1492,10 +1493,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
+    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -1505,7 +1506,7 @@ impl TransactionStatus {
             },
             Err(code) => {
                 if code.status_type() == StatusType::InvariantViolation
-                    && charge_invariant_violation
+                    && features.is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)
                 {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
                 } else {
@@ -1621,37 +1622,6 @@ impl Default for TransactionAuxiliaryData {
 }
 
 impl TransactionAuxiliaryData {
-    pub fn from_vm_status(vm_status: &VMStatus) -> Self {
-        let detail_error_message = match vm_status.clone().keep_or_discard() {
-            Ok(KeptVMStatus::MiscellaneousError) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, None))
-            },
-            Ok(KeptVMStatus::ExecutionFailure {
-                location: _,
-                function: _,
-                code_offset: _,
-                message,
-            }) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, message))
-            },
-            Err(status_code) => {
-                // emulate the behavior of
-                if status_code.status_type() == StatusType::InvariantViolation {
-                    Some(VMErrorDetail::new(status_code, None))
-                } else {
-                    None
-                }
-            },
-            _ => None,
-        };
-
-        Self::V1(TransactionAuxiliaryDataV1 {
-            detail_error_message,
-        })
-    }
-
     pub fn get_detail_error_message(&self) -> Option<&VMErrorDetail> {
         match self {
             Self::V1(data) => data.detail_error_message.as_ref(),
@@ -1698,14 +1668,18 @@ impl TransactionOutput {
         }
     }
 
-    pub fn new_empty_success() -> Self {
+    pub fn new_success_with_write_set(write_set: WriteSet) -> Self {
         Self {
-            write_set: WriteSet::default(),
+            write_set,
             events: vec![],
             gas_used: 0,
             status: TransactionStatus::Keep(ExecutionStatus::Success),
             auxiliary_data: TransactionAuxiliaryData::None,
         }
+    }
+
+    pub fn new_empty_success() -> Self {
+        Self::new_success_with_write_set(WriteSet::default())
     }
 
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
@@ -1856,6 +1830,7 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
             transaction_hash,
@@ -1864,6 +1839,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            auxiliary_info_hash,
         ))
     }
 
@@ -1880,6 +1856,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            None,
         )
     }
 
@@ -1892,6 +1869,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
+            None,
         )
     }
 }
@@ -1932,8 +1910,8 @@ pub struct TransactionInfoV0 {
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
 
-    /// Potentially summarizes all evicted items from state. Always `None` for now.
-    state_cemetery_hash: Option<HashValue>,
+    /// The hash value summarizing PersistedAuxiliaryInfo.
+    auxiliary_info_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1944,6 +1922,7 @@ impl TransactionInfoV0 {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -1952,7 +1931,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
-            state_cemetery_hash: None,
+            auxiliary_info_hash,
         }
     }
 
@@ -1970,6 +1949,10 @@ impl TransactionInfoV0 {
 
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        self.auxiliary_info_hash
     }
 
     pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
@@ -2495,10 +2478,22 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
-    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+    pub fn block_epilogue_v0(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V0 {
             block_id,
             block_end_info,
+        })
+    }
+
+    pub fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V1 {
+            block_id,
+            block_end_info,
+            fee_distribution,
         })
     }
 
@@ -2599,20 +2594,140 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    type Value: Send + Sync + Debug + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + Eq + PartialEq + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+
+    /// None if it is not a user transaction.
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        None
+    }
+
+    fn from_txn(_txn: Transaction) -> Self {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ViewFunctionError {
+    // This is to represent errors are from a MoveAbort and has error info from the module metadata to display.
+    // The ExecutionStatus is used to construct the error message in the same way as MoveAborts for entry functions.
+    MoveAbort(ExecutionStatus, Option<StatusCode>),
+    // This is a generic error message that takes in a string and display it in the error response.
+    ErrorMessage(String, Option<StatusCode>),
+}
+
+impl std::fmt::Display for ViewFunctionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ViewFunctionError::MoveAbort(status, vm_status) => {
+                write!(
+                    f,
+                    "Execution status: {:?}, VM status: {:?}",
+                    status, vm_status
+                )
+            },
+            ViewFunctionError::ErrorMessage(msg, vm_status) => {
+                write!(f, "Error: {}, VM status: {:?}", msg, vm_status)
+            },
+        }
+    }
 }
 
 pub struct ViewFunctionOutput {
-    pub values: Result<Vec<Vec<u8>>>,
+    pub values: Result<Vec<Vec<u8>>, ViewFunctionError>,
     pub gas_used: u64,
 }
 
 impl ViewFunctionOutput {
-    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+    pub fn new(values: Result<Vec<Vec<u8>>, ViewFunctionError>, gas_used: u64) -> Self {
         Self { values, gas_used }
     }
+
+    pub fn new_ok(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
+        Self {
+            values: Ok(values),
+            gas_used,
+        }
+    }
+
+    pub fn new_error_message(
+        message: String,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::ErrorMessage(message, vm_status)),
+            gas_used,
+        }
+    }
+
+    pub fn new_move_abort_error(
+        status: ExecutionStatus,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::MoveAbort(status, vm_status)),
+            gas_used,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AuxiliaryInfo {
+    persisted_info: PersistedAuxiliaryInfo,
+    ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+}
+
+impl AuxiliaryInfo {
+    pub fn new(
+        persisted_info: PersistedAuxiliaryInfo,
+        ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            persisted_info,
+            ephemeral_info,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
+        self.persisted_info
+    }
+
+    pub fn persisted_info(&self) -> &PersistedAuxiliaryInfo {
+        &self.persisted_info
+    }
+
+    pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
+        &self.ephemeral_info
+    }
+}
+
+#[derive(
+    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum PersistedAuxiliaryInfo {
+    None,
+    // The index of the transaction in a block (after shuffler, before execution).
+    // Note that this would be slightly different from the index of transactions that get committed
+    // onchain, as this considers transactions that may get discarded.
+    V1 { transaction_index: u32 },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EphemeralAuxiliaryInfo {
+    // TODO(grao): After execution pool is implemented we might want this information be persisted
+    // onchain?
+    pub proposer_index: u64,
 }

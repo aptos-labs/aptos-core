@@ -23,7 +23,7 @@ module aptos_experimental::pending_order_book_index {
             price_move_down_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
             // Orders to trigger whem the oracle price move greater than
             price_move_up_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
-            //time_based_index: BigOrderedMap<BidKey<TimestampType>, ActiveBidData>,
+            // time_based_index: BigOrderedMap<BidKey<TimestampType>, ActiveBidData>,
             // Orders to trigger when the time is greater than
             time_based_index: BigOrderedMap<u64, OrderIdType>
         }
@@ -41,10 +41,10 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_buy: bool
+        is_bid: bool
     ) {
         let (price_move_up_index, price_move_down_index, time_based_index) =
-            trigger_condition.index(is_buy);
+            trigger_condition.index(is_bid);
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(
                 &PendingOrderKey {
@@ -71,11 +71,11 @@ module aptos_experimental::pending_order_book_index {
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_buy: bool
+        is_bid: bool
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =
-            trigger_condition.index(is_buy);
+            trigger_condition.index(is_bid);
 
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.add(
@@ -98,7 +98,7 @@ module aptos_experimental::pending_order_book_index {
         };
     }
 
-    public fun take_ready_price_based_orders(
+    public(friend) fun take_ready_price_based_orders(
         self: &mut PendingOrderBookIndex, current_price: u64
     ): vector<OrderIdType> {
         let orders = vector::empty();
@@ -123,7 +123,7 @@ module aptos_experimental::pending_order_book_index {
         orders
     }
 
-    public fun take_time_time_based_orders(
+    public(friend) fun take_time_time_based_orders(
         self: &mut PendingOrderBookIndex
     ): vector<OrderIdType> {
         let orders = vector::empty();
@@ -138,6 +138,20 @@ module aptos_experimental::pending_order_book_index {
             }
         };
         orders
+    }
+
+    #[test_only]
+    public(friend) fun destroy_pending_order_book_index(
+        self: PendingOrderBookIndex
+    ) {
+        let PendingOrderBookIndex::V1 {
+            price_move_up_index,
+            price_move_down_index,
+            time_based_index
+        } = self;
+        price_move_up_index.destroy(|_v| {});
+        price_move_down_index.destroy(|_v| {});
+        time_based_index.destroy(|_v| {});
     }
 
     #[test_only]
@@ -159,19 +173,5 @@ module aptos_experimental::pending_order_book_index {
         self: &PendingOrderBookIndex
     ): &BigOrderedMap<u64, OrderIdType> {
         &self.time_based_index
-    }
-
-    #[test_only]
-    public(friend) fun destroy_pending_order_book_index(
-        self: PendingOrderBookIndex
-    ) {
-        let PendingOrderBookIndex::V1 {
-            price_move_up_index,
-            price_move_down_index,
-            time_based_index
-        } = self;
-        price_move_up_index.destroy(|_v| {});
-        price_move_down_index.destroy(|_v| {});
-        time_based_index.destroy(|_v| {});
     }
 }

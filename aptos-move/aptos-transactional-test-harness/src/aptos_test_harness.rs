@@ -58,7 +58,10 @@ use move_transactional_test_runner::{
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
 use move_vm_runtime::{move_vm::SerializedReturnValues, AsFunctionValueExtension};
-use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -501,7 +504,7 @@ impl AptosTestAdapter<'_> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
-        let txn_provider = DefaultTxnProvider::new(sig_verified_block);
+        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_block);
         let mut outputs = AptosVMBlockExecutor::new()
             .execute_block_no_limit(&txn_provider, &self.storage.clone())?;
 
@@ -1031,8 +1034,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let environment = AptosEnvironment::new(&self.storage);
         let code_storage = self.storage.as_aptos_code_storage(&environment);
-        ValueSerDeContext::new()
-            .with_func_args_deserialization(&code_storage.as_function_value_extension())
+
+        let function_value_extension = code_storage.as_function_value_extension();
+        ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+            .with_func_args_deserialization(&function_value_extension)
             .deserialize(bytes, layout)
     }
 }
@@ -1053,7 +1058,11 @@ impl fmt::Display for PrettyEvent<'_> {
             },
             ContractEvent::V2(_v2) => (),
         }
-        writeln!(f, "    type:    {}", self.0.type_tag())?;
+        writeln!(
+            f,
+            "    type:    {}",
+            self.0.type_tag().to_canonical_string()
+        )?;
         writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;
         write!(f, "}}")
     }

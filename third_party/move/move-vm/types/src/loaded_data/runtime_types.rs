@@ -16,7 +16,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
@@ -32,7 +32,6 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
 ///
 /// It has the form of `max(CBase, T1 + C1, T2 + C2, ..)` where `Ti` is the depth of the ith type parameter
@@ -40,6 +39,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// This form has a special property: when you compute the max of multiple formulae, you can normalize
 /// them into a single formula.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct DepthFormula {
     pub terms: Vec<(TypeParameterIndex, u64)>, // Ti + Ci
     pub constant: Option<u64>,                 // Cbase
@@ -93,14 +93,13 @@ impl DepthFormula {
             formulas.push(DepthFormula::constant(*constant))
         }
         for (t_i, c_i) in terms {
-            let Some(mut u_form) = map.remove(t_i) else {
+            let Some(u_form) = map.remove(t_i) else {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("{t_i:?} missing mapping")),
                 );
             };
-            u_form.scale(*c_i);
-            formulas.push(u_form)
+            formulas.push(u_form.scale(*c_i))
         }
         Ok(DepthFormula::normalize(formulas))
     }
@@ -114,14 +113,15 @@ impl DepthFormula {
         depth
     }
 
-    pub fn scale(&mut self, c: u64) {
-        let Self { terms, constant } = self;
+    pub fn scale(mut self, c: u64) -> Self {
+        let Self { terms, constant } = &mut self;
         for (_t_i, c_i) in terms {
             *c_i = (*c_i).saturating_add(c);
         }
         if let Some(cbase) = constant.as_mut() {
             *cbase = (*cbase).saturating_add(c);
         }
+        self
     }
 }
 
@@ -514,10 +514,6 @@ impl Type {
                     && abilities.is_subset(*given_abilities)
             },
             (Type::Reference(ty), Type::Reference(given)) => {
-                given.paranoid_check_assignable(ty)?;
-                true
-            },
-            (Type::MutableReference(ty), Type::MutableReference(given)) => {
                 given.paranoid_check_assignable(ty)?;
                 true
             },
@@ -1326,9 +1322,23 @@ impl TypeBuilder {
                     results,
                     abilities,
                 } = fun.as_ref();
-                let mut to_list = |ts: &[TypeTag]| {
+                let mut to_list = |ts: &[FunctionParamOrReturnTag]| {
                     ts.iter()
-                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
+                        .map(|t| {
+                            // Note: for reference or mutable reference tags, we add 1 more level
+                            // of depth, hence adding 2 to the counter.
+                            Ok(match t {
+                                FunctionParamOrReturnTag::Reference(t) => Reference(Box::new(
+                                    self.create_ty_impl(t, resolver, count, depth + 2)?,
+                                )),
+                                FunctionParamOrReturnTag::MutableReference(t) => MutableReference(
+                                    Box::new(self.create_ty_impl(t, resolver, count, depth + 2)?),
+                                ),
+                                FunctionParamOrReturnTag::Value(t) => {
+                                    self.create_ty_impl(t, resolver, count, depth + 1)?
+                                },
+                            })
+                        })
                         .collect::<VMResult<Vec<_>>>()
                 };
                 Function {

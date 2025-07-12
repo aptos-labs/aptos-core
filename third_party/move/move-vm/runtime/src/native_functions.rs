@@ -3,28 +3,43 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
+    check_dependencies_and_charge_gas,
     data_cache::TransactionDataCache,
     interpreter::InterpreterDebugInterface,
+    loader::{LazyLoadedFunction, LazyLoadedFunctionState},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
     },
-    ModuleStorage,
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{ExecutionState, PartialVMError, PartialVMResult};
+use ambassador::delegate_to_methods;
+use bytes::Bytes;
+use move_binary_format::{
+    errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
-    identifier::Identifier,
-    language_storage::TypeTag,
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, resolver::ResourceResolver,
-    values::Value,
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
+    natives::function::NativeResult,
+    resolver::ResourceResolver,
+    values::{AbstractFunction, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -98,32 +113,25 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
+pub struct NativeContext<'a, 'b, 'c> {
     interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
     resource_resolver: &'a dyn ResourceResolver,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
-    gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
-
-    /// Counter used to record the (conceptual) heap memory usage by a native functions,
-    /// measured in abstract memory unit.
-    ///
-    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
-    /// and allow them to access the gas meter directly.
-    heap_memory_usage: u64,
+    gas_meter: &'a mut dyn NativeGasMeter,
+    traversal_context: &'a mut TraversalContext<'c>,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
         interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
         resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
-        gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
+        gas_meter: &'a mut dyn NativeGasMeter,
+        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
@@ -131,15 +139,13 @@ impl<'a, 'b> NativeContext<'a, 'b> {
             resource_resolver,
             module_storage,
             extensions,
-            gas_balance,
+            gas_meter,
             traversal_context,
-
-            heap_memory_usage: 0,
         }
     }
 }
 
-impl<'b> NativeContext<'_, 'b> {
+impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
@@ -209,19 +215,30 @@ impl<'b> NativeContext<'_, 'b> {
         self.interpreter.get_stack_frames(count)
     }
 
-    pub fn gas_balance(&self) -> InternalGas {
-        self.gas_balance
+    pub fn legacy_gas_budget(&self) -> InternalGas {
+        self.gas_meter.legacy_gas_budget_in_native_context()
     }
 
-    pub fn use_heap_memory(&mut self, amount: u64) {
-        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    /// Returns the gas meter used for execution. Even if native functions cannot use it to
+    /// charge gas (feature-gating), gas meter can be used to query gas meter's balance.
+    pub fn gas_meter(&mut self) -> &mut dyn NativeGasMeter {
+        self.gas_meter
     }
 
-    pub fn heap_memory_usage(&self) -> u64 {
-        self.heap_memory_usage
+    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> VMResult<()> {
+        let arena_id = self
+            .traversal_context
+            .referenced_module_ids
+            .alloc(module_id);
+        check_dependencies_and_charge_gas(
+            self.module_storage,
+            self.gas_meter,
+            self.traversal_context,
+            [(arena_id.address(), arena_id.name())],
+        )
     }
 
-    pub fn traversal_context(&self) -> &TraversalContext {
+    pub fn traversal_context(&self) -> &TraversalContext<'c> {
         self.traversal_context
     }
 
@@ -229,5 +246,66 @@ impl<'b> NativeContext<'_, 'b> {
         FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         }
+    }
+
+    /// Returns a vector of layouts for captured arguments. Used to format captured arguments as
+    /// strings. Returns [Ok(None)] in case layouts contain delayed fields (i.e., the values cannot
+    /// be formatted as strings).
+    pub fn get_captured_layouts_for_string_utils(
+        &mut self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
+        Ok(
+            match &*LazyLoadedFunction::expect_this_impl(fun)?.state.borrow() {
+                LazyLoadedFunctionState::Unresolved { data, .. } => {
+                    Some(data.captured_layouts.clone())
+                },
+                LazyLoadedFunctionState::Resolved {
+                    fun,
+                    mask,
+                    captured_layouts,
+                    ..
+                } => match captured_layouts.as_ref() {
+                    Some(captured_layouts) => Some(captured_layouts.clone()),
+                    None => LazyLoadedFunction::construct_captured_layouts(
+                        &ModuleStorageWrapper {
+                            module_storage: self.module_storage,
+                        },
+                        &mut DependencyGasMeterWrapper {
+                            gas_meter: self.gas_meter,
+                        },
+                        self.traversal_context,
+                        fun,
+                        *mask,
+                    )?,
+                },
+            },
+        )
+    }
+}
+
+// Wrappers to use trait objects where static dispatch is expected.
+struct ModuleStorageWrapper<'a> {
+    module_storage: &'a dyn ModuleStorage,
+}
+
+#[delegate_to_methods]
+#[delegate(WithRuntimeEnvironment, target_ref = "inner")]
+#[delegate(ModuleStorage, target_ref = "inner")]
+impl<'a> ModuleStorageWrapper<'a> {
+    fn inner(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+}
+
+struct DependencyGasMeterWrapper<'a> {
+    gas_meter: &'a mut dyn DependencyGasMeter,
+}
+
+#[delegate_to_methods]
+#[delegate(DependencyGasMeter, target_mut = "inner_mut")]
+impl<'a> DependencyGasMeterWrapper<'a> {
+    fn inner_mut(&mut self) -> &mut dyn DependencyGasMeter {
+        self.gas_meter
     }
 }

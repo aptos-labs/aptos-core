@@ -7,17 +7,20 @@
 
 use crate::state_store::{
     state_key::StateKey,
+    state_slot::StateSlot,
     state_value::{PersistedStateValueMetadata, StateValue, StateValueMetadata},
 };
 use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use ark_std::iterable::Iterable;
 use bytes::Bytes;
+use itertools::Either;
 use once_cell::sync::Lazy;
+use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
-    fmt::Debug,
-    ops::{Deref, DerefMut},
+    fmt::{Debug, Formatter},
 };
 
 // Note: in case this changes in the future, it doesn't have to be a constant, and can be read from
@@ -79,12 +82,55 @@ impl PersistedWriteOp {
     }
 }
 
-#[derive(Clone, Eq, PartialEq)]
-pub enum WriteOp {
+/// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BaseStateOp {
     Creation(StateValue),
     Modification(StateValue),
     Deletion(StateValueMetadata),
+    MakeHot { prev_slot: StateSlot },
+    Eviction { prev_slot: StateSlot },
 }
+
+impl BaseStateOp {
+    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(val) | Modification(val) => Some(val),
+            Deletion(_) => None,
+            MakeHot { prev_slot } => prev_slot.as_state_value_opt(),
+            Eviction { prev_slot } => prev_slot.as_state_value_opt(),
+        }
+    }
+
+    pub fn as_write_op_opt(&self) -> Option<&WriteOp> {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion(_) => Some(WriteOp::ref_cast(self)),
+            MakeHot { .. } | Eviction { .. } => None,
+        }
+    }
+
+    pub fn expect_as_write_op(&self) -> &WriteOp {
+        self.as_write_op_opt().expect("Expected write op")
+    }
+
+    pub fn is_value_write_op(&self) -> bool {
+        use BaseStateOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion(_) => true,
+            MakeHot { .. } | Eviction { .. } => false,
+        }
+    }
+}
+
+/// Represents a change to a state value.
+#[derive(Clone, Eq, PartialEq, RefCast)]
+#[repr(transparent)]
+pub struct WriteOp(BaseStateOp);
 
 impl WriteOp {
     fn to_persistable(&self) -> PersistedWriteOp {
@@ -92,21 +138,27 @@ impl WriteOp {
 
         let metadata = self.metadata().clone().into_persistable();
         match metadata {
-            None => match self {
-                WriteOp::Creation(v) => Creation(v.bytes().clone()),
-                WriteOp::Modification(v) => Modification(v.bytes().clone()),
-                WriteOp::Deletion { .. } => Deletion,
+            None => match &self.0 {
+                BaseStateOp::Creation(v) => Creation(v.bytes().clone()),
+                BaseStateOp::Modification(v) => Modification(v.bytes().clone()),
+                BaseStateOp::Deletion { .. } => Deletion,
+                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                    unreachable!("malformed write op")
+                },
             },
-            Some(metadata) => match self {
-                WriteOp::Creation(v) => CreationWithMetadata {
+            Some(metadata) => match &self.0 {
+                BaseStateOp::Creation(v) => CreationWithMetadata {
                     data: v.bytes().clone(),
                     metadata,
                 },
-                WriteOp::Modification(v) => ModificationWithMetadata {
+                BaseStateOp::Modification(v) => ModificationWithMetadata {
                     data: v.bytes().clone(),
                     metadata,
                 },
-                WriteOp::Deletion { .. } => DeletionWithMetadata { metadata },
+                BaseStateOp::Deletion { .. } => DeletionWithMetadata { metadata },
+                BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                    unreachable!("malformed write op")
+                },
             },
         }
     }
@@ -116,9 +168,11 @@ impl WriteOp {
     /// returns `false` if the result indicates no op has happened -- that's when the first op
     ///   creates the item and the second deletes it.
     pub fn squash(op: &mut Self, other: Self) -> Result<bool> {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match (&op, other) {
+        match (&mut op.0, other.0) {
+            (MakeHot { .. }, ..) | (.., MakeHot { .. })
+            | (Eviction { .. }, ..) | (.., Eviction { .. }) => unreachable!("malformed write op"),
             (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
             | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
@@ -127,17 +181,17 @@ impl WriteOp {
             (Creation(c) , Modification(m)) => {
                 Self::ensure_metadata_compatible(c.metadata(), m.metadata())?;
 
-                *op = Creation(m)
+                *op = Self(Creation(m));
             },
             (Modification(c) , Modification(m)) => {
                 Self::ensure_metadata_compatible(c.metadata(), m.metadata())?;
 
-                *op = Modification(m);
+                *op = Self(Modification(m));
             },
             (Modification(m), Deletion(d_meta)) => {
                 Self::ensure_metadata_compatible(m.metadata(), &d_meta)?;
 
-                *op = Deletion(d_meta)
+                *op = Self(Deletion(d_meta))
             },
             (Deletion(d_meta), Creation(c)) => {
                 // n.b. With write sets from multiple sessions being squashed together, it's possible
@@ -146,7 +200,7 @@ impl WriteOp {
                 //   shouldn't change due to the squash.
                 // And because the deposit or refund happens after all squashing is finished, it's
                 // not a concern of fairness.
-                *op = Modification(StateValue::new_with_metadata(c.into_bytes(), d_meta.clone()))
+                *op = Self(Modification(StateValue::new_with_metadata(c.into_bytes(), d_meta.clone())))
             },
             (Creation(c), Deletion(d_meta)) => {
                 Self::ensure_metadata_compatible(c.metadata(), &d_meta)?;
@@ -170,17 +224,12 @@ impl WriteOp {
         Ok(())
     }
 
-    pub fn state_value_ref(&self) -> Option<&StateValue> {
-        use WriteOp::*;
-
-        match self {
-            Creation(v) | Modification(v) => Some(v),
-            Deletion(..) => None,
-        }
+    pub fn as_state_value_opt(&self) -> Option<&StateValue> {
+        self.0.as_state_value_opt()
     }
 
     pub fn bytes(&self) -> Option<&Bytes> {
-        self.state_value_ref().map(StateValue::bytes)
+        self.as_state_value_opt().map(StateValue::bytes)
     }
 
     /// Size not counting metadata.
@@ -189,54 +238,101 @@ impl WriteOp {
     }
 
     pub fn metadata(&self) -> &StateValueMetadata {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match self {
+        match &self.0 {
             Creation(v) | Modification(v) => v.metadata(),
             Deletion(meta) => meta,
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
     pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match self {
+        match &mut self.0 {
             Creation(v) | Modification(v) => v.metadata_mut(),
             Deletion(meta) => meta,
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
     pub fn into_metadata(self) -> StateValueMetadata {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match self {
+        match self.0 {
             Creation(v) | Modification(v) => v.into_metadata(),
             Deletion(meta) => meta,
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 
     pub fn creation(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Creation(StateValue::new_with_metadata(data, metadata))
+        Self(BaseStateOp::Creation(StateValue::new_with_metadata(
+            data, metadata,
+        )))
     }
 
     pub fn modification(data: Bytes, metadata: StateValueMetadata) -> Self {
-        Self::Modification(StateValue::new_with_metadata(data, metadata))
+        Self(BaseStateOp::Modification(StateValue::new_with_metadata(
+            data, metadata,
+        )))
+    }
+
+    pub fn modification_to_value(state_value: StateValue) -> Self {
+        Self(BaseStateOp::Modification(state_value))
     }
 
     pub fn deletion(metadata: StateValueMetadata) -> Self {
-        Self::Deletion(metadata)
+        Self(BaseStateOp::Deletion(metadata))
     }
 
     pub fn legacy_creation(data: Bytes) -> Self {
-        Self::Creation(StateValue::new_legacy(data))
+        Self(BaseStateOp::Creation(StateValue::new_legacy(data)))
     }
 
     pub fn legacy_modification(data: Bytes) -> Self {
-        Self::Modification(StateValue::new_legacy(data))
+        Self(BaseStateOp::Modification(StateValue::new_legacy(data)))
     }
 
     pub fn legacy_deletion() -> Self {
-        Self::Deletion(StateValueMetadata::none())
+        Self(BaseStateOp::Deletion(StateValueMetadata::none()))
+    }
+
+    pub fn project_write_op_size<GetSize>(&self, get_size: GetSize) -> WriteOpSize
+    where
+        GetSize: FnOnce() -> Option<u64>,
+    {
+        use BaseStateOp::*;
+
+        match &self.0 {
+            Creation { .. } => WriteOpSize::Creation {
+                write_len: get_size().expect("Creation must have size"),
+            },
+            Modification { .. } => WriteOpSize::Modification {
+                write_len: get_size().expect("Modification must have size"),
+            },
+            Deletion { .. } => WriteOpSize::Deletion,
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+        }
+    }
+
+    pub fn as_base_op(&self) -> &BaseStateOp {
+        &self.0
+    }
+
+    pub fn into_base_op(self) -> BaseStateOp {
+        self.0
+    }
+
+    pub fn is_delete(&self) -> bool {
+        use BaseStateOp::*;
+
+        match &self.0 {
+            Creation(_) | Modification(_) => false,
+            Deletion(_) => true,
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
+        }
     }
 }
 
@@ -344,37 +440,41 @@ impl TransactionWrite for WriteOp {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.state_value_ref().cloned()
+        self.as_state_value_opt().cloned()
     }
 
     // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
     // read would not read the metadata of the deletion op.
     fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
-        self.state_value_ref().map(StateValue::metadata).cloned()
+        self.as_state_value_opt().map(StateValue::metadata).cloned()
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
         match maybe_state_value {
             None => Self::legacy_deletion(),
-            Some(state_value) => Self::Modification(state_value),
+            Some(state_value) => Self(BaseStateOp::Modification(state_value)),
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
         use WriteOpKind::*;
-        match self {
-            WriteOp::Creation { .. } => Creation,
-            WriteOp::Modification { .. } => Modification,
-            WriteOp::Deletion { .. } => Deletion,
+        match &self.0 {
+            BaseStateOp::Creation { .. } => Creation,
+            BaseStateOp::Modification { .. } => Modification,
+            BaseStateOp::Deletion { .. } => Deletion,
+            BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => {
+                unreachable!("malformed write op")
+            },
         }
     }
 
     fn set_bytes(&mut self, bytes: Bytes) {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match self {
+        match &mut self.0 {
             Creation(v) | Modification(v) => v.set_bytes(bytes),
             Deletion { .. } => (),
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 }
@@ -382,9 +482,9 @@ impl TransactionWrite for WriteOp {
 #[allow(clippy::format_collect)]
 impl Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use WriteOp::*;
+        use BaseStateOp::*;
 
-        match self {
+        match &self.0 {
             Creation(v) => write!(
                 f,
                 "Creation({}, metadata:{:?})",
@@ -406,26 +506,122 @@ impl Debug for WriteOp {
             Deletion(metadata) => {
                 write!(f, "Deletion(metadata:{:?})", metadata,)
             },
+            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
         }
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum WriteSet {
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename = "WriteSet")]
+pub enum ValueWriteSet {
     V0(WriteSetV0),
 }
 
-impl Default for WriteSet {
+impl Default for ValueWriteSet {
     fn default() -> Self {
         Self::V0(WriteSetV0::default())
     }
 }
 
-impl WriteSet {
-    pub fn into_mut(self) -> WriteSetMut {
-        match self {
-            Self::V0(write_set) => write_set.0,
+// TODO(HotState): revisit when the hot state is deterministic.
+/// Represents a hotness only change, not persisted for now.
+#[derive(Clone, Eq, PartialEq)]
+pub struct HotStateOp(BaseStateOp);
+
+impl HotStateOp {
+    pub fn make_hot(prev_slot: StateSlot) -> Self {
+        Self(BaseStateOp::MakeHot { prev_slot })
+    }
+
+    pub fn as_base_op(&self) -> &BaseStateOp {
+        &self.0
+    }
+
+    pub fn into_base_op(self) -> BaseStateOp {
+        self.0
+    }
+}
+
+impl Debug for HotStateOp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use BaseStateOp::*;
+
+        match &self.0 {
+            MakeHot { prev_slot } => {
+                write!(f, "MakeHot(prev_slot:{:?})", prev_slot)
+            },
+            Eviction { prev_slot } => {
+                write!(f, "Eviction(prev_slot:{:?})", prev_slot)
+            },
+            Creation(_) | Modification(_) | Deletion(_) => {
+                unreachable!("malformed hot state op")
+            },
         }
+    }
+}
+
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+pub enum WriteSet {
+    Value(ValueWriteSet),
+    /// TODO(HotState): this variant silently serializes to an empty ValueWriteSet for now.
+    Hotness(BTreeMap<StateKey, HotStateOp>),
+}
+
+impl Default for WriteSet {
+    fn default() -> Self {
+        Self::Value(ValueWriteSet::default())
+    }
+}
+
+impl Serialize for WriteSet {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            WriteSet::Value(ws) => ws.serialize(serializer),
+            WriteSet::Hotness(_hot_state_ops) => ValueWriteSet::default().serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for WriteSet {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let ws = ValueWriteSet::deserialize(deserializer)?;
+        Ok(WriteSet::Value(ws))
+    }
+}
+
+impl WriteSet {
+    pub fn expect_into_v0(self) -> WriteSetV0 {
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn expect_v0(&self) -> &WriteSetV0 {
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn expect_v0_mut(&mut self) -> &mut WriteSetV0 {
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
+            // TODO(HotState):
+            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        }
+    }
+
+    pub fn into_mut(self) -> WriteSetMut {
+        self.expect_into_v0().0
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -445,7 +641,9 @@ impl WriteSet {
     }
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.iter().map(|(key, op)| (key, op.state_value_ref()))
+        self.expect_v0()
+            .iter()
+            .map(|(key, op)| (key, op.as_state_value_opt()))
     }
 
     pub fn state_updates_cloned(
@@ -454,22 +652,63 @@ impl WriteSet {
         self.state_update_refs()
             .map(|(k, v)| (k.clone(), v.cloned()))
     }
-}
 
-impl Deref for WriteSet {
-    type Target = WriteSetV0;
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.expect_v0_mut().update_total_supply(value);
+    }
 
-    fn deref(&self) -> &Self::Target {
+    pub fn get_write_op(&self, state_key: &StateKey) -> Option<&WriteOp> {
         match self {
-            Self::V0(write_set) => write_set,
+            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.get(state_key),
+            WriteSet::Hotness(_) => None,
         }
     }
-}
 
-impl DerefMut for WriteSet {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+    pub fn get_total_supply(&self) -> Option<u128> {
+        self.expect_v0().get_total_supply()
+    }
+
+    pub fn is_empty(&self) -> bool {
         match self {
-            Self::V0(write_set) => write_set,
+            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.is_empty(),
+            WriteSet::Hotness(ws) => ws.is_empty(),
+        }
+    }
+
+    pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
+        self.expect_into_v0().0.write_set
+    }
+
+    pub fn expect_write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+        self.expect_v0().0.write_set.iter()
+    }
+
+    pub fn write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+        const EMPTY: &[(&StateKey, &WriteOp)] = &[];
+
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.iter()),
+            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().copied()),
+        }
+    }
+
+    pub fn into_write_op_iter(self) -> impl Iterator<Item = (StateKey, WriteOp)> {
+        const EMPTY: &[(StateKey, WriteOp)] = &[];
+
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.into_write_op_iter()),
+            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().cloned()),
+        }
+    }
+
+    pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
+        match self {
+            WriteSet::Value(ValueWriteSet::V0(ws)) => {
+                Either::Left(ws.iter().map(|(key, op)| (key, op.as_base_op())))
+            },
+            WriteSet::Hotness(ws) => {
+                Either::Right(ws.iter().map(|(key, op)| (key, op.as_base_op())))
+            },
         }
     }
 }
@@ -484,7 +723,7 @@ pub struct WriteSetV0(WriteSetMut);
 
 impl WriteSetV0 {
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
@@ -493,11 +732,16 @@ impl WriteSetV0 {
         self.0.write_set.iter()
     }
 
+    #[inline]
+    pub fn into_write_op_iter(self) -> btree_map::IntoIter<StateKey, WriteOp> {
+        self.0.write_set.into_iter()
+    }
+
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.0.get(key)
     }
 
-    pub fn get_total_supply(&self) -> Option<u128> {
+    fn get_total_supply(&self) -> Option<u128> {
         let value = self
             .0
             .get(&TOTAL_SUPPLY_STATE_KEY)
@@ -510,7 +754,7 @@ impl WriteSetV0 {
     // TODO: get rid of this func() and use WriteSetMut instead; for that we need to change
     //       VM execution such that to 'TransactionOutput' is materialized after updating
     //       total_supply.
-    pub fn update_total_supply(&mut self, value: u128) {
+    fn update_total_supply(&mut self, value: u128) {
         assert!(self
             .0
             .write_set
@@ -538,6 +782,14 @@ impl WriteSetMut {
         }
     }
 
+    pub fn try_new(
+        write_ops: impl IntoIterator<Item = Result<(StateKey, WriteOp)>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            write_set: write_ops.into_iter().collect::<Result<_>>()?,
+        })
+    }
+
     pub fn insert(&mut self, item: (StateKey, WriteOp)) {
         self.write_set.insert(item.0, item.1);
     }
@@ -557,7 +809,7 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet::V0(WriteSetV0(self)))
+        Ok(WriteSet::Value(ValueWriteSet::V0(WriteSetV0(self))))
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
@@ -599,27 +851,5 @@ impl FromIterator<(StateKey, WriteOp)> for WriteSetMut {
             ws.insert((write.0, write.1));
         }
         ws
-    }
-}
-
-impl<'a> IntoIterator for &'a WriteSet {
-    type IntoIter = btree_map::Iter<'a, StateKey, WriteOp>;
-    type Item = (&'a StateKey, &'a WriteOp);
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            WriteSet::V0(write_set) => write_set.0.write_set.iter(),
-        }
-    }
-}
-
-impl IntoIterator for WriteSet {
-    type IntoIter = btree_map::IntoIter<StateKey, WriteOp>;
-    type Item = (StateKey, WriteOp);
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::V0(write_set) => write_set.0.write_set.into_iter(),
-        }
     }
 }

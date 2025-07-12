@@ -487,7 +487,7 @@ impl DBIndexer {
             }
 
             if self.indexer_db.statekeys_enabled() {
-                writeset.iter().for_each(|(state_key, write_op)| {
+                writeset.write_op_iter().for_each(|(state_key, write_op)| {
                     if write_op.is_creation() || write_op.is_modification() {
                         batch
                             .put::<StateKeysSchema>(state_key, &())

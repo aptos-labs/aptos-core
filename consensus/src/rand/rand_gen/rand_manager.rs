@@ -196,8 +196,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
+        let rand = hex::encode(randomness.randomness());
         info!(
             metadata = randomness.metadata(),
+            rand = rand,
             "Processing decisioned randomness."
         );
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {

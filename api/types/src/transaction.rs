@@ -1815,6 +1815,27 @@ pub struct MultiKeySignature {
 
 impl VerifyInput for MultiKeySignature {
     fn verify(&self) -> anyhow::Result<()> {
+        if self.public_keys.is_empty() {
+            bail!("MultiKey signature has no public keys")
+        } else if self.signatures.is_empty() {
+            bail!("MultiKey signature has no signatures")
+        } else if self.public_keys.len() > MAX_NUM_OF_KEYS {
+            bail!(
+                "MultiKey signature has over the maximum number of public keys {}",
+                MAX_NUM_OF_KEYS
+            )
+        } else if self.signatures.len() > MAX_NUM_OF_SIGS {
+            bail!(
+                "MultiKey signature has over the maximum number of signatures {}",
+                MAX_NUM_OF_SIGS
+            )
+        } else if self.signatures.len() != self.signatures_required as usize {
+            bail!("MultiKey signature does not the number of signatures required")
+        } else if self.signatures_required == 0 {
+            bail!("MultiKey signature threshold must be greater than 0")
+        } else if self.signatures_required > MAX_NUM_OF_SIGS as u8 {
+            bail!("MultiKey signature threshold is greater than the maximum number of signatures")
+        }
         let _: AccountAuthenticator = self.try_into()?;
         Ok(())
     }

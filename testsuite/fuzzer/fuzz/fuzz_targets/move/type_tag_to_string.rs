@@ -5,6 +5,7 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_core_types::{ability::AbilitySet, identifier::Identifier, language_storage::TypeTag};
+
 mod utils;
 
 #[derive(Arbitrary, Debug)]
@@ -24,8 +25,14 @@ fn is_valid_type_tag(type_tag: &TypeTag) -> bool {
         TypeTag::Vector(inner_type_tag) => is_valid_type_tag(inner_type_tag),
         TypeTag::Function(function_tag) => {
             function_tag.abilities.into_u8() <= AbilitySet::ALL.into_u8()
-                && function_tag.args.iter().all(is_valid_type_tag)
-                && function_tag.results.iter().all(is_valid_type_tag)
+                && function_tag
+                    .args
+                    .iter()
+                    .all(|t| is_valid_type_tag(t.inner_tag()))
+                && function_tag
+                    .results
+                    .iter()
+                    .all(|t| is_valid_type_tag(t.inner_tag()))
         },
         _ => true, // Primitive types are always valid
     }
@@ -60,16 +67,15 @@ fuzz_target!(|data: FuzzData| -> Corpus {
         tdbg!(
             "a_type:{:?}\na_string:{}\nserialized:{:?}",
             data.a.clone(),
-            data.a.to_string(),
+            data.a.to_canonical_string(),
             bcs::to_bytes(&data.a).unwrap()
         );
         tdbg!(
             "b_type:{:?}\nb_string:{}\nserialized:{:?}",
             data.b.clone(),
-            data.b.to_string(),
+            data.b.to_canonical_string(),
             bcs::to_bytes(&data.b).unwrap()
         );
-        assert!(data.a.to_string() != data.b.to_string());
         assert!(data.a.to_canonical_string() != data.b.to_canonical_string());
     }
 

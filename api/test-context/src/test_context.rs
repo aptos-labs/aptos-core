@@ -830,7 +830,7 @@ impl TestContext {
             .execute_block(
                 (metadata.id(), into_signature_verified_block(txns.clone())).into(),
                 parent_id,
-                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                BlockExecutorConfigFromOnchain::on_but_large_for_test(),
             )
             .unwrap();
         let compute_status = result.compute_status_for_input_txns().clone();
@@ -842,7 +842,7 @@ impl TestContext {
             self.executor
                 .commit_blocks(
                     vec![metadata.id()],
-                    // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                    // BlockEpilogue is added on top of the input transactions.
                     self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
                 )
                 .unwrap();
@@ -1194,6 +1194,7 @@ impl TestContext {
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+        self.wait_for_internal_indexer_caught_up().await;
         let resp = self.reply(req).await;
 
         let headers = resp.headers();
