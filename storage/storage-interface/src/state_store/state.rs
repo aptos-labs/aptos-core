@@ -265,7 +265,7 @@ impl LedgerState {
     pub fn update_with_db_reader(
         &self,
         persisted_snapshot: &State,
-        hot_state: Arc<dyn HotStateView>,
+        hot_state: Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
         updates: &StateUpdateRefs,
         reader: Arc<dyn DbReader>,
     ) -> Result<(LedgerState, ShardedStateCache)> {

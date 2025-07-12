@@ -9,6 +9,7 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::state_store::{state_key::StateKey, state_slot::StateSlot};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -60,7 +61,12 @@ impl PersistedState {
         self.summary.lock().clone()
     }
 
-    pub fn get_state(&self) -> (Arc<dyn HotStateView>, State) {
+    pub fn get_state(
+        &self,
+    ) -> (
+        Arc<dyn HotStateView<Key = StateKey, Value = StateSlot>>,
+        State,
+    ) {
         self.hot_state.get_committed()
     }
 
