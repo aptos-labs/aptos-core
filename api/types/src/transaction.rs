@@ -516,6 +516,16 @@ pub struct UserTransactionRequest {
     pub replay_protection_nonce: Option<U64>,
 }
 
+impl UserTransactionRequest {
+    pub fn replay_protector(&self) -> aptos_types::transaction::ReplayProtector {
+        if let Some(nonce) = self.replay_protection_nonce {
+            aptos_types::transaction::ReplayProtector::Nonce(nonce.0)
+        } else {
+            aptos_types::transaction::ReplayProtector::SequenceNumber(self.sequence_number.0)
+        }
+    }
+}
+
 /// Request to create signing messages
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserCreateSigningMessageRequest {
