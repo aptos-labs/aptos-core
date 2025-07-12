@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    module_traversal::TraversalContext,
     storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
@@ -20,6 +21,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::DependencyGasMeter,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -27,20 +29,38 @@ use move_vm_types::{
 };
 use std::collections::btree_map::{BTreeMap, Entry};
 
+pub trait MoveVmDataCache {
+    fn load_resource(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&GlobalValue, Option<NumBytes>)> {
+        let (gv, loaded_bytes) =
+            self.load_resource_mut(module_storage, gas_meter, traversal_context, addr, ty)?;
+        Ok((gv, loaded_bytes))
+    }
+
+    fn load_resource_mut(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)>;
+}
+
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
-pub(crate) struct DataCacheEntry {
+struct DataCacheEntry {
     struct_tag: StructTag,
     layout: MoveTypeLayout,
     contains_delayed_fields: bool,
     value: GlobalValue,
-}
-
-impl DataCacheEntry {
-    pub(crate) fn value(&self) -> &GlobalValue {
-        &self.value
-    }
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -56,16 +76,21 @@ impl DataCacheEntry {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub struct TransactionDataCache {
+pub struct TransactionDataCache<'a, DataView> {
     account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
+    data_view: &'a DataView,
 }
 
-impl TransactionDataCache {
+impl<'a, DataView> TransactionDataCache<'a, DataView>
+where
+    DataView: ResourceResolver,
+{
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub fn empty() -> Self {
-        TransactionDataCache {
+    pub fn empty(data_view: &'a DataView) -> Self {
+        Self {
             account_map: BTreeMap::new(),
+            data_view,
         }
     }
 
@@ -128,9 +153,9 @@ impl TransactionDataCache {
     /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
-    pub(crate) fn create_data_cache_entry(
+    fn create_data_cache_entry(
+        &self,
         module_storage: &dyn ModuleStorage,
-        resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
@@ -156,7 +181,7 @@ impl TransactionDataCache {
 
             // If we need to process delayed fields, we pass type layout to remote storage. Remote
             // storage, in turn ensures that all delayed field values are pre-processed.
-            resource_resolver.get_resource_bytes_with_metadata_and_layout(
+            self.data_view.get_resource_bytes_with_metadata_and_layout(
                 addr,
                 &struct_tag,
                 &metadata,
@@ -201,7 +226,7 @@ impl TransactionDataCache {
 
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
     /// state of the cache does not chang when calling this function.
-    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
+    fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
         self.account_map
             .get(addr)
             .is_some_and(|account_cache| account_cache.contains_key(ty))
@@ -209,7 +234,7 @@ impl TransactionDataCache {
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
     /// entry already for the specified address-type pair.
-    pub(crate) fn insert_resource(
+    fn insert_resource(
         &mut self,
         addr: AccountAddress,
         ty: Type,
@@ -229,7 +254,7 @@ impl TransactionDataCache {
 
     /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
     /// not exist in cache), an error is returned.
-    pub(crate) fn get_resource_mut(
+    fn get_resource_mut(
         &mut self,
         addr: &AccountAddress,
         ty: &Type,
@@ -244,5 +269,28 @@ impl TransactionDataCache {
         let err =
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
         Err(err)
+    }
+}
+
+impl<'a, DataView> MoveVmDataCache for TransactionDataCache<'a, DataView>
+where
+    DataView: ResourceResolver,
+{
+    fn load_resource_mut(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        _gas_meter: &mut dyn DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
+        let bytes_loaded = if !self.contains_resource(&addr, ty) {
+            let (entry, bytes_loaded) = self.create_data_cache_entry(module_storage, &addr, ty)?;
+            self.insert_resource(addr, ty.clone(), entry)?;
+            Some(bytes_loaded)
+        } else {
+            None
+        };
+        Ok((self.get_resource_mut(&addr, ty)?, bytes_loaded))
     }
 }

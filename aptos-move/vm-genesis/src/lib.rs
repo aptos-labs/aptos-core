@@ -45,10 +45,8 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
-    move_vm_ext::{
-        convert_modules_into_write_ops, AptosMoveResolver, GenesisMoveVm, GenesisRuntimeBuilder,
-        SessionExt,
-    },
+    move_vm_ext::{convert_modules_into_write_ops, GenesisMoveVm, GenesisRuntimeBuilder},
+    session::Session,
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
@@ -440,7 +438,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 }
 
 fn exec_function_internal(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     traversal_context: &mut TraversalContext,
     module_name: &str,
@@ -472,7 +470,7 @@ fn exec_function_internal(
 }
 
 fn exec_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     traversal_context: &mut TraversalContext,
     module_name: &str,
@@ -493,7 +491,7 @@ fn exec_function(
 }
 
 fn exec_experimental_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     traversal_context: &mut TraversalContext,
     module_name: &str,
@@ -514,7 +512,7 @@ fn exec_experimental_function(
 }
 
 fn initialize(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     chain_id: ChainId,
@@ -570,7 +568,7 @@ fn initialize(
 }
 
 fn initialize_features(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     features_override: Option<Vec<FeatureFlag>>,
@@ -597,7 +595,7 @@ fn initialize_features(
 }
 
 fn initialize_aptos_coin(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -613,7 +611,7 @@ fn initialize_aptos_coin(
 }
 
 fn initialize_config_buffer(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -629,7 +627,7 @@ fn initialize_config_buffer(
 }
 
 fn initialize_dkg(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -645,7 +643,7 @@ fn initialize_dkg(
 }
 
 fn initialize_randomness_config_seqnum(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -661,7 +659,7 @@ fn initialize_randomness_config_seqnum(
 }
 
 fn initialize_randomness_api_v0_config(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -681,7 +679,7 @@ fn initialize_randomness_api_v0_config(
 }
 
 fn initialize_randomness_config(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     randomness_config: OnChainRandomnessConfig,
@@ -701,7 +699,7 @@ fn initialize_randomness_config(
 }
 
 fn initialize_randomness_resources(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -717,7 +715,7 @@ fn initialize_randomness_resources(
 }
 
 fn initialize_account_abstraction(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -780,7 +778,7 @@ fn initialize_account_abstraction(
 }
 
 fn initialize_reconfiguration_state(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -796,7 +794,7 @@ fn initialize_reconfiguration_state(
 }
 
 fn initialize_jwk_consensus_config(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     jwk_consensus_config: &OnChainJWKConsensusConfig,
@@ -816,7 +814,7 @@ fn initialize_jwk_consensus_config(
 }
 
 fn initialize_jwks_resources(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -832,7 +830,7 @@ fn initialize_jwks_resources(
 }
 
 fn set_genesis_end(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -848,7 +846,7 @@ fn set_genesis_end(
 }
 
 fn initialize_core_resources_and_aptos_coin(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     core_resources_key: &Ed25519PublicKey,
@@ -870,7 +868,7 @@ fn initialize_core_resources_and_aptos_coin(
 
 /// Create and initialize Association and Core Code accounts.
 fn initialize_on_chain_governance(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     genesis_config: &GenesisConfiguration,
@@ -892,7 +890,7 @@ fn initialize_on_chain_governance(
 }
 
 fn initialize_keyless_accounts(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     chain_id: ChainId,
@@ -962,7 +960,7 @@ fn initialize_keyless_accounts(
 }
 
 fn initialize_confidential_asset(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
     traversal_context: &mut TraversalContext,
@@ -981,7 +979,7 @@ fn initialize_confidential_asset(
 }
 
 fn create_accounts(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     accounts: &[AccountBalance],
@@ -1001,7 +999,7 @@ fn create_accounts(
 }
 
 fn create_employee_validators(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     employees: &[EmployeePool],
@@ -1029,7 +1027,7 @@ fn create_employee_validators(
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
 fn create_and_initialize_validators(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     validators: &[Validator],
@@ -1049,7 +1047,7 @@ fn create_and_initialize_validators(
 }
 
 fn create_and_initialize_validators_with_commission(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
     validators: &[ValidatorWithCommissionRate],
@@ -1072,7 +1070,7 @@ fn create_and_initialize_validators_with_commission(
 }
 
 fn allow_core_resources_to_set_version(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {
@@ -1088,7 +1086,7 @@ fn allow_core_resources_to_set_version(
 }
 
 fn initialize_package(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl ModuleStorage,
     traversal_context: &mut TraversalContext,
     addr: AccountAddress,
@@ -1126,13 +1124,16 @@ fn code_to_writes_for_publishing(
     let verified_module_bundle =
         module_storage_with_staged_modules.release_verified_module_bundle();
 
+    let mut writes = BTreeMap::new();
     convert_modules_into_write_ops(
+        &mut writes,
         &resolver,
         genesis_features,
         &module_storage,
         verified_module_bundle,
     )
-    .map_err(|e| e.finish(Location::Undefined))
+    .map_err(|e| e.finish(Location::Undefined))?;
+    Ok(writes)
 }
 
 /// Produces the changes when a framework is published:
@@ -1216,7 +1217,7 @@ fn publish_framework(
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
 fn emit_new_block_and_epoch_event(
-    session: &mut SessionExt<impl AptosMoveResolver>,
+    session: &mut impl Session,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
 ) {

@@ -5,7 +5,7 @@
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     check_dependencies_and_charge_gas,
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
     interpreter::InterpreterDebugInterface,
     loader::{LazyLoadedFunction, LazyLoadedFunctionState},
     module_traversal::TraversalContext,
@@ -38,7 +38,6 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
     natives::function::NativeResult,
-    resolver::ResourceResolver,
     values::{AbstractFunction, Value},
 };
 use std::{
@@ -115,8 +114,7 @@ impl NativeFunctions {
 
 pub struct NativeContext<'a, 'b, 'c> {
     interpreter: &'a dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache,
-    resource_resolver: &'a dyn ResourceResolver,
+    data_cache: &'a mut dyn MoveVmDataCache,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_meter: &'a mut dyn NativeGasMeter,
@@ -126,8 +124,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
         interpreter: &'a dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache,
-        resource_resolver: &'a dyn ResourceResolver,
+        data_cache: &'a mut impl MoveVmDataCache,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_meter: &'a mut dyn NativeGasMeter,
@@ -135,8 +132,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     ) -> Self {
         Self {
             interpreter,
-            data_store,
-            resource_resolver,
+            data_cache,
             module_storage,
             extensions,
             gas_meter,
@@ -160,21 +156,18 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   Propagate exists call all the way to resolver, because we can implement the check more
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
-        Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-                self.module_storage,
-                self.resource_resolver,
-                &address,
-                ty,
-            )?;
-            let exists = entry.value().exists()?;
-            self.data_store
-                .insert_resource(address, ty.clone(), entry)?;
-            (exists, Some(bytes_loaded))
-        } else {
-            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
-            (exists, None)
-        })
+        let (gv, bytes_loaded) = self.data_cache.load_resource_mut(
+            &ModuleStorageWrapper {
+                module_storage: self.module_storage,
+            },
+            &mut DependencyGasMeterWrapper {
+                gas_meter: self.gas_meter,
+            },
+            self.traversal_context,
+            address,
+            ty,
+        )?;
+        Ok((gv.exists()?, bytes_loaded))
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {

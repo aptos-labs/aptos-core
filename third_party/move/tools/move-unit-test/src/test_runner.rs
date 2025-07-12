@@ -256,7 +256,7 @@ impl SharedTestingConfig {
         let mut gas_meter = factory.lock().unwrap().new_gas_meter();
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = TransactionDataCache::empty(&self.starting_storage_state);
 
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
@@ -278,7 +278,6 @@ impl SharedTestingConfig {
                     &mut traversal_context,
                     &mut extensions,
                     &module_storage,
-                    &self.starting_storage_state,
                 )
             });
 
