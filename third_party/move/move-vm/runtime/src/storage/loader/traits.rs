@@ -11,6 +11,9 @@ use std::sync::Arc;
 
 /// Provides access to struct definitions.
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {
+    /// Returns true if the current loader is lazy, and false otherwise.
+    fn is_lazy_loading_enabled(&self) -> bool;
+
     /// Returns the struct definition corresponding to the specified index. The function may also
     /// charge gas for loading the module where the struct is defined. Returns an error if such
     /// metering fails, or if the struct / module where it is defined do not exist.
