@@ -49,7 +49,7 @@ const fn all_bytes_valid(b: &[u8], start_offset: usize) -> bool {
     let mut i = start_offset;
     // TODO(philiphayes): use for loop instead of while loop when it's stable in const fn's.
     while i < b.len() {
-        if !is_valid_identifier_char(b[i] as char) {
+        if !is_valid_identifier_char(b[i] as char) && b[i] != b'$' {
             return false;
         }
         i += 1;
@@ -84,7 +84,7 @@ pub const fn is_valid(s: &str) -> bool {
     match b {
         b"<SELF>" => true,
         [b'<', b'S', b'E', b'L', b'F', b'>', b'_', ..] if b.len() > 7 => all_bytes_numeric(b, 7),
-        [b'a'..=b'z', ..] | [b'A'..=b'Z', ..] => all_bytes_valid(b, 1),
+        [b'a'..=b'z', ..] | [b'A'..=b'Z', ..] | [b'$', ..] => all_bytes_valid(b, 1),
         [b'_', ..] if b.len() > 1 => all_bytes_valid(b, 1),
         _ => false,
     }
@@ -96,10 +96,10 @@ pub const fn is_valid(s: &str) -> bool {
 #[cfg(any(test, feature = "fuzzing"))]
 #[allow(dead_code)]
 pub(crate) static ALLOWED_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_]*)|(?:_[a-zA-Z0-9_]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
+    r"(?:[a-zA-Z\$][a-zA-Z0-9_\$]*)|(?:_[a-zA-Z0-9_\$]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) static ALLOWED_NO_SELF_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_]*)|(?:_[a-zA-Z0-9_]+)";
+    r"(?:[a-zA-Z\$][a-zA-Z0-9_\$]*)|(?:_[a-zA-Z0-9_\$]+)";
 
 /// An owned identifier.
 ///

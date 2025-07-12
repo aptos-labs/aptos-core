@@ -3065,11 +3065,12 @@ fn parse_struct_decl(
     context: &mut Context,
 ) -> Result<StructDefinition, Box<Diagnostic>> {
     let Modifiers {
-        visibility,
+        visibility: visibility_opt,
         entry,
         native,
     } = modifiers;
-    match visibility {
+    let mut visibility = Visibility::Internal;
+    match visibility_opt {
         Some(vis) if !context.env.flags().lang_v2() => {
             let msg = format!(
                 "Invalid struct declaration. Structs cannot have visibility modifiers as they are \
@@ -3079,6 +3080,9 @@ fn parse_struct_decl(
             context
                 .env
                 .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
+        },
+        Some(vis) => {
+            visibility = vis;
         },
         _ => {},
     }
@@ -3168,6 +3172,7 @@ fn parse_struct_decl(
         name,
         type_parameters,
         layout,
+        visibility,
     })
 }
 
