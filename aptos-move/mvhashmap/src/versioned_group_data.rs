@@ -309,7 +309,7 @@ impl<
         let key_ref = GroupKeyRef { group_key, tag };
         let initialized = self.group_sizes.contains_key(group_key);
 
-        match self.values.fetch_data(&key_ref, txn_idx) {
+        match self.values.fetch_data_no_record(&key_ref, txn_idx) {
             Ok(MVDataOutput::Versioned(version, value)) => Ok((version, value)),
             Err(MVDataError::Uninitialized) => Err(if initialized {
                 MVGroupError::TagNotFound

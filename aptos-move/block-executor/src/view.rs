@@ -616,9 +616,9 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
             let data = if self.scheduler.is_v2() {
                 self.versioned_map
                     .data()
-                    .fetch_data_v2(key, txn_idx, self.incarnation)
+                    .fetch_data_and_record(key, txn_idx, self.incarnation)
             } else {
-                self.versioned_map.data().fetch_data(key, txn_idx)
+                self.versioned_map.data().fetch_data_no_record(key, txn_idx)
             };
 
             match data {
@@ -3185,7 +3185,7 @@ mod test {
             holder
                 .versioned_map
                 .data()
-                .fetch_data(&KeyType::<u32>(3), 1)
+                .fetch_data_no_record(&KeyType::<u32>(3), 1)
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
