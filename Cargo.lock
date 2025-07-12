@@ -1658,6 +1658,7 @@ dependencies = [
  "chrono",
  "clap 4.5.21",
  "futures",
+ "lazy_static",
  "rand 0.7.3",
  "reqwest 0.11.23",
  "serde",
