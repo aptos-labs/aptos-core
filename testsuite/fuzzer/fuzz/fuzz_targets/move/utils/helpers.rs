@@ -3,8 +3,6 @@
 
 #![allow(dead_code)]
 
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use arbitrary::Arbitrary;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 
@@ -31,37 +29,6 @@ macro_rules! tdbg {
             }
         }
     };
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub enum FundAmount {
-    Zero,
-    Poor,
-    Rich,
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone, Copy)]
-pub struct UserAccount {
-    is_inited_and_funded: bool,
-    fund: FundAmount,
-}
-
-impl UserAccount {
-    pub fn fund_amount(&self) -> u64 {
-        match self.fund {
-            FundAmount::Zero => 0,
-            FundAmount::Poor => 1_000,
-            FundAmount::Rich => 1_000_000_000_000_000,
-        }
-    }
-
-    pub fn convert_account(&self, vm: &mut FakeExecutor) -> Account {
-        if self.is_inited_and_funded {
-            vm.create_accounts(1, self.fund_amount(), 0).remove(0)
-        } else {
-            Account::new()
-        }
-    }
 }
 
 pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
