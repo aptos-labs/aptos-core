@@ -1,0 +1,10 @@
+address acc = 0x66
+module acc::test
+
+fun f(x: u64): u64
+    ret
+
+fun g()
+    ld_u64 1
+    call acc::test::f
+    ret

@@ -11873,6 +11873,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-asm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.21",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "either",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-core-types",
+ "move-disassembler",
+ "move-ir-types",
+ "move-prover-test-utils",
+]
+
+[[package]]
 name = "move-ast-generator-tests"
 version = "0.1.0"
 dependencies = [

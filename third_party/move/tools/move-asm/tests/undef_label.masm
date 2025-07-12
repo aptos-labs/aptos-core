@@ -1,0 +1,5 @@
+module 0x66::test
+
+fun f(x: u64)
+    br_false l3
+l2: ret

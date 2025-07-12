@@ -1,0 +1,12 @@
+module 0x66::test
+
+fun f(x: u64): u64
+    local y: u64
+    copy_loc x
+    ld_u64 1
+    add
+    st_loc y
+    move_loc x
+    move_loc y
+    mod
+    ret

@@ -1,0 +1,9 @@
+// Move bytecode v7
+module 102.test {
+
+
+f<Ty0, Ty1>(Arg0: Ty0, Arg1: Ty1): Ty0 * Ty1 /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+}
