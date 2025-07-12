@@ -824,7 +824,7 @@ impl Client {
 
             if let Some(max_server_lag_wait_duration) = max_server_lag_wait {
                 if aptos_infallible::duration_since_epoch().as_secs()
-                    > expiration_timestamp_secs + max_server_lag_wait_duration.as_secs()
+                    > expiration_timestamp_secs.saturating_add(max_server_lag_wait_duration.as_secs())
                 {
                     return Err(anyhow!(
                         "Ledger on endpoint ({}) is more than {}s behind current time, timing out waiting for the transaction. Warning, transaction ({}) might still succeed.",
