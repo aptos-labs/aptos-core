@@ -23,12 +23,10 @@ use aptos_storage_service_notifications::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, GetTransactionDataWithProofRequest, StateValuesWithProofRequest,
-        StorageServiceRequest, SubscribeTransactionDataWithProofRequest,
+        DataRequest, StateValuesWithProofRequest, StorageServiceRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        SubscriptionStreamMetadata, TransactionData, TransactionDataRequestType,
-        TransactionOrOutputData, TransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionsWithProofRequest,
     },
     responses::{
         CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse,
@@ -575,15 +573,13 @@ pub async fn get_transactions_with_proof(
     use_request_v2: bool,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = if use_request_v2 {
-        let transaction_data_request_type =
-            TransactionDataRequestType::TransactionData(TransactionData { include_events });
-        DataRequest::GetTransactionDataWithProof(GetTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::get_transaction_data_with_proof(
             proof_version,
             start_version,
             end_version,
-            max_response_bytes: 0,
-        })
+            include_events,
+            0,
+        )
     } else {
         DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
             proof_version,
@@ -695,16 +691,12 @@ pub async fn subscribe_to_transactions_or_outputs_for_peer(
         subscription_stream_id,
     };
     let data_request = if use_request_v2 {
-        let transaction_data_request_type =
-            TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-                include_events,
-            });
-        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::subscribe_transaction_or_output_data_with_proof(
             subscription_stream_metadata,
             subscription_stream_index,
-            max_response_bytes: 0,
-        })
+            include_events,
+            0,
+        )
     } else {
         DataRequest::SubscribeTransactionsOrOutputsWithProof(
             SubscribeTransactionsOrOutputsWithProofRequest {
@@ -762,13 +754,11 @@ pub async fn subscribe_to_transaction_outputs_for_peer(
         subscription_stream_id,
     };
     let data_request = if use_request_v2 {
-        let transaction_data_request_type = TransactionDataRequestType::TransactionOutputData;
-        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::subscribe_transaction_output_data_with_proof(
             subscription_stream_metadata,
             subscription_stream_index,
-            max_response_bytes: 0,
-        })
+            0,
+        )
     } else {
         DataRequest::SubscribeTransactionOutputsWithProof(
             SubscribeTransactionOutputsWithProofRequest {
@@ -827,14 +817,12 @@ pub async fn subscribe_to_transactions_for_peer(
         subscription_stream_id,
     };
     let data_request = if use_request_v2 {
-        let transaction_data_request_type =
-            TransactionDataRequestType::TransactionData(TransactionData { include_events });
-        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::subscribe_transaction_data_with_proof(
             subscription_stream_metadata,
             subscription_stream_index,
-            max_response_bytes: 0,
-        })
+            include_events,
+            0,
+        )
     } else {
         DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
             subscription_stream_metadata,
