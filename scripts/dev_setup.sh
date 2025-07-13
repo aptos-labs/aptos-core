@@ -1062,7 +1062,7 @@ install_libudev-dev
 
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
-  if [[ "$PACKAGE_MANAGER == brew" ]]; then
+  if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
     install_pkg pre-commit "$PACKAGE_MANAGER"
   elif [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
