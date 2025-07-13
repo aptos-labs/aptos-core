@@ -3,7 +3,9 @@
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
-    state_store::state_slot::StateSlot, transaction::Version, write_set::BaseStateOp,
+    state_store::{hot_state::LRUEntry, state_slot::StateSlot},
+    transaction::Version,
+    write_set::BaseStateOp,
 };
 
 #[derive(Clone, Debug)]
@@ -15,25 +17,44 @@ pub struct StateUpdateRef<'kv> {
 
 impl StateUpdateRef<'_> {
     pub fn to_result_slot(&self) -> StateSlot {
+        // TODO(HotState): distinguish uninitialized lru info with a single entry (prev and next
+        // are `None`).
         match self.state_op.clone() {
             BaseStateOp::Creation(value) | BaseStateOp::Modification(value) => {
                 StateSlot::HotOccupied {
                     value_version: self.version,
                     value,
                     hot_since_version: self.version,
+                    lru_info: LRUEntry {
+                        prev: None,
+                        next: None,
+                    },
                 }
             },
             BaseStateOp::Deletion(_) => StateSlot::HotVacant {
                 hot_since_version: self.version,
+                lru_info: LRUEntry {
+                    prev: None,
+                    next: None,
+                },
             },
             BaseStateOp::MakeHot { prev_slot } => match prev_slot {
                 StateSlot::ColdVacant => StateSlot::HotVacant {
                     hot_since_version: self.version,
+                    lru_info: LRUEntry {
+                        prev: None,
+                        next: None,
+                    },
                 },
                 StateSlot::HotVacant {
                     hot_since_version: _,
+                    ..
                 } => StateSlot::HotVacant {
                     hot_since_version: self.version,
+                    lru_info: LRUEntry {
+                        prev: None,
+                        next: None,
+                    },
                 },
                 StateSlot::ColdOccupied {
                     value_version,
@@ -43,10 +64,15 @@ impl StateUpdateRef<'_> {
                     value_version,
                     value,
                     hot_since_version: _,
+                    ..
                 } => StateSlot::HotOccupied {
                     value_version,
                     value,
                     hot_since_version: self.version,
+                    lru_info: LRUEntry {
+                        prev: None,
+                        next: None,
+                    },
                 },
             },
             BaseStateOp::Eviction { prev_slot } => match prev_slot {
