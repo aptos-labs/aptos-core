@@ -2249,7 +2249,7 @@ impl TransactionListWithProofV2 {
         }
     }
 
-    /// Splits the transaction list with proof v2 into its components
+    /// Splits the transaction list with proof v2 into its components.
     pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
@@ -2502,7 +2502,7 @@ impl TransactionOutputListWithProofV2 {
         }
     }
 
-    /// Splits the transaction output list with proof v2 into its components
+    /// Splits the transaction output list with proof v2 into its components.
     pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
