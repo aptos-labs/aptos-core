@@ -6,5 +6,5 @@ fun identity<T>(x: T): T
 fun test(): u64
     ld_u64 2
     pack_closure identity<u64>, 1
-    call_closure < ||u64 has drop >
+    call_closure <||u64 has drop>
     ret

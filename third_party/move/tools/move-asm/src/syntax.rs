@@ -11,6 +11,8 @@
 //! by a sequence of qualified identifiers separated by `::` (as in
 //! `0x66::bar::foo`, or `bar::foo`).
 //!
+//! Notice that line comments are supported and preceded by `//`.
+//!
 //! ```
 //! unit :=
 //!   { address_alias LF }
@@ -22,7 +24,7 @@
 //!
 //! fun_def :=
 //!   fun_modifier "fun" ID "(" [ LIST(local) ] ")" [ tuple_type ] LF
-//!   { instruction LF }
+//!   { "local" local LF } { instruction LF }
 //!
 //! fun_modifier := [ [ "public" | "friend" ] "entry" ]
 //!
@@ -42,7 +44,7 @@
 //!
 //! instruction :=
 //!   ( INDENT | LOOKAHEAD(ID ":") )
-//!   ( "local" local | opcode [ LIST(argument) ] ) LF
+//!   opcode [ LIST(argument) ]
 //!
 //! opcode := IDENT # current instr set
 //!
@@ -56,18 +58,17 @@ use move_binary_format::file_format::Visibility;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     u256::U256,
 };
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     fmt::{Display, Formatter},
     ops::Range,
     str::FromStr,
     string::ToString,
 };
-
 // ==========================================================================================
 // Diagnostics
 
@@ -194,7 +195,7 @@ struct AsmParser {
 
 pub fn parse_asm(source: &str) -> AsmResult<Unit> {
     let mut tokens = scan(source.as_bytes())?;
-    let (loc, next) = tokens.pop_front().unwrap();
+    let (loc, next) = tokens.pop_front().expect("scan returns at least one token");
     AsmParser {
         previous_loc: loc,
         next_loc: loc,
@@ -569,7 +570,7 @@ impl AsmParser {
                 if !instrs.is_empty() {
                     return Err(error(
                         self.next_loc,
-                        "local declarations must proceed instructions",
+                        "local declarations must precede instructions",
                     ));
                 }
                 self.advance()?;
@@ -594,13 +595,13 @@ impl AsmParser {
 
     fn module_id(
         &mut self,
-        address_aliases: &[(Identifier, AccountAddress)],
+        address_aliases: &BTreeMap<&IdentStr, AccountAddress>,
     ) -> AsmResult<ModuleId> {
         let addr = if matches!(&self.next, Token::Number(..)) {
             self.address()?
         } else if self.is_ident() {
             let id = self.ident()?;
-            if let Some((_, addr)) = address_aliases.iter().find(|(n, _)| n == &id) {
+            if let Some(addr) = address_aliases.get(id.as_ident_str()) {
                 *addr
             } else {
                 return Err(error(
@@ -626,10 +627,14 @@ impl AsmParser {
             self.expect_newline()?;
             address_aliases.push((name, addr));
         }
+        let address_alias_map: BTreeMap<&IdentStr, AccountAddress> = address_aliases
+            .iter()
+            .map(|(name, addr)| (name.as_ident_str(), *addr))
+            .collect();
         let mut module_aliases = vec![];
         while self.is_soft_kw("use") {
             self.advance()?;
-            let module = self.module_id(&address_aliases)?;
+            let module = self.module_id(&address_alias_map)?;
             self.expect_soft_kw("as")?;
             let name = self.ident()?;
             self.expect_newline()?;
@@ -637,7 +642,7 @@ impl AsmParser {
         }
         let name = if self.is_soft_kw("module") {
             self.advance()?;
-            UnitId::Module(self.module_id(&address_aliases)?)
+            UnitId::Module(self.module_id(&address_alias_map)?)
         } else if self.is_soft_kw("script") {
             UnitId::Script
         } else {

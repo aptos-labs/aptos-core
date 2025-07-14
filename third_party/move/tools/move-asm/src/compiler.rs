@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Implements the compiler from the Move assembler syntax into bytecode,
-//! using the `module_builder`.
+//! Implements the assembler from the abstract syntax into bytecode,
+//! using the `ModuleBuilder`.
 
 use crate::{
     module_builder::{ModuleBuilder, ModuleBuilderOptions},
@@ -23,7 +23,7 @@ use move_binary_format::{
 use move_core_types::{function::ClosureMask, identifier::Identifier, u256::U256};
 use std::collections::BTreeMap;
 
-struct Compiler<'a> {
+struct Assembler<'a> {
     builder: ModuleBuilder<'a>,
     diags: Vec<Diag>,
     /// Context available during processing of a function.
@@ -40,7 +40,7 @@ pub(crate) fn compile<'a>(
     context_modules: impl IntoIterator<Item = &'a CompiledModule>,
     ast: Unit,
 ) -> AsmResult<Either<CompiledModule, CompiledScript>> {
-    let mut compiler = Compiler {
+    let mut compiler = Assembler {
         builder: ModuleBuilder::new(options, context_modules, ast.name.module_opt()),
         diags: vec![],
         fun_context: None,
@@ -56,7 +56,7 @@ pub(crate) fn compile<'a>(
     }
 }
 
-impl<'a> Compiler<'a> {
+impl<'a> Assembler<'a> {
     fn unit(&mut self, ast: &Unit) {
         let Unit {
             name: _,
