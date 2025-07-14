@@ -38,9 +38,11 @@ module 0xABCD::existence {
 
     fun make_b(seed: u64): B {
         let va = vector::empty<A>();
-        vector::push_back(&mut va, make_a(100 + seed));
-        vector::push_back(&mut va, make_a(200 + seed));
-        vector::push_back(&mut va, make_a(500 + seed));
+        let i = 0;
+        while (i < 100) {
+            vector::push_back(&mut va, make_a(10 * i + seed));
+            i = i + 1;
+        };
         B {
             va: va,
             name: utf8(b"Super epic B"),
@@ -55,8 +57,11 @@ module 0xABCD::existence {
         );
 
         let bt = table::new<B, String>();
-        table::add(&mut bt, make_b(10), utf8(b"B number 1"));
-        table::add(&mut bt, make_b(20), utf8(b"B number 2"));
+        let i = 0;
+        while (i < 100) {
+            table::add(&mut bt, make_b(i + 1), utf8(b"B number i"));
+            i = i + 1;
+        };
         move_to<C>(
             publisher,
             C {
