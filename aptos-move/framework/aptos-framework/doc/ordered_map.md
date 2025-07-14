@@ -806,6 +806,16 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>, r
             <b>if</b> (ord.is_eq()) {
                 // we skip the entries one, and below put in the result one from other.
                 overwritten.push_back(self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
+
+                <b>if</b> (cur_i == 0) {
+                    // make other_entries empty, and rest in entries.
+                    // TODO cannot <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a> until it is <b>public</b>/released
+                    // <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> self.entries, &<b>mut</b> other_entries);
+                    self.entries.<a href="ordered_map.md#0x1_ordered_map_append">append</a>(other_entries);
+                    <b>break</b>;
+                } <b>else</b> {
+                    cur_i -= 1;
+                };
             };
 
             reverse_result.push_back(other_entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());

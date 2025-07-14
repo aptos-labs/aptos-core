@@ -572,11 +572,17 @@ module aptos_std::big_ordered_map {
 
     // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
     public(friend) inline fun for_each_ref_friend<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
-        self.for_each_leaf_node_ref(|node| {
-            node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
-                f(k, &v.value);
-            });
-        })
+        let iter = self.new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            f(iter.iter_borrow_key(), iter.iter_borrow(self));
+            iter = iter.iter_next(self);
+        };
+
+        // self.for_each_leaf_node_ref(|node| {
+        //     node.children.for_each_ref_friend(|k: &K, v: &Child<V>| {
+        //         f(k, &v.value);
+        //     });
+        // })
     }
 
     /// Apply the function to a mutable reference of each key-value pair in the map.
