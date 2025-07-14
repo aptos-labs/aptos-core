@@ -27,3 +27,9 @@ pub trait THotStateSlot {
     fn set_prev(&mut self, prev: Option<Self::Key>);
     fn set_next(&mut self, next: Option<Self::Key>);
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SpeculativeLRUEntry<V> {
+    Existing(V),
+    Deleted,
+}

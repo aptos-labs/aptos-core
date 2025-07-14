@@ -4,7 +4,11 @@
 use crate::state_store::state::State;
 use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
+    state_store::{
+        state_key::StateKey,
+        state_slot::{StateSlot, HOT_STATE_MAX_ITEMS},
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use itertools::Itertools;
@@ -58,5 +62,35 @@ impl StateDelta {
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         self.shards[state_key.get_shard_id()].get(state_key)
+    }
+
+    /*
+    pub fn num_hot_items(&self) -> usize {
+        self.current.hot_state_metadata.num_items
+    }
+    */
+
+    pub fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        let mut ret = [0; NUM_STATE_SHARDS];
+        for i in 0..NUM_STATE_SHARDS {
+            assert!(self.current.hot_state_metadata[i].num_items <= HOT_STATE_MAX_ITEMS);
+            ret[i] = HOT_STATE_MAX_ITEMS - self.current.hot_state_metadata[i].num_items
+        }
+        ret
+    }
+
+    pub fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        match self.get_state_slot(state_key) {
+            Some(slot) => slot.is_hot(),
+            None => false,
+        }
+    }
+
+    pub fn get_oldest_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.current.hot_state_metadata[shard_id].oldest.clone()
+    }
+
+    pub fn get_newest_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.current.hot_state_metadata[shard_id].latest.clone()
     }
 }
