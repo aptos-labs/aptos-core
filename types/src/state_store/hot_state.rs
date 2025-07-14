@@ -1,6 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// TODO(HotState): create configs for these.
+// 256 MiB per shard
+pub const HOT_STATE_MAX_BYTES: usize = 256 * 1024 * 1024;
+// 250k items per shard
+pub const HOT_STATE_MAX_ITEMS: usize = 250_000;
+// 10KB, worst case the hot state still caches 400K items
+pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LRUEntry<K> {
     /// The key that is slightly newer than the current entry. `None` for the newest entry.
