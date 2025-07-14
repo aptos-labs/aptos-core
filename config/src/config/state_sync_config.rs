@@ -404,7 +404,11 @@ pub struct AptosDataClientConfig {
     pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
-    /// Maximum number of output reductions before transactions are returned
+    /// Maximum number of output reductions (division by 2) before transactions are returned,
+    /// e.g., if 1000 outputs are requested in a single data chunk, and this is set to 1, then
+    /// we'll accept anywhere between 1000 and 500 outputs. Any less, and the server should
+    /// return transactions instead of outputs.
+    // TODO: migrate away from this, and use cleaner chunk packing configs and logic.
     pub max_num_output_reductions: u64,
     /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
     pub max_optimistic_fetch_lag_secs: u64,
