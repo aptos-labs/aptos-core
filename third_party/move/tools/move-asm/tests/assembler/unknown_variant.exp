@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-12:
+Error: error: undeclared variant `V2`
+  ┌─ test:8:5
+  │
+8 │     borrow_variant_field E, V2::y
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+

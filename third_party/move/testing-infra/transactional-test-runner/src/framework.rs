@@ -439,8 +439,6 @@ pub trait MoveTestAdapter<'a>: Sized {
                     },
                     SyntaxChoice::ASM => {
                         // TODO(#16582): generate source info for .masm file
-                        self.compiled_state()
-                            .add_and_generate_interface_file(module);
                     },
                 };
                 Ok(merge_output(warnings_opt, output))
