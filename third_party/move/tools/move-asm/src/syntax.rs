@@ -66,7 +66,6 @@ use std::{
     collections::{BTreeMap, VecDeque},
     fmt::{Display, Formatter},
     ops::Range,
-    str::FromStr,
     string::ToString,
 };
 // ==========================================================================================
@@ -271,6 +270,10 @@ impl AsmParser {
     }
 
     fn expect_newline(&mut self) -> AsmResult<()> {
+        if self.is_tok(&Token::End) {
+            // End of file can serve as newline, but is not consumed
+            return Ok(());
+        }
         self.expect(&Token::Newline)?;
         // Skip empty lines.
         while self.is_tok(&Token::Newline) {
@@ -308,7 +311,9 @@ impl AsmParser {
 
     fn address(&mut self) -> AsmResult<AccountAddress> {
         if let Token::Number(num) = &self.next {
-            let addr = AccountAddress::from_str(&num.to_string()).expect("valid number");
+            let mut bytes = num.to_le_bytes().to_vec();
+            bytes.reverse();
+            let addr = AccountAddress::from_bytes(bytes).expect("valid number");
             self.advance()?;
             Ok(addr)
         } else {
@@ -618,6 +623,12 @@ impl AsmParser {
     }
 
     fn unit(&mut self) -> AsmResult<Unit> {
+        // Skip any empty lines at beginning of file. After that, further empty lines
+        // are consumed on line break.
+        while self.is_tok(&Token::Newline) {
+            self.advance()?
+        }
+        // Parse address and module aliases
         let mut address_aliases = vec![];
         while self.is_soft_kw("address") {
             self.advance()?;
@@ -640,15 +651,18 @@ impl AsmParser {
             self.expect_newline()?;
             module_aliases.push((name, module));
         }
+        // Parse module header
         let name = if self.is_soft_kw("module") {
             self.advance()?;
             UnitId::Module(self.module_id(&address_alias_map)?)
         } else if self.is_soft_kw("script") {
+            self.advance()?;
             UnitId::Script
         } else {
             return Err(error(self.next_loc, "expected `module` or `script` header"));
         };
         self.expect_newline()?;
+        // Parse definitions
         let mut functions = vec![];
         while self.is_fun() {
             functions.push(self.fun()?)
@@ -682,18 +696,18 @@ fn scan(input: &[u8]) -> AsmResult<VecDeque<(Loc, Token)>> {
     let mut result = VecDeque::new();
     loop {
         // Skip space
-        let mut start = pos;
+        let start = pos;
         while pos < end && matches!(input[pos], b' ' | b'\t' | b'\r') {
             pos += 1
         }
         // Skip comment
-        if pos < end && matches!(input[pos], b'#') {
-            pos += 1;
+        if pos + 1 < end && matches!(input[pos], b'/') && matches!(input[pos + 1], b'/') {
+            pos += 2;
             // Skip until end of line
             while pos < end && !matches!(input[pos], b'\n') {
                 pos += 1
             }
-            start = pos;
+            continue;
         }
         // Terminate at end
         if pos >= end {

@@ -3,7 +3,7 @@
 
 //! Entry point into the Move assembler ('move-asm').
 
-pub mod compiler;
+pub mod assembler;
 pub mod module_builder;
 pub mod syntax;
 
@@ -11,16 +11,18 @@ use crate::{
     module_builder::ModuleBuilderOptions,
     syntax::{AsmResult, Diag},
 };
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use clap::Parser;
 use codespan_reporting::{
     files::{Files, SimpleFile},
     term,
-    term::termcolor::WriteColor,
+    term::{termcolor, termcolor::WriteColor},
 };
 use either::Either;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use std::{fs, io::Write, path::PathBuf};
+
+pub type ModuleOrScript = Either<CompiledModule, CompiledScript>;
 
 #[derive(Parser, Clone, Debug, Default)]
 #[clap(author, version, about)]
@@ -28,6 +30,10 @@ pub struct Options {
     /// Options for the module builder
     #[clap(flatten)]
     pub module_builder_options: ModuleBuilderOptions,
+
+    /// List of files with binary dependencies
+    #[clap(short, long)]
+    pub deps: Vec<String>,
 
     /// Directory where to place assembled code.
     #[clap(short, long, default_value = "")]
@@ -38,18 +44,26 @@ pub struct Options {
 }
 
 /// Assembles source as specified by options.
-pub fn run<W>(error_writer: &mut W) -> anyhow::Result<()>
+pub fn run<W>(options: Options, error_writer: &mut W) -> anyhow::Result<()>
 where
     W: Write + WriteColor,
 {
-    let options = Options::parse();
     if options.inputs.len() != 1 {
         bail!("expected exactly one file name for the assembler source")
     }
     let input_path = options.inputs.first().unwrap();
     let input = fs::read_to_string(input_path)?;
 
-    let result = match assemble(&options, &input) {
+    let context_modules = options
+        .deps
+        .iter()
+        .map(|file| {
+            let bytes = fs::read(file).map_err(|e| anyhow!(e))?;
+            CompiledModule::deserialize(&bytes).map_err(|e| anyhow!(e))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    let result = match assemble(&options, &input, context_modules.iter()) {
         Ok(x) => x,
         Err(diags) => {
             let diag_file = SimpleFile::new(&input_path, &input);
@@ -82,17 +96,20 @@ where
     Ok(())
 }
 
-pub fn assemble(
+pub fn assemble<'a>(
     options: &Options,
     input: &str,
-) -> AsmResult<Either<CompiledModule, CompiledScript>> {
+    context_modules: impl Iterator<Item = &'a CompiledModule>,
+) -> AsmResult<ModuleOrScript> {
     let ast = syntax::parse_asm(input)?;
-    let result = compiler::compile(
-        options.module_builder_options.clone(),
-        std::iter::empty(),
-        ast,
-    )?;
-    Ok(result)
+    assembler::compile(options.module_builder_options.clone(), context_modules, ast)
+}
+
+pub fn diag_to_string(file_name: &str, source: &str, diags: Vec<Diag>) -> String {
+    let files = SimpleFile::new(file_name, source);
+    let mut error_writer = termcolor::Buffer::no_color();
+    report_diags(&mut error_writer, &files, diags);
+    String::from_utf8_lossy(&error_writer.into_inner()).to_string()
 }
 
 pub(crate) fn report_diags<'a, W: Write + WriteColor>(

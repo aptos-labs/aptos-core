@@ -20,10 +20,10 @@ move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
 
 [dev-dependencies]
-datatest-stable = { workspace = true }
-move-disassembler = { workspace = true }
-move-ir-types = { workspace = true } # Because of Loc...
-move-prover-test-utils = { workspace = true }
+itertools = { workspace = true }
+libtest-mimic = { workspace = true }
+move-transactional-test-runner = { workspace = true }
+walkdir = { workspace = true }
 
 [features]
 default = []

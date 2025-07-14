@@ -11880,14 +11880,14 @@ dependencies = [
  "clap 4.5.21",
  "codespan",
  "codespan-reporting",
- "datatest-stable",
  "either",
+ "itertools 0.13.0",
+ "libtest-mimic",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
- "move-disassembler",
- "move-ir-types",
- "move-prover-test-utils",
+ "move-transactional-test-runner",
+ "walkdir",
 ]
 
 [[package]]
@@ -12597,7 +12597,9 @@ dependencies = [
  "clap 4.5.21",
  "datatest-stable",
  "difference",
+ "either",
  "legacy-move-compiler",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
