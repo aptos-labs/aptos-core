@@ -3,17 +3,11 @@
 #
 # On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
 
-name: "replay-verify-on-archive"
+name: "Replay-verify on archive: Mainnet"
 on:
   # Allow triggering manually
   workflow_dispatch:
     inputs:
-      NETWORK:
-        required: true
-        type: choice
-        options: [testnet, mainnet, all]
-        default: all
-        description: The chain name to test. If not specified, it will test both testnet and mainnet.
       IMAGE_TAG:
         required: false
         type: string
@@ -21,17 +15,17 @@ on:
       START_VERSION:
         required: false
         type: string
-        description: Optional version to start replaying. If not specified, replay-verify will determines start version itself.
+        description: Optional version to start replaying. If not specified, replay-verify will determine start version itself.
       END_VERSION:
         required: false
         type: string
-        description: Optional version to end replaying. If not specified, replay-verify will determines end version itself.
+        description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
   pull_request:
     paths:
-      - ".github/workflows/replay-verify.yaml"
+      - ".github/workflows/replay-verify-mainnet.yaml"
       - ".github/workflows/workflow-run-replay-verify-on-archive.yaml"
   schedule:
-    - cron: "0 8 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 08:00
+    - cron: "0 10 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 10:00
 
 permissions:
   contents: read
@@ -55,23 +49,9 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-  replay-testnet:
+  replay:
     if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'testnet' || inputs.NETWORK == 'all')
-    needs: determine-test-metadata
-    uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
-    secrets: inherit
-    with:
-      NETWORK: "testnet"
-      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-      START_VERSION: ${{ inputs.START_VERSION }}
-      END_VERSION: ${{ inputs.END_VERSION }}
-
-  replay-mainnet:
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'mainnet' || inputs.NETWORK == 'all' )
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
     secrets: inherit
