@@ -18,8 +18,9 @@ use anyhow::Result;
 use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
+        hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
+        StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -279,6 +280,47 @@ impl TStateView for CachedStateView {
 
     fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    fn contains_hot_state_value(&self, state_key: &StateKey) -> bool {
+        if let Some(slot) = self.speculative.get_state_slot(state_key) {
+            return slot.is_hot();
+        }
+
+        self.hot.get_state_slot(state_key).is_some()
+    }
+
+    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.speculative.num_free_hot_slots()
+    }
+
+    fn get_shard_id(&self, state_key: &StateKey) -> usize {
+        state_key.get_shard_id()
+    }
+
+    fn get_next_old_key(
+        &self,
+        shard_id: usize,
+        state_key: Option<&StateKey>,
+    ) -> Option<Option<StateKey>> {
+        let key = match state_key {
+            Some(k) => {
+                assert_eq!(k.get_shard_id(), shard_id);
+                k
+            },
+            None => return Some(self.speculative.get_oldest_key(shard_id)),
+        };
+
+        // Most likely the slot we get from `self.speculative` is hot. However, this is not
+        // garanteend because there could be rules like values larger than X KB do not go into hot
+        // state.
+        if let Some(slot) = self.speculative.get_state_slot(key) {
+            slot.is_hot().then(|| slot.next().cloned())
+        } else if let Some(slot) = self.hot.get_state_slot(key) {
+            slot.is_hot().then(|| slot.next().cloned())
+        } else {
+            None
+        }
     }
 }
 
