@@ -30,6 +30,23 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 
+#[derive(Clone, Debug)]
+pub struct HotStateMetadata {
+    pub latest: Option<StateKey>,
+    pub oldest: Option<StateKey>,
+    pub num_items: usize,
+}
+
+impl HotStateMetadata {
+    fn new() -> Self {
+        Self {
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
+
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
 #[derive(Clone, Debug)]
@@ -41,6 +58,7 @@ pub struct State {
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    pub(crate) hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -49,11 +67,13 @@ impl State {
     pub fn new_with_updates(
         version: Option<Version>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_metadata,
             usage,
         }
     }
@@ -62,6 +82,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
+            arr![HotStateMetadata::new(); 16],
             usage,
         )
     }
@@ -149,7 +170,8 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        let hot_state_metadata = arr![HotStateMetadata::new(); 16];
+        State::new_with_updates(updates.last_version(), shards, hot_state_metadata, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
