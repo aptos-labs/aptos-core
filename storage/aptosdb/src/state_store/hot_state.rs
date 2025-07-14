@@ -7,10 +7,10 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_view::hot_state_view::HotStateView, NUM_STATE_SHARDS,
+    state::State, state_view::hot_state_view::HotStateView,
 };
 use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
 };
 use arr_macro::arr;
 use dashmap::{
