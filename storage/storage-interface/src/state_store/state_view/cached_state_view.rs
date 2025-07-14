@@ -95,7 +95,7 @@ pub struct CachedStateView {
     speculative: StateDelta,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
-    hot: Arc<dyn HotStateView>,
+    pub hot: Arc<dyn HotStateView>,
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
@@ -248,6 +248,28 @@ impl CachedStateView {
     pub fn memorized_reads(&self) -> &ShardedStateCache {
         &self.memorized
     }
+
+    /*
+    pub(crate) fn get_hot_lru_entry_question(
+        &self,
+        state_key: &StateKey,
+    ) -> Option<LRUEntry<StateKey>> {
+        match self.speculative.get_lru_entry(state_key) {
+            Some(SpeculativeLRUEntry::Existing(entry)) => return Some(entry),
+            Some(SpeculativeLRUEntry::Deleted) => return None,
+            None => (),
+        }
+        self.hot.get_lru_entry(state_key)
+    }
+
+    pub(crate) fn get_lru_head(&self) -> Option<StateKey> {
+        self.speculative.get_newest_key()
+    }
+
+    pub(crate) fn get_lru_tail(&self) -> Option<StateKey> {
+        self.speculative.get_oldest_key()
+    }
+    */
 }
 
 impl TStateView for CachedStateView {
@@ -279,6 +301,42 @@ impl TStateView for CachedStateView {
 
     fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.speculative.num_free_hot_slots()
+    }
+
+    fn get_shard_id(&self, state_key: &StateKey) -> usize {
+        state_key.get_shard_id()
+    }
+
+    fn contains_hot_state_value(&self, state_key: &StateKey) -> bool {
+        if self.speculative.hot_state_contains(state_key) {
+            return true;
+        }
+
+        self.hot.get_state_slot(state_key).is_some()
+    }
+
+    fn get_next_old_key(&self, shard_id: usize, state_key: Option<&StateKey>) -> Option<StateKey> {
+        let key = match state_key {
+            Some(k) => {
+                assert_eq!(k.get_shard_id(), shard_id);
+                k
+            },
+            None => return self.speculative.get_oldest_key(shard_id),
+        };
+
+        let slot = if let Some(slot) = self.speculative.get_state_slot(key) {
+            slot
+        } else if let Some(slot) = self.hot.get_state_slot(key) {
+            slot
+        } else {
+            unreachable!();
+        };
+        assert!(slot.is_hot());
+        slot.next().cloned()
     }
 }
 
