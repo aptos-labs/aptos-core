@@ -11,7 +11,6 @@ use crate::{
             hot_state_view::HotStateView,
         },
         versioned_state_value::StateUpdateRef,
-        NUM_STATE_SHARDS,
     },
     DbReader,
 };
@@ -21,7 +20,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        StateViewId,
+        StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
