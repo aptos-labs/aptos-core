@@ -17,7 +17,7 @@ use crate::{
         ContinuouslyStreamTransactionOutputsRequest, GetAllEpochEndingLedgerInfosRequest,
         GetAllStatesRequest, GetAllTransactionsRequest, StreamRequest,
     },
-    tests::utils::{create_ledger_info, create_transaction_list_with_proof},
+    tests::{utils, utils::create_ledger_info},
 };
 use aptos_config::config::DataStreamingServiceConfig;
 use aptos_crypto::HashValue;
@@ -31,8 +31,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionListWithProof,
+        TransactionListWithProofV2, TransactionOutput, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -233,12 +234,9 @@ fn create_missing_data_request_transactions() {
     let transactions = (start_version..last_response_version + 1)
         .map(|_| create_test_transaction())
         .collect::<Vec<_>>();
-    let response_payload = ResponsePayload::TransactionsWithProof(TransactionListWithProof {
-        transactions,
-        events: None,
-        first_transaction_version: Some(start_version),
-        proof: TransactionInfoListWithProof::new_empty(),
-    });
+    let transaction_list_with_proof =
+        create_transaction_list_with_proof(start_version, transactions);
+    let response_payload = ResponsePayload::TransactionsWithProof(transaction_list_with_proof);
 
     // Create the missing data request and verify that it's valid
     let missing_data_request =
@@ -257,12 +255,9 @@ fn create_missing_data_request_transactions() {
     let transactions = (start_version..last_response_version + 1)
         .map(|_| create_test_transaction())
         .collect::<Vec<_>>();
-    let response_payload = ResponsePayload::TransactionsWithProof(TransactionListWithProof {
-        transactions,
-        events: None,
-        first_transaction_version: Some(start_version),
-        proof: TransactionInfoListWithProof::new_empty(),
-    });
+    let transaction_list_with_proof =
+        create_transaction_list_with_proof(start_version, transactions);
+    let response_payload = ResponsePayload::TransactionsWithProof(transaction_list_with_proof);
 
     // Create the missing data request and verify that it's empty
     let missing_data_request =
@@ -287,12 +282,9 @@ fn create_missing_data_request_transaction_outputs() {
     let transactions_and_outputs = (start_version..last_response_version + 1)
         .map(|_| (create_test_transaction(), create_test_transaction_output()))
         .collect::<Vec<_>>();
-    let response_payload =
-        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProof {
-            transactions_and_outputs,
-            proof: TransactionInfoListWithProof::new_empty(),
-            first_transaction_output_version: Some(start_version),
-        });
+    let output_list_with_proof =
+        create_output_list_with_proof(transactions_and_outputs, start_version);
+    let response_payload = ResponsePayload::TransactionOutputsWithProof(output_list_with_proof);
 
     // Create the missing data request and verify that it's valid
     let missing_data_request =
@@ -310,12 +302,9 @@ fn create_missing_data_request_transaction_outputs() {
     let transactions_and_outputs = (start_version..last_response_version + 1)
         .map(|_| (create_test_transaction(), create_test_transaction_output()))
         .collect::<Vec<_>>();
-    let response_payload =
-        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProof {
-            transactions_and_outputs,
-            proof: TransactionInfoListWithProof::new_empty(),
-            first_transaction_output_version: Some(start_version),
-        });
+    let output_list_with_proof =
+        create_output_list_with_proof(transactions_and_outputs, start_version);
+    let response_payload = ResponsePayload::TransactionOutputsWithProof(output_list_with_proof);
 
     // Create the missing data request and verify that it's empty
     let missing_data_request =
@@ -341,24 +330,18 @@ fn create_missing_data_request_transactions_or_outputs() {
     let transactions = (start_version..last_response_version + 1)
         .map(|_| create_test_transaction())
         .collect::<Vec<_>>();
+    let transaction_list_with_proof =
+        create_transaction_list_with_proof(start_version, transactions);
     let response_payload_with_transactions =
-        ResponsePayload::TransactionsWithProof(TransactionListWithProof {
-            transactions,
-            events: None,
-            first_transaction_version: Some(start_version),
-            proof: TransactionInfoListWithProof::new_empty(),
-        });
-
+        ResponsePayload::TransactionsWithProof(transaction_list_with_proof);
     // Create a partial response payload with transaction outputs
     let transactions_and_outputs = (start_version..last_response_version + 1)
         .map(|_| (create_test_transaction(), create_test_transaction_output()))
         .collect::<Vec<_>>();
+    let output_list_with_proof =
+        create_output_list_with_proof(transactions_and_outputs, start_version);
     let response_payload_with_transaction_outputs =
-        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProof {
-            transactions_and_outputs,
-            proof: TransactionInfoListWithProof::new_empty(),
-            first_transaction_output_version: Some(start_version),
-        });
+        ResponsePayload::TransactionOutputsWithProof(output_list_with_proof);
 
     // Create the missing data requests and verify that they are valid
     for response_payload in [
@@ -383,24 +366,19 @@ fn create_missing_data_request_transactions_or_outputs() {
     let transactions = (start_version..last_response_version + 1)
         .map(|_| create_test_transaction())
         .collect::<Vec<_>>();
+    let transaction_list_with_proof =
+        create_transaction_list_with_proof(start_version, transactions);
     let response_payload_with_transactions =
-        ResponsePayload::TransactionsWithProof(TransactionListWithProof {
-            transactions,
-            events: None,
-            first_transaction_version: Some(start_version),
-            proof: TransactionInfoListWithProof::new_empty(),
-        });
+        ResponsePayload::TransactionsWithProof(transaction_list_with_proof);
 
     // Create a complete response payload with transaction outputs
     let transactions_and_outputs = (start_version..last_response_version + 1)
         .map(|_| (create_test_transaction(), create_test_transaction_output()))
         .collect::<Vec<_>>();
+    let output_list_with_proof =
+        create_output_list_with_proof(transactions_and_outputs, start_version);
     let response_payload_with_transaction_outputs =
-        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProof {
-            transactions_and_outputs,
-            proof: TransactionInfoListWithProof::new_empty(),
-            first_transaction_output_version: Some(start_version),
-        });
+        ResponsePayload::TransactionOutputsWithProof(output_list_with_proof);
 
     // Create the missing data requests and verify that they are empty
     for response_payload in [
@@ -699,7 +677,7 @@ fn transform_transactions_stream_notifications() {
 
     // Create an empty client response
     let client_response_payload =
-        ResponsePayload::TransactionsWithProof(TransactionListWithProof::new_empty());
+        ResponsePayload::TransactionsWithProof(TransactionListWithProofV2::new_empty());
 
     // Transform the client response into a notification and verify an error is returned
     let _ = stream_engine
@@ -713,7 +691,7 @@ fn transform_transactions_stream_notifications() {
     // Create a partial client response
     let last_version = end_version - 50;
     let transactions_with_proof =
-        create_transaction_list_with_proof(start_version, last_version, true);
+        utils::create_transaction_list_with_proof(start_version, last_version, true);
     let client_response_payload =
         ResponsePayload::TransactionsWithProof(transactions_with_proof.clone());
 
@@ -806,7 +784,7 @@ fn transform_continuous_outputs_stream_notifications() {
 
     // Create an empty client response
     let client_response_payload =
-        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProof::new_empty());
+        ResponsePayload::TransactionOutputsWithProof(TransactionOutputListWithProofV2::new_empty());
 
     // Transform the client response into a notification and verify an error is returned
     let _ = stream_engine
@@ -822,13 +800,10 @@ fn transform_continuous_outputs_stream_notifications() {
     let transactions_and_outputs = (known_version..last_version + 1)
         .map(|_| (create_test_transaction(), create_test_transaction_output()))
         .collect::<Vec<_>>();
-    let transaction_outputs_with_proof = TransactionOutputListWithProof {
-        transactions_and_outputs,
-        proof: TransactionInfoListWithProof::new_empty(),
-        first_transaction_output_version: Some(known_version),
-    };
+    let output_list_with_proof =
+        create_output_list_with_proof(transactions_and_outputs, known_version);
     let client_response_payload =
-        ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof.clone());
+        ResponsePayload::TransactionOutputsWithProof(output_list_with_proof);
 
     // Transform the client response into a notification
     let data_client_request =
@@ -859,6 +834,19 @@ fn transform_continuous_outputs_stream_notifications() {
 /// Returns a simple notification ID generator for testing purposes
 fn create_notification_id_generator() -> Arc<U64IdGenerator> {
     Arc::new(U64IdGenerator::new())
+}
+
+/// Creates an output list with proof for testing purposes
+fn create_output_list_with_proof(
+    transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
+    start_version: Version,
+) -> TransactionOutputListWithProofV2 {
+    let output_list_with_proof = TransactionOutputListWithProof {
+        transactions_and_outputs,
+        proof: TransactionInfoListWithProof::new_empty(),
+        first_transaction_output_version: Some(start_version),
+    };
+    TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof)
 }
 
 /// Returns a state value chunk with proof for testing purposes
@@ -898,4 +886,18 @@ fn create_test_transaction_output() -> TransactionOutput {
         TransactionStatus::Retry,
         TransactionAuxiliaryData::default(),
     )
+}
+
+/// Creates a transaction list with proof for testing purposes
+fn create_transaction_list_with_proof(
+    start_version: Version,
+    transactions: Vec<Transaction>,
+) -> TransactionListWithProofV2 {
+    let transaction_list_with_proof = TransactionListWithProof {
+        transactions,
+        events: None,
+        first_transaction_version: Some(start_version),
+        proof: TransactionInfoListWithProof::new_empty(),
+    };
+    TransactionListWithProofV2::new_from_v1(transaction_list_with_proof)
 }

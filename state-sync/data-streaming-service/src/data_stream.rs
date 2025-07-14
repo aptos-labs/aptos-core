@@ -555,8 +555,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // Get the highest version sent in the subscription response
         let highest_response_version = match response_payload {
             ResponsePayload::NewTransactionsWithProof((transactions_with_proof, _)) => {
-                if let Some(first_version) = transactions_with_proof.first_transaction_version {
-                    let num_transactions = transactions_with_proof.transactions.len();
+                if let Some(first_version) = transactions_with_proof.get_first_transaction_version()
+                {
+                    let num_transactions = transactions_with_proof.get_num_transactions();
                     first_version
                         .saturating_add(num_transactions as u64)
                         .saturating_sub(1) // first_version + num_txns - 1
@@ -567,8 +568,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 }
             },
             ResponsePayload::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
-                if let Some(first_version) = outputs_with_proof.first_transaction_output_version {
-                    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                if let Some(first_version) = outputs_with_proof.get_first_output_version() {
+                    let num_outputs = outputs_with_proof.get_num_outputs();
                     first_version
                         .saturating_add(num_outputs as u64)
                         .saturating_sub(1) // first_version + num_outputs - 1
@@ -1165,7 +1166,7 @@ fn create_missing_transactions_request(
     match response_payload {
         ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
             // Check if the request was satisfied
-            let num_received_transactions = transactions_with_proof.transactions.len() as u64;
+            let num_received_transactions = transactions_with_proof.get_num_transactions() as u64;
             if num_received_transactions < num_requested_transactions {
                 let start_version = request
                     .start_version
@@ -1210,9 +1211,7 @@ fn create_missing_transaction_outputs_request(
     match response_payload {
         ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
             // Check if the request was satisfied
-            let num_received_outputs = transaction_outputs_with_proof
-                .transactions_and_outputs
-                .len() as u64;
+            let num_received_outputs = transaction_outputs_with_proof.get_num_outputs() as u64;
             if num_received_outputs < num_requested_outputs {
                 let start_version = request
                     .start_version
@@ -1257,12 +1256,10 @@ fn create_missing_transactions_or_outputs_request(
     // Calculate the number of received data items
     let num_received_data_items = match response_payload {
         ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-            transactions_with_proof.transactions.len() as u64
+            transactions_with_proof.get_num_transactions() as u64
         },
         ResponsePayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
-            transaction_outputs_with_proof
-                .transactions_and_outputs
-                .len() as u64
+            transaction_outputs_with_proof.get_num_outputs() as u64
         },
         payload => {
             return Err(Error::AptosDataClientResponseIsInvalid(format!(
@@ -1510,8 +1507,6 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
     })
 }
 
-// TODO: don't drop the v2 response info!
-
 async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: StateValuesWithProofRequest,
@@ -1555,16 +1550,9 @@ async fn get_new_transaction_outputs_with_proof<
         request.known_epoch,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, (output_list_with_proof_v2, ledger_info_with_signatures)) =
-            response.into_parts();
-        let output_list_with_proof = output_list_with_proof_v2.get_output_list_with_proof();
-        let response_v1 = Response::new(
-            context,
-            (output_list_with_proof.clone(), ledger_info_with_signatures),
-        );
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn get_new_transactions_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
@@ -1578,20 +1566,9 @@ async fn get_new_transactions_with_proof<T: AptosDataClientInterface + Send + Cl
         request.include_events,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, (transaction_list_with_proof_v2, ledger_info_with_signatures)) =
-            response.into_parts();
-        let transaction_list_with_proof =
-            transaction_list_with_proof_v2.get_transaction_list_with_proof();
-        let response_v1 = Response::new(
-            context,
-            (
-                transaction_list_with_proof.clone(),
-                ledger_info_with_signatures,
-            ),
-        );
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn get_new_transactions_or_outputs_with_proof<
@@ -1607,22 +1584,8 @@ async fn get_new_transactions_or_outputs_with_proof<
         request.include_events,
         request_timeout_ms,
     );
-    let (
-        context,
-        ((transaction_list_with_proof_v2, output_list_with_proof_v2), ledger_info_with_signatures),
-    ) = client_response.await?.into_parts();
-    let transaction_or_output_list_with_proof = (
-        transaction_list_with_proof_v2.map(|t| t.get_transaction_list_with_proof().clone()),
-        output_list_with_proof_v2.map(|o| o.get_output_list_with_proof().clone()),
-    );
-    let payload_v1 = (
-        transaction_or_output_list_with_proof,
-        ledger_info_with_signatures,
-    );
-    Ok(Response::new(
-        context,
-        ResponsePayload::try_from(payload_v1)?,
-    ))
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
 async fn get_number_of_states<T: AptosDataClientInterface + Send + Clone + 'static>(
@@ -1650,12 +1613,9 @@ async fn get_transaction_outputs_with_proof<
         request.end_version,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, output_list_with_proof_v2) = response.into_parts();
-        let output_list_with_proof = output_list_with_proof_v2.get_output_list_with_proof();
-        let response_v1 = Response::new(context, output_list_with_proof.clone());
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn get_transactions_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
@@ -1670,13 +1630,9 @@ async fn get_transactions_with_proof<T: AptosDataClientInterface + Send + Clone 
         request.include_events,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, transaction_list_with_proof_v2) = response.into_parts();
-        let transaction_list_with_proof =
-            transaction_list_with_proof_v2.get_transaction_list_with_proof();
-        let response_v1 = Response::new(context, transaction_list_with_proof.clone());
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn get_transactions_or_outputs_with_proof<
@@ -1693,16 +1649,8 @@ async fn get_transactions_or_outputs_with_proof<
         request.include_events,
         request_timeout_ms,
     );
-    let (context, (transaction_list_with_proof_v2, output_list_with_proof_v2)) =
-        client_response.await?.into_parts();
-    let payload_v1 = (
-        transaction_list_with_proof_v2.map(|t| t.get_transaction_list_with_proof().clone()),
-        output_list_with_proof_v2.map(|o| o.get_output_list_with_proof().clone()),
-    );
-    Ok(Response::new(
-        context,
-        ResponsePayload::try_from(payload_v1)?,
-    ))
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
 async fn subscribe_to_transactions_with_proof<
@@ -1723,20 +1671,9 @@ async fn subscribe_to_transactions_with_proof<
         request.include_events,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, (transaction_list_with_proof_v2, ledger_info_with_signatures)) =
-            response.into_parts();
-        let transaction_list_with_proof =
-            transaction_list_with_proof_v2.get_transaction_list_with_proof();
-        let response_v1 = Response::new(
-            context,
-            (
-                transaction_list_with_proof.clone(),
-                ledger_info_with_signatures,
-            ),
-        );
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn subscribe_to_transaction_outputs_with_proof<
@@ -1756,16 +1693,9 @@ async fn subscribe_to_transaction_outputs_with_proof<
         subscription_request_metadata,
         request_timeout_ms,
     );
-    client_response.await.map(|response| {
-        let (context, (output_list_with_proof_v2, ledger_info_with_signatures)) =
-            response.into_parts();
-        let output_list_with_proof = output_list_with_proof_v2.get_output_list_with_proof();
-        let response_v1 = Response::new(
-            context,
-            (output_list_with_proof.clone(), ledger_info_with_signatures),
-        );
-        response_v1.map(ResponsePayload::from)
-    })
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }
 
 async fn subscribe_to_transactions_or_outputs_with_proof<
@@ -1786,22 +1716,8 @@ async fn subscribe_to_transactions_or_outputs_with_proof<
         request.include_events,
         request_timeout_ms,
     );
-    let (
-        context,
-        ((transaction_list_with_proof_v2, output_list_with_proof_v2), ledger_info_with_signatures),
-    ) = client_response.await?.into_parts();
-    let transaction_or_output_list_with_proof = (
-        transaction_list_with_proof_v2.map(|t| t.get_transaction_list_with_proof().clone()),
-        output_list_with_proof_v2.map(|o| o.get_output_list_with_proof().clone()),
-    );
-    let payload_v1 = (
-        transaction_or_output_list_with_proof,
-        ledger_info_with_signatures,
-    );
-    Ok(Response::new(
-        context,
-        ResponsePayload::try_from(payload_v1)?,
-    ))
+    let (context, payload) = client_response.await?.into_parts();
+    Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
 #[cfg(test)]

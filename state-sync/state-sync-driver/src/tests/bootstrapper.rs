@@ -28,7 +28,7 @@ use aptos_data_streaming_service::{
 };
 use aptos_time_service::TimeService;
 use aptos_types::{
-    transaction::{TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
@@ -401,7 +401,9 @@ async fn test_data_stream_state_values() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
+        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProofV2::new_from_v1(
+            create_output_list_with_proof(),
+        )),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 
@@ -473,7 +475,9 @@ async fn test_data_stream_transactions() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
+        DataPayload::TransactionsWithProof(TransactionListWithProofV2::new_from_v1(
+            create_transaction_list_with_proof(),
+        )),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 
@@ -545,7 +549,7 @@ async fn test_data_stream_transaction_outputs() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProof::new_empty()),
+        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProofV2::new_empty()),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 
@@ -1230,7 +1234,7 @@ async fn test_snapshot_sync_existing_state() {
     // Send an invalid notification (incorrect data type)
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
+        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProofV2::new_empty()),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 

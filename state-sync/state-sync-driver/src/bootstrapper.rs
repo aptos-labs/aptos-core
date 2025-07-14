@@ -620,14 +620,19 @@ impl<
                     .await?;
                 },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
                     );
                     self.process_transaction_or_output_payload(
                         notification_metadata,
-                        Some(transactions_with_proof),
+                        Some(
+                            transactions_with_proof
+                                .get_transaction_list_with_proof()
+                                .clone(),
+                        ),
                         None,
                         payload_start_version,
                     )
@@ -635,7 +640,7 @@ impl<
                 },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -643,7 +648,11 @@ impl<
                     self.process_transaction_or_output_payload(
                         notification_metadata,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(
+                            transaction_outputs_with_proof
+                                .get_output_list_with_proof()
+                                .clone(),
+                        ),
                         payload_start_version,
                     )
                     .await?;

@@ -345,10 +345,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
                 let output_list_with_proof_v2 = transaction_data_with_proof
                     .transaction_output_list_with_proof
                     .unwrap();
-                output_list_with_proof_v2
-                    .get_output_list_with_proof()
-                    .transactions_and_outputs
-                    .len() as u64
+                output_list_with_proof_v2.get_num_outputs() as u64
             },
             _ => panic!("Expected outputs with proof but got: {:?}", response),
         };

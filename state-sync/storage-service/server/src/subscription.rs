@@ -503,10 +503,7 @@ impl SubscriptionStreamRequests {
                         if let Some(transaction_list_with_proof_v2) =
                             &response.transaction_list_with_proof
                         {
-                            transaction_list_with_proof_v2
-                                .get_transaction_list_with_proof()
-                                .transactions
-                                .len()
+                            transaction_list_with_proof_v2.get_num_transactions()
                         } else {
                             return Err(Error::UnexpectedErrorEncountered(format!(
                                 "Transaction data response is missing transaction list: {:?}",
@@ -518,10 +515,7 @@ impl SubscriptionStreamRequests {
                         if let Some(output_list_with_proof_v2) =
                             &response.transaction_output_list_with_proof
                         {
-                            output_list_with_proof_v2
-                                .get_output_list_with_proof()
-                                .transactions_and_outputs
-                                .len()
+                            output_list_with_proof_v2.get_num_outputs()
                         } else {
                             return Err(Error::UnexpectedErrorEncountered(format!(
                                 "Transaction output data response is missing output list: {:?}",
