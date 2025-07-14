@@ -32,7 +32,6 @@ use aptos_types::{
     transaction::Version,
 };
 use arr_macro::arr;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -156,11 +155,7 @@ impl StateKvDb {
     }
 
     pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch {
-        (0..NUM_STATE_SHARDS)
-            .map(|shard_id| self.db_shard(shard_id).new_native_batch())
-            .collect_vec()
-            .try_into()
-            .expect("known to be 16 shards")
+        std::array::from_fn(|shard_id| self.db_shard(shard_id).new_native_batch())
     }
 
     pub(crate) fn commit(
