@@ -9,8 +9,10 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
-use aptos_types::state_store::hot_state::{
-    HOT_STATE_MAX_BYTES, HOT_STATE_MAX_ITEMS, HOT_STATE_MAX_SINGLE_VALUE_BYTES,
+use aptos_types::state_store::{
+    hot_state::{HOT_STATE_MAX_BYTES, HOT_STATE_MAX_ITEMS, HOT_STATE_MAX_SINGLE_VALUE_BYTES},
+    state_key::StateKey,
+    state_slot::StateSlot,
 };
 use std::sync::Arc;
 

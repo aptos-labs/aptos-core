@@ -63,6 +63,12 @@ impl StateDelta {
         self.shards[state_key.get_shard_id()].get(state_key)
     }
 
+    /*
+    pub fn num_hot_items(&self) -> usize {
+        self.current.hot_state_metadata.num_items
+    }
+    */
+
     pub fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
         let mut ret = [0; NUM_STATE_SHARDS];
         for i in 0..NUM_STATE_SHARDS {
@@ -70,6 +76,13 @@ impl StateDelta {
             ret[i] = HOT_STATE_MAX_ITEMS - self.current.hot_state_metadata[i].num_items
         }
         ret
+    }
+
+    pub fn hot_state_contains(&self, state_key: &StateKey) -> bool {
+        match self.get_state_slot(state_key) {
+            Some(slot) => slot.is_hot(),
+            None => false,
+        }
     }
 
     pub fn get_oldest_key(&self, shard_id: usize) -> Option<StateKey> {

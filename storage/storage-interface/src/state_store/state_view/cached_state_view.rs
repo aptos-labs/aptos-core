@@ -96,7 +96,7 @@ pub struct CachedStateView {
     speculative: StateDelta,
 
     /// Persisted hot state. To be fetched if a key isn't in `speculative`.
-    hot: Arc<dyn HotStateView>,
+    pub hot: Arc<dyn HotStateView>,
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
@@ -249,6 +249,28 @@ impl CachedStateView {
     pub fn memorized_reads(&self) -> &ShardedStateCache {
         &self.memorized
     }
+
+    /*
+    pub(crate) fn get_hot_lru_entry_question(
+        &self,
+        state_key: &StateKey,
+    ) -> Option<LRUEntry<StateKey>> {
+        match self.speculative.get_lru_entry(state_key) {
+            Some(SpeculativeLRUEntry::Existing(entry)) => return Some(entry),
+            Some(SpeculativeLRUEntry::Deleted) => return None,
+            None => (),
+        }
+        self.hot.get_lru_entry(state_key)
+    }
+
+    pub(crate) fn get_lru_head(&self) -> Option<StateKey> {
+        self.speculative.get_newest_key()
+    }
+
+    pub(crate) fn get_lru_tail(&self) -> Option<StateKey> {
+        self.speculative.get_oldest_key()
+    }
+    */
 }
 
 impl TStateView for CachedStateView {
