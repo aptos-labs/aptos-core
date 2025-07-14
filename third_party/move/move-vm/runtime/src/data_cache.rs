@@ -27,6 +27,81 @@ use move_vm_types::{
 };
 use std::collections::btree_map::{BTreeMap, Entry};
 
+enum LazyDeserializationValue {
+    Serialized(Option<Bytes>),
+    Deserialized(GlobalValue),
+}
+
+impl LazyDeserializationValue {
+    fn from_data(data: Option<Bytes>) -> Self {
+        Self::Serialized(data)
+    }
+
+    fn get_value_mut(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        addr: &AccountAddress,
+        layout: &MoveTypeLayout,
+        struct_tag: &StructTag,
+    ) -> PartialVMResult<&mut GlobalValue> {
+        match self {
+            Self::Deserialized(v) => Ok(v),
+            Self::Serialized(data) => {
+                let value = match data {
+                    Some(blob) => {
+                        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+                        let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                        let val = ValueSerDeContext::new(max_value_nest_depth)
+                            .with_func_args_deserialization(&function_value_extension)
+                            .with_delayed_fields_serde()
+                            .deserialize(&blob, layout)
+                            .ok_or_else(|| {
+                                let msg = format!(
+                                    "Failed to deserialize resource {} at {}!",
+                                    struct_tag.to_canonical_string(),
+                                    addr
+                                );
+                                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
+                                    .with_message(msg)
+                            })?;
+                        GlobalValue::cached(val)?
+                    },
+                    None => GlobalValue::none(),
+                };
+                *self = Self::Deserialized(value);
+                match self {
+                    Self::Deserialized(v) => Ok(v),
+                    Self::Serialized(_) => Err(PartialVMError::new_invariant_violation("Value must be deserialized")),
+                }
+            }
+        }
+    }
+
+    fn get_value(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        addr: &AccountAddress,
+        layout: &MoveTypeLayout,
+        struct_tag: &StructTag,
+    ) -> PartialVMResult<&GlobalValue> {
+        self.get_value_mut(module_storage, addr, layout, struct_tag).map(|v| &*v)
+    }
+
+    fn into_value(
+        mut self,
+        module_storage: &dyn ModuleStorage,
+        addr: &AccountAddress,
+        layout: &MoveTypeLayout,
+        struct_tag: &StructTag,
+    ) -> PartialVMResult<GlobalValue> {
+        let _ = self.get_value(module_storage, addr, layout, struct_tag)?;
+        match self {
+            Self::Deserialized(v) => Ok(v),
+            Self::Serialized(_) => Err(PartialVMError::new_invariant_violation("Value must be deserialized")),
+        }
+    }
+}
+
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
@@ -34,12 +109,23 @@ pub(crate) struct DataCacheEntry {
     struct_tag: StructTag,
     layout: MoveTypeLayout,
     contains_delayed_fields: bool,
-    value: GlobalValue,
+    value: LazyDeserializationValue,
 }
 
 impl DataCacheEntry {
-    pub(crate) fn value(&self) -> &GlobalValue {
-        &self.value
+    pub(crate) fn value(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        addr: &AccountAddress,
+    ) -> PartialVMResult<&GlobalValue> {
+        self.value.get_value(module_storage, addr, &self.layout, &self.struct_tag)
+    }
+
+    pub(crate) fn exists(&self) -> PartialVMResult<bool> {
+        match &self.value {
+            LazyDeserializationValue::Deserialized(v) => v.exists(),
+            LazyDeserializationValue::Serialized(data) => Ok(data.is_some()),
+        }
     }
 }
 
@@ -87,7 +173,7 @@ impl TransactionDataCache {
                             .with_message(format!("Error when serializing resource {}.", value))
                     })
             };
-        self.into_custom_effects(&resource_converter)
+        self.into_custom_effects(&resource_converter, module_storage)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
@@ -95,6 +181,7 @@ impl TransactionDataCache {
     pub fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        module_storage: &dyn ModuleStorage
     ) -> PartialVMResult<Changes<Resource>> {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
@@ -106,7 +193,7 @@ impl TransactionDataCache {
                     contains_delayed_fields,
                     value,
                 } = entry;
-                if let Some(op) = value.into_effect_with_layout(layout) {
+                if let Some(op) = value.into_value(module_storage, &addr, &layout, &struct_tag)?.into_effect_with_layout(layout) {
                     resources.insert(
                         struct_tag,
                         op.and_then(|(value, layout)| {
@@ -168,39 +255,17 @@ impl TransactionDataCache {
             )?
         };
 
-        let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-        let value = match data {
-            Some(blob) => {
-                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
-                let val = ValueSerDeContext::new(max_value_nest_depth)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .with_delayed_fields_serde()
-                    .deserialize(&blob, &layout)
-                    .ok_or_else(|| {
-                        let msg = format!(
-                            "Failed to deserialize resource {} at {}!",
-                            struct_tag.to_canonical_string(),
-                            addr
-                        );
-                        PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
-                            .with_message(msg)
-                    })?;
-                GlobalValue::cached(val)?
-            },
-            None => GlobalValue::none(),
-        };
-
         let entry = DataCacheEntry {
             struct_tag,
             layout,
             contains_delayed_fields,
-            value,
+            value: LazyDeserializationValue::from_data(data),
         };
         Ok((entry, NumBytes::new(bytes_loaded as u64)))
     }
 
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
-    /// state of the cache does not chang when calling this function.
+    /// state of the cache does not change when calling this function.
     pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
         self.account_map
             .get(addr)
@@ -227,16 +292,14 @@ impl TransactionDataCache {
         Ok(())
     }
 
-    /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
-    /// not exist in cache), an error is returned.
-    pub(crate) fn get_resource_mut(
+    fn get_entry_mut(
         &mut self,
         addr: &AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<&mut GlobalValue> {
+    ) -> PartialVMResult<&mut DataCacheEntry> {
         if let Some(account_cache) = self.account_map.get_mut(addr) {
             if let Some(entry) = account_cache.get_mut(ty) {
-                return Ok(&mut entry.value);
+                return Ok(entry);
             }
         }
 
@@ -244,5 +307,26 @@ impl TransactionDataCache {
         let err =
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
         Err(err)
+    }
+
+    /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
+    /// not exist in cache), an error is returned.
+    pub(crate) fn get_resource_mut(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+        module_storage: &dyn ModuleStorage,
+    ) -> PartialVMResult<&mut GlobalValue> {
+        let entry = self.get_entry_mut(addr, ty)?;
+        entry.value.get_value_mut(module_storage, addr, &entry.layout, &entry.struct_tag)
+    }
+
+    pub(crate) fn resource_exists(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<bool> {
+        let entry = self.get_entry_mut(addr, ty)?;
+        entry.exists()
     }
 }

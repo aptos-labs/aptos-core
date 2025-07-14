@@ -161,18 +161,18 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
         Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+            let (mut entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
                 self.module_storage,
                 self.resource_resolver,
                 &address,
                 ty,
             )?;
-            let exists = entry.value().exists()?;
+            let exists = entry.value(self.module_storage, &address)?.exists()?;
             self.data_store
                 .insert_resource(address, ty.clone(), entry)?;
             (exists, Some(bytes_loaded))
         } else {
-            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
+            let exists = self.data_store.get_resource_mut(&address, ty, self.module_storage)?.exists()?;
             (exists, None)
         })
     }

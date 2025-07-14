@@ -1088,7 +1088,7 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+        let (mut entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
             module_storage,
             resource_resolver,
             &addr,
@@ -1100,10 +1100,38 @@ where
                 ty,
                 runtime_environment: module_storage.runtime_environment(),
             },
-            entry.value().view(),
+            // None,
+            entry.value(
+                module_storage,
+                &addr,
+            )?.view(),
             bytes_loaded,
         )?;
         Ok(entry)
+    }
+
+    fn fetch_resource_if_needed<'c>(
+        &self,
+        data_cache: &'c mut TransactionDataCache,
+        resource_resolver: &impl ResourceResolver,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<()> {
+        if !data_cache.contains_resource(&addr, ty) {
+            let entry = self.create_and_charge_data_cache_entry(
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                addr,
+                ty,
+            )?;
+            data_cache.insert_resource(addr, ty.clone(), entry)?;
+        }
+        Ok(())
     }
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
@@ -1117,18 +1145,22 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        if !data_cache.contains_resource(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
-                resource_resolver,
-                module_storage,
-                gas_meter,
-                traversal_context,
-                addr,
-                ty,
-            )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
-        }
-        data_cache.get_resource_mut(&addr, ty)
+        self.fetch_resource_if_needed(data_cache, resource_resolver, module_storage, gas_meter, traversal_context, addr, ty)?;
+        data_cache.get_resource_mut(&addr, ty, module_storage)
+    }
+
+    fn check_resource_existence(
+        &self,
+        data_cache: &mut TransactionDataCache,
+        resource_resolver: &impl ResourceResolver,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<bool> {
+        self.fetch_resource_if_needed(data_cache, resource_resolver, module_storage, gas_meter, traversal_context, addr, ty)?;
+        data_cache.resource_exists(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1226,7 +1258,7 @@ where
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let gv = self.load_resource(
+        let exists = self.check_resource_existence(
             data_cache,
             resource_resolver,
             module_storage,
@@ -1235,7 +1267,6 @@ where
             addr,
             ty,
         )?;
-        let exists = gv.exists()?;
         gas_meter.charge_exists(
             is_generic,
             TypeWithRuntimeEnvironment {
