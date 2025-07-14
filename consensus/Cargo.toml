@@ -118,7 +118,7 @@ fuzzing = [
     "aptos-safety-rules/testing",
 ]
 failpoints = ["fail/failpoints"]
-consensus_fuzzer = []
+consensus-fuzzer = []
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]

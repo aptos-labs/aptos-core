@@ -21,7 +21,7 @@ aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
-aptos-consensus = { workspace = true, features = ["consensus_fuzzer"] }
+aptos-consensus = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
 aptos-crash-handler = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -96,7 +96,7 @@ assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-clone
 check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
 default = []
-consensus_fuzzer = ["aptos-consensus/consensus_fuzzer", "rapture"]
+consensus-fuzzer = ["aptos-consensus/consensus-fuzzer", "rapture"]
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
 indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
