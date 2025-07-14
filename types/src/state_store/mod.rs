@@ -24,6 +24,8 @@ pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
 
+pub const NUM_STATE_SHARDS: usize = 16;
+
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;
 
 /// A trait that defines a read-only snapshot of the global state. It is passed to the VM for
@@ -76,6 +78,31 @@ pub trait TStateView {
     fn contains_state_value(&self, state_key: &Self::Key) -> StateViewResult<bool> {
         self.get_state_value(state_key).map(|opt| opt.is_some())
     }
+
+    /// Checks if a state keyed by the given state key exists in the hot state.
+    fn contains_hot_state_value(&self, _state_key: &Self::Key) -> bool {
+        false
+    }
+
+    /// Number of free slots in hot state.
+    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        [0; NUM_STATE_SHARDS]
+    }
+
+    fn get_shard_id(&self, _state_key: &Self::Key) -> usize {
+        unimplemented!();
+    }
+
+    /// Returns the oldest key in the hot state if `state_key` is `None`. Else returns the key
+    /// that's just a little bit newer, i.e. the next candidate for eviction.
+    /// NOTE: the given key (if not `None`) must exist in the hot state.
+    fn get_next_old_key(
+        &self,
+        _shard_id: usize,
+        _state_key: Option<&Self::Key>,
+    ) -> Option<Self::Key> {
+        unimplemented!();
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}
@@ -126,6 +153,26 @@ where
 
     fn get_state_value(&self, state_key: &K) -> StateViewResult<Option<StateValue>> {
         self.deref().get_state_value(state_key)
+    }
+
+    fn contains_hot_state_value(&self, state_key: &Self::Key) -> bool {
+        self.deref().contains_hot_state_value(state_key)
+    }
+
+    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.deref().num_free_hot_slots()
+    }
+
+    fn get_shard_id(&self, state_key: &Self::Key) -> usize {
+        self.deref().get_shard_id(state_key)
+    }
+
+    fn get_next_old_key(
+        &self,
+        shard_id: usize,
+        state_key: Option<&Self::Key>,
+    ) -> Option<Self::Key> {
+        self.deref().get_next_old_key(shard_id, state_key)
     }
 }
 
