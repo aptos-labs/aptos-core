@@ -125,7 +125,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
-        smp.network_interface.is_validator() && !smp.broadcast_within_validator_network();
+        smp.network_interface.is_validator() && (!smp.broadcast_within_validator_network() || !transaction.is_encrypted());
     let timeline_state = if ineligible_for_broadcast {
         TimelineState::NonQualified
     } else {
@@ -702,7 +702,9 @@ pub(crate) async fn process_config_update<V, P>(
     match consensus_config {
         Ok(consensus_config) => {
             *broadcast_within_validator_network.write() =
-                !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
+                // !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
+                // daniel todo: should only broadcast encrypted txns
+                true
         },
         Err(e) => {
             error!(
