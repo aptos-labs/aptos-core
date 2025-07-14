@@ -9,7 +9,9 @@ use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView, NUM_STATE_SHARDS,
 };
-use aptos_types::state_store::{hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot};
+use aptos_types::state_store::{
+    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+};
 use arr_macro::arr;
 use dashmap::{
     mapref::one::{Ref, RefMut},
@@ -23,17 +25,11 @@ use std::sync::{
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 
 #[derive(Debug)]
-struct Entry<K, V> {
-    data: V,
-    lru: LRUEntry<K>,
-}
-
-#[derive(Debug)]
 struct Shard<K, V>
 where
     K: Eq + std::hash::Hash,
 {
-    inner: DashMap<K, Entry<K, V>>,
+    inner: DashMap<K, V>,
 }
 
 impl<K, V> Shard<K, V>
@@ -50,19 +46,19 @@ where
         self.inner.contains_key(key)
     }
 
-    fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
+    fn get(&self, key: &K) -> Option<Ref<K, V>> {
         self.inner.get(key)
     }
 
-    fn get_mut(&self, key: &K) -> Option<RefMut<K, Entry<K, V>>> {
+    fn get_mut(&self, key: &K) -> Option<RefMut<K, V>> {
         self.inner.get_mut(key)
     }
 
-    fn insert(&self, key: K, entry: Entry<K, V>) {
-        self.inner.insert(key, entry);
+    fn insert(&self, key: K, value: V) {
+        self.inner.insert(key, value);
     }
 
-    fn remove(&self, key: &K) -> Option<(K, Entry<K, V>)> {
+    fn remove(&self, key: &K) -> Option<(K, V)> {
         self.inner.remove(key)
     }
 
@@ -103,7 +99,7 @@ where
         }
     }
 
-    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<K, Entry<K, V>>> {
+    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<K, V>> {
         self.shards[shard_id].get(key)
     }
 
@@ -115,14 +111,7 @@ where
 impl HotStateView for HotStateBase<StateKey, StateSlot> {
     fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
         let shard_id = state_key.get_shard_id();
-        self.get_from_shard(shard_id, state_key)
-            .map(|e| e.data.clone())
-    }
-
-    fn get_lru_entry(&self, state_key: &StateKey) -> Option<LRUEntry<StateKey>> {
-        let shard_id = state_key.get_shard_id();
-        self.get_from_shard(shard_id, state_key)
-            .map(|e| e.lru.clone())
+        self.get_from_shard(shard_id, state_key).map(|e| e.clone())
     }
 }
 
@@ -346,7 +335,7 @@ where
 impl<'a, K, V> LRUUpdater<'a, K, V>
 where
     K: Clone + std::fmt::Debug + Eq + std::hash::Hash,
-    V: Clone + std::fmt::Debug,
+    V: Clone + std::fmt::Debug + THotStateSlot<Key = K>,
 {
     fn new(
         shard: &'a Shard<K, V>,
@@ -385,38 +374,38 @@ where
             None => return None,
         };
 
-        match &old_entry.lru.prev {
+        match old_entry.prev() {
             Some(prev_key) => {
                 let mut prev_entry = self
                     .shard
                     .get_mut(prev_key)
                     .expect("The previous key must exist");
-                prev_entry.lru.next = old_entry.lru.next.clone();
+                prev_entry.set_next(old_entry.next().cloned());
             },
             None => {
                 // There is no newer entry. The current key was the head.
-                *self.head = old_entry.lru.next.clone();
+                *self.head = old_entry.next().cloned();
             },
         }
 
-        match &old_entry.lru.next {
+        match old_entry.next() {
             Some(next_key) => {
                 let mut next_entry = self
                     .shard
                     .get_mut(next_key)
                     .expect("The next key must exist.");
-                next_entry.lru.prev = old_entry.lru.prev;
+                next_entry.set_prev(old_entry.prev().cloned());
             },
             None => {
                 // There is no older entry. The current key was the tail.
-                *self.tail = old_entry.lru.prev;
+                *self.tail = old_entry.prev().cloned();
             },
         }
 
-        Some(old_entry.data)
+        Some(old_entry)
     }
 
-    fn insert_to_front(&mut self, key: K, value: V) {
+    fn insert_to_front(&mut self, key: K, mut value: V) {
         assert_eq!(self.head.is_some(), self.tail.is_some());
         match self.head.take() {
             Some(head) => {
@@ -424,27 +413,17 @@ where
                     // Release the reference to the old entry ASAP to avoid deadlock when inserting
                     // the new entry below.
                     let mut old_head_entry = self.shard.get_mut(&head).expect("Head must exist.");
-                    old_head_entry.lru.prev = Some(key.clone());
+                    old_head_entry.set_prev(Some(key.clone()));
                 }
-                let entry = Entry {
-                    data: value,
-                    lru: LRUEntry {
-                        prev: None,
-                        next: Some(head),
-                    },
-                };
-                self.shard.insert(key.clone(), entry);
+                value.set_prev(None);
+                value.set_next(Some(head));
+                self.shard.insert(key.clone(), value);
                 *self.head = Some(key);
             },
             None => {
-                let entry = Entry {
-                    data: value,
-                    lru: LRUEntry {
-                        prev: None,
-                        next: None,
-                    },
-                };
-                self.shard.insert(key.clone(), entry);
+                value.set_prev(None);
+                value.set_next(None);
+                self.shard.insert(key.clone(), value);
                 *self.head = Some(key.clone());
                 *self.tail = Some(key);
             },
@@ -477,10 +456,10 @@ where
         let mut current_key = self.head.clone();
         while let Some(key) = current_key {
             let entry = self.shard.get(&key).unwrap();
-            assert_eq!(entry.lru.prev, keys.last().cloned());
+            assert_eq!(entry.prev(), keys.last());
             keys.push(key);
-            values.push(entry.data.clone());
-            current_key = entry.lru.next.clone();
+            values.push(entry.clone());
+            current_key = entry.next().cloned();
         }
         itertools::zip_eq(keys, values).collect()
     }
@@ -488,16 +467,53 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{LRUUpdater, Shard};
+    use super::{LRUUpdater, Shard, THotStateSlot};
     use lru::LruCache;
     use proptest::{collection::vec, option, prelude::*};
     use std::num::NonZeroUsize;
+
+    #[derive(Clone, Debug)]
+    struct TestSlot {
+        num: u64,
+        prev: Option<u32>,
+        next: Option<u32>,
+    }
+
+    impl TestSlot {
+        fn new(num: u64) -> Self {
+            Self {
+                num,
+                prev: None,
+                next: None,
+            }
+        }
+    }
+
+    impl THotStateSlot for TestSlot {
+        type Key = u32;
+
+        fn prev(&self) -> Option<&Self::Key> {
+            self.prev.as_ref()
+        }
+
+        fn next(&self) -> Option<&Self::Key> {
+            self.next.as_ref()
+        }
+
+        fn set_prev(&mut self, prev: Option<Self::Key>) {
+            self.prev = prev;
+        }
+
+        fn set_next(&mut self, next: Option<Self::Key>) {
+            self.next = next;
+        }
+    }
 
     proptest! {
         #[test]
         fn test_hot_state_lru(
             max_items in 1..10usize,
-            updates in vec((0..20u64, option::weighted(0.8, 0..1000u64)), 1..50),
+            updates in vec((0..20u32, option::weighted(0.8, 0..1000u64)), 1..50),
         ) {
             let shard = Shard::new(max_items);
             let mut head = None;
@@ -509,7 +525,7 @@ mod tests {
             for (key, value_opt) in updates {
                 match value_opt {
                     Some(value) => {
-                        updater.insert(key, value);
+                        updater.insert(key, TestSlot::new(value));
                         cache.put(key, value);
                     }
                     None => {
@@ -521,7 +537,10 @@ mod tests {
 
                 prop_assert_eq!(shard.len(), cache.len());
                 let items = updater.collect_all();
-                prop_assert_eq!(items, cache.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>());
+                prop_assert_eq!(
+                    items.into_iter().map(|(k, v)| (k, v.num)).collect::<Vec<_>>(),
+                    cache.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+                );
             }
         }
     }
