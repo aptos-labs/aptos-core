@@ -23,11 +23,11 @@ spec:
           value: "info"
       resources:
         requests:
-          memory: "90Gi"
-          cpu: "30"
+          memory: "110Gi"
+          cpu: "28"
         limits:
-          memory: "90Gi"
-          cpu: "30"
+          memory: "110Gi"
+          cpu: "28"
   volumes:
     - name: archive
       persistentVolumeClaim:
@@ -40,4 +40,4 @@ spec:
               - key: cloud.google.com/machine-family
                 operator: In
                 values:
-                  - t2d
+                  - c3d

@@ -1,0 +1,62 @@
+# This defines a workflow to replay transactions on the given chain with the latest aptos node software.
+# In order to trigger it go to the Actions Tab of the Repo, click "replay-verify" and then "Run Workflow".
+#
+# On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
+
+name: "Replay-verify on archive: Testnet"
+on:
+  # Allow triggering manually
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      START_VERSION:
+        required: false
+        type: string
+        description: Optional version to start replaying. If not specified, replay-verify will determine start version itself.
+      END_VERSION:
+        required: false
+        type: string
+        description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
+  pull_request:
+    paths:
+      - ".github/workflows/replay-verify-testnet.yaml"
+      - ".github/workflows/workflow-run-replay-verify-on-archive.yaml"
+  schedule:
+    - cron: "0 4 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 04:00
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  issues: read
+  pull-requests: read
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}-${{ inputs.IMAGE_TAG || 'latest' }}
+  cancel-in-progress: true
+
+jobs:
+  determine-test-metadata:
+    runs-on: ubuntu-latest-32-core # consider  moving this to a smaller machine since the compute runs on GKE
+    steps:
+      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+
+  replay:
+    if: |
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: determine-test-metadata
+    uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
+    secrets: inherit
+    with:
+      NETWORK: "testnet"
+      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      START_VERSION: ${{ inputs.START_VERSION }}
+      END_VERSION: ${{ inputs.END_VERSION }}
