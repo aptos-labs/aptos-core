@@ -66,7 +66,13 @@ async fn setup_simple_test(
     JoinHandle<anyhow::Result<()>>,
     RosettaClient,
 ) {
-    setup_test(num_accounts, Arc::new(|_, _, _| {})).await
+    setup_test(
+        num_accounts,
+        Arc::new(|_, config, _| {
+            config.indexer_db_config.enable_transaction = true;
+        }),
+    )
+    .await
 }
 
 async fn setup_test(

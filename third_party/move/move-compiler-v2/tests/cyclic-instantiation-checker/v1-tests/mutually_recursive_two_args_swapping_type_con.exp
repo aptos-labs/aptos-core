@@ -1,19 +1,19 @@
 
 Diagnostics:
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:4:9
   │
 4 │     fun f<T1, T2, T3>() {
   │         ^
   │
-  = `f<T1, T2, T3>` calls `g<T2, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:5
-  = `g<T2, T1>` calls `f<T2, S<T1>, u64>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:9
+  = `f<T1, T2, T3>` uses `g<T2, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:5
+  = `g<T2, T1>` uses `f<T2, S<T1>, u64>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:9
 
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:8:9
   │
 8 │     fun g<T1, T2>() {
   │         ^
   │
-  = `g<T1, T2>` calls `f<T1, S<T2>, u64>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:9
-  = `f<T1, S<T2>, u64>` calls `g<S<T2>, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:5
+  = `g<T1, T2>` uses `f<T1, S<T2>, u64>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:9
+  = `f<T1, S<T2>, u64>` uses `g<S<T2>, T1>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_two_args_swapping_type_con.move:5

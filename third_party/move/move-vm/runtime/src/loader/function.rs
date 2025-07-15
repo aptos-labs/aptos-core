@@ -4,8 +4,10 @@
 
 use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
+    module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    ModuleStorage, RuntimeEnvironment,
+    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+    ModuleStorage,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -22,16 +24,18 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::DependencyGasMeter,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
     values::{AbstractFunction, SerializedFunctionData},
 };
-use std::{cell::RefCell, cmp::Ordering, fmt::Debug, rc::Rc, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -113,11 +117,15 @@ impl LoadedFunction {
 /// `LoadedFunction`. This is wrapped into a Rc so one can clone the
 /// function while sharing the loading state.
 #[derive(Clone, Tid)]
-pub(crate) struct LazyLoadedFunction(pub(crate) Rc<RefCell<LazyLoadedFunctionState>>);
+pub(crate) struct LazyLoadedFunction {
+    pub(crate) state: Rc<RefCell<LazyLoadedFunctionState>>,
+}
 
 #[derive(Clone)]
 pub(crate) enum LazyLoadedFunctionState {
     Unresolved {
+        // Note: this contains layouts from storage, which may be out-dated (e.g., storing only old
+        // enum variant layouts even when enum has been upgraded to contain more variants).
         data: SerializedFunctionData,
     },
     Resolved {
@@ -129,29 +137,101 @@ pub(crate) enum LazyLoadedFunctionState {
         // unresolved case, the type argument tags are stored with the serialized data.
         ty_args: Vec<TypeTag>,
         mask: ClosureMask,
+        // Layouts for captured arguments. The invariant is that these are always set for storable
+        // closures at construction time. Non-storable closures just have None as they will not be
+        // serialized anyway.
+        captured_layouts: Option<Vec<MoveTypeLayout>>,
     },
 }
 
 impl LazyLoadedFunction {
     pub(crate) fn new_unresolved(data: SerializedFunctionData) -> Self {
-        Self(Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved {
-            data,
-        })))
+        Self {
+            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved { data })),
+        }
     }
 
     pub(crate) fn new_resolved(
-        runtime_environment: &RuntimeEnvironment,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
+        let runtime_environment = module_storage.runtime_environment();
         let ty_args = fun
             .ty_args
             .iter()
             .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(Self(Rc::new(RefCell::new(
-            LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
-        ))))
+
+        // When building a closure, if it captures arguments, and it is persistent (i.e., it may
+        // be stored to storage), pre-compute layouts which will be stored alongside the captured
+        // arguments. This way layouts always exist for storable closures and there is no need to
+        // construct them at serialization time. This makes loading and metering logic much simpler
+        // while adding layout construction overhead only for storable closures.
+        let captured_layouts = fun
+            .function
+            .is_persistent()
+            .then(|| {
+                // In case there are delayed fields when constructing captured layouts, we need to
+                // fail early to not allow their capturing altogether.
+                Self::construct_captured_layouts(
+                    module_storage,
+                    gas_meter,
+                    traversal_context,
+                    &fun,
+                    mask,
+                )?
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS)
+                        .with_message("Function values cannot capture delayed fields".to_string())
+                })
+            })
+            .transpose()?;
+
+        Ok(Self {
+            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
+                fun,
+                ty_args,
+                mask,
+                captured_layouts,
+            })),
+        })
+    }
+
+    /// For a given function and a mask, constructs a vector of layouts for the captured arguments.
+    /// Returns [None] if there are any captured delayed fields in the layouts (i.e., the captured
+    /// values are not serializable not "displayable"). For all other failures, an error is
+    /// returned.
+    pub(crate) fn construct_captured_layouts(
+        module_storage: &impl ModuleStorage,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        fun: &LoadedFunction,
+        mask: ClosureMask,
+    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
+        let ty_converter = StorageLayoutConverter::new(module_storage);
+        let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+
+        mask.extract(fun.param_tys(), true)
+            .into_iter()
+            .map(|ty| {
+                let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
+                    ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
+                } else {
+                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
+                    ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
+                };
+
+                // Do not allow delayed fields to be serialized.
+                if contains_delayed_fields {
+                    return Ok(None);
+                }
+
+                Ok(Some(layout))
+            })
+            .collect::<PartialVMResult<Option<Vec<_>>>>()
     }
 
     pub(crate) fn expect_this_impl(
@@ -171,7 +251,7 @@ impl LazyLoadedFunction {
         &self,
         action: impl FnOnce(Option<&ModuleId>, &IdentStr, &[TypeTag]) -> T,
     ) -> T {
-        match &*self.0.borrow() {
+        match &*self.state.borrow() {
             LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
@@ -194,7 +274,7 @@ impl LazyLoadedFunction {
         &self,
         module_storage: &impl ModuleStorage,
     ) -> PartialVMResult<Rc<LoadedFunction>> {
-        let mut state = self.0.borrow_mut();
+        let mut state = self.state.borrow_mut();
         Ok(match &mut *state {
             LazyLoadedFunctionState::Resolved { fun, .. } => fun.clone(),
             LazyLoadedFunctionState::Unresolved {
@@ -205,17 +285,19 @@ impl LazyLoadedFunction {
                         fun_id,
                         ty_args,
                         mask,
-                        captured_layouts: _,
+                        captured_layouts,
                     },
             } => {
                 let fun = module_storage
                     .load_function(module_id, fun_id, ty_args)
                     .map(Rc::new)
                     .map_err(|err| err.to_partial())?;
+
                 *state = LazyLoadedFunctionState::Resolved {
                     fun: fun.clone(),
-                    ty_args: ty_args.clone(),
+                    ty_args: mem::take(ty_args),
                     mask: *mask,
+                    captured_layouts: Some(mem::take(captured_layouts)),
                 };
                 fun
             },
@@ -225,7 +307,7 @@ impl LazyLoadedFunction {
 
 impl AbstractFunction for LazyLoadedFunction {
     fn closure_mask(&self) -> ClosureMask {
-        let state = self.0.borrow();
+        let state = self.state.borrow();
         match &*state {
             LazyLoadedFunctionState::Resolved { mask, .. } => *mask,
             LazyLoadedFunctionState::Unresolved {
@@ -254,7 +336,7 @@ impl AbstractFunction for LazyLoadedFunction {
     fn to_canonical_string(&self) -> String {
         self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
-                format!("0x{}::{}::", m.address(), m.name())
+                format!("{}::{}", m.address(), m.name())
             } else {
                 "".to_string()
             };

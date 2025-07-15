@@ -646,8 +646,6 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             versioned_value.insert_final_value(idx_to_commit, new_entry);
         }
 
-        // Should be guaranteed, as this is the only function modifying the idx,
-        // and value is checked at the start.
         // Need to assert, because if not matching we are in an inconsistent state.
         assert_eq!(
             idx_to_commit,
@@ -699,6 +697,18 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     .map_err(MVDelayedFieldsError::from_panic_or)
             },
         }
+    }
+
+    pub fn remove_all_at_or_after_for_epilogue(
+        &self,
+        txn_idx: TxnIndex,
+        epilogue_txn_idx: TxnIndex,
+    ) {
+        for mut entry in self.values.iter_mut() {
+            entry.value_mut().versioned_map.split_off(&txn_idx);
+        }
+        self.next_idx_to_commit
+            .store(epilogue_txn_idx, Ordering::SeqCst);
     }
 }
 

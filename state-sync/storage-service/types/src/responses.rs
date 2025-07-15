@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    requests::DataRequest::{
-        GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof,
-        GetNewTransactionsOrOutputsWithProof, GetNewTransactionsWithProof,
-        GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
-        GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
-        GetTransactionsWithProof, SubscribeTransactionOutputsWithProof,
-        SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
+    requests::{
+        DataRequest::{
+            GetEpochEndingLedgerInfos, GetNewTransactionDataWithProof,
+            GetNewTransactionOutputsWithProof, GetNewTransactionsOrOutputsWithProof,
+            GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetServerProtocolVersion,
+            GetStateValuesWithProof, GetStorageServerSummary, GetTransactionDataWithProof,
+            GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
+            GetTransactionsWithProof, SubscribeTransactionDataWithProof,
+            SubscribeTransactionOutputsWithProof, SubscribeTransactionsOrOutputsWithProof,
+            SubscribeTransactionsWithProof,
+        },
+        TransactionDataRequestType,
     },
     responses::Error::DegenerateRangeError,
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
@@ -488,71 +493,23 @@ impl DataSummary {
 
                 can_serve_states && can_create_proof
             },
-            GetTransactionOutputsWithProof(request) => {
-                let desired_range =
-                    match CompleteDataRange::new(request.start_version, request.end_version) {
-                        Ok(desired_range) => desired_range,
-                        Err(_) => return false,
-                    };
-
-                let can_serve_outputs = self
-                    .transaction_outputs
-                    .map(|range| range.superset_of(&desired_range))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= request.proof_version)
-                    .unwrap_or(false);
-
-                can_serve_outputs && can_create_proof
-            },
-            GetTransactionsWithProof(request) => {
-                let desired_range =
-                    match CompleteDataRange::new(request.start_version, request.end_version) {
-                        Ok(desired_range) => desired_range,
-                        Err(_) => return false,
-                    };
-
-                let can_serve_txns = self
-                    .transactions
-                    .map(|range| range.superset_of(&desired_range))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= request.proof_version)
-                    .unwrap_or(false);
-
-                can_serve_txns && can_create_proof
-            },
-            GetTransactionsOrOutputsWithProof(request) => {
-                let desired_range =
-                    match CompleteDataRange::new(request.start_version, request.end_version) {
-                        Ok(desired_range) => desired_range,
-                        Err(_) => return false,
-                    };
-
-                let can_serve_txns = self
-                    .transactions
-                    .map(|range| range.superset_of(&desired_range))
-                    .unwrap_or(false);
-
-                let can_serve_outputs = self
-                    .transaction_outputs
-                    .map(|range| range.superset_of(&desired_range))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= request.proof_version)
-                    .unwrap_or(false);
-
-                can_serve_txns && can_serve_outputs && can_create_proof
-            },
+            GetTransactionOutputsWithProof(request) => self
+                .can_service_transaction_outputs_with_proof(
+                    request.start_version,
+                    request.end_version,
+                    request.proof_version,
+                ),
+            GetTransactionsWithProof(request) => self.can_service_transactions_with_proof(
+                request.start_version,
+                request.end_version,
+                request.proof_version,
+            ),
+            GetTransactionsOrOutputsWithProof(request) => self
+                .can_service_transactions_or_outputs_with_proof(
+                    request.start_version,
+                    request.end_version,
+                    request.proof_version,
+                ),
             SubscribeTransactionOutputsWithProof(_) => can_service_subscription_request(
                 aptos_data_client_config,
                 time_service,
@@ -568,7 +525,113 @@ impl DataSummary {
                 time_service,
                 self.synced_ledger_info.as_ref(),
             ),
+
+            // Transaction data v2 requests (transactions with auxiliary data)
+            GetTransactionDataWithProof(request) => match request.transaction_data_request_type {
+                TransactionDataRequestType::TransactionData(_) => self
+                    .can_service_transactions_with_proof(
+                        request.start_version,
+                        request.end_version,
+                        request.proof_version,
+                    ),
+                TransactionDataRequestType::TransactionOutputData => self
+                    .can_service_transaction_outputs_with_proof(
+                        request.start_version,
+                        request.end_version,
+                        request.proof_version,
+                    ),
+                TransactionDataRequestType::TransactionOrOutputData(_) => self
+                    .can_service_transactions_or_outputs_with_proof(
+                        request.start_version,
+                        request.end_version,
+                        request.proof_version,
+                    ),
+            },
+            GetNewTransactionDataWithProof(_) => can_service_optimistic_request(
+                aptos_data_client_config,
+                time_service,
+                self.synced_ledger_info.as_ref(),
+            ),
+            SubscribeTransactionDataWithProof(_) => can_service_subscription_request(
+                aptos_data_client_config,
+                time_service,
+                self.synced_ledger_info.as_ref(),
+            ),
         }
+    }
+
+    /// Returns true iff the peer can create a proof for the given version
+    fn can_create_proof(&self, proof_version: u64) -> bool {
+        self.synced_ledger_info
+            .as_ref()
+            .map(|li| li.ledger_info().version() >= proof_version)
+            .unwrap_or(false)
+    }
+
+    /// Returns true iff the peer can service the transaction outputs in the given range
+    fn can_service_transaction_outputs(&self, desired_range: &CompleteDataRange<u64>) -> bool {
+        self.transaction_outputs
+            .map(|range| range.superset_of(desired_range))
+            .unwrap_or(false)
+    }
+
+    /// Returns true iff the peer can service the transactions in the given range
+    fn can_service_transactions(&self, desired_range: &CompleteDataRange<u64>) -> bool {
+        self.transactions
+            .map(|range| range.superset_of(desired_range))
+            .unwrap_or(false)
+    }
+
+    /// Returns true iff the peer can service the transaction outputs and proof
+    fn can_service_transaction_outputs_with_proof(
+        &self,
+        start_version: u64,
+        end_version: u64,
+        proof_version: u64,
+    ) -> bool {
+        let desired_range = match CompleteDataRange::new(start_version, end_version) {
+            Ok(desired_range) => desired_range,
+            Err(_) => return false,
+        };
+
+        let can_service_outputs = self.can_service_transaction_outputs(&desired_range);
+        let can_create_proof = self.can_create_proof(proof_version);
+        can_service_outputs && can_create_proof
+    }
+
+    /// Returns true iff the peer can service the transactions or outputs and proof
+    fn can_service_transactions_or_outputs_with_proof(
+        &self,
+        start_version: u64,
+        end_version: u64,
+        proof_version: u64,
+    ) -> bool {
+        let desired_range = match CompleteDataRange::new(start_version, end_version) {
+            Ok(desired_range) => desired_range,
+            Err(_) => return false,
+        };
+
+        let can_service_transactions = self.can_service_transactions(&desired_range);
+        let can_service_outputs = self.can_service_transaction_outputs(&desired_range);
+        let can_create_proof = self.can_create_proof(proof_version);
+        can_service_transactions && can_service_outputs && can_create_proof
+    }
+
+    /// Returns true iff the peer can service the transactions and proof
+    fn can_service_transactions_with_proof(
+        &self,
+        start_version: u64,
+        end_version: u64,
+        proof_version: u64,
+    ) -> bool {
+        let desired_range = match CompleteDataRange::new(start_version, end_version) {
+            Ok(desired_range) => desired_range,
+            Err(_) => return false,
+        };
+
+        let can_service_transactions = self.can_service_transactions(&desired_range);
+        let can_create_proof = self.can_create_proof(proof_version);
+        can_service_transactions && can_create_proof
     }
 
     /// Returns the version of the synced ledger info (if one exists)

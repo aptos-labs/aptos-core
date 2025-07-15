@@ -346,6 +346,24 @@ impl GasMeter for GasStatus {
         )
     }
 
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let field_count = AbstractMemorySize::new(args.len() as u64);
+        self.charge_instr_with_size(
+            if is_generic {
+                Opcodes::PACK_CLOSURE_GENERIC
+            } else {
+                Opcodes::PACK_CLOSURE
+            },
+            args.fold(field_count, |acc, val| {
+                acc + val.legacy_abstract_memory_size()
+            }),
+        )
+    }
+
     fn charge_read_ref(&mut self, ref_val: impl ValueView) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::READ_REF, ref_val.legacy_abstract_memory_size())
     }

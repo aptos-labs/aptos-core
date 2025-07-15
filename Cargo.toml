@@ -100,7 +100,7 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
-    "crates/aptos-transactions-filter",
+    "crates/aptos-transaction-filters",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
@@ -448,7 +448,7 @@ aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
-aptos-transactions-filter = { path = "crates/aptos-transactions-filter" }
+aptos-transaction-filters = { path = "crates/aptos-transaction-filters" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -560,7 +560,7 @@ crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "5.5.3", features = ["inline"] }
+dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
@@ -589,6 +589,7 @@ ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
+equivalent = "1.0"
 erased-serde = "0.3.13"
 ethnum = "1.5.0"
 ethers = { version = "2" }
@@ -646,7 +647,7 @@ libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.5.2"
 log = "0.4.17"
-lru = "0.7.5"
+lru = "0.16.0"
 lz4 = "1.28.0"
 maplit = "1.0.2"
 merlin = "3"

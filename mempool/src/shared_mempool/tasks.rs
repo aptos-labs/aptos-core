@@ -406,7 +406,7 @@ fn filter_transactions(
     Option<BroadcastPeerPriority>,
 )> {
     // If the filter is not enabled, return early
-    if !transaction_filter_config.enable_mempool_filter {
+    if !transaction_filter_config.is_enabled() {
         return transactions;
     }
 
@@ -420,8 +420,8 @@ fn filter_transactions(
         .into_iter()
         .filter_map(|(transaction, account_sequence_number, priority)| {
             if transaction_filter_config
-                .transaction_filter
-                .allows(&transaction)
+                .transaction_filter()
+                .allows_transaction(&transaction)
             {
                 Some((transaction, account_sequence_number, priority))
             } else {
@@ -784,7 +784,7 @@ pub(crate) async fn process_config_update<V, P>(
 mod test {
     use super::*;
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
-    use aptos_transactions_filter::transaction_matcher::Filter;
+    use aptos_transaction_filters::transaction_filter::TransactionFilter;
     use aptos_types::{
         chain_id::ChainId,
         transaction::{RawTransaction, Script, TransactionPayload},
@@ -800,14 +800,10 @@ mod test {
         }
 
         // Create a config with filtering enabled (the first and last transactions will be rejected)
-        let filter = Filter::empty()
+        let transaction_filter = TransactionFilter::empty()
             .add_sender_filter(false, transactions[0].0.sender())
             .add_sender_filter(false, transactions[9].0.sender());
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: true,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];
@@ -839,12 +835,8 @@ mod test {
         }
 
         // Create a config with filtering disabled
-        let filter = Filter::empty().add_all_filter(false); // Reject all transactions
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: false,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter = TransactionFilter::empty().add_all_filter(false); // Reject all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(false, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];
@@ -873,12 +865,8 @@ mod test {
         }
 
         // Create a config with filtering enabled (the filter is empty, so no transactions will be rejected)
-        let filter = Filter::empty();
-        let transaction_filter_config = TransactionFilterConfig {
-            enable_mempool_filter: true,
-            transaction_filter: filter,
-            ..TransactionFilterConfig::default()
-        };
+        let transaction_filter = TransactionFilter::empty(); // Allow all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
 
         // Filter the transactions
         let mut statuses = vec![];

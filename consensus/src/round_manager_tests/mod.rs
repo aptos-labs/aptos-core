@@ -17,9 +17,13 @@ use crate::{
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    payload_manager::DirectMempoolPayloadManager,
+    payload_manager::{
+        DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager,
+        TQuorumStoreCommitNotifier,
+    },
     persistent_liveness_storage::RecoveryData,
     pipeline::buffer_manager::OrderedBlocks,
+    quorum_store::batch_store::BatchReader,
     round_manager::RoundManager,
     test_utils::{
         mock_execution_client::MockExecutionClient, MockOptQSPayloadProvider,
@@ -29,14 +33,17 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::ConsensusConfig,
+    config::{BlockTransactionFilterConfig, ConsensusConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
+    opt_block_data::OptBlockData,
+    opt_proposal_msg::OptProposalMsg,
     order_vote_msg::OrderVoteMsg,
     pipeline::commit_decision::CommitDecision,
+    proof_of_store::BatchInfo,
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
     utils::PayloadTxnsSize,
@@ -44,6 +51,7 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_network::{
@@ -70,12 +78,17 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
     waypoint::Waypoint,
+    PeerId,
 };
-use futures::{channel::mpsc, executor::block_on, stream::select, FutureExt, Stream, StreamExt};
+use futures::{
+    channel::mpsc, executor::block_on, future::Shared, stream::select, FutureExt, Stream, StreamExt,
+};
 use maplit::hashmap;
 use std::{
     collections::VecDeque,
+    future::Future,
     iter::FromIterator,
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -85,11 +98,81 @@ use std::{
 use tokio::{runtime::Handle, task::JoinHandle};
 
 mod consensus_test;
+mod opt_proposal_test;
+mod txn_filter_proposal_test;
 mod vtxn_on_proposal_test;
+
+fn config_with_round_timeout_msg_disabled() -> ConsensusConfig {
+    // Disable RoundTimeoutMsg to unless expliclity enabled.
+    ConsensusConfig {
+        enable_round_timeout_msg: false,
+        ..Default::default()
+    }
+}
+
+fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle {
+    let done = Arc::new(AtomicBool::new(false));
+    let mut handles = Vec::new();
+    for mut node in nodes.into_iter() {
+        let done_clone = done.clone();
+        handles.push(tokio::spawn(async move {
+            while !done_clone.load(Ordering::Relaxed) {
+                info!("Asking for RPC request on {:?}", node.identity_desc());
+                let maybe_request = node.poll_block_retrieval().await;
+                if let Some(request) = maybe_request {
+                    info!(
+                        "RPC request received: {:?} on {:?}",
+                        request,
+                        node.identity_desc()
+                    );
+                    let wrapped_request = IncomingBlockRetrievalRequest {
+                        req: request.req,
+                        protocol: request.protocol,
+                        response_sender: request.response_sender,
+                    };
+                    node.block_store
+                        .process_block_retrieval(wrapped_request)
+                        .await
+                        .unwrap();
+                } else {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }
+            node
+        }));
+    }
+    ReplyingRPCHandle { handles, done }
+}
+
+struct ReplyingRPCHandle {
+    handles: Vec<JoinHandle<NodeSetup>>,
+    done: Arc<AtomicBool>,
+}
+
+impl ReplyingRPCHandle {
+    async fn join(self) -> Vec<NodeSetup> {
+        self.done.store(true, Ordering::Relaxed);
+        let mut result = Vec::new();
+        for handle in self.handles.into_iter() {
+            result.push(handle.await.unwrap());
+        }
+        info!(
+            "joined nodes in order: {:?}",
+            result.iter().map(|v| v.id).collect::<Vec<_>>()
+        );
+        result
+    }
+}
+
+#[derive(Debug)]
+pub enum ProposalMsgType {
+    Normal(ProposalMsg),
+    Optimistic(OptProposalMsg),
+}
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
-    block_store: Arc<BlockStore>,
+    pub block_store: Arc<BlockStore>,
     round_manager: RoundManager,
     storage: Arc<MockStorage>,
     signer: ValidatorSigner,
@@ -102,14 +185,18 @@ pub struct NodeSetup {
     _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
+    block_txn_filter_config: BlockTransactionFilterConfig,
     local_consensus_config: ConsensusConfig,
     onchain_randomness_config: OnChainRandomnessConfig,
     onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     vote_queue: VecDeque<VoteMsg>,
     order_vote_queue: VecDeque<OrderVoteMsg>,
     proposal_queue: VecDeque<ProposalMsg>,
+    opt_proposal_queue: VecDeque<OptProposalMsg>,
     round_timeout_queue: VecDeque<RoundTimeoutMsg>,
     commit_decision_queue: VecDeque<CommitDecision>,
+    processed_opt_proposal_rx: aptos_channels::UnboundedReceiver<OptBlockData>,
+    use_quorum_store_payloads: bool,
 }
 
 impl NodeSetup {
@@ -130,9 +217,11 @@ impl NodeSetup {
         num_nodes: usize,
         proposer_indices: Option<Vec<usize>>,
         onchain_consensus_config: Option<OnChainConsensusConfig>,
+        block_txn_filter_config: Option<BlockTransactionFilterConfig>,
         local_consensus_config: Option<ConsensusConfig>,
         onchain_randomness_config: Option<OnChainRandomnessConfig>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
+        use_quorum_store_payloads: bool,
     ) -> Vec<Self> {
         Self::create_nodes_with_validator_set(
             playground,
@@ -140,10 +229,12 @@ impl NodeSetup {
             num_nodes,
             proposer_indices,
             onchain_consensus_config,
+            block_txn_filter_config,
             local_consensus_config,
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             None,
+            use_quorum_store_payloads,
         )
     }
 
@@ -153,10 +244,12 @@ impl NodeSetup {
         num_nodes: usize,
         proposer_indices: Option<Vec<usize>>,
         onchain_consensus_config: Option<OnChainConsensusConfig>,
+        block_txn_filter_config: Option<BlockTransactionFilterConfig>,
         local_consensus_config: Option<ConsensusConfig>,
         onchain_randomness_config: Option<OnChainRandomnessConfig>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
         validator_set: Option<(Vec<ValidatorSigner>, ValidatorVerifier)>,
+        use_quorum_store_payloads: bool,
     ) -> Vec<Self> {
         let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         // With order votes feature, the validators additionally send order votes.
@@ -178,6 +271,7 @@ impl NodeSetup {
             onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
             .unwrap_or_else(OnChainJWKConsensusConfig::default_if_missing);
+        let block_txn_filter_config = block_txn_filter_config.unwrap_or_default();
         let local_consensus_config = local_consensus_config.unwrap_or_default();
         let (signers, validators) =
             validator_set.unwrap_or_else(|| random_validator_verifier(num_nodes, None, false));
@@ -228,9 +322,11 @@ impl NodeSetup {
                 safety_rules_manager,
                 id,
                 onchain_consensus_config.clone(),
+                block_txn_filter_config.clone(),
                 local_consensus_config.clone(),
                 onchain_randomness_config.clone(),
                 onchain_jwk_consensus_config.clone(),
+                use_quorum_store_payloads,
             ));
         }
         nodes
@@ -246,9 +342,11 @@ impl NodeSetup {
         safety_rules_manager: SafetyRulesManager,
         id: usize,
         onchain_consensus_config: OnChainConsensusConfig,
+        block_txn_filter_config: BlockTransactionFilterConfig,
         local_consensus_config: ConsensusConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        use_quorum_store_payloads: bool,
     ) -> Self {
         let _entered_runtime = executor.enter();
         let epoch_state = Arc::new(EpochState::new(1, storage.get_validator_set().into()));
@@ -295,6 +393,19 @@ impl NodeSetup {
         ));
         let time_service = Arc::new(ClockTimeService::new(executor));
 
+        let payload_manager: Arc<dyn TPayloadManager> = if use_quorum_store_payloads {
+            Arc::new(QuorumStorePayloadManager::new(
+                Arc::new(MockBatchReader) as Arc<dyn BatchReader>,
+                Box::new(MockQuorumStoreCommitNotifier) as Box<dyn TQuorumStoreCommitNotifier>,
+                None,
+                vec![],
+                hashmap![],
+                false,
+            ))
+        } else {
+            Arc::new(DirectMempoolPayloadManager::new())
+        };
+
         let window_size = onchain_consensus_config.window_size();
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
@@ -303,7 +414,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
-            Arc::from(DirectMempoolPayloadManager::new()),
+            payload_manager,
             false,
             window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
@@ -345,7 +456,7 @@ impl NodeSetup {
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
-        let (opt_proposal_loopback_tx, _) = aptos_channels::new_unbounded(
+        let (opt_proposal_loopback_tx, opt_proposal_loopback_rx) = aptos_channels::new_unbounded(
             &counters::OP_COUNTERS.gauge("opt_proposal_loopback_queue"),
         );
 
@@ -362,6 +473,7 @@ impl NodeSetup {
             storage.clone(),
             onchain_consensus_config.clone(),
             round_manager_tx,
+            block_txn_filter_config.clone(),
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
@@ -384,14 +496,18 @@ impl NodeSetup {
             _state_sync_receiver,
             id,
             onchain_consensus_config,
+            block_txn_filter_config,
             local_consensus_config,
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             vote_queue: VecDeque::new(),
             order_vote_queue: VecDeque::new(),
             proposal_queue: VecDeque::new(),
+            opt_proposal_queue: VecDeque::new(),
             round_timeout_queue: VecDeque::new(),
             commit_decision_queue: VecDeque::new(),
+            processed_opt_proposal_rx: opt_proposal_loopback_rx,
+            use_quorum_store_payloads,
         }
     }
 
@@ -413,9 +529,11 @@ impl NodeSetup {
             self.safety_rules_manager,
             self.id,
             self.onchain_consensus_config.clone(),
+            self.block_txn_filter_config.clone(),
             self.local_consensus_config.clone(),
             self.onchain_randomness_config.clone(),
             self.onchain_jwk_consensus_config.clone(),
+            self.use_quorum_store_payloads,
         )
     }
 
@@ -458,6 +576,9 @@ impl NodeSetup {
         match consensus_msg {
             ConsensusMsg::ProposalMsg(proposal) => {
                 self.proposal_queue.push_back(*proposal);
+            },
+            ConsensusMsg::OptProposalMsg(opt_proposal) => {
+                self.opt_proposal_queue.push_back(*opt_proposal);
             },
             ConsensusMsg::VoteMsg(vote) => {
                 self.vote_queue.push_back(*vote);
@@ -503,6 +624,25 @@ impl NodeSetup {
             self.next_network_message().await;
         }
         self.proposal_queue.pop_front().unwrap()
+    }
+
+    pub async fn next_opt_proposal(&mut self) -> OptProposalMsg {
+        while self.opt_proposal_queue.is_empty() {
+            self.next_network_message().await;
+        }
+        self.opt_proposal_queue.pop_front().unwrap()
+    }
+
+    pub async fn next_opt_or_normal_proposal(&mut self) -> ProposalMsgType {
+        while self.opt_proposal_queue.is_empty() && self.proposal_queue.is_empty() {
+            self.next_network_message().await;
+        }
+
+        if !self.opt_proposal_queue.is_empty() {
+            return ProposalMsgType::Optimistic(self.opt_proposal_queue.pop_front().unwrap());
+        }
+
+        ProposalMsgType::Normal(self.proposal_queue.pop_front().unwrap())
     }
 
     pub async fn next_vote(&mut self) -> VoteMsg {
@@ -590,64 +730,32 @@ impl NodeSetup {
     }
 }
 
-fn config_with_round_timeout_msg_disabled() -> ConsensusConfig {
-    // Disable RoundTimeoutMsg to unless expliclity enabled.
-    ConsensusConfig {
-        enable_round_timeout_msg: false,
-        ..Default::default()
+/// A mock quorum store commit notifier that provides limited functionality
+struct MockQuorumStoreCommitNotifier;
+
+impl TQuorumStoreCommitNotifier for MockQuorumStoreCommitNotifier {
+    fn notify(&self, _block_timestamp: u64, _batches: Vec<BatchInfo>) {
+        unimplemented!()
     }
 }
 
-fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle {
-    let done = Arc::new(AtomicBool::new(false));
-    let mut handles = Vec::new();
-    for mut node in nodes.into_iter() {
-        let done_clone = done.clone();
-        handles.push(tokio::spawn(async move {
-            while !done_clone.load(Ordering::Relaxed) {
-                info!("Asking for RPC request on {:?}", node.identity_desc());
-                let maybe_request = node.poll_block_retrieval().await;
-                if let Some(request) = maybe_request {
-                    info!(
-                        "RPC request received: {:?} on {:?}",
-                        request,
-                        node.identity_desc()
-                    );
-                    let wrapped_request = IncomingBlockRetrievalRequest {
-                        req: request.req,
-                        protocol: request.protocol,
-                        response_sender: request.response_sender,
-                    };
-                    node.block_store
-                        .process_block_retrieval(wrapped_request)
-                        .await
-                        .unwrap();
-                } else {
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
-            }
-            node
-        }));
+/// A mock batch reader that provides limited functionality
+struct MockBatchReader;
+
+impl BatchReader for MockBatchReader {
+    fn exists(&self, _digest: &HashValue) -> Option<PeerId> {
+        None
     }
-    ReplyingRPCHandle { handles, done }
-}
 
-struct ReplyingRPCHandle {
-    handles: Vec<JoinHandle<NodeSetup>>,
-    done: Arc<AtomicBool>,
-}
+    fn get_batch(
+        &self,
+        _batch_info: BatchInfo,
+        _signers: Vec<PeerId>,
+    ) -> Shared<Pin<Box<dyn Future<Output = ExecutorResult<Vec<SignedTransaction>>> + Send>>> {
+        unimplemented!()
+    }
 
-impl ReplyingRPCHandle {
-    async fn join(self) -> Vec<NodeSetup> {
-        self.done.store(true, Ordering::Relaxed);
-        let mut result = Vec::new();
-        for handle in self.handles.into_iter() {
-            result.push(handle.await.unwrap());
-        }
-        info!(
-            "joined nodes in order: {:?}",
-            result.iter().map(|v| v.id).collect::<Vec<_>>()
-        );
-        result
+    fn update_certified_timestamp(&self, _certified_time: u64) {
+        unimplemented!()
     }
 }

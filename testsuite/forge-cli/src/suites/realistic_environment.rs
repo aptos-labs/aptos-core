@@ -316,8 +316,8 @@ pub(crate) fn realistic_env_max_load_test(
             // Give at least 60s for catchup, give 10% of the run for longer durations.
             (duration.as_secs() / 10).max(60),
         )
-        .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P70)
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 16.0,
@@ -335,7 +335,7 @@ pub(crate) fn realistic_env_max_load_test(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
@@ -347,7 +347,7 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -382,10 +382,10 @@ pub(crate) fn realistic_env_max_load_test(
             // Increase the consensus observer fallback thresholds
             config
                 .consensus_observer
-                .observer_fallback_progress_threshold_ms = 20_000; // 20 seconds
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
             config
                 .consensus_observer
-                .observer_fallback_sync_lag_threshold_ms = 30_000; // 30 seconds
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(

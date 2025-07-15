@@ -45,7 +45,7 @@ aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
-aptos-transactions-filter = { workspace = true }
+aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
@@ -96,6 +96,7 @@ aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
+aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["fuzzing"] }
 aptos-vm-validator = { workspace = true }

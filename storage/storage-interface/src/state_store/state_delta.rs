@@ -57,6 +57,6 @@ impl StateDelta {
     /// Get the state update for a given state key.
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-        self.shards[state_key.get_shard_id() as usize].get(state_key)
+        self.shards[state_key.get_shard_id()].get(state_key)
     }
 }

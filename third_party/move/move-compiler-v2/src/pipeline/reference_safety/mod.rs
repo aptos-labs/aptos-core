@@ -56,6 +56,11 @@ impl LifetimeInfoAtCodeOffset {
     pub fn borrow_kind_after(&self, temp: TempIndex) -> Option<ReferenceKind> {
         self.after.borrow_kind(temp)
     }
+
+    /// Returns true if the given temporary is borrowed before or after the program point.
+    pub fn is_borrowed(&self, temp: TempIndex) -> bool {
+        self.borrow_kind_before(temp).is_some() || self.borrow_kind_after(temp).is_some()
+    }
 }
 
 /// A trait to be implemented by reference safety processors

@@ -8,10 +8,10 @@ metadata:
     run: some-label
 spec:
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 10Ti
+      storage: 12Ti
   storageClassName: ssd-data-xfs-immediate
   volumeMode: Filesystem
   dataSourceRef:

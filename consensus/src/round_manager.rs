@@ -35,7 +35,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
-use aptos_config::config::ConsensusConfig;
+use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
@@ -79,7 +79,8 @@ use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, Sin
 use lru::LruCache;
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
+    collections::BTreeMap, mem::Discriminant, num::NonZeroUsize, ops::Add, pin::Pin, sync::Arc,
+    time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -273,6 +274,7 @@ pub struct RoundManager {
     onchain_config: OnChainConsensusConfig,
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
+    block_txn_filter_config: BlockTransactionFilterConfig,
     local_config: ConsensusConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
@@ -304,6 +306,7 @@ impl RoundManager {
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
+        block_txn_filter_config: BlockTransactionFilterConfig,
         local_config: ConsensusConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
@@ -333,12 +336,15 @@ impl RoundManager {
             onchain_config,
             vtxn_config,
             buffered_proposal_tx,
+            block_txn_filter_config,
             local_config,
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
-            blocks_with_broadcasted_fast_shares: LruCache::new(5),
+            blocks_with_broadcasted_fast_shares: LruCache::new(
+                NonZeroUsize::new(5).expect("LRU capacity should be non-zero."),
+            ),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
@@ -797,14 +803,13 @@ impl RoundManager {
     /// 2. Create a regular proposal by adding QC and failed_authors to the opt block
     /// 3. Process the proposal using exsiting logic
     async fn process_opt_proposal(&mut self, opt_block_data: OptBlockData) -> anyhow::Result<()> {
-        if self
-            .block_store
-            .get_block_for_round(opt_block_data.round())
-            .is_some()
-        {
-            // ignore the opt proposal if we have already received the proposal
-            return Ok(());
-        }
+        ensure!(
+            self.block_store
+                .get_block_for_round(opt_block_data.round())
+                .is_none(),
+            "Proposal has already been processed for round: {}",
+            opt_block_data.round()
+        );
         let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
         ensure!(
             hqc.certified_block().round() + 1 == opt_block_data.round(),
@@ -1155,6 +1160,20 @@ impl RoundManager {
             author,
             proposal,
         );
+
+        // If the proposal contains any inline transactions that need to be denied
+        // (e.g., due to filtering) drop the message and do not vote for the block.
+        if let Err(error) = self
+            .block_store
+            .check_denied_inline_transactions(&proposal, &self.block_txn_filter_config)
+        {
+            counters::REJECTED_PROPOSAL_DENY_TXN_COUNT.inc();
+            bail!(
+                "[RoundManager] Proposal for block {} contains denied inline transactions: {}. Dropping proposal!",
+                proposal.id(),
+                error
+            );
+        }
 
         if !proposal.is_opt_block() {
             // Validate that failed_authors list is correctly specified in the block.

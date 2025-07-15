@@ -3,7 +3,11 @@
 
 # Module `0x7::active_order_book`
 
-(work in progress)
+ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
+book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
+The orders are matched based on time-price priority.
+
+This is internal module, which cannot be used directly, use OrderBook instead.
 
 
 -  [Struct `ActiveBidKey`](#0x7_active_order_book_ActiveBidKey)
@@ -111,7 +115,7 @@
 OrderBook tracking active (i.e. unconditional, immediately executable) limit orders.
 
 - invariant - all buys are smaller than sells, at all times.
-- tie_breaker in sells is U256_MAX-value, to make sure largest value in the book
+- tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
 that is taken first, is the one inserted first, amongst those with same bid price.
 
 
@@ -169,15 +173,6 @@ There is a code bug that breaks internal invariant
 
 
 
-<a id="0x7_active_order_book_U256_MAX"></a>
-
-
-
-<pre><code><b>const</b> <a href="active_order_book.md#0x7_active_order_book_U256_MAX">U256_MAX</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-</code></pre>
-
-
-
 <a id="0x7_active_order_book_EINVALID_MAKER_ORDER"></a>
 
 
@@ -203,7 +198,7 @@ There is a code bug that breaks internal invariant
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_new_active_order_book">new_active_order_book</a>(): <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_new_active_order_book">new_active_order_book</a>(): <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>
 </code></pre>
 
 
@@ -212,7 +207,7 @@ There is a code bug that breaks internal invariant
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_new_active_order_book">new_active_order_book</a>(): <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_new_active_order_book">new_active_order_book</a>(): <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a> {
     // potentially add max value <b>to</b> both sides (that will be skipped),
     // so that max_key never changes, and doesn't create conflict.
     ActiveOrderBook::V1 {
@@ -234,7 +229,7 @@ Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
 aborts if there are no buys
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -243,7 +238,7 @@ aborts if there are no buys
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
     <b>if</b> (self.buys.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
@@ -265,7 +260,7 @@ Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
 aborts if there are no sells
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -274,7 +269,7 @@ aborts if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
     <b>if</b> (self.sells.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
@@ -294,7 +289,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_mid_price">get_mid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_mid_price">get_mid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -303,7 +298,7 @@ aborts if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_mid_price">get_mid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_mid_price">get_mid_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>): Option&lt;u64&gt; {
     <b>let</b> best_bid = self.<a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>();
     <b>let</b> best_ask = self.<a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>();
     <b>if</b> (best_bid.is_none() || best_ask.is_none()) {
@@ -326,7 +321,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_slippage_price">get_slippage_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, is_buy: bool, slippage_pct: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_slippage_price">get_slippage_price</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, is_bid: bool, slippage_pct: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -335,8 +330,8 @@ aborts if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_slippage_price">get_slippage_price</a>(
-    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, is_buy: bool, slippage_pct: u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_slippage_price">get_slippage_price</a>(
+    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, is_bid: bool, slippage_pct: u64
 ): Option&lt;u64&gt; {
     <b>let</b> mid_price = self.<a href="active_order_book.md#0x7_active_order_book_get_mid_price">get_mid_price</a>();
     <b>if</b> (mid_price.is_none()) {
@@ -346,7 +341,7 @@ aborts if there are no sells
     <b>let</b> slippage = mul_div(
         mid_price, slippage_pct, get_slippage_pct_precision() * 100
     );
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price + slippage)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price - slippage)
@@ -388,9 +383,8 @@ aborts if there are no sells
             } <b>else</b> {
                 front_value.size
             };
-        total_value = total_value
-            + (matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
-        total_size = total_size + matched_size;
+        total_value +=(matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
+        total_size += matched_size;
         <b>let</b> next_key = orders.prev_key(&front_key);
         <b>if</b> (next_key.is_none()) {
             // TODO maybe we should <b>return</b> none <b>if</b> there is not enough depth?
@@ -437,9 +431,8 @@ aborts if there are no sells
             } <b>else</b> {
                 front_value.size
             };
-        total_value = total_value
-            + (matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
-        total_size = total_size + matched_size;
+        total_value +=(matched_size <b>as</b> u128) * (front_key.price <b>as</b> u128);
+        total_size += matched_size;
         <b>let</b> next_key = orders.next_key(&front_key);
         <b>if</b> (next_key.is_none()) {
             <b>break</b>;
@@ -461,7 +454,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_buy: bool): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
 </code></pre>
 
 
@@ -471,9 +464,9 @@ aborts if there are no sells
 
 
 <pre><code>inline <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(
-    unique_priority_idx: UniqueIdxType, is_buy: bool
+    unique_priority_idx: UniqueIdxType, is_bid: bool
 ): UniqueIdxType {
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         unique_priority_idx
     } <b>else</b> {
         unique_priority_idx.descending_idx()
@@ -491,7 +484,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_buy: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): u64
 </code></pre>
 
 
@@ -500,16 +493,16 @@ aborts if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_cancel_active_order">cancel_active_order</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
     unique_priority_idx: UniqueIdxType,
-    is_buy: bool
+    is_bid: bool
 ): u64 {
-    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price: price, tie_breaker };
     <b>let</b> value =
-        <b>if</b> (is_buy) {
+        <b>if</b> (is_bid) {
             self.buys.remove(&key)
         } <b>else</b> {
             self.sells.remove(&key)
@@ -528,7 +521,7 @@ aborts if there are no sells
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_buy: bool): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, is_bid: bool): bool
 </code></pre>
 
 
@@ -537,15 +530,15 @@ aborts if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_active_order">is_active_order</a>(
     self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
     unique_priority_idx: UniqueIdxType,
-    is_buy: bool
+    is_bid: bool
 ): bool {
-    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price: price, tie_breaker };
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         self.buys.contains(&key)
     } <b>else</b> {
         self.sells.contains(&key)
@@ -564,7 +557,7 @@ aborts if there are no sells
 Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, is_buy: bool): bool
+<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool): bool
 </code></pre>
 
 
@@ -574,14 +567,22 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(
-    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, is_buy: bool
+    self: &<a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, is_bid: bool
 ): bool {
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         <b>let</b> best_ask_price = self.<a href="active_order_book.md#0x7_active_order_book_best_ask_price">best_ask_price</a>();
-        best_ask_price.is_some() && price &gt;= best_ask_price.destroy_some()
+        best_ask_price.is_some()
+            && (
+                price.is_none()
+                    || price.destroy_some() &gt;= best_ask_price.destroy_some()
+            )
     } <b>else</b> {
         <b>let</b> best_bid_price = self.<a href="active_order_book.md#0x7_active_order_book_best_bid_price">best_bid_price</a>();
-        best_bid_price.is_some() && price &lt;= best_bid_price.destroy_some()
+        best_bid_price.is_some()
+            && (
+                price.is_none()
+                    || price.destroy_some() &lt;= best_bid_price.destroy_some()
+            )
     }
 }
 </code></pre>
@@ -646,7 +647,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -656,10 +657,14 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(
-    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, size: u64
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, size: u64
 ): ActiveMatchedOrder {
     <b>let</b> (smallest_key, smallest_value) = self.sells.borrow_front();
-    <b>assert</b>!(price &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+    <b>if</b> (price.is_some()) {
+        <b>assert</b>!(
+            price.destroy_some() &gt;= smallest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
+        );
+    };
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,
         smallest_key,
@@ -679,7 +684,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -689,10 +694,14 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 <pre><code><b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(
-    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: u64, size: u64
+    self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>, price: Option&lt;u64&gt;, size: u64
 ): ActiveMatchedOrder {
     <b>let</b> (largest_key, largest_value) = self.buys.borrow_back();
-    <b>assert</b>!(price &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
+    <b>if</b> (price.is_some()) {
+        <b>assert</b>!(
+            price.destroy_some() &lt;= largest_key.price, <a href="active_order_book.md#0x7_active_order_book_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>
+        );
+    };
     <a href="active_order_book.md#0x7_active_order_book_single_match_with_current_active_order">single_match_with_current_active_order</a>(
         size,
         largest_key,
@@ -712,7 +721,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, size: u64, is_buy: bool): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -721,13 +730,13 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_get_single_match_result">get_single_match_result</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
-    price: u64,
+    price: Option&lt;u64&gt;,
     size: u64,
-    is_buy: bool
+    is_bid: bool
 ): ActiveMatchedOrder {
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         self.<a href="active_order_book.md#0x7_active_order_book_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(price, size)
     } <b>else</b> {
         self.<a href="active_order_book.md#0x7_active_order_book_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(price, size)
@@ -746,7 +755,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 Increase the size of the order in the orderbook without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_buy: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -755,16 +764,16 @@ Increase the size of the order in the orderbook without altering its position in
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_increase_order_size">increase_order_size</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
     unique_priority_idx: UniqueIdxType,
     size_delta: u64,
-    is_buy: bool
+    is_bid: bool
 ) {
-    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         self.buys.borrow_mut(&key).size += size_delta;
     } <b>else</b> {
         self.sells.borrow_mut(&key).size += size_delta;
@@ -783,7 +792,7 @@ Increase the size of the order in the orderbook without altering its position in
 Decrease the size of the order in the order book without altering its position in the price-time priority.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_buy: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size_delta: u64, is_bid: bool)
 </code></pre>
 
 
@@ -792,16 +801,16 @@ Decrease the size of the order in the order book without altering its position i
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_decrease_order_size">decrease_order_size</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     price: u64,
     unique_priority_idx: UniqueIdxType,
     size_delta: u64,
-    is_buy: bool
+    is_bid: bool
 ) {
-    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
-    <b>if</b> (is_buy) {
+    <b>if</b> (is_bid) {
         self.buys.borrow_mut(&key).size -= size_delta;
     } <b>else</b> {
         self.sells.borrow_mut(&key).size -= size_delta;
@@ -819,7 +828,7 @@ Decrease the size of the order in the order book without altering its position i
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size: u64, is_buy: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">active_order_book::ActiveOrderBook</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, price: u64, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, size: u64, is_bid: bool)
 </code></pre>
 
 
@@ -828,20 +837,20 @@ Decrease the size of the order in the order book without altering its position i
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="active_order_book.md#0x7_active_order_book_place_maker_order">place_maker_order</a>(
     self: &<b>mut</b> <a href="active_order_book.md#0x7_active_order_book_ActiveOrderBook">ActiveOrderBook</a>,
     order_id: OrderIdType,
     price: u64,
     unique_priority_idx: UniqueIdxType,
     size: u64,
-    is_buy: bool
+    is_bid: bool
 ) {
-    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_buy);
+    <b>let</b> tie_breaker = <a href="active_order_book.md#0x7_active_order_book_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="active_order_book.md#0x7_active_order_book_ActiveBidKey">ActiveBidKey</a> { price, tie_breaker };
     <b>let</b> value = <a href="active_order_book.md#0x7_active_order_book_ActiveBidData">ActiveBidData</a> { order_id, size };
     // Assert that this is not a taker order
-    <b>assert</b>!(!self.<a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(price, is_buy), <a href="active_order_book.md#0x7_active_order_book_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
-    <b>if</b> (is_buy) {
+    <b>assert</b>!(!self.<a href="active_order_book.md#0x7_active_order_book_is_taker_order">is_taker_order</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(price), is_bid), <a href="active_order_book.md#0x7_active_order_book_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
+    <b>if</b> (is_bid) {
         self.buys.add(key, value);
     } <b>else</b> {
         self.sells.add(key, value);
