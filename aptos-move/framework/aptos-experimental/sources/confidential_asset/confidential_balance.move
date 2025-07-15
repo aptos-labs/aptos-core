@@ -44,12 +44,12 @@ module aptos_experimental::confidential_balance {
 
     /// Represents a compressed confidential balance, where each chunk is a compressed Twisted ElGamal ciphertext.
     struct CompressedConfidentialBalance has store, drop, copy {
-        chunks: vector<twisted_elgamal::CompressedCiphertext>,
+        chunks: vector<twisted_elgamal::CompressedCiphertext>
     }
 
     /// Represents a confidential balance, where each chunk is a Twisted ElGamal ciphertext.
     struct ConfidentialBalance has drop {
-        chunks: vector<twisted_elgamal::Ciphertext>,
+        chunks: vector<twisted_elgamal::Ciphertext>
     }
 
     //
@@ -60,7 +60,9 @@ module aptos_experimental::confidential_balance {
     public fun new_pending_balance_no_randomness(): ConfidentialBalance {
         ConfidentialBalance {
             chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_points(ristretto255::point_identity(), ristretto255::point_identity())
+                twisted_elgamal::ciphertext_from_points(
+                    ristretto255::point_identity(), ristretto255::point_identity()
+                )
             })
         }
     }
@@ -69,7 +71,9 @@ module aptos_experimental::confidential_balance {
     public fun new_actual_balance_no_randomness(): ConfidentialBalance {
         ConfidentialBalance {
             chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|_| {
-                twisted_elgamal::ciphertext_from_points(ristretto255::point_identity(), ristretto255::point_identity())
+                twisted_elgamal::ciphertext_from_points(
+                    ristretto255::point_identity(), ristretto255::point_identity()
+                )
             })
         }
     }
@@ -79,7 +83,9 @@ module aptos_experimental::confidential_balance {
         CompressedConfidentialBalance {
             chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|_| {
                 twisted_elgamal::ciphertext_from_compressed_points(
-                    ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed())
+                    ristretto255::point_identity_compressed(),
+                    ristretto255::point_identity_compressed()
+                )
             })
         }
     }
@@ -89,7 +95,9 @@ module aptos_experimental::confidential_balance {
         CompressedConfidentialBalance {
             chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|_| {
                 twisted_elgamal::ciphertext_from_compressed_points(
-                    ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed())
+                    ristretto255::point_identity_compressed(),
+                    ristretto255::point_identity_compressed()
+                )
             })
         }
     }
@@ -118,9 +126,11 @@ module aptos_experimental::confidential_balance {
             return std::option::none()
         };
 
-        option::some(ConfidentialBalance {
-            chunks: chunks.map(|chunk| chunk.extract())
-        })
+        option::some(
+            ConfidentialBalance {
+                chunks: chunks.map(|chunk| chunk.extract())
+            }
+        )
     }
 
     /// Creates a new actual balance from a serialized byte array representation.
@@ -138,22 +148,29 @@ module aptos_experimental::confidential_balance {
             return std::option::none()
         };
 
-        option::some(ConfidentialBalance {
-            chunks: chunks.map(|chunk| chunk.extract())
-        })
+        option::some(
+            ConfidentialBalance {
+                chunks: chunks.map(|chunk| chunk.extract())
+            }
+        )
     }
 
     /// Compresses a confidential balance into its `CompressedConfidentialBalance` representation.
     public fun compress_balance(balance: &ConfidentialBalance): CompressedConfidentialBalance {
         CompressedConfidentialBalance {
-            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::compress_ciphertext(ciphertext))
+            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::compress_ciphertext(
+                ciphertext
+            ))
         }
     }
 
     /// Decompresses a compressed confidential balance into its `ConfidentialBalance` representation.
-    public fun decompress_balance(balance: &CompressedConfidentialBalance): ConfidentialBalance {
+    public fun decompress_balance(balance: &CompressedConfidentialBalance):
         ConfidentialBalance {
-            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::decompress_ciphertext(ciphertext))
+        ConfidentialBalance {
+            chunks: balance.chunks.map_ref(|ciphertext| twisted_elgamal::decompress_ciphertext(
+                ciphertext
+            ))
         }
     }
 
@@ -186,8 +203,13 @@ module aptos_experimental::confidential_balance {
 
     /// Adds two confidential balances homomorphically, mutating the first balance in place.
     /// The second balance must have fewer or equal chunks compared to the first.
-    public fun add_balances_mut(lhs: &mut ConfidentialBalance, rhs: &ConfidentialBalance) {
-        assert!(lhs.chunks.length() >= rhs.chunks.length(), error::internal(EINTERNAL_ERROR));
+    public fun add_balances_mut(
+        lhs: &mut ConfidentialBalance, rhs: &ConfidentialBalance
+    ) {
+        assert!(
+            lhs.chunks.length() >= rhs.chunks.length(),
+            error::internal(EINTERNAL_ERROR)
+        );
 
         lhs.chunks.enumerate_mut(|i, chunk| {
             if (i < rhs.chunks.length()) {
@@ -198,8 +220,13 @@ module aptos_experimental::confidential_balance {
 
     /// Subtracts one confidential balance from another homomorphically, mutating the first balance in place.
     /// The second balance must have fewer or equal chunks compared to the first.
-    public fun sub_balances_mut(lhs: &mut ConfidentialBalance, rhs: &ConfidentialBalance) {
-        assert!(lhs.chunks.length() >= rhs.chunks.length(), error::internal(EINTERNAL_ERROR));
+    public fun sub_balances_mut(
+        lhs: &mut ConfidentialBalance, rhs: &ConfidentialBalance
+    ) {
+        assert!(
+            lhs.chunks.length() >= rhs.chunks.length(),
+            error::internal(EINTERNAL_ERROR)
+        );
 
         lhs.chunks.enumerate_mut(|i, chunk| {
             if (i < rhs.chunks.length()) {
@@ -209,30 +236,45 @@ module aptos_experimental::confidential_balance {
     }
 
     /// Checks if two confidential balances are equivalent, including both value and randomness components.
-    public fun balance_equals(lhs: &ConfidentialBalance, rhs: &ConfidentialBalance): bool {
-        assert!(lhs.chunks.length() == rhs.chunks.length(), error::internal(EINTERNAL_ERROR));
+    public fun balance_equals(
+        lhs: &ConfidentialBalance, rhs: &ConfidentialBalance
+    ): bool {
+        assert!(
+            lhs.chunks.length() == rhs.chunks.length(),
+            error::internal(EINTERNAL_ERROR)
+        );
 
         let ok = true;
 
-        lhs.chunks.zip_ref(&rhs.chunks, |l, r| {
-            ok = ok && twisted_elgamal::ciphertext_equals(l, r);
-        });
+        lhs.chunks.zip_ref(
+            &rhs.chunks, |l, r| {
+                ok = ok && twisted_elgamal::ciphertext_equals(l, r);
+            }
+        );
 
         ok
     }
 
     /// Checks if the corresponding value components (`C`) of two confidential balances are equivalent.
-    public fun balance_c_equals(lhs: &ConfidentialBalance, rhs: &ConfidentialBalance): bool {
-        assert!(lhs.chunks.length() == rhs.chunks.length(), error::internal(EINTERNAL_ERROR));
+    public fun balance_c_equals(
+        lhs: &ConfidentialBalance, rhs: &ConfidentialBalance
+    ): bool {
+        assert!(
+            lhs.chunks.length() == rhs.chunks.length(),
+            error::internal(EINTERNAL_ERROR)
+        );
 
         let ok = true;
 
-        lhs.chunks.zip_ref(&rhs.chunks, |l, r| {
-            let (lc, _) = twisted_elgamal::ciphertext_as_points(l);
-            let (rc, _) = twisted_elgamal::ciphertext_as_points(r);
+        lhs.chunks.zip_ref(
+            &rhs.chunks,
+            |l, r| {
+                let (lc, _) = twisted_elgamal::ciphertext_as_points(l);
+                let (rc, _) = twisted_elgamal::ciphertext_as_points(r);
 
-            ok = ok && ristretto255::point_equals(lc, rc);
-        });
+                ok = ok && ristretto255::point_equals(lc, rc);
+            }
+        );
 
         ok
     }
@@ -242,7 +284,9 @@ module aptos_experimental::confidential_balance {
         balance.chunks.all(|chunk| {
             twisted_elgamal::ciphertext_equals(
                 chunk,
-                &twisted_elgamal::ciphertext_from_points(ristretto255::point_identity(), ristretto255::point_identity())
+                &twisted_elgamal::ciphertext_from_points(
+                    ristretto255::point_identity(), ristretto255::point_identity()
+                )
             )
         })
     }
@@ -250,14 +294,18 @@ module aptos_experimental::confidential_balance {
     /// Splits a 64-bit integer amount into four 16-bit chunks, represented as `Scalar` values.
     public fun split_into_chunks_u64(amount: u64): vector<Scalar> {
         vector::range(0, PENDING_BALANCE_CHUNKS).map(|i| {
-            ristretto255::new_scalar_from_u64(amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff)
+            ristretto255::new_scalar_from_u64(
+                amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
+            )
         })
     }
 
     /// Splits a 128-bit integer amount into eight 16-bit chunks, represented as `Scalar` values.
     public fun split_into_chunks_u128(amount: u128): vector<Scalar> {
         vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|i| {
-            ristretto255::new_scalar_from_u128(amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff)
+            ristretto255::new_scalar_from_u128(
+                amount >> (i * CHUNK_SIZE_BITS as u8) & 0xffff
+            )
         })
     }
 
@@ -292,7 +340,7 @@ module aptos_experimental::confidential_balance {
     /// Each `r` element represents a random scalar used for Twisted ElGamal encryption.
     /// Can be used to generate both actual and pending balances.
     struct ConfidentialBalanceRandomness has drop {
-        r: vector<Scalar>,
+        r: vector<Scalar>
     }
 
     #[test_only]
@@ -306,7 +354,9 @@ module aptos_experimental::confidential_balance {
 
     #[test_only]
     /// Returns a reference to the vector of random scalars within the provided `ConfidentialBalanceRandomness`.
-    public fun balance_randomness_as_scalars(randomness: &ConfidentialBalanceRandomness): &vector<Scalar> {
+    public fun balance_randomness_as_scalars(
+        randomness: &ConfidentialBalanceRandomness
+    ): &vector<Scalar> {
         &randomness.r
     }
 
@@ -316,13 +366,15 @@ module aptos_experimental::confidential_balance {
     public fun new_actual_balance_from_u128(
         amount: u128,
         randomness: &ConfidentialBalanceRandomness,
-        ek: &twisted_elgamal::CompressedPubkey): ConfidentialBalance
-    {
+        ek: &twisted_elgamal::CompressedPubkey
+    ): ConfidentialBalance {
         let amount_chunks = split_into_chunks_u128(amount);
 
         ConfidentialBalance {
             chunks: vector::range(0, ACTUAL_BALANCE_CHUNKS).map(|i| {
-                twisted_elgamal::new_ciphertext_with_basepoint(&amount_chunks[i], &randomness.r[i], ek)
+                twisted_elgamal::new_ciphertext_with_basepoint(
+                    &amount_chunks[i], &randomness.r[i], ek
+                )
             })
         }
     }
@@ -333,13 +385,15 @@ module aptos_experimental::confidential_balance {
     public fun new_pending_balance_from_u64(
         amount: u64,
         randomness: &ConfidentialBalanceRandomness,
-        ek: &twisted_elgamal::CompressedPubkey): ConfidentialBalance
-    {
+        ek: &twisted_elgamal::CompressedPubkey
+    ): ConfidentialBalance {
         let amount_chunks = split_into_chunks_u64(amount);
 
         ConfidentialBalance {
             chunks: vector::range(0, PENDING_BALANCE_CHUNKS).map(|i| {
-                twisted_elgamal::new_ciphertext_with_basepoint(&amount_chunks[i], &randomness.r[i], ek)
+                twisted_elgamal::new_ciphertext_with_basepoint(
+                    &amount_chunks[i], &randomness.r[i], ek
+                )
             })
         }
     }
@@ -348,18 +402,34 @@ module aptos_experimental::confidential_balance {
     /// Verifies that an actual balance encrypts the specified 128-bit amount using the provided decryption key.
     /// Checks that the decryption of each chunk matches the corresponding 16-bit chunk of the provided amount.
     /// Use carefully, as it may return `false` if the balance is not normalized (i.e. has overflowed chunks).
-    public fun verify_actual_balance(balance: &ConfidentialBalance, dk: &Scalar, amount: u128): bool {
-        assert!(balance.chunks.length() == ACTUAL_BALANCE_CHUNKS, error::internal(EINTERNAL_ERROR));
+    public fun verify_actual_balance(
+        balance: &ConfidentialBalance, dk: &Scalar, amount: u128
+    ): bool {
+        assert!(
+            balance.chunks.length() == ACTUAL_BALANCE_CHUNKS,
+            error::internal(EINTERNAL_ERROR)
+        );
 
         let amount_chunks = split_into_chunks_u128(amount);
         let ok = true;
 
-        balance.chunks.zip_ref(&amount_chunks, |balance, amount| {
-            let (balance_c, balance_d) = twisted_elgamal::ciphertext_as_points(balance);
-            let point_amount = ristretto255::point_sub(balance_c, &ristretto255::point_mul(balance_d, dk));
+        balance.chunks.zip_ref(
+            &amount_chunks,
+            |balance, amount| {
+                let (balance_c, balance_d) =
+                    twisted_elgamal::ciphertext_as_points(balance);
+                let point_amount =
+                    ristretto255::point_sub(
+                        balance_c, &ristretto255::point_mul(balance_d, dk)
+                    );
 
-            ok = ok && ristretto255::point_equals(&point_amount, &ristretto255::basepoint_mul(amount));
-        });
+                ok =
+                    ok
+                        && ristretto255::point_equals(
+                            &point_amount, &ristretto255::basepoint_mul(amount)
+                        );
+            }
+        );
 
         ok
     }
@@ -368,18 +438,34 @@ module aptos_experimental::confidential_balance {
     /// Verifies that a pending balance encrypts the specified 64-bit amount using the provided decryption key.
     /// Checks that the decryption of each chunk matches the corresponding 16-bit chunk of the provided amount.
     /// Use carefully, as it may return `false` if the balance is not normalized (i.e. has overflowed chunks).
-    public fun verify_pending_balance(balance: &ConfidentialBalance, dk: &Scalar, amount: u64): bool {
-        assert!(balance.chunks.length() == PENDING_BALANCE_CHUNKS, error::internal(EINTERNAL_ERROR));
+    public fun verify_pending_balance(
+        balance: &ConfidentialBalance, dk: &Scalar, amount: u64
+    ): bool {
+        assert!(
+            balance.chunks.length() == PENDING_BALANCE_CHUNKS,
+            error::internal(EINTERNAL_ERROR)
+        );
 
         let amount_chunks = split_into_chunks_u64(amount);
         let ok = true;
 
-        balance.chunks.zip_ref(&amount_chunks, |balance, amount| {
-            let (balance_c, balance_d) = twisted_elgamal::ciphertext_as_points(balance);
-            let point_amount = ristretto255::point_sub(balance_c, &ristretto255::point_mul(balance_d, dk));
+        balance.chunks.zip_ref(
+            &amount_chunks,
+            |balance, amount| {
+                let (balance_c, balance_d) =
+                    twisted_elgamal::ciphertext_as_points(balance);
+                let point_amount =
+                    ristretto255::point_sub(
+                        balance_c, &ristretto255::point_mul(balance_d, dk)
+                    );
 
-            ok = ok && ristretto255::point_equals(&point_amount, &ristretto255::basepoint_mul(amount));
-        });
+                ok =
+                    ok
+                        && ristretto255::point_equals(
+                            &point_amount, &ristretto255::basepoint_mul(amount)
+                        );
+            }
+        );
 
         ok
     }

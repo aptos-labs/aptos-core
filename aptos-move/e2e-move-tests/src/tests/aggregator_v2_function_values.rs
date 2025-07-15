@@ -5,8 +5,7 @@ use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_transaction_simulation::Account;
-use aptos_types::{move_utils::MemberId, transaction::ExecutionStatus};
-use claims::assert_ok;
+use aptos_types::move_utils::MemberId;
 use move_core_types::{
     account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
 };
@@ -92,7 +91,7 @@ fn test_function_value_captures_aggregator_is_not_storable() {
         vec![],
         vec![bcs::to_bytes(&100_u64).unwrap()],
     );
-    assert_vm_status!(status, StatusCode::VALUE_SERIALIZATION_ERROR);
+    assert_vm_status!(status, StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS);
 
     let status = h.run_entry_function(
         &acc,
@@ -113,38 +112,40 @@ fn test_function_value_captures_aggregator_is_not_storable() {
 }
 
 #[test]
-fn test_function_value_captures_aggregator() {
+fn test_function_value_uses_aggregator_is_storable() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     initialize(&mut h);
 
-    let mut value = 100;
     let status = h.run_entry_function(
         &acc,
-        MemberId::from_str("0x1::proxy::initialize").unwrap(),
+        MemberId::from_str("0x1::function_store::try_initialize_should_succeed").unwrap(),
         vec![],
-        vec![bcs::to_bytes(&value).unwrap()],
+        vec![bcs::to_bytes(&100_u64).unwrap()],
     );
     assert_success!(status);
-    assert_counter_value_eq(&h, &acc, value);
 
-    let increment = 100;
-    value += increment;
     let status = h.run_entry_function(
         &acc,
-        MemberId::from_str("0x1::capturing::capture_aggregator").unwrap(),
+        MemberId::from_str("0x1::function_store::run_stored_add").unwrap(),
         vec![],
-        vec![
-            bcs::to_bytes(&increment).unwrap(),
-            bcs::to_bytes(&value).unwrap(),
-        ],
+        vec![bcs::to_bytes(&200_u64).unwrap()],
     );
     assert_success!(status);
+}
+
+#[test]
+fn test_function_value_captures_aggregator() {
+    let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis());
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    initialize(&mut h);
 
     for name in [
+        "capture_aggregator",
         "to_bytes_with_captured_aggregator",
         "to_string_with_captured_aggregator",
         "emit_event_with_captured_aggregator",
+        "serialized_size_with_captured_aggregator",
     ] {
         let status = h.run_entry_function(
             &acc,
@@ -152,20 +153,6 @@ fn test_function_value_captures_aggregator() {
             vec![],
             vec![],
         );
-        assert_vm_status!(status, StatusCode::VALUE_SERIALIZATION_ERROR);
+        assert_vm_status!(status, StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS);
     }
-
-    let status = h.run_entry_function(
-        &acc,
-        MemberId::from_str("0x1::capturing::serialized_size_with_captured_aggregator").unwrap(),
-        vec![],
-        vec![],
-    );
-
-    // Note: the native function remaps the error and aborts with this code.
-    let status = assert_ok!(status.as_kept_status());
-    assert!(matches!(status, ExecutionStatus::MoveAbort {
-        code: 453,
-        ..
-    }));
 }

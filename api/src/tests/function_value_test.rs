@@ -82,3 +82,32 @@ async fn test_function_values() {
         .unwrap()["data"];
     assert_eq!(state, &json!({"__variant__": "Value", "_0": "33"}));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_function_values_with_references() {
+    let mut context = new_test_context(current_function_name!());
+    let mut account = context.create_account().await;
+    let addr = account.address();
+
+    let named_addresses = vec![("account".to_string(), addr)];
+    let txn = futures::executor::block_on(async move {
+        let path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_function_values");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+
+    let resource = format!("{}::test::FunctionStore", addr);
+    let response = &context.gen_resource(&addr, &resource).await.unwrap();
+
+    let expected_name = format!("{}::test::freeze_ref", addr);
+    assert_eq!(
+        response["data"],
+        json!({
+            "f": {
+                "__fun_name__": &expected_name,
+                "__mask__": "0",
+            }
+        })
+    );
+}

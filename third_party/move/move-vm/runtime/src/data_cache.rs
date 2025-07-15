@@ -22,7 +22,7 @@ use move_core_types::{
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::{BTreeMap, Entry};
@@ -77,7 +77,8 @@ impl TransactionDataCache {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 let function_value_extension = FunctionValueExtensionAdapter { module_storage };
-                ValueSerDeContext::new()
+                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                ValueSerDeContext::new(max_value_nest_depth)
                     .with_func_args_deserialization(&function_value_extension)
                     .serialize(&value, &layout)?
                     .map(Into::into)
@@ -170,13 +171,17 @@ impl TransactionDataCache {
         let function_value_extension = FunctionValueExtensionAdapter { module_storage };
         let value = match data {
             Some(blob) => {
-                let val = ValueSerDeContext::new()
+                let max_value_nest_depth = function_value_extension.max_value_nest_depth();
+                let val = ValueSerDeContext::new(max_value_nest_depth)
                     .with_func_args_deserialization(&function_value_extension)
                     .with_delayed_fields_serde()
                     .deserialize(&blob, &layout)
                     .ok_or_else(|| {
-                        let msg =
-                            format!("Failed to deserialize resource {} at {}!", struct_tag, addr);
+                        let msg = format!(
+                            "Failed to deserialize resource {} at {}!",
+                            struct_tag.to_canonical_string(),
+                            addr
+                        );
                         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
                             .with_message(msg)
                     })?;

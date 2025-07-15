@@ -100,6 +100,7 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-transaction-filters",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
@@ -447,6 +448,7 @@ aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-transaction-filter = { path = "ecosystem/indexer-grpc/transaction-filter" }
+aptos-transaction-filters = { path = "crates/aptos-transaction-filters" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -496,7 +498,7 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c63f6ee891e42cc50f92480c21d4afa86012b157", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.1", features = [
     "postgres_partial",
 ] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
@@ -558,7 +560,7 @@ crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "5.5.3", features = ["inline"] }
+dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
@@ -587,6 +589,7 @@ ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
+equivalent = "1.0"
 erased-serde = "0.3.13"
 ethnum = "1.5.0"
 ethers = { version = "2" }
@@ -644,7 +647,7 @@ libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.5.2"
 log = "0.4.17"
-lru = "0.7.5"
+lru = "0.16.0"
 lz4 = "1.28.0"
 maplit = "1.0.2"
 merlin = "3"
@@ -695,7 +698,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", rev = "8628f1534efa28ada547bbcd34afec1af55697d4", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.4", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"

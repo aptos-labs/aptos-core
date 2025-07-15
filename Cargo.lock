@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.3.0"
+version = "7.6.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -352,7 +352,7 @@ dependencies = [
  "clap 4.5.21",
  "clap_complete",
  "colored",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "diesel",
  "diesel-async",
  "dirs 5.0.1",
@@ -486,6 +486,7 @@ dependencies = [
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-storage-interface",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
@@ -706,6 +707,7 @@ dependencies = [
  "ambassador",
  "anyhow",
  "aptos-aggregator",
+ "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-logger",
@@ -754,7 +756,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.21",
  "criterion",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "jemallocator",
  "move-core-types",
@@ -893,6 +895,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-short-hex-str",
  "aptos-temppath",
+ "aptos-transaction-filters",
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
@@ -954,6 +957,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -965,14 +969,14 @@ dependencies = [
  "chrono",
  "claims",
  "clap 4.5.21",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "enum_dispatch",
  "fail",
  "futures",
  "futures-channel",
  "hex",
  "itertools 0.13.0",
- "lru 0.7.8",
+ "lru",
  "maplit",
  "mini-moka",
  "mirai-annotations",
@@ -990,7 +994,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serde_yaml 0.8.26",
  "sha3 0.9.1",
  "strum 0.27.1",
  "strum_macros 0.27.1",
@@ -1154,7 +1157,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "claims",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "futures",
  "itertools 0.13.0",
  "maplit",
@@ -1200,6 +1203,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-accumulator",
+ "aptos-block-executor",
  "aptos-config",
  "aptos-crypto",
  "aptos-db-indexer",
@@ -1225,12 +1229,12 @@ dependencies = [
  "claims",
  "clap 4.5.21",
  "crossbeam-channel",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "either",
  "hex",
  "indicatif 0.15.0",
  "itertools 0.13.0",
- "lru 0.7.8",
+ "lru",
  "move-core-types",
  "once_cell",
  "ouroboros",
@@ -1262,7 +1266,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
@@ -1545,7 +1549,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap 4.5.21",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "derivative",
  "indicatif 0.15.0",
  "itertools 0.13.0",
@@ -1585,7 +1589,7 @@ dependencies = [
  "clap 4.5.21",
  "crossbeam-channel",
  "ctrlc",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "num_cpus",
  "once_cell",
@@ -1771,7 +1775,7 @@ dependencies = [
  "hex",
  "ipnet",
  "iprange",
- "lru 0.9.0",
+ "lru",
  "once_cell",
  "poem",
  "poem-openapi",
@@ -2224,7 +2228,7 @@ dependencies = [
  "async-trait",
  "build_html",
  "clap 4.5.21",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "futures",
  "jemallocator",
  "once_cell",
@@ -2382,7 +2386,7 @@ dependencies = [
  "async-trait",
  "build_html",
  "clap 4.5.21",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "futures",
  "jemallocator",
  "once_cell",
@@ -2466,7 +2470,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cloud-storage",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "futures",
  "itertools 0.13.0",
  "lz4",
@@ -2510,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
@@ -2595,10 +2599,10 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "aptos-transaction-filter 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "chrono",
@@ -2800,7 +2804,7 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "bcs 0.1.4",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "firestore",
  "hex",
  "hyper 0.14.28",
@@ -2970,6 +2974,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-time-service",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
@@ -3105,7 +3110,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=62beedc881d1b76632318ceb186ee9065236468e#62beedc881d1b76632318ceb186ee9065236468e"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
 dependencies = [
  "chrono",
 ]
@@ -3113,7 +3118,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=62beedc881d1b76632318ceb186ee9065236468e#62beedc881d1b76632318ceb186ee9065236468e"
 dependencies = [
  "chrono",
 ]
@@ -3124,16 +3129,21 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-infallible",
  "aptos-types",
  "aptos-vm-types",
  "bytes",
  "claims",
+ "concurrent-queue",
  "crossbeam",
- "dashmap",
+ "dashmap 7.0.0-rc2",
+ "equivalent",
+ "fail",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
+ "num_cpus",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -3148,8 +3158,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-types",
- "bcs 0.1.4",
- "bytes",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3938,7 +3946,7 @@ dependencies = [
  "aptos-vm",
  "bitvec 1.0.1",
  "criterion",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "jemallocator",
  "once_cell",
@@ -4123,7 +4131,7 @@ dependencies = [
  "aptos-types",
  "arr_macro",
  "bcs 0.1.4",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
  "once_cell",
@@ -4183,7 +4191,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "futures",
  "maplit",
  "mini-moka",
@@ -4509,6 +4517,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-filters"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "move-core-types",
+ "rand 0.7.3",
+ "serde",
+ "serde_yaml 0.8.26",
+]
+
+[[package]]
 name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
@@ -4631,15 +4651,16 @@ dependencies = [
  "claims",
  "coset",
  "criterion",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "derivative",
+ "derive_more 0.99.17",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
  "hex",
  "itertools 0.13.0",
  "jsonwebtoken 8.3.0",
- "lru 0.7.8",
+ "lru",
  "move-binary-format",
  "move-core-types",
  "move-model",
@@ -4660,6 +4681,7 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
+ "ref-cast",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
@@ -4692,7 +4714,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bcs 0.1.4",
- "lru 0.7.8",
+ "lru",
  "move-core-types",
  "tokio",
 ]
@@ -5907,7 +5929,7 @@ version = "0.69.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a00dc851838a2120612785d195287475a3ac45514741da670b735818822129a0"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "cexpr",
  "clang-sys",
  "itertools 0.12.1",
@@ -5927,7 +5949,16 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.6.3",
+]
+
+[[package]]
+name = "bit-set"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
+dependencies = [
+ "bit-vec 0.8.0",
 ]
 
 [[package]]
@@ -5935,6 +5966,12 @@ name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
+name = "bit-vec"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bit_field"
@@ -5950,9 +5987,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.6.0"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
+checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
 name = "bitmaps"
@@ -7547,7 +7584,21 @@ dependencies = [
  "hashbrown 0.14.3",
  "lock_api",
  "once_cell",
- "parking_lot_core 0.9.9",
+ "parking_lot_core 0.9.10",
+]
+
+[[package]]
+name = "dashmap"
+version = "7.0.0-rc2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4a1e35a65fe0538a60167f0ada6e195ad5d477f6ddae273943596d4a1a5730b"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "equivalent",
+ "hashbrown 0.15.3",
+ "lock_api",
+ "parking_lot_core 0.9.10",
 ]
 
 [[package]]
@@ -7803,7 +7854,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35b696af9ff4c0d2a507db2c5faafa8aa0205e297e5f11e203a24226d5355e7a"
 dependencies = [
  "bigdecimal",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "byteorder",
  "chrono",
  "diesel_derives",
@@ -8982,6 +9033,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9389,6 +9446,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "getrandom"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "r-efi",
+ "wasi 0.14.2+wasi-0.2.4",
+]
+
+[[package]]
 name = "ghash"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9623,7 +9692,7 @@ dependencies = [
  "ff",
  "rand 0.8.5",
  "rand_core 0.6.4",
- "rand_xorshift",
+ "rand_xorshift 0.3.0",
  "subtle",
 ]
 
@@ -9776,9 +9845,14 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.1"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a9bfc1af68b1726ea47d3d5109de126281def866b33970e10fbab11b5dafab3"
+checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash",
+]
 
 [[package]]
 name = "hashers"
@@ -10493,7 +10567,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
 dependencies = [
  "equivalent",
- "hashbrown 0.15.1",
+ "hashbrown 0.15.3",
  "serde",
 ]
 
@@ -10538,7 +10612,7 @@ dependencies = [
  "clap 4.5.21",
  "crossbeam-channel",
  "crossbeam-utils",
- "dashmap",
+ "dashmap 5.5.3",
  "env_logger",
  "indexmap 2.7.0",
  "is-terminal",
@@ -10581,7 +10655,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
 dependencies = [
  "delegate",
  "derive_builder",
@@ -10604,7 +10678,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
  "ahash 0.7.8",
- "dashmap",
+ "dashmap 5.5.3",
  "hashbrown 0.12.3",
  "once_cell",
  "parking_lot 0.12.1",
@@ -11015,7 +11089,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a1cbf952127589f2851ab2046af368fd20645491bb4b376f04b7f94d7a9837b"
 dependencies = [
  "ascii-canvas",
- "bit-set",
+ "bit-set 0.5.3",
  "diff",
  "ena",
  "is-terminal",
@@ -11037,7 +11111,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55cb077ad656299f160924eb2912aa147d7339ea7d69e1b5517326fdcec3c1ca"
 dependencies = [
  "ascii-canvas",
- "bit-set",
+ "bit-set 0.5.3",
  "ena",
  "itertools 0.11.0",
  "lalrpop-util 0.20.2",
@@ -11240,7 +11314,7 @@ version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85c833ca1e66078851dba29046874e38f08b2c883700aa29a03ddd3b23814ee8"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "libc",
  "redox_syscall 0.4.1",
 ]
@@ -11392,9 +11466,9 @@ checksum = "c4cd1a83af159aa67994778be9070f0ae1bd732942279cabb14f86f986a21456"
 
 [[package]]
 name = "lock_api"
-version = "0.4.11"
+version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
+checksum = "07af8b9cdd281b7915f413fa73f29ebd5d55d0d3f0155584dade1ff18cea1b17"
 dependencies = [
  "autocfg",
  "scopeguard",
@@ -11425,20 +11499,11 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.8"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e999beba7b6e8345721bd280141ed958096a2e4abdf74f67ff4ce49b4b54e47a"
+checksum = "86ea4e65087ff52f3862caff188d489f1fab49a0cb09e01b2e3f1a617b10aaed"
 dependencies = [
- "hashbrown 0.12.3",
-]
-
-[[package]]
-name = "lru"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e7d46de488603ffdd5f30afbc64fbba2378214a2c3a2fb83abf3d33126df17"
-dependencies = [
- "hashbrown 0.13.2",
+ "hashbrown 0.15.3",
 ]
 
 [[package]]
@@ -11663,7 +11728,7 @@ checksum = "c325dfab65f261f386debee8b0969da215b3fa0037e74c8a1234db7ba986d803"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",
- "dashmap",
+ "dashmap 5.5.3",
  "skeptic",
  "smallvec",
  "tagptr",
@@ -12617,7 +12682,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "legacy-move-compiler",
- "lru 0.7.8",
+ "lru",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -12675,7 +12740,7 @@ dependencies = [
  "bytes",
  "claims",
  "crossbeam",
- "dashmap",
+ "dashmap 7.0.0-rc2",
  "derivative",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
@@ -12844,7 +12909,7 @@ version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "cfg-if",
  "libc",
 ]
@@ -12855,7 +12920,7 @@ version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "cfg-if",
  "cfg_aliases 0.2.1",
  "libc",
@@ -13250,7 +13315,7 @@ version = "0.10.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9529f4786b70a3e8c61e11179af17ab6188ad8d0ded78c5529441ed39d4bd9c1"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "cfg-if",
  "foreign-types 0.3.2",
  "libc",
@@ -13514,7 +13579,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
- "parking_lot_core 0.9.9",
+ "parking_lot_core 0.9.10",
 ]
 
 [[package]]
@@ -13533,15 +13598,15 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.9"
+version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c42a9226546d68acdd9c0a280d17ce19bfe27a46bf68784e4066115788d008e"
+checksum = "1e401f977ab385c9e4e3ab30627d6f26d00e2c73eef317493c4ec6d468726cf8"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall 0.4.1",
+ "redox_syscall 0.5.11",
  "smallvec",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -13626,7 +13691,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "499cff8432e71c5f8784d9645aac0f9fca604d67f59b68a606170b5e229c6538"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "ciborium",
  "coset",
  "data-encoding",
@@ -14593,7 +14658,7 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?rev=8628f1534efa28ada547bbcd34afec1af55697d4#8628f1534efa28ada547bbcd34afec1af55697d4"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?tag=aptos-indexer-processors-v2.1.4#768c3433275cc4a4d191b8e97442c78408642849"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
@@ -14603,7 +14668,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bigdecimal",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "canonical_json",
  "chrono",
  "clap 4.5.21",
@@ -14734,18 +14799,18 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.4.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b476131c3c86cb68032fdc5cb6d5a1045e3e42d96b69fa599fd77701e1f5bf"
+checksum = "6fcdab19deb5195a31cf7726a210015ff1496ba1464fd42cb4f537b8b01b471f"
 dependencies = [
- "bit-set",
- "bit-vec",
- "bitflags 2.6.0",
+ "bit-set 0.8.0",
+ "bit-vec 0.8.0",
+ "bitflags 2.9.1",
  "lazy_static",
  "num-traits",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_xorshift",
+ "rand 0.9.1",
+ "rand_chacha 0.9.0",
+ "rand_xorshift 0.4.0",
  "regex-syntax 0.8.2",
  "rusty-fork",
  "tempfile",
@@ -15068,6 +15133,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-efi"
+version = "5.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
+
+[[package]]
 name = "r2d2"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15116,6 +15187,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
+dependencies = [
+ "rand_chacha 0.9.0",
+ "rand_core 0.9.3",
+]
+
+[[package]]
 name = "rand_chacha"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15136,6 +15217,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_chacha"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.9.3",
+]
+
+[[package]]
 name = "rand_core"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15151,6 +15242,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.11",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
+dependencies = [
+ "getrandom 0.3.3",
 ]
 
 [[package]]
@@ -15178,6 +15278,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+dependencies = [
+ "rand_core 0.9.3",
 ]
 
 [[package]]
@@ -15282,6 +15391,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4722d768eff46b75989dd134e5c353f0d6296e5aaa3132e776cbdb56be7731aa"
 dependencies = [
  "bitflags 1.3.2",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2f103c6d277498fbceb16e84d317e2a400f160f46904d5f5410848c829511a3"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]
@@ -15780,7 +15898,7 @@ version = "0.38.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72e572a5e8ca657d7366229cdde4bd14c4eb5499a9573d4d366fe1b599daa316"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "errno",
  "libc",
  "linux-raw-sys 0.4.12",
@@ -16017,7 +16135,7 @@ dependencies = [
 [[package]]
 name = "sample"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=c63f6ee891e42cc50f92480c21d4afa86012b157#c63f6ee891e42cc50f92480c21d4afa86012b157"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
 dependencies = [
  "tracing",
 ]
@@ -16797,6 +16915,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
+ "aptos-api-types",
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-cached-packages",
@@ -18799,6 +18918,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
+name = "wasi"
+version = "0.14.2+wasi-0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
+dependencies = [
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "wasite"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19298,6 +19426,15 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
+dependencies = [
+ "bitflags 2.9.1",
 ]
 
 [[package]]

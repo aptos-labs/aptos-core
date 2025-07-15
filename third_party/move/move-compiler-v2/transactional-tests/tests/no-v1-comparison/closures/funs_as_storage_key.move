@@ -69,6 +69,108 @@ module 0x42::mod3 {
     }
 }
 
+//# publish
+module 0x42::mod4 {
+    struct Wrapper<T> has key {
+        fv: T
+    }
+
+    #[persistent]
+    fun test(ref: &u64, _mut_ref: &mut u8): &u64 {
+        ref
+    }
+
+    fun initialize(acc: &signer) {
+        move_to<Wrapper<|&u64, &mut u8|&u64 has copy+store+drop>>(acc, Wrapper { fv: 0x42::mod4::test});
+    }
+
+    fun check_exists(_acc: &signer) {
+        let exists = exists<Wrapper<|&u64, &mut u8|&u64 has copy+store+drop>>(@0x42);
+        assert!(exists, 404);
+    }
+}
+
+//# publish
+module 0x42::mod5 {
+    struct VecWrapper<T> has key {
+        fvs: vector<T>
+    }
+
+    #[persistent]
+    fun test(ref: &u64, _mut_ref: &mut u8): &u64 {
+        ref
+    }
+
+    fun initialize(acc: &signer) {
+        move_to<VecWrapper<|&u64, &mut u8|&u64 has copy+store+drop>>(acc, VecWrapper { fvs: vector[0x42::mod5::test]});
+    }
+
+    fun check_exists(_acc: &signer) {
+        let exists = exists<VecWrapper<|&u64, &mut u8|&u64 has copy+store+drop>>(@0x42);
+        assert!(exists, 404);
+    }
+}
+
+//# publish
+module 0x42::mod6 {
+    struct VecWrapper<T> has key {
+        fvs: vector<T>
+    }
+
+    #[persistent]
+    fun test1(x: &mut u8) {
+        *x = *x + 1;
+    }
+
+    #[persistent]
+    fun test2(x: &mut u8) {
+        *x = *x + 2;
+    }
+
+    #[persistent]
+    fun test3(x: &mut u8) {
+        *x = *x + 3;
+    }
+
+    fun initialize(acc: &signer) {
+        let fvs = vector[
+            0x42::mod6::test1,
+            0x42::mod6::test2,
+            0x42::mod6::test3,
+        ];
+        move_to<VecWrapper<|&mut u8| has copy+store+drop>>(acc, VecWrapper { fvs });
+    }
+
+    fun compute(_acc: &signer): u8 {
+        let do_not_exist = !exists<VecWrapper<|&mut u8| has store+drop>>(@0x42)
+            && !exists<VecWrapper<|&mut u8| has store>>(@0x42);
+        assert!(do_not_exist, 404);
+
+        let wrapper = &borrow_global<VecWrapper<|&mut u8| has copy+store+drop>>(@0x42).fvs;
+        let x = 0;
+
+        let i = 0;
+        while (i < 3) {
+            let f = std::vector::borrow(wrapper, i);
+            (*f)(&mut x);
+            i = i + 1;
+        };
+        x
+    }
+}
+
 //# run 0x42::mod3::test_items --signers 0x42 --args true
 
 //# run 0x42::mod3::test_items --signers 0x42 --args false
+
+//# run 0x42::mod4::initialize --signers 0x42
+
+//# run 0x42::mod4::check_exists --signers 0x42
+
+//# run 0x42::mod5::initialize --signers 0x42
+
+//# run 0x42::mod5::check_exists --signers 0x42
+
+//# run 0x42::mod6::initialize --signers 0x42
+
+//# run 0x42::mod6::compute --signers 0x42

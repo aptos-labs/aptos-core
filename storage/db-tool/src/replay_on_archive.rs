@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{Error, Ok, Result};
+use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
@@ -26,6 +26,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use clap::Parser;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
+    panic,
     path::PathBuf,
     process,
     sync::{atomic::AtomicU64, Arc},
@@ -134,9 +135,27 @@ struct Verifier {
 
 impl Verifier {
     pub fn new(config: &Opt) -> Result<Self> {
+        // Open in write mode to create any new DBs necessary.
+        {
+            if let Err(e) = panic::catch_unwind(|| {
+                AptosDB::open(
+                    StorageDirPaths::from_path(config.db_dir.as_path()),
+                    false,
+                    NO_OP_STORAGE_PRUNER_CONFIG,
+                    config.rocksdb_opt.clone().into(),
+                    false,
+                    BUFFERED_STATE_TARGET_ITEMS,
+                    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                    None,
+                )
+            }) {
+                warn!("Unable to open AptosDB in write mode: {:?}", e);
+            };
+        }
+
         let aptos_db = AptosDB::open(
             StorageDirPaths::from_path(config.db_dir.as_path()),
-            true,
+            false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             config.rocksdb_opt.clone().into(),
             false,
@@ -194,7 +213,7 @@ impl Verifier {
         let res = ranges
             .par_iter()
             .map(|(start, limit)| self.verify(*start, *limit))
-            .collect::<Vec<Result<Vec<Error>>>>();
+            .collect::<Vec<_>>();
         let mut all_failed_txns = Vec::new();
         for iter in res.into_iter() {
             all_failed_txns.extend(iter?);
@@ -217,7 +236,12 @@ impl Verifier {
             // timeout check
             if let Some(duration) = self.timeout_secs {
                 if self.replay_stat.get_elapsed_secs() >= duration {
-                    return Ok(total_failed_txns);
+                    bail!(
+                        "Verify timeout: {}s elapsed. Deadline: {}s. Failed txns count: {}",
+                        self.replay_stat.get_elapsed_secs(),
+                        duration,
+                        total_failed_txns.len(),
+                    );
                 }
             }
 
@@ -306,7 +330,8 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
-        let txns_provider = DefaultTxnProvider::new(txns);
+        // TODO(grao): Pass in persisted info.
+        let txns_provider = DefaultTxnProvider::new_without_info(txns);
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             &txns_provider,
             &self
@@ -325,23 +350,12 @@ impl Verifier {
                 Some(&expected_writesets[idx]),
                 Some(&expected_events[idx]),
             ) {
-                let err_opt = if idx == 0 {
-                    // FIXME(aldenhu): remove this hack
-                    warn!(
-                        version = version,
-                        "Probably known failure due to StateStorageUsage missing from a restored DB."
-                    );
-                    Ok(None)
-                } else {
-                    Ok(Some(err))
-                };
-
                 cur_txns.drain(0..idx + 1);
                 expected_txn_infos.drain(0..idx + 1);
                 expected_events.drain(0..idx + 1);
                 expected_writesets.drain(0..idx + 1);
 
-                return err_opt;
+                return Ok(Some(err));
             }
         }
 

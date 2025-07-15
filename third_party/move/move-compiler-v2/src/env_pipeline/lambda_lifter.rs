@@ -40,6 +40,8 @@
 //! like `|x| f(c, x)` can be represented as `Closure(f, mask(0b01), c)`, whereas
 //! `|x| f(x, c)` can be represented as `Closure(f, mask(0b10), c)`.
 
+use crate::COMPILER_BUG_REPORT_MSG;
+use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_core_types::function::ClosureMask;
@@ -49,8 +51,10 @@ use move_model::{
     model::{FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use std::{
+    borrow::BorrowMut,
     collections::{BTreeMap, BTreeSet},
     mem,
 };
@@ -100,7 +104,21 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
                 new_funs.append(&mut lifter.lifted);
                 updated_funs.insert(fun.get_id(), new_def);
             }
+            // Lift lambda in function level specs
+            // TODO(#16256): add support for module level specs and spec funs
+            let mut spec_mut_ref = fun.get_mut_spec();
+            let fun_spec = spec_mut_ref.borrow_mut();
+            for cond in &mut fun_spec.conditions {
+                for expr in cond.all_exps_mut() {
+                    let new_def = lifter.rewrite_exp(expr.clone());
+                    if expr != &new_def {
+                        *expr = new_def;
+                    }
+                }
+            }
+            new_funs.append(&mut lifter.lifted);
         }
+
         // Now that we have processed all functions and released
         // all references to the env, mutate it.
         for (fun_id, new_def) in updated_funs {
@@ -158,7 +176,7 @@ pub struct LambdaLifter<'a> {
 }
 
 struct VarInfo {
-    /// The node were this variable was found.
+    /// The node where this variable was found.
     node_id: NodeId,
     /// Whether the variable is modified
     modified: bool,
@@ -347,6 +365,17 @@ impl<'a> LambdaLifter<'a> {
                         None
                     },
                     Operation::MoveFunction(mid, fid) => {
+                        let env = self.fun_env.env();
+                        let qualified_fun_id = mid.qualified(*fid);
+                        let move_fun_env = env.get_function(qualified_fun_id);
+                        if move_fun_env.module_env.is_std_vector()
+                            && well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS
+                                .contains(&move_fun_env.get_name_str().as_str())
+                        {
+                            // Do not curry std::vector functions that are bytecode instructions
+                            return None;
+                        }
+
                         let lambda_bound = lambda_params
                             .iter()
                             .map(|Parameter(name, ..)| *name)
@@ -360,12 +389,10 @@ impl<'a> LambdaLifter<'a> {
                             {
                                 // We can capture an argument if it can be eagerly evaluated and if
                                 // it does not depend on lambda arguments.
-                                if pos >= ClosureMask::MAX_ARGS {
-                                    // Exceeded maximal number of arguments which can be captured
+                                if mask.set_captured(pos).is_err() {
                                     return None;
                                 }
                                 captured.push(arg.clone());
-                                mask.set_captured(pos);
                             } else if lambda_param_pos < lambda_params.len()
                                 && matches!(arg.as_ref(), LocalVar(_, name) if name == &lambda_params[lambda_param_pos].0)
                             {
@@ -382,7 +409,6 @@ impl<'a> LambdaLifter<'a> {
                         }
                         // Create a new node id. We inherit location and type from the lambda,
                         // but instantiation is taken from the call of the curried function.
-                        let env = self.fun_env.module_env.env;
                         let curry_id = env.new_node(env.get_node_loc(id), env.get_node_type(id));
                         if let Some(inst) = env.get_node_instantiation_opt(*call_id) {
                             env.set_node_instantiation(curry_id, inst)
@@ -436,6 +462,53 @@ impl<'a> LambdaLifter<'a> {
             | Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) | SpecBlock(..) => false,
         }
     }
+
+    fn is_symbol_in_scope(&self, sym: &Symbol) -> bool {
+        self.scopes.iter().any(|scope| scope.contains(sym))
+    }
+
+    /// Insert `sym` as a free local variable, if it is not already in scope.
+    fn try_insert_free_local(&mut self, sym: Symbol, var_info: VarInfo) {
+        if !self.is_symbol_in_scope(&sym) {
+            if var_info.modified {
+                // Make sure we mark the variable as modified.
+                self.free_locals.insert(sym, var_info);
+            } else {
+                self.free_locals.entry(sym).or_insert(var_info);
+            }
+        }
+    }
+
+    /// Perform a rewrite action in an isolated context.
+    /// To do so, we save the current context (free parameters, free locals, and scopes),
+    /// perform the rewrite action, and then restore the context.
+    fn rewrite_with_isolated_context<F>(&mut self, rewrite: F, exp: Exp) -> Exp
+    where
+        F: FnOnce(&mut Self, Exp) -> Exp,
+    {
+        // Save the current context.
+        let mut curr_free_params = mem::take(&mut self.free_params);
+        let mut curr_free_locals = mem::take(&mut self.free_locals);
+        let curr_scopes = mem::take(&mut self.scopes);
+        // Perform the rewrite action.
+        let result = rewrite(self, exp);
+        // Restore the context.
+        self.scopes = curr_scopes;
+        // Remove free vars present in the re-instated scope.
+        let to_remove = self
+            .free_locals
+            .keys()
+            .filter(|sym| self.is_symbol_in_scope(sym))
+            .copied()
+            .collect::<Vec<_>>();
+        for sym in to_remove {
+            self.free_locals.remove(&sym);
+        }
+        self.free_locals.append(&mut curr_free_locals);
+        self.free_params.append(&mut curr_free_params);
+        // Return the result of the rewrite.
+        result
+    }
 }
 
 impl ExpRewriterFunctions for LambdaLifter<'_> {
@@ -457,12 +530,7 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
         // Also if this is a lambda, before descent, clear any usages from siblings in the
         // context, so we get the isolated usage information for the lambda's body.
         if matches!(exp.as_ref(), ExpData::Lambda(..)) {
-            let mut curr_free_params = mem::take(&mut self.free_params);
-            let mut curr_free_locals = mem::take(&mut self.free_locals);
-            let result = self.rewrite_exp_descent(exp);
-            self.free_params.append(&mut curr_free_params);
-            self.free_locals.append(&mut curr_free_locals);
-            result
+            self.rewrite_with_isolated_context(ExpRewriterFunctions::rewrite_exp_descent, exp)
         } else {
             self.rewrite_exp_descent(exp)
         }
@@ -478,14 +546,12 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
     }
 
     fn rewrite_exit_scope(&mut self, _id: NodeId) {
-        let exiting = self.scopes.pop().expect("stack balanced");
-        // Remove all locals which are bound in the scope we are exiting.
-        self.free_locals.retain(|name, _| !exiting.contains(name));
+        self.scopes.pop().expect("stack balanced");
     }
 
     fn rewrite_local_var(&mut self, node_id: NodeId, sym: Symbol) -> Option<Exp> {
         // duplicates are OK -- they are all the same local at different locations
-        self.free_locals.entry(sym).or_insert(VarInfo {
+        self.try_insert_free_local(sym, VarInfo {
             node_id,
             modified: false,
         });
@@ -503,7 +569,7 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(name, VarInfo {
+            self.try_insert_free_local(name, VarInfo {
                 node_id,
                 modified: true,
             });
@@ -515,7 +581,7 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(*name, VarInfo {
+                    self.try_insert_free_local(*name, VarInfo {
                         node_id: *node_id,
                         modified: true,
                     });
@@ -698,7 +764,15 @@ impl ExpRewriterFunctions for LambdaLifter<'_> {
                 Operation::Closure(
                     module_id,
                     fun_id,
-                    ClosureMask::new_for_leading(closure_args.len()),
+                    ClosureMask::new_for_leading(closure_args.len()).unwrap_or_else(|err| {
+                        env.diag_with_notes(
+                            Severity::Bug,
+                            &env.get_node_loc(id),
+                            &format!("compiler internal error: {}", err),
+                            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+                        );
+                        ClosureMask::empty()
+                    }),
                 ),
                 closure_args,
             )

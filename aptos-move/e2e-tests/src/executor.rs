@@ -747,7 +747,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        let txn_provider = DefaultTxnProvider::new(txn_block);
+        let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
         AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -1245,7 +1245,9 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1262,7 +1264,7 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 &module_storage,
             );
             if let Err(err) = result {
@@ -1302,7 +1304,10 @@ impl FakeExecutor {
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             session
                 .execute_function_bypass_visibility(
                     &module_id,
@@ -1311,7 +1316,7 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
+                    &mut traversal_context,
                     &module_storage,
                 )
                 .unwrap_or_else(|e| {
@@ -1452,14 +1457,14 @@ pub fn assert_outputs_equal(
 
         let keys = txn_output_1
             .write_set()
-            .iter()
-            .chain(txn_output_2.write_set().iter())
+            .write_op_iter()
+            .chain(txn_output_2.write_set().write_op_iter())
             .map(|(k, _)| k)
             .collect::<BTreeSet<_>>();
         let mut differences = vec![];
         for key in keys {
-            let write1 = txn_output_1.write_set().get(key);
-            let write2 = txn_output_2.write_set().get(key);
+            let write1 = txn_output_1.write_set().get_write_op(key);
+            let write2 = txn_output_2.write_set().get_write_op(key);
 
             if write1 != write2 {
                 differences.push(format!(

@@ -6,7 +6,7 @@ use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{ExecutionStatus, TransactionStatus},
-    write_set::WriteOp,
+    write_set::BaseStateOp,
 };
 use aptos_vm::testing::{testing_only::inject_error_once, InjectedError};
 use move_core_types::account_address::AccountAddress;
@@ -156,16 +156,17 @@ fn assert_result(
     // check the creates / deletes in the txn output
     let mut creates = 0;
     let mut deletes = 0;
-    for (_state_key, write_op) in txn_out.write_set() {
-        match write_op {
-            WriteOp::Creation { .. } => creates += 1,
-            WriteOp::Deletion(metadata) => {
+    for (_state_key, write_op) in txn_out.write_set().write_op_iter() {
+        match write_op.as_base_op() {
+            BaseStateOp::Creation { .. } => creates += 1,
+            BaseStateOp::Deletion(metadata) => {
                 if metadata.is_none() {
                     panic!("This test expects all deletions to have metadata")
                 }
                 deletes += 1
             },
-            WriteOp::Modification { .. } => (),
+            BaseStateOp::Modification { .. } => (),
+            BaseStateOp::MakeHot { .. } | BaseStateOp::Eviction { .. } => unreachable!(),
         }
     }
     if expect_success {

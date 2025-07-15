@@ -195,13 +195,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get module writes")
             .module_write_set()
-            .clone()
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -334,15 +336,62 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
-    /// Return the fee statement of the transaction.
-    /// Should never be called after vm_output is consumed.
+    /// Returns the fee statement of the transaction.
+    ///
+    /// TODO(gelash): Consider defensive access pattern to committed_output / vm_output.
     fn fee_statement(&self) -> FeeStatement {
+        if let Some(committed_output) = self.committed_output.get() {
+            if let Ok(Some(fee_statement)) = committed_output.try_extract_fee_statement() {
+                return fee_statement;
+            }
+            return FeeStatement::zero();
+        }
         *self
             .vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get fee statement")
             .fee_statement()
+    }
+
+    /// Returns true iff the TransactionsStatus is Retry.
+    fn is_retry(&self) -> bool {
+        if let Some(committed_output) = self.committed_output.get() {
+            committed_output.status().is_retry()
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Either vm_output or committed_output must exist.")
+                .status()
+                .is_retry()
+        }
+    }
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool {
+        self.committed_output
+            .get()
+            .expect("Must call after commit.")
+            .has_new_epoch_event()
+    }
+
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool {
+        if let Some(committed_output) = self.committed_output.get() {
+            committed_output
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Either vm_output or committed_output must exist.")
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success())
+        }
     }
 
     fn output_approx_size(&self) -> u64 {
@@ -446,11 +495,12 @@ impl<
         let ret = executor.execute_block(
             signature_verified_block,
             state_view,
+            &transaction_slice_metadata,
             &mut module_cache_manager_guard,
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_end_info) = block_output.into_inner();
+                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
                 let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
@@ -465,7 +515,7 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_end_info))
+                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,

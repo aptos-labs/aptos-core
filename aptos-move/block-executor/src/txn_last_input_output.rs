@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::{CapturedReads, DataRead, ReadKind},
     errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
@@ -26,7 +26,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
@@ -47,13 +47,6 @@ macro_rules! forward_on_success_or_skip_rest {
             })
     }};
 }
-
-pub(crate) enum KeyKind<T> {
-    Resource,
-    // Contains the set of tags for the given group key.
-    Group(HashSet<T>),
-}
-
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
@@ -103,6 +96,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
     }
 
+    pub fn fetch_exchanged_data(
+        &self,
+        key: &T::Key,
+        txn_idx: TxnIndex,
+    ) -> Result<(Arc<T::Value>, Arc<MoveTypeLayout>), PanicError> {
+        self.inputs[txn_idx as usize].load().as_ref().map_or_else(
+            || {
+                Err(code_invariant_error(
+                    "Read must be recorded before fetching exchanged data".to_string(),
+                ))
+            },
+            |input| {
+                let data_read = input.get_by_kind(key, None, ReadKind::Value);
+                if let Some(DataRead::Versioned(_, value, Some(layout))) = data_read {
+                    Ok((value, layout))
+                } else {
+                    Err(code_invariant_error(format!(
+                        "Read value needing exchange {:?} not in Exchanged format",
+                        data_read
+                    )))
+                }
+            },
+        )
+    }
+
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
@@ -134,7 +152,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    /// Does a transaction at txn_idx have SkipRest or Abort status.
+    /// Does a transaction at txn_idx have SkipRest.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             self.outputs[txn_idx as usize]
@@ -211,42 +229,46 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // Extracts a set of resource paths (keys) written or updated during execution from transaction
-    // output, with corresponding KeyKind. If take_group_tags is true, the final HashSet
-    // of tags is moved for the group key - should be called once for each incarnation / record
-    // due to 'take'. if false, stored modified group resource tags in the group are cloned out.
-    pub(crate) fn modified_keys(
+    // BlockSTMv1 method, avoids cloning the tags by calling mark_estimate on reference.
+    pub(crate) fn mark_estimate_group_keys_and_tags(
+        &self,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        txn_idx: TxnIndex,
+    ) {
+        for (key, tags) in self.resource_group_keys_and_tags[txn_idx as usize]
+            .acquire()
+            .dereference()
+            .iter()
+        {
+            versioned_cache
+                .group_data()
+                .mark_estimate(key, txn_idx, tags);
+        }
+    }
+
+    pub(crate) fn modified_group_keys(&self, txn_idx: TxnIndex) -> Vec<(T::Key, HashSet<T::Tag>)> {
+        std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
+    }
+
+    // Extracts a set of resource paths (keys) written or updated during execution from
+    // transaction output. The group keys are not included, and the boolean indicates
+    // whether the resource is used as an AggregatorV1.
+    pub(crate) fn modified_resource_keys(
         &self,
         txn_idx: TxnIndex,
-        take_group_tags: bool,
-    ) -> Option<impl Iterator<Item = (T::Key, KeyKind<T::Tag>)>> {
-        let group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = if take_group_tags {
-            std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
-        } else {
-            self.resource_group_keys_and_tags[txn_idx as usize]
-                .acquire()
-                .clone()
-        };
-
+    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
-                        .map(|(k, _, _)| k)
-                        .chain(t.aggregator_v1_write_set().into_keys())
+                        .map(|(k, _, _)| (k, false))
+                        .chain(t.aggregator_v1_write_set().into_keys().map(|k| (k, true)))
                         .chain(
                             t.aggregator_v1_delta_set()
                                 .into_iter()
-                                .map(|(k, _)| k)
-                                .collect::<Vec<_>>(),
-                        )
-                        .map(|k| (k, KeyKind::Resource))
-                        .chain(
-                            group_keys_and_tags
-                                .into_iter()
-                                .map(|(k, tags)| (k, KeyKind::Group(tags))),
+                                .map(|(k, _)| (k, true)),
                         ),
                 ),
                 ExecutionStatus::Abort(_)
@@ -255,10 +277,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn module_write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> BTreeMap<T::Key, ModuleWrite<T::Value>> {
+    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Vec<ModuleWrite<T::Value>> {
         use ExecutionStatus as E;
 
         match self.outputs[txn_idx as usize]
@@ -272,7 +291,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 | E::DelayedFieldsCodeInvariantError(_)
                 | E::SpeculativeExecutionAbortError(_),
             )
-            | None => BTreeMap::new(),
+            | None => Vec::new(),
         }
     }
 

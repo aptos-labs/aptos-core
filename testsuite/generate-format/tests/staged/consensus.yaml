@@ -226,6 +226,15 @@ BlockEpiloguePayload:
               TYPENAME: HashValue
           - block_end_info:
               TYPENAME: BlockEndInfo
+    1:
+      V1:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
+          - fee_distribution:
+              TYPENAME: FeeDistribution
 BlockInfo:
   STRUCT:
     - epoch: U64
@@ -345,6 +354,10 @@ BlockType:
       ProposalExt:
         NEWTYPE:
           TYPENAME: ProposalExt
+    4:
+      OptimisticProposal:
+        NEWTYPE:
+          TYPENAME: OptBlockBody
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -467,6 +480,10 @@ ConsensusMsg:
       BlockRetrievalRequest:
         NEWTYPE:
           TYPENAME: BlockRetrievalRequest
+    21:
+      OptProposalMsg:
+        NEWTYPE:
+          TYPENAME: OptProposalMsg
 ContractEvent:
   ENUM:
     0:
@@ -582,6 +599,29 @@ FederatedKeylessPublicKey:
         TYPENAME: AccountAddress
     - pk:
         TYPENAME: KeylessPublicKey
+FeeDistribution:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - amount:
+              MAP:
+                KEY: U64
+                VALUE: U64
+FunctionParamOrReturnTag:
+  ENUM:
+    0:
+      Reference:
+        NEWTYPE:
+          TYPENAME: TypeTag
+    1:
+      MutableReference:
+        NEWTYPE:
+          TYPENAME: TypeTag
+    2:
+      Value:
+        NEWTYPE:
+          TYPENAME: TypeTag
 FunctionInfo:
   STRUCT:
     - module_address:
@@ -592,10 +632,10 @@ FunctionTag:
   STRUCT:
     - args:
         SEQ:
-          TYPENAME: TypeTag
+          TYPENAME: FunctionParamOrReturnTag
     - results:
         SEQ:
-          TYPENAME: TypeTag
+          TYPENAME: FunctionParamOrReturnTag
     - abilities:
         TYPENAME: AbilitySet
 G1Bytes:
@@ -722,6 +762,35 @@ OpenIdSig:
         TYPENAME: Pepper
     - idc_aud_val:
         OPTION: STR
+OptBlockBody:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - grandparent_qc:
+              TYPENAME: QuorumCert
+OptBlockData:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+    - timestamp_usecs: U64
+    - parent:
+        TYPENAME: BlockInfo
+    - block_body:
+        TYPENAME: OptBlockBody
+OptProposalMsg:
+  STRUCT:
+    - block_data:
+        TYPENAME: OptBlockData
+    - sync_info:
+        TYPENAME: SyncInfo
 OptQuorumStorePayload:
   ENUM:
     0:

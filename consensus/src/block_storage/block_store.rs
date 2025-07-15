@@ -22,6 +22,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -57,6 +58,12 @@ pub mod sync_manager;
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+        if block.block().is_opt_block() {
+            observe_block(
+                block.block().timestamp_usecs(),
+                BlockStage::ORDERED_OPT_BLOCK,
+            );
+        }
     }
 }
 
@@ -324,8 +331,6 @@ impl BlockStore {
 
         assert!(!blocks_to_commit.is_empty());
 
-        let block_tree = self.inner.clone();
-        let storage = self.storage.clone();
         let finality_proof_clone = finality_proof.clone();
         self.pending_blocks
             .lock()
@@ -337,25 +342,8 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
-        let window_size = self.window_size;
-        // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
-            .finalize_order(
-                &blocks_to_commit,
-                finality_proof.clone(),
-                Box::new(
-                    move |committed_blocks: &[Arc<PipelinedBlock>],
-                          commit_decision: LedgerInfoWithSignatures| {
-                        block_tree.write().commit_callback_deprecated(
-                            storage,
-                            committed_blocks,
-                            finality_proof,
-                            commit_decision,
-                            window_size,
-                        );
-                    },
-                ),
-            )
+            .finalize_order(blocks_to_commit, finality_proof.clone())
             .await
             .expect("Failed to persist commit");
 
@@ -551,6 +539,12 @@ impl BlockStore {
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
+                if pipelined_block.block().is_opt_block() {
+                    observe_block(
+                        pipelined_block.block().timestamp_usecs(),
+                        BlockStage::QC_ADDED_OPT_BLOCK,
+                    );
+                }
                 pipelined_block.set_qc(Arc::new(qc.clone()));
             },
             None => bail!("Insert {} without having the block in store first", qc),
@@ -598,6 +592,15 @@ impl BlockStore {
         tokio::time::timeout(duration, self.payload_manager.get_transactions(block, None))
             .await??;
         Ok(())
+    }
+
+    pub fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        self.payload_manager
+            .check_denied_inline_transactions(block, block_txn_filter_config)
     }
 
     pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {

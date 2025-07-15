@@ -22,6 +22,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_VERSION_CF_NAME,
         EVENT_CF_NAME,
         LEDGER_INFO_CF_NAME,
+        PERSISTED_AUXILIARY_INFO_CF_NAME,
         STALE_STATE_VALUE_INDEX_CF_NAME,
         STATE_VALUE_CF_NAME,
         TRANSACTION_CF_NAME,
@@ -46,6 +47,14 @@ pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_KEY_CF_NAME,
         EVENT_BY_VERSION_CF_NAME,
         EVENT_CF_NAME,
+    ]
+}
+
+pub(super) fn persisted_auxiliary_info_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        PERSISTED_AUXILIARY_INFO_CF_NAME,
     ]
 }
 
@@ -188,6 +197,13 @@ fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
 
 pub(super) fn gen_event_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = event_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_persisted_auxiliary_info_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = persisted_auxiliary_info_db_column_families();
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 

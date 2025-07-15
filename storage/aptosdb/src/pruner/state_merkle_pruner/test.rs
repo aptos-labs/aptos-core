@@ -234,7 +234,7 @@ fn test_state_store_pruner_partial_version() {
     );
 
     if aptos_db.state_merkle_db().sharding_enabled() {
-        for i in 0..NUM_STATE_SHARDS as u8 {
+        for i in 0..NUM_STATE_SHARDS {
             assert_eq!(
                 aptos_db
                     .state_merkle_db()

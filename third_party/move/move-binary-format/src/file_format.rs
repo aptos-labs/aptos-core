@@ -1152,7 +1152,8 @@ impl SignatureToken {
     /// Returns true if this type can have assigned a value of the source type.
     /// For function types, this is true if the argument and result types
     /// are equal, and if this function type's ability set is a subset of the other
-    /// one. For all other types, they must be equal
+    /// one. For immutable references, this is true if the inner types are assignable.
+    /// For all other types, this is true if the two types are equal.
     pub fn is_assignable_from(&self, source: &SignatureToken) -> bool {
         match (self, source) {
             (
@@ -1160,9 +1161,6 @@ impl SignatureToken {
                 SignatureToken::Function(args2, results2, abs2),
             ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
             (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
-                ty1.is_assignable_from(ty2)
-            },
-            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
                 ty1.is_assignable_from(ty2)
             },
             _ => self == source,
@@ -2700,7 +2698,7 @@ pub enum Bytecode {
 
     #[group = "closure"]
     #[description = r#"
-        `CallClosure(|t1..tn|r has a)` evalutes a closure of the given function type,
+        `CallClosure(|t1..tn|r has a)` evaluates a closure of the given function type,
         taking the captured arguments and mixing in the provided ones on the stack.
 
         On top of the stack is the closure being evaluated, underneath the arguments:

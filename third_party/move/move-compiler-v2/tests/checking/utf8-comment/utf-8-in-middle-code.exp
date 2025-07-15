@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/utf8-comment/utf-8-in-middle-code.move:4:29
+  │
+4 │         const C: vector<u8> 字符串 = b"abc";
+  │                             ^^ Invalid character: `字`

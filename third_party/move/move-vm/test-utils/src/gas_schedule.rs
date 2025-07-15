@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -195,6 +195,32 @@ impl GasStatus {
     }
 }
 
+impl DependencyGasMeter for GasStatus {
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        _addr: &AccountAddress,
+        _name: &IdentStr,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
+
+impl NativeGasMeter for GasStatus {
+    fn legacy_gas_budget_in_native_context(&self) -> InternalGas {
+        self.gas_left
+    }
+
+    fn charge_native_execution(&mut self, _amount: InternalGas) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
+
 impl GasMeter for GasStatus {
     fn balance_internal(&self) -> InternalGas {
         self.gas_left
@@ -313,6 +339,24 @@ impl GasMeter for GasStatus {
                 Opcodes::UNPACK_GENERIC
             } else {
                 Opcodes::UNPACK
+            },
+            args.fold(field_count, |acc, val| {
+                acc + val.legacy_abstract_memory_size()
+            }),
+        )
+    }
+
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let field_count = AbstractMemorySize::new(args.len() as u64);
+        self.charge_instr_with_size(
+            if is_generic {
+                Opcodes::PACK_CLOSURE_GENERIC
+            } else {
+                Opcodes::PACK_CLOSURE
             },
             args.fold(field_count, |acc, val| {
                 acc + val.legacy_abstract_memory_size()
@@ -507,20 +551,6 @@ impl GasMeter for GasStatus {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
-        Ok(())
-    }
-
-    fn charge_dependency(
-        &mut self,
-        _is_new: bool,
-        _addr: &AccountAddress,
-        _name: &IdentStr,
-        _size: NumBytes,
-    ) -> PartialVMResult<()> {
-        Ok(())
-    }
-
-    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
     }
 }

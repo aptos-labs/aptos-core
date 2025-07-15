@@ -99,7 +99,7 @@ impl ExecutionAndIOCosts {
                     addr: _addr,
                     ty,
                     cost,
-                } => insert_or_add(&mut storage_reads, format!("{}", ty), *cost),
+                } => insert_or_add(&mut storage_reads, ty.to_canonical_string(), *cost),
                 CreateTy { cost } => insert_or_add(&mut ops, "create_ty".to_string(), *cost),
             }
         }

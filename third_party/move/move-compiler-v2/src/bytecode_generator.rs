@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Options;
+use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -317,7 +317,14 @@ impl<'env> Generator<'env> {
 
     /// Report an (internal) error at the location associated with the node.
     fn internal_error(&self, id: NodeId, msg: impl AsRef<str>) {
-        self.diag(id, Severity::Bug, msg)
+        let env = self.env();
+        let loc = env.get_node_loc(id);
+        env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            &format!("compiler internal error: {}", msg.as_ref()),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        );
     }
 
     fn diag(&self, id: NodeId, severity: Severity, msg: impl AsRef<str>) {
@@ -418,10 +425,7 @@ impl Generator<'_> {
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
-                // Notice that we cannot be in reference mode here for reasons
-                // of typing: the result of the Mutate operator is `()` and cannot
-                // appear where references are processed.
-                let rhs_temp = self.gen_arg(rhs, false);
+                let rhs_temp = self.gen_escape_auto_ref_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
                 let lhs_type = self.get_node_type(lhs.node_id());
 
@@ -643,7 +647,7 @@ impl Generator<'_> {
         // Arguments are first computed, finally the function. (On a stack machine, the
         // function is on the top).
         let mut arg_temps = self.gen_arg_list(args);
-        let fun_temp = self.gen_arg(fun, false);
+        let fun_temp = self.gen_escape_auto_ref_arg(fun, false);
 
         // The function can be a wrapper `struct W(|T|S|)` which we need to unpack first.
         let fun_ty = self.get_node_type(fun.node_id());
@@ -1244,7 +1248,9 @@ impl Generator<'_> {
     // nested.
     fn gen_tuple(&mut self, exp: &Exp, with_forced_temp: bool) -> Vec<TempIndex> {
         if let ExpData::Call(_, Operation::Tuple, args) = exp.as_ref() {
-            args.iter().map(|arg| self.gen_arg(arg, false)).collect()
+            args.iter()
+                .map(|arg| self.gen_escape_auto_ref_arg(arg, false))
+                .collect()
         } else {
             let exp_ty = self.env().get_node_type(exp.node_id());
             if exp_ty.is_tuple() {
@@ -1257,7 +1263,7 @@ impl Generator<'_> {
                 self.gen(temps.clone(), exp);
                 temps
             } else {
-                vec![self.gen_arg(exp, with_forced_temp)]
+                vec![self.gen_escape_auto_ref_arg(exp, with_forced_temp)]
             }
         }
     }
@@ -1342,7 +1348,7 @@ impl Generator<'_> {
         // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
         // this capability in the stack machine, we need to keep those temps in locals
         // and can't manage them on the stack during stackification.
-        let temp = self.gen_arg(arg, false);
+        let temp = self.gen_escape_auto_ref_arg(arg, false);
         self.gen_borrow_temp(target, id, temp)
     }
 

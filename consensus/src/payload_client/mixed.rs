@@ -12,7 +12,6 @@ use aptos_logger::debug;
 use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
 use fail::fail_point;
-use futures::future::BoxFuture;
 use std::{cmp::min, sync::Arc, time::Instant};
 
 pub struct MixedPayloadClient {
@@ -60,7 +59,6 @@ impl PayloadClient for MixedPayloadClient {
         &self,
         params: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
@@ -100,10 +98,7 @@ impl PayloadClient for MixedPayloadClient {
             .saturating_sub(validator_txn_pull_timer.elapsed());
 
         // Pull user payload.
-        let user_payload = self
-            .user_payload_client
-            .pull(user_txn_pull_params, wait_callback)
-            .await?;
+        let user_payload = self.user_payload_client.pull(user_txn_pull_params).await?;
 
         Ok((validator_txns, user_payload))
     }
@@ -159,7 +154,6 @@ mod tests {
                     aptos_infallible::duration_since_epoch(),
                 ),
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                Box::pin(async {}),
             )
             .await
             .unwrap()
@@ -187,7 +181,6 @@ mod tests {
                     aptos_infallible::duration_since_epoch(),
                 ),
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                Box::pin(async {}),
             )
             .await
             .unwrap()
@@ -215,7 +208,6 @@ mod tests {
                     aptos_infallible::duration_since_epoch(),
                 ),
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                Box::pin(async {}),
             )
             .await
             .unwrap()
@@ -243,7 +235,6 @@ mod tests {
                     aptos_infallible::duration_since_epoch(),
                 ),
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                Box::pin(async {}),
             )
             .await
             .unwrap()
@@ -289,7 +280,6 @@ mod tests {
                     aptos_infallible::duration_since_epoch(),
                 ),
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                Box::pin(async {}),
             )
             .await
             .unwrap()

@@ -22,7 +22,7 @@ use crate::{
         types::{AugmentedData, RandConfig, Share},
     },
     state_computer::ExecutionProxy,
-    state_replication::{StateComputer, StateComputerCommitCallBackType},
+    state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
 };
@@ -71,7 +71,6 @@ pub trait TExecutionClient: Send + Sync {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
-        new_pipeline_enabled: bool,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -80,9 +79,8 @@ pub trait TExecutionClient: Send + Sync {
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: WrappedLedgerInfo,
-        callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
 
     fn send_commit_msg(
@@ -210,7 +208,6 @@ impl ExecutionProxyClient {
         buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
-        new_pipeline_enabled: bool,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -282,11 +279,9 @@ impl ExecutionProxyClient {
             buffer_manager,
         ) = prepare_phases_and_buffer_manager(
             self.author,
-            self.execution_proxy.clone(),
             commit_signer_provider,
             network_sender,
             commit_msg_rx,
-            self.execution_proxy.clone(),
             execution_ready_block_rx,
             reset_buffer_manager_rx,
             epoch_state,
@@ -298,7 +293,6 @@ impl ExecutionProxyClient {
             consensus_publisher,
             self.consensus_config
                 .max_pending_rounds_in_commit_vote_cache,
-            new_pipeline_enabled,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -324,7 +318,6 @@ impl TExecutionClient for ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
-        new_pipeline_enabled: bool,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
@@ -338,7 +331,6 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_config.enable_pre_commit,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
-            new_pipeline_enabled,
         );
 
         let transaction_shuffler =
@@ -368,9 +360,8 @@ impl TExecutionClient for ExecutionProxyClient {
 
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
+        blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: WrappedLedgerInfo,
-        callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
         let mut execute_tx = match self.handle.read().execute_tx.clone() {
@@ -381,7 +372,7 @@ impl TExecutionClient for ExecutionProxyClient {
             },
         };
 
-        for block in blocks {
+        for block in &blocks {
             block.set_insertion_time();
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
                 tx.order_proof_tx
@@ -392,12 +383,8 @@ impl TExecutionClient for ExecutionProxyClient {
 
         if execute_tx
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
+                ordered_blocks: blocks,
                 ordered_proof: ordered_proof.ledger_info().clone(),
-                callback,
             })
             .await
             .is_err()
@@ -548,7 +535,6 @@ impl TExecutionClient for DummyExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
-        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -558,9 +544,8 @@ impl TExecutionClient for DummyExecutionClient {
 
     async fn finalize_order(
         &self,
-        _: &[Arc<PipelinedBlock>],
+        _: Vec<Arc<PipelinedBlock>>,
         _: WrappedLedgerInfo,
-        _: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         Ok(())
     }

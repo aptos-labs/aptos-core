@@ -56,8 +56,7 @@ pub struct Accesses<K> {
 }
 
 /// Trait for single threaded transaction executor.
-// TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
-pub trait ExecutorTask: Sync {
+pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -109,9 +108,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
         Option<Arc<MoveTypeLayout>>,
     )>;
 
-    fn module_write_set(
-        &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>;
+    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
 
     fn aggregator_v1_write_set(
         &self,
@@ -193,6 +190,15 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    /// Returns true iff the TransactionsStatus is Retry.
+    fn is_retry(&self) -> bool;
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool;
+
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool;
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.
