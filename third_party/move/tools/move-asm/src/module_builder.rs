@@ -24,6 +24,7 @@ use move_binary_format::{
     },
     file_format_common::VERSION_DEFAULT,
     internals::ModuleIndex,
+    module_to_script::convert_module_to_script,
     views::{
         FunctionDefinitionView, FunctionHandleView, ModuleHandleView, ModuleView, StructHandleView,
     },
@@ -72,6 +73,10 @@ pub struct ModuleBuilder<'a> {
     module_aliases: BTreeMap<Identifier, ModuleId>,
     /// The build module.
     module: RefCell<CompiledModule>,
+    /// If we are building a script, the handle of the main function. This must not
+    /// be contained in the handle table as it is removed when converting to
+    /// CompiledScript.
+    main_handle: RefCell<Option<FunctionHandle>>,
     /// The module index for which we generate code.
     this_module_idx: ModuleHandleIndex,
     /// A mapping from modules to indices.
@@ -106,55 +111,81 @@ impl Display for QualifiedId {
 }
 
 impl<'a> ModuleBuilder<'a> {
+    /// Creates a new module builder, using the given context modules. If the
+    /// builder is for a script, `module_id_opt` should be `None`, otherwise
+    /// contain the module id.
     pub fn new(
         options: ModuleBuilderOptions,
         context_modules: impl IntoIterator<Item = &'a CompiledModule>,
         module_id_opt: Option<&ModuleId>,
     ) -> Self {
-        let mut module = CompiledModule {
-            version: options.bytecode_version,
-            self_module_handle_idx: ModuleHandleIndex(0),
-            ..Default::default()
-        };
-
-        module.module_handles.push(ModuleHandle {
-            address: AddressIdentifierIndex(0),
-            name: IdentifierIndex(0),
-        });
-        let ModuleId {
-            address: script_address,
-            name: script_name,
-        } = language_storage::pseudo_script_module_id().clone();
-        let (address, name) = if let Some(mid) = module_id_opt {
-            assert_ne!(mid.address, script_address, "address reserved for scripts");
-            (mid.address, mid.name.clone())
-        } else {
-            (script_address, script_name)
-        };
-        module.address_identifiers.push(address);
-        module.identifiers.push(name);
-
         let context_modules = context_modules
             .into_iter()
             .map(|m| (ModuleView::new(m).id(), m))
             .collect();
-        Self {
-            module: RefCell::new(module),
-            options,
-            context_modules,
-            ..Default::default()
+        if let Some(mid) = module_id_opt {
+            let mut module = CompiledModule {
+                version: options.bytecode_version,
+                self_module_handle_idx: ModuleHandleIndex(0),
+                ..Default::default()
+            };
+            module.module_handles.push(ModuleHandle {
+                address: AddressIdentifierIndex(0),
+                name: IdentifierIndex(0),
+            });
+            module.address_identifiers.push(mid.address);
+            module.identifiers.push(mid.name.clone());
+            let builder = Self {
+                module: RefCell::new(module),
+                options,
+                context_modules,
+                ..Default::default()
+            };
+            builder
+                .module_to_idx
+                .borrow_mut()
+                .insert(mid.clone(), ModuleHandleIndex::new(0));
+            builder
+                .address_to_idx
+                .borrow_mut()
+                .insert(*mid.address(), AddressIdentifierIndex::new(0));
+            builder
+                .name_to_idx
+                .borrow_mut()
+                .insert(mid.name().to_owned(), IdentifierIndex::new(0));
+            builder
+        } else {
+            // Use a pseudo handle index for scripts
+            let module = CompiledModule {
+                version: options.bytecode_version,
+                self_module_handle_idx: Self::pseudo_script_module_index(),
+                ..Default::default()
+            };
+            Self {
+                module: RefCell::new(module),
+                options,
+                context_modules,
+                ..Default::default()
+            }
         }
     }
 
     /// Return result as a module.
     pub fn into_module(self) -> Result<CompiledModule> {
-        Ok(self.module.take())
+        if self.main_handle.borrow().is_some() {
+            bail!("a module cannot be built from a script")
+        } else {
+            Ok(self.module.take())
+        }
     }
 
     /// Return result as a script.
     pub fn into_script(self) -> Result<CompiledScript> {
-        // TODO(#16582): script conversion
-        bail!("NYI: script conversion")
+        if let Some(handle) = self.main_handle.replace(None) {
+            convert_module_to_script(self.into_module()?, handle)
+        } else {
+            bail!("a script cannot be built from a module")
+        }
     }
 }
 
@@ -220,14 +251,19 @@ impl<'a> ModuleBuilder<'a> {
             access_specifiers: None,
             attributes: vec![],
         };
-        let fhdl_idx = self.index(
-            &mut self.module.borrow_mut().function_handles,
-            &mut self.fun_to_idx.borrow_mut(),
-            full_name,
-            fhdl,
-            FunctionHandleIndex,
-            "function handle",
-        )?;
+        let fhdl_idx = if self.is_script() {
+            *self.main_handle.borrow_mut() = Some(fhdl);
+            Self::pseudo_script_function_index()
+        } else {
+            self.index(
+                &mut self.module.borrow_mut().function_handles,
+                &mut self.fun_to_idx.borrow_mut(),
+                full_name,
+                fhdl,
+                FunctionHandleIndex,
+                "function handle",
+            )?
+        };
         let fdef = FunctionDefinition {
             function: fhdl_idx,
             visibility,
@@ -253,12 +289,16 @@ impl<'a> ModuleBuilder<'a> {
     }
 
     fn this_module(&self) -> ModuleId {
-        let module_ref = self.module.borrow();
-        let view = ModuleHandleView::new(
-            &*module_ref,
-            &module_ref.module_handles[self.this_module_idx.0 as usize],
-        );
-        view.module_id()
+        if self.is_script() {
+            language_storage::pseudo_script_module_id().clone()
+        } else {
+            let module_ref = self.module.borrow();
+            let view = ModuleHandleView::new(
+                &*module_ref,
+                &module_ref.module_handles[self.this_module_idx.0 as usize],
+            );
+            view.module_id()
+        }
     }
 
     fn this_module_id(&self, id: Identifier) -> QualifiedId {
@@ -266,6 +306,18 @@ impl<'a> ModuleBuilder<'a> {
             module_id: self.this_module(),
             id,
         }
+    }
+
+    fn is_script(&self) -> bool {
+        self.module.borrow().self_module_handle_idx == Self::pseudo_script_module_index()
+    }
+
+    fn pseudo_script_module_index() -> ModuleHandleIndex {
+        ModuleHandleIndex::new(TableIndex::MAX)
+    }
+
+    fn pseudo_script_function_index() -> FunctionHandleIndex {
+        FunctionHandleIndex::new(TableIndex::MAX)
     }
 
     // ==========================================================================================

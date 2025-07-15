@@ -1,5 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-14:
+
+== BEGIN Bytecode ==
 // Move bytecode v7
-module 102.test {
+module 66.test {
 
 
 f(Arg0: u64) /* def_idx: 0 */ {
@@ -18,3 +23,4 @@ B2:
 	9: Ret
 }
 }
+== END Bytecode ==

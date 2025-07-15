@@ -11,12 +11,13 @@ use crate::{
         map_diag, Argument, AsmResult, Diag, Fun, Instruction, Loc, Local, Type, Unit, UnitId,
         Value,
     },
+    ModuleOrScript,
 };
 use either::Either;
 use move_binary_format::{
     file_format::{
-        Bytecode, CodeOffset, CompiledScript, FunctionDefinitionIndex, FunctionHandleIndex,
-        LocalIndex, SignatureIndex, SignatureToken, TableIndex,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandleIndex, LocalIndex,
+        SignatureIndex, SignatureToken, TableIndex,
     },
     CompiledModule,
 };
@@ -39,7 +40,7 @@ pub(crate) fn compile<'a>(
     options: ModuleBuilderOptions,
     context_modules: impl IntoIterator<Item = &'a CompiledModule>,
     ast: Unit,
-) -> AsmResult<Either<CompiledModule, CompiledScript>> {
+) -> AsmResult<ModuleOrScript> {
     let mut compiler = Assembler {
         builder: ModuleBuilder::new(options, context_modules, ast.name.module_opt()),
         diags: vec![],
