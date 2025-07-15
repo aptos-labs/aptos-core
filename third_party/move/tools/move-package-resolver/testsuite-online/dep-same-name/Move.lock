@@ -1,0 +1,5 @@
+[git]
+"github.com/aptos-labs/aptos-framework@main" = "eaf7f49eb9e64d6bc215289371c6778fb2a7c57f"
+"github.com/aptos-labs/aptos-framework@testnet" = "a232ffcf03e3f527bfed0448f0f92fedeba5c30f"
+
+[on_chain]

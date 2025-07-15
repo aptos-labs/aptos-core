@@ -6,7 +6,7 @@ use crate::{
     file_lock::FileLock,
     listener::{EmptyPackageCacheListener, PackageCacheListener},
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use aptos_framework::natives::code::PackageRegistry;
 use futures::future;
 use git2::{
@@ -121,11 +121,13 @@ impl<L> PackageCache<L> {
             let repo = Repository::open_bare(&repo_path)?;
             {
                 let mut remote = repo.find_remote("origin")?;
-                remote.fetch(
-                    &["refs/heads/*:refs/remotes/origin/*"],
-                    Some(&mut fetch_options),
-                    None,
-                )?;
+                remote
+                    .fetch(
+                        &["refs/heads/*:refs/remotes/origin/*"],
+                        Some(&mut fetch_options),
+                        None,
+                    )
+                    .map_err(|err| anyhow!("Failed to update git repo at {}: {}", git_url, err))?;
             }
 
             self.listener.on_repo_update_complete(git_url.as_str());
@@ -137,7 +139,9 @@ impl<L> PackageCache<L> {
             repo_builder.bare(true);
 
             self.listener.on_repo_clone_start(git_url.as_str());
-            let repo = repo_builder.clone(git_url.as_str(), &repo_path)?;
+            let repo = repo_builder
+                .clone(git_url.as_str(), &repo_path)
+                .map_err(|err| anyhow!("Failed to clone git repo at {}: {}", git_url, err))?;
             self.listener.on_repo_clone_complete(git_url.as_str());
 
             repo
@@ -158,7 +162,16 @@ impl<L> PackageCache<L> {
     {
         let repo = self.clone_or_update_git_repo(git_url).await?;
 
-        let obj = repo.repo.revparse_single(&format!("origin/{}", rev))?;
+        let obj = repo
+            .repo
+            .revparse_single(&format!("origin/{}", rev))
+            .map_err(|_err| {
+                anyhow!(
+                    "Failed to resolve rev string \"{}\" in repo {}",
+                    rev,
+                    git_url
+                )
+            })?;
         let oid = obj.id();
 
         Ok(oid)
@@ -242,7 +255,7 @@ impl<L> PackageCache<L> {
     /// additional metadata in the future.
     pub async fn fetch_on_chain_package(
         &self,
-        fullnode_url: Url,
+        fullnode_url: &Url,
         network_version: u64,
         address: AccountAddress,
         package_name: &str,
@@ -253,7 +266,7 @@ impl<L> PackageCache<L> {
         let on_chain_packages_path = self.root.join("on-chain");
 
         let canonical_name = canonical::canonical_on_chain_package_name(
-            &fullnode_url,
+            fullnode_url,
             network_version,
             address,
             package_name,
@@ -363,11 +376,11 @@ impl<L> PackageCache<L> {
         future::try_join_all(fetch_futures).await?;
 
         remove_dir_if_exists(&cached_package_path)?;
-        fs::rename(temp.into_path(), cached_package_path)?;
+        fs::rename(temp.into_path(), &cached_package_path)?;
 
         self.listener
             .on_bytecode_package_download_complete(address, package_name);
 
-        Ok(PathBuf::new())
+        Ok(cached_package_path)
     }
 }
