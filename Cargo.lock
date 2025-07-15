@@ -12403,6 +12403,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-package-resolver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-rest-client",
+ "datatest-stable",
+ "either",
+ "git2 0.16.1",
+ "move-core-types",
+ "move-package-cache",
+ "move-package-manifest",
+ "move-prover-test-utils",
+ "petgraph 0.6.5",
+ "serde",
+ "tokio",
+ "toml 0.7.8",
+ "url",
+]
+
+[[package]]
 name = "move-prover"
 version = "0.1.0"
 dependencies = [

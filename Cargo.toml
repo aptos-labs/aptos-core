@@ -252,6 +252,7 @@ members = [
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
     "third_party/move/tools/move-package-manifest",
+    "third_party/move/tools/move-package-resolver",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
