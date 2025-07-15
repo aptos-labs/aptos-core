@@ -1,5 +1,5 @@
 //# print-bytecode
-// expecting error
+// expecting error because default is script
 module 0x66::m
 
 public fun f(x: u64): u64

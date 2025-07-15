@@ -158,7 +158,7 @@ impl<'a> ModuleBuilder<'a> {
             // Use a pseudo handle index for scripts
             let module = CompiledModule {
                 version: options.bytecode_version,
-                self_module_handle_idx: ModuleHandleIndex(TableIndex::MAX),
+                self_module_handle_idx: Self::pseudo_script_module_index(),
                 ..Default::default()
             };
             Self {
@@ -173,7 +173,7 @@ impl<'a> ModuleBuilder<'a> {
     /// Return result as a module.
     pub fn into_module(self) -> Result<CompiledModule> {
         if self.main_handle.borrow().is_some() {
-            bail!("a module cannot be build from a script")
+            bail!("a module cannot be built from a script")
         } else {
             Ok(self.module.take())
         }
@@ -184,7 +184,7 @@ impl<'a> ModuleBuilder<'a> {
         if let Some(handle) = self.main_handle.replace(None) {
             convert_module_to_script(self.into_module()?, handle)
         } else {
-            bail!("a script cannot be build from a module")
+            bail!("a script cannot be built from a module")
         }
     }
 }
@@ -309,7 +309,11 @@ impl<'a> ModuleBuilder<'a> {
     }
 
     fn is_script(&self) -> bool {
-        self.module.borrow().self_module_handle_idx == ModuleHandleIndex(TableIndex::MAX)
+        self.module.borrow().self_module_handle_idx == Self::pseudo_script_module_index()
+    }
+
+    fn pseudo_script_module_index() -> ModuleHandleIndex {
+        ModuleHandleIndex::new(TableIndex::MAX)
     }
 
     // ==========================================================================================

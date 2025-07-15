@@ -313,7 +313,7 @@ impl AsmParser {
         if let Token::Number(num) = &self.next {
             let mut bytes = num.to_le_bytes().to_vec();
             bytes.reverse();
-            let addr = AccountAddress::from_bytes(bytes).expect("valid number");
+            let addr = AccountAddress::from_bytes(bytes).expect("valid address value");
             self.advance()?;
             Ok(addr)
         } else {
