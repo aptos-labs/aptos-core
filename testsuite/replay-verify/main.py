@@ -94,13 +94,13 @@ def get_env_var(name: str, default_value: str = "") -> str:
 class ReplayConfig:
     def __init__(self, network: Network) -> None:
         if network == Network.TESTNET:
-            self.concurrent_replayer = 20
+            self.concurrent_replayer = 35
             self.pvc_number = 35
             self.min_range_size = 10_000
             self.range_size = 5_000_000
             self.timeout_secs = 9000
         else:
-            self.concurrent_replayer = 20
+            self.concurrent_replayer = 35
             self.pvc_number = 49
             self.min_range_size = 10_000
             self.range_size = 2_000_000
@@ -242,9 +242,6 @@ class WorkerPod:
             and self.end_version < 6800000000
         ):
             pod_manifest["spec"]["containers"][0]["resources"]["requests"][
-                "memory"
-            ] = "180Gi"
-            pod_manifest["spec"]["containers"][0]["resources"]["limits"][
                 "memory"
             ] = "180Gi"
 
@@ -504,11 +501,11 @@ class ReplayScheduler:
         pvc = self.create_one_pvc_from_snapshot(snapshot_name)
         self.pvcs = [pvc]
         # Wait for the PVC to be bound before creating other PVCs
+        logger.info(f"Waiting for the PVC {pvc} to be bound...")
         bound_status = self.get_pvc_bound_status()
-        while not bound_status[0]:
-            logger.info(f"Waiting for the PVC {pvc} to be bound...")
+        while not self.get_pvc_bound_status()[0]:
             time.sleep(QUERY_DELAY)
-            bound_status = self.get_pvc_bound_status()
+        logger.info(f"PVC {pvc} has been bound...")
         self.create_pvc_from_existing(snapshot_name, pvc)
 
     def create_one_pvc_from_snapshot(self, snapshot_name: str) -> str:
@@ -603,9 +600,9 @@ class ReplayScheduler:
                 if self.current_workers[i] is not None:
                     try:
                         phase = self.current_workers[i].get_phase()
-                        logger.info(
-                            f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
-                        )
+                        # logger.info(
+                        #     f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
+                        # )
                     except Exception as e:
                         logger.error(f"Failed to get pod status: {e}")
                         self.reschedule_pod(self.current_workers[i], i)
