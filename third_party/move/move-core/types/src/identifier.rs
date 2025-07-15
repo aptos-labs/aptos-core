@@ -123,6 +123,12 @@ impl Identifier {
         }
     }
 
+    /// Creates an unchecked `Identifier` instance, allowing characters which
+    /// are invalid in the language.
+    pub fn new_unchecked(s: impl Into<Box<str>>) -> Self {
+        Self(s.into())
+    }
+
     /// Returns true if this string is a valid identifier.
     pub fn is_valid(s: impl AsRef<str>) -> bool {
         is_valid(s.as_ref())

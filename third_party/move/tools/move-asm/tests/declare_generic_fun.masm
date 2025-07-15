@@ -1,0 +1,4 @@
+module 0x66::test
+
+fun f<A, B>(x: A, y: B): (A, B)
+    ret

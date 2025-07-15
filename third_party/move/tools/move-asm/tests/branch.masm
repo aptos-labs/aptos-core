@@ -1,0 +1,13 @@
+module 0x66::test
+
+fun f(x: u64)
+l1: copy_loc x
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc x
+    ld_u64 1
+    sub
+    st_loc x
+    branch l1
+l2: ret
