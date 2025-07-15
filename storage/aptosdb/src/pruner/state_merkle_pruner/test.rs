@@ -17,12 +17,13 @@ use crate::{
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
