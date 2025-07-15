@@ -1,7 +1,8 @@
+//# publish --print-bytecode
 address acc = 0x66
 module acc::test
 
-fun f(x: u64): u64
+fun f(x: u64)
     ret
 
 fun g()

@@ -1,6 +1,8 @@
+//# publish --print-bytecode
 module 0x66::test
 
 fun f(x: u64): u64
+    move_loc x
     ret
 
 fun g(): u64

@@ -1,0 +1,5 @@
+//# publish --print-bytecode
+script
+
+public fun f(x: u64)
+    ret

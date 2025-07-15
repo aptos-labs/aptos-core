@@ -1,6 +1,8 @@
+//# publish --print-bytecode
 module 0x66::test
 
 fun identity<T>(x: T): T
+    move_loc x
     ret
 
 fun test(): u64
