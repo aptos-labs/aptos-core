@@ -6,8 +6,10 @@
 //! state sync v2.
 use crate::{
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb,
-        write_set_db::WriteSetDb, LedgerDb, LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb,
+        persisted_auxiliary_info_db::PersistedAuxiliaryInfoDb,
+        transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb, LedgerDb,
+        LedgerDbSchemaBatches,
     },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -29,7 +31,7 @@ use aptos_types::{
         definition::LeafCount,
         position::{FrozenSubTreeIterator, Position},
     },
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
 use std::sync::Arc;
@@ -115,6 +117,7 @@ pub(crate) fn save_transactions(
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
     txns: &[Transaction],
+    persisted_aux_info: &[PersistedAuxiliaryInfo],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
@@ -131,6 +134,7 @@ pub(crate) fn save_transactions(
             ledger_db,
             first_version,
             txns,
+            persisted_aux_info,
             txn_infos,
             events,
             write_sets.as_ref(),
@@ -149,6 +153,7 @@ pub(crate) fn save_transactions(
             Arc::clone(&ledger_db),
             first_version,
             txns,
+            persisted_aux_info,
             txn_infos,
             events,
             write_sets.as_ref(),
@@ -190,6 +195,7 @@ pub(crate) fn save_transactions_impl(
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
     txns: &[Transaction],
+    persisted_aux_info: &[PersistedAuxiliaryInfo],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: &[WriteSet],
@@ -203,6 +209,14 @@ pub(crate) fn save_transactions_impl(
             txn,
             /*skip_index=*/ false,
             &mut ledger_db_batch.transaction_db_batches,
+        )?;
+    }
+
+    for (idx, aux_info) in persisted_aux_info.iter().enumerate() {
+        PersistedAuxiliaryInfoDb::put_persisted_auxiliary_info(
+            first_version + idx as Version,
+            aux_info,
+            &mut ledger_db_batch.persisted_auxiliary_info_db_batches,
         )?;
     }
 

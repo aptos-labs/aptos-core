@@ -52,6 +52,7 @@ pub trait TransactionChunk {
 
 pub struct ChunkToExecute {
     pub transactions: Vec<Transaction>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -71,6 +72,7 @@ impl TransactionChunk for ChunkToExecute {
     ) -> Result<ExecutionOutput> {
         let ChunkToExecute {
             transactions,
+            persisted_aux_info,
             first_version: _,
         } = self;
 
@@ -90,13 +92,13 @@ impl TransactionChunk for ChunkToExecute {
         };
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
-        let mut auxiliary_info = Vec::new();
-        // TODO(grao): Pass in persisted auxiliary info.
-        auxiliary_info.resize(sig_verified_txns.len(), AuxiliaryInfo::new_empty());
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
-            auxiliary_info,
+            persisted_aux_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -108,7 +110,7 @@ impl TransactionChunk for ChunkToExecute {
 pub struct ChunkToApply {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
-    pub persisted_info: Vec<PersistedAuxiliaryInfo>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -129,14 +131,14 @@ impl TransactionChunk for ChunkToApply {
         let Self {
             transactions,
             transaction_outputs,
-            persisted_info,
+            persisted_aux_info,
             first_version: _,
         } = self;
 
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,
-            persisted_info
+            persisted_aux_info
                 .into_iter()
                 .map(|info| AuxiliaryInfo::new(info, None))
                 .collect(),

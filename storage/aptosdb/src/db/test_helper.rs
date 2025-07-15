@@ -897,7 +897,13 @@ pub fn verify_committed_transactions(
             txn_list_with_proof
                 .verify(ledger_info, Some(cur_ver))
                 .unwrap();
-            assert_eq!(txn_list_with_proof.transactions.len(), 1);
+            assert_eq!(
+                txn_list_with_proof
+                    .get_transaction_list_with_proof()
+                    .transactions
+                    .len(),
+                1
+            );
 
             let txn_output_list_with_proof = db
                 .get_transaction_outputs(cur_ver, 1, ledger_version)
@@ -905,7 +911,13 @@ pub fn verify_committed_transactions(
             txn_output_list_with_proof
                 .verify(ledger_info, Some(cur_ver))
                 .unwrap();
-            assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
+            assert_eq!(
+                txn_output_list_with_proof
+                    .get_output_list_with_proof()
+                    .transactions_and_outputs
+                    .len(),
+                1
+            );
         }
         cur_ver += 1;
     }

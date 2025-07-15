@@ -34,8 +34,9 @@ use aptos_types::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         AuxiliaryInfo, BlockEndInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction,
-        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProofV2, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -342,7 +343,7 @@ fn create_blocks_and_chunks(
     chunk_ranges: Vec<std::ops::RangeInclusive<Version>>,
 ) -> (
     Vec<(Vec<Transaction>, LedgerInfoWithSignatures)>,
-    Vec<TransactionListWithProof>,
+    Vec<TransactionListWithProofV2>,
 ) {
     assert_eq!(*block_ranges.first().unwrap().start(), 1);
     assert_eq!(*chunk_ranges.first().unwrap().start(), 1);
@@ -389,7 +390,21 @@ fn create_blocks_and_chunks(
         let block_id = gen_block_id(version);
         let output = block_executor
             .execute_block(
-                (block_id, into_signature_verified_block(txns.clone())).into(),
+                (
+                    block_id,
+                    into_signature_verified_block(txns.clone()),
+                    (0..num_txns)
+                        .map(|i| {
+                            AuxiliaryInfo::new(
+                                PersistedAuxiliaryInfo::V1 {
+                                    transaction_index: i as u32,
+                                },
+                                None,
+                            )
+                        })
+                        .collect(),
+                )
+                    .into(),
                 parent_block_id,
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -423,7 +438,7 @@ fn create_blocks_and_chunks(
 
 fn create_transaction_chunks(
     chunks: Vec<std::ops::RangeInclusive<Version>>,
-) -> (Vec<TransactionListWithProof>, LedgerInfoWithSignatures) {
+) -> (Vec<TransactionListWithProofV2>, LedgerInfoWithSignatures) {
     let num_txns = *chunks.last().unwrap().end();
     // last txn is a block epilogue
     let all_txns = 1..=num_txns;
@@ -790,12 +805,12 @@ proptest! {
         // get txn_infos from db
         let db = executor.db.reader.clone();
         prop_assert_eq!(db.expect_synced_version(), ledger_version);
-        let txn_list = db.get_transactions(
+        let (txn_list, persisted_aux_info)= db.get_transactions(
             1, /* start version */
             ledger_version, /* version */
             ledger_version, /* ledger version */
             false /* fetch events */
-        ).unwrap();
+        ).unwrap().into_inner();
         prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns]);
         let txn_infos = txn_list.proof.transaction_infos;
         let write_sets = db.get_write_set_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
@@ -806,7 +821,7 @@ proptest! {
         let replayer = chunk_executor_tests::TestExecutor::new();
         let chunks_enqueued = replayer.executor.enqueue_chunks(
             txn_list.transactions,
-            txn_infos.iter().map(|_| PersistedAuxiliaryInfo::None).collect(),
+            persisted_aux_info,
             txn_infos,
             write_sets,
             event_vecs,

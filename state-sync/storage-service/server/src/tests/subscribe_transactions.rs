@@ -8,10 +8,8 @@ use aptos_config::{
 };
 use aptos_network::protocols::network::RpcError;
 use aptos_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures,
-    transaction::{PersistedAuxiliaryInfo, TransactionListWithProof},
-    PeerId,
+    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
+    transaction::TransactionListWithProofV2, PeerId,
 };
 use bytes::Bytes;
 use claims::assert_none;
@@ -40,21 +38,13 @@ async fn test_subscribe_transactions_different_networks() {
                     highest_version,
                     highest_version,
                     include_events,
+                    use_request_v2,
                 );
                 let transaction_list_with_proof_2 = utils::create_transaction_list_with_proof(
                     peer_version_2 + 1,
                     highest_version,
                     highest_version,
                     include_events,
-                );
-                let persisted_auxiliary_infos_1 = utils::create_persisted_auxiliary_infos(
-                    peer_version_1 + 1,
-                    highest_version,
-                    use_request_v2,
-                );
-                let persisted_auxiliary_infos_2 = utils::create_persisted_auxiliary_infos(
-                    peer_version_2 + 1,
-                    highest_version,
                     use_request_v2,
                 );
 
@@ -70,8 +60,6 @@ async fn test_subscribe_transactions_different_networks() {
                     highest_version,
                     include_events,
                     transaction_list_with_proof_1.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos_1.clone(),
                 );
                 utils::expect_get_transactions(
                     &mut db_reader,
@@ -80,8 +68,6 @@ async fn test_subscribe_transactions_different_networks() {
                     highest_version,
                     include_events,
                     transaction_list_with_proof_2.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos_2.clone(),
                 );
 
                 // Create a storage service config
@@ -145,7 +131,6 @@ async fn test_subscribe_transactions_different_networks() {
                     use_request_v2,
                     transaction_list_with_proof_1,
                     highest_ledger_info.clone(),
-                    persisted_auxiliary_infos_1.clone(),
                 )
                 .await;
                 utils::verify_new_transactions_with_proof(
@@ -154,7 +139,6 @@ async fn test_subscribe_transactions_different_networks() {
                     use_request_v2,
                     transaction_list_with_proof_2,
                     highest_ledger_info,
-                    persisted_auxiliary_infos_2.clone(),
                 )
                 .await;
             }
@@ -214,10 +198,6 @@ async fn test_subscribe_transactions_epoch_change() {
                 epoch_change_version,
                 epoch_change_version,
                 include_events,
-            );
-            let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                peer_version + 1,
-                epoch_change_version,
                 use_request_v2,
             );
 
@@ -233,8 +213,6 @@ async fn test_subscribe_transactions_epoch_change() {
                 epoch_change_version,
                 include_events,
                 transaction_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
             utils::expect_get_epoch_ending_ledger_infos(
                 &mut db_reader,
@@ -282,7 +260,6 @@ async fn test_subscribe_transactions_epoch_change() {
                 use_request_v2,
                 transaction_list_with_proof,
                 epoch_change_proof.ledger_info_with_sigs[0].clone(),
-                persisted_auxiliary_infos,
             )
             .await;
         }
@@ -316,10 +293,6 @@ async fn test_subscribe_transactions_max_chunk() {
                 peer_version + max_transaction_chunk_size,
                 peer_version + max_transaction_chunk_size,
                 include_events,
-            );
-            let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                peer_version + 1,
-                peer_version + max_transaction_chunk_size,
                 use_request_v2,
             );
 
@@ -335,8 +308,6 @@ async fn test_subscribe_transactions_max_chunk() {
                 highest_version,
                 include_events,
                 transaction_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
 
             // Create the storage client and server
@@ -375,7 +346,6 @@ async fn test_subscribe_transactions_max_chunk() {
                 use_request_v2,
                 transaction_list_with_proof,
                 highest_ledger_info,
-                persisted_auxiliary_infos,
             )
             .await;
         }
@@ -413,16 +383,8 @@ async fn test_subscribe_transactions_streaming() {
                     end_version,
                     highest_version,
                     false,
+                    use_request_v2,
                 )
-            })
-            .collect();
-
-        // Create the persisted auxiliary infos
-        let persisted_auxiliary_infos: Vec<_> = (0..num_stream_requests)
-            .map(|i| {
-                let start_version = peer_version + (i * max_transaction_chunk_size) + 1;
-                let end_version = start_version + max_transaction_chunk_size - 1;
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2)
             })
             .collect();
 
@@ -437,8 +399,6 @@ async fn test_subscribe_transactions_streaming() {
                 highest_version,
                 false,
                 transaction_lists_with_proofs[i as usize].clone(),
-                use_request_v2,
-                persisted_auxiliary_infos[i as usize].clone(),
             );
         }
 
@@ -495,7 +455,6 @@ async fn test_subscribe_transactions_streaming() {
                 // Verify that the correct response is received
                 verify_transaction_subscription_response(
                     transaction_lists_with_proofs.clone(),
-                    persisted_auxiliary_infos.clone(),
                     highest_ledger_info.clone(),
                     &mut mock_client,
                     &mut response_receivers,
@@ -555,17 +514,6 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
                     *end_version,
                     highest_version,
                     false,
-                )
-            })
-            .collect();
-
-        // Create the persisted auxiliary infos
-        let persisted_auxiliary_infos: Vec<_> = chunk_start_and_end_versions
-            .iter()
-            .map(|(start_version, end_version)| {
-                utils::create_persisted_auxiliary_infos(
-                    *start_version,
-                    *end_version,
                     use_request_v2,
                 )
             })
@@ -593,8 +541,6 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
                 proof_version,
                 false,
                 transaction_lists_with_proofs[i].clone(),
-                use_request_v2,
-                persisted_auxiliary_infos[i].clone(),
             );
         }
 
@@ -641,6 +587,7 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
         for stream_request_index in 0..max_num_active_subscriptions {
             // Determine the target ledger info for the response
             let first_output_version = transaction_lists_with_proofs[stream_request_index as usize]
+                .get_transaction_list_with_proof()
                 .first_transaction_version
                 .unwrap();
             let target_ledger_info = if first_output_version > epoch_change_version {
@@ -652,7 +599,6 @@ async fn test_subscribe_transactions_streaming_epoch_change() {
             // Verify that the correct response is received
             verify_transaction_subscription_response(
                 transaction_lists_with_proofs.clone(),
-                persisted_auxiliary_infos.clone(),
                 target_ledger_info.clone(),
                 &mut mock_client,
                 &mut response_receivers,
@@ -695,16 +641,8 @@ async fn test_subscribe_transactions_streaming_loop() {
                     end_version,
                     highest_version,
                     false,
+                    use_request_v2,
                 )
-            })
-            .collect();
-
-        // Create the persisted auxiliary infos
-        let persisted_auxiliary_infos: Vec<_> = (0..num_stream_requests)
-            .map(|i| {
-                let start_version = peer_version + (i * max_transaction_chunk_size) + 1;
-                let end_version = start_version + max_transaction_chunk_size - 1;
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2)
             })
             .collect();
 
@@ -719,8 +657,6 @@ async fn test_subscribe_transactions_streaming_loop() {
                 highest_version,
                 false,
                 transaction_lists_with_proofs[i as usize].clone(),
-                use_request_v2,
-                persisted_auxiliary_infos[i as usize].clone(),
             );
         }
 
@@ -782,7 +718,6 @@ async fn test_subscribe_transactions_streaming_loop() {
                 use_request_v2,
                 transaction_lists_with_proofs[stream_request_index as usize].clone(),
                 highest_ledger_info.clone(),
-                persisted_auxiliary_infos[stream_request_index as usize].clone(),
             )
             .await;
         }
@@ -831,8 +766,7 @@ async fn send_transaction_subscription_request_batch(
 /// Verifies that a response is received for a given stream request index
 /// and that the response contains the correct data.
 async fn verify_transaction_subscription_response(
-    expected_transaction_lists_with_proofs: Vec<TransactionListWithProof>,
-    expected_persisted_auxiliary_infos: Vec<Option<Vec<PersistedAuxiliaryInfo>>>,
+    expected_transaction_lists_with_proofs: Vec<TransactionListWithProofV2>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
@@ -846,7 +780,6 @@ async fn verify_transaction_subscription_response(
         use_request_v2,
         expected_transaction_lists_with_proofs[stream_request_index as usize].clone(),
         expected_target_ledger_info,
-        expected_persisted_auxiliary_infos[stream_request_index as usize].clone(),
     )
     .await;
 }

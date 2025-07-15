@@ -23,7 +23,7 @@ use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{sync::Arc, time::Duration};
 
@@ -208,6 +208,7 @@ impl<
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
+                // TODO(joshlind): Update to V2 type.
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     transaction_outputs_with_proof,
@@ -223,11 +224,14 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(TransactionOutputListWithProofV2::new_from_v1(
+                            transaction_outputs_with_proof,
+                        )),
                         payload_start_version,
                     )
                     .await?;
                 },
+                // TODO(joshlind): Update to V2 type.
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,
@@ -241,7 +245,9 @@ impl<
                         consensus_sync_request.clone(),
                         notification_metadata,
                         ledger_info_with_sigs,
-                        Some(transactions_with_proof),
+                        Some(TransactionListWithProofV2::new_from_v1(
+                            transactions_with_proof,
+                        )),
                         None,
                         payload_start_version,
                     )
@@ -277,8 +283,8 @@ impl<
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
         notification_metadata: NotificationMetadata,
         ledger_info_with_signatures: LedgerInfoWithSignatures,
-        transaction_list_with_proof: Option<TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
