@@ -1,0 +1,6 @@
+--- Aborting with assembler errors:
+error: unknown local `z`
+  ┌─ tests/undef_local.masm:5:5
+  │
+5 │     copy_loc z
+  │     ^^^^^^^^^^
