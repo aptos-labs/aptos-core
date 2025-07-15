@@ -39,20 +39,6 @@ impl CachedInformation {
             CachedInformation::SizeOnly(_) => Err(PartialVMError::new_invariant_violation("Data is not cached"))
         }
     }
-
-    fn value(&self) -> PartialVMResult<&GlobalValue> {
-        match self {
-            CachedInformation::Value(v) => Ok(v),
-            CachedInformation::SizeOnly(_) => Err(PartialVMError::new_invariant_violation("Data is not cached"))
-        }
-    }
-
-    fn into_value(self) -> PartialVMResult<GlobalValue> {
-        match self {
-            CachedInformation::Value(v) => Ok(v),
-            CachedInformation::SizeOnly(_) => Err(PartialVMError::new_invariant_violation("Data is not cached"))
-        }
-    }
 }
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
@@ -66,10 +52,6 @@ pub(crate) struct DataCacheEntry {
 }
 
 impl DataCacheEntry {
-    pub(crate) fn value(&self) -> PartialVMResult<&GlobalValue> {
-        self.value.value()
-    }
-
     pub(crate) fn maybe_value(&self) -> Option<&GlobalValue> {
         match &self.value {
             CachedInformation::SizeOnly(_) => None,
