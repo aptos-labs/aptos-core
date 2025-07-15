@@ -12371,6 +12371,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-package-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-rest-client",
+ "fs2",
+ "futures",
+ "git2 0.16.1",
+ "hex",
+ "move-core-types",
+ "percent-encoding",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "move-package-manifest"
 version = "0.1.0"
 dependencies = [
