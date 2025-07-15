@@ -1,0 +1,16 @@
+// Move bytecode v7
+module 102.test {
+
+
+identity<Ty0>(Arg0: Ty0): Ty0 /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+test(): u64 /* def_idx: 1 */ {
+B0:
+	0: LdU64(2)
+	1: PackClosureGeneric#1 identity<u64>(u64): u64
+	2: CallClosure(||u64 has drop)
+	3: Ret
+}
+}
