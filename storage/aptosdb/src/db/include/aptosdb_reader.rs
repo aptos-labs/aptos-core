@@ -4,7 +4,10 @@
 use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
+use aptos_types::{
+    block_info::BlockHeight, state_store::state_slot::StateSlot,
+    transaction::IndexedTransactionSummary,
+};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
