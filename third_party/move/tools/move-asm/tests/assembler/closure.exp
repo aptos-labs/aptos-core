@@ -1,10 +1,16 @@
+processed 1 task
+
+task 0 'publish'. lines 1-12:
+
+== BEGIN Bytecode ==
 // Move bytecode v7
-module 102.test {
+module 66.test {
 
 
 identity<Ty0>(Arg0: Ty0): Ty0 /* def_idx: 0 */ {
 B0:
-	0: Ret
+	0: MoveLoc[0](Arg0: Ty0)
+	1: Ret
 }
 test(): u64 /* def_idx: 1 */ {
 B0:
@@ -14,3 +20,4 @@ B0:
 	3: Ret
 }
 }
+== END Bytecode ==

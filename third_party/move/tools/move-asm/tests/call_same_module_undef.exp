@@ -1,6 +1,0 @@
---- Aborting with assembler errors:
-error: undeclared function `f1` in `0000000000000000000000000000000000000000000000000000000000000102::test`
-  ┌─ tests/call_same_module_undef.masm:8:5
-  │
-8 │     call f1
-  │     ^^^^^^^

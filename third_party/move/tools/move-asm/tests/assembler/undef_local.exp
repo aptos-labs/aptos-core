@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-7:
+Error: error: unknown local `z`
+  ┌─ test:5:5
+  │
+5 │     copy_loc z
+  │     ^^^^^^^^^^
+
+
