@@ -3,11 +3,13 @@
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_experimental_layered_map::LayeredMap;
+use aptos_logger::prelude::*;
 use aptos_types::state_store::{
     hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
 };
 use std::{collections::HashMap, sync::Arc};
 
+/// NOTE: this always operates on a single shard.
 pub(crate) struct HotStateLRU<'a> {
     /// The entire hot state resulted from committed transactions.
     committed: Arc<dyn HotStateView>,
@@ -47,6 +49,7 @@ impl<'a> HotStateLRU<'a> {
     }
 
     fn insert_as_head(&mut self, key: StateKey, mut slot: StateSlot) {
+        info!("self.num_items: {}", self.num_items);
         self.num_items += 1;
         match self.head.take() {
             Some(head) => {
@@ -76,6 +79,7 @@ impl<'a> HotStateLRU<'a> {
         if old_entry.is_cold() {
             return;
         }
+        info!("self.num_items: {}", self.num_items);
         self.num_items -= 1;
 
         match old_entry.prev() {
