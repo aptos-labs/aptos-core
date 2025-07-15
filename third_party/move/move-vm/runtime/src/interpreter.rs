@@ -1087,12 +1087,14 @@ where
         _traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
+        load_data: bool,
     ) -> PartialVMResult<DataCacheEntry> {
-        let (mut entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
             module_storage,
             resource_resolver,
             &addr,
             ty,
+            load_data,
         )?;
         gas_meter.charge_load_resource(
             addr,
@@ -1100,38 +1102,13 @@ where
                 ty,
                 runtime_environment: module_storage.runtime_environment(),
             },
-            // None,
-            entry.value(
-                module_storage,
-                &addr,
-            )?.view(),
+            match entry.maybe_value() {
+                None => None,
+                Some(v) => v.view(),
+            },
             bytes_loaded,
         )?;
         Ok(entry)
-    }
-
-    fn fetch_resource_if_needed<'c>(
-        &self,
-        data_cache: &'c mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<()> {
-        if !data_cache.contains_resource(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
-                resource_resolver,
-                module_storage,
-                gas_meter,
-                traversal_context,
-                addr,
-                ty,
-            )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
-        }
-        Ok(())
     }
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
@@ -1145,13 +1122,24 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        self.fetch_resource_if_needed(data_cache, resource_resolver, module_storage, gas_meter, traversal_context, addr, ty)?;
-        data_cache.get_resource_mut(&addr, ty, module_storage)
+        if !data_cache.contains_resource_data(&addr, ty) {
+            let entry = self.create_and_charge_data_cache_entry(
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                addr,
+                ty,
+                true,
+            )?;
+            data_cache.insert_resource(addr, ty.clone(), entry)?;
+        }
+        data_cache.get_resource_mut(&addr, ty)
     }
 
-    fn check_resource_existence(
+    fn load_resource_existence<'c>(
         &self,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1159,8 +1147,19 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<bool> {
-        self.fetch_resource_if_needed(data_cache, resource_resolver, module_storage, gas_meter, traversal_context, addr, ty)?;
-        data_cache.resource_exists(&addr, ty)
+        if !data_cache.contains_resource_existence(&addr, ty) {
+            let entry = self.create_and_charge_data_cache_entry(
+                resource_resolver,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                addr,
+                ty,
+                false,
+            )?;
+            data_cache.insert_resource(addr, ty.clone(), entry)?;
+        }
+        data_cache.get_resource_existence(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1258,7 +1257,7 @@ where
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = module_storage.runtime_environment();
-        let exists = self.check_resource_existence(
+        let exists = self.load_resource_existence(
             data_cache,
             resource_resolver,
             module_storage,

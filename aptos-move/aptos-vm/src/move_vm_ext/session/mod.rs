@@ -207,7 +207,7 @@ where
         } = self;
 
         let change_set = data_cache
-            .into_custom_effects(&resource_converter, module_storage)
+            .into_custom_effects(&resource_converter)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let (change_set, resource_group_change_set) =

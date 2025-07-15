@@ -35,7 +35,8 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, metadata::Metadata, value::MoveTypeLayout
+    account_address::AccountAddress, language_storage::StructTag, metadata::Metadata,
+    value::MoveTypeLayout,
 };
 use move_vm_types::{
     delayed_values::delayed_field_id::DelayedFieldID,
@@ -134,7 +135,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<Option<usize>> {
+    ) -> PartialVMResult<usize> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
@@ -150,17 +151,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             };
 
             let buf_size = resource_size(&buf);
-            Ok(buf.map(|_| buf_size + group_size as usize))
+            Ok(buf_size + group_size as usize)
         } else {
             let state_key = resource_state_key(address, struct_tag)?;
-            let buf_size = self
-                .executor_view
-                .get_resource_state_value_size(&state_key)?;
-            Ok(if buf_size == 0 {
-                None
-            } else {
-                Some(buf_size as usize)
-            })
+            Ok(self.executor_view.get_resource_state_value_size(&state_key)? as usize)
         }
     }
 }
@@ -208,14 +202,14 @@ impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
         self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 
-    fn get_resource_size_if_exists(
+    fn get_resource_size_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<Option<usize>> {
-        self.get_any_resource_size_with_layout(address, struct_tag, metadata, layout)
+        maybe_layout: Option<&MoveTypeLayout>,
+    ) -> PartialVMResult<usize> {
+        self.get_any_resource_size_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }
 

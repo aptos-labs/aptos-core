@@ -160,19 +160,20 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   Propagate exists call all the way to resolver, because we can implement the check more
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
-        Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (mut entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+        Ok(if !self.data_store.contains_resource_existence(&address, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
                 self.module_storage,
                 self.resource_resolver,
                 &address,
                 ty,
+                false,
             )?;
-            let exists = entry.value(self.module_storage, &address)?.exists()?;
+            let exists = entry.exists()?;
             self.data_store
                 .insert_resource(address, ty.clone(), entry)?;
             (exists, Some(bytes_loaded))
         } else {
-            let exists = self.data_store.get_resource_mut(&address, ty, self.module_storage)?.exists()?;
+            let exists = self.data_store.get_resource_existence(&address, ty)?;
             (exists, None)
         })
     }

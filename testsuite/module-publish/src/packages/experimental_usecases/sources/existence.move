@@ -71,14 +71,33 @@ module 0xABCD::existence {
         );
     }
 
+    fun very_long_function(how_long: u64): u64 {
+        let sum = 0;
+        let i = 0;
+        while (i < how_long) {
+            let j = 0;
+            while (j < 10) {
+                let k = 0;
+                while (k < 10) {
+                    sum = sum + i * j * k + k * i * i + j + 1;
+                    k = k + 1;
+                };
+                j = j + 1;
+            };
+            i = i + 1;
+        };
+        sum
+    }
+
     public entry fun check() {
         if (exists<C>(@0xABCD)) {
-            event::emit(DummyEvent { value: 321 });
+            event::emit(DummyEvent { value: very_long_function(50) });
         }
     }
 
     public entry fun modify() acquires C {
         let a = borrow_global_mut<C>(@0xABCD);
-        a.b1.super_a.a1 = a.b1.super_a.a1 + 1;
+        let v = very_long_function(100);
+        a.b1.super_a.a1 = a.b1.super_a.a1 + v;
     }
 }
