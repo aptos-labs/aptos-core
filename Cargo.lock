@@ -11884,7 +11884,6 @@ dependencies = [
  "itertools 0.13.0",
  "libtest-mimic",
  "move-binary-format",
- "move-command-line-common",
  "move-core-types",
  "move-transactional-test-runner",
  "walkdir",

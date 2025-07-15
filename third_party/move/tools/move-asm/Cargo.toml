@@ -16,7 +16,6 @@ codespan = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 either = { workspace = true }
 move-binary-format = { workspace = true }
-move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
 
 [dev-dependencies]

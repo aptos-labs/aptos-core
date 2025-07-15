@@ -253,7 +253,7 @@ impl<'a> ModuleBuilder<'a> {
         };
         let fhdl_idx = if self.is_script() {
             *self.main_handle.borrow_mut() = Some(fhdl);
-            FunctionHandleIndex(TableIndex::MAX)
+            Self::pseudo_script_function_index()
         } else {
             self.index(
                 &mut self.module.borrow_mut().function_handles,
@@ -314,6 +314,10 @@ impl<'a> ModuleBuilder<'a> {
 
     fn pseudo_script_module_index() -> ModuleHandleIndex {
         ModuleHandleIndex::new(TableIndex::MAX)
+    }
+
+    fn pseudo_script_function_index() -> FunctionHandleIndex {
+        FunctionHandleIndex::new(TableIndex::MAX)
     }
 
     // ==========================================================================================
