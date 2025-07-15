@@ -17,10 +17,10 @@ use either::Either;
 use move_binary_format::{
     file_format::{
         Bytecode, CodeOffset, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, LocalIndex, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
+        FunctionDefinitionIndex, FunctionHandleIndex, LocalIndex, MemberCount, SignatureIndex,
+        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
         StructVariantHandleIndex, StructVariantInstantiationIndex, TableIndex, TypeSignature,
-        VariantDefinition, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        VariantDefinition, VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
     CompiledModule,
 };
@@ -794,51 +794,11 @@ impl<'a> Assembler<'a> {
                 }
                 let (def_idx, targs_opt) = self.struct_ref(instr, &instr.args[0])?;
 
-                let mut variants = vec![];
-                let mut field_offs = None;
-                for field in &instr.args[1..] {
-                    match field {
-                        Argument::Id(
-                            PartialIdent {
-                                address: None,
-                                id_parts,
-                            },
-                            None,
-                        ) if id_parts.len() == 2 => {
-                            let variant_idx = self.add_diags(
-                                instr.loc,
-                                self.builder
-                                    .resolve_variant(def_idx, id_parts[0].as_ident_str()),
-                            )?;
-                            variants.push(variant_idx);
-                            let offs = self.add_diags(
-                                instr.loc,
-                                self.builder.resolve_field(
-                                    def_idx,
-                                    Some(variant_idx),
-                                    id_parts[1].as_ident_str(),
-                                ),
-                            )?;
-                            if field_offs.map(|cur| cur == offs).unwrap_or(true) {
-                                field_offs = Some(offs)
-                            } else {
-                                self.error(instr.loc, format!("variants of fields must be at some position, previous was {} while this is {}", field_offs.unwrap(), offs));
-                                return None;
-                            }
-                        },
-                        _ => {
-                            self.error(
-                                instr.loc,
-                                "expected `<variant>::<field>` to describe field of variant",
-                            );
-                            return None;
-                        },
-                    }
-                }
+                let (variants, field_offs) = self.variants(instr, def_idx)?;
                 let hdl_idx = self.add_diags(
                     instr.loc,
                     self.builder
-                        .variant_field_index(def_idx, variants, field_offs.unwrap()),
+                        .variant_field_index(def_idx, variants, field_offs),
                 )?;
                 if let Some(targs) = targs_opt {
                     let inst_idx = self.add_diags(
@@ -880,6 +840,63 @@ impl<'a> Assembler<'a> {
             },
         };
         Some(instr)
+    }
+
+    fn variants(
+        &mut self,
+        instr: &Instruction,
+        def_idx: StructDefinitionIndex,
+    ) -> Option<(Vec<VariantIndex>, MemberCount)> {
+        let mut variants = vec![];
+        let mut field_offs = None;
+        for field in &instr.args[1..] {
+            match field {
+                Argument::Id(
+                    PartialIdent {
+                        address: None,
+                        id_parts,
+                    },
+                    None,
+                ) if id_parts.len() == 2 => {
+                    let variant_idx = self.add_diags(
+                        instr.loc,
+                        self.builder
+                            .resolve_variant(def_idx, id_parts[0].as_ident_str()),
+                    )?;
+                    variants.push(variant_idx);
+                    let offs = self.add_diags(
+                        instr.loc,
+                        self.builder.resolve_field(
+                            def_idx,
+                            Some(variant_idx),
+                            id_parts[1].as_ident_str(),
+                        ),
+                    )?;
+                    if field_offs.map(|cur| cur == offs).unwrap_or(true) {
+                        field_offs = Some(offs)
+                    } else {
+                        self.error(
+                            instr.loc,
+                            format!(
+                                "variants of fields must be \
+                        at some position, previous was {} while this is {}",
+                                field_offs.unwrap(),
+                                offs
+                            ),
+                        );
+                        return None;
+                    }
+                },
+                _ => {
+                    self.error(
+                        instr.loc,
+                        "expected `<variant>::<field>` to describe field of variant",
+                    );
+                    return None;
+                },
+            }
+        }
+        Some((variants, field_offs?))
     }
 
     fn simple_id(&mut self, instr: &Instruction, arg: &Argument, ctx: &str) -> Option<Identifier> {

@@ -117,7 +117,8 @@ pub struct Unit {
     pub address_aliases: Vec<(Identifier, AccountAddress)>,
     /// A list of module aliases.
     pub module_aliases: Vec<(Identifier, ModuleId)>,
-    /// List of struct definitions (including enums).
+    /// List of struct definitions (including enums, which are technically
+    /// a special form of struct).
     pub structs: Vec<Struct>,
     /// List of function definitions.
     pub functions: Vec<Fun>,
@@ -142,6 +143,7 @@ impl UnitId {
 pub struct Struct {
     pub loc: Loc,
     pub name: Identifier,
+    /// Each type parameter is a triple `(name, constraints, is_phantom)`
     pub type_params: Vec<(Identifier, AbilitySet, bool)>,
     pub abilities: AbilitySet,
     pub layout: StructLayout,
@@ -269,6 +271,10 @@ impl AsmParser {
 
     fn lookahead_newline(&self) -> bool {
         matches!(&self.tokens[0].1, Token::Newline)
+    }
+
+    fn lookahead_soft_kw(&self, kw: &str) -> bool {
+        matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
     }
 
     fn expect(&mut self, tok: &Token) -> AsmResult<()> {
@@ -549,7 +555,7 @@ impl AsmParser {
             let ty = self.type_()?;
             self.expect_special(">")?;
             Ok(Argument::Type(ty))
-        } else if self.is_value() {
+        } else if self.is_value() && !self.lookahead_special("::") {
             let val = self.value()?;
             Ok(Argument::Constant(val))
         } else {
@@ -641,6 +647,9 @@ impl AsmParser {
             if let Some(name) = cur_variant_name {
                 variants.push((cur_loc, name, cur_fields));
             }
+            if variants.is_empty() {
+                return Err(error(loc, "enum type must have at least one variant"));
+            }
             Ok(Struct {
                 loc,
                 name,
@@ -671,12 +680,11 @@ impl AsmParser {
         Ok((loc, id, ty_params, abilities))
     }
 
-    #[allow(unused)]
     fn is_fun(&self) -> bool {
         self.is_soft_kw("fun")
-            || self.is_soft_kw("public")
-            || self.is_soft_kw("friend")
             || self.is_soft_kw("entry")
+            || (self.is_soft_kw("public") || self.is_soft_kw("friend"))
+                && self.lookahead_soft_kw("fun")
     }
 
     fn fun(&mut self) -> AsmResult<Fun> {
@@ -780,7 +788,7 @@ impl AsmParser {
         while self.is_tok(&Token::Newline) {
             self.advance()?
         }
-        // Parse address and module aliases
+        // Parse address aliases
         let mut address_aliases = vec![];
         while self.is_soft_kw("address") {
             self.advance()?;
@@ -794,15 +802,7 @@ impl AsmParser {
             .iter()
             .map(|(name, addr)| (name.as_ident_str(), *addr))
             .collect();
-        let mut module_aliases = vec![];
-        while self.is_soft_kw("use") {
-            self.advance()?;
-            let module = self.module_id(&address_alias_map)?;
-            self.expect_soft_kw("as")?;
-            let name = self.ident()?;
-            self.expect_newline()?;
-            module_aliases.push((name, module));
-        }
+
         // Parse module header
         let name = if self.is_soft_kw("module") {
             self.advance()?;
@@ -814,6 +814,21 @@ impl AsmParser {
             return Err(error(self.next_loc, "expected `module` or `script` header"));
         };
         self.expect_newline()?;
+
+        // Parse module aliases
+        let mut module_aliases = vec![];
+        while self.is_soft_kw("use") {
+            self.advance()?;
+            let module = self.module_id(&address_alias_map)?;
+            let name = if self.is_soft_kw("as") {
+                self.advance()?;
+                self.ident()?
+            } else {
+                module.name.clone()
+            };
+            self.expect_newline()?;
+            module_aliases.push((name, module));
+        }
 
         // Parse definitions
         let mut structs = vec![];

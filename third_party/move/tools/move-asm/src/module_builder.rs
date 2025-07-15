@@ -109,7 +109,8 @@ pub struct ModuleBuilder<'a> {
     /// A mapping from struct instantiations to indices.
     struct_def_inst_to_idx:
         RefCell<BTreeMap<(StructDefinitionIndex, SignatureIndex), StructDefInstantiationIndex>>,
-    /// A mapping from fields to indices.
+    /// A mapping from fields to indices. Notice that MemberCount is used in the VM for
+    /// representing field offsets.
     field_to_idx: RefCell<BTreeMap<(StructDefinitionIndex, MemberCount), FieldHandleIndex>>,
     /// A mapping from generic fields to indices.
     field_inst_to_idx:
@@ -296,6 +297,7 @@ impl<'a> ModuleBuilder<'a> {
         )?;
         let sdef = StructDefinition {
             struct_handle: shdl_idx,
+            // Will be later set by `define_struct_layout`
             field_information: StructFieldInformation::Native,
         };
         let new_idx = self.module.borrow().struct_defs.len();
@@ -425,8 +427,9 @@ impl<'a> ModuleBuilder<'a> {
     /// Resolves a module name, where the name is specified to some extent.
     /// - If an address is given, one further name part needs to be present
     ///   for the module.
-    /// - If no address is given two name parts must be present, the first
+    /// - If no address is given and there are two parts, the first
     ///   an address alias, the 2nd the module name.
+    /// - If no address and one name part, the name must be a module alias
     pub fn resolve_module(
         &self,
         address_opt: &Option<AccountAddress>,
@@ -438,15 +441,27 @@ impl<'a> ModuleBuilder<'a> {
                 bail!("expected one name part after address")
             }
             ModuleId::new(*addr, name_parts[0].clone())
-        } else if name_parts.len() == 2 {
-            // The first name must be an address alias
-            if let Some(addr) = self.address_aliases.get(&name_parts[0]) {
-                ModuleId::new(*addr, name_parts[1].clone())
-            } else {
-                bail!("undeclared address alias `{}`", name_parts[0])
-            }
         } else {
-            bail!("expected two name parts")
+            match name_parts.len() {
+                2 => {
+                    // The first name must be an address alias
+                    if let Some(addr) = self.address_aliases.get(&name_parts[0]) {
+                        ModuleId::new(*addr, name_parts[1].clone())
+                    } else {
+                        bail!("undeclared address alias `{}`", name_parts[0])
+                    }
+                },
+                1 => {
+                    if let Some(module) = self.module_aliases.get(&name_parts[0]) {
+                        module.clone()
+                    } else {
+                        bail!("undeclared module alias `{}`", name_parts[0])
+                    }
+                },
+                _ => {
+                    bail!("expected two name parts")
+                },
+            }
         };
         if self.context_modules.contains_key(&id) || self.this_module() == id {
             Ok(id)
