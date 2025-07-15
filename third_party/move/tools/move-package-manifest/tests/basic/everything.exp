@@ -39,7 +39,7 @@ PackageManifest {
             ),
             location: Aptos {
                 node_url: "mainnet",
-                package_addr: "0x1",
+                package_addr: 0000000000000000000000000000000000000000000000000000000000000001,
             },
         },
         "baz": Dependency {

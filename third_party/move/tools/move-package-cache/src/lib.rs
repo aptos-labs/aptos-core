@@ -44,5 +44,6 @@ mod file_lock;
 mod listener;
 mod package_cache;
 
+pub use canonical::{CanonicalGitIdentity, CanonicalNodeIdentity};
 pub use listener::{DebugPackageCacheListener, EmptyPackageCacheListener, PackageCacheListener};
 pub use package_cache::PackageCache;
