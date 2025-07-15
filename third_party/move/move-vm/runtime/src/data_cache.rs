@@ -311,7 +311,7 @@ impl TransactionDataCache {
         ty: &Type,
     ) -> PartialVMResult<&mut GlobalValue> {
         if let Some(entry) = self.find_entry_mut(addr, ty) {
-            return Ok(entry.value.value_mut()?);
+            return entry.value.value_mut();
         }
 
         let msg = format!("Resource for {:?} at {} must exist", ty, addr);
