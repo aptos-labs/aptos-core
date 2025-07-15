@@ -13,7 +13,7 @@
 //!
 //! Notice that line comments are supported and preceded by `//`.
 //!
-//! ```
+//! ```ignore
 //! unit :=
 //!   { address_alias LF }
 //!   ( "module" QID | "script" ) LF
@@ -50,7 +50,7 @@
 //!
 //! argument :=
 //!   VALUE | QID [ type_args ] | type_args
-//!
+//!```
 
 use codespan::{RawIndex, Span};
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
