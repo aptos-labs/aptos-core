@@ -73,6 +73,7 @@ pub trait StateComputer: Send + Sync {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        virtual_genesis_block_id: Option<aptos_crypto::HashValue>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

@@ -124,6 +124,15 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
     fn reset(&self) -> Result<()>;
 
+    /// Reset with a virtual genesis block ID (used for consensus recovery)
+    fn reset_with_virtual_genesis(
+        &self,
+        _virtual_genesis_block_id: Option<HashValue>,
+    ) -> Result<()> {
+        // Default implementation just calls reset() for backward compatibility
+        self.reset()
+    }
+
     /// Executes a block - TBD, this API will be removed in favor of `execute_and_state_checkpoint`, followed
     /// by `ledger_update` once we have ledger update as a separate pipeline phase.
     #[cfg(any(test, feature = "fuzzing"))]

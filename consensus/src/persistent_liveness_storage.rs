@@ -110,6 +110,8 @@ impl LedgerRecoveryData {
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
         let ends_epoch = self.storage_ledger.ledger_info().ends_epoch();
+        //TODO(l1-migration): when blocks is empty and we have to create virtual genesis from storage to start consensus.
+        // This is only required for migration when we only have a single validator network
         let blocks_empty = blocks.is_empty();
         let (latest_commit_id, latest_ledger_info_sig) = if ends_epoch || blocks_empty {
             let genesis =
@@ -211,6 +213,7 @@ impl LedgerRecoveryData {
         // We start from the block that storage's latest ledger info, if storage has end-epoch
         // LedgerInfo, we generate the virtual genesis block
         let ends_epoch = self.storage_ledger.ledger_info().ends_epoch();
+        // TODO(l1-migration): This is for single validator network boostrap. We created virtual genesis to start the consensus
         let blocks_empty = blocks.is_empty();
         let (root_id, latest_ledger_info_sig) = if ends_epoch || blocks_empty {
             let genesis =

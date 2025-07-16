@@ -91,6 +91,7 @@ impl StateComputer for EmptyStateComputer {
         _: Arc<dyn TransactionDeduper>,
         _: bool,
         _: bool,
+        _: Option<HashValue>,
     ) {
     }
 
@@ -179,6 +180,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionDeduper>,
         _: bool,
         _: bool,
+        _: Option<HashValue>,
     ) {
     }
 

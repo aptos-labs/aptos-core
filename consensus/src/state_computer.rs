@@ -492,7 +492,17 @@ impl StateComputer for ExecutionProxy {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        virtual_genesis_block_id: Option<HashValue>,
     ) {
+        // Reset the executor with the virtual genesis block ID if provided
+        if let Some(virtual_genesis_id) = virtual_genesis_block_id {
+            self.executor
+                .reset_with_virtual_genesis(Some(virtual_genesis_id))
+                .expect("Failed to reset executor with virtual genesis");
+        } else {
+            self.executor.reset().expect("Failed to reset executor");
+        }
+
         *self.state.write() = Some(MutableState {
             validators: epoch_state
                 .verifier
@@ -668,6 +678,7 @@ async fn test_commit_sync_race() {
         create_transaction_deduper(TransactionDeduperType::NoDedup),
         false,
         false,
+        None,
     );
     executor
         .commit(vec![], generate_li(1, 1), callback.clone())

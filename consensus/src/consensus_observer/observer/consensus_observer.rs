@@ -1077,16 +1077,17 @@ impl ConsensusObserver {
             .start_epoch(
                 sk,
                 epoch_state.clone(),
-                dummy_signer.clone(),
+                dummy_signer,
                 payload_manager,
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
-                None,
-                None,
+                None, // rand_config
+                None, // fast_rand_config
                 rand_msg_rx,
-                0,
-                self.pipeline_enabled(),
+                0, // highest_committed_round
+                self.observer_epoch_state.pipeline_enabled(),
+                None, // Consensus observer doesn't use virtual genesis
             )
             .await;
         if self.pipeline_enabled() {
