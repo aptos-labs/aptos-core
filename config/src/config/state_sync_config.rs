@@ -127,9 +127,9 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteOrApplyFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 100,
@@ -250,7 +250,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             dynamic_prefetching: DynamicPrefetchingConfig::default(),
-            enable_subscription_streaming: false,
+            enable_subscription_streaming: true,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
