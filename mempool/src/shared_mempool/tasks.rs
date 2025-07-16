@@ -61,35 +61,39 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation,
 {
     let network_interface = &smp.network_interface.clone();
+    counters::shared_mempool_broadcast_running_event_inc(counters::RUNNING_LABEL);
+
     // If there's no connection, don't bother to broadcast
     if network_interface.sync_states_exists(&peer) {
         if let Err(err) = network_interface
             .execute_broadcast(peer, backoff, smp)
             .await
         {
+            counters::shared_mempool_broadcast_running_event_inc(err.get_label());
             match err {
-                BroadcastError::NetworkError(peer, error) => warn!(LogSchema::event_log(
-                    LogEntry::BroadcastTransaction,
-                    LogEvent::NetworkSendFail
-                )
-                .peer(&peer)
-                .error(&error)),
-                BroadcastError::NoTransactions(_) | BroadcastError::PeerNotPrioritized(_, _) => {
+                BroadcastError::NoTransactions(_) => {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(60)),
-                        trace!("{:?}", err)
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        info!("No transactions to broadcast: {:?}", err)
+                    );
+                },
+                BroadcastError::PeerNotPrioritized(_, _) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        info!("Peer not prioritized. Skipping broadcast: {:?}", err)
                     );
                 },
                 _ => {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(60)),
-                        debug!("{:?}", err)
+                        SampleRate::Duration(Duration::from_secs(1)),
+                        warn!("Execute broadcast failed: {:?}", err)
                     );
                 },
             }
         }
     } else {
         // Drop the scheduled broadcast, we're not connected anymore
+        counters::shared_mempool_broadcast_running_event_inc(counters::DROP_BROADCAST_LABEL);
         return;
     }
     let schedule_backoff = network_interface.is_backoff_mode(&peer);
