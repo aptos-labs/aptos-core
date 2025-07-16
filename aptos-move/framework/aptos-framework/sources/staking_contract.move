@@ -83,7 +83,7 @@ module aptos_framework::staking_contract {
         signer_cap: SignerCapability,
     }
 
-    struct Staker has key, copy, drop, store {
+    struct Staker has key, copy, drop {
         staker: address,
     }
 
