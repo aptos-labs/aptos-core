@@ -95,7 +95,9 @@ where
                     COUNTER.inc_with(&["vacant_new"]);
                     true
                 },
-                StateSlot::HotVacant { hot_since_version } => {
+                StateSlot::HotVacant {
+                    hot_since_version, ..
+                } => {
                     if self.should_refresh(hot_since_version) {
                         COUNTER.inc_with(&["vacant_refresh"]);
                         true
