@@ -29,7 +29,7 @@ use std::collections::btree_map::{BTreeMap, Entry};
 
 enum CachedInformation {
     Value(GlobalValue),
-    SizeOnly(u64),
+    SizeOnly(Option<u64>),
 }
 
 impl CachedInformation {
@@ -61,7 +61,7 @@ impl DataCacheEntry {
 
     pub(crate) fn exists(&self) -> PartialVMResult<bool> {
         match &self.value {
-            CachedInformation::SizeOnly(e) => Ok(*e != 0),
+            CachedInformation::SizeOnly(e) => Ok(e.unwrap_or(0) != 0),
             CachedInformation::Value(v) => v.exists()
         }
     }
@@ -229,7 +229,7 @@ impl TransactionDataCache {
                     None
                 },
             )?;
-            (CachedInformation::SizeOnly(bytes_loaded.unwrap_or(0)), bytes_loaded.unwrap_or(0) as usize)
+            (CachedInformation::SizeOnly(bytes_loaded), bytes_loaded.unwrap_or(0) as usize)
         };
 
         let entry = DataCacheEntry {
@@ -269,12 +269,6 @@ impl TransactionDataCache {
     pub(crate) fn contains_resource_existence(&self, addr: &AccountAddress, ty: &Type) -> bool {
         self.find_entry(addr, ty).is_some()
     }
-
-    // pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
-    //     self.account_map
-    //         .get(addr)
-    //         .is_some_and(|account_cache| account_cache.contains_key(ty))
-    // }
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
     /// entry already for the specified address-type pair.
