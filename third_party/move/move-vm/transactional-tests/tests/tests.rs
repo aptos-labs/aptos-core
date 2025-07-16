@@ -127,6 +127,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         language_version: config.language_version,
         experiments,
         vm_config: config.vm_config,
+        use_masm: false,
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

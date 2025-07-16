@@ -3,33 +3,27 @@ processed 2 tasks
 task 0 'publish'. lines 1-6:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test1 {
+// Bytecode version v7
+module 0x66::test1
+// Function definition at index 0
+public fun f(l0: u64): u64
+    move_loc l0
+    ret
 
 
-public f(Arg0: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: Ret
-}
-}
 == END Bytecode ==
 
 task 1 'publish'. lines 9-16:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test2 {
-use 0000000000000000000000000000000000000000000000000000000000000066::test1;
+// Bytecode version v7
+module 0x66::test2
+use 0x66::test1
+// Function definition at index 0
+fun g(): u64
+    ld_u64 10
+    call test1::f
+    ret
 
 
-
-
-g(): u64 /* def_idx: 0 */ {
-B0:
-	0: LdU64(10)
-	1: Call test1::f(u64): u64
-	2: Ret
-}
-}
 == END Bytecode ==

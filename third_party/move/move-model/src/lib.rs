@@ -26,14 +26,10 @@ use legacy_move_compiler::{
     Compiler, Flags, PASS_EXPANSION, PASS_PARSER,
 };
 use move_binary_format::{
-    check_bounds::BoundsChecker,
-    file_format::{
-        AddressIdentifierIndex, CompiledModule, CompiledScript, FunctionDefinition, FunctionHandle,
-        FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
-        SignatureIndex, Visibility,
-    },
+    file_format::{CompiledModule, CompiledScript},
+    module_script_conversion,
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -524,126 +520,7 @@ pub fn convert_script_to_module(script: CompiledScript, index: usize) -> Compile
         .expect("malformed script without function");
     let name = script.identifier_at(fhd.name);
     let unique_name = format!("{}_{}", name, index);
-    script_into_module(script, &unique_name)
-}
-
-#[allow(deprecated)]
-pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> CompiledModule {
-    let mut script = compiled_script;
-
-    // Add the "<SELF>" identifier if it isn't present.
-    //
-    // Note: When adding an element to the table, in theory it is possible for the index
-    // to overflow. This will not be a problem if we get rid of the script/module conversion.
-    let self_ident_idx = match script
-        .identifiers
-        .iter()
-        .position(|ident| ident.as_ident_str().as_str() == name)
-    {
-        Some(idx) => IdentifierIndex::new(idx as u16),
-        None => {
-            let idx = IdentifierIndex::new(script.identifiers.len() as u16);
-            script
-                .identifiers
-                .push(Identifier::new(name.to_string()).unwrap());
-            idx
-        },
-    };
-
-    // Add a dummy address if none exists.
-    let dummy_addr = AccountAddress::MAX_ADDRESS;
-    let dummy_addr_idx = match script
-        .address_identifiers
-        .iter()
-        .position(|addr| addr == &dummy_addr)
-    {
-        Some(idx) => AddressIdentifierIndex::new(idx as u16),
-        None => {
-            let idx = AddressIdentifierIndex::new(script.address_identifiers.len() as u16);
-            script.address_identifiers.push(dummy_addr);
-            idx
-        },
-    };
-
-    // Add a self module handle.
-    let self_module_handle_idx = match script
-        .module_handles
-        .iter()
-        .position(|handle| handle.address == dummy_addr_idx && handle.name == self_ident_idx)
-    {
-        Some(idx) => ModuleHandleIndex::new(idx as u16),
-        None => {
-            let idx = ModuleHandleIndex::new(script.module_handles.len() as u16);
-            script.module_handles.push(ModuleHandle {
-                address: dummy_addr_idx,
-                name: self_ident_idx,
-            });
-            idx
-        },
-    };
-
-    // Find the index to the empty signature [].
-    // Create one if it doesn't exist.
-    let return_sig_idx = match script.signatures.iter().position(|sig| sig.0.is_empty()) {
-        Some(idx) => SignatureIndex::new(idx as u16),
-        None => {
-            let idx = SignatureIndex::new(script.signatures.len() as u16);
-            script.signatures.push(Signature(vec![]));
-            idx
-        },
-    };
-
-    // Create a function handle for the main function.
-    let main_handle_idx = FunctionHandleIndex::new(script.function_handles.len() as u16);
-    script.function_handles.push(FunctionHandle {
-        module: self_module_handle_idx,
-        name: self_ident_idx,
-        parameters: script.parameters,
-        return_: return_sig_idx,
-        type_parameters: script.type_parameters,
-        access_specifiers: None, // TODO: access specifiers for script functions
-        attributes: vec![],
-    });
-
-    // Create a function definition for the main function.
-    let main_def = FunctionDefinition {
-        function: main_handle_idx,
-        visibility: Visibility::Public,
-        is_entry: true,
-        acquires_global_resources: vec![],
-        code: Some(script.code),
-    };
-
-    let module = CompiledModule {
-        version: script.version,
-        module_handles: script.module_handles,
-        self_module_handle_idx,
-        struct_handles: script.struct_handles,
-        function_handles: script.function_handles,
-        field_handles: vec![],
-        friend_decls: vec![],
-
-        struct_def_instantiations: vec![],
-        function_instantiations: script.function_instantiations,
-        field_instantiations: vec![],
-
-        signatures: script.signatures,
-
-        identifiers: script.identifiers,
-        address_identifiers: script.address_identifiers,
-        constant_pool: script.constant_pool,
-        metadata: script.metadata,
-
-        struct_defs: vec![],
-        function_defs: vec![main_def],
-
-        struct_variant_handles: vec![],
-        struct_variant_instantiations: vec![],
-        variant_field_handles: vec![],
-        variant_field_instantiations: vec![],
-    };
-    BoundsChecker::verify_module(&module).expect("invalid bounds in module");
-    module
+    module_script_conversion::script_into_module(script, &unique_name)
 }
 
 // =================================================================================================

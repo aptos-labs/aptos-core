@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use move_asm::{run, Options};
+use move_asm::assembler::{run, Options};
 
 fn main() {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);

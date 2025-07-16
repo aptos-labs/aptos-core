@@ -3,14 +3,12 @@ processed 1 task
 task 0 'publish'. lines 1-6:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test {
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+entry public fun f(l0: u64): u64
+    move_loc l0
+    ret
 
 
-entry public f(Arg0: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: Ret
-}
-}
 == END Bytecode ==

@@ -3,21 +3,19 @@ processed 1 task
 task 0 'publish'. lines 1-12:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test {
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+fun identity<T0>(l0: T0): T0
+    move_loc l0
+    ret
+
+// Function definition at index 1
+fun test(): u64
+    ld_u64 2
+    call test::identity<u64>, 1
+    call_closure <||u64 has drop>
+    ret
 
 
-identity<Ty0>(Arg0: Ty0): Ty0 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](Arg0: Ty0)
-	1: Ret
-}
-test(): u64 /* def_idx: 1 */ {
-B0:
-	0: LdU64(2)
-	1: PackClosureGeneric#1 identity<u64>(u64): u64
-	2: CallClosure(||u64 has drop)
-	3: Ret
-}
-}
 == END Bytecode ==

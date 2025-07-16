@@ -504,6 +504,9 @@ pub enum TestRunConfig {
         experiments: Vec<(String, bool)>,
         /// Configuration for the VM that runs tests.
         vm_config: VMConfig,
+        /// Whether to use  Move Assembler (.masm) format when printing
+        /// bytecode.
+        use_masm: bool,
     },
 }
 
@@ -521,6 +524,20 @@ impl TestRunConfig {
                 paranoid_type_checks: true,
                 ..VMConfig::default()
             },
+            use_masm: false,
+        }
+    }
+
+    pub fn with_masm(mut self) -> TestRunConfig {
+        match &mut self {
+            Self::CompilerV2 { use_masm, .. } => *use_masm = true,
+        }
+        self
+    }
+
+    pub(crate) fn using_masm(&self) -> bool {
+        match self {
+            Self::CompilerV2 { use_masm, .. } => *use_masm,
         }
     }
 }
@@ -528,6 +545,14 @@ impl TestRunConfig {
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_with_config(
         TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]),
+        path,
+    )
+}
+
+// Notice this will go away once we have removed legacy disassembler
+pub fn run_test_print_bytecode_with_masm(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_with_config(
+        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]).with_masm(),
         path,
     )
 }
