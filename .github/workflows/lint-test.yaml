@@ -17,6 +17,7 @@ env:
   HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 # cancel redundant builds
 concurrency:

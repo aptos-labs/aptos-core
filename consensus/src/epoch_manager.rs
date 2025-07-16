@@ -113,6 +113,13 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "consensus_fuzzer")]
+use crate::rapture_hook::{StateModelLike, run_fuzzer};
+#[cfg(feature = "consensus_fuzzer")]
+use std::sync::OnceLock;
+#[cfg(feature = "consensus_fuzzer")]
+static GLOBAL_STATE_MODEL: OnceLock<Arc<Mutex<Box<dyn StateModelLike>>>> = OnceLock::new();
+
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
@@ -949,7 +956,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let max_blocks_allowed = self
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
-
+        
+        #[cfg(feature = "consensus_fuzzer")]
+        {
+            let epoch_state_copy = epoch_state.clone();
+            let safety_rules_container_new = safety_rules_container.clone();
+        }
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),
@@ -984,25 +996,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         #[cfg(feature = "consensus_fuzzer")]
         {
-            let mut state_model = StateModel::new("");
-
-            let safety_rules_container = Arc::new(Mutex::new(safety_rules));
             let mut rapture_network_sender = NetworkSender::new(
                 self.author,
                 self.network_sender.clone(),
                 self.self_sender.clone(),
-                epoch_state.verifier.clone(),
+                epoch_state_copy.verifier.clone(),
             );
             let mut copy_network = rapture_network_sender.clone();
-            let mut safety_rules_container_new = safety_rules_container.clone();
-            unsafe {
-                INIT.call_once(|| {
-                    thread::spawn(|| {
-                        info!("\n\n @@@@ RAPTURE enter the EPOCH time! Ready to Start Fuzzing! @@@@ \n\n");
-                        rapture_fuzzer::rapture_fuzzer::start_fuzzer(copy_network, &mut state_model, safety_rules_container_new, self.author);
-                        info!("\n\n @@@@ Finish RAPTURE Fuzzer! @@@@ \n\n");
-                    });
-                });
+            if let Some(state_model) = crate::rapture_hook::get_state_model_arc() {
+                run_fuzzer(copy_network, state_model.clone(), safety_rules_container_new, self.author);
             }
         }
     }
@@ -1523,7 +1525,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
         #[cfg(feature = "consensus_fuzzer")]
-        state_model.on_new_msg(&consensus_msg);
+        if let Some(model) = GLOBAL_STATE_MODEL.get() {
+            let mut model_guard = model.lock();
+            model_guard.on_new_msg(&consensus_msg);
+        }
 
         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
             observe_block(
