@@ -96,13 +96,13 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         }
     }
 
-    fn get_any_resource_with_layout(
+    fn get_resource_group_bytes(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<(Option<Bytes>, usize)> {
+    ) -> PartialVMResult<Option<(Option<Bytes>, usize)>> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
@@ -118,15 +118,29 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             };
 
             let buf_size = resource_size(&buf);
-            Ok((buf, buf_size + group_size as usize))
-        } else {
-            let state_key = resource_state_key(address, struct_tag)?;
-            let buf = self
-                .executor_view
-                .get_resource_bytes(&state_key, maybe_layout)?;
-            let buf_size = resource_size(&buf);
-            Ok((buf, buf_size))
+            return Ok(Some((buf, buf_size + group_size as usize)));
         }
+        Ok(None)
+    }
+
+    fn get_any_resource_with_layout(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+        maybe_layout: Option<&MoveTypeLayout>,
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
+        let resource_group_bytes = self.get_resource_group_bytes(address, struct_tag, metadata, maybe_layout)?;
+        if let Some(result) = resource_group_bytes {
+            return Ok(result);
+        }
+
+        let state_key = resource_state_key(address, struct_tag)?;
+        let buf = self
+            .executor_view
+            .get_resource_bytes(&state_key, maybe_layout)?;
+        let buf_size = resource_size(&buf);
+        Ok((buf, buf_size))
     }
 
     fn get_any_resource_size_with_layout(
@@ -136,26 +150,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<u64>> {
-        let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
-        if let Some(resource_group) = resource_group {
-            let key = StateKey::resource_group(address, &resource_group);
-            let buf =
-                self.resource_group_view
-                    .get_resource_from_group(&key, struct_tag, maybe_layout)?;
-
-            let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let group_size = if first_access {
-                self.resource_group_view.resource_group_size(&key)?.get()
-            } else {
-                0
-            };
-
-            let buf_size = resource_size(&buf);
-            Ok(Some(buf_size as u64 + group_size))
-        } else {
-            let state_key = resource_state_key(address, struct_tag)?;
-            self.executor_view.get_resource_state_value_size(&state_key)
+        let resource_group_bytes = self.get_resource_group_bytes(address, struct_tag, metadata, maybe_layout)?;
+        if let Some((_, size)) = resource_group_bytes {
+            return Ok(Some(size as u64));
         }
+        let state_key = resource_state_key(address, struct_tag)?;
+        self.executor_view.get_resource_state_value_size(&state_key)
     }
 }
 
