@@ -116,7 +116,6 @@ where
     ) -> ExecutorResult<StateComputeResult> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "ledger_update"]);
 
-        self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
