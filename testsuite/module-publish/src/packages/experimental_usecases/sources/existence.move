@@ -32,7 +32,7 @@ module 0xABCD::existence {
     fun make_a(seed: u64): A {
         A {
             a1: seed + 42,
-            a2: utf8(b"a2a2a2"),
+            a2: utf8(b"Lorem ipsum"),
         }
     }
 
@@ -45,30 +45,9 @@ module 0xABCD::existence {
         };
         B {
             va: va,
-            name: utf8(b"Super epic B"),
+            name: utf8(b"dolor sit amet"),
             super_a: make_a(1000 + seed),
         }
-    }
-
-    public entry fun create(publisher: &signer) {
-        assert!(
-            signer::address_of(publisher) == @0xABCD,
-            ENOT_AUTHORIZED,
-        );
-
-        let bt = table::new<B, String>();
-        let i = 0;
-        while (i < 100) {
-            table::add(&mut bt, make_b(i + 1), utf8(b"B number i"));
-            i = i + 1;
-        };
-        move_to<C>(
-            publisher,
-            C {
-                b1: make_b(30),
-                bt: bt,
-            }
-        );
     }
 
     fun very_long_function(how_long: u64): u64 {
@@ -87,6 +66,27 @@ module 0xABCD::existence {
             i = i + 1;
         };
         sum
+    }
+
+    fun init_module(publisher: &signer) {
+        assert!(
+            signer::address_of(publisher) == @0xABCD,
+            ENOT_AUTHORIZED,
+        );
+
+        let bt = table::new<B, String>();
+        let i = 0;
+        while (i < 100) {
+            table::add(&mut bt, make_b(i + 1), utf8(b"consectetur adipiscing elit"));
+            i = i + 1;
+        };
+        move_to<C>(
+            publisher,
+            C {
+                b1: make_b(30),
+                bt: bt,
+            }
+        );
     }
 
     public entry fun check() {
