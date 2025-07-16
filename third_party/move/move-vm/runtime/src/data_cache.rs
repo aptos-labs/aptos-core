@@ -29,7 +29,7 @@ use std::collections::btree_map::{BTreeMap, Entry};
 
 enum CachedInformation {
     Value(GlobalValue),
-    SizeOnly(NumBytes),
+    SizeOnly(u64),
 }
 
 impl CachedInformation {
@@ -61,7 +61,7 @@ impl DataCacheEntry {
 
     pub(crate) fn exists(&self) -> PartialVMResult<bool> {
         match &self.value {
-            CachedInformation::SizeOnly(e) => Ok(!e.is_zero()),
+            CachedInformation::SizeOnly(e) => Ok(*e != 0),
             CachedInformation::Value(v) => v.exists()
         }
     }
@@ -229,7 +229,7 @@ impl TransactionDataCache {
                     None
                 },
             )?;
-            (CachedInformation::SizeOnly(NumBytes::from(bytes_loaded.unwrap_or(0))), bytes_loaded.unwrap_or(0) as usize)
+            (CachedInformation::SizeOnly(bytes_loaded.unwrap_or(0)), bytes_loaded.unwrap_or(0) as usize)
         };
 
         let entry = DataCacheEntry {
