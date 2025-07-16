@@ -1,0 +1,10 @@
+//# publish --print-bytecode
+module 0x66::test
+
+fun f(x: u64): u64
+    ret
+
+fun g(): u64
+    ld_u64 10
+    call f1
+    ret

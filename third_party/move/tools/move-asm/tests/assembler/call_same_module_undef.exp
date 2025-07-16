@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-10:
+Error: error: undeclared function `f1` in `0000000000000000000000000000000000000000000000000000000000000066::test`
+  ┌─ test:7:5
+  │
+7 │     call f1
+  │     ^^^^^^^
+
+

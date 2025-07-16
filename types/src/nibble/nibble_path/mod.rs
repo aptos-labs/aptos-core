@@ -221,9 +221,9 @@ impl NibblePath {
     }
 
     // Returns the shard_id of the NibblePath, or None if it is root.
-    pub fn get_shard_id(&self) -> Option<u8> {
+    pub fn get_shard_id(&self) -> Option<usize> {
         if self.num_nibbles() > 0 {
-            Some(u8::from(self.get_nibble(0)))
+            Some(usize::from(self.get_nibble(0)))
         } else {
             None
         }

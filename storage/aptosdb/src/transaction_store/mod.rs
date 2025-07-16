@@ -146,13 +146,24 @@ impl TransactionStore {
         transactions: &[(Version, Transaction)],
         db_batch: &mut SchemaBatch,
     ) -> Result<()> {
-        for (version, transaction) in transactions {
+        for (_, transaction) in transactions {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
                 if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
                     db_batch
                         .delete::<OrderedTransactionByAccountSchema>(&(txn.sender(), seq_num))?;
                 }
-                // TODO[Orderless]: Check where else transactions summaries need to be pruned
+            }
+        }
+        Ok(())
+    }
+
+    pub fn prune_transaction_summaries_by_account(
+        &self,
+        transactions: &[(Version, Transaction)],
+        db_batch: &mut SchemaBatch,
+    ) -> Result<()> {
+        for (version, transaction) in transactions {
+            if let Some(txn) = transaction.try_as_signed_user_txn() {
                 db_batch
                     .delete::<TransactionSummariesByAccountSchema>(&(txn.sender(), *version))?;
             }

@@ -65,14 +65,12 @@ impl StateMerkleBatchCommitter {
                         .state_merkle_db
                         .commit(current_version, top_levels_batch, batches_for_shards)
                         .expect("State merkle nodes commit failed.");
-                    if self.state_db.state_merkle_db.cache_enabled() {
+                    if let Some(lru_cache) = self.state_db.state_merkle_db.lru_cache() {
                         self.state_db
                             .state_merkle_db
                             .version_caches()
                             .iter()
-                            .for_each(|(_, cache)| {
-                                cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
-                            });
+                            .for_each(|(_, cache)| cache.maybe_evict_version(lru_cache));
                     }
 
                     info!(

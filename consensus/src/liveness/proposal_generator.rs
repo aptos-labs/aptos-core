@@ -39,7 +39,6 @@ use aptos_types::{
     block_info::BlockInfo, on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
-use futures::future::BoxFuture;
 use itertools::Itertools;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -492,7 +491,6 @@ impl ProposalGenerator {
         &self,
         round: Round,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
         let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
@@ -514,7 +512,6 @@ impl ProposalGenerator {
                 round,
                 hqc.certified_block().id(),
                 proposer_election.clone(),
-                wait_callback,
                 maybe_optqs_payload_pull_params,
             )
             .await?
@@ -557,7 +554,6 @@ impl ProposalGenerator {
         round: Round,
         parent_id: HashValue,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-        wait_callback: BoxFuture<'static, ()>,
         maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, u64)> {
         {
@@ -665,7 +661,6 @@ impl ProposalGenerator {
                     block_timestamp: timestamp,
                 },
                 validator_txn_filter,
-                wait_callback,
             )
             .await
             .context("Fail to retrieve payload")?;
@@ -691,7 +686,6 @@ impl ProposalGenerator {
         parent: BlockInfo,
         grandparent_qc: QuorumCert,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-        wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<OptBlockData> {
         let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
@@ -711,7 +705,6 @@ impl ProposalGenerator {
                 round,
                 parent.id(),
                 proposer_election,
-                wait_callback,
                 maybe_optqs_payload_pull_params,
             )
             .await?

@@ -84,7 +84,14 @@ impl Closure {
 impl Debug for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(fun, captured) = self;
-        write!(f, "Closure({}, {:?})", fun.to_canonical_string(), captured)
+        let mask = fun.closure_mask();
+
+        f.debug_struct("Closure")
+            .field("function", &fun.to_canonical_string())
+            .field("closure_mask", &mask)
+            .field("captured_count", &captured.len())
+            .field("captured_values", captured)
+            .finish()
     }
 }
 
@@ -130,6 +137,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
                 ctx: self.ctx,
                 layout: &layout,
                 value,
+                depth: self.depth + 1,
             })?
         }
         seq.end()
@@ -208,5 +216,101 @@ where
     match seq.next_element::<T>()? {
         Some(x) => Ok(x),
         None => Err(A::Error::custom("expected more elements")),
+    }
+}
+
+/// Mock AbstractFunction for testing
+/// Value:closure(AbstractFunction, [Value]) requires an AbstractFunction, which is agnostic from runtime implementation.
+/// This mock is used to test the function values system.
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+pub(crate) mod mock {
+    use super::*;
+    use better_any::{Tid, TidAble, TidExt};
+    use move_binary_format::errors::PartialVMResult;
+    use move_core_types::{
+        account_address::AccountAddress,
+        function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+        value::MoveTypeLayout,
+    };
+    use std::cmp::Ordering;
+
+    // Since Abstract functions are `Tid`, we cannot auto-mock them, so need to mock manually.
+    #[derive(Clone, Tid)]
+    pub(crate) struct MockAbstractFunction {
+        pub(crate) data: SerializedFunctionData,
+    }
+
+    impl MockAbstractFunction {
+        #[allow(dead_code)]
+        pub(crate) fn new(
+            fun_name: &str,
+            ty_args: Vec<TypeTag>,
+            mask: ClosureMask,
+            captured_layouts: Vec<MoveTypeLayout>,
+        ) -> MockAbstractFunction {
+            Self {
+                data: SerializedFunctionData {
+                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+                    module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
+                    fun_id: Identifier::new(fun_name).unwrap(),
+                    ty_args,
+                    mask,
+                    captured_layouts,
+                },
+            }
+        }
+
+        #[allow(dead_code)]
+        pub(crate) fn new_from_data(data: SerializedFunctionData) -> Self {
+            Self { data }
+        }
+    }
+
+    impl AbstractFunction for MockAbstractFunction {
+        fn closure_mask(&self) -> ClosureMask {
+            self.data.mask
+        }
+
+        fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+            // We only need equality for tests
+            let other_mock = other.downcast_ref::<MockAbstractFunction>().unwrap();
+            Ok(if self.data == other_mock.data {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            })
+        }
+
+        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            // Didn't need it in the test
+            unimplemented!("clone_dyn is not implemented for MockAbstractFunction")
+        }
+
+        fn to_canonical_string(&self) -> String {
+            // Needed for assertion failure printing
+            let ty_args_str = if self.data.ty_args.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<{}>",
+                    self.data
+                        .ty_args
+                        .iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+
+            format!(
+                "{}::{}::{}{}",
+                self.data.module_id.address(),
+                self.data.module_id.name(),
+                self.data.fun_id,
+                ty_args_str
+            )
+        }
     }
 }

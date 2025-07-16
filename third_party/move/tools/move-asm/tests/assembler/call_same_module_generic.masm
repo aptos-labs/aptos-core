@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test
+
+fun f<A>(x: A): A
+    move_loc x
+    ret
+
+fun g(): u64
+    ld_u64 10
+    call f<u64>
+    ret

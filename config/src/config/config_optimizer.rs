@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    ConsensusObserverConfig, Identity, IdentityFromConfig, IdentitySource, IndexerGrpcConfig,
-    StorageConfig,
+    ConsensusConfig, ConsensusObserverConfig, Identity, IdentityFromConfig, IdentitySource,
+    IndexerGrpcConfig, StorageConfig,
 };
 use crate::{
     config::{
@@ -110,6 +110,9 @@ impl ConfigOptimizer for NodeConfig {
         let mut optimizers_with_modifications = vec![];
         if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());
+        }
+        if ConsensusConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ConsensusConfig::get_optimizer_name());
         }
         if ConsensusObserverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(ConsensusObserverConfig::get_optimizer_name());

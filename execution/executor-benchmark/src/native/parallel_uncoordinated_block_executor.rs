@@ -46,7 +46,6 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use std::{
     cell::Cell,
     collections::BTreeMap,
-    hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
 };
 use thread_local::ThreadLocal;
@@ -86,13 +85,21 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
+        let mut native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
                 .get_txns()
                 .par_iter()
                 .map(NativeTransaction::parse)
                 .collect::<Vec<_>>()
         });
+        native_transactions.push(NativeTransaction::parse(&block_epilogue_txn.clone().into()));
 
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
@@ -111,13 +118,6 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
                     Some(format!("{:?}", e).to_string()),
                 )
             })?;
-
-        let block_epilogue_txn = Transaction::block_epilogue_v0(
-            transaction_slice_metadata
-                .append_state_checkpoint_to_block()
-                .unwrap(),
-            BlockEndInfo::new_empty(),
-        );
 
         Ok(BlockOutput::new(
             transaction_outputs,
@@ -140,11 +140,13 @@ impl IncrementalOutput {
     }
 
     fn into_success_output(mut self, gas: u64) -> Result<TransactionOutput> {
-        self.events.push(
-            FeeStatement::new(gas, gas, 0, 0, 0)
-                .create_event_v2()
-                .expect("Creating FeeStatement should always succeed"),
-        );
+        if gas != 0 {
+            self.events.push(
+                FeeStatement::new(gas, gas, 0, 0, 0)
+                    .create_event_v2()
+                    .expect("Creating FeeStatement should always succeed"),
+            );
+        }
 
         Ok(TransactionOutput::new(
             WriteSetMut::new(self.write_set).freeze()?,
@@ -425,6 +427,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                     }
                 }
             },
+            NativeTransaction::BlockEpilogue => return output.into_success_output(0),
         };
 
         self.reduce_apt_supply(fa_migration_complete, gas, state_view, &mut output)?;
@@ -1023,7 +1026,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> Ref<'a, StateKey, CachedResource, RandomState> {
+    ) -> Ref<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get(key) {
             return ref_mut;
@@ -1039,7 +1042,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> RefMut<'a, StateKey, CachedResource, RandomState> {
+    ) -> RefMut<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get_mut(key) {
             return ref_mut;
@@ -1241,6 +1244,7 @@ impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
                 }
                 (sender, sequence_number)
             },
+            NativeTransaction::BlockEpilogue => return output.into_success_output(0),
         };
 
         self.seq_nums.insert(sender, sequence_number);

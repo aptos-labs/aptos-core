@@ -44,7 +44,11 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    gas::GasMeter,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
@@ -176,7 +180,7 @@ where
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
@@ -184,7 +188,7 @@ where
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))

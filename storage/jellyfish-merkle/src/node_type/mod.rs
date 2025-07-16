@@ -146,7 +146,7 @@ impl NodeKey {
     }
 
     // Returns the shard_id of the NodeKey, or None if it is root.
-    pub fn get_shard_id(&self) -> Option<u8> {
+    pub fn get_shard_id(&self) -> Option<usize> {
         self.nibble_path().get_shard_id()
     }
 }

@@ -147,6 +147,8 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
+    /// Whether transaction data v2 is enabled
+    pub enable_transaction_data_v2: bool,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -180,6 +182,7 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
+            enable_transaction_data_v2: false, // TODO: flip this once V2 data is enabled
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
@@ -404,7 +407,11 @@ pub struct AptosDataClientConfig {
     pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
-    /// Maximum number of output reductions before transactions are returned
+    /// Maximum number of output reductions (division by 2) before transactions are returned,
+    /// e.g., if 1000 outputs are requested in a single data chunk, and this is set to 1, then
+    /// we'll accept anywhere between 1000 and 500 outputs. Any less, and the server should
+    /// return transactions instead of outputs.
+    // TODO: migrate away from this, and use cleaner chunk packing configs and logic.
     pub max_num_output_reductions: u64,
     /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
     pub max_optimistic_fetch_lag_secs: u64,

@@ -48,6 +48,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+scopeguard = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

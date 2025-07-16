@@ -79,7 +79,6 @@ impl TransactionBuilder {
         self.payload.replay_protection_nonce().is_some()
     }
 
-    // Primarily used for running the tests with both payload v1 and v2 formats.
     pub fn upgrade_payload(
         mut self,
         use_txn_payload_v2_format: bool,

@@ -16,7 +16,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
@@ -807,7 +807,21 @@ fn from_function_tag(f: &FunctionTag) -> MoveType {
         results,
         abilities,
     } = f;
-    let from_vec = |tys: &[TypeTag]| tys.iter().map(MoveType::from).collect::<Vec<_>>();
+    let from_vec = |ts: &[FunctionParamOrReturnTag]| {
+        ts.iter()
+            .map(|t| match t {
+                FunctionParamOrReturnTag::Reference(t) => MoveType::Reference {
+                    mutable: false,
+                    to: Box::new(MoveType::from(t)),
+                },
+                FunctionParamOrReturnTag::MutableReference(t) => MoveType::Reference {
+                    mutable: true,
+                    to: Box::new(MoveType::from(t)),
+                },
+                FunctionParamOrReturnTag::Value(t) => MoveType::from(t),
+            })
+            .collect::<Vec<_>>()
+    };
     MoveType::Function {
         args: from_vec(args),
         results: from_vec(results),
@@ -838,7 +852,19 @@ impl TryFrom<&MoveType> for TypeTag {
             } => {
                 let try_vec = |tys: &[MoveType]| {
                     tys.iter()
-                        .map(Self::try_from)
+                        .map(|t| {
+                            Ok(match t {
+                                MoveType::Reference { mutable, to } => {
+                                    let tag = to.as_ref().try_into()?;
+                                    if *mutable {
+                                        FunctionParamOrReturnTag::MutableReference(tag)
+                                    } else {
+                                        FunctionParamOrReturnTag::Reference(tag)
+                                    }
+                                },
+                                t => FunctionParamOrReturnTag::Value(t.try_into()?),
+                            })
+                        })
                         .collect::<anyhow::Result<_>>()
                 };
                 TypeTag::Function(Box::new(FunctionTag {
@@ -848,7 +874,7 @@ impl TryFrom<&MoveType> for TypeTag {
                 }))
             },
             MoveType::GenericTypeParam { index: _ } => TypeTag::Address, // Dummy type, allows for Object<T>
-            _ => {
+            MoveType::Reference { .. } | MoveType::Unparsable(_) => {
                 return Err(anyhow::anyhow!(
                     "Invalid move type for converting into `TypeTag`: {:?}",
                     &tag

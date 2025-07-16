@@ -1,7 +1,10 @@
-processed 4 tasks
+processed 13 tasks
 
-task 2 'run'. lines 72-72:
+task 5 'run'. lines 162-162:
 return values: true
 
-task 3 'run'. lines 74-74:
+task 6 'run'. lines 164-164:
 return values: true
+
+task 12 'run'. lines 176-176:
+return values: 6

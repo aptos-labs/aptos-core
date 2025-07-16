@@ -86,7 +86,9 @@ Returns an encryption of zero, without any randomness (i.e., $r=0$), under any E
 
 <pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x7_helpers_get_veiled_balance_zero_ciphertext">get_veiled_balance_zero_ciphertext</a>(): elgamal::CompressedCiphertext {
     elgamal::ciphertext_from_compressed_points(
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(), <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>())
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>(),
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity_compressed">ristretto255::point_identity_compressed</a>()
+    )
 }
 </code></pre>
 

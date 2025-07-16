@@ -84,6 +84,7 @@ fn test_transaction(
             None,
             178,                      // gas used, chosen arbitrarily
             ExecutionStatus::Success, // TODO: Add other statuses
+            None,
         )),
         events,
         accumulator_root_hash: Default::default(),

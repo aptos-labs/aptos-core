@@ -67,5 +67,5 @@ fn test_vec_pack() {
         &m,
     )
     .unwrap_err();
-    assert_eq!(res.major_status(), StatusCode::VALUE_STACK_PUSH_OVERFLOW);
+    assert_eq!(res.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
 }

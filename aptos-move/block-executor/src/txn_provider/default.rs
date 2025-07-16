@@ -6,7 +6,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction};
 
 pub struct DefaultTxnProvider<T: Transaction> {
-    pub txns: Vec<T>,
+    txns: Vec<T>,
     auxiliary_info: Vec<AuxiliaryInfo>,
 }
 
@@ -31,6 +31,10 @@ impl<T: Transaction> DefaultTxnProvider<T> {
 
     pub fn get_txns(&self) -> &Vec<T> {
         &self.txns
+    }
+
+    pub fn into_inner(self) -> (Vec<T>, Vec<AuxiliaryInfo>) {
+        (self.txns, self.auxiliary_info)
     }
 }
 

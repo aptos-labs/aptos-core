@@ -162,9 +162,8 @@ impl TransferFunctions for CopyDropAnalysis<'_> {
         let lifetime = self.lifetime.get_info_at(offset);
         let exit_state = self.exit_state.get_state_at(offset);
         // Only temps which are used after or borrowed need a copy
-        let temp_needs_copy = |temp, instr| {
-            live_var.is_temp_used_after(temp, instr) || lifetime.borrow_kind_before(*temp).is_some()
-        };
+        let temp_needs_copy =
+            |temp, instr| live_var.is_temp_used_after(temp, instr) || lifetime.is_borrowed(*temp);
         // References always need to be dropped to satisfy bytecode verifier borrow analysis, other values
         // only if this execution path can return.
         let temp_needs_drop = |temp: &TempIndex| {
@@ -366,12 +365,7 @@ impl Transformer<'_> {
                 // Only need to perform the actual copy if src is borrowed, as this
                 // information cannot be determined from live-var analysis in later
                 // phases.
-                if self
-                    .lifetime
-                    .get_info_at(code_offset)
-                    .borrow_kind_after(*src)
-                    .is_some()
-                {
+                if self.lifetime.get_info_at(code_offset).is_borrowed(*src) {
                     let ty = self.builder.get_local_type(*src);
                     let temp = self.builder.new_temp(ty);
                     self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
@@ -445,11 +439,7 @@ impl Transformer<'_> {
             }
             for temp in copy_drop_at.needs_drop.iter() {
                 // Give a better error message if we know its borrowed
-                let is_borrowed = self
-                    .lifetime
-                    .get_info_at(code_offset)
-                    .borrow_kind_after(*temp)
-                    .is_some();
+                let is_borrowed = self.lifetime.get_info_at(code_offset).is_borrowed(*temp);
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
                         if is_borrowed {

@@ -275,7 +275,6 @@ impl DagDriver {
                     block_timestamp: self.time_service.now_unix_time(),
                 },
                 sys_payload_filter,
-                Box::pin(async {}),
             )
             .await
         {

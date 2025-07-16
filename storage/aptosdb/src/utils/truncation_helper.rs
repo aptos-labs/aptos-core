@@ -122,13 +122,13 @@ pub(crate) fn truncate_state_kv_db_shards(
     (0..state_kv_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
-            truncate_state_kv_db_single_shard(state_kv_db, shard_id as u8, target_version)
+            truncate_state_kv_db_single_shard(state_kv_db, shard_id, target_version)
         })
 }
 
 pub(crate) fn truncate_state_kv_db_single_shard(
     state_kv_db: &StateKvDb,
-    shard_id: u8,
+    shard_id: usize,
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
@@ -186,13 +186,13 @@ pub(crate) fn truncate_state_merkle_db_shards(
     (0..state_merkle_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
-            truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
+            truncate_state_merkle_db_single_shard(state_merkle_db, shard_id, target_version)
         })
 }
 
 pub(crate) fn truncate_state_merkle_db_single_shard(
     state_merkle_db: &StateMerkleDb,
-    shard_id: u8,
+    shard_id: usize,
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
@@ -264,7 +264,7 @@ pub(crate) fn get_max_version_in_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
     let mut version = get_current_version_in_state_merkle_db(state_merkle_db)?;
-    let num_real_shards = state_merkle_db.hack_num_real_shards() as u8;
+    let num_real_shards = state_merkle_db.hack_num_real_shards();
     if num_real_shards > 1 {
         for shard_id in 0..num_real_shards {
             let shard_version = find_closest_node_version_at_or_before(
@@ -385,6 +385,7 @@ fn delete_transaction_index_data(
             .zip(transactions)
             .collect::<Vec<_>>();
         transaction_store.prune_transaction_by_account(&transactions, batch)?;
+        transaction_store.prune_transaction_summaries_by_account(&transactions, batch)?;
     }
 
     Ok(())
@@ -602,7 +603,7 @@ where
 fn delete_nodes_and_stale_indices_at_or_after_version(
     db: &DB,
     version: Version,
-    shard_id: Option<u8>,
+    shard_id: Option<usize>,
     batch: &mut SchemaBatch,
 ) -> Result<()> {
     delete_stale_node_index_at_or_after_version::<StaleNodeIndexSchema>(db, version, batch)?;

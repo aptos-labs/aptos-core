@@ -19,11 +19,13 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, SubscriptionStreamMetadata,
-        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-        TransactionsWithProofRequest,
+        DataRequest, GetTransactionDataWithProofRequest, StorageServiceRequest,
+        SubscriptionStreamMetadata, TransactionDataRequestType, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
-    responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
+    responses::{
+        DataResponse, StorageServerSummary, StorageServiceResponse, TransactionDataResponseType,
+    },
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
@@ -122,6 +124,15 @@ impl SubscriptionRequest {
                     },
                 )
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                DataRequest::GetTransactionDataWithProof(GetTransactionDataWithProofRequest {
+                    transaction_data_request_type: request.transaction_data_request_type,
+                    proof_version: target_version,
+                    start_version,
+                    end_version,
+                    max_response_bytes: request.max_response_bytes,
+                })
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         };
         let storage_request =
@@ -143,6 +154,11 @@ impl SubscriptionRequest {
                     .known_version_at_stream_start
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request
                     .subscription_stream_metadata
                     .known_version_at_stream_start
@@ -169,6 +185,11 @@ impl SubscriptionRequest {
                     .subscription_stream_metadata
                     .known_epoch_at_stream_start
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_epoch_at_stream_start
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -184,6 +205,19 @@ impl SubscriptionRequest {
             DataRequest::SubscribeTransactionsOrOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                match request.transaction_data_request_type {
+                    TransactionDataRequestType::TransactionData(_) => {
+                        config.max_transaction_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOutputData => {
+                        config.max_transaction_output_chunk_size
+                    },
+                    TransactionDataRequestType::TransactionOrOutputData(_) => {
+                        config.max_transaction_output_chunk_size
+                    },
+                }
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -198,6 +232,9 @@ impl SubscriptionRequest {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
@@ -216,6 +253,9 @@ impl SubscriptionRequest {
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
                 request.subscription_stream_index
             },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
+                request.subscription_stream_index
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -230,6 +270,9 @@ impl SubscriptionRequest {
                 request.subscription_stream_metadata
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request.subscription_stream_metadata
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
@@ -453,6 +496,43 @@ impl SubscriptionStreamRequests {
                         data_response
                     )));
                 }
+            },
+            DataResponse::NewTransactionDataWithProof(response) => {
+                let num_data_items = match response.transaction_data_response_type {
+                    TransactionDataResponseType::TransactionData => {
+                        if let Some(transaction_list_with_proof_v2) =
+                            &response.transaction_list_with_proof
+                        {
+                            transaction_list_with_proof_v2
+                                .get_transaction_list_with_proof()
+                                .transactions
+                                .len()
+                        } else {
+                            return Err(Error::UnexpectedErrorEncountered(format!(
+                                "Transaction data response is missing transaction list: {:?}",
+                                data_response
+                            )));
+                        }
+                    },
+                    TransactionDataResponseType::TransactionOutputData => {
+                        if let Some(output_list_with_proof_v2) =
+                            &response.transaction_output_list_with_proof
+                        {
+                            output_list_with_proof_v2
+                                .get_output_list_with_proof()
+                                .transactions_and_outputs
+                                .len()
+                        } else {
+                            return Err(Error::UnexpectedErrorEncountered(format!(
+                                "Transaction output data response is missing output list: {:?}",
+                                data_response
+                            )));
+                        }
+                    },
+                };
+                let target_ledger_info = &response.ledger_info_with_signatures;
+
+                (num_data_items, target_ledger_info)
             },
             _ => {
                 return Err(Error::UnexpectedErrorEncountered(format!(

@@ -164,9 +164,7 @@ Returns <code>Some(<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twi
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_new_pubkey_from_bytes">new_pubkey_from_bytes</a>(bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedPubkey">CompressedPubkey</a>&gt; {
     <b>let</b> point = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_compressed_point_from_bytes">ristretto255::new_compressed_point_from_bytes</a>(bytes);
     <b>if</b> (point.is_some()) {
-        <b>let</b> pk = <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedPubkey">CompressedPubkey</a> {
-            point: point.extract()
-        };
+        <b>let</b> pk = <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedPubkey">CompressedPubkey</a> { point: point.extract() };
         std::option::some(pk)
     } <b>else</b> {
         std::option::none()
@@ -281,10 +279,12 @@ Returns <code>Some(<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twi
     <b>let</b> right_point = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes_right);
 
     <b>if</b> (left_point.is_some() && right_point.is_some()) {
-        std::option::some(<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
-            left: left_point.extract(),
-            right: right_point.extract()
-        })
+        std::option::some(
+            <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
+                left: left_point.extract(),
+                right: right_point.extract()
+            }
+        )
     } <b>else</b> {
         std::option::none()
     }
@@ -314,7 +314,7 @@ Creates a ciphertext <code>(val * G, 0 * G)</code> where <code>val</code> is the
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_new_ciphertext_no_randomness">new_ciphertext_no_randomness</a>(val: &Scalar): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(val),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>(),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_identity">ristretto255::point_identity</a>()
     }
 }
 </code></pre>
@@ -339,11 +339,10 @@ Constructs a Twisted ElGamal ciphertext from two <code>RistrettoPoint</code>s.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_from_points">ciphertext_from_points</a>(left: RistrettoPoint, right: RistrettoPoint): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
-    <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
-        left,
-        right,
-    }
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_from_points">ciphertext_from_points</a>(
+    left: RistrettoPoint, right: RistrettoPoint
+): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
+    <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> { left, right }
 }
 </code></pre>
 
@@ -368,13 +367,9 @@ Constructs a Twisted ElGamal ciphertext from two compressed Ristretto255 points.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_from_compressed_points">ciphertext_from_compressed_points</a>(
-    left: CompressedRistretto,
-    right: CompressedRistretto
+    left: CompressedRistretto, right: CompressedRistretto
 ): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a> {
-    <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a> {
-        left,
-        right,
-    }
+    <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a> { left, right }
 }
 </code></pre>
 
@@ -400,7 +395,9 @@ Serializes a Twisted ElGamal ciphertext into its byte representation.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_to_bytes">ciphertext_to_bytes</a>(ct: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.left));
-    bytes.append(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right)));
+    bytes.append(
+        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right))
+    );
     bytes
 }
 </code></pre>
@@ -479,7 +476,7 @@ Compresses a Twisted ElGamal ciphertext into its <code><a href="ristretto255_twi
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_compress_ciphertext">compress_ciphertext</a>(ct: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.left),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&ct.right)
     }
 }
 </code></pre>
@@ -507,7 +504,7 @@ Decompresses a <code><a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_t
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_decompress_ciphertext">decompress_ciphertext</a>(ct: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_CompressedCiphertext">CompressedCiphertext</a>): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(&ct.left),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(&ct.right),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(&ct.right)
     }
 }
 </code></pre>
@@ -535,7 +532,7 @@ Adds two ciphertexts homomorphically, producing a new ciphertext representing th
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_add">ciphertext_add</a>(lhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add">ristretto255::point_add</a>(&lhs.left, &rhs.left),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add">ristretto255::point_add</a>(&lhs.right, &rhs.right),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add">ristretto255::point_add</a>(&lhs.right, &rhs.right)
     }
 }
 </code></pre>
@@ -560,7 +557,9 @@ Adds two ciphertexts homomorphically, updating the first ciphertext in place.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_add_assign">ciphertext_add_assign</a>(lhs: &<b>mut</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_add_assign">ciphertext_add_assign</a>(
+    lhs: &<b>mut</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>
+) {
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> lhs.left, &rhs.left);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_add_assign">ristretto255::point_add_assign</a>(&<b>mut</b> lhs.right, &rhs.right);
 }
@@ -589,7 +588,7 @@ Subtracts one ciphertext from another homomorphically, producing a new ciphertex
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_sub">ciphertext_sub</a>(lhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub">ristretto255::point_sub</a>(&lhs.left, &rhs.left),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub">ristretto255::point_sub</a>(&lhs.right, &rhs.right),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub">ristretto255::point_sub</a>(&lhs.right, &rhs.right)
     }
 }
 </code></pre>
@@ -614,7 +613,9 @@ Subtracts one ciphertext from another homomorphically, updating the first cipher
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_sub_assign">ciphertext_sub_assign</a>(lhs: &<b>mut</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>) {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_sub_assign">ciphertext_sub_assign</a>(
+    lhs: &<b>mut</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>
+) {
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub_assign">ristretto255::point_sub_assign</a>(&<b>mut</b> lhs.left, &rhs.left);
     <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_sub_assign">ristretto255::point_sub_assign</a>(&<b>mut</b> lhs.right, &rhs.right);
 }
@@ -643,7 +644,7 @@ Creates a copy of the provided ciphertext.
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_clone">ciphertext_clone</a>(c: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
     <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a> {
         left: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(&c.left),
-        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(&c.right),
+        right: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_clone">ristretto255::point_clone</a>(&c.right)
     }
 }
 </code></pre>
@@ -669,8 +670,8 @@ Compares two ciphertexts for equality, returning <code><b>true</b></code> if the
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_ciphertext_equals">ciphertext_equals</a>(lhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>, rhs: &<a href="ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal_Ciphertext">Ciphertext</a>): bool {
-    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&lhs.left, &rhs.left) &&
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&lhs.right, &rhs.right)
+    <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&lhs.left, &rhs.left)
+        && <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_equals">ristretto255::point_equals</a>(&lhs.right, &rhs.right)
 }
 </code></pre>
 

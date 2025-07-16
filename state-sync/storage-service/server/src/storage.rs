@@ -5,14 +5,22 @@ use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::debug;
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
-use aptos_storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
+use aptos_storage_service_types::{
+    requests::{GetTransactionDataWithProofRequest, TransactionDataRequestType},
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, TransactionDataResponseType,
+        TransactionDataWithProofResponse, TransactionOrOutputListWithProof,
+    },
 };
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{
+        PersistedAuxiliaryInfo, TransactionListWithAuxiliaryInfos, TransactionListWithProof,
+        TransactionListWithProofV2, TransactionOutputListWithAuxiliaryInfos,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, Version,
+    },
 };
 use serde::Serialize;
 use std::{cmp::min, sync::Arc};
@@ -75,6 +83,12 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         max_num_output_reductions: u64,
     ) -> aptos_storage_service_types::Result<TransactionOrOutputListWithProof, Error>;
 
+    /// Returns transaction data with a proof for the given request
+    fn get_transaction_data_with_proof(
+        &self,
+        transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+
     /// Returns the number of states in the state tree at the specified version.
     fn get_number_of_states(&self, version: u64)
         -> aptos_storage_service_types::Result<u64, Error>;
@@ -105,6 +119,107 @@ impl StorageReader {
         let storage = Arc::new(TimedStorageReader::new(storage));
 
         Self { config, storage }
+    }
+
+    /// Constructs the transaction list with proof v2 (which includes auxiliary
+    /// information for each transaction in the given list with proof v1).
+    fn construct_transaction_list_with_proof_v2(
+        &self,
+        transaction_list_with_proof: TransactionListWithProof,
+    ) -> Result<TransactionDataWithProofResponse, Error> {
+        // Verify that the first transaction version exists
+        let first_transaction_version = transaction_list_with_proof
+            .first_transaction_version
+            .ok_or_else(|| {
+                Error::UnexpectedErrorEncountered(
+                    "First transaction version is missing in the response!".into(),
+                )
+            })?;
+
+        // Get the persisted auxiliary infos for the transactions
+        let num_infos_to_fetch = transaction_list_with_proof.transactions.len();
+        let persisted_auxiliary_infos =
+            self.fetch_persisted_auxiliary_infos(first_transaction_version, num_infos_to_fetch)?;
+
+        // Create the transaction list with proof v2
+        let transaction_list_with_auxiliary_info = TransactionListWithAuxiliaryInfos {
+            transaction_list_with_proof,
+            persisted_auxiliary_infos,
+        };
+        let transaction_list_with_proof =
+            TransactionListWithProofV2::new(transaction_list_with_auxiliary_info);
+
+        // Return the transaction data response
+        Ok(TransactionDataWithProofResponse {
+            transaction_data_response_type: TransactionDataResponseType::TransactionData,
+            transaction_list_with_proof: Some(transaction_list_with_proof),
+            transaction_output_list_with_proof: None,
+        })
+    }
+
+    /// Constructs the transaction output list with proof v2 (which includes
+    /// auxiliary information for each item in the given list with proof v1).
+    fn construct_output_list_with_proof_v2(
+        &self,
+        transaction_output_list_with_proof: TransactionOutputListWithProof,
+    ) -> Result<TransactionDataWithProofResponse, Error> {
+        // Verify that the first transaction output version exists
+        let first_transaction_output_version = transaction_output_list_with_proof
+            .first_transaction_output_version
+            .ok_or_else(|| {
+                Error::UnexpectedErrorEncountered(
+                    "First transaction output version is missing in the response!".into(),
+                )
+            })?;
+
+        // Get the persisted auxiliary infos
+        let num_infos_to_fetch = transaction_output_list_with_proof
+            .transactions_and_outputs
+            .len();
+        let persisted_auxiliary_infos = self.fetch_persisted_auxiliary_infos(
+            first_transaction_output_version,
+            num_infos_to_fetch,
+        )?;
+
+        // Create the transaction output list with proof v2
+        let transaction_output_list_with_auxiliary_info = TransactionOutputListWithAuxiliaryInfos {
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+        };
+        let transaction_output_list_with_proof_v2 =
+            TransactionOutputListWithProofV2::new(transaction_output_list_with_auxiliary_info);
+
+        // Return the transaction data response
+        Ok(TransactionDataWithProofResponse {
+            transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+            transaction_list_with_proof: None,
+            transaction_output_list_with_proof: Some(transaction_output_list_with_proof_v2),
+        })
+    }
+
+    /// Fetches the persisted auxiliary infos starting at the specified
+    /// version. Note: it is possible for some auxiliary infos to be
+    /// missing, in which case None is returned for each missing version.
+    fn fetch_persisted_auxiliary_infos(
+        &self,
+        first_version: Version,
+        num_infos_to_fetch: usize,
+    ) -> aptos_storage_service_types::Result<Vec<PersistedAuxiliaryInfo>, Error> {
+        // Get an iterator for the persisted auxiliary infos
+        let persisted_auxiliary_info_iter = self
+            .storage
+            .get_persisted_auxiliary_info_iterator(first_version, num_infos_to_fetch)
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+
+        // Collect the persisted auxiliary infos into a vector
+        let mut persisted_auxiliary_infos = vec![];
+        for result in persisted_auxiliary_info_iter {
+            match result {
+                Ok(auxiliary_info) => persisted_auxiliary_infos.push(auxiliary_info),
+                Err(error) => return Err(Error::StorageErrorEncountered(error.to_string())),
+            }
+        }
+        Ok(persisted_auxiliary_infos)
     }
 
     /// Returns the state values range held in the database (lowest to highest).
@@ -437,6 +552,77 @@ impl StorageReaderInterface for StorageReader {
         Ok((Some(transactions_with_proof), None))
     }
 
+    // TODOs:
+    // 1. Make this function respect the `max_network_chunk_bytes` limit. It's
+    //    currently not respected because the auxiliary information is not
+    //    size checked. However, this is okay for now because the limit is not
+    //    a hard limit, and auxiliary information is still quite small (e.g., u32
+    //    per transaction). However, we should address this.
+    // 2. Make this function respect the `max_response_bytes` limit in each request.
+    //    It's currently not respected because we only consider the
+    //    `max_network_chunk_bytes` limit as defined by the storage service config.
+    //    We should also address this.
+    fn get_transaction_data_with_proof(
+        &self,
+        transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+        // Extract the data versions from the request
+        let proof_version = transaction_data_with_proof_request.proof_version;
+        let start_version = transaction_data_with_proof_request.start_version;
+        let end_version = transaction_data_with_proof_request.end_version;
+
+        // Fetch the transaction data based on the request type
+        match transaction_data_with_proof_request.transaction_data_request_type {
+            TransactionDataRequestType::TransactionData(request) => {
+                // Get the transaction list with proof
+                let transaction_list_with_proof = self.get_transactions_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    request.include_events,
+                )?;
+
+                // Fetch the persisted auxiliary infos and combine the data
+                self.construct_transaction_list_with_proof_v2(transaction_list_with_proof)
+            },
+            TransactionDataRequestType::TransactionOutputData => {
+                // Get the transaction output list with proof
+                let output_list_with_proof = self.get_transaction_outputs_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                )?;
+
+                // Fetch the persisted auxiliary infos and combine the data
+                self.construct_output_list_with_proof_v2(output_list_with_proof)
+            },
+            TransactionDataRequestType::TransactionOrOutputData(request) => {
+                // Get the transaction or output list with proof
+                let (transaction_list_with_proof, output_list_with_proof) = self
+                    .get_transactions_or_outputs_with_proof(
+                        proof_version,
+                        start_version,
+                        end_version,
+                        request.include_events,
+                        0, // Fetch all outputs, or return transactions
+                    )?;
+
+                // Fetch the persisted auxiliary infos and combine the data
+                match (transaction_list_with_proof, output_list_with_proof) {
+                    (Some(transaction_list_with_proof), None) => {
+                        self.construct_transaction_list_with_proof_v2(transaction_list_with_proof)
+                    },
+                    (None, Some(output_list_with_proof)) => {
+                        self.construct_output_list_with_proof_v2(output_list_with_proof)
+                    },
+                    _ => Err(Error::UnexpectedErrorEncountered(
+                        "Unexpected transactions and outputs returned! None or both found!".into(),
+                    )),
+                }
+            },
+        }
+    }
+
     fn get_number_of_states(
         &self,
         version: u64,
@@ -578,6 +764,12 @@ impl DbReader for TimedStorageReader {
             start_idx: usize,
             chunk_size: usize,
         ) -> StorageResult<StateValueChunkWithProof>;
+
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<PersistedAuxiliaryInfo>> + '_>>;
     );
 }
 

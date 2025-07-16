@@ -5,7 +5,6 @@ use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
-    execution_pipeline::SIG_VERIFY_POOL,
     monitor,
     payload_manager::TPayloadManager,
     txn_notifier::TxnNotifier,
@@ -44,6 +43,7 @@ use aptos_types::{
 };
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     future::Future,
@@ -51,6 +51,15 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(16)
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .expect("Failed to create signature verification thread pool"),
+    )
+});
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides

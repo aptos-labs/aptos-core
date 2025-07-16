@@ -19,7 +19,14 @@ module 0x1::fixed_point32 {
         _t3 = (denominator as u128) << 32u8;
         if (!(_t3 != 0u128)) abort 65537;
         _t4 = ((numerator as u128) << 64u8) / _t3;
-        if (_t4 != 0u128) _t5 = true else _t5 = numerator == 0;
+        loop {
+            if (_t4 != 0u128) {
+                _t5 = true;
+                break
+            };
+            _t5 = numerator == 0;
+            break
+        };
         if (!_t5) abort 131077;
         if (!(_t4 <= 18446744073709551615u128)) abort 131077;
         FixedPoint32{value: _t4 as u64}
@@ -48,12 +55,26 @@ module 0x1::fixed_point32 {
     }
     public fun max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
         let _t2;
-        if (*&(&num1).value > *&(&num2).value) _t2 = num1 else _t2 = num2;
+        loop {
+            if (*&(&num1).value > *&(&num2).value) {
+                _t2 = num1;
+                break
+            };
+            _t2 = num2;
+            break
+        };
         _t2
     }
     public fun min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
         let _t2;
-        if (*&(&num1).value < *&(&num2).value) _t2 = num1 else _t2 = num2;
+        loop {
+            if (*&(&num1).value < *&(&num2).value) {
+                _t2 = num1;
+                break
+            };
+            _t2 = num2;
+            break
+        };
         _t2
     }
     public fun multiply_u64(val: u64, multiplier: FixedPoint32): u64 {
@@ -67,7 +88,14 @@ module 0x1::fixed_point32 {
         let _t1;
         _t1 = floor(self) << 32u8;
         _t2 = _t1 + 2147483648;
-        if (*&(&self).value < _t2) _t2 = _t1 >> 32u8 else _t2 = ceil(self);
+        loop {
+            if (*&(&self).value < _t2) {
+                _t2 = _t1 >> 32u8;
+                break
+            };
+            _t2 = ceil(self);
+            break
+        };
         _t2
     }
 }

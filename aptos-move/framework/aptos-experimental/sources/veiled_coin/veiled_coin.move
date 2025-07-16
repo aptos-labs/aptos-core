@@ -186,7 +186,7 @@ module aptos_experimental::veiled_coin {
     struct VeiledCoinStore<phantom CoinType> has key {
         /// A ElGamal ciphertext of a value $v \in [0, 2^{32})$, an invariant that is enforced throughout the code.
         veiled_balance: elgamal::CompressedCiphertext,
-        pk: elgamal::CompressedPubkey,
+        pk: elgamal::CompressedPubkey
     }
 
     #[event]
@@ -206,14 +206,14 @@ module aptos_experimental::veiled_coin {
     /// Holds an `account::SignerCapability` for the resource account created when initializing this module. This
     /// resource account houses a `coin::CoinStore<T>` for every type of coin `T` that is veiled.
     struct VeiledCoinMinter has store, key {
-        signer_cap: account::SignerCapability,
+        signer_cap: account::SignerCapability
     }
 
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
         /// ElGamal ciphertext which encrypts the number of coins $v \in [0, 2^{32})$. This $[0, 2^{32})$ range invariant
         /// is enforced throughout the code via Bulletproof-based ZK range proofs.
-        veiled_amount: elgamal::Ciphertext,
+        veiled_amount: elgamal::Ciphertext
     }
 
     //
@@ -224,13 +224,13 @@ module aptos_experimental::veiled_coin {
     struct TransferProof has drop {
         sigma_proof: sigma_protos::TransferSubproof,
         zkrp_new_balance: RangeProof,
-        zkrp_amount: RangeProof,
+        zkrp_amount: RangeProof
     }
 
     /// A cryptographic proof that ensures correctness of a veiled-to-*unveiled* coin transfer.
     struct WithdrawalProof has drop {
         sigma_proof: sigma_protos::WithdrawalSubproof,
-        zkrp_new_balance: RangeProof,
+        zkrp_new_balance: RangeProof
     }
 
     //
@@ -246,19 +246,17 @@ module aptos_experimental::veiled_coin {
         );
 
         assert!(
-            NUM_LEAST_SIGNIFICANT_BITS_REMOVED + NUM_MOST_SIGNIFICANT_BITS_REMOVED == 32,
+            NUM_LEAST_SIGNIFICANT_BITS_REMOVED + NUM_MOST_SIGNIFICANT_BITS_REMOVED
+                == 32,
             error::internal(EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT)
         );
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
-        let (_resource, signer_cap) = account::create_resource_account(deployer, vector::empty());
+        let (_resource, signer_cap) =
+            account::create_resource_account(deployer, vector::empty());
 
-        move_to(deployer,
-            VeiledCoinMinter {
-                signer_cap
-            }
-        )
+        move_to(deployer, VeiledCoinMinter { signer_cap })
     }
 
     //
@@ -276,8 +274,8 @@ module aptos_experimental::veiled_coin {
     ///
     /// **WARNING:** This function *leaks* the transferred `amount`, since it is given as a public input.
     public entry fun veil_to<CoinType>(
-        sender: &signer, recipient: address, amount: u32) acquires VeiledCoinMinter, VeiledCoinStore
-    {
+        sender: &signer, recipient: address, amount: u32
+    ) acquires VeiledCoinMinter, VeiledCoinStore {
         let c = coin::withdraw<CoinType>(sender, cast_u32_to_u64_amount(amount));
 
         let vc = veiled_mint_from_coin(c);
@@ -290,7 +288,9 @@ module aptos_experimental::veiled_coin {
     /// This function can be used by the `owner` to initialize his veiled balance to a *public* value.
     ///
     /// **WARNING:** The initialized balance is *leaked*, since its initialized `amount` is public here.
-    public entry fun veil<CoinType>(owner: &signer, amount: u32) acquires VeiledCoinMinter, VeiledCoinStore {
+    public entry fun veil<CoinType>(
+        owner: &signer, amount: u32
+    ) acquires VeiledCoinMinter, VeiledCoinStore {
         veil_to<CoinType>(owner, signer::address_of(owner), amount)
     }
 
@@ -307,25 +307,38 @@ module aptos_experimental::veiled_coin {
         amount: u32,
         comm_new_balance: vector<u8>,
         zkrp_new_balance: vector<u8>,
-        withdraw_subproof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
-    {
+        withdraw_subproof: vector<u8>
+    ) acquires VeiledCoinStore, VeiledCoinMinter {
         // Deserialize all the proofs into their proper Move structs
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
-        assert!(comm_new_balance.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(
+            comm_new_balance.is_some(),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
-        let sigma_proof = sigma_protos::deserialize_withdrawal_subproof(withdraw_subproof);
-        assert!(std::option::is_some(&sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        let sigma_proof =
+            sigma_protos::deserialize_withdrawal_subproof(withdraw_subproof);
+        assert!(
+            std::option::is_some(&sigma_proof),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
         let comm_new_balance = comm_new_balance.extract();
         let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
 
         let withdrawal_proof = WithdrawalProof {
             sigma_proof: std::option::extract(&mut sigma_proof),
-            zkrp_new_balance,
+            zkrp_new_balance
         };
 
         // Do the actual work
-        unveil_to_internal<CoinType>(sender, recipient, amount, comm_new_balance, withdrawal_proof);
+        unveil_to_internal<CoinType>(
+            sender,
+            recipient,
+            amount,
+            comm_new_balance,
+            withdrawal_proof
+        );
     }
 
     /// Like `unveil_to`, except the `sender` is also the recipient.
@@ -334,8 +347,8 @@ module aptos_experimental::veiled_coin {
         amount: u32,
         comm_new_balance: vector<u8>,
         zkrp_new_balance: vector<u8>,
-        withdraw_subproof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
-    {
+        withdraw_subproof: vector<u8>
+    ) acquires VeiledCoinStore, VeiledCoinMinter {
         unveil_to<CoinType>(
             sender,
             signer::address_of(sender),
@@ -370,23 +383,38 @@ module aptos_experimental::veiled_coin {
         comm_amount: vector<u8>,
         zkrp_new_balance: vector<u8>,
         zkrp_amount: vector<u8>,
-        transfer_subproof: vector<u8>) acquires VeiledCoinStore
-    {
+        transfer_subproof: vector<u8>
+    ) acquires VeiledCoinStore {
         // Deserialize everything into their proper Move structs
         let veiled_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
-        assert!(veiled_withdraw_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(
+            veiled_withdraw_amount.is_some(),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
         let veiled_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
-        assert!(veiled_deposit_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(
+            veiled_deposit_amount.is_some(),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
-        assert!(comm_new_balance.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(
+            comm_new_balance.is_some(),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
         let comm_amount = pedersen::new_commitment_from_bytes(comm_amount);
-        assert!(comm_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED));
+        assert!(
+            comm_amount.is_some(), error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
-        let transfer_subproof = sigma_protos::deserialize_transfer_subproof(transfer_subproof);
-        assert!(std::option::is_some(&transfer_subproof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        let transfer_subproof =
+            sigma_protos::deserialize_transfer_subproof(transfer_subproof);
+        assert!(
+            std::option::is_some(&transfer_subproof),
+            error::invalid_argument(EDESERIALIZATION_FAILED)
+        );
 
         let transfer_proof = TransferProof {
             zkrp_new_balance: bulletproofs::range_proof_from_bytes(zkrp_new_balance),
@@ -402,7 +430,7 @@ module aptos_experimental::veiled_coin {
             veiled_deposit_amount.extract(),
             comm_new_balance.extract(),
             comm_amount.extract(),
-            &transfer_proof,
+            &transfer_proof
         )
     }
 
@@ -441,17 +469,21 @@ module aptos_experimental::veiled_coin {
     }
 
     /// Returns the ElGamal encryption of the veiled balance of `owner` for the provided `CoinType`.
-    public fun veiled_balance<CoinType>(owner: address): elgamal::CompressedCiphertext acquires VeiledCoinStore {
+    public fun veiled_balance<CoinType>(
+        owner: address
+    ): elgamal::CompressedCiphertext acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(owner),
-            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
+            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
         );
 
         borrow_global<VeiledCoinStore<CoinType>>(owner).veiled_balance
     }
 
     /// Given an address `addr`, returns the ElGamal encryption public key associated with that address
-    public fun encryption_public_key<CoinType>(addr: address): elgamal::CompressedPubkey acquires VeiledCoinStore {
+    public fun encryption_public_key<CoinType>(
+        addr: address
+    ): elgamal::CompressedPubkey acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(addr),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
@@ -487,11 +519,13 @@ module aptos_experimental::veiled_coin {
 
     /// Like `register`, but the public key has been parsed in a type-safe struct.
     /// TODO: Do we want to require a PoK of the SK here?
-    public fun register_internal<CoinType>(user: &signer, pk: elgamal::CompressedPubkey) {
+    public fun register_internal<CoinType>(
+        user: &signer, pk: elgamal::CompressedPubkey
+    ) {
         let account_addr = signer::address_of(user);
         assert!(
             !has_veiled_coin_store<CoinType>(account_addr),
-            error::already_exists(EVEILED_COIN_STORE_ALREADY_PUBLISHED),
+            error::already_exists(EVEILED_COIN_STORE_ALREADY_PUBLISHED)
         );
 
         // Note: There is no way to find an ElGamal SK such that the `(0_G, 0_G)` ciphertext below decrypts to a non-zero
@@ -500,22 +534,25 @@ module aptos_experimental::veiled_coin {
 
         let coin_store = VeiledCoinStore<CoinType> {
             veiled_balance: helpers::get_veiled_balance_zero_ciphertext(),
-            pk,
+            pk
         };
         move_to(user, coin_store);
     }
 
     /// Deposits a veiled `coin` at address `to_addr`.
-    public fun veiled_deposit<CoinType>(to_addr: address, coin: VeiledCoin<CoinType>) acquires VeiledCoinStore {
+    public fun veiled_deposit<CoinType>(
+        to_addr: address, coin: VeiledCoin<CoinType>
+    ) acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(to_addr),
-            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
+            error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
         );
 
         let veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(to_addr);
 
         // Fetch the veiled balance
-        let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
+        let veiled_balance =
+            elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
         // Add the veiled amount to the veiled balance (leverages the homomorphism of the encryption scheme)
         elgamal::ciphertext_add_assign(&mut veiled_balance, &coin.veiled_amount);
@@ -527,9 +564,7 @@ module aptos_experimental::veiled_coin {
         let VeiledCoin<CoinType> { veiled_amount: _ } = coin;
 
         // Once successful, emit an event that a veiled deposit occurred.
-        event::emit(
-            Deposit { user: to_addr },
-        );
+        event::emit(Deposit { user: to_addr });
     }
 
     /// Like `unveil_to`, except the proofs have been deserialized into type-safe structs.
@@ -551,7 +586,8 @@ module aptos_experimental::veiled_coin {
 
         // Fetch the sender's veiled balance
         let veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
-        let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
+        let veiled_balance =
+            elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
         // Create a (not-yet-secure) encryption of `amount`, since `amount` is a public argument here.
         let scalar_amount = ristretto255::new_scalar_from_u32(amount);
@@ -562,14 +598,16 @@ module aptos_experimental::veiled_coin {
             &veiled_balance,
             &comm_new_balance,
             &scalar_amount,
-            &withdrawal_proof.sigma_proof);
+            &withdrawal_proof.sigma_proof
+        );
 
         // Verify a ZK range proof on `comm_new_balance` (and thus on the remaining `veiled_balance`)
         verify_range_proofs(
             &comm_new_balance,
             &withdrawal_proof.zkrp_new_balance,
             &std::option::none(),
-            &std::option::none());
+            &std::option::none()
+        );
 
         let veiled_amount = elgamal::new_ciphertext_no_randomness(&scalar_amount);
 
@@ -580,12 +618,13 @@ module aptos_experimental::veiled_coin {
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Emit event to indicate a veiled withdrawal occurred
-        event::emit(
-            Withdraw { user: addr },
-        );
+        event::emit(Withdraw { user: addr });
 
         // Withdraw normal `Coin`'s from the resource account and deposit them in the recipient's
-        let c = coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount));
+        let c =
+            coin::withdraw(
+                &get_resource_account_signer(), cast_u32_to_u64_amount(amount)
+            );
 
         coin::deposit<CoinType>(recipient, c);
     }
@@ -598,18 +637,20 @@ module aptos_experimental::veiled_coin {
         veiled_deposit_amount: elgamal::Ciphertext,
         comm_new_balance: pedersen::Commitment,
         comm_amount: pedersen::Commitment,
-        transfer_proof: &TransferProof) acquires VeiledCoinStore
-    {
+        transfer_proof: &TransferProof
+    ) acquires VeiledCoinStore {
         let sender_addr = signer::address_of(sender);
 
         let sender_pk = encryption_public_key<CoinType>(sender_addr);
         let recipient_pk = encryption_public_key<CoinType>(recipient_addr);
 
         // Note: The `encryption_public_key` call from above already asserts that `sender_addr` has a coin store.
-        let sender_veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
+        let sender_veiled_coin_store =
+            borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
 
         // Fetch the veiled balance of the veiled account
-        let veiled_balance = elgamal::decompress_ciphertext(&sender_veiled_coin_store.veiled_balance);
+        let veiled_balance =
+            elgamal::decompress_ciphertext(&sender_veiled_coin_store.veiled_balance);
 
         // Checks that `veiled_withdraw_amount` and `veiled_deposit_amount` encrypt the same amount of coins, under the
         // sender and recipient's PKs. Also checks this amount is committed inside `comm_amount`. Also, checks that the
@@ -622,26 +663,27 @@ module aptos_experimental::veiled_coin {
             &comm_amount,
             &comm_new_balance,
             &veiled_balance,
-            &transfer_proof.sigma_proof);
+            &transfer_proof.sigma_proof
+        );
 
         // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
         elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_withdraw_amount);
-
 
         // Verifies range proofs on the transferred amount and the remaining balance
         verify_range_proofs(
             &comm_new_balance,
             &transfer_proof.zkrp_new_balance,
             &std::option::some(comm_amount),
-            &std::option::some(transfer_proof.zkrp_amount));
+            &std::option::some(transfer_proof.zkrp_amount)
+        );
 
         // Update the veiled balance to reflect the veiled withdrawal
-        sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
+        sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(
+            &veiled_balance
+        );
 
         // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
-        event::emit(
-            Withdraw { user: sender_addr },
-        );
+        event::emit(Withdraw { user: sender_addr });
 
         // Create a new veiled coin for the recipient.
         let vc = VeiledCoin<CoinType> { veiled_amount: veiled_deposit_amount };
@@ -689,7 +731,8 @@ module aptos_experimental::veiled_coin {
             bulletproofs::verify_range_proof_pedersen(
                 comm_new_balance,
                 zkrp_new_balance,
-                MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
+                MAX_BITS_IN_VEILED_COIN_VALUE,
+                VEILED_COIN_BULLETPROOFS_DST
             ),
             error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
         );
@@ -700,7 +743,8 @@ module aptos_experimental::veiled_coin {
                 bulletproofs::verify_range_proof_pedersen(
                     comm_amount.borrow(),
                     zkrp_amount.borrow(),
-                    MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
+                    MAX_BITS_IN_VEILED_COIN_VALUE,
+                    VEILED_COIN_BULLETPROOFS_DST
                 ),
                 error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
             );
@@ -713,13 +757,17 @@ module aptos_experimental::veiled_coin {
 
     /// Returns a signer for the resource account storing all the normal coins that have been veiled.
     fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@aptos_experimental).signer_cap)
+        account::create_signer_with_capability(
+            &borrow_global<VeiledCoinMinter>(@aptos_experimental).signer_cap
+        )
     }
 
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
     ///
     /// **WARNING:** Fundamentally, there is no way to hide the value of the coin being minted here.
-    fun veiled_mint_from_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> acquires VeiledCoinMinter {
+    fun veiled_mint_from_coin<CoinType>(
+        c: Coin<CoinType>
+    ): VeiledCoin<CoinType> acquires VeiledCoinMinter {
         // If there is no `coin::CoinStore<CoinType>` in the resource account, create one.
         let rsrc_acc_signer = get_resource_account_signer();
         let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
@@ -735,7 +783,10 @@ module aptos_experimental::veiled_coin {
 
         // Paranoid check: assert that the u64 coin value had only its middle 32 bits set (should be the case
         // because the caller should have withdrawn a u32 amount, but enforcing this here anyway).
-        assert!(cast_u32_to_u64_amount(value_u32) == value_u64, error::internal(EINTERNAL_ERROR));
+        assert!(
+            cast_u32_to_u64_amount(value_u32) == value_u64,
+            error::internal(EINTERNAL_ERROR)
+        );
 
         // Deposit a normal coin into the resource account...
         coin::deposit(rsrc_acc_addr, c);
@@ -754,8 +805,11 @@ module aptos_experimental::veiled_coin {
     /// Returns true if the balance at address `owner` equals `value`.
     /// Requires the ElGamal encryption randomness `r` and public key `pk` as auxiliary inputs.
     public fun verify_opened_balance<CoinType>(
-        owner: address, value: u32, r: &Scalar, pk: &elgamal::CompressedPubkey): bool acquires VeiledCoinStore
-    {
+        owner: address,
+        value: u32,
+        r: &Scalar,
+        pk: &elgamal::CompressedPubkey
+    ): bool acquires VeiledCoinStore {
         // compute the expected encrypted balance
         let value = ristretto255::new_scalar_from_u32(value);
         let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, r, pk);

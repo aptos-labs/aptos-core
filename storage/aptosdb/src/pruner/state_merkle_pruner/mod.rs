@@ -135,7 +135,7 @@ where
 
         let shard_pruners = if state_merkle_db.sharding_enabled() {
             let num_shards = state_merkle_db.num_shards();
-            let mut shard_pruners = Vec::with_capacity(num_shards as usize);
+            let mut shard_pruners = Vec::with_capacity(num_shards);
             for shard_id in 0..num_shards {
                 shard_pruners.push(StateMerkleShardPruner::new(
                     shard_id,

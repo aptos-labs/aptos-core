@@ -25,8 +25,8 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
@@ -100,7 +100,7 @@ impl From<aptos_secure_net::Error> for Error {
 macro_rules! delegate_read {
     ($(
         $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+        fn $name:ident(&self $(, $arg: ident : $ty: ty)* $(,)?) -> $return_type:ty;
     )+) => {
         $(
             $(#[$($attr)*])*
@@ -165,6 +165,15 @@ pub trait DbReader: Send + Sync {
             &self,
             version: Version,
         ) -> Result<Option<TransactionAuxiliaryData>>;
+
+        /// See [AptosDB::get_persisted_auxiliary_info_iterator].
+        ///
+        /// [AptosDB::get_persisted_auxiliary_info_iterator]: ../aptosdb/struct.AptosDB.html#method.get_persisted_auxiliary_info_iterator
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>>;
 
         /// See [AptosDB::get_first_txn_version].
         ///

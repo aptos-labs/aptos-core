@@ -41,6 +41,8 @@ impl std::fmt::Debug for FileHash {
 pub const MOVE_EXTENSION: &str = "move";
 /// Extension for Move IR files
 pub const MOVE_IR_EXTENSION: &str = "mvir";
+/// Extension for Move ASM files
+pub const MOVE_ASM_EXTENSION: &str = "masm";
 /// Extension for Move bytecode files
 pub const MOVE_COMPILED_EXTENSION: &str = "mv";
 /// Extension for Move source map files (mappings from source to bytecode)

@@ -650,12 +650,6 @@ async fn sign_transaction_any_keyless_pk(
         addr.to_hex_literal(),
         info.get_balance(addr).await
     );
-    // TODO: No idea why, but these calls do not actually reflect the updated sequence number after a successful TXN.
-    info!(
-        "{} sequence number before TXN: {}",
-        addr.to_hex_literal(),
-        info.get_account_sequence_number(addr).await.unwrap()
-    );
     info.sync_root_account_sequence_number().await;
     let recipient = info
         .create_and_fund_user_account(20_000_000_000)

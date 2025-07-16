@@ -19,7 +19,7 @@ use crate::{
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{Features, ValidatorSet},
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
@@ -541,7 +541,7 @@ impl Arbitrary for TransactionExtraConfig {
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        TransactionStatus::from_vm_status(vm_status, true)
+        TransactionStatus::from_vm_status(vm_status, &Features::default())
     }
 }
 

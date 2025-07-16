@@ -47,7 +47,11 @@ use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
     InMemoryStorage,
 };
-use move_vm_types::{resolver::ResourceResolver, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    resolver::ResourceResolver,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -376,8 +380,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
     fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let module_storage = self.storage.as_unsync_module_storage();
-        ValueSerDeContext::new()
-            .with_func_args_deserialization(&module_storage.as_function_value_extension())
+        let function_extension = module_storage.as_function_value_extension();
+        let max_value_nest_depth = function_extension.max_value_nest_depth();
+        ValueSerDeContext::new(max_value_nest_depth)
+            .with_func_args_deserialization(&function_extension)
             .deserialize(bytes, layout)
     }
 }

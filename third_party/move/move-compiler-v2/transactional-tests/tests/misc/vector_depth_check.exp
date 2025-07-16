@@ -1,0 +1,13 @@
+processed 3 tasks
+
+task 1 'run'. lines 9-9:
+return values: 0
+
+task 2 'publish'. lines 11-17:
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::n'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0xc0ffee::n,
+    indices: [],
+    offsets: [],
+}

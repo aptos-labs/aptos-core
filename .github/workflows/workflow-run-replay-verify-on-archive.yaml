@@ -42,6 +42,7 @@ on:
 jobs:
   run-replay-verify:
     runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
+    timeout-minutes: 420 # 7 hours
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -58,7 +59,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           EXPORT_GCP_PROJECT_VARIABLES: "false"
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          GCP_AUTH_DURATION: "18000"
+          GCP_AUTH_DURATION: "25200" # 7 hours
 
       # Authenticate to Google Cloud the project is aptos-ci with credentails files generated
       - name: Authenticate to Google Cloud
@@ -109,7 +110,7 @@ jobs:
           fi
 
           eval $CMD
-        timeout-minutes: 420
+        timeout-minutes: 420 # 7 hours
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
         env:

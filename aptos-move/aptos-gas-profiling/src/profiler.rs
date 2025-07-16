@@ -267,6 +267,13 @@ where
             args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         ) -> PartialVMResult<()>;
 
+        [PACK_CLOSURE]
+        fn charge_pack_closure(
+            &mut self,
+            is_generic: bool,
+            args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        ) -> PartialVMResult<()>;
+
         [READ_REF]
         fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
 

@@ -32,8 +32,12 @@ mod unit_tests;
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
 ///
-/// TODO: separate V into different generic types for data and code modules with specialized
-/// traits (currently both WriteOp for executor).
+/// TODO(BlockSTMv2): consider handling the baseline retrieval inside MVHashMap, by
+/// providing a lambda during construction. This would simplify the caller logic and
+/// allow unifying initialization logic e.g. for resource groups that span two
+/// different multi-version data-structures (MVData and MVGroupData). It would also
+/// allow performing a check on the path once during initialization (to determine
+/// if the path is for a resource or a group), and then checking invariants.
 pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
@@ -48,7 +52,7 @@ impl<K, T, V, I> MVHashMap<K, T, V, I>
 where
     K: ModulePath + Hash + Clone + Eq + Debug,
     T: Hash + Clone + Eq + Debug + Serialize,
-    V: TransactionWrite,
+    V: TransactionWrite + PartialEq,
     I: Copy + Clone + Eq + Hash + Debug,
 {
     #[allow(clippy::new_without_default)]
@@ -115,6 +119,17 @@ where
     /// Returns the script cache.
     pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
         &self.script_cache
+    }
+
+    pub fn remove_all_at_or_after_for_epilogue(
+        &self,
+        txn_idx: TxnIndex,
+        epilogue_txn_idx: TxnIndex,
+    ) {
+        self.data.remove_all_at_or_after(txn_idx);
+        self.group_data.remove_all_at_or_after(txn_idx);
+        self.delayed_fields
+            .remove_all_at_or_after_for_epilogue(txn_idx, epilogue_txn_idx);
     }
 }
 

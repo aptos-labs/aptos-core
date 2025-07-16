@@ -1,0 +1,20 @@
+processed 1 task
+
+task 0 'publish'. lines 1-9:
+Error: compilation errors:
+ bug: bytecode verification failed with unexpected status code `LOOP_IN_INSTANTIATION_GRAPH`:
+Error message: edges with constructors: [f0#0 --StructInstantiation(StructHandleIndex(0), [TypeParameter(0)])--> f0#0], nodes: [f0#0]
+  ┌─ TEMPFILE:2:1
+  │  
+2 │ ╭ module 0x8675309::M {
+3 │ │     struct S<T> { f: T }
+4 │ │     fun f<T>() {
+5 │ │         let ff = || f<S<T>>();
+6 │ │         ff();
+7 │ │     }
+8 │ │ }
+  │ ╰─^
+  │  
+  = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+

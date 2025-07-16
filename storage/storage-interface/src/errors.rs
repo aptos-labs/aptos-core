@@ -8,7 +8,7 @@ use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
 /// This enum defines errors commonly used among `AptosDB` APIs.
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum AptosDbError {
     /// A requested item is not found.
     #[error("{0} not found.")]

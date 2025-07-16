@@ -3,7 +3,10 @@
 
 //! This module defines the gas parameters for all Move instructions.
 
-use crate::{gas_feature_versions::RELEASE_V1_18, gas_schedule::VMGasParameters};
+use crate::{
+    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33},
+    gas_schedule::VMGasParameters,
+};
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
     InternalGasPerTypeNode,
@@ -82,6 +85,10 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [unpack_per_field: InternalGasPerArg, "unpack.per_field", 147],
         [unpack_generic_base: InternalGas, "unpack_generic.base", 808],
         [unpack_generic_per_field: InternalGasPerArg, "unpack_generic.per_field", 147],
+        [pack_closure_base: InternalGas, { RELEASE_V1_33.. => "pack_closure.base" }, 908],
+        [pack_closure_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack.closure.per_arg" }, 147],
+        [pack_closure_generic_base: InternalGas,  { RELEASE_V1_33.. => "pack_closure_generic.base" }, 908],
+        [pack_closure_generic_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack_closure_generic.per_arg" }, 147],
         // ref
         [read_ref_base: InternalGas, "read_ref.base", 735],
         [read_ref_per_abs_val_unit: InternalGasPerAbstractValueUnit, "read_ref.per_abs_val_unit", 14],

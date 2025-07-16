@@ -20,8 +20,6 @@ pub struct ConsensusObserverConfig {
     pub observer_enabled: bool,
     /// Whether the consensus publisher is enabled
     pub publisher_enabled: bool,
-    /// Whether to use new pipeline
-    pub enable_pipeline: bool,
 
     /// Maximum number of pending network messages
     pub max_network_channel_size: u64,
@@ -64,7 +62,6 @@ impl Default for ConsensusObserverConfig {
         Self {
             observer_enabled: false,
             publisher_enabled: false,
-            enable_pipeline: true,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds

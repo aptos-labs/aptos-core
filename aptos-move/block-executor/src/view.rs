@@ -24,8 +24,8 @@ use aptos_aggregator::{
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
+        Incarnation, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion,
+        TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -59,7 +59,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{AsFunctionValueExtension, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
-    value_serde::ValueSerDeContext,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
 };
 use std::{
     cell::RefCell,
@@ -227,6 +227,7 @@ pub(crate) struct ParallelState<'a, T: Transaction> {
     scheduler: SchedulerWrapper<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
+    incarnation: Incarnation,
     pub(crate) captured_reads:
         RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
@@ -516,13 +517,16 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         shared_scheduler: SchedulerWrapper<'a>,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
+        incarnation: Incarnation,
     ) -> Self {
+        let blockstm_v2 = shared_scheduler.is_v2();
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
-            captured_reads: RefCell::new(CapturedReads::new()),
+            incarnation,
+            captured_reads: RefCell::new(CapturedReads::new(blockstm_v2.then_some(incarnation))),
         }
     }
 
@@ -609,7 +613,15 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
         }
 
         loop {
-            match self.versioned_map.data().fetch_data(key, txn_idx) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .data()
+                    .fetch_data_v2(key, txn_idx, self.incarnation)
+            } else {
+                self.versioned_map.data().fetch_data(key, txn_idx)
+            };
+
+            match data {
                 Ok(Versioned(version, value)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -1173,15 +1185,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 // values with unique identifiers with the same type layout.
                 // The values are stored in aggregators multi-version data structure,
                 // see the actual trait implementation for more details.
-                let patched_value = ValueSerDeContext::new()
-                    .with_delayed_fields_replacement(&mapping)
-                    .with_func_args_deserialization(&function_value_extension)
-                    .deserialize(bytes.as_ref(), layout)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("Failed to deserialize resource during id replacement")
-                    })?;
+                let patched_value =
+                    ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+                        .with_delayed_fields_replacement(&mapping)
+                        .with_func_args_deserialization(&function_value_extension)
+                        .deserialize(bytes.as_ref(), layout)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Failed to deserialize resource during id replacement")
+                        })?;
 
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_value_extension)
                     .serialize(&patched_value, layout)?
@@ -1206,7 +1219,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
         let function_value_extension = self.as_function_value_extension();
-        let value = ValueSerDeContext::new()
+        let value = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
@@ -1218,7 +1231,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             })?;
 
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
-        let patched_bytes = ValueSerDeContext::new()
+        let patched_bytes = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_delayed_fields_replacement(&mapping)
             .with_func_args_deserialization(&function_value_extension)
             .serialize(&value, layout)?
@@ -1516,7 +1529,9 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> BlockSynchronizationKillSwitch
 {
     fn interrupt_requested(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Sync(state) => state
+                .scheduler
+                .interrupt_requested(self.txn_idx, state.incarnation),
             ViewState::Unsync(_) => false,
         }
     }
@@ -1675,10 +1690,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestV
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(_) => true,
-        }
+        true
     }
 }
 
@@ -1982,7 +1994,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2127,7 +2139,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2272,7 +2284,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2417,7 +2429,7 @@ mod test {
             CompiledModule,
             Module,
             AptosModuleExtension,
-        >::new());
+        >::new(None));
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2541,7 +2553,7 @@ mod test {
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
         StateValue::new_legacy(
-            ValueSerDeContext::new()
+            ValueSerDeContext::new(None)
                 .serialize(value, layout)
                 .unwrap()
                 .unwrap()
@@ -2887,6 +2899,7 @@ mod test {
                         SchedulerWrapper::V1(&self.scheduler, &self.holder.skip_module_validation),
                         self.start_counter,
                         &self.counter,
+                        0,
                     )),
                     1,
                 );

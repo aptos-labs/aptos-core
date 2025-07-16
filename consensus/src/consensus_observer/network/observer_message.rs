@@ -1047,7 +1047,6 @@ mod test {
             ProofBatches,
         },
         pipelined_block::OrderedBlockWindow,
-        proof_of_store::BatchId,
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
@@ -1055,6 +1054,7 @@ mod test {
         aggregate_signature::AggregateSignature,
         chain_id::ChainId,
         ledger_info::LedgerInfo,
+        quorum_store::BatchId,
         transaction::{RawTransaction, Script, TransactionPayload},
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},

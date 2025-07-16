@@ -22,6 +22,7 @@ pub mod deserializer;
 pub mod file_format;
 pub mod file_format_common;
 pub mod internals;
+pub mod module_to_script;
 pub mod normalized;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;

@@ -30,16 +30,15 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use batch::{IntoRawBatch, NativeBatch, WriteBatch};
 use iterator::{ScanDirection, SchemaIterator};
-use rocksdb::ErrorKind;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
     SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
+use rocksdb::{ErrorKind, WriteOptions};
 use std::{collections::HashSet, fmt::Debug, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
@@ -265,15 +264,16 @@ impl DB {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 
-    /// Writes a group of records wrapped in a [`SchemaBatch`].
-    pub fn write_schemas(&self, batch: impl IntoRawBatch) -> DbResult<()> {
-        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS.timer_with(&[&self.name]);
+    fn write_schemas_inner(&self, batch: impl IntoRawBatch, option: &WriteOptions) -> DbResult<()> {
+        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
+            .with_label_values(&[&self.name])
+            .start_timer();
 
         let raw_batch = batch.into_raw_batch(self)?;
 
         let serialized_size = raw_batch.inner.size_in_bytes();
         self.inner
-            .write_opt(raw_batch.inner, &default_write_options())
+            .write_opt(raw_batch.inner, option)
             .into_db_res()?;
 
         raw_batch.stats.commit();
@@ -282,6 +282,20 @@ impl DB {
             .observe(serialized_size as f64);
 
         Ok(())
+    }
+
+    /// Writes a group of records wrapped in a [`SchemaBatch`].
+    pub fn write_schemas(&self, batch: impl IntoRawBatch) -> DbResult<()> {
+        self.write_schemas_inner(batch, &sync_write_option())
+    }
+
+    /// Writes without sync flag in write option.
+    /// If this flag is false, and the machine crashes, some recent
+    /// writes may be lost.  Note that if it is just the process that
+    /// crashes (i.e., the machine does not reboot), no writes will be
+    /// lost even if sync==false.
+    pub fn write_schemas_relaxed(&self, batch: impl IntoRawBatch) -> DbResult<()> {
+        self.write_schemas_inner(batch, &WriteOptions::default())
     }
 
     fn get_cf_handle(&self, cf_name: &str) -> DbResult<&rocksdb::ColumnFamily> {
@@ -338,7 +352,7 @@ impl Drop for DB {
 /// For now we always use synchronous writes. This makes sure that once the operation returns
 /// `Ok(())` the data is persisted even if the machine crashes. In the future we might consider
 /// selectively turning this off for some non-critical writes to improve performance.
-fn default_write_options() -> rocksdb::WriteOptions {
+fn sync_write_option() -> rocksdb::WriteOptions {
     let mut opts = rocksdb::WriteOptions::default();
     opts.set_sync(true);
     opts

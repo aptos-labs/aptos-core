@@ -7,7 +7,6 @@ use crate::config::{
     config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
     node_config_loader::NodeType, utils::RootPath, Error, NodeConfig,
 };
-use aptos_transactions_filter::transaction_matcher::Filter;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
@@ -50,8 +49,6 @@ pub struct ExecutionConfig {
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
-    /// Enables filtering of transactions before they are sent to execution
-    pub transaction_filter: Filter,
     /// Used during DB bootstrapping
     pub genesis_waypoint: Option<WaypointConfig>,
 }
@@ -84,7 +81,6 @@ impl Default for ExecutionConfig {
             paranoid_hot_potato_verification: true,
             discard_failed_blocks: false,
             processed_transactions_detailed_counters: false,
-            transaction_filter: Filter::empty(),
             genesis_waypoint: None,
         }
     }

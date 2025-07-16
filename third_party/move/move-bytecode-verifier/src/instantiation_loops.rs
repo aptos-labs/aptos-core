@@ -217,15 +217,106 @@ impl<'a> InstantiationLoopChecker<'a> {
     ) {
         if let Some(code) = &caller_def.code {
             for instr in &code.code {
-                if let Bytecode::CallGeneric(callee_inst_idx) = instr {
-                    // Get the id of the definition of the function being called.
-                    // Skip if the function is not defined in the current module, as we do not
-                    // have mutual recursions across module boundaries.
-                    let callee_si = self.module.function_instantiation_at(*callee_inst_idx);
-                    if let Some(callee_idx) = self.func_handle_def_map.get(&callee_si.handle) {
-                        let callee_idx = *callee_idx;
-                        self.build_graph_call(caller_idx, callee_idx, callee_si.type_parameters)
-                    }
+                match instr {
+                    Bytecode::CallGeneric(callee_inst_idx)
+                    | Bytecode::PackClosureGeneric(callee_inst_idx, _) => {
+                        // Get the id of the definition of the function being called/packed into a closure.
+                        // Skip if the function is not defined in the current module, as we do not
+                        // have mutual recursions across module boundaries.
+                        let callee_si = self.module.function_instantiation_at(*callee_inst_idx);
+                        if let Some(callee_idx) = self.func_handle_def_map.get(&callee_si.handle) {
+                            let callee_idx = *callee_idx;
+                            self.build_graph_call(caller_idx, callee_idx, callee_si.type_parameters)
+                        }
+                    },
+                    Bytecode::Pop
+                    | Bytecode::Ret
+                    | Bytecode::BrTrue(_)
+                    | Bytecode::BrFalse(_)
+                    | Bytecode::Branch(_)
+                    | Bytecode::LdU8(_)
+                    | Bytecode::LdU16(_)
+                    | Bytecode::LdU32(_)
+                    | Bytecode::LdU64(_)
+                    | Bytecode::LdU128(_)
+                    | Bytecode::LdU256(_)
+                    | Bytecode::LdConst(_)
+                    | Bytecode::LdTrue
+                    | Bytecode::LdFalse
+                    | Bytecode::CopyLoc(_)
+                    | Bytecode::MoveLoc(_)
+                    | Bytecode::StLoc(_)
+                    | Bytecode::FreezeRef
+                    | Bytecode::MutBorrowLoc(_)
+                    | Bytecode::ImmBorrowLoc(_)
+                    | Bytecode::MutBorrowField(_)
+                    | Bytecode::ImmBorrowField(_)
+                    | Bytecode::MutBorrowFieldGeneric(_)
+                    | Bytecode::ImmBorrowFieldGeneric(_)
+                    | Bytecode::Call(_)
+                    | Bytecode::Pack(_)
+                    | Bytecode::Unpack(_)
+                    | Bytecode::ReadRef
+                    | Bytecode::WriteRef
+                    | Bytecode::CastU8
+                    | Bytecode::CastU16
+                    | Bytecode::CastU32
+                    | Bytecode::CastU64
+                    | Bytecode::CastU128
+                    | Bytecode::CastU256
+                    | Bytecode::Add
+                    | Bytecode::Sub
+                    | Bytecode::Mul
+                    | Bytecode::Mod
+                    | Bytecode::Div
+                    | Bytecode::BitOr
+                    | Bytecode::BitAnd
+                    | Bytecode::Xor
+                    | Bytecode::Shl
+                    | Bytecode::Shr
+                    | Bytecode::Or
+                    | Bytecode::And
+                    | Bytecode::Not
+                    | Bytecode::Eq
+                    | Bytecode::Neq
+                    | Bytecode::Lt
+                    | Bytecode::Gt
+                    | Bytecode::Le
+                    | Bytecode::Ge
+                    | Bytecode::Abort
+                    | Bytecode::Nop
+                    | Bytecode::Exists(_)
+                    | Bytecode::ExistsGeneric(_)
+                    | Bytecode::MoveFrom(_)
+                    | Bytecode::MoveFromGeneric(_)
+                    | Bytecode::MoveTo(_)
+                    | Bytecode::MoveToGeneric(_)
+                    | Bytecode::VecPack(_, _)
+                    | Bytecode::VecLen(_)
+                    | Bytecode::VecImmBorrow(_)
+                    | Bytecode::VecMutBorrow(_)
+                    | Bytecode::VecPushBack(_)
+                    | Bytecode::VecPopBack(_)
+                    | Bytecode::VecUnpack(_, _)
+                    | Bytecode::VecSwap(_)
+                    | Bytecode::UnpackGeneric(_)
+                    | Bytecode::PackGeneric(_)
+                    | Bytecode::PackVariant(_)
+                    | Bytecode::UnpackVariant(_)
+                    | Bytecode::PackVariantGeneric(_)
+                    | Bytecode::UnpackVariantGeneric(_)
+                    | Bytecode::TestVariant(_)
+                    | Bytecode::TestVariantGeneric(_)
+                    | Bytecode::MutBorrowVariantField(_)
+                    | Bytecode::MutBorrowVariantFieldGeneric(_)
+                    | Bytecode::ImmBorrowVariantField(_)
+                    | Bytecode::ImmBorrowVariantFieldGeneric(_)
+                    | Bytecode::MutBorrowGlobal(_)
+                    | Bytecode::ImmBorrowGlobal(_)
+                    | Bytecode::MutBorrowGlobalGeneric(_)
+                    | Bytecode::ImmBorrowGlobalGeneric(_)
+                    | Bytecode::PackClosure(_, _)
+                    | Bytecode::CallClosure(_) => {},
                 }
             }
         }

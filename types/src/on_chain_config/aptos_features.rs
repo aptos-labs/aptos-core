@@ -239,9 +239,8 @@ impl FeatureFlag {
             FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
             FeatureFlag::TRANSACTION_PAYLOAD_V2,
             FeatureFlag::ORDERLESS_TRANSACTIONS,
-            // TODO(grao): Enable priority fee feature flags.
-            // FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
-            // FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
+            FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
         ]
     }
 }

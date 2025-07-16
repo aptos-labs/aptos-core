@@ -980,4 +980,8 @@ spec aptos_framework::stake {
                 config.rewards_rate_denominator
         }
     }
+
+    spec get_pending_transaction_fee {
+        pragma verify = false;
+    }
 }

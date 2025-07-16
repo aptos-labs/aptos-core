@@ -188,7 +188,7 @@ https://github.com/aptos-labs/aptos-core/blob/main/state-sync/README.md
 
 ### Continuously backing up to a cloud storage
 
-The backup coordinator runs continously, talks to the backup service embedded
+The backup coordinator runs continuously, talks to the backup service embedded
 inside a Aptos Node and writes backup data automatically to a configured cloud
 storage.
 

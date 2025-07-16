@@ -10,23 +10,27 @@ module aptos_experimental::test_derivable_account_abstraction_ed25519_hex {
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
-        new_unvalidated_public_key_from_bytes,
+        new_unvalidated_public_key_from_bytes
     };
     use aptos_framework::auth_data::AbstractionAuthData;
 
     const EINVALID_SIGNATURE: u64 = 1;
 
     /// Authorization function for domain account abstraction.
-    public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
+    public fun authenticate(
+        account: signer, aa_auth_data: AbstractionAuthData
+    ): signer {
         let hex_digest = string_utils::to_string(aa_auth_data.digest());
 
-        let public_key = new_unvalidated_public_key_from_bytes(*aa_auth_data.derivable_abstract_public_key());
-        let signature = new_signature_from_bytes(*aa_auth_data.derivable_abstract_signature());
+        let public_key =
+            new_unvalidated_public_key_from_bytes(
+                *aa_auth_data.derivable_abstract_public_key()
+            );
+        let signature =
+            new_signature_from_bytes(*aa_auth_data.derivable_abstract_signature());
         assert!(
             ed25519::signature_verify_strict(
-                &signature,
-                &public_key,
-                *hex_digest.bytes(),
+                &signature, &public_key, *hex_digest.bytes()
             ),
             error::permission_denied(EINVALID_SIGNATURE)
         );

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
         MAX_HEALTHY_WAIT_SECS,
@@ -11,7 +11,10 @@ use crate::{
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_forge::{NodeExt, Swarm};
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[tokio::test]
 async fn test_create_mint_transfer_block_metadata() {
@@ -110,7 +113,13 @@ async fn test_concurrent_transfers_single_node() {
 
 #[tokio::test]
 async fn test_latest_events_and_transactions() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.indexer_db_config.enable_event = true;
+        }))
+        .build()
+        .await;
     let client = swarm.validators().next().unwrap().rest_client();
     let start_events = client
         .get_new_block_events_bcs(None, Some(2))

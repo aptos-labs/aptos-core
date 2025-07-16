@@ -143,7 +143,7 @@ fn update_rocksdb_properties(
             for cf in state_kv_db_new_key_column_families() {
                 set_property(cf, state_kv_db.metadata_db())?;
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_shard_property(cf, state_kv_db.db_shard(shard as u8), shard)?;
+                    set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
                 }
             }
         }
@@ -157,7 +157,7 @@ fn update_rocksdb_properties(
         set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_shard_property(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
+                set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
             }
         }
     }

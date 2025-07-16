@@ -9,7 +9,7 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
@@ -47,14 +47,6 @@ macro_rules! forward_on_success_or_skip_rest {
             })
     }};
 }
-
-pub(crate) enum KeyKind<T> {
-    Resource,
-    // Contains the set of tags for the given group key.
-    Group(HashSet<T>),
-    AggregatorV1,
-}
-
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
@@ -160,7 +152,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
     }
 
-    /// Does a transaction at txn_idx have SkipRest or Abort status.
+    /// Does a transaction at txn_idx have SkipRest.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             self.outputs[txn_idx as usize]
@@ -237,44 +229,46 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // Extracts a set of resource paths (keys) written or updated during execution from transaction
-    // output, with corresponding KeyKind. If take_group_tags is true, the final HashSet
-    // of tags is moved for the group key - should be called once for each incarnation / record
-    // due to 'take'. if false, stored modified group resource tags in the group are cloned out.
-    pub(crate) fn modified_keys(
+    // BlockSTMv1 method, avoids cloning the tags by calling mark_estimate on reference.
+    pub(crate) fn mark_estimate_group_keys_and_tags(
+        &self,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        txn_idx: TxnIndex,
+    ) {
+        for (key, tags) in self.resource_group_keys_and_tags[txn_idx as usize]
+            .acquire()
+            .dereference()
+            .iter()
+        {
+            versioned_cache
+                .group_data()
+                .mark_estimate(key, txn_idx, tags);
+        }
+    }
+
+    pub(crate) fn modified_group_keys(&self, txn_idx: TxnIndex) -> Vec<(T::Key, HashSet<T::Tag>)> {
+        std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
+    }
+
+    // Extracts a set of resource paths (keys) written or updated during execution from
+    // transaction output. The group keys are not included, and the boolean indicates
+    // whether the resource is used as an AggregatorV1.
+    pub(crate) fn modified_resource_keys(
         &self,
         txn_idx: TxnIndex,
-        take_group_tags: bool,
-    ) -> Option<impl Iterator<Item = (T::Key, KeyKind<T::Tag>)>> {
-        let group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = if take_group_tags {
-            std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
-        } else {
-            self.resource_group_keys_and_tags[txn_idx as usize]
-                .acquire()
-                .clone()
-        };
-
+    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
-                        .map(|(k, _, _)| (k, KeyKind::Resource))
-                        .chain(
-                            t.aggregator_v1_write_set()
-                                .into_keys()
-                                .map(|k| (k, KeyKind::AggregatorV1)),
-                        )
+                        .map(|(k, _, _)| (k, false))
+                        .chain(t.aggregator_v1_write_set().into_keys().map(|k| (k, true)))
                         .chain(
                             t.aggregator_v1_delta_set()
                                 .into_iter()
-                                .map(|(k, _)| (k, KeyKind::AggregatorV1)),
-                        )
-                        .chain(
-                            group_keys_and_tags
-                                .into_iter()
-                                .map(|(k, tags)| (k, KeyKind::Group(tags))),
+                                .map(|(k, _)| (k, true)),
                         ),
                 ),
                 ExecutionStatus::Abort(_)

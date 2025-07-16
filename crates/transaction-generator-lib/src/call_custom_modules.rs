@@ -233,9 +233,7 @@ impl CustomModulesDelegationGeneratorCreator {
     ) -> Vec<(Package, LocalAccount)> {
         let mut rng = StdRng::from_entropy();
         let mut requests_create = Vec::with_capacity(num_modules);
-        let mut requests_publish = Vec::with_capacity(num_modules);
-        let mut package_handler = PackageHandler::new(pre_built, package_name);
-        let mut packages = Vec::new();
+        let mut accounts = Vec::new();
 
         let publisher_balance = publisher_balance.unwrap_or(
             4 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
@@ -255,15 +253,9 @@ impl CustomModulesDelegationGeneratorCreator {
                 publisher_balance,
             ));
 
-            let package = package_handler.pick_package(&mut rng, publisher.address());
-            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
-                requests_publish.push(
-                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
-                );
-            }
-
-            packages.push((package, publisher));
+            accounts.push(publisher);
         }
+
         info!("Creating {} publisher accounts", requests_create.len());
         // all publishers are created from root account, split it up.
         for req_chunk in requests_create.chunks(100) {
@@ -277,6 +269,41 @@ impl CustomModulesDelegationGeneratorCreator {
                     )
                 })
                 .unwrap();
+        }
+
+        let packages = Self::publish_package_to_accounts(
+            init_txn_factory,
+            txn_executor,
+            pre_built,
+            package_name,
+            &accounts,
+        )
+        .await;
+
+        packages.into_iter().zip(accounts.into_iter()).collect()
+    }
+
+    pub async fn publish_package_to_accounts(
+        init_txn_factory: TransactionFactory,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        pre_built: &'static dyn PreBuiltPackages,
+        package_name: &str,
+        accounts: &[LocalAccount],
+    ) -> Vec<Package> {
+        let mut rng = StdRng::from_entropy();
+        let mut requests_publish = Vec::with_capacity(accounts.len());
+        let mut package_handler = PackageHandler::new(pre_built, package_name);
+        let mut packages = Vec::new();
+
+        for publisher in accounts {
+            let package = package_handler.pick_package(&mut rng, publisher.address());
+            for payload in package.publish_transaction_payload(&init_txn_factory.get_chain_id()) {
+                requests_publish.push(
+                    publisher.sign_with_transaction_builder(init_txn_factory.payload(payload)),
+                );
+            }
+
+            packages.push(package);
         }
 
         info!(

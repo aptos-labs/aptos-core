@@ -143,7 +143,11 @@ impl ProofWithData {
         self.proofs.extend(other.proofs);
     }
 
-    pub fn len(&self) -> usize {
+    pub fn num_proofs(&self) -> usize {
+        self.proofs.len()
+    }
+
+    pub fn num_txns(&self) -> usize {
         self.proofs
             .iter()
             .map(|proof| proof.num_txns() as usize)
@@ -280,15 +284,15 @@ impl Payload {
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(proof_with_status) => proof_with_status.len(),
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.num_txns(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 // here we return the actual length of the payload; limit is considered at the stage
                 // where we prepare the block from the payload
-                proof_with_status.proof_with_data.len()
+                proof_with_status.proof_with_data.num_txns()
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
-                proof_with_data.len()
+                proof_with_data.num_txns()
                     + inline_batches
                         .iter()
                         .map(|(_, txns)| txns.len())
@@ -301,18 +305,18 @@ impl Payload {
     pub fn len_for_execution(&self) -> u64 {
         match self {
             Payload::DirectMempool(txns) => txns.len() as u64,
-            Payload::InQuorumStore(proof_with_status) => proof_with_status.len() as u64,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.num_txns() as u64,
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 // here we return the actual length of the payload; limit is considered at the stage
                 // where we prepare the block from the payload
-                (proof_with_status.proof_with_data.len() as u64)
+                (proof_with_status.proof_with_data.num_txns() as u64)
                     .min(proof_with_status.max_txns_to_execute.unwrap_or(u64::MAX))
             },
             Payload::QuorumStoreInlineHybrid(
                 inline_batches,
                 proof_with_data,
                 max_txns_to_execute,
-            ) => ((proof_with_data.len()
+            ) => ((proof_with_data.num_txns()
                 + inline_batches
                     .iter()
                     .map(|(_, txns)| txns.len())
@@ -327,7 +331,7 @@ impl Payload {
                 inline_batches,
                 proof_with_data,
                 execution_limit,
-            ) => ((proof_with_data.len()
+            ) => ((proof_with_data.num_txns()
                 + inline_batches
                     .iter()
                     .map(|(_, txns)| txns.len())

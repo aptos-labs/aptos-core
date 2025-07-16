@@ -8,12 +8,15 @@ use crate::state_store::{
     state_view::cached_state_view::ShardedStateCache,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
 };
-use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};
+use aptos_types::transaction::{
+    PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
+};
 
 #[derive(Clone)]
 pub struct ChunkToCommit<'a> {
     pub first_version: Version,
     pub transactions: &'a [Transaction],
+    pub persisted_info: &'a [PersistedAuxiliaryInfo],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
     pub state: &'a LedgerState,

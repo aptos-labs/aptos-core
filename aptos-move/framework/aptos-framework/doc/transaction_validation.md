@@ -554,10 +554,16 @@ Only called during genesis to initialize system resources for this module.
     // Check <b>if</b> the authentication key is valid
     <b>if</b> (!<a href="transaction_validation.md#0x1_transaction_validation_skip_auth_key_check">skip_auth_key_check</a>(is_simulation, &txn_authentication_key)) {
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&txn_authentication_key)) {
-            <b>assert</b>!(
-                txn_authentication_key == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(sender_address)),
-                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
-            );
+            <b>if</b> (
+                sender_address == gas_payer_address ||
+                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(sender_address) ||
+                !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_sponsored_automatic_account_creation_enabled">features::sponsored_automatic_account_creation_enabled</a>()
+            ) {
+                <b>assert</b>!(
+                    txn_authentication_key == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(sender_address)),
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+                );
+            };
         } <b>else</b> {
             <b>assert</b>!(
                 <a href="transaction_validation.md#0x1_transaction_validation_allow_missing_txn_authentication_key">allow_missing_txn_authentication_key</a>(sender_address),
@@ -2014,7 +2020,7 @@ not equal the number of singers.
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>pragma</b> verify_duration_estimate = 120;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_FEE_PAYER_ENABLED">features::FEE_PAYER_ENABLED</a>);
-<b>let</b> gas_payer = <a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(fee_payer_address);
+<b>let</b> gas_payer = <a href="create_signer.md#0x1_create_signer_spec_create_signer">create_signer::spec_create_signer</a>(fee_payer_address);
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     gas_payer,
     replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),

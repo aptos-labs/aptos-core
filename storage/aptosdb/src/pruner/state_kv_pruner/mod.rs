@@ -124,7 +124,7 @@ impl StateKvPruner {
 
         let shard_pruners = if state_kv_db.enabled_sharding() {
             let num_shards = state_kv_db.num_shards();
-            let mut shard_pruners = Vec::with_capacity(num_shards as usize);
+            let mut shard_pruners = Vec::with_capacity(num_shards);
             for shard_id in 0..num_shards {
                 shard_pruners.push(StateKvShardPruner::new(
                     shard_id,

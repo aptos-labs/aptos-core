@@ -131,7 +131,7 @@ impl StateSnapshotCommitter {
                                     };
 
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
-                                        shard_id as u8,
+                                        shard_id,
                                         jmt_update_refs(&updates),
                                         Some(&node_hashes),
                                         version,

@@ -241,6 +241,7 @@ pub fn create_transaction_info() -> TransactionInfo {
         Some(HashValue::random()),
         0,
         ExecutionStatus::Success,
+        Some(HashValue::random()),
     )
 }
 

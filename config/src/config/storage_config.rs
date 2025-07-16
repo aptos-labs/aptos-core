@@ -152,8 +152,12 @@ pub struct RocksdbConfigs {
     pub state_merkle_db_config: RocksdbConfig,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
-    // Note: Not ready for production use yet.
+    #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
+}
+
+fn default_to_true() -> bool {
+    true
 }
 
 impl Default for RocksdbConfigs {
@@ -166,7 +170,7 @@ impl Default for RocksdbConfigs {
                 max_open_files: 1000,
                 ..Default::default()
             },
-            enable_storage_sharding: false,
+            enable_storage_sharding: true,
         }
     }
 }
@@ -440,7 +444,7 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
-    pub fn state_kv_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.state_kv_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
@@ -452,13 +456,13 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
-    pub fn state_merkle_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn state_merkle_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.state_merkle_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
     }
 
-    pub fn hot_state_kv_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+    pub fn hot_state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.hot_state_kv_db_paths
             .shard_path(shard_id)
             .unwrap_or(&self.default_path)
@@ -514,8 +518,8 @@ impl ShardedDbPaths {
         self.metadata_path.as_ref()
     }
 
-    fn shard_path(&self, shard_id: u8) -> Option<&PathBuf> {
-        self.shard_paths[shard_id as usize].as_ref()
+    fn shard_path(&self, shard_id: usize) -> Option<&PathBuf> {
+        self.shard_paths[shard_id].as_ref()
     }
 }
 

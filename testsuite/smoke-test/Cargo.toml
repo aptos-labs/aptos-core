@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
+aptos-api-types = { workspace = true }
 aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true, features = ["smoke-test"] }

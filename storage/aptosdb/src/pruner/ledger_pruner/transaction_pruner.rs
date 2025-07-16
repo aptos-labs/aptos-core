@@ -49,6 +49,8 @@ impl DBSubPruner for TransactionPruner {
             target_version,
             &mut batch,
         )?;
+        self.transaction_store
+            .prune_transaction_summaries_by_account(&candidate_transactions, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionPrunerProgress,
             &DbMetadataValue::Version(target_version),

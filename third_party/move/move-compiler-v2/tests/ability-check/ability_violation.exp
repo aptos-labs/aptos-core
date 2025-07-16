@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: value of type `Impotent` does not have the `drop` ability
+  ┌─ tests/ability-check/ability_violation.move:7:10
+  │
+7 │         (x, x);
+  │          ^ implicitly dropped here since it is no longer used
+
 error: local `x` of type `Impotent` does not have the `copy` ability
   ┌─ tests/ability-check/ability_violation.move:7:10
   │
@@ -7,12 +13,6 @@ error: local `x` of type `Impotent` does not have the `copy` ability
   │          ^  - used here
   │          │
   │          copy needed here because value is still in use
-
-error: value of type `Impotent` does not have the `drop` ability
-  ┌─ tests/ability-check/ability_violation.move:7:10
-  │
-7 │         (x, x);
-  │          ^ implicitly dropped here since it is no longer used
 
 error: value of type `Impotent` does not have the `drop` ability
   ┌─ tests/ability-check/ability_violation.move:7:13

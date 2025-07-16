@@ -5,7 +5,10 @@ use crate::{
     optimistic_fetch::OptimisticFetchRequest,
     storage::StorageReader,
     subscription::SubscriptionStreamRequests,
-    tests::mock::{MockClient, MockDatabaseReader},
+    tests::{
+        mock::{MockClient, MockDatabaseReader},
+        utils,
+    },
     StorageServiceServer,
 };
 use aptos_config::{
@@ -20,12 +23,17 @@ use aptos_storage_service_notifications::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StateValuesWithProofRequest, StorageServiceRequest,
+        DataRequest, GetTransactionDataWithProofRequest, StateValuesWithProofRequest,
+        StorageServiceRequest, SubscribeTransactionDataWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        SubscriptionStreamMetadata, TransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionData, TransactionDataRequestType,
+        TransactionOrOutputData, TransactionsWithProofRequest,
     },
-    responses::{CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse},
+    responses::{
+        CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse,
+        TransactionDataResponseType,
+    },
     Epoch, StorageServiceError,
 };
 use aptos_time_service::{MockTimeService, TimeService};
@@ -39,8 +47,8 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
         TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
@@ -172,12 +180,51 @@ pub fn create_output_list_with_proof(
     )
 }
 
+/// Creates and returns a list of persisted auxiliary infos (if request v2 is enabled)
+pub fn create_persisted_auxiliary_infos(
+    start_version: u64,
+    end_version: u64,
+    use_request_v2: bool,
+) -> Option<Vec<PersistedAuxiliaryInfo>> {
+    // Check if request v2 is enabled
+    if !use_request_v2 {
+        return None;
+    }
+
+    // Calculate the number of auxiliary infos
+    let num_auxiliary_infos = end_version - start_version + 1;
+
+    // Create a list of auxiliary infos
+    let mut persisted_auxiliary_infos = vec![];
+    for i in 0..num_auxiliary_infos {
+        let persisted_auxiliary_info = if utils::get_random_u64() % 2 == 0 {
+            PersistedAuxiliaryInfo::V1 {
+                transaction_index: i as u32,
+            }
+        } else {
+            PersistedAuxiliaryInfo::None
+        };
+        persisted_auxiliary_infos.push(persisted_auxiliary_info);
+    }
+
+    // Return the list of auxiliary infos
+    Some(persisted_auxiliary_infos)
+}
+
 /// Creates a vector of entries from first_index to last_index (inclusive)
 /// and shuffles the entries randomly.
 pub fn create_shuffled_vector(first_index: u64, last_index: u64) -> Vec<u64> {
     let mut vector: Vec<u64> = (first_index..=last_index).collect();
     vector.shuffle(&mut rand::thread_rng());
     vector
+}
+
+/// Creates and returns a storage service config
+pub fn create_storage_config(enable_transaction_data_v2: bool) -> StorageServiceConfig {
+    StorageServiceConfig {
+        enable_transaction_data_v2,
+        ..Default::default()
+    }
 }
 
 /// Creates a test ledger info with signatures
@@ -299,6 +346,7 @@ pub fn configure_network_chunk_limit(
     fallback_to_transactions: bool,
     output_list_with_proof: &TransactionOutputListWithProof,
     transaction_list_with_proof: &TransactionListWithProof,
+    enable_transaction_data_v2: bool,
 ) -> StorageServiceConfig {
     let max_network_chunk_bytes = if fallback_to_transactions {
         // Network limit is only big enough for the transaction list
@@ -309,6 +357,7 @@ pub fn configure_network_chunk_limit(
     };
     StorageServiceConfig {
         max_network_chunk_bytes,
+        enable_transaction_data_v2,
         ..Default::default()
     }
 }
@@ -343,12 +392,25 @@ pub fn expect_get_transaction_outputs(
     num_items: u64,
     proof_version: u64,
     output_list: TransactionOutputListWithProof,
+    use_request_v2: bool,
+    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
+    // Expect a call to get transaction outputs with proof
     mock_db
         .expect_get_transaction_outputs()
         .times(1)
         .with(eq(start_version), eq(num_items), eq(proof_version))
         .returning(move |_, _, _| Ok(output_list.clone()));
+
+    // If the request is v2, also expect a call to get auxiliary info
+    if use_request_v2 {
+        let persisted_auxiliary_info_iter = persisted_auxiliary_infos.unwrap().into_iter().map(Ok);
+        mock_db
+            .expect_get_persisted_auxiliary_info_iterator()
+            .times(1)
+            .with(eq(start_version), eq(num_items as usize))
+            .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iter.clone())));
+    }
 }
 
 /// Sets an expectation on the given mock db for a call to fetch transactions
@@ -359,7 +421,10 @@ pub fn expect_get_transactions(
     proof_version: u64,
     include_events: bool,
     transaction_list: TransactionListWithProof,
+    use_request_v2: bool,
+    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
+    // Expect a call to get transactions with proof
     mock_db
         .expect_get_transactions()
         .times(1)
@@ -370,6 +435,16 @@ pub fn expect_get_transactions(
             eq(include_events),
         )
         .returning(move |_, _, _, _| Ok(transaction_list.clone()));
+
+    // If the request is v2, also expect a call to get auxiliary info
+    if use_request_v2 {
+        let persisted_auxiliary_info_iter = persisted_auxiliary_infos.unwrap().into_iter().map(Ok);
+        mock_db
+            .expect_get_persisted_auxiliary_info_iterator()
+            .times(1)
+            .with(eq(start_version), eq(num_items as usize))
+            .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iter.clone())));
+    }
 }
 
 /// Extracts the peer and network ids from an optional peer network id
@@ -497,13 +572,26 @@ pub async fn get_transactions_with_proof(
     proof_version: u64,
     include_events: bool,
     use_compression: bool,
+    use_request_v2: bool,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
-    let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version,
-        start_version,
-        end_version,
-        include_events,
-    });
+    let data_request = if use_request_v2 {
+        let transaction_data_request_type =
+            TransactionDataRequestType::TransactionData(TransactionData { include_events });
+        DataRequest::GetTransactionDataWithProof(GetTransactionDataWithProofRequest {
+            transaction_data_request_type,
+            proof_version,
+            start_version,
+            end_version,
+            max_response_bytes: 0,
+        })
+    } else {
+        DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+        })
+    };
     send_storage_request(mock_client, use_compression, data_request).await
 }
 
@@ -525,6 +613,7 @@ pub async fn send_output_subscription_request_batch(
     stream_id: u64,
     peer_version: u64,
     peer_epoch: u64,
+    use_request_v2: bool,
 ) -> HashMap<u64, Receiver<Result<Bytes, RpcError>>> {
     // Shuffle the stream request indices to emulate out of order requests
     let stream_request_indices =
@@ -541,6 +630,7 @@ pub async fn send_output_subscription_request_batch(
             stream_id,
             stream_request_index,
             Some(peer_network_id),
+            use_request_v2,
         )
         .await;
 
@@ -570,6 +660,7 @@ pub async fn subscribe_to_transactions_or_outputs(
     max_num_output_reductions: u64,
     stream_id: u64,
     stream_index: u64,
+    use_request_v2: bool,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     subscribe_to_transactions_or_outputs_for_peer(
         mock_client,
@@ -580,6 +671,7 @@ pub async fn subscribe_to_transactions_or_outputs(
         stream_id,
         stream_index,
         None,
+        use_request_v2,
     )
     .await
 }
@@ -594,6 +686,7 @@ pub async fn subscribe_to_transactions_or_outputs_for_peer(
     subscription_stream_id: u64,
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
+    use_request_v2: bool,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -601,14 +694,27 @@ pub async fn subscribe_to_transactions_or_outputs_for_peer(
         known_epoch_at_stream_start,
         subscription_stream_id,
     };
-    let data_request = DataRequest::SubscribeTransactionsOrOutputsWithProof(
-        SubscribeTransactionsOrOutputsWithProofRequest {
+    let data_request = if use_request_v2 {
+        let transaction_data_request_type =
+            TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
+                include_events,
+            });
+        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
+            transaction_data_request_type,
             subscription_stream_metadata,
-            include_events,
-            max_num_output_reductions,
             subscription_stream_index,
-        },
-    );
+            max_response_bytes: 0,
+        })
+    } else {
+        DataRequest::SubscribeTransactionsOrOutputsWithProof(
+            SubscribeTransactionsOrOutputsWithProofRequest {
+                subscription_stream_metadata,
+                include_events,
+                max_num_output_reductions,
+                subscription_stream_index,
+            },
+        )
+    };
     let storage_request = StorageServiceRequest::new(data_request, true);
 
     // Send the request
@@ -625,6 +731,7 @@ pub async fn subscribe_to_transaction_outputs(
     known_epoch: u64,
     stream_id: u64,
     stream_index: u64,
+    use_request_v2: bool,
 ) -> Receiver<Result<Bytes, RpcError>> {
     subscribe_to_transaction_outputs_for_peer(
         mock_client,
@@ -633,6 +740,7 @@ pub async fn subscribe_to_transaction_outputs(
         stream_id,
         stream_index,
         None,
+        use_request_v2,
     )
     .await
 }
@@ -645,6 +753,7 @@ pub async fn subscribe_to_transaction_outputs_for_peer(
     subscription_stream_id: u64,
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
+    use_request_v2: bool,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -652,12 +761,22 @@ pub async fn subscribe_to_transaction_outputs_for_peer(
         known_epoch_at_stream_start,
         subscription_stream_id,
     };
-    let data_request = DataRequest::SubscribeTransactionOutputsWithProof(
-        SubscribeTransactionOutputsWithProofRequest {
+    let data_request = if use_request_v2 {
+        let transaction_data_request_type = TransactionDataRequestType::TransactionOutputData;
+        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
+            transaction_data_request_type,
             subscription_stream_metadata,
             subscription_stream_index,
-        },
-    );
+            max_response_bytes: 0,
+        })
+    } else {
+        DataRequest::SubscribeTransactionOutputsWithProof(
+            SubscribeTransactionOutputsWithProofRequest {
+                subscription_stream_metadata,
+                subscription_stream_index,
+            },
+        )
+    };
     let storage_request = StorageServiceRequest::new(data_request, true);
 
     // Send the request
@@ -675,6 +794,7 @@ pub async fn subscribe_to_transactions(
     include_events: bool,
     stream_id: u64,
     stream_index: u64,
+    use_request_v2: bool,
 ) -> Receiver<Result<Bytes, RpcError>> {
     subscribe_to_transactions_for_peer(
         mock_client,
@@ -684,6 +804,7 @@ pub async fn subscribe_to_transactions(
         stream_id,
         stream_index,
         None,
+        use_request_v2,
     )
     .await
 }
@@ -697,6 +818,7 @@ pub async fn subscribe_to_transactions_for_peer(
     subscription_stream_id: u64,
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
+    use_request_v2: bool,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -704,12 +826,22 @@ pub async fn subscribe_to_transactions_for_peer(
         known_epoch_at_stream_start,
         subscription_stream_id,
     };
-    let data_request =
+    let data_request = if use_request_v2 {
+        let transaction_data_request_type =
+            TransactionDataRequestType::TransactionData(TransactionData { include_events });
+        DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
+            transaction_data_request_type,
+            subscription_stream_metadata,
+            subscription_stream_index,
+            max_response_bytes: 0,
+        })
+    } else {
         DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
             subscription_stream_metadata,
             include_events,
             subscription_stream_index,
-        });
+        })
+    };
     let storage_request = StorageServiceRequest::new(data_request, true);
 
     // Send the request
@@ -798,26 +930,70 @@ pub fn verify_active_stream_id_for_peer(
 /// and that the response contains the correct data.
 pub async fn verify_new_transaction_outputs_with_proof(
     mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
-    output_list_with_proof: TransactionOutputListWithProof,
+    receiver: Receiver<Result<Bytes, RpcError>>,
+    use_request_v2: bool,
+    expected_output_list_with_proof: TransactionOutputListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
+    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
-    match mock_client
-        .wait_for_response(receiver)
-        .await
-        .unwrap()
-        .get_data_response()
-        .unwrap()
-    {
+    // Get the data response
+    let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
+    let data_response = storage_service_response.get_data_response().unwrap();
+
+    // Verify the response type (v1 or v2)
+    match &data_response {
+        DataResponse::NewTransactionOutputsWithProof(_) => assert!(!use_request_v2),
+        DataResponse::NewTransactionDataWithProof(_) => {
+            assert!(use_request_v2)
+        },
+        _ => panic!(
+            "Expected new transaction outputs with proof but got: {:?}",
+            data_response
+        ),
+    }
+
+    // Verify the response data
+    match data_response {
         DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
-            assert_eq!(outputs_with_proof, output_list_with_proof);
+            assert_eq!(outputs_with_proof, expected_output_list_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         },
-        response => panic!(
+        DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
+            // Verify the data type
+            assert_eq!(
+                new_transaction_data_with_proof_response.transaction_data_response_type,
+                TransactionDataResponseType::TransactionOutputData
+            );
+
+            // Verify the ledger info
+            assert_eq!(
+                new_transaction_data_with_proof_response.ledger_info_with_signatures,
+                expected_ledger_info
+            );
+
+            // Verify the transactions
+            assert!(new_transaction_data_with_proof_response
+                .transaction_list_with_proof
+                .is_none());
+
+            // Verify the outputs and auxiliary infos
+            let output_list_with_proof_v2 = new_transaction_data_with_proof_response
+                .transaction_output_list_with_proof
+                .unwrap();
+            assert_eq!(
+                output_list_with_proof_v2.get_output_list_with_proof(),
+                &expected_output_list_with_proof
+            );
+            assert_eq!(
+                output_list_with_proof_v2.get_persisted_auxiliary_infos(),
+                &expected_persisted_auxiliary_infos.unwrap(),
+            );
+        },
+        _ => panic!(
             "Expected new transaction outputs with proof but got: {:?}",
-            response
+            data_response
         ),
-    };
+    }
 }
 
 /// Verifies that a new transactions with proof response is received
@@ -825,25 +1001,69 @@ pub async fn verify_new_transaction_outputs_with_proof(
 pub async fn verify_new_transactions_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
+    use_request_v2: bool,
     expected_transactions_with_proof: TransactionListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
+    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
-    match mock_client
-        .wait_for_response(receiver)
-        .await
-        .unwrap()
-        .get_data_response()
-        .unwrap()
-    {
+    // Get the data response
+    let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
+    let data_response = storage_service_response.get_data_response().unwrap();
+
+    // Verify the response type (v1 or v2)
+    match &data_response {
+        DataResponse::NewTransactionsWithProof(_) => assert!(!use_request_v2),
+        DataResponse::NewTransactionDataWithProof(_) => {
+            assert!(use_request_v2)
+        },
+        _ => panic!(
+            "Expected new transaction with proof but got: {:?}",
+            data_response
+        ),
+    }
+
+    // Verify the response data
+    match data_response {
         DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
             assert_eq!(transactions_with_proof, expected_transactions_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         },
-        response => panic!(
+        DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
+            // Verify the data type
+            assert_eq!(
+                new_transaction_data_with_proof_response.transaction_data_response_type,
+                TransactionDataResponseType::TransactionData
+            );
+
+            // Verify the ledger info
+            assert_eq!(
+                new_transaction_data_with_proof_response.ledger_info_with_signatures,
+                expected_ledger_info
+            );
+
+            // Verify the outputs
+            assert!(new_transaction_data_with_proof_response
+                .transaction_output_list_with_proof
+                .is_none());
+
+            // Verify the transactions and auxiliary infos
+            let transaction_list_with_proof_v2 = new_transaction_data_with_proof_response
+                .transaction_list_with_proof
+                .unwrap();
+            assert_eq!(
+                transaction_list_with_proof_v2.get_transaction_list_with_proof(),
+                &expected_transactions_with_proof
+            );
+            assert_eq!(
+                transaction_list_with_proof_v2.get_persisted_auxiliary_infos(),
+                &expected_persisted_auxiliary_infos.unwrap(),
+            );
+        },
+        _ => panic!(
             "Expected new transaction with proof but got: {:?}",
-            response
+            data_response
         ),
-    };
+    }
 }
 
 /// Verifies that a new transactions or outputs with proof response is received
@@ -851,34 +1071,152 @@ pub async fn verify_new_transactions_with_proof(
 pub async fn verify_new_transactions_or_outputs_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
+    use_request_v2: bool,
     expected_transaction_list_with_proof: Option<TransactionListWithProof>,
     expected_output_list_with_proof: Option<TransactionOutputListWithProof>,
     expected_ledger_info: LedgerInfoWithSignatures,
+    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
-    let response = mock_client.wait_for_response(receiver).await.unwrap();
-    match response.get_data_response().unwrap() {
+    // Get the data response
+    let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
+    let data_response = storage_service_response.get_data_response().unwrap();
+
+    // Verify the response type (v1 or v2)
+    match &data_response {
+        DataResponse::NewTransactionsOrOutputsWithProof(_) => assert!(!use_request_v2),
+        DataResponse::NewTransactionDataWithProof(_) => {
+            assert!(use_request_v2)
+        },
+        _ => panic!(
+            "Expected new transactions or outputs with proof but got: {:?}",
+            data_response
+        ),
+    }
+
+    // Verify the response data
+    match data_response {
         DataResponse::NewTransactionsOrOutputsWithProof((
-            transactions_or_outputs_with_proof,
+            (transactions_with_proof, outputs_with_proof),
             ledger_info,
         )) => {
-            let (transactions_with_proof, outputs_with_proof) = transactions_or_outputs_with_proof;
-            if let Some(transactions_with_proof) = transactions_with_proof {
+            // Verify the ledger info
+            assert_eq!(ledger_info, expected_ledger_info);
+
+            // Verify the transactions or outputs
+            assert_eq!(
+                transactions_with_proof,
+                expected_transaction_list_with_proof
+            );
+            assert_eq!(outputs_with_proof, expected_output_list_with_proof);
+        },
+        DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
+            // Verify the ledger info
+            assert_eq!(
+                new_transaction_data_with_proof_response.ledger_info_with_signatures,
+                expected_ledger_info
+            );
+
+            // Verify the transactions or outputs
+            if let Some(transactions_with_proof_v2) =
+                new_transaction_data_with_proof_response.transaction_list_with_proof
+            {
                 assert_eq!(
-                    transactions_with_proof,
-                    expected_transaction_list_with_proof.unwrap()
+                    new_transaction_data_with_proof_response.transaction_data_response_type,
+                    TransactionDataResponseType::TransactionData,
+                );
+                assert!(new_transaction_data_with_proof_response
+                    .transaction_output_list_with_proof
+                    .is_none());
+                assert_eq!(
+                    transactions_with_proof_v2.get_transaction_list_with_proof(),
+                    &expected_transaction_list_with_proof.unwrap()
+                );
+                assert_eq!(
+                    transactions_with_proof_v2.get_persisted_auxiliary_infos(),
+                    &expected_persisted_auxiliary_infos.unwrap(),
+                );
+            } else if let Some(outputs_with_proof_v2) =
+                new_transaction_data_with_proof_response.transaction_output_list_with_proof
+            {
+                assert_eq!(
+                    new_transaction_data_with_proof_response.transaction_data_response_type,
+                    TransactionDataResponseType::TransactionOutputData,
+                );
+                assert!(new_transaction_data_with_proof_response
+                    .transaction_list_with_proof
+                    .is_none());
+                assert_eq!(
+                    outputs_with_proof_v2.get_output_list_with_proof(),
+                    &expected_output_list_with_proof.unwrap()
+                );
+                assert_eq!(
+                    outputs_with_proof_v2.get_persisted_auxiliary_infos(),
+                    &expected_persisted_auxiliary_infos.unwrap(),
                 );
             } else {
-                assert_eq!(
-                    outputs_with_proof.unwrap(),
-                    expected_output_list_with_proof.unwrap()
-                );
+                panic!("Expected either transactions or outputs with proof, but got neither!");
             }
-            assert_eq!(ledger_info, expected_ledger_info);
         },
-        response => panic!(
-            "Expected new transaction outputs with proof but got: {:?}",
-            response
+        _ => panic!(
+            "Expected new transactions or outputs with proof but got: {:?}",
+            data_response
         ),
+    }
+}
+
+/// Verifies the response for a transaction with proof request
+pub fn verify_transaction_with_proof_response(
+    use_request_v2: bool,
+    transaction_list_with_proof: TransactionListWithProof,
+    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
+    response: StorageServiceResponse,
+) {
+    // Get the data response
+    let data_response = response.get_data_response().unwrap();
+
+    // Verify the response type (v1 or v2)
+    match &data_response {
+        DataResponse::TransactionsWithProof(_) => assert!(!use_request_v2),
+        DataResponse::TransactionDataWithProof(_) => {
+            assert!(use_request_v2)
+        },
+        _ => panic!(
+            "Expected transactions with proof but got: {:?}",
+            data_response
+        ),
+    }
+
+    // Verify the response data
+    match data_response {
+        DataResponse::TransactionsWithProof(transactions_with_proof) => {
+            assert_eq!(transactions_with_proof, transaction_list_with_proof)
+        },
+        DataResponse::TransactionDataWithProof(transaction_data_with_proof) => {
+            // Verify the data type
+            assert_eq!(
+                transaction_data_with_proof.transaction_data_response_type,
+                TransactionDataResponseType::TransactionData
+            );
+
+            // Verify the outputs
+            assert!(transaction_data_with_proof
+                .transaction_output_list_with_proof
+                .is_none());
+
+            // Verify the transactions and auxiliary infos
+            let transaction_list_with_proof_v2 = transaction_data_with_proof
+                .transaction_list_with_proof
+                .unwrap();
+            assert_eq!(
+                transaction_list_with_proof_v2.get_transaction_list_with_proof(),
+                &transaction_list_with_proof
+            );
+            assert_eq!(
+                transaction_list_with_proof_v2.get_persisted_auxiliary_infos(),
+                &persisted_auxiliary_infos.unwrap(),
+            );
+        },
+        _ => panic!("Expected transactions with proof but got: {:?}", response),
     };
 }
 
@@ -895,17 +1233,21 @@ pub fn verify_no_subscription_responses(
 /// and that the response contains the correct data.
 pub async fn verify_output_subscription_response(
     expected_output_lists_with_proofs: Vec<TransactionOutputListWithProof>,
+    expected_persisted_auxiliary_infos: Vec<Option<Vec<PersistedAuxiliaryInfo>>>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
     stream_request_index: u64,
+    use_request_v2: bool,
 ) {
     let response_receiver = response_receivers.remove(&stream_request_index).unwrap();
     verify_new_transaction_outputs_with_proof(
         mock_client,
         response_receiver,
+        use_request_v2,
         expected_output_lists_with_proofs[stream_request_index as usize].clone(),
         expected_target_ledger_info,
+        expected_persisted_auxiliary_infos[stream_request_index as usize].clone(),
     )
     .await;
 }

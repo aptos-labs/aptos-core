@@ -22,7 +22,6 @@ use crate::{
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
-    state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::ConsensusObserverConfig;
@@ -81,7 +80,6 @@ pub struct ResetRequest {
 pub struct OrderedBlocks {
     pub ordered_blocks: Vec<Arc<PipelinedBlock>>,
     pub ordered_proof: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
 }
 
 impl OrderedBlocks {
@@ -139,10 +137,6 @@ pub struct BufferManager {
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
 
-    // self channel to retry execution schedule phase
-    execution_schedule_retry_tx: UnboundedSender<()>,
-    execution_schedule_retry_rx: UnboundedReceiver<()>,
-
     stop: bool,
 
     epoch_state: Arc<EpochState>,
@@ -177,7 +171,6 @@ pub struct BufferManager {
     // Items are popped from the buffer when sending to the persisting phase since callback is not clonable.
     // but we need to keep the pending blocks for reset.
     pending_commit_blocks: BTreeMap<Round, Arc<PipelinedBlock>>,
-    new_pipeline_enabled: bool,
 }
 
 impl BufferManager {
@@ -209,7 +202,6 @@ impl BufferManager {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         max_pending_rounds_in_commit_vote_cache: u64,
-        new_pipeline_enabled: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -217,7 +209,6 @@ impl BufferManager {
             .factor(50)
             .max_delay(Duration::from_secs(5));
 
-        let (tx, rx) = unbounded();
         Self {
             author,
 
@@ -252,9 +243,6 @@ impl BufferManager {
             block_rx,
             reset_rx,
 
-            execution_schedule_retry_tx: tx,
-            execution_schedule_retry_rx: rx,
-
             stop: false,
 
             epoch_state,
@@ -275,7 +263,6 @@ impl BufferManager {
             max_pending_rounds_in_commit_vote_cache,
             pending_commit_votes: BTreeMap::new(),
             pending_commit_blocks: BTreeMap::new(),
-            new_pipeline_enabled,
         }
     }
 
@@ -399,7 +386,6 @@ impl BufferManager {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
-            callback,
         } = ordered_blocks;
 
         info!(
@@ -411,7 +397,6 @@ impl BufferManager {
 
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
-            lifetime_guard: self.create_new_request(()),
         });
         if let Some(consensus_publisher) = &self.consensus_publisher {
             let message = ConsensusObserverMessage::new_ordered_block_message(
@@ -435,8 +420,7 @@ impl BufferManager {
                 }
             }
         }
-        let item =
-            BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_votes);
+        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, unverified_votes);
         self.buffer.push_back(item);
     }
 
@@ -540,13 +524,6 @@ impl BufferManager {
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
                         commit_ledger_info: aggregated_item.commit_proof,
-                        // we use the last callback
-                        // this is okay because the callback function (from BlockStore::commit)
-                        // takes in the actual blocks and ledger info from the state computer
-                        // the encoded values are references to the block_tree, storage, and a commit root
-                        // the block_tree and storage are the same for all the callbacks in the current epoch
-                        // the commit root is used in logging only.
-                        callback: aggregated_item.callback,
                     }))
                     .await
                     .expect("Failed to send persist request");
@@ -591,9 +568,6 @@ impl BufferManager {
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         info!("Receive reset");
-        if !self.new_pipeline_enabled {
-            self.reset_flag.store(true, Ordering::SeqCst);
-        }
 
         match signal {
             ResetSignal::Stop => self.stop = true,
@@ -607,9 +581,6 @@ impl BufferManager {
 
         self.reset().await;
         let _ = tx.send(ResetAck::default());
-        if !self.new_pipeline_enabled {
-            self.reset_flag.store(false, Ordering::SeqCst);
-        }
         info!("Reset finishes");
     }
 
@@ -622,29 +593,7 @@ impl BufferManager {
             .expect("Failed to send execution wait request.");
     }
 
-    async fn retry_schedule_phase(&mut self) {
-        let mut cursor = self.execution_root;
-        let mut count = 0;
-        while cursor.is_some() {
-            let ordered_blocks = self.buffer.get(&cursor).get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest {
-                ordered_blocks,
-                lifetime_guard: self.create_new_request(()),
-            });
-            count += 1;
-            self.execution_schedule_phase_tx
-                .send(request)
-                .await
-                .expect("Failed to send execution schedule request.");
-            cursor = self.buffer.get_next(&cursor);
-        }
-        info!(
-            "Reschedule {} execution requests from {:?}",
-            count, self.execution_root
-        );
-    }
-
-    /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
+    /// If the response is successful, advance the item to Executed.
     #[allow(clippy::unwrap_used)]
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
@@ -661,7 +610,6 @@ impl BufferManager {
                     e,
                     &counters::BUFFER_MANAGER_RECEIVED_EXECUTOR_ERROR_COUNT,
                     block_id,
-                    self.new_pipeline_enabled,
                 );
                 return;
             },
@@ -994,28 +942,11 @@ impl BufferManager {
                 })},
                 Some(response) = self.execution_wait_phase_rx.next() => {
                     monitor!("buffer_manager_process_execution_wait_response", {
-                    let response_block_id = response.block_id;
                     self.process_execution_response(response).await;
-                    if let Some(block_id) = self.advance_execution_root() {
-                        // if the response is for the current execution root, retry the schedule phase
-                        if response_block_id == block_id {
-                            let mut tx = self.execution_schedule_retry_tx.clone();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(Duration::from_millis(100)).await;
-                                // buffer manager can be dropped at the point of sending retry
-                                let _ = tx.send(()).await;
-                            });
-                        }
-                    }
+                    self.advance_execution_root();
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
                     }});
-                },
-                _ = self.execution_schedule_retry_rx.next() => {
-                    if !self.new_pipeline_enabled {
-                        monitor!("buffer_manager_process_execution_schedule_retry",
-                            self.retry_schedule_phase().await);
-                    }
                 },
                 Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {

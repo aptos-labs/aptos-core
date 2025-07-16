@@ -15,12 +15,15 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+equivalent = { workspace = true }
+fail = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
@@ -29,7 +32,10 @@ serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
+concurrent-queue = { workspace = true }
+fail = { workspace = true, features = ["failpoints"] }
 move-vm-runtime = { workspace = true }
+num_cpus = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }

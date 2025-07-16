@@ -98,8 +98,8 @@ proptest! {
         let shard1 = key1.get_shard_id();
         let shard2 = key2.get_shard_id();
 
-        assert_eq!(shard1, key1.crypto_hash_ref().nibble(0));
-        assert_eq!(shard2, key2.crypto_hash_ref().nibble(0));
+        assert_eq!(shard1, usize::from(key1.crypto_hash_ref().nibble(0)));
+        assert_eq!(shard2, usize::from(key2.crypto_hash_ref().nibble(0)));
 
         if shard1 != shard2 {
             assert_eq!(

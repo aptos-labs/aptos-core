@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_storage_interface::state_store::state::State;
-use aptos_storage_interface::state_store::state_summary::StateSummary;
-use aptos_storage_interface::state_store::state_view::hot_state_view::HotStateView;
+use aptos_storage_interface::state_store::{
+    state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+};
+use aptos_types::transaction::PersistedAuxiliaryInfo;
 use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
 
 impl DbReader for AptosDB {
@@ -149,24 +150,23 @@ impl DbReader for AptosDB {
 
             let txn_summaries_iter = self
                 .transaction_store
-                .get_account_transaction_summaries_iter(address, start_version, end_version, limit, ledger_version)?
+                .get_account_transaction_summaries_iter(
+                    address,
+                    start_version,
+                    end_version,
+                    limit,
+                    ledger_version,
+                )?
                 .map(|result| {
                     let (_version, txn_summary) = result?;
                     Ok(txn_summary)
                 });
 
             if start_version.is_some() {
-                txn_summaries_iter
-                    .collect::<Result<Vec<_>>>()
+                txn_summaries_iter.collect::<Result<Vec<_>>>()
             } else {
-                let txn_summaries = txn_summaries_iter
-                    .collect::<Result<Vec<_>>>()?;
-                Ok(
-                    txn_summaries
-                        .into_iter()
-                        .rev()
-                        .collect::<Vec<_>>()
-                )
+                let txn_summaries = txn_summaries_iter.collect::<Result<Vec<_>>>()?;
+                Ok(txn_summaries.into_iter().rev().collect::<Vec<_>>())
             }
         })
     }
@@ -363,6 +363,23 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns an iterator that yields the requested number of persisted auxiliary
+    /// info's starting from the specified version. Note: the caller should ensure
+    /// that the iterator does not query data beyond the latest version.
+    fn get_persisted_auxiliary_info_iterator(
+        &self,
+        start_version: Version,
+        num_persisted_auxiliary_info: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
+        gauged_api("get_persisted_auxiliary_info_iterator", || {
+            let iter = self
+                .ledger_db
+                .persisted_auxiliary_info_db()
+                .get_persisted_auxiliary_info_iter(start_version, num_persisted_auxiliary_info)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>)
+        })
+    }
+
     /// TODO(bowu): Deprecate after internal index migration
     fn get_events(
         &self,
@@ -556,11 +573,8 @@ impl DbReader for AptosDB {
         gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
-            self.state_store.get_state_value_with_proof_by_version_ext(
-                key_hash,
-                version,
-                root_depth,
-            )
+            self.state_store
+                .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
         })
     }
 
@@ -579,7 +593,10 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
         gauged_api("get_pre_committed_ledger_summary", || {
-            let (state, state_summary) = self.state_store.current_state_locked().to_state_and_summary();
+            let (state, state_summary) = self
+                .state_store
+                .current_state_locked()
+                .to_state_and_summary();
             let num_txns = state.next_version();
 
             let frozen_subtrees = self
@@ -628,9 +645,7 @@ impl DbReader for AptosDB {
             for item in iter {
                 let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
-                if latest_version
-                    .as_ref().is_some_and(|v| first_version <= *v)
-                {
+                if latest_version.as_ref().is_some_and(|v| first_version <= *v) {
                     let event = self
                         .ledger_db
                         .event_db()
@@ -681,7 +696,11 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self.state_store.current_state_locked().last_checkpoint().version())
+            Ok(self
+                .state_store
+                .current_state_locked()
+                .last_checkpoint()
+                .version())
         })
     }
 

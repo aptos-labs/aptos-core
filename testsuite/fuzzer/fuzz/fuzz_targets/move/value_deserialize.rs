@@ -19,6 +19,5 @@ fuzz_target!(|fuzz_data: FuzzData| {
     if fuzz_data.data.is_empty() || !is_valid_layout(&fuzz_data.layout) {
         return;
     }
-    // TODO: How do we fuzz function resolution?
-    let _ = ValueSerDeContext::new().deserialize(&fuzz_data.data, &fuzz_data.layout);
+    let _ = ValueSerDeContext::new(None).deserialize(&fuzz_data.data, &fuzz_data.layout);
 });

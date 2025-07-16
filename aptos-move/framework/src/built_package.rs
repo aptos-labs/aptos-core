@@ -461,6 +461,28 @@ impl BuiltPackage {
             })
     }
 
+    /// Replaces a module by name with a new CompiledModule instance
+    #[cfg(feature = "testing")]
+    pub fn replace_module(
+        &mut self,
+        module_name: &str,
+        new_module: CompiledModule,
+    ) -> anyhow::Result<()> {
+        for unit_with_source in &mut self.package.root_compiled_units {
+            if let CompiledUnit::Module(named_module) = &mut unit_with_source.unit {
+                if named_module.name.as_str() == module_name {
+                    named_module.module = new_module;
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "Module '{}' not found in package",
+            module_name
+        ))
+    }
+
     /// Returns the number of scripts in the package.
     pub fn script_count(&self) -> usize {
         self.package.scripts().count()

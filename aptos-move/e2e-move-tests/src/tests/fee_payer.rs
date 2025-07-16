@@ -38,7 +38,7 @@ fn test_existing_account_with_fee_payer() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = h.new_account_with_balance_and_sequence_number(0, 0);
@@ -73,7 +73,7 @@ fn test_existing_account_with_fee_payer_aborts() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = h.new_account_with_balance_and_sequence_number(0, 0);
@@ -109,7 +109,7 @@ fn test_account_not_exist_with_fee_payer() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = Account::new();
@@ -151,7 +151,7 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = Account::new();
@@ -195,7 +195,7 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = Account::new();
@@ -256,7 +256,7 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = Account::new();
@@ -298,7 +298,7 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         ],
-        vec![],
+        vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE],
     );
 
     let alice = Account::new();

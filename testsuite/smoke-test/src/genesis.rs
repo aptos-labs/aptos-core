@@ -373,18 +373,7 @@ async fn delete_db_and_execute_restore(
     fs::remove_dir_all(&db_dir).unwrap();
 
     // Perform a DB restore on the specified validator
-    let enable_storage_sharding = validator
-        .config()
-        .storage
-        .rocksdb_configs
-        .enable_storage_sharding;
-    db_restore(
-        backup_path.path(),
-        db_dir.as_path(),
-        &[waypoint],
-        enable_storage_sharding,
-        None,
-    );
+    db_restore(backup_path.path(), db_dir.as_path(), &[waypoint], None);
 
     // Restart the validator and wait for it to become healthy
     validator.start().unwrap();

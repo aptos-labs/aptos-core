@@ -11,9 +11,11 @@ use crate::{
     },
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
+use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
+use move_asm::{self, ModuleOrScript};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
@@ -21,7 +23,7 @@ use move_binary_format::{
 use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
@@ -38,11 +40,14 @@ use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::values::Value;
+use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
+    fs,
     io::Write,
     path::Path,
+    str::FromStr,
 };
 use tempfile::NamedTempFile;
 
@@ -209,6 +214,28 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
+                // It is possible that a module gets republished. In this case, we need to filter
+                // existing pre-compiled dependencies to remove old module. Because we do not know
+                // in advance the module we are compiling, we need to see if the module matches the
+                // one already compiled. This special case is sufficient for testing, and in case
+                // match is not found, compiler should complain when seeing a duplicate symbol.
+                let deps = state
+                    .source_files()
+                    .filter_map(|(dep_id, path)| {
+                        let re =
+                            Regex::new(r"module\s+(0x[0-9a-fA-F]+::[A-Za-z]\w*)\s*\{").unwrap();
+                        let code = std::fs::read_to_string(data_path).unwrap();
+                        if let Some(id) = re
+                            .captures(code.trim())
+                            .and_then(|c| ModuleId::from_str(&c[1]).ok())
+                        {
+                            id.ne(dep_id).then(|| path.to_owned())
+                        } else {
+                            Some(path.to_owned())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
                 let (unit, opt_model, warnings_opt) = match run_config {
                     // Run the V2 compiler if requested
                     TestRunConfig::CompilerV2 {
@@ -218,7 +245,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
@@ -243,6 +270,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let module = compile_ir_module(state.dep_modules(), data_path)?;
+                (None, module, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let module = compile_asm_module(state.dep_modules(), data_path)?;
                 (None, module, None, None)
             },
         };
@@ -290,7 +321,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &state
+                            .source_files()
+                            .map(|(_, path)| path)
+                            .cloned()
+                            .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
@@ -307,6 +342,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let script = compile_ir_script(state.dep_modules(), data_path)?;
+                (script, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
         };
@@ -395,6 +434,11 @@ pub trait MoveTestAdapter<'a>: Sized {
                         (data_path.to_owned(), data),
                     ),
                     SyntaxChoice::IR => {
+                        self.compiled_state()
+                            .add_and_generate_interface_file(module);
+                    },
+                    SyntaxChoice::ASM => {
+                        // TODO(#16582): generate source info for .masm file
                         self.compiled_state()
                             .add_and_generate_interface_file(module);
                     },
@@ -574,7 +618,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         }
     }
 }
-
 fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
     let source_mapping =
         SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
@@ -621,10 +664,10 @@ impl<'a> CompiledState<'a> {
         self.modules.values().map(|pmod| &pmod.module)
     }
 
-    pub fn source_files(&self) -> impl Iterator<Item = &String> {
+    pub fn source_files(&self) -> impl Iterator<Item = (&ModuleId, &String)> {
         self.modules
             .iter()
-            .filter_map(|(_, pmod)| Some(&pmod.source_file.as_ref()?.0))
+            .filter_map(|(id, pmod)| Some((id, &pmod.source_file.as_ref()?.0)))
     }
 
     pub fn add_with_source_file(
@@ -790,6 +833,38 @@ fn compile_ir_script<'a>(
     Ok(script)
 }
 
+fn compile_asm_module<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledModule> {
+    if let Either::Left(m) = compile_asm(deps, path)? {
+        Ok(m)
+    } else {
+        bail!("expected a module but found a script")
+    }
+}
+
+fn compile_asm_script<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledScript> {
+    if let Either::Right(s) = compile_asm(deps, path)? {
+        Ok(s)
+    } else {
+        bail!("expected a script but found a module")
+    }
+}
+
+fn compile_asm<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<ModuleOrScript> {
+    let options = move_asm::Options::default();
+    let source = fs::read_to_string(path)?;
+    move_asm::assemble(&options, &source, deps)
+        .map_err(|diags| anyhow!(move_asm::diag_to_string("test", &source, diags)))
+}
+
 pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
@@ -805,11 +880,13 @@ where
     Adapter::Subcommand: Debug,
 {
     let extension = path.extension().unwrap().to_str().unwrap();
-    let default_syntax = if extension == MOVE_IR_EXTENSION {
-        SyntaxChoice::IR
-    } else {
-        assert!(extension == MOVE_EXTENSION);
-        SyntaxChoice::Source
+    let default_syntax = match extension {
+        MOVE_EXTENSION => SyntaxChoice::Source,
+        MOVE_IR_EXTENSION => SyntaxChoice::IR,
+        MOVE_ASM_EXTENSION => SyntaxChoice::ASM,
+        _ => {
+            panic!("unexpected extensions `{}`", extension)
+        },
     };
 
     let mut output = String::new();

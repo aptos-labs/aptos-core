@@ -1,0 +1,19 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-6:
+
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 66.m {
+
+
+public f(Arg0: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Ret
+}
+}
+== END Bytecode ==
+
+task 1 'run'. lines 8-8:
+return values: 1

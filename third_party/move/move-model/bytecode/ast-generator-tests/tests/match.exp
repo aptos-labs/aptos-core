@@ -99,22 +99,28 @@ loop {
 return _t1
 
 --- If-Transformed Generated AST
-if test_variants m::Entity::Person(self) {
-  _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
-} else {
+loop {
+  if test_variants m::Entity::Person(self) {
+    _t1: u64 = Deref(select_variants m::Entity.Person.id(self));
+    break
+  };
   if (Not(test_variants m::Entity::Institution(self))) Abort(14566554180833181697);
-  _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+  _t1: u64 = Deref(select_variants m::Entity.Institution.id(self));
+  break
 };
 return _t1
 
 --- Var-Bound Generated AST
 {
   let _t1: u64;
-  if test_variants m::Entity::Person(self) {
-    _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
-  } else {
+  loop {
+    if test_variants m::Entity::Person(self) {
+      _t1: u64 = Deref(select_variants m::Entity.Person.id(self));
+      break
+    };
     if (Not(test_variants m::Entity::Institution(self))) Abort(14566554180833181697);
-    _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+    _t1: u64 = Deref(select_variants m::Entity.Institution.id(self));
+    break
   };
   return _t1
 }
@@ -249,16 +255,19 @@ return _t2
 
 --- If-Transformed Generated AST
 _t1: &Entity = Borrow(Immutable)(self);
-if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
-  m::Entity::Person{ id: _t20 } = self;
-  _t2: u64 = _t20
-} else {
+loop {
+  if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
+    m::Entity::Person{ id: _t20 } = self;
+    _t2: u64 = _t20;
+    break
+  };
   if test_variants m::Entity::Institution(_t1) {
     m::Entity::Institution{ id: _t9, admin: _t10 } = self;
-    _t2: u64 = _t9
-  } else {
-    _t2: u64 = 0
-  }
+    _t2: u64 = _t9;
+    break
+  };
+  _t2: u64 = 0;
+  break
 };
 return _t2
 
@@ -274,16 +283,19 @@ return _t2
         {
           let _t1: &Entity;
           _t1: &Entity = Borrow(Immutable)(self);
-          if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
-            m::Entity::Person{ id: _t20 } = self;
-            _t2: u64 = _t20
-          } else {
+          loop {
+            if And(test_variants m::Entity::Person(_t1), Gt(Deref(select_variants m::Entity.Person.id(_t1)), 0)) {
+              m::Entity::Person{ id: _t20 } = self;
+              _t2: u64 = _t20;
+              break
+            };
             if test_variants m::Entity::Institution(_t1) {
               m::Entity::Institution{ id: _t9, admin: _t10 } = self;
-              _t2: u64 = _t9
-            } else {
-              _t2: u64 = 0
-            }
+              _t2: u64 = _t9;
+              break
+            };
+            _t2: u64 = 0;
+            break
           };
           return _t2
         }
@@ -305,9 +317,14 @@ module 0x815::m {
     }
     fun id(self: &Entity): u64 {
         let _t1;
-        if (self is Person) _t1 = *&self.id else {
+        loop {
+            if (self is Person) {
+                _t1 = *&self.id;
+                break
+            };
             if (!(self is Institution)) abort 14566554180833181697;
-            _t1 = *&self.id
+            _t1 = *&self.id;
+            break
         };
         _t1
     }
@@ -318,13 +335,20 @@ module 0x815::m {
         let _t20;
         let _t1;
         _t1 = &self;
-        if ((_t1 is Person) && *&_t1.id > 0) {
-            Entity::Person{id: _t20} = self;
-            _t2 = _t20
-        } else if (_t1 is Institution) {
-            Entity::Institution{id: _t9,admin: _t10} = self;
-            _t2 = _t9
-        } else _t2 = 0;
+        loop {
+            if ((_t1 is Person) && *&_t1.id > 0) {
+                Entity::Person{id: _t20} = self;
+                _t2 = _t20;
+                break
+            };
+            if (_t1 is Institution) {
+                Entity::Institution{id: _t9,admin: _t10} = self;
+                _t2 = _t9;
+                break
+            };
+            _t2 = 0;
+            break
+        };
         _t2
     }
 }
