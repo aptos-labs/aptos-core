@@ -174,8 +174,9 @@ mod test {
         },
         utils::truncation_helper::num_frozen_nodes_in_accumulator,
     };
-    use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
+    use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
+    use aptos_types::state_store::NUM_STATE_SHARDS;
     use proptest::prelude::*;
 
     proptest! {
