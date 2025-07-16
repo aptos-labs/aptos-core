@@ -272,14 +272,14 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
         }
     }
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
         self.try_get_resource_write_op_from_change_set(state_key, "get_resource_state_value_size")?
             .map_or_else(
                 || {
                     self.base_executor_view
                         .get_resource_state_value_size(state_key)
                 },
-                |write_op| Ok(write_op.bytes_size() as u64),
+                |write_op| Ok(Some(write_op.bytes_size() as u64)),
             )
     }
 
