@@ -18,13 +18,8 @@ use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::ExecutorError;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_storage_interface::{
-    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader,
-};
-use aptos_types::{
-    account_config::ChainIdResource, ledger_info::LedgerInfo, on_chain_config::OnChainConfig,
-    proof::definition::LeafCount,
-};
+use aptos_storage_interface::DbReader;
+use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{mpsc::Receiver, Arc, Weak},
@@ -182,14 +177,25 @@ pub struct BlockTree {
 
 impl BlockTree {
     pub fn new(db: &Arc<dyn DbReader>) -> Result<Self> {
+        Self::new_with_virtual_genesis(db, None)
+    }
+
+    pub fn new_with_virtual_genesis(
+        db: &Arc<dyn DbReader>,
+        virtual_genesis_block_id: Option<HashValue>,
+    ) -> Result<Self> {
         let block_lookup = Arc::new(BlockLookup::new());
-        let root = Mutex::new(Self::root_from_db(&block_lookup, db)?);
+        let root = Mutex::new(Self::root_from_db(
+            &block_lookup,
+            db,
+            virtual_genesis_block_id,
+        )?);
 
         Ok(Self { root, block_lookup })
     }
 
     pub fn reset(&self, db: &Arc<dyn DbReader>) -> Result<()> {
-        *self.root.lock() = Self::root_from_db(&self.block_lookup, db)?;
+        *self.root.lock() = Self::root_from_db(&self.block_lookup, db, None)?;
         Ok(())
     }
 
@@ -209,22 +215,11 @@ impl BlockTree {
         self.block_lookup.multi_get(ids)
     }
 
-    fn is_new_virtual_genesis(db: &Arc<dyn DbReader>) -> Result<bool> {
-        let db_state_view = db
-            .latest_state_checkpoint_view()
-            .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
-        let chain_id = ChainIdResource::fetch_config(&db_state_view)
-            .expect("[aptos-node] missing chain ID resource")
-            .chain_id();
-        let ledger_info_with_sigs = db.get_latest_ledger_info()?;
-        let cur_epoch = ledger_info_with_sigs.ledger_info().epoch();
-        if chain_id.is_movement_mainnet() && cur_epoch == 1848695 {
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    fn root_from_db(block_lookup: &Arc<BlockLookup>, db: &Arc<dyn DbReader>) -> Result<Arc<Block>> {
+    fn root_from_db(
+        block_lookup: &Arc<BlockLookup>,
+        db: &Arc<dyn DbReader>,
+        virtual_genesis_block_id: Option<HashValue>,
+    ) -> Result<Arc<Block>> {
         let ledger_info_with_sigs = db.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sigs.ledger_info();
         let ledger_summary = db.get_pre_committed_ledger_summary()?;
@@ -236,7 +231,14 @@ impl BlockTree {
             ledger_info.version(),
         );
 
-        let id = if ledger_info.ends_epoch() || Self::is_new_virtual_genesis(db)? {
+        let id = if let Some(virtual_genesis_id) = virtual_genesis_block_id {
+            // Use the virtual genesis block ID provided by consensus
+            info!(
+                "Using virtual genesis block ID from consensus: {:x}",
+                virtual_genesis_id
+            );
+            virtual_genesis_id
+        } else if ledger_info.ends_epoch() {
             epoch_genesis_block_id(ledger_info)
         } else {
             ledger_info.consensus_block_id()

@@ -580,7 +580,7 @@ impl PipelinedBlock {
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
             .map_err(|e| ExecutorError::InternalError {
-                error: e.to_string()
+                error: e.to_string(),
             })
     }
 

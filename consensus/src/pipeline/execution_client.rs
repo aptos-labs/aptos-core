@@ -72,6 +72,7 @@ pub trait TExecutionClient: Send + Sync {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
+        virtual_genesis_block_id: Option<aptos_crypto::HashValue>,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -325,8 +326,9 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
+        virtual_genesis_block_id: Option<aptos_crypto::HashValue>,
     ) {
-        let maybe_rand_msg_tx = self.spawn_decoupled_execution(
+        self.spawn_decoupled_execution(
             maybe_consensus_key,
             commit_signer_provider,
             epoch_state.clone(),
@@ -357,9 +359,8 @@ impl TExecutionClient for ExecutionProxyClient {
             transaction_deduper,
             randomness_enabled,
             onchain_consensus_config.order_vote_enabled(),
+            virtual_genesis_block_id,
         );
-
-        maybe_rand_msg_tx
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
@@ -546,6 +547,7 @@ impl TExecutionClient for DummyExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
         _new_pipeline_enabled: bool,
+        _virtual_genesis_block_id: Option<aptos_crypto::HashValue>,
     ) {
     }
 

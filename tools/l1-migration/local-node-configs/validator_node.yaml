@@ -16,7 +16,7 @@ consensus:
       from_file:
         waypoint:
           from_file: /Users/bowu/data/.maptos/waypoint.txt # update to your path
-        identity_blob_path: /Users/bowu/projects/aptos-core/tools/l1-migration/operator_keys/mainnet/validator-identity.yaml # update to your path
+        identity_blob_path: /Users/bowu/data/.maptos/operator_keys/mainnet/validator-identity.yaml # update to your path
     
 execution:
   genesis_file_location: /Users/bowu/data/.maptos/genesis.blob # update to your path
@@ -29,7 +29,7 @@ validator_network:
   mutual_authentication: true
   identity:
     type: from_file
-    path: /Users/bowu/projects/aptos-core/tools/l1-migration/operator_keys/mainnet/validator-identity.yaml # update to your path
+    path: /Users/bowu/data/.maptos/operator_keys/mainnet/validator-identity.yaml # update to your path
   listen_address: /ip4/0.0.0.0/tcp/6180
 api:
   enabled: true

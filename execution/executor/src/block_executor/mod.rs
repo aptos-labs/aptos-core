@@ -93,6 +93,19 @@ where
         Ok(())
     }
 
+    fn reset_with_virtual_genesis(
+        &self,
+        virtual_genesis_block_id: Option<HashValue>,
+    ) -> Result<()> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "reset"]);
+
+        *self.inner.write() = Some(BlockExecutorInner::new_with_virtual_genesis(
+            self.db.clone(),
+            virtual_genesis_block_id,
+        )?);
+        Ok(())
+    }
+
     fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
@@ -162,7 +175,14 @@ where
     V: VMBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
-        let block_tree = BlockTree::new(&db.reader)?;
+        Self::new_with_virtual_genesis(db, None)
+    }
+
+    pub fn new_with_virtual_genesis(
+        db: DbReaderWriter,
+        virtual_genesis_block_id: Option<HashValue>,
+    ) -> Result<Self> {
+        let block_tree = BlockTree::new_with_virtual_genesis(&db.reader, virtual_genesis_block_id)?;
         Ok(Self {
             db,
             block_tree,

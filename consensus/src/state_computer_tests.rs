@@ -195,6 +195,7 @@ async fn should_see_and_notify_validator_txns() {
         Arc::new(NoOpDeduper {}),
         false,
         false,
+        None,
     );
 
     // Ensure the dummy executor has received the txns.

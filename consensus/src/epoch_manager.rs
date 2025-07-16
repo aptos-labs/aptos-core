@@ -844,6 +844,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        // Extract virtual genesis block ID if consensus created one
+        let virtual_genesis_block_id = if recovery_data.commit_root_block().is_genesis_block() {
+            Some(recovery_data.commit_root_block().id())
+        } else {
+            None
+        };
+
         self.execution_client
             .start_epoch(
                 consensus_key.clone(),
@@ -858,6 +865,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 recovery_data.commit_root_block().round(),
                 self.config.enable_pipeline,
+                virtual_genesis_block_id,
             )
             .await;
         let consensus_sk = consensus_key;
@@ -1422,6 +1430,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 highest_committed_round,
                 self.config.enable_pipeline,
+                None, // DAG doesn't use virtual genesis
             )
             .await;
 
@@ -1479,7 +1488,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     //TODO(l1-migration) turn on quorum store
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
         fail_point!("consensus::start_new_epoch::disable_qs", |_| false);
-        onchain_config.quorum_store_enabled() && false
+        onchain_config.quorum_store_enabled()
     }
 
     async fn process_message(
