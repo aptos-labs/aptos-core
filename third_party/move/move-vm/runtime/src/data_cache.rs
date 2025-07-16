@@ -229,7 +229,7 @@ impl TransactionDataCache {
                     None
                 },
             )?;
-            (CachedInformation::SizeOnly(NumBytes::from(bytes_loaded as u64)), bytes_loaded)
+            (CachedInformation::SizeOnly(NumBytes::from(bytes_loaded.unwrap_or(0))), bytes_loaded.unwrap_or(0) as usize)
         };
 
         let entry = DataCacheEntry {

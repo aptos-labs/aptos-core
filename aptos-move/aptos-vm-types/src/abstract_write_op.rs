@@ -76,7 +76,7 @@ impl AbstractResourceWriteOp {
         let size = if fix_prev_materialized_size {
             match self {
                 Write(_) | WriteWithDelayedFields(_) => {
-                    executor_view.get_resource_state_value_size(state_key)?
+                    executor_view.get_resource_state_value_size(state_key)?.unwrap_or(0)
                 },
                 InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
                     materialized_size,
@@ -97,7 +97,7 @@ impl AbstractResourceWriteOp {
                 | WriteWithDelayedFields(WriteWithDelayedFieldsOp { .. })
                 | InPlaceDelayedFieldChange(_)
                 | ResourceGroupInPlaceDelayedFieldChange(_) => {
-                    executor_view.get_resource_state_value_size(state_key)?
+                    executor_view.get_resource_state_value_size(state_key)?.unwrap_or(0)
                 },
                 WriteResourceGroup(GroupWrite {
                     prev_group_size, ..

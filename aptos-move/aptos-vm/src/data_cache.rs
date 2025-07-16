@@ -135,7 +135,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<usize> {
+    ) -> PartialVMResult<Option<u64>> {
         let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
@@ -151,10 +151,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             };
 
             let buf_size = resource_size(&buf);
-            Ok(buf_size + group_size as usize)
+            Ok(Some(buf_size as u64 + group_size))
         } else {
             let state_key = resource_state_key(address, struct_tag)?;
-            Ok(self.executor_view.get_resource_state_value_size(&state_key)? as usize)
+            self.executor_view.get_resource_state_value_size(&state_key)
         }
     }
 }
@@ -208,7 +208,7 @@ impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<usize> {
+    ) -> PartialVMResult<Option<u64>> {
         self.get_any_resource_size_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }
