@@ -1,13 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    metrics::TIMER,
-    state_store::{versioned_state_value::StateUpdateRef, NUM_STATE_SHARDS},
-};
+use crate::{metrics::TIMER, state_store::versioned_state_value::StateUpdateRef};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
     write_set::{BaseStateOp, WriteSet},
 };
