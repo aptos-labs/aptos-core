@@ -4,24 +4,20 @@ task 0 'print-bytecode'. lines 1-7:
 Error: expected a script but found a module
 
 task 1 'print-bytecode'. lines 9-14:
-// Move bytecode v7
-module 66.m {
+// Bytecode version v7
+module 0x66::m
+// Function definition at index 0
+public fun f(l0: u64): u64
+    move_loc l0
+    ret
 
 
-public f(Arg0: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: Ret
-}
-}
 
 task 2 'print-bytecode'. lines 17-21:
-// Move bytecode v7
-script {
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main(l0: u64)
+    ret
 
 
-main(Arg0: u64) /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
