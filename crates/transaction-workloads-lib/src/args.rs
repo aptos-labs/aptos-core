@@ -93,6 +93,8 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    /// A set of workloads where X% of transactions modify a resource and other trnasactions just check its existence
+    /// All modifications are strictly serialized but existence checks should be perfectly parallelizable
     ExistenceCheck0Pct,
     ExistenceCheck20Pct,
     ExistenceCheck50Pct,
