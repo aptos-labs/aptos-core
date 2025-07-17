@@ -121,7 +121,7 @@ on account to have access to this.
 </code></pre>
 
 
-Convert address to singer and return.
+Convert address to signer and return.
 
 
 <pre><code><b>pragma</b> opaque;

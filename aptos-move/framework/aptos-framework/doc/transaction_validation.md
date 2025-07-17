@@ -1964,7 +1964,7 @@ Give some constraints that may abort according to the conditions.
 
 
 Aborts if length of public key hashed vector
-not equal the number of singers.
+not equal the number of signers.
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;

@@ -96,7 +96,7 @@ Most primitive, builtin types have `copy`, `drop`, and `store` with the exceptio
 
 None of the primitive types have `key`, meaning none of them can be used directly with the [global storage operations](./global-storage-operators.md).
 
-几乎所有内置的基本类型具都有 `copy`，`drop`，以及 `store` 能力，`singer` 除外，它只有 `drop` 能力(原文是 `store` 有误，译者注)
+几乎所有内置的基本类型具都有 `copy`，`drop`，以及 `store` 能力，`signer` 除外，它只有 `drop` 能力(原文是 `store` 有误，译者注)
 
 * `bool`, `u8`, `u64`, `u128`, `address` 都具有 `copy`, `drop`, 以及 `store` 能力。
 * `signer` 具有 `drop` 能力。 不能被复制以及不能被存放在全局存储中

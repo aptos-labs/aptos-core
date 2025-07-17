@@ -1049,10 +1049,10 @@ module aptos_experimental::confidential_asset {
         let fa_config_address = get_fa_config_address(token);
 
         if (!exists<FAConfig>(fa_config_address)) {
-            let fa_config_singer = get_fa_config_signer(token);
+            let fa_config_signer = get_fa_config_signer(token);
 
             move_to(
-                &fa_config_singer,
+                &fa_config_signer,
                 FAConfig { allowed: false, auditor_ek: std::option::none() }
             );
         };
