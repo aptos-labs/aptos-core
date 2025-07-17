@@ -4,15 +4,14 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    dispatch_loader,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
-        loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
-        ty_layout_converter::LayoutConverter,
+        loader::traits::Loader, module_storage::FunctionValueExtensionAdapter,
+        ty_depth_checker::TypeDepthChecker, ty_layout_converter::LayoutConverter,
     },
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage,
+    LoadedFunction,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -62,39 +61,15 @@ impl MoveVM {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        module_storage: &impl ModuleStorage,
-        resource_resolver: &impl ResourceResolver,
-    ) -> VMResult<SerializedReturnValues> {
-        dispatch_loader!(module_storage, loader, {
-            Self::execute_loaded_function_impl(
-                function,
-                serialized_args,
-                data_cache,
-                &loader,
-                gas_meter,
-                traversal_context,
-                extensions,
-                module_storage,
-                resource_resolver,
-            )
-        })
-    }
-
-    pub fn execute_loaded_function_impl(
-        function: LoadedFunction,
-        serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
         loader: &impl Loader,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        extensions: &mut NativeContextExtensions,
-        module_storage: &impl ModuleStorage,
         resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
-        let vm_config = module_storage.runtime_environment().vm_config();
+        let vm_config = loader.runtime_environment().vm_config();
         let check_invariant_in_swap_loc = vm_config.check_invariant_in_swap_loc;
 
-        let function_value_extension = module_storage.as_function_value_extension();
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: loader.unmetered_module_storage(),
+        };
         let layout_converter = LayoutConverter::new(loader);
         let ty_depth_checker = TypeDepthChecker::new(loader);
 
@@ -126,7 +101,6 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
-                module_storage,
                 loader,
                 &ty_depth_checker,
                 &layout_converter,
