@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        hot_state::{LRUEntry, THotStateSlot},
+        state_key::StateKey,
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -20,6 +24,7 @@ pub enum StateSlot {
     ColdVacant,
     HotVacant {
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
     ColdOccupied {
         value_version: Version,
@@ -29,6 +34,7 @@ pub enum StateSlot {
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
 }
 
@@ -36,7 +42,9 @@ impl StateSlot {
     fn maybe_update_cold_state(&self, min_version: Version) -> Option<Option<&StateValue>> {
         match self {
             ColdVacant => Some(None),
-            HotVacant { hot_since_version } => {
+            HotVacant {
+                hot_since_version, ..
+            } => {
                 if *hot_since_version >= min_version {
                     // TODO(HotState): revisit after the hot state is exclusive with the cold state
                     // Can't tell if there was a deletion to the cold state here, not much harm to
@@ -55,7 +63,7 @@ impl StateSlot {
             | HotOccupied {
                 value_version,
                 value,
-                hot_since_version: _,
+                ..
             } => {
                 if *value_version >= min_version {
                     // an update happened at or after min_version, need to update
@@ -108,6 +116,10 @@ impl StateSlot {
         }
     }
 
+    pub fn is_hot(&self) -> bool {
+        !self.is_cold()
+    }
+
     pub fn is_cold(&self) -> bool {
         match self {
             ColdVacant | ColdOccupied { .. } => true,
@@ -151,6 +163,53 @@ impl StateSlot {
             ColdOccupied { value_version, .. } | HotOccupied { value_version, .. } => {
                 *value_version
             },
+        }
+    }
+
+    pub fn to_cold(self) -> Self {
+        match self {
+            HotOccupied {
+                value_version,
+                value,
+                ..
+            } => ColdOccupied {
+                value_version,
+                value,
+            },
+            HotVacant { .. } => ColdVacant,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+}
+
+impl THotStateSlot for StateSlot {
+    type Key = StateKey;
+
+    fn prev(&self) -> Option<&Self::Key> {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev.as_ref(),
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn next(&self) -> Option<&Self::Key> {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next.as_ref(),
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn set_prev(&mut self, prev: Option<Self::Key>) {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev = prev,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn set_next(&mut self, next: Option<Self::Key>) {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next = next,
+            _ => panic!("Should not be called on cold slots."),
         }
     }
 }

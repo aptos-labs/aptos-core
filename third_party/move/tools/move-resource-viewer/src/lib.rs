@@ -24,7 +24,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
@@ -487,9 +487,28 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
-            TypeTag::Function(..) => {
-                // TODO(#15664) implement functions for fat types
-                bail!("TODO: support functions for fat types")
+            TypeTag::Function(function_tag) => {
+                let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
+                    tags.iter()
+                        .map(|t| {
+                            use FunctionParamOrReturnTag::*;
+                            Ok(match t {
+                                Reference(t) => {
+                                    FatType::Reference(Box::new(self.resolve_type_impl(t, limit)?))
+                                },
+                                MutableReference(t) => FatType::MutableReference(Box::new(
+                                    self.resolve_type_impl(t, limit)?,
+                                )),
+                                Value(t) => self.resolve_type_impl(t, limit)?,
+                            })
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()
+                };
+                FatType::Function(Box::new(FatFunctionType {
+                    args: convert_tags(&function_tag.args)?,
+                    results: convert_tags(&function_tag.results)?,
+                    abilities: function_tag.abilities,
+                }))
             },
         })
     }

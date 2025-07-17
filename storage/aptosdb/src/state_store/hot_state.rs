@@ -9,8 +9,14 @@ use aptos_metrics_core::{IntCounterHelper, IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{hot_state::LRUEntry, state_key::StateKey, state_slot::StateSlot};
-use dashmap::{mapref::one::Ref, DashMap};
+use aptos_types::state_store::{
+    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+};
+use arr_macro::arr;
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
 use std::sync::{
     mpsc::{Receiver, SyncSender, TryRecvError},
     Arc,
@@ -19,9 +25,46 @@ use std::sync::{
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 
 #[derive(Debug)]
-struct Entry<K, V> {
-    data: V,
-    lru: LRUEntry<K>,
+struct Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    inner: DashMap<K, V>,
+}
+
+impl<K, V> Shard<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn new(max_items: usize) -> Self {
+        Self {
+            inner: DashMap::with_capacity(max_items),
+        }
+    }
+
+    fn contains_key(&self, key: &K) -> bool {
+        self.inner.contains_key(key)
+    }
+
+    fn get(&self, key: &K) -> Option<Ref<K, V>> {
+        self.inner.get(key)
+    }
+
+    fn get_mut(&self, key: &K) -> Option<RefMut<K, V>> {
+        self.inner.get_mut(key)
+    }
+
+    fn insert(&self, key: K, value: V) {
+        self.inner.insert(key, value);
+    }
+
+    fn remove(&self, key: &K) -> Option<(K, V)> {
+        self.inner.remove(key)
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 #[derive(Debug)]
@@ -31,15 +74,15 @@ where
 {
     /// After committing a new batch to `inner`, items are evicted so that
     ///  1. total number of items doesn't exceed this number
-    max_items: usize,
+    max_items_per_shard: usize,
     ///  2. total number of bytes, incl. both keys and values doesn't exceed this number
     #[allow(dead_code)] // TODO(HotState): not enforced for now
-    max_bytes: usize,
+    max_bytes_per_shard: usize,
     /// No item is accepted to `inner` if the size of the value exceeds this number
     #[allow(dead_code)] // TODO(HotState): not enforced for now
     max_single_value_bytes: usize,
 
-    inner: DashMap<K, Entry<K, V>>,
+    shards: [Shard<K, V>; NUM_STATE_SHARDS],
 }
 
 impl<K, V> HotStateBase<K, V>
@@ -47,27 +90,32 @@ where
     K: Eq + std::hash::Hash,
     V: Clone,
 {
-    fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
+    fn new_empty(
+        max_items_per_shard: usize,
+        max_bytes_per_shard: usize,
+        max_single_value_bytes: usize,
+    ) -> Self {
         Self {
-            max_items,
-            max_bytes,
+            max_items_per_shard,
+            max_bytes_per_shard,
             max_single_value_bytes,
-            inner: DashMap::with_capacity(max_items),
+            shards: arr![Shard::new(max_items_per_shard); 16],
         }
     }
 
-    fn get(&self, key: &K) -> Option<Ref<K, Entry<K, V>>> {
-        self.inner.get(key)
+    fn get_from_shard(&self, shard_id: usize, key: &K) -> Option<Ref<K, V>> {
+        self.shards[shard_id].get(key)
+    }
+
+    fn len(&self) -> usize {
+        self.shards.iter().map(|s| s.len()).sum()
     }
 }
 
 impl HotStateView for HotStateBase<StateKey, StateSlot> {
     fn get_state_slot(&self, state_key: &StateKey) -> Option<StateSlot> {
-        self.get(state_key).map(|e| e.data.clone())
-    }
-
-    fn get_lru_entry(&self, state_key: &StateKey) -> Option<LRUEntry<StateKey>> {
-        self.get(state_key).map(|e| e.lru.clone())
+        let shard_id = state_key.get_shard_id();
+        self.get_from_shard(shard_id, state_key).map(|v| v.clone())
     }
 }
 
@@ -81,13 +129,13 @@ pub struct HotState {
 impl HotState {
     pub fn new(
         state: State,
-        max_items: usize,
-        max_bytes: usize,
+        max_items_per_shard: usize,
+        max_bytes_per_shard: usize,
         max_single_value_bytes: usize,
     ) -> Self {
         let base = Arc::new(HotStateBase::new_empty(
-            max_items,
-            max_bytes,
+            max_items_per_shard,
+            max_bytes_per_shard,
             max_single_value_bytes,
         ));
         let committed = Arc::new(Mutex::new(state));
@@ -127,9 +175,9 @@ pub struct Committer {
     total_key_bytes: usize,
     total_value_bytes: usize,
     /// Points to the newest entry. `None` if empty.
-    head: Option<StateKey>,
+    heads: [Option<StateKey>; NUM_STATE_SHARDS],
     /// Points to the oldest entry. `None` if empty.
-    tail: Option<StateKey>,
+    tails: [Option<StateKey>; NUM_STATE_SHARDS],
 }
 
 impl Committer {
@@ -147,8 +195,8 @@ impl Committer {
             rx,
             total_key_bytes: 0,
             total_value_bytes: 0,
-            head: None,
-            tail: None,
+            heads: arr![None; 16],
+            tails: arr![None; 16],
         }
     }
 
@@ -157,9 +205,10 @@ impl Committer {
 
         while let Some(to_commit) = self.next_to_commit() {
             self.commit(&to_commit);
+            self.evict();
             *self.committed.lock() = to_commit;
 
-            GAUGE.set_with(&["hot_state_items"], self.base.inner.len() as i64);
+            GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
             GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
         }
@@ -204,45 +253,48 @@ impl Committer {
         let mut n_insert = 0;
 
         let delta = to_commit.make_delta(&self.committed.lock());
-        let mut all_updates = delta
-            .shards
-            .iter()
-            .flat_map(|shard| shard.iter())
-            .collect::<Vec<_>>();
-        // We will update the LRU next. Here we put the deletions at the
-        // beginning, then the older updates, and the newest updates are at the
-        // end.
-        all_updates.sort_unstable_by_key(|(_key, slot)| {
-            slot.hot_since_version_opt().map_or(-1, |v| v as i64)
-        });
+        for shard_id in 0..NUM_STATE_SHARDS {
+            let mut updates: Vec<_> = delta.shards[shard_id].iter().collect();
+            // We will update the LRU next. Here we put the deletions at the beginning, then the
+            // older updates, and the newest updates are at the end.
+            updates.sort_unstable_by_key(|(_key, slot)| {
+                slot.hot_since_version_opt().map_or(-1, |v| v as i64)
+            });
 
-        let mut updater = LRUUpdater::new(Arc::clone(&self.base), &mut self.head, &mut self.tail);
-        for (key, slot) in all_updates {
-            let has_old_entry = if let Some(old_slot) = self.base.get_state_slot(&key) {
-                self.total_key_bytes -= key.size();
-                self.total_value_bytes -= old_slot.size();
-                true
-            } else {
-                false
-            };
+            let mut updater = LRUUpdater::new(
+                &self.base.shards[shard_id],
+                &mut self.heads[shard_id],
+                &mut self.tails[shard_id],
+                self.base.max_items_per_shard,
+            );
 
-            if slot.is_cold() {
-                // deletion
-                if has_old_entry {
-                    n_delete += 1;
-                    updater.delete(&key);
-                }
-            } else {
-                if has_old_entry {
-                    n_update += 1;
+            for (key, slot) in updates {
+                let has_old_entry = if let Some(old_slot) = self.base.get_state_slot(&key) {
+                    self.total_key_bytes -= key.size();
+                    self.total_value_bytes -= old_slot.size();
+                    true
                 } else {
-                    n_insert += 1;
+                    false
                 };
 
-                self.total_key_bytes += key.size();
-                self.total_value_bytes += slot.size();
+                if slot.is_cold() {
+                    // deletion
+                    if has_old_entry {
+                        n_delete += 1;
+                        updater.delete(&key);
+                    }
+                } else {
+                    if has_old_entry {
+                        n_update += 1;
+                    } else {
+                        n_insert += 1;
+                    };
 
-                updater.insert(key, slot);
+                    self.total_key_bytes += key.size();
+                    self.total_value_bytes += slot.size();
+
+                    updater.insert(key, slot);
+                }
             }
         }
 
@@ -250,37 +302,27 @@ impl Committer {
         COUNTER.inc_with_by(&["hot_state_too_large"], n_too_large);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
+    }
 
-        {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_evict"]);
+    fn evict(&mut self) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_evict"]);
+        let mut num_evicted = 0;
 
+        for shard_id in 0..NUM_STATE_SHARDS {
+            let mut updater = LRUUpdater::new(
+                &self.base.shards[shard_id],
+                &mut self.heads[shard_id],
+                &mut self.tails[shard_id],
+                self.base.max_items_per_shard,
+            );
             let evicted = updater.evict();
-            if evicted.is_empty() {
-                return;
-            }
+            num_evicted += evicted.len();
             for (key, slot) in &evicted {
                 self.total_key_bytes -= key.size();
                 self.total_value_bytes -= slot.size();
             }
-
-            let head = self
-                .head
-                .as_ref()
-                .expect("LRU must not be empty when eviction has happened.");
-            let latest_version = self
-                .base
-                .inner
-                .get(head)
-                .expect("Head must exist.")
-                .data
-                .expect_hot_since_version();
-            let max_evicted_version = evicted.last().unwrap().1.expect_hot_since_version();
-            GAUGE.set_with(
-                &["hot_state_item_evict_age_versions"],
-                (latest_version - max_evicted_version) as i64,
-            );
-            COUNTER.inc_with_by(&["hot_state_evict"], evicted.len() as u64);
         }
+        COUNTER.inc_with_by(&["hot_state_evict"], num_evicted as u64);
     }
 }
 
@@ -288,26 +330,33 @@ struct LRUUpdater<'a, K, V>
 where
     K: Eq + std::hash::Hash,
 {
-    base: Arc<HotStateBase<K, V>>,
+    shard: &'a Shard<K, V>,
     head: &'a mut Option<K>,
     tail: &'a mut Option<K>,
+    max_items: usize,
 }
 
 impl<'a, K, V> LRUUpdater<'a, K, V>
 where
     K: Clone + std::fmt::Debug + Eq + std::hash::Hash,
-    V: Clone + std::fmt::Debug,
+    V: Clone + std::fmt::Debug + THotStateSlot<Key = K>,
 {
     fn new(
-        base: Arc<HotStateBase<K, V>>,
+        shard: &'a Shard<K, V>,
         head: &'a mut Option<K>,
         tail: &'a mut Option<K>,
+        max_items: usize,
     ) -> Self {
-        Self { base, head, tail }
+        Self {
+            shard,
+            head,
+            tail,
+            max_items,
+        }
     }
 
     fn insert(&mut self, key: K, value: V) {
-        if self.base.inner.contains_key(&key) {
+        if self.shard.contains_key(&key) {
             self.delete(&key);
         }
         self.insert_to_front(key, value);
@@ -324,74 +373,61 @@ where
     }
 
     fn delete(&mut self, key: &K) -> Option<V> {
-        let old_entry = match self.base.inner.remove(key) {
+        let old_entry = match self.shard.remove(key) {
             Some((_k, e)) => e,
             None => return None,
         };
 
-        match &old_entry.lru.prev {
+        match old_entry.prev() {
             Some(prev_key) => {
                 let mut prev_entry = self
-                    .base
-                    .inner
+                    .shard
                     .get_mut(prev_key)
                     .expect("The previous key must exist");
-                prev_entry.lru.next = old_entry.lru.next.clone();
+                prev_entry.set_next(old_entry.next().cloned());
             },
             None => {
                 // There is no newer entry. The current key was the head.
-                *self.head = old_entry.lru.next.clone();
+                *self.head = old_entry.next().cloned();
             },
         }
 
-        match &old_entry.lru.next {
+        match old_entry.next() {
             Some(next_key) => {
                 let mut next_entry = self
-                    .base
-                    .inner
+                    .shard
                     .get_mut(next_key)
                     .expect("The next key must exist.");
-                next_entry.lru.prev = old_entry.lru.prev;
+                next_entry.set_prev(old_entry.prev().cloned());
             },
             None => {
                 // There is no older entry. The current key was the tail.
-                *self.tail = old_entry.lru.prev;
+                *self.tail = old_entry.prev().cloned();
             },
         }
 
-        Some(old_entry.data)
+        Some(old_entry)
     }
 
-    fn insert_to_front(&mut self, key: K, value: V) {
+    fn insert_to_front(&mut self, key: K, mut value: V) {
         assert_eq!(self.head.is_some(), self.tail.is_some());
         match self.head.take() {
             Some(head) => {
                 {
                     // Release the reference to the old entry ASAP to avoid deadlock when inserting
                     // the new entry below.
-                    let mut old_head_entry =
-                        self.base.inner.get_mut(&head).expect("Head must exist.");
-                    old_head_entry.lru.prev = Some(key.clone());
+                    let mut old_head_entry = self.shard.get_mut(&head).expect("Head must exist.");
+                    old_head_entry.set_prev(Some(key.clone()));
                 }
-                let entry = Entry {
-                    data: value,
-                    lru: LRUEntry {
-                        prev: None,
-                        next: Some(head),
-                    },
-                };
-                self.base.inner.insert(key.clone(), entry);
+                value.set_prev(None);
+                value.set_next(Some(head));
+                self.shard.insert(key.clone(), value);
                 *self.head = Some(key);
             },
             None => {
-                let entry = Entry {
-                    data: value,
-                    lru: LRUEntry {
-                        prev: None,
-                        next: None,
-                    },
-                };
-                self.base.inner.insert(key.clone(), entry);
+                value.set_prev(None);
+                value.set_next(None);
+                self.shard.insert(key.clone(), value);
                 *self.head = Some(key.clone());
                 *self.tail = Some(key);
             },
@@ -403,7 +439,7 @@ where
             return Vec::new();
         }
 
-        let mut items = Vec::with_capacity(self.base.inner.len() - self.base.max_items);
+        let mut items = Vec::with_capacity(self.shard.len() - self.max_items);
         while self.should_evict() {
             items.push(self.delete_lru().unwrap());
         }
@@ -411,7 +447,7 @@ where
     }
 
     fn should_evict(&self) -> bool {
-        self.base.inner.len() > self.base.max_items
+        self.shard.len() > self.max_items
     }
 
     #[cfg(test)]
@@ -423,11 +459,11 @@ where
 
         let mut current_key = self.head.clone();
         while let Some(key) = current_key {
-            let entry = self.base.inner.get(&key).unwrap();
-            assert_eq!(entry.lru.prev, keys.last().cloned());
+            let entry = self.shard.get(&key).unwrap();
+            assert_eq!(entry.prev(), keys.last());
             keys.push(key);
-            values.push(entry.data.clone());
-            current_key = entry.lru.next.clone();
+            values.push(entry.clone());
+            current_key = entry.next().cloned();
         }
         itertools::zip_eq(keys, values).collect()
     }
@@ -435,35 +471,65 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{HotStateBase, LRUUpdater};
+    use super::{LRUUpdater, Shard, THotStateSlot};
     use lru::LruCache;
     use proptest::{collection::vec, option, prelude::*};
-    use std::{num::NonZeroUsize, sync::Arc};
+    use std::num::NonZeroUsize;
 
-    const MAX_BYTES: usize = 10000;
-    const MAX_SINGLE_VALUE_BYTES: usize = 100;
+    #[derive(Clone, Debug)]
+    struct TestSlot {
+        num: u64,
+        prev: Option<u32>,
+        next: Option<u32>,
+    }
+
+    impl TestSlot {
+        fn new(num: u64) -> Self {
+            Self {
+                num,
+                prev: None,
+                next: None,
+            }
+        }
+    }
+
+    impl THotStateSlot for TestSlot {
+        type Key = u32;
+
+        fn prev(&self) -> Option<&Self::Key> {
+            self.prev.as_ref()
+        }
+
+        fn next(&self) -> Option<&Self::Key> {
+            self.next.as_ref()
+        }
+
+        fn set_prev(&mut self, prev: Option<Self::Key>) {
+            self.prev = prev;
+        }
+
+        fn set_next(&mut self, next: Option<Self::Key>) {
+            self.next = next;
+        }
+    }
 
     proptest! {
         #[test]
         fn test_hot_state_lru(
             max_items in 1..10usize,
-            updates in vec((0..20u64, option::weighted(0.8, 0..1000u64)), 1..50),
+            updates in vec((0..20u32, option::weighted(0.8, 0..1000u64)), 1..50),
         ) {
-            let base = Arc::new(HotStateBase::new_empty(
-                max_items,
-                MAX_BYTES,
-                MAX_SINGLE_VALUE_BYTES,
-            ));
+            let shard = Shard::new(max_items);
             let mut head = None;
             let mut tail = None;
 
-            let mut updater = LRUUpdater::new(base, &mut head, &mut tail);
+            let mut updater = LRUUpdater::new(&shard, &mut head, &mut tail, max_items);
             let mut cache = LruCache::new(NonZeroUsize::new(max_items).unwrap());
 
             for (key, value_opt) in updates {
                 match value_opt {
                     Some(value) => {
-                        updater.insert(key, value);
+                        updater.insert(key, TestSlot::new(value));
                         cache.put(key, value);
                     }
                     None => {
@@ -473,9 +539,12 @@ mod tests {
                 }
                 updater.evict();
 
-                prop_assert_eq!(updater.base.inner.len(), cache.len());
+                prop_assert_eq!(shard.len(), cache.len());
                 let items = updater.collect_all();
-                prop_assert_eq!(items, cache.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>());
+                prop_assert_eq!(
+                    items.into_iter().map(|(k, v)| (k, v.num)).collect::<Vec<_>>(),
+                    cache.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+                );
             }
         }
     }

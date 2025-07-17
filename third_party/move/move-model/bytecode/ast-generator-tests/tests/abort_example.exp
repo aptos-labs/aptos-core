@@ -83,15 +83,18 @@ loop {
 _t8: u64 = 0;
 _t1: u64 = _t8;
 loop {
-  _t9: u64 = _t1;
-  _t10: u64 = length;
-  _t11: bool = Lt(_t9, _t10);
-  if (Not(_t11)) break;
-  _t12: u64 = _t1;
-  _t13: u64 = 1;
-  _t14: u64 = Add(_t12, _t13);
-  _t1: u64 = _t14;
-  continue
+  loop {
+    _t9: u64 = _t1;
+    _t10: u64 = length;
+    _t11: bool = Lt(_t9, _t10);
+    if (Not(_t11)) break[1];
+    _t12: u64 = _t1;
+    _t13: u64 = 1;
+    _t14: u64 = Add(_t12, _t13);
+    _t1: u64 = _t14;
+    continue
+  };
+  break
 };
 _t15: u64 = _t1;
 return _t15
@@ -107,9 +110,12 @@ loop {
 };
 _t1: u64 = 0;
 loop {
-  if (Not(Lt(_t1, length))) break;
-  _t1: u64 = Add(_t1, 1);
-  continue
+  loop {
+    if (Not(Lt(_t1, length))) break[1];
+    _t1: u64 = Add(_t1, 1);
+    continue
+  };
+  break
 };
 return _t1
 
@@ -118,9 +124,12 @@ if (Not(Gt(length, 0))) Abort(1);
 if (Not(Lt(length, 100))) Abort(2);
 _t1: u64 = 0;
 loop {
-  if (Not(Lt(_t1, length))) break;
-  _t1: u64 = Add(_t1, 1);
-  continue
+  loop {
+    if (Not(Lt(_t1, length))) break[1];
+    _t1: u64 = Add(_t1, 1);
+    continue
+  };
+  break
 };
 return _t1
 
@@ -131,9 +140,12 @@ return _t1
   if (Not(Lt(length, 100))) Abort(2);
   _t1: u64 = 0;
   loop {
-    if (Not(Lt(_t1, length))) break;
-    _t1: u64 = Add(_t1, 1);
-    continue
+    loop {
+      if (Not(Lt(_t1, length))) break[1];
+      _t1: u64 = Add(_t1, 1);
+      continue
+    };
+    break
   };
   return _t1
 }
@@ -145,7 +157,13 @@ module 0x815::m {
         if (!(length > 0)) abort 1;
         if (!(length < 100)) abort 2;
         _t1 = 0;
-        while (_t1 < length) _t1 = _t1 + 1;
+        'l0: loop {
+            loop {
+                if (!(_t1 < length)) break 'l0;
+                _t1 = _t1 + 1
+            };
+            break
+        };
         _t1
     }
 }

@@ -4,6 +4,7 @@
 use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
 };
+use aptos_types::transaction::PersistedAuxiliaryInfo;
 use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
 
 impl DbReader for AptosDB {
@@ -359,6 +360,23 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
+        })
+    }
+
+    /// Returns an iterator that yields the requested number of persisted auxiliary
+    /// info's starting from the specified version. Note: the caller should ensure
+    /// that the iterator does not query data beyond the latest version.
+    fn get_persisted_auxiliary_info_iterator(
+        &self,
+        start_version: Version,
+        num_persisted_auxiliary_info: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
+        gauged_api("get_persisted_auxiliary_info_iterator", || {
+            let iter = self
+                .ledger_db
+                .persisted_auxiliary_info_db()
+                .get_persisted_auxiliary_info_iter(start_version, num_persisted_auxiliary_info)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>)
         })
     }
 
