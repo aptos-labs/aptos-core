@@ -2231,6 +2231,29 @@ impl TransactionListWithProofV2 {
         ))
     }
 
+    /// Returns the first version in the transaction list
+    pub fn get_first_transaction_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .first_transaction_version
+            },
+        }
+    }
+
+    /// Returns the number of transactions in the transaction list
+    pub fn get_num_transactions(&self) -> usize {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .transactions
+                    .len()
+            },
+        }
+    }
+
     /// Returns a reference to the inner transaction list with proof
     pub fn get_transaction_list_with_proof(&self) -> &TransactionListWithProof {
         match self {
@@ -2459,6 +2482,29 @@ impl TransactionOutputListWithProofV2 {
                 transaction_output_list_with_proof,
             ),
         )
+    }
+
+    /// Returns the first version in the transaction output list
+    pub fn get_first_output_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .first_transaction_output_version
+            },
+        }
+    }
+
+    /// Returns the number of outputs in the transaction output list
+    pub fn get_num_outputs(&self) -> usize {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .transactions_and_outputs
+                    .len()
+            },
+        }
     }
 
     /// Returns a reference to the inner transaction output list with proof

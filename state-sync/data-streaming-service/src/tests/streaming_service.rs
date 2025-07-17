@@ -1911,16 +1911,11 @@ fn verify_continuous_outputs_with_proof(
     assert_eq!(ledger_info.epoch(), expected_epoch);
 
     // Verify the output start version matches the expected version
-    let first_output_version = outputs_with_proofs
-        .get_output_list_with_proof()
-        .first_transaction_output_version;
+    let first_output_version = outputs_with_proofs.get_first_output_version();
     assert_eq!(Some(expected_version), first_output_version);
 
     // Calculate the next expected version
-    let num_outputs = outputs_with_proofs
-        .get_output_list_with_proof()
-        .transactions_and_outputs
-        .len() as u64;
+    let num_outputs = outputs_with_proofs.get_num_outputs() as u64;
     let next_expected_version = expected_version + num_outputs;
 
     // Update epochs if we've hit the epoch end

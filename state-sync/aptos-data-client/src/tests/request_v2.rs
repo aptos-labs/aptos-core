@@ -973,9 +973,7 @@ fn verify_response_data(
     // Verify the transaction data
     if let Some(transaction_list_with_proof_v2) = transaction_list_with_proof_v2 {
         // Verify the number of transactions
-        let transaction_list_with_proof =
-            transaction_list_with_proof_v2.get_transaction_list_with_proof();
-        let num_transactions = transaction_list_with_proof.transactions.len();
+        let num_transactions = transaction_list_with_proof_v2.get_num_transactions();
         assert_eq!(num_transactions, expected_count);
 
         // Verify the persisted auxiliary infos
@@ -989,8 +987,7 @@ fn verify_response_data(
     // Verify the output data
     if let Some(output_list_with_proof_v2) = output_list_with_proof_v2 {
         // Verify the number of outputs
-        let output_list_with_proof = output_list_with_proof_v2.get_output_list_with_proof();
-        let num_outputs = output_list_with_proof.transactions_and_outputs.len();
+        let num_outputs = output_list_with_proof_v2.get_num_outputs();
         assert_eq!(num_outputs, expected_count);
 
         // Verify the persisted auxiliary infos
