@@ -165,6 +165,21 @@ impl StateSlot {
             },
         }
     }
+
+    pub fn to_cold(self) -> Self {
+        match self {
+            HotOccupied {
+                value_version,
+                value,
+                ..
+            } => ColdOccupied {
+                value_version,
+                value,
+            },
+            HotVacant { .. } => ColdVacant,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
 }
 
 impl THotStateSlot for StateSlot {
