@@ -88,7 +88,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
     let batch_size = 128;
 
     for n in [128, 256, 512] {
-        let t = n * 3 / 2 + 1;
+        let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);

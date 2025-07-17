@@ -47,7 +47,7 @@ impl ThresholdConfig {
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
     /// (which I think takes it from Modrn Computer Algebra, by von zur Gathen and Gerhard
-    fn all_lagrange(&self, xs: &HashSet<Fr>) -> HashMap<Fr, Fr> {
+    pub fn all_lagrange(&self, xs: &HashSet<Fr>) -> HashMap<Fr, Fr> {
         // step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<Fr>>());
         let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
