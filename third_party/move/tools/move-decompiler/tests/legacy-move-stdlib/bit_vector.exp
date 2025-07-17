@@ -1,4 +1,3 @@
-
 module 0x1::bit_vector {
     struct BitVector has copy, drop, store {
         length: u64,
@@ -65,3 +64,6 @@ module 0x1::bit_vector {
         *0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index) = false;
     }
 }
+
+
+============ recompilation succeeded ========
