@@ -1079,8 +1079,9 @@ where
 
     /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
     /// of bytes loaded.
-    fn create_and_charge_data_cache_entry(
+    fn create_and_charge_and_insert_data_cache_entry<'c>(
         &self,
+        data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
@@ -1088,7 +1089,7 @@ where
         addr: AccountAddress,
         ty: &Type,
         load_data: bool,
-    ) -> PartialVMResult<DataCacheEntry> {
+    ) -> PartialVMResult<()> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
             module_storage,
             resource_resolver,
@@ -1108,7 +1109,8 @@ where
             },
             bytes_loaded,
         )?;
-        Ok(entry)
+        data_cache.insert_resource(addr, ty.clone(), entry)?;
+        Ok(())
     }
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
@@ -1123,7 +1125,8 @@ where
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         if !data_cache.contains_resource_data(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
+            self.create_and_charge_and_insert_data_cache_entry(
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -1132,7 +1135,6 @@ where
                 ty,
                 true,
             )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
         }
         data_cache.get_resource_mut(&addr, ty)
     }
@@ -1148,7 +1150,8 @@ where
         ty: &Type,
     ) -> PartialVMResult<bool> {
         if !data_cache.contains_resource_existence(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
+            self.create_and_charge_and_insert_data_cache_entry(
+                data_cache,
                 resource_resolver,
                 module_storage,
                 gas_meter,
@@ -1157,7 +1160,6 @@ where
                 ty,
                 false,
             )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
         }
         data_cache.get_resource_existence(&addr, ty)
     }
