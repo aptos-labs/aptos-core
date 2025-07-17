@@ -16,7 +16,7 @@ pub fn digest(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("FPTX::digest");
 
-    for batch_size in [8, 32, 128, 512 ] {
+    for batch_size in [128, 256, 512 ] {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
@@ -39,7 +39,7 @@ pub fn verify_ct(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("FPTX::verify_ct");
 
-    for batch_size in [8, 32, 128, 512 ] {
+    for batch_size in [128, 256, 512 ] {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
@@ -61,7 +61,7 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("FPTX::eval_proofs_compute_all");
 
-    for batch_size in [8, 32, 128, 512 ] {
+    for batch_size in [128, 256, 512 ] {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
@@ -115,7 +115,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("FPTX::verify_decryption_key_share");
 
-    for batch_size in [8, 32, 128, 512 ] {
+    for batch_size in [128, 256, 512 ] {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
@@ -180,7 +180,7 @@ pub fn decrypt(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("FPTX::decrypt (full batch, all cts)");
 
-    for batch_size in [8, 32, 128, 512 ] {
+    for batch_size in [8, 32, 128, 256, 512 ] {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
