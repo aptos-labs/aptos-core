@@ -42,7 +42,7 @@ impl Default for VMConfig {
             paranoid_type_checks: false,
             check_invariant_in_swap_loc: true,
             max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
-            layout_max_size: 256,
+            layout_max_size: 512,
             layout_max_depth: 128,
             type_max_cost: 0,
             type_base_cost: 0,

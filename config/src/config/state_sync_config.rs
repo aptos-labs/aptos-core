@@ -147,6 +147,8 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
+    /// Whether transaction data v2 is enabled
+    pub enable_transaction_data_v2: bool,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -180,6 +182,7 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
+            enable_transaction_data_v2: false, // TODO: flip this once V2 data is enabled
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB

@@ -1,0 +1,21 @@
+processed 1 task
+
+task 0 'publish'. lines 1-11:
+
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 66.test {
+
+
+f(Arg0: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+g() /* def_idx: 1 */ {
+B0:
+	0: LdU64(1)
+	1: Call f(u64)
+	2: Ret
+}
+}
+== END Bytecode ==

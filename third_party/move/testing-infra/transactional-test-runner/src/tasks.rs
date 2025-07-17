@@ -190,6 +190,7 @@ impl<T> TaskInput<T> {
 pub enum SyntaxChoice {
     Source,
     IR,
+    ASM,
 }
 
 /// When printing bytecode, the input program must either be a script or a module.

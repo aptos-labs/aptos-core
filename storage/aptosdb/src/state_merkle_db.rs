@@ -29,13 +29,11 @@ use aptos_schemadb::{
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{
-    db_ensure as ensure, state_store::NUM_STATE_SHARDS, AptosDbError, Result,
-};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;

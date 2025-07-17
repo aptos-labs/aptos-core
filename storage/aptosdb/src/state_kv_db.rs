@@ -26,9 +26,9 @@ use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
     ReadOptions, DB,
 };
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
+use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;

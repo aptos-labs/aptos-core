@@ -1,0 +1,10 @@
+processed 1 task
+
+task 0 'publish'. lines 1-6:
+Error: error: unbound branch label `l3`
+  ┌─ test:4:5
+  │
+4 │     br_false l3
+  │     ^^^^^^^^^^^
+
+

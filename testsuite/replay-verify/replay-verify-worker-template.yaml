@@ -23,21 +23,26 @@ spec:
           value: "info"
       resources:
         requests:
-          memory: "110Gi"
-          cpu: "28"
-        limits:
-          memory: "110Gi"
+          memory: "100Gi"
           cpu: "28"
   volumes:
     - name: archive
       persistentVolumeClaim:
         claimName: testnet-archive-9
+  tolerations:
+  - key: aptos-workload
+    operator: Equal
+    value: "replay-verify"
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
-              - key: cloud.google.com/machine-family
-                operator: In
-                values:
-                  - c3d
+            - key: cloud.google.com/machine-family
+              operator: In
+              values:
+              - "c3d"
+            - key: node-restriction.kubernetes.io/aptos-workload
+              operator: In
+              values:
+              - "replay-verify"
