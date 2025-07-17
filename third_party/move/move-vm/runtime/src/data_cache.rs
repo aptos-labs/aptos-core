@@ -217,9 +217,9 @@ impl TransactionDataCache {
                 },
                 None => GlobalValue::none(),
             };
-            (CachedInformation::Value(value), bytes_loaded as u64)
+            (CachedInformation::Value(value), bytes_loaded)
         } else {
-            let bytes_loaded = resource_resolver.get_resource_size_with_metadata_and_layout(
+            let (size, bytes_loaded) = resource_resolver.get_resource_size_with_metadata_and_layout(
                 addr,
                 &struct_tag,
                 &metadata,
@@ -229,10 +229,7 @@ impl TransactionDataCache {
                     None
                 },
             )?;
-            (
-                CachedInformation::SizeOnly(bytes_loaded),
-                bytes_loaded.unwrap_or(0),
-            )
+            (CachedInformation::SizeOnly(size), bytes_loaded)
         };
 
         let entry = DataCacheEntry {
@@ -241,7 +238,7 @@ impl TransactionDataCache {
             contains_delayed_fields,
             value: cached_info,
         };
-        Ok((entry, NumBytes::new(bytes_loaded)))
+        Ok((entry, NumBytes::new(bytes_loaded as u64)))
     }
 
     fn find_entry(&self, addr: &AccountAddress, ty: &Type) -> Option<&DataCacheEntry> {

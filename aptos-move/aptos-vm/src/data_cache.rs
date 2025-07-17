@@ -150,14 +150,15 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<Option<u64>> {
+    ) -> PartialVMResult<(Option<u64>, usize)> {
         let resource_group_bytes =
             self.get_resource_group_bytes(address, struct_tag, metadata, maybe_layout)?;
-        if let Some((bytes, size)) = resource_group_bytes {
-            return Ok(bytes.map(|_| size as u64));
+        if let Some((bytes, bytes_loaded)) = resource_group_bytes {
+            return Ok((bytes.map(|bytes| bytes.len() as u64), bytes_loaded));
         }
         let state_key = resource_state_key(address, struct_tag)?;
-        self.executor_view.get_resource_state_value_size(&state_key)
+        let size = self.executor_view.get_resource_state_value_size(&state_key)?;
+        Ok((size, size.unwrap_or(0) as usize))
     }
 }
 
@@ -210,7 +211,7 @@ impl<E: ExecutorView> ResourceResolver for StorageAdapter<'_, E> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<Option<u64>> {
+    ) -> PartialVMResult<(Option<u64>, usize)> {
         self.get_any_resource_size_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }

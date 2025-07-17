@@ -32,16 +32,16 @@ pub trait ResourceResolver {
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
 
     /// Due to resource groups bytes_loaded is not always equal to bytes.len()
-    /// This function returns the virtual number of bytes loaded used later to charge gas
+    /// This function returns both bytes.len() if it exists and the number of bytes for the gas charge
     fn get_resource_size_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
-    ) -> PartialVMResult<Option<u64>> {
+    ) -> PartialVMResult<(Option<u64>, usize)> {
         let (bytes, bytes_loaded) = self
             .get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, layout)?;
-        Ok(bytes.map(|_| bytes_loaded as u64))
+        Ok((bytes.map(|bytes| bytes.len() as u64), bytes_loaded))
     }
 }
