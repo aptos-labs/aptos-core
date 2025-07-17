@@ -575,7 +575,7 @@ impl<T: fmt::Write> Disassembler<T> {
                     FunctionHandleView::new(module, module.function_handle_at(inst_handle.handle));
                 write!(
                     self.out,
-                    "call {}{}",
+                    "pack_closure {}{}",
                     self.module_id_prefix(&view.module_id())?,
                     view.name()
                 )?;

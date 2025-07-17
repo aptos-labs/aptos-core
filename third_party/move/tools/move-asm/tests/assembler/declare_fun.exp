@@ -7,6 +7,7 @@ task 0 'publish'. lines 1-13:
 module 0x66::test
 // Function definition at index 0
 fun f(l0: u64): u64
+    local l1: u64
     copy_loc l0
     ld_u64 1
     add
