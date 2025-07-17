@@ -7,7 +7,6 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, ReadPosition},
 };
 use aptos_types::error::{code_invariant_error, PanicError, PanicOr};
-use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -722,18 +721,6 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             },
         }
     }
-
-    pub fn remove_all_at_or_after_for_epilogue(
-        &self,
-        txn_idx: TxnIndex,
-        epilogue_txn_idx: TxnIndex,
-    ) {
-        for mut entry in self.values.iter_mut() {
-            entry.value_mut().versioned_map.split_off(&txn_idx);
-        }
-        self.next_idx_to_commit
-            .store(epilogue_txn_idx, Ordering::SeqCst);
-    }
 }
 
 impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
@@ -778,7 +765,7 @@ mod test {
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
     };
     use aptos_types::delayed_fields::SnapshotToStringFormula;
-    use claims::{assert_err_eq, assert_ok_eq, assert_some};
+    use claims::{assert_err_eq, assert_matches, assert_ok_eq, assert_some};
     use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
