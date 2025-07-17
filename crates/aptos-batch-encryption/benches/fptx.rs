@@ -87,7 +87,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
     let mut group = c.benchmark_group("FPTX::derive_decryption_key_share");
     let batch_size = 128;
 
-    for n in [8, 32, 128, 256, 512] {
+    for n in [128, 256, 512] {
         let t = n * 3 / 2 + 1;
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
@@ -105,7 +105,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
         let msk_share = &msk_shares[0];
 
 
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(msk_share, d), |b, input| {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("n={}, t={}", n, t)), &(msk_share, d), |b, input| {
             b.iter(|| FPTX::derive_decryption_key_share(&input.0, &input.1));
         });
     }
@@ -113,7 +113,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
 
 pub fn verify_decryption_key_share(c: &mut Criterion) {
 
-    let mut group = c.benchmark_group("FPTX::decrypt (full batch, all cts)");
+    let mut group = c.benchmark_group("FPTX::verify_decryption_key_share");
 
     for batch_size in [8, 32, 128, 512 ] {
         let mut rng = thread_rng();
@@ -147,7 +147,7 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
     let batch_size = 128;
 
     for n in [8, 32, 128, 256, 512] {
-        let t = n * 3 / 2 + 1;
+        let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);
@@ -170,8 +170,8 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
 
 
 
-        group.bench_with_input(BenchmarkId::from_parameter(format!("threshold={}",t)), &(dk_shares, tc), |b, input| {
-            b.iter(|| FPTX::reconstruct_decryption_key(&input.0, &input.1).unwrap());
+        group.bench_with_input(BenchmarkId::from_parameter(format!("n={}, t={}",n,t)), &(dk_shares, tc, tp), |b, input| {
+            b.iter(|| FPTX::reconstruct_decryption_key(&input.0, &input.1, &input.2).unwrap());
         });
     }
 }
@@ -199,7 +199,7 @@ pub fn decrypt(c: &mut Criterion) {
         let dk_shares : Vec<BIBEDecryptionKeyShare> = 
             vec![ FPTX::derive_decryption_key_share(&msk_shares[0], &d) ];
 
-        let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc).unwrap();
+        let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc, &tp).unwrap();
 
 
         group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(dk, cts, pfs, tp), |b, input| {

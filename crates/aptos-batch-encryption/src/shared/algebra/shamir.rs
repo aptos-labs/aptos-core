@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{errors::ReconstructError, group::{Fr, G1Affine, G1Projective}, shared::algebra::{differentiate::DifferentiableFn, interpolate::vanishing_poly}};
+use ark_ec::VariableBaseMSM as _;
 use ark_poly::{EvaluationDomain, Evaluations, Polynomial, Radix2EvaluationDomain};
 use rand_core::RngCore;
 use ark_std::UniformRand;
 use num_traits::{One, Zero};
 use anyhow::Result;
+use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 use crate::shared::ark_serialize::*;
 
@@ -54,7 +56,10 @@ impl ThresholdConfig {
         let numerators = 
             self.domain
             .elements()
-            .filter_map(|x| xs.contains(&x).then_some(vanishing_poly_eval / -x));
+            .collect::<Vec<Fr>>()
+            .into_par_iter()
+            .filter_map(|x| xs.contains(&x).then_some(vanishing_poly_eval / -x))
+            .collect::<Vec<Fr>>();
 
         // step 3a (denominators): Compute derivative of poly from step 1
         let derivative = vanishing_poly.differentiate();
@@ -64,12 +69,14 @@ impl ThresholdConfig {
         let denominators_indexed_by_x  = 
             derivative.evaluate_over_domain(self.domain)
             .evals
-            .into_iter()
-            .zip(self.domain.elements())
-            .filter_map(|(y, x)| xs.contains(&x).then_some((x,y)));
+            .into_par_iter()
+            .zip(self.domain.elements().collect::<Vec<Fr>>())
+            .filter_map(|(y, x)| xs.contains(&x).then_some((x,y)))
+            .collect::<Vec<(Fr, Fr)>>();
 
         // step 4: combine
         numerators
+            .into_par_iter()
             .zip(denominators_indexed_by_x)
             .map(|(numerator, (x, denominator))| (x, numerator / denominator) )
             .collect()
@@ -113,12 +120,16 @@ impl ThresholdConfig {
             let xs = HashSet::from_iter(shares.iter().map(|s| s.x));
             let lagrange_coeffs = self.all_lagrange(&xs);
 
-            for ShamirGroupShare { x, g_y } in shares {
-                let component = (*g_y) * lagrange_coeffs[x];
-                sum += component;
-            }
+            let (bases, coeffs)
+                : (Vec<G1Affine>, Vec<Fr>) =
+                shares.into_iter()
+                .map(|ShamirGroupShare { x, g_y }|
+                    (g_y, lagrange_coeffs[x]))
+                .collect();
 
-            Ok(sum.into())
+            Ok(G1Projective::msm(&bases, &coeffs)
+                .unwrap() // TODO this shouldn't ever panic. Is it ok to leave here?
+                .into())
         }
     }
 }

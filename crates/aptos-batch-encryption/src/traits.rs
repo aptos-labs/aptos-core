@@ -94,7 +94,7 @@ pub trait BatchThresholdEncryption {
 
     /// Reconstruct a decryption key from a set of [`DecryptionKeyShare`]s assuming the set of
     /// shares surpasses the threshold.
-    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig) 
+    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig, pool: &ThreadPool) 
         -> Result<Self::DecryptionKey>;
 
     

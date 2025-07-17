@@ -36,7 +36,7 @@ fn smoke() {
         .choose_multiple(&mut rng, 5)
         .cloned()
         .collect::<Vec<BIBEDecryptionKeyShare>>(),
-        &tc).unwrap();
+        &tc, &tp).unwrap();
 
 
     let decrypted_plaintexts : Vec<String> = 

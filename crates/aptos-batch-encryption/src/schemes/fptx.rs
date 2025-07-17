@@ -141,8 +141,10 @@ impl BatchThresholdEncryption for FPTX {
         msk_share.derive_decryption_key_share(digest)
     }
 
-    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig) -> anyhow::Result<Self::DecryptionKey> {
-        BIBEDecryptionKey::reconstruct(shares, config)
+    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig, pool: &rayon::ThreadPool)  -> anyhow::Result<Self::DecryptionKey> {
+        pool.install(||
+            BIBEDecryptionKey::reconstruct(shares, config)
+        )
     }
 
     fn decrypt<'a, P: Plaintext>(
