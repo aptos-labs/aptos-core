@@ -31,6 +31,8 @@ pub trait ResourceResolver {
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
 
+    /// Due to resource groups bytes_loaded is not always equal to bytes.len()
+    /// This function returns the virtual number of bytes loaded used later to charge gas
     fn get_resource_size_with_metadata_and_layout(
         &self,
         address: &AccountAddress,

@@ -29,6 +29,7 @@ use std::collections::btree_map::{BTreeMap, Entry};
 
 enum CachedInformation {
     Value(GlobalValue),
+    /// If resource exists then store its size, None otherwise
     SizeOnly(Option<u64>),
 }
 
@@ -216,7 +217,7 @@ impl TransactionDataCache {
                 },
                 None => GlobalValue::none(),
             };
-            (CachedInformation::Value(value), bytes_loaded)
+            (CachedInformation::Value(value), bytes_loaded as u64)
         } else {
             let bytes_loaded = resource_resolver.get_resource_size_with_metadata_and_layout(
                 addr,
@@ -230,7 +231,7 @@ impl TransactionDataCache {
             )?;
             (
                 CachedInformation::SizeOnly(bytes_loaded),
-                bytes_loaded.unwrap_or(0) as usize,
+                bytes_loaded.unwrap_or(0),
             )
         };
 
@@ -240,7 +241,7 @@ impl TransactionDataCache {
             contains_delayed_fields,
             value: cached_info,
         };
-        Ok((entry, NumBytes::new(bytes_loaded as u64)))
+        Ok((entry, NumBytes::new(bytes_loaded)))
     }
 
     fn find_entry(&self, addr: &AccountAddress, ty: &Type) -> Option<&DataCacheEntry> {
@@ -259,17 +260,18 @@ impl TransactionDataCache {
         }
     }
 
-    /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
-    /// state of the cache does not chang when calling this function.
+    /// Returns true if resource is present in the cache and thus we know if it exists.
+    /// The state of the cache does not change when calling this function.
+    pub(crate) fn contains_resource_existence(&self, addr: &AccountAddress, ty: &Type) -> bool {
+        self.find_entry(addr, ty).is_some()
+    }
+
+    /// Returns true if resource is present in the cache and we know its whole value, not just the size.
     pub(crate) fn contains_resource_data(&self, addr: &AccountAddress, ty: &Type) -> bool {
         match self.find_entry(addr, ty) {
             None => false,
             Some(entry) => matches!(entry.value, CachedInformation::Value(_)),
         }
-    }
-
-    pub(crate) fn contains_resource_existence(&self, addr: &AccountAddress, ty: &Type) -> bool {
-        self.find_entry(addr, ty).is_some()
     }
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
