@@ -229,9 +229,7 @@ where
     fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
         self.get_state_value(state_key).map_or_else(
             |e| Err(map_storage_error(state_key, e)),
-            |maybe_state_value| {
-                Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
-            },
+            |maybe_state_value| Ok(maybe_state_value.map(|state_value| state_value.size() as u64)),
         )
     }
 

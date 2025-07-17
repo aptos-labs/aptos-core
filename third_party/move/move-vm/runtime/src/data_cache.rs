@@ -36,7 +36,9 @@ impl CachedInformation {
     fn value_mut(&mut self) -> PartialVMResult<&mut GlobalValue> {
         match self {
             CachedInformation::Value(v) => Ok(v),
-            CachedInformation::SizeOnly(_) => Err(PartialVMError::new_invariant_violation("Data is not cached"))
+            CachedInformation::SizeOnly(_) => Err(PartialVMError::new_invariant_violation(
+                "Data is not cached",
+            )),
         }
     }
 }
@@ -62,7 +64,7 @@ impl DataCacheEntry {
     pub(crate) fn exists(&self) -> PartialVMResult<bool> {
         match &self.value {
             CachedInformation::SizeOnly(e) => Ok(e.unwrap_or(0) != 0),
-            CachedInformation::Value(v) => v.exists()
+            CachedInformation::Value(v) => v.exists(),
         }
     }
 }
@@ -160,7 +162,7 @@ impl TransactionDataCache {
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
         ty: &Type,
-        load_data: bool
+        load_data: bool,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
             TypeTag::Struct(struct_tag) => *struct_tag,
@@ -175,10 +177,7 @@ impl TransactionDataCache {
             .type_to_type_layout_with_identifier_mappings(ty)?;
 
         let metadata = module_storage
-            .fetch_existing_module_metadata(
-                &struct_tag.address,
-                struct_tag.module.as_ident_str(),
-            )
+            .fetch_existing_module_metadata(&struct_tag.address, struct_tag.module.as_ident_str())
             .map_err(|err| err.to_partial())?;
 
         let (cached_info, bytes_loaded) = if load_data {
@@ -229,7 +228,10 @@ impl TransactionDataCache {
                     None
                 },
             )?;
-            (CachedInformation::SizeOnly(bytes_loaded), bytes_loaded.unwrap_or(0) as usize)
+            (
+                CachedInformation::SizeOnly(bytes_loaded),
+                bytes_loaded.unwrap_or(0) as usize,
+            )
         };
 
         let entry = DataCacheEntry {
@@ -262,7 +264,7 @@ impl TransactionDataCache {
     pub(crate) fn contains_resource_data(&self, addr: &AccountAddress, ty: &Type) -> bool {
         match self.find_entry(addr, ty) {
             None => false,
-            Some(entry) => matches!(entry.value, CachedInformation::Value(_))
+            Some(entry) => matches!(entry.value, CachedInformation::Value(_)),
         }
     }
 
@@ -282,9 +284,11 @@ impl TransactionDataCache {
             Entry::Vacant(entry) => {
                 entry.insert(data_cache_entry);
                 Ok(())
-            }
+            },
             Entry::Occupied(mut entry) => {
-                if matches!(entry.get().value, CachedInformation::SizeOnly(_)) && matches!(data_cache_entry.value, CachedInformation::Value(_)) {
+                if matches!(entry.get().value, CachedInformation::SizeOnly(_))
+                    && matches!(data_cache_entry.value, CachedInformation::Value(_))
+                {
                     entry.insert(data_cache_entry);
                     Ok(())
                 } else {

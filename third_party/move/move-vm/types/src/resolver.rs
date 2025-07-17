@@ -38,7 +38,8 @@ pub trait ResourceResolver {
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<u64>> {
-        let (bytes, bytes_loaded) = self.get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, layout)?;
+        let (bytes, bytes_loaded) = self
+            .get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, layout)?;
         Ok(bytes.map(|_| bytes_loaded as u64))
     }
 }

@@ -99,7 +99,7 @@ pub enum TransactionTypeArg {
     ExistenceCheck20Pct,
     ExistenceCheck50Pct,
     ExistenceCheck80Pct,
-    ExistenceCheck100Pct
+    ExistenceCheck100Pct,
 }
 
 impl TransactionTypeArg {
@@ -413,11 +413,31 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
-            TransactionTypeArg::ExistenceCheck0Pct => call_custom_module(EntryPoints::ExistenceCheck { modify_frequency: 0.0 }),
-            TransactionTypeArg::ExistenceCheck20Pct => call_custom_module(EntryPoints::ExistenceCheck { modify_frequency: 0.2 }),
-            TransactionTypeArg::ExistenceCheck50Pct => call_custom_module(EntryPoints::ExistenceCheck { modify_frequency: 0.5 }),
-            TransactionTypeArg::ExistenceCheck80Pct => call_custom_module(EntryPoints::ExistenceCheck { modify_frequency: 0.8 }),
-            TransactionTypeArg::ExistenceCheck100Pct => call_custom_module(EntryPoints::ExistenceCheck { modify_frequency: 1.0 }),
+            TransactionTypeArg::ExistenceCheck0Pct => {
+                call_custom_module(EntryPoints::ExistenceCheck {
+                    modify_frequency: 0.0,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck20Pct => {
+                call_custom_module(EntryPoints::ExistenceCheck {
+                    modify_frequency: 0.2,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck50Pct => {
+                call_custom_module(EntryPoints::ExistenceCheck {
+                    modify_frequency: 0.5,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck80Pct => {
+                call_custom_module(EntryPoints::ExistenceCheck {
+                    modify_frequency: 0.8,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck100Pct => {
+                call_custom_module(EntryPoints::ExistenceCheck {
+                    modify_frequency: 1.0,
+                })
+            },
         }
     }
 

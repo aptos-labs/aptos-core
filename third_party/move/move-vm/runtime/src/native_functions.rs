@@ -160,22 +160,24 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   Propagate exists call all the way to resolver, because we can implement the check more
         //   efficiently, without the need to actually load bytes, deserialize the value and cache
         //   it in the data cache.
-        Ok(if !self.data_store.contains_resource_existence(&address, ty) {
-            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-                self.module_storage,
-                self.resource_resolver,
-                &address,
-                ty,
-                false,
-            )?;
-            let exists = entry.exists()?;
-            self.data_store
-                .insert_resource(address, ty.clone(), entry)?;
-            (exists, Some(bytes_loaded))
-        } else {
-            let exists = self.data_store.get_resource_existence(&address, ty)?;
-            (exists, None)
-        })
+        Ok(
+            if !self.data_store.contains_resource_existence(&address, ty) {
+                let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                    self.module_storage,
+                    self.resource_resolver,
+                    &address,
+                    ty,
+                    false,
+                )?;
+                let exists = entry.exists()?;
+                self.data_store
+                    .insert_resource(address, ty.clone(), entry)?;
+                (exists, Some(bytes_loaded))
+            } else {
+                let exists = self.data_store.get_resource_existence(&address, ty)?;
+                (exists, None)
+            },
+        )
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
