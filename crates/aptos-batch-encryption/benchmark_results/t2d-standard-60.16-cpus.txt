@@ -1,0 +1,302 @@
+
+running 18 tests
+test shared::algebra::fk_algorithm::tests::compute_eval_proofs_at_roots_of_unity ... ignored
+test shared::algebra::interpolate::tests::test_divide ... ignored
+test shared::algebra::interpolate::tests::test_vanishing_poly ... ignored
+test shared::algebra::mult_tree::tests::test_quotient ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_inv_mod_xpow ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_3 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_4 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_naive ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder_2 ... ignored
+test shared::algebra::shamir::tests::test_reconstruct ... ignored
+test shared::algebra::shamir::tests::test_reconstruct_in_exponent ... ignored
+test shared::digest::tests::compute_and_verify_all_opening_proofs_arbitrary_x ... ignored
+test shared::digest::tests::compute_and_verify_individual_opening_proofs_arbitrary_x ... ignored
+
+test result: ok. 0 passed; 0 failed; 18 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Digest::compute/FFTDomainId/8
+                        time:   [528.18 µs 531.45 µs 534.86 µs]
+                        change: [+56.899% +58.665% +60.502%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low severe
+Digest::compute/FFTDomainId/32
+                        time:   [548.22 µs 552.92 µs 557.83 µs]
+                        change: [+16.254% +17.700% +19.159%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Digest::compute/FFTDomainId/128
+                        time:   [849.29 µs 853.12 µs 857.06 µs]
+                        change: [-1.2052% -0.2387% +0.6315%] (p = 0.63 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Digest::compute/FFTDomainId/512
+                        time:   [1.3268 ms 1.3361 ms 1.3453 ms]
+                        change: [-19.462% -18.447% -17.498%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Digest::compute/FreeRootId/8
+                        time:   [1.2929 ms 1.3002 ms 1.3076 ms]
+                        change: [+70.195% +71.994% +73.797%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Digest::compute/FreeRootId/32
+                        time:   [1.5194 ms 1.5287 ms 1.5375 ms]
+                        change: [+9.2742% +11.473% +13.736%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+Digest::compute/FreeRootId/128
+                        time:   [3.1139 ms 3.1381 ms 3.1708 ms]
+                        change: [+19.870% +23.474% +27.176%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  5 (5.00%) high severe
+Digest::compute/FreeRootId/512
+                        time:   [6.9257 ms 6.9729 ms 7.0210 ms]
+                        change: [+26.605% +28.624% +30.668%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+EvalProofs::compute_all/FreeRootId/8
+                        time:   [5.2888 ms 5.3109 ms 5.3343 ms]
+                        change: [+16.834% +17.516% +18.148%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 8 outliers among 100 measurements (8.00%)
+  2 (2.00%) low mild
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+EvalProofs::compute_all/FreeRootId/32
+                        time:   [19.852 ms 19.966 ms 20.085 ms]
+                        change: [-25.854% -25.200% -24.586%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+EvalProofs::compute_all/FreeRootId/128
+                        time:   [106.70 ms 107.45 ms 108.24 ms]
+                        change: [-35.620% -35.087% -34.510%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+EvalProofs::compute_all/FreeRootId/512
+                        time:   [595.40 ms 597.26 ms 599.14 ms]
+                        change: [-39.168% -38.925% -38.672%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+EvalProofs::compute_single/FreeRootId/8
+                        time:   [1.2324 ms 1.2390 ms 1.2458 ms]
+                        change: [+76.798% +79.434% +82.211%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+EvalProofs::compute_single/FreeRootId/32
+                        time:   [2.9411 ms 2.9575 ms 2.9739 ms]
+                        change: [+81.365% +84.149% +87.028%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+EvalProofs::compute_single/FreeRootId/128
+                        time:   [4.6501 ms 4.6984 ms 4.7498 ms]
+                        change: [+61.795% +65.188% +68.604%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+EvalProofs::compute_single/FreeRootId/512
+                        time:   [7.2273 ms 7.2701 ms 7.3184 ms]
+                        change: [+26.963% +29.231% +31.615%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  6 (6.00%) high severe
+
+EvalProofs::compute/FreeRootId/batch size = 128, num proofs = 10
+                        time:   [10.717 ms 10.760 ms 10.811 ms]
+                        change: [-39.196% -38.871% -38.533%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+EvalProofs::compute/FreeRootId/batch size = 128, num proofs = 32
+                        time:   [14.524 ms 14.579 ms 14.637 ms]
+                        change: [-41.469% -41.156% -40.841%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+EvalProofs::compute/FreeRootId/batch size = 128, num proofs = 64
+                        time:   [19.896 ms 19.944 ms 19.999 ms]
+                        change: [-43.558% -43.299% -43.027%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+EvalProofs::compute/FreeRootId/batch size = 128, num proofs = 96
+                        time:   [25.511 ms 25.564 ms 25.620 ms]
+                        change: [-45.785% -45.594% -45.391%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  7 (7.00%) high mild
+  1 (1.00%) high severe
+EvalProofs::compute/FreeRootId/batch size = 128, num proofs = 128
+                        time:   [31.137 ms 31.242 ms 31.374 ms]
+                        change: [-46.216% -46.001% -45.743%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+msm/4                   time:   [246.72 µs 248.45 µs 250.15 µs]
+                        change: [+17.666% +18.704% +19.769%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+msm/8                   time:   [293.15 µs 294.80 µs 296.37 µs]
+                        change: [+25.306% +26.567% +27.878%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+msm/32                  time:   [254.11 µs 255.99 µs 257.89 µs]
+                        change: [-10.832% -9.5943% -8.2562%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+msm/128                 time:   [458.36 µs 461.20 µs 464.16 µs]
+                        change: [-12.174% -11.370% -10.548%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+msm/512                 time:   [842.62 µs 847.47 µs 852.52 µs]
+                        change: [-22.275% -21.675% -21.144%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  7 (7.00%) high mild
+  1 (1.00%) high severe
+
+pairing/32              time:   [4.9833 ms 4.9935 ms 5.0072 ms]
+                        change: [+3.4646% +4.0362% +4.6874%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low severe
+  6 (6.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+pairing/128             time:   [15.673 ms 15.693 ms 15.713 ms]
+                        change: [-8.4530% -8.0080% -7.5568%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+pairing/1449            time:   [178.21 ms 178.35 ms 178.50 ms]
+                        change: [-6.3506% -6.1800% -6.0072%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+
+multi_point_eval/4      time:   [2.0514 ms 2.0611 ms 2.0709 ms]
+                        change: [+38.114% +39.332% +40.605%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+multi_point_eval/8      time:   [4.1465 ms 4.1610 ms 4.1752 ms]
+                        change: [+11.816% +12.437% +13.091%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+multi_point_eval/32     time:   [16.950 ms 17.036 ms 17.121 ms]
+                        change: [-29.019% -28.555% -28.133%] (p = 0.00 < 0.05)
+                        Performance has improved.
+multi_point_eval/128    time:   [94.895 ms 95.437 ms 95.981 ms]
+                        change: [-37.984% -37.580% -37.155%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+multi_point_eval/512    time:   [547.64 ms 549.18 ms 550.73 ms]
+                        change: [-41.776% -41.564% -41.345%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+
+multi_point_eval_field/4
+                        time:   [841.94 µs 846.96 µs 852.06 µs]
+                        change: [+83.932% +86.870% +89.758%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+multi_point_eval_field/8
+                        time:   [1.3462 ms 1.3537 ms 1.3610 ms]
+                        change: [+67.389% +70.401% +73.497%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+multi_point_eval_field/32
+                        time:   [3.7905 ms 3.8207 ms 3.8530 ms]
+                        change: [+32.032% +34.159% +36.412%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+multi_point_eval_field/128
+                        time:   [15.527 ms 15.647 ms 15.772 ms]
+                        change: [+40.144% +43.348% +46.666%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+multi_point_eval_field/512
+                        time:   [66.265 ms 67.134 ms 67.981 ms]
+                        change: [+43.125% +46.461% +49.989%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+
+multi_point_eval_small/4
+                        time:   [943.19 µs 948.14 µs 953.39 µs]
+                        change: [+96.013% +98.784% +101.41%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+multi_point_eval_small/8
+                        time:   [1.3849 ms 1.3980 ms 1.4107 ms]
+                        change: [+64.374% +67.089% +69.920%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+multi_point_eval_small/32
+                        time:   [3.0494 ms 3.0673 ms 3.0846 ms]
+                        change: [+31.063% +33.279% +35.452%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+multi_point_eval_small/128
+                        time:   [7.9533 ms 8.0134 ms 8.0741 ms]
+                        change: [+18.046% +19.671% +21.306%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+multi_point_eval_small/512
+                        time:   [21.632 ms 21.732 ms 21.830 ms]
+                        change: [+4.3752% +5.5060% +6.6616%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+

@@ -1,0 +1,178 @@
+use aptos_batch_encryption::group::Fr;
+use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
+use aptos_batch_encryption::shared::ids::*;
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use ark_std::{rand::thread_rng, UniformRand, Zero, One};
+
+
+pub fn compute(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Digest::compute/FFTDomainId");
+
+    // 8
+
+    let mut rng = thread_rng();
+    let setup = DigestKey::new(&mut rng, 8, 1).unwrap();
+    let mut ids : FFTDomainIdSet<8> = FFTDomainIdSet::with_capacity(8).unwrap();
+    for x in 0..8 {
+        ids.set(x, Fr::rand(&mut rng));
+    }
+
+    group.bench_with_input(BenchmarkId::from_parameter(8), &(setup, ids), |b, input| {
+        b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+    });
+
+    // 32
+
+    let mut rng = thread_rng();
+    let setup = DigestKey::new(&mut rng, 32, 1).unwrap();
+    let mut ids : FFTDomainIdSet<32> = FFTDomainIdSet::with_capacity(32).unwrap();
+    for x in 0..32 {
+        ids.set(x, Fr::rand(&mut rng));
+    }
+
+    group.bench_with_input(BenchmarkId::from_parameter(32), &(setup, ids), |b, input| {
+        b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+    });
+
+    // 128
+
+    let mut rng = thread_rng();
+    let setup = DigestKey::new(&mut rng, 128, 1).unwrap();
+    let mut ids : FFTDomainIdSet<128> = FFTDomainIdSet::with_capacity(128).unwrap();
+    for x in 0..128 {
+        ids.set(x, Fr::rand(&mut rng));
+    }
+
+    group.bench_with_input(BenchmarkId::from_parameter(128), &(setup, ids), |b, input| {
+        b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+    });
+
+    // 512
+
+    let mut rng = thread_rng();
+    let setup = DigestKey::new(&mut rng, 512, 1).unwrap();
+    let mut ids : FFTDomainIdSet<512> = FFTDomainIdSet::with_capacity(512).unwrap();
+    for x in 0..512 {
+        ids.set(x, Fr::rand(&mut rng));
+    }
+
+    group.bench_with_input(BenchmarkId::from_parameter(512), &(setup, ids), |b, input| {
+        b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+    });
+}
+
+
+pub fn compute_arbitrary_x(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Digest::compute/FreeRootId");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
+        let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
+
+        for _x in 0..batch_size {
+            ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
+        }
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(setup, ids), |b, input| {
+            b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+        });
+    }
+}
+//
+//
+//pub fn compute_all_eval_proofs(c: &mut Criterion) {
+//    let mut group = c.benchmark_group("Digest::compute_all_eval_proofs");
+//
+//    for batch_size in [8, 32, 128, 512 ] {
+//        let mut rng = thread_rng();
+//        let setup = DigestKey::new(&mut rng, batch_size).unwrap();
+//        let mut ids = FFTDomainIdSet::with_capacity(batch_size).unwrap();
+//
+//        // set all possible ids
+//        for x in 0..batch_size {
+//            ids.set(x, Fr::rand(&mut rng));
+//        }
+//
+//        let d = Digest::compute(&setup, ids);
+//        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &d, |b, d| {
+//            b.iter(|| d.compute_all_eval_proofs());
+//        });
+//    }
+//}
+//
+pub fn compute_all_eval_proofs_arbitrary_x(c: &mut Criterion) {
+    let mut group = c.benchmark_group("EvalProofs::compute_all/FreeRootId");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
+        let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
+
+        for _x in 0..batch_size  {
+            ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
+        }
+        let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &pfs, |b, pfs| {
+            b.iter(|| { 
+                pfs.clone().compute_all()
+            });
+        });
+    }
+}
+
+pub fn compute_n_eval_proofs_arbitrary_x(c: &mut Criterion) {
+    let mut group = c.benchmark_group("EvalProofs::compute/FreeRootId");
+
+    for batch_size in [128] {
+        for num_proofs in [10, 32, 64, 96, 128] {
+            let mut rng = thread_rng();
+            let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
+            let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
+
+            for _x in 0..batch_size  {
+                ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
+            }
+            let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
+            let first_n_ids = &ids.as_vec()[0..num_proofs];
+
+            let mut pfs_testing = pfs.clone();
+            pfs_testing.compute(&first_n_ids);
+            pfs_testing.verify_all().unwrap();
+
+
+
+            group.bench_with_input(BenchmarkId::from_parameter(format!("batch size = {}, num proofs = {}", batch_size, num_proofs)), &(pfs, first_n_ids), |b, input| {
+                b.iter(|| { 
+                    input.0.clone().compute(input.1)
+                });
+            });
+        }
+    }
+}
+
+
+pub fn compute_single_eval_proof_arbitrary_x(c: &mut Criterion) {
+    let mut group = c.benchmark_group("EvalProofs::compute_single/FreeRootId");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
+        let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
+
+        for _x in 0..batch_size  {
+            ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
+        }
+        let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, ids.as_vec()[0]), |b, input| {
+            b.iter(|| { 
+                input.0.clone().compute_single(input.1);
+            });
+        });
+    }
+}
+
+criterion_group!(benches, compute, compute_arbitrary_x, compute_all_eval_proofs_arbitrary_x, compute_single_eval_proof_arbitrary_x, compute_n_eval_proofs_arbitrary_x);
+criterion_main!(benches);

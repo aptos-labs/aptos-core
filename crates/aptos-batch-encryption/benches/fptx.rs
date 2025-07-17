@@ -1,0 +1,212 @@
+use aes_gcm::aes::cipher;
+use aptos_batch_encryption::group::Fr;
+use aptos_batch_encryption::schemes::fptx::FPTX;
+use aptos_batch_encryption::shared::algebra::shamir::ThresholdConfig;
+use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
+use aptos_batch_encryption::shared::ids::*;
+use aptos_batch_encryption::shared::key_derivation::BIBEDecryptionKeyShare;
+use aptos_batch_encryption::traits::{BatchThresholdEncryption, DecryptionKeyShare, Plaintext};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use ark_std::{rand::thread_rng, UniformRand, Zero, One};
+use rayon::ThreadPoolBuilder;
+use serde::de;
+
+
+pub fn digest(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::digest");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(1, 1);
+        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(dk, cts, tp), |b, input| {
+            b.iter(|| FPTX::digest(&input.0, &input.1, 0, &input.2));
+        });
+    }
+}
+
+pub fn verify_ct(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::verify_ct");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(1, 1);
+        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let ct = FPTX::encrypt(&ek, &mut rng, &msg).unwrap();
+
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &ct, |b, ct| {
+            b.iter(|| FPTX::verify_ct(&ct).unwrap());
+        });
+    }
+}
+
+pub fn eval_proofs_compute_all(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::eval_proofs_compute_all");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(1, 1);
+        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+        let (_, pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, tp), |b, input| {
+            b.iter(|| FPTX::eval_proofs_compute_all(&mut input.0.clone(), &input.1));
+        });
+    }
+}
+
+
+pub fn derive_decryption_key_share(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::derive_decryption_key_share");
+    let batch_size = 128;
+
+    for n in [8, 32, 128, 256, 512] {
+        let t = n * 3 / 2 + 1;
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(n, t);
+        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+
+        let msk_share = &msk_shares[0];
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(msk_share, d), |b, input| {
+            b.iter(|| FPTX::derive_decryption_key_share(&input.0, &input.1));
+        });
+    }
+}
+
+pub fn verify_decryption_key_share(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::decrypt (full batch, all cts)");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(1, 1);
+        let (ek, dk, vks, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+        let (d, mut pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+
+        FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+
+        let dk_share = FPTX::derive_decryption_key_share(&msk_shares[0], &d);
+        let vk = &vks[0];
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(vk, d, dk_share), |b, input| {
+            b.iter(|| FPTX::verify_decryption_key_share(input.0, &input.1, &input.2));
+        });
+    }
+}
+
+
+pub fn reconstruct_decryption_key(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::reconstruct_decryption_key");
+    let batch_size = 128;
+
+    for n in [8, 32, 128, 256, 512] {
+        let t = n * 3 / 2 + 1;
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(n, t);
+        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+
+        let dk_shares : Vec<BIBEDecryptionKeyShare> = 
+            msk_shares
+            .iter()
+            .map(|msk_share| FPTX::derive_decryption_key_share(msk_share, &d))
+            .take(t)
+            .collect();
+
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(format!("threshold={}",t)), &(dk_shares, tc), |b, input| {
+            b.iter(|| FPTX::reconstruct_decryption_key(&input.0, &input.1).unwrap());
+        });
+    }
+}
+
+pub fn decrypt(c: &mut Criterion) {
+
+    let mut group = c.benchmark_group("FPTX::decrypt (full batch, all cts)");
+
+    for batch_size in [8, 32, 128, 512 ] {
+        let mut rng = thread_rng();
+        let tp = ThreadPoolBuilder::default().build().unwrap();
+        let tc = ThresholdConfig::new(1, 1);
+        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+
+        let msg : String = String::from("hi");
+
+        let cts : Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
+            .collect();
+
+        let (d, mut pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+
+        FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+
+        let dk_shares : Vec<BIBEDecryptionKeyShare> = 
+            vec![ FPTX::derive_decryption_key_share(&msk_shares[0], &d) ];
+
+        let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc).unwrap();
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(dk, cts, pfs, tp), |b, input| {
+            b.iter(|| FPTX::decrypt::<String>(&input.0, &input.1, &input.2, &input.3).unwrap());
+        });
+    }
+}
+
+criterion_group!(benches, digest, verify_ct, eval_proofs_compute_all, derive_decryption_key_share, verify_decryption_key_share, reconstruct_decryption_key, decrypt);
+criterion_main!(benches);
