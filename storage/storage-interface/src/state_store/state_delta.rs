@@ -10,7 +10,6 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use itertools::Itertools;
 use std::sync::Arc;
 
 /// This represents two state sparse merkle trees at their versions in memory with the updates
@@ -31,16 +30,9 @@ impl StateDelta {
     pub fn new(base: State, current: State) -> Self {
         assert!(current.is_descendant_of(&base));
 
-        let shards = Arc::new(
-            current
-                .shards()
-                .iter()
-                .zip_eq(base.shards().iter())
-                .map(|(current, base)| current.view_layers_after(base))
-                .collect_vec()
-                .try_into()
-                .expect("Known to be 16 shards."),
-        );
+        let shards = Arc::new(std::array::from_fn(|shard_id| {
+            current.shards()[shard_id].view_layers_after(&base.shards()[shard_id])
+        }));
 
         Self {
             base,
