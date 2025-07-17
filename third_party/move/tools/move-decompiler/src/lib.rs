@@ -62,7 +62,25 @@ pub struct Options {
     pub inputs: Vec<String>,
 }
 
-/// Represents an instance of a decompiler. The decompiler can be run end-to-end operating
+impl Options {
+    /// Disable conditional transformation.
+    pub fn disable_conditional_transformation(self, no_conditionals: bool) -> Self {
+        Self {
+            no_conditionals,
+            ..self
+        }
+    }
+
+    /// Disable assignment transformation.
+    pub fn disable_assignment_transformation(self, no_expressions: bool) -> Self {
+        Self {
+            no_expressions,
+            ..self
+        }
+    }
+}
+
+/// Represent an instance of a decompiler. The decompiler can be run end-to-end operating
 /// on files, or incrementally without already deserialized modules and scripts.
 pub struct Decompiler {
     options: Options,
