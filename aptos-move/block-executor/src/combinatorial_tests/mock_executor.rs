@@ -730,6 +730,10 @@ where
         Ok(self)
     }
 
+    fn check_materialization(&self) -> Result<bool, PanicError> {
+        Ok(!self.skipped)
+    }
+
     fn legacy_sequential_materialize_agg_v1(&self, _view: &impl TAggregatorV1View<Identifier = K>) {
         // TODO[agg_v2](tests): implement this method and compare
         // against sequential execution results v. aggregator v1.
@@ -849,10 +853,10 @@ where
             .collect()
     }
 
-    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
-    {
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        callback: &mut dyn FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
         for (key, _, _, ops) in self.group_writes.iter() {
             callback(key, ops.iter().map(|(tag, _)| tag).collect())?;
         }
@@ -860,7 +864,7 @@ where
     }
 
     fn output_approx_size(&self) -> u64 {
-        // TODO add block output limit testing
+        // TODO: add block output limit testing
         0
     }
 
