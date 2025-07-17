@@ -162,7 +162,7 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:84:9
    │
 84 │         x << 8
@@ -171,7 +171,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:88:9
    │
 88 │         x << 16
@@ -180,7 +180,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:92:9
    │
 92 │         x << 32
@@ -189,7 +189,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:96:9
    │
 96 │         x << 64
@@ -198,7 +198,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:100:9
     │
 100 │         x << 128
@@ -207,7 +207,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:104:9
     │
 104 │         x << SHIFT_AMOUNT
@@ -216,7 +216,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:108:9
     │
 108 │         x >> 8
@@ -225,7 +225,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:112:9
     │
 112 │         x >> 16
@@ -234,7 +234,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:116:9
     │
 116 │         x >> 32
@@ -243,7 +243,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:120:9
     │
 120 │         x >> 64
@@ -252,7 +252,7 @@ warning: [lint] Shift by amount greater than or equal to the type's bit width wi
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
-warning: [lint] Shift by amount greater than or equal to the type's bit width will abort
+warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:124:9
     │
 124 │         x >> 128

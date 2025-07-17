@@ -17,7 +17,7 @@ use move_model::{
         Operation,
         Value::Number,
     },
-    model::GlobalEnv,
+    model::{FunctionEnv, GlobalEnv},
     ty::Type,
 };
 use num::BigInt;
@@ -26,7 +26,7 @@ use Operation::*;
 const DIVISION_BY_ZERO_MSG: &str = "Division by zero will abort";
 const MODULO_BY_ZERO_MSG: &str = "Modulo by zero will abort";
 const SHIFT_OVERFLOW_MSG: &str =
-    "Shift by an amount greater than or equal to the type's bit width will abort"
+    "Shift by an amount greater than or equal to the type's bit width will abort";
 const CAST_OVERFLOW_MSG: &str =
     "Cast operation will abort because the value is outside the target type's range";
 
@@ -72,7 +72,8 @@ impl ExpChecker for KnownToAbort {
         "known_to_abort".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function_env: &FunctionEnv<'_>, expr: &ExpData) {
+        let env = function_env.env();
         match expr {
             Call(id, op, args) if args.len() == 2 => {
                 let (lhs, rhs): (&ExpData, &ExpData) = (&args[0], &args[1]);
