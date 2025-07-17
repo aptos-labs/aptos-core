@@ -97,6 +97,7 @@ pub trait BatchThresholdEncryption {
     fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig, pool: &ThreadPool) 
         -> Result<Self::DecryptionKey>;
 
+    // TODO: verify decryption key?
     
     /// Decrypt a set of ciphertext using a decryption key and advice.
     fn decrypt<'a, P: Plaintext>(
