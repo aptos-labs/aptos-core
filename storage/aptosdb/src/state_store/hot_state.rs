@@ -74,10 +74,10 @@ where
 {
     /// After committing a new batch to `inner`, items are evicted so that
     ///  1. total number of items doesn't exceed this number
-    max_items: usize,
+    max_items_per_shard: usize,
     ///  2. total number of bytes, incl. both keys and values doesn't exceed this number
     #[allow(dead_code)] // TODO(HotState): not enforced for now
-    max_bytes: usize,
+    max_bytes_per_shard: usize,
     /// No item is accepted to `inner` if the size of the value exceeds this number
     #[allow(dead_code)] // TODO(HotState): not enforced for now
     max_single_value_bytes: usize,
@@ -90,12 +90,16 @@ where
     K: Eq + std::hash::Hash,
     V: Clone,
 {
-    fn new_empty(max_items: usize, max_bytes: usize, max_single_value_bytes: usize) -> Self {
+    fn new_empty(
+        max_items_per_shard: usize,
+        max_bytes_per_shard: usize,
+        max_single_value_bytes: usize,
+    ) -> Self {
         Self {
-            max_items,
-            max_bytes,
+            max_items_per_shard,
+            max_bytes_per_shard,
             max_single_value_bytes,
-            shards: arr![Shard::new(max_items); 16],
+            shards: arr![Shard::new(max_items_per_shard); 16],
         }
     }
 
@@ -125,13 +129,13 @@ pub struct HotState {
 impl HotState {
     pub fn new(
         state: State,
-        max_items: usize,
-        max_bytes: usize,
+        max_items_per_shard: usize,
+        max_bytes_per_shard: usize,
         max_single_value_bytes: usize,
     ) -> Self {
         let base = Arc::new(HotStateBase::new_empty(
-            max_items,
-            max_bytes,
+            max_items_per_shard,
+            max_bytes_per_shard,
             max_single_value_bytes,
         ));
         let committed = Arc::new(Mutex::new(state));
@@ -261,7 +265,7 @@ impl Committer {
                 &self.base.shards[shard_id],
                 &mut self.heads[shard_id],
                 &mut self.tails[shard_id],
-                self.base.max_items,
+                self.base.max_items_per_shard,
             );
 
             for (key, slot) in updates {
@@ -309,7 +313,7 @@ impl Committer {
                 &self.base.shards[shard_id],
                 &mut self.heads[shard_id],
                 &mut self.tails[shard_id],
-                self.base.max_items,
+                self.base.max_items_per_shard,
             );
             let evicted = updater.evict();
             num_evicted += evicted.len();
