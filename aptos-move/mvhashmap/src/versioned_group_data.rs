@@ -564,16 +564,6 @@ impl<
                 })?,
         ))
     }
-
-    pub fn remove_all_at_or_after(&self, txn_idx: TxnIndex) {
-        self.values.remove_all_at_or_after(txn_idx);
-        for mut entry in self.group_sizes.iter_mut() {
-            entry
-                .value_mut()
-                .size_entries
-                .split_off(&ShiftedTxnIndex::new(txn_idx));
-        }
-    }
 }
 
 // Private methods.

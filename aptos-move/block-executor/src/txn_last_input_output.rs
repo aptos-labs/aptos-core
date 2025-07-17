@@ -71,6 +71,8 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
+    /// num_txns passed here is typically larger than the number of txns in the block,
+    /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -275,22 +277,25 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     /// Returns an error if callback returns an error.
-    pub(crate) fn for_each_resource_group_key_and_tags<F>(
+    pub(crate) fn for_each_resource_group_key_and_tags(
         &self,
         txn_idx: TxnIndex,
-        callback: F,
-    ) -> Result<(), PanicError>
-    where
-        F: FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
-    {
-        with_success_or_skip_rest!(
-            self,
-            txn_idx,
-            |t| t
-                .before_materialization()?
-                .for_each_resource_group_key_and_tags(callback),
-            Ok(())
-        )
+        mut callback: impl FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
+            match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    t.before_materialization()?
+                        .for_each_resource_group_key_and_tags(&mut callback)?;
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                    // No resource group keys for failed transactions
+                },
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn modified_group_key_and_tags_cloned(

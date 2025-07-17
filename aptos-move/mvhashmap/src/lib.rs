@@ -120,17 +120,6 @@ where
     pub fn script_cache(&self) -> &SyncScriptCache<[u8; 32], CompiledScript, Script> {
         &self.script_cache
     }
-
-    pub fn remove_all_at_or_after_for_epilogue(
-        &self,
-        txn_idx: TxnIndex,
-        epilogue_txn_idx: TxnIndex,
-    ) {
-        self.data.remove_all_at_or_after(txn_idx);
-        self.group_data.remove_all_at_or_after(txn_idx);
-        self.delayed_fields
-            .remove_all_at_or_after_for_epilogue(txn_idx, epilogue_txn_idx);
-    }
 }
 
 pub struct BlockStateStats {
