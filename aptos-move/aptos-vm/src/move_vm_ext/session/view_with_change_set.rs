@@ -279,7 +279,7 @@ impl TResourceView for ExecutorViewWithChangeSet<'_> {
                     self.base_executor_view
                         .get_resource_state_value_size(state_key)
                 },
-                |write_op| Ok(Some(write_op.bytes_size() as u64)),
+                |write_op| Ok(write_op.bytes().map(|bytes| bytes.len() as u64)),
             )
     }
 
