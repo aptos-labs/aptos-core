@@ -4134,6 +4134,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
+ "lru",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",
