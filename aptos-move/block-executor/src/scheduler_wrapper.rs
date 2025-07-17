@@ -13,6 +13,44 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+// Currently, OwnedSchedulerWrapper is only used in executor.rs for re-executing 
+// block epilogue txn, to share the same code path as re-execution that may happen
+// during sequential commit hook, e.g. when there is delayed field validation failure.
+//
+// The scheduler needs to be owned because block epilogue is executed after the main
+// worker loop is exited, the main thread owns the scheduler and must be able to pass
+// it to asynchronous dropper. as_scheduler_wrapper() method converts OwnedSchedulerWrapper
+// to SchedulerWrapper, which allows using unified interfaces with BlockSTM txn execution.
+//
+// In case of V1, AtomicBool is initialized with true (skip module reads validation),
+// and for SchedulerV2, the worker ID is set to 0. These should not have any effect
+// on simple execution flow, but need to be treated with caution, such as if the inner
+// state of scheduler changes, e.g. assigning more work for worker 0, or enforcing any
+// other (outdated after worker loop exit) invariants.
+pub(crate) enum OwnedSchedulerWrapper {
+    V1(Scheduler, AtomicBool),
+    V2(SchedulerV2),
+}
+
+impl OwnedSchedulerWrapper {
+    pub(crate) fn from_v1(scheduler: Scheduler) -> Self {
+        OwnedSchedulerWrapper::V1(scheduler, AtomicBool::new(true))
+    }
+
+    pub(crate) fn from_v2(scheduler: SchedulerV2) -> Self {
+        OwnedSchedulerWrapper::V2(scheduler)
+    }
+
+    pub(crate) fn as_scheduler_wrapper(&self) -> SchedulerWrapper {
+        match self {
+            OwnedSchedulerWrapper::V1(scheduler, skip_module_reads_validation) => {
+                SchedulerWrapper::V1(scheduler, skip_module_reads_validation)
+            },
+            OwnedSchedulerWrapper::V2(scheduler) => SchedulerWrapper::V2(scheduler, 0),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) enum SchedulerWrapper<'a> {
     // The AtomicBool contains a flag that determines whether to skip module reads

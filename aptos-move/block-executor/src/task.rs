@@ -186,7 +186,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
             .collect()
     }
 
-    /// Execution output for transactions that comes after SkipRest signal.
+    /// Execution output for transactions that comes after SkipRest signal
+    /// (except BlockEpilogue txn).
     fn skip_output() -> Self;
 
     /// Execution output for transactions that should be discarded.
@@ -218,20 +219,17 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
-    /// Returns true iff the TransactionsStatus is Retry.
-    fn is_retry(&self) -> bool;
-
     /// Returns true iff it has a new epoch event.
-    fn has_new_epoch_event(&self) -> bool;
+    fn has_new_epoch_event(&self) -> Result<bool, PanicError>;
 
     /// Returns true iff the execution status is Keep(Success).
-    fn is_success(&self) -> bool;
+    fn is_kept_success(&self) -> Result<bool, PanicError>;
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.
     ///
     /// Sum of all sizes of writes (keys + write_ops) and events.
-    fn output_approx_size(&self) -> u64;
+    fn output_approx_size(&self) -> Result<u64, PanicError>;
 
     fn get_write_summary(
         &self,

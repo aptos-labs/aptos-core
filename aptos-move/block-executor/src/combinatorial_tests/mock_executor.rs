@@ -788,9 +788,9 @@ where
         Self::with_discard_code(discard_code)
     }
 
-    fn output_approx_size(&self) -> u64 {
+    fn output_approx_size(&self) -> Result<u64, PanicError> {
         // TODO add block output limit testing
-        0
+        Ok(0)
     }
 
     fn get_write_summary(
@@ -854,16 +854,12 @@ where
         )
     }
 
-    fn is_retry(&self) -> bool {
-        self.skipped
+    fn has_new_epoch_event(&self) -> Result<bool, PanicError> {
+        Ok(false)
     }
 
-    fn has_new_epoch_event(&self) -> bool {
-        false
-    }
-
-    fn is_success(&self) -> bool {
-        !self.skipped
+    fn is_kept_success(&self) -> Result<bool, PanicError> {
+        Ok(!self.skipped)
     }
 }
 

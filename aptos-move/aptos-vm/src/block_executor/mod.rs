@@ -23,7 +23,7 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
-    error::PanicError,
+    error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -114,12 +114,102 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         )))
     }
 
+    // TODO(BlockSTMv2): convert invariant checks to PanicErrors.
+
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
+        materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
+        materialized_events: Vec<ContractEvent>,
+    ) -> Result<(), PanicError> {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output_with_materialized_write_set(
+                            aggregator_v1_writes,
+                            materialized_resource_write_set,
+                            materialized_events,
+                        )?,
+                )
+                .is_ok(),
+            "Could not combine VMOutput with the materialized resource and event data"
+        );
+        Ok(())
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output()
+                        .expect("We should be able to always convert to transaction output"),
+                )
+                .is_ok(),
+            "Could not combine VMOutput with the materialized resource and event data"
+        );
+    }
+
+    /// TODO: Consider defensive access pattern to committed_output / vm_output.
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_kept_success(&self) -> Result<bool, PanicError> {
+        if let Some(committed_output) = self.committed_output.get() {
+            Ok(committed_output
+                .status()
+                .as_kept_status()
+                .map_or(false, |status| status.is_success()))
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .map(|output| {
+                    output
+                        .status()
+                        .as_kept_status()
+                        .map_or(false, |status| status.is_success())
+                })
+                .ok_or_else(|| {
+                    code_invariant_error("Either vm_output or committed_output must exist.")
+                })
+        }
+    }
+
+    /// Returns true iff the TransactionOutput has a new epoch event.
+    fn has_new_epoch_event(&self) -> Result<bool, PanicError> {
+        if let Some(committed_output) = self.committed_output.get() {
+            Ok(committed_output.has_new_epoch_event())
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .map(|output| {
+                    output
+                        .events()
+                        .iter()
+                        .map(|(event, _)| event)
+                        .any(ContractEvent::is_new_epoch_event)
+                })
+                .ok_or_else(|| {
+                    code_invariant_error("Either vm_output or committed_output must exist.")
+                })
+        }
+    }
+
+    /// CAUTION: The methods below should never be called after incorporating materialized output,
+    /// as that consumes vm_output.
+
     // TODO: get rid of the cloning data-structures in the following APIs.
     // This can be accomplished either by providing callbacks or by providing AsRef access to
     // a guard, which for different resources write types would require changing the
     // data-structures in the VMOutput / ChangeSet.
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn resource_group_write_set(
         &self,
     ) -> HashMap<
@@ -348,57 +438,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Delta materialization failed");
     }
 
-    fn incorporate_materialized_txn_output(
-        &self,
-        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
-        materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
-        materialized_events: Vec<ContractEvent>,
-    ) -> Result<(), PanicError> {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .lock()
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output_with_materialized_write_set(
-                            aggregator_v1_writes,
-                            materialized_resource_write_set,
-                            materialized_events,
-                        )?,
-                )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
-        Ok(())
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&self) {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .lock()
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output()
-                        .expect("We should be able to always convert to transaction output"),
-                )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
-    }
-
-    /// Returns the fee statement of the transaction.
-    ///
-    /// TODO(gelash): Consider defensive access pattern to committed_output / vm_output.
     fn fee_statement(&self) -> FeeStatement {
-        if let Some(committed_output) = self.committed_output.get() {
-            if let Ok(Some(fee_statement)) = committed_output.try_extract_fee_statement() {
-                return fee_statement;
-            }
-            return FeeStatement::zero();
-        }
         *self
             .vm_output
             .lock()
@@ -407,52 +447,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .fee_statement()
     }
 
-    /// Returns true iff the TransactionsStatus is Retry.
-    fn is_retry(&self) -> bool {
-        if let Some(committed_output) = self.committed_output.get() {
-            committed_output.status().is_retry()
-        } else {
-            self.vm_output
-                .lock()
-                .as_ref()
-                .expect("Either vm_output or committed_output must exist.")
-                .status()
-                .is_retry()
-        }
-    }
-
-    /// Returns true iff it has a new epoch event.
-    fn has_new_epoch_event(&self) -> bool {
-        self.committed_output
-            .get()
-            .expect("Must call after commit.")
-            .has_new_epoch_event()
-    }
-
-    /// Returns true iff the execution status is Keep(Success).
-    fn is_success(&self) -> bool {
-        if let Some(committed_output) = self.committed_output.get() {
-            committed_output
-                .status()
-                .as_kept_status()
-                .map_or(false, |status| status.is_success())
-        } else {
-            self.vm_output
-                .lock()
-                .as_ref()
-                .expect("Either vm_output or committed_output must exist.")
-                .status()
-                .as_kept_status()
-                .map_or(false, |status| status.is_success())
-        }
-    }
-
-    fn output_approx_size(&self) -> u64 {
-        let vm_output = self.vm_output.lock();
-        vm_output
+    fn output_approx_size(&self) -> Result<u64, PanicError> {
+        self.vm_output
+            .lock()
             .as_ref()
-            .expect("Output to be set to get approximate size")
-            .materialized_size()
+            .map(|output| output.materialized_size())
+            .ok_or_else(|| code_invariant_error("Either vm_output or committed_output must exist."))
     }
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
