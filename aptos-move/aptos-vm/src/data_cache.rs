@@ -153,8 +153,8 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     ) -> PartialVMResult<Option<u64>> {
         let resource_group_bytes =
             self.get_resource_group_bytes(address, struct_tag, metadata, maybe_layout)?;
-        if let Some((_, size)) = resource_group_bytes {
-            return Ok(Some(size as u64));
+        if let Some((bytes, size)) = resource_group_bytes {
+            return Ok(bytes.map(|_| size as u64));
         }
         let state_key = resource_state_key(address, struct_tag)?;
         self.executor_view.get_resource_state_value_size(&state_key)

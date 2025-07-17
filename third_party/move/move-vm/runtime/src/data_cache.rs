@@ -63,7 +63,7 @@ impl DataCacheEntry {
 
     pub(crate) fn exists(&self) -> PartialVMResult<bool> {
         match &self.value {
-            CachedInformation::SizeOnly(e) => Ok(e.unwrap_or(0) != 0),
+            CachedInformation::SizeOnly(e) => Ok(e.is_some()),
             CachedInformation::Value(v) => v.exists(),
         }
     }
