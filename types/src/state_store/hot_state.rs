@@ -4,7 +4,7 @@
 // 256 MiB per shard
 pub const HOT_STATE_MAX_BYTES_PER_SHARD: usize = 256 * 1024 * 1024;
 // 250k items per shard
-pub const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = 250_000;
+pub const HOT_STATE_MAX_ITEMS_PER_SHARD: usize = 1_000;
 // 10KB, worst case the hot state still caches about 400K items (all shards)
 pub const HOT_STATE_MAX_SINGLE_VALUE_BYTES: usize = 10 * 1024;
 
@@ -35,4 +35,10 @@ pub trait THotStateSlot {
 
     fn set_prev(&mut self, prev: Option<Self::Key>);
     fn set_next(&mut self, next: Option<Self::Key>);
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SpeculativeLRUEntry<V> {
+    Existing(V),
+    Deleted,
 }
