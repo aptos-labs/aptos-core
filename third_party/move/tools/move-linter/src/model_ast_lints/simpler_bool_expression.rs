@@ -20,7 +20,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{Exp, ExpData, Operation},
-    model::GlobalEnv,
+    model::FunctionEnv,
 };
 use ExpData::Call;
 use Operation::{And, Not, Or};
@@ -144,11 +144,13 @@ impl SimplerBoolExpression {
 
         if is_negation_pair(left, right) || is_negation_pair(right, left) {
             let result_value = matches!(op, Or);
-            Some(if result_value {
-                SimplerBoolPatternType::Tautology
-            } else {
-                SimplerBoolPatternType::Contradiction
-            })
+            Some(
+                if result_value {
+                    SimplerBoolPatternType::Tautology
+                } else {
+                    SimplerBoolPatternType::Contradiction
+                },
+            )
         } else {
             None
         }
@@ -210,7 +212,9 @@ impl ExpChecker for SimplerBoolExpression {
         "simpler_bool_expression".to_string()
     }
 
-    fn visit_expr_pre(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, function_env: &FunctionEnv<'_>, expr: &ExpData) {
+        let env = function_env.env();
+
         let Call(id, op, args) = expr else { return };
 
         let pattern = match op {
