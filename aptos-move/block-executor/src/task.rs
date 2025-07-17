@@ -152,12 +152,15 @@ pub trait TransactionOutput: Send + Sync + Debug {
         ),
     >;
 
-    fn for_each_resource_group_key_and_tags<F>(&self, callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        // This is &mut dyn and not Impl to sidestep an internal compiler error:
+        // https://github.com/rust-lang/rust/issues/145188.
+        callback: &mut dyn FnMut(
             &<Self::Txn as Transaction>::Key,
             HashSet<&<Self::Txn as Transaction>::Tag>,
-        ) -> Result<(), PanicError>;
+        ) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError>;
 
     // For now, the below interfaces for keys and metada and keys and tags are provided
     // to avoid unnecessarily cloning the whole resource group write set.
@@ -186,7 +189,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
             .collect()
     }
 
-    /// Execution output for transactions that comes after SkipRest signal.
+    /// Execution output for transactions that comes after SkipRest signal
+    /// (except BlockEpilogue txn).
     fn skip_output() -> Self;
 
     /// Execution output for transactions that should be discarded.
@@ -215,23 +219,36 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn set_txn_output_for_non_dynamic_change_set(&self);
 
-    /// Return the fee statement of the transaction.
-    fn fee_statement(&self) -> FeeStatement;
+    /// The purpose of this method is to return true if the output has been committed
+    /// (i.e. incorporate_materialized_txn_output has been called), or false otherwise.
+    /// The method can also assert any invariants provided by the trait implementation
+    /// and the caller. For instance, in the current block executor implementation,
+    /// final output placeholders are initialized via skip_output method and not modified
+    /// until commit - so if the output is not committed, it must be a placeholder.
+    ///
+    /// Must be called after concurrent block execution is complete, including committing
+    /// all required outputs (currently used to check invariants for block epilogue txn).
+    fn is_committed(&self) -> Result<bool, PanicError>;
 
-    /// Returns true iff the TransactionsStatus is Retry.
-    fn is_retry(&self) -> bool;
+    /// Returns true iff the execution status is Keep(Success). Required to be called after
+    /// the output is committed.
+    fn is_kept_success_after_commit(&self) -> Result<bool, PanicError>;
+
+    /// Return the fee statement of the transaction before committing. If the appropriate
+    /// API isn't called (before or after materialize call in commit), the call will
+    /// return a code invariant error.
+    fn fee_statement_before_commit(&self) -> Result<FeeStatement, PanicError>;
+    fn fee_statement_after_commit(&self) -> Result<FeeStatement, PanicError>;
 
     /// Returns true iff it has a new epoch event.
-    fn has_new_epoch_event(&self) -> bool;
-
-    /// Returns true iff the execution status is Keep(Success).
-    fn is_success(&self) -> bool;
+    fn has_new_epoch_event_before_commit(&self) -> Result<bool, PanicError>;
+    fn has_new_epoch_event_after_commit(&self) -> Result<bool, PanicError>;
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.
     ///
     /// Sum of all sizes of writes (keys + write_ops) and events.
-    fn output_approx_size(&self) -> u64;
+    fn output_approx_size(&self) -> Result<u64, PanicError>;
 
     fn get_write_summary(
         &self,
