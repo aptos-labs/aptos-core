@@ -1,4 +1,3 @@
-
 module 0x99::cfg_opt_simple {
     fun test1(x: u64, y: u64): u64 {
         loop {
@@ -17,3 +16,6 @@ module 0x99::cfg_opt_simple {
         x + y
     }
 }
+
+
+============ recompilation succeeded ========

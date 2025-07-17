@@ -1,4 +1,3 @@
-
 module 0x1::vector {
     public native fun empty<Element>(): vector<Element>;
     public native fun length<Element>(self: &vector<Element>): u64;
@@ -151,3 +150,35 @@ module 0x1::vector {
         _t3
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with stackless-bytecode checks failed
+error: cannot freeze value which is still mutably borrowed
+   ┌─ vector.move:40:67
+   │
+40 │         reverse_slice<Element>(self, 0, length<Element>(/*freeze*/self));
+   │         ----------------------------------------------------------^^^^--
+   │         │                      │                                  │
+   │         │                      │                                  implicitly frozen here
+   │         │                      previously mutably borrowed here
+   │         conflicting reference used here
+
+error: cannot freeze value which is still mutably borrowed
+    ┌─ vector.move:103:71
+    │
+103 │         rotate_slice<Element>(self, 0, rot, length<Element>(/*freeze*/self))
+    │         --------------------------------------------------------------^^^^--
+    │         │                     │                                       │
+    │         │                     │                                       implicitly frozen here
+    │         │                     previously mutably borrowed here
+    │         conflicting reference used here
+
+error: cannot freeze value which is still mutably borrowed
+    ┌─ vector.move:131:58
+    │
+131 │         swap<Element>(self, i, length<Element>(/*freeze*/self) - 1);
+    │         -------------------------------------------------^^^^------
+    │         │             │                                  │
+    │         │             │                                  implicitly frozen here
+    │         │             previously mutably borrowed here
+    │         conflicting reference used here

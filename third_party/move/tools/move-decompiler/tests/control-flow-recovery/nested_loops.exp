@@ -1,4 +1,3 @@
-
 module 0x99::nested_loops {
     fun nested_for_loops() {
         let _t4;
@@ -233,3 +232,6 @@ module 0x99::nested_loops {
         };
     }
 }
+
+
+============ recompilation succeeded ========
