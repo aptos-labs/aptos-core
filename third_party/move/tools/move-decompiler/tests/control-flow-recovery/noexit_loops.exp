@@ -1,4 +1,3 @@
-
 module 0x99::noexit_loops {
     struct R {
     }
@@ -70,3 +69,23 @@ module 0x99::noexit_loops {
         loop continue
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:54:9
+   │
+54 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `u64`
+   ┌─ noexit_loops.move:57:9
+   │
+57 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:63:9
+   │
+63 │         loop continue
+   │         ^^^^^^^^^^^^^

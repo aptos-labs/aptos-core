@@ -12151,6 +12151,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "datatest-stable",
+ "libtest-mimic",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -12159,6 +12160,9 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
+ "once_cell",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
