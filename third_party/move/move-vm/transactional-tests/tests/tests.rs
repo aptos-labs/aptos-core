@@ -83,6 +83,20 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             include: &["paranoid-tests"],
             exclude: &[],
         },
+        TestConfig {
+            name: "eager-loading",
+            runner: |p| run(p, get_config_by_name("eager-loading")),
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            vm_config: VMConfig {
+                verifier_config: VerifierConfig::production(),
+                paranoid_type_checks: true,
+                enable_lazy_loading: false,
+                ..VMConfig::default()
+            },
+            include: &[],
+            exclude: &[],
+        },
     ]
 });
 
@@ -101,7 +115,11 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// `test.mvir`) to the same baseline file `test.exp` *unless* there is an entry in this array
 /// matching the path of `test.move` or `test.mvir`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &[];
+const SEPARATE_BASELINE: &[&str] = &[
+    // The output of the tests could be different depending on whether lazy loading is enabled or
+    // not.
+    "/module_publishing/",
+];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
