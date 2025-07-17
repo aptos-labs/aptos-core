@@ -121,6 +121,17 @@ pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PARALLEL_FINALIZE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_finalize_parallel_execution_seconds",
+        // metric description
+        "The time spent in seconds in finalizing parallel execution",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
 pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
