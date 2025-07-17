@@ -36,6 +36,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
+lru = { workspace = true }
 
 [features]
 default = []
