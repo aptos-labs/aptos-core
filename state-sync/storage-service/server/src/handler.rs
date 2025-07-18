@@ -521,8 +521,7 @@ impl<T: StorageReaderInterface> Handler<T> {
             response
                 .transaction_output_list_with_proof
                 .unwrap()
-                .into_parts()
-                .0,
+                .consume_output_list_with_proof(),
         ))
     }
 
@@ -538,7 +537,10 @@ impl<T: StorageReaderInterface> Handler<T> {
         )?;
 
         Ok(DataResponse::TransactionsWithProof(
-            response.transaction_list_with_proof.unwrap().into_parts().0,
+            response
+                .transaction_list_with_proof
+                .unwrap()
+                .consume_transaction_list_with_proof(),
         ))
     }
 
@@ -557,10 +559,10 @@ impl<T: StorageReaderInterface> Handler<T> {
         Ok(DataResponse::TransactionsOrOutputsWithProof((
             response
                 .transaction_list_with_proof
-                .map(|t| t.into_parts().0),
+                .map(|t| t.consume_transaction_list_with_proof()),
             response
                 .transaction_output_list_with_proof
-                .map(|t| t.into_parts().0),
+                .map(|t| t.consume_output_list_with_proof()),
         )))
     }
 

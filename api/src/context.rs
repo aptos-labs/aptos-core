@@ -838,8 +838,7 @@ impl Context {
         let data = self
             .db
             .get_transaction_outputs(start_version, limit as u64, ledger_version)?
-            .into_parts()
-            .0;
+            .consume_output_list_with_proof();
 
         let txn_start_version = data
             .get_first_output_version()
@@ -1077,8 +1076,7 @@ impl Context {
         let (_, txn_output) = &self
             .db
             .get_transaction_outputs(txn.version, 1, txn.version)?
-            .into_parts()
-            .0
+            .consume_output_list_with_proof()
             .transactions_and_outputs[0];
         self.get_accumulator_root_hash(txn.version)
             .map(|h| (txn, h, txn_output).into())
