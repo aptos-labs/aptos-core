@@ -20,6 +20,7 @@ types of pending orders are supported.
 -  [Enum `OrderBook`](#0x7_order_book_OrderBook)
 -  [Enum `OrderType`](#0x7_order_book_OrderType)
 -  [Struct `TestMetadata`](#0x7_order_book_TestMetadata)
+-  [Struct `TestMetadataWithId`](#0x7_order_book_TestMetadataWithId)
 -  [Constants](#@Constants_0)
 -  [Function `new_order_request`](#0x7_order_book_new_order_request)
 -  [Function `new_order_book`](#0x7_order_book_new_order_book)
@@ -32,6 +33,8 @@ types of pending orders are supported.
 -  [Function `place_pending_maker_order`](#0x7_order_book_place_pending_maker_order)
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_order_book_decrease_order_size)
+-  [Function `get_order_metadata`](#0x7_order_book_get_order_metadata)
+-  [Function `set_order_metadata`](#0x7_order_book_set_order_metadata)
 -  [Function `is_active_order`](#0x7_order_book_is_active_order)
 -  [Function `get_order`](#0x7_order_book_get_order)
 -  [Function `get_remaining_size`](#0x7_order_book_get_remaining_size)
@@ -286,6 +289,33 @@ types of pending orders are supported.
 <dl>
 <dt>
 <code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_order_book_TestMetadataWithId"></a>
+
+## Struct `TestMetadataWithId`
+
+
+
+<pre><code><b>struct</b> <a href="order_book.md#0x7_order_book_TestMetadataWithId">TestMetadataWithId</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>id: u64</code>
 </dt>
 <dd>
 
@@ -890,6 +920,67 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
             order.is_bid()
         );
     };
+    self.orders.add(order_id, order_with_state);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_get_order_metadata"></a>
+
+## Function `get_order_metadata`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_metadata">get_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_metadata">get_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType
+): Option&lt;M&gt; {
+    <b>if</b> (!self.orders.contains(&order_id)) {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.orders.borrow(&order_id).get_metadata_from_state())
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_set_order_metadata"></a>
+
+## Function `set_order_metadata`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_set_order_metadata">set_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, metadata: M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
+) {
+    <b>if</b> (!self.orders.contains(&order_id)) {
+        <b>return</b>;
+    };
+
+    <b>let</b> order_with_state = self.orders.remove(&order_id);
+    order_with_state.set_metadata_in_state(metadata);
     self.orders.add(order_id, order_with_state);
 }
 </code></pre>

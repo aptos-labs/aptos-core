@@ -3,6 +3,7 @@ module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
     use std::signer;
+    use std::string;
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_experimental::order_book_types::OrderIdType;
@@ -22,6 +23,12 @@ module aptos_experimental::clearinghouse_test {
 
     public fun new_test_order_metadata(): TestOrderMetadata {
         TestOrderMetadata {}
+    }
+
+    public fun get_order_metadata_string(
+        _order_metadata: TestOrderMetadata
+    ): string::String {
+        string::utf8(b"TestOrderMetadata")
     }
 
     struct Position has store, drop {
@@ -161,6 +168,9 @@ module aptos_experimental::clearinghouse_test {
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_string(order_metadata)
             }
         )
     }
@@ -183,6 +193,9 @@ module aptos_experimental::clearinghouse_test {
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_string(order_metadata)
             }
         )
     }

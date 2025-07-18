@@ -37,6 +37,7 @@
 -  [Function `index`](#0x7_order_book_types_index)
 -  [Function `get_order_from_state`](#0x7_order_book_types_get_order_from_state)
 -  [Function `get_metadata_from_state`](#0x7_order_book_types_get_metadata_from_state)
+-  [Function `set_metadata_in_state`](#0x7_order_book_types_set_metadata_in_state)
 -  [Function `get_order_id`](#0x7_order_book_types_get_order_id)
 -  [Function `get_account`](#0x7_order_book_types_get_account)
 -  [Function `get_unique_priority_idx`](#0x7_order_book_types_get_unique_priority_idx)
@@ -1133,6 +1134,32 @@
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): M {
     self.order.metadata
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_set_metadata_in_state"></a>
+
+## Function `set_metadata_in_state`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;, metadata: M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;, metadata: M
+) {
+    self.order.metadata = metadata;
 }
 </code></pre>
 
