@@ -22,8 +22,8 @@ use crate::{
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter,
-        QualifiedId, SchemaId, SpecFunId, SpecVarId, StructAPI, StructData, StructId,
-        TypeParameter, TypeParameterKind,
+        QualifiedId, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -3899,9 +3899,14 @@ impl ModuleBuilder<'_, '_> {
         &self,
         variants: &[StructVariant],
         symbol_pool: &SymbolPool,
-    ) -> BTreeMap<Symbol, (Vec<FieldId>, Type, bool)> {
-        let mut field_name_map = BTreeMap::<Symbol, Vec<FieldId>>::new();
+    ) -> (
+        BTreeMap<Symbol, (Vec<FieldId>, Type, bool)>,
+        BTreeMap<(Symbol, Symbol), (FieldId, Type)>,
+    ) {
+        let mut field_name_map = BTreeMap::<Symbol, Vec<(FieldId, Symbol)>>::new();
         let mut field_type_map = BTreeMap::<Symbol, Type>::new();
+        let mut stand_alone_field = BTreeSet::<Symbol>::new();
+        let mut stand_alone_map = BTreeMap::<(Symbol, Symbol), (FieldId, Type)>::new();
 
         for variant in variants {
             for (field_name, field) in sorted_fields(&variant.fields) {
@@ -3909,34 +3914,51 @@ impl ModuleBuilder<'_, '_> {
                     symbol_pool.string(variant.name).as_str(),
                     symbol_pool.string(*field_name).as_str(),
                 )));
+                if stand_alone_field.contains(field_name) {
+                    stand_alone_map.insert((*field_name, variant.name), (fid, field.ty.clone()));
+                }
 
                 match (
                     field_type_map.get(field_name),
                     field_name_map.get_mut(field_name),
                 ) {
                     (Some(existing_ty), Some(fids)) if existing_ty == &field.ty => {
-                        fids.push(fid);
+                        fids.push((fid, variant.name));
                     },
                     (Some(_), _) => {
-                        field_name_map.remove(field_name);
-                        field_type_map.remove(field_name);
+                        stand_alone_field.insert(*field_name);
+                        stand_alone_map
+                            .insert((*field_name, variant.name), (fid, field.ty.clone()));
+                        let ids = field_name_map.remove(field_name);
+                        let ty = field_type_map.remove(field_name);
+                        if let (Some(ids), Some(ty)) = (ids, ty) {
+                            for (fid, variant_name) in ids {
+                                stand_alone_map
+                                    .insert((*field_name, variant_name), (fid, ty.clone()));
+                            }
+                        }
                     },
                     (None, _) => {
                         field_type_map.insert(*field_name, field.ty.clone());
-                        field_name_map.insert(*field_name, vec![fid]);
+
+                        field_name_map.insert(*field_name, vec![(fid, variant.name)]);
                     },
                 }
             }
         }
 
-        field_name_map
-            .into_iter()
-            .filter_map(|(field_name, fids)| {
-                field_type_map
-                    .get(&field_name)
-                    .map(|ty| (field_name, (fids, ty.clone(), true)))
-            })
-            .collect()
+        (
+            field_name_map
+                .into_iter()
+                .filter_map(|(field_name, fids)| {
+                    field_type_map.get(&field_name).map(|ty| {
+                        let fids = fids.iter().map(|(fid, _)| *fid).collect_vec();
+                        (field_name, (fids, ty.clone(), true))
+                    })
+                })
+                .collect(),
+            stand_alone_map,
+        )
     }
 
     fn create_struct_field_apis(
@@ -3945,7 +3967,8 @@ impl ModuleBuilder<'_, '_> {
         struct_entry: &StructEntry,
         src_mutable: bool,
         dst_mutable: bool,
-    ) -> BTreeMap<Symbol, FunctionData> {
+        function_data: &mut BTreeMap<FunId, FunctionData>,
+    ) {
         let symbol_pool = self.parent.env.symbol_pool();
 
         // Setup shared parameter for &$s
@@ -3982,30 +4005,46 @@ impl ModuleBuilder<'_, '_> {
                 .map(|(name, field)| (*name, (vec![FieldId::new(*name)], field.ty.clone(), false)))
                 .collect(),
             StructLayout::Variants(variants) => {
-                self.collect_shared_variant_fields(variants, symbol_pool)
+                let (field_map, stand_alone_map) =
+                    self.collect_shared_variant_fields(variants, symbol_pool);
+                for ((field_name, variant_name), (field_id, ty)) in stand_alone_map {
+                    let fun_data = self.build_borrow_function(
+                        struct_name,
+                        field_name,
+                        vec![field_id],
+                        &param,
+                        &local_para_var,
+                        &ty,
+                        struct_entry,
+                        src_mutable,
+                        dst_mutable,
+                        true,
+                        Some(variant_name),
+                    );
+                    let fun_id = FunId::new(fun_data.name);
+                    function_data.insert(fun_id, fun_data);
+                }
+                field_map
             },
-            StructLayout::None => return BTreeMap::new(),
+            StructLayout::None => BTreeMap::new(),
         };
-
-        // Build function data for each field
-        field_map
-            .into_iter()
-            .map(|(field_name, (field_ids, ty, is_variant))| {
-                let fun_data = self.build_borrow_function(
-                    struct_name,
-                    field_name,
-                    field_ids,
-                    &param,
-                    &local_para_var,
-                    &ty,
-                    struct_entry,
-                    src_mutable,
-                    dst_mutable,
-                    is_variant,
-                );
-                (field_name, fun_data)
-            })
-            .collect()
+        for (field_name, (field_ids, ty, is_variant)) in field_map {
+            let fun_data = self.build_borrow_function(
+                struct_name,
+                field_name,
+                field_ids,
+                &param,
+                &local_para_var,
+                &ty,
+                struct_entry,
+                src_mutable,
+                dst_mutable,
+                is_variant,
+                None,
+            );
+            let fun_id = FunId::new(fun_data.name);
+            function_data.insert(fun_id, fun_data);
+        }
     }
 
     fn build_borrow_function(
@@ -4020,6 +4059,7 @@ impl ModuleBuilder<'_, '_> {
         src_mutable: bool,
         dst_mutable: bool,
         is_variant: bool,
+        variant_name_opt: Option<Symbol>,
     ) -> FunctionData {
         let symbol_pool = self.parent.env.symbol_pool();
 
@@ -4028,13 +4068,19 @@ impl ModuleBuilder<'_, '_> {
             Box::new(field_type.clone()),
         );
 
-        let fun_name = symbol_pool.make(&format!(
-            "borrow{}from{}${}${}",
+        let fun_name_str = format!(
+            "borrow{}from{}${}${}{}",
             if dst_mutable { "_mut_" } else { "_" },
             if src_mutable { "_mut" } else { "" },
             struct_name.display(symbol_pool),
-            field_name.display(symbol_pool)
-        ));
+            field_name.display(symbol_pool),
+            if let Some(variant_name) = variant_name_opt {
+                format!("${}", variant_name.display(symbol_pool))
+            } else {
+                "".to_string()
+            }
+        );
+        let fun_name = symbol_pool.make(&fun_name_str);
 
         let select_node = self
             .parent
@@ -4117,7 +4163,7 @@ impl ModuleBuilder<'_, '_> {
                 },
                 StructLayout::None => false,
             };
-            let mut data = StructData {
+            let data = StructData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
                 def_idx: None,
@@ -4131,7 +4177,6 @@ impl ModuleBuilder<'_, '_> {
                 is_native: entry.is_native,
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
-                struct_api: None,
             };
             if entry.visibility != Visibility::Private
                 && self
@@ -4140,8 +4185,7 @@ impl ModuleBuilder<'_, '_> {
                     .language_version()
                     .is_at_least(LanguageVersion::V2_4)
             {
-                let struct_api = self.create_struct_api(name.symbol, entry, &mut function_data);
-                data.struct_api = Some(struct_api);
+                self.create_struct_api(name.symbol, entry, &mut function_data);
             }
             // generate source apis
             struct_data.insert(StructId::new(name.symbol), data);
@@ -4241,27 +4285,11 @@ impl ModuleBuilder<'_, '_> {
         struct_name: Symbol,
         struct_entry: &StructEntry,
         function_data: &mut BTreeMap<FunId, FunctionData>,
-    ) -> StructAPI {
-        let struct_pack_api =
-            self.create_struct_pack_api_map(struct_name, struct_entry, function_data);
-        let struct_unpack_api =
-            self.create_struct_unpack_api_map(struct_name, struct_entry, function_data);
-        let (
-            struct_field_borrow_map,
-            struct_field_borrow_mut_map,
-            struct_field_borrow_immut_from_mut_map,
-        ) = self.create_struct_field_api_maps(struct_name, struct_entry, function_data);
-        let struct_test_variant_api =
-            self.create_struct_test_variant_api_map(struct_name, struct_entry, function_data);
-
-        StructAPI {
-            struct_pack_api,
-            struct_unpack_api,
-            struct_field_borrow_map,
-            struct_field_borrow_mut_map,
-            struct_field_borrow_immut_from_mut_map,
-            struct_test_variant_api,
-        }
+    ) {
+        self.create_struct_pack_api_map(struct_name, struct_entry, function_data);
+        self.create_struct_unpack_api_map(struct_name, struct_entry, function_data);
+        self.create_struct_field_api_maps(struct_name, struct_entry, function_data);
+        self.create_struct_test_variant_api_map(struct_name, struct_entry, function_data);
     }
 
     /// Creates the pack API map for a struct
@@ -4270,15 +4298,12 @@ impl ModuleBuilder<'_, '_> {
         struct_name: Symbol,
         struct_entry: &StructEntry,
         function_data: &mut BTreeMap<FunId, FunctionData>,
-    ) -> BTreeMap<Option<Symbol>, FunId> {
-        let mut struct_pack_api = BTreeMap::new();
+    ) {
         let pack_api = self.create_struct_pack_api(struct_name, struct_entry);
-        for (variant, fun_def) in pack_api {
+        for (_, fun_def) in pack_api {
             let fun_id = FunId::new(fun_def.name);
-            struct_pack_api.insert(variant, fun_id);
             function_data.insert(fun_id, fun_def);
         }
-        struct_pack_api
     }
 
     /// Creates the unpack API map for a struct
@@ -4287,15 +4312,12 @@ impl ModuleBuilder<'_, '_> {
         struct_name: Symbol,
         struct_entry: &StructEntry,
         function_data: &mut BTreeMap<FunId, FunctionData>,
-    ) -> BTreeMap<Option<Symbol>, FunId> {
-        let mut struct_unpack_api = BTreeMap::new();
+    ) {
         let unpack_api = self.create_struct_unpack_api(struct_name, struct_entry);
-        for (variant, fun_def) in unpack_api {
+        for (_, fun_def) in unpack_api {
             let fun_id = FunId::new(fun_def.name);
-            struct_unpack_api.insert(variant, fun_id);
             function_data.insert(fun_id, fun_def);
         }
-        struct_unpack_api
     }
 
     /// Creates the field access API maps for a struct
@@ -4304,47 +4326,15 @@ impl ModuleBuilder<'_, '_> {
         struct_name: Symbol,
         struct_entry: &StructEntry,
         function_data: &mut BTreeMap<FunId, FunctionData>,
-    ) -> (
-        BTreeMap<Symbol, FunId>,
-        BTreeMap<Symbol, FunId>,
-        BTreeMap<Symbol, FunId>,
     ) {
-        let mut struct_field_borrow_map = BTreeMap::new();
-        let mut struct_field_borrow_mut_map = BTreeMap::new();
-        let mut struct_field_borrow_immut_from_mut_map = BTreeMap::new();
-
         // Create immutable borrow from immutable
-        let fields_borrow_map =
-            self.create_struct_field_apis(struct_name, struct_entry, false, false);
-        for (field_name, field_data) in fields_borrow_map {
-            let fun_id = FunId::new(field_data.name);
-            struct_field_borrow_map.insert(field_name, fun_id);
-            function_data.insert(fun_id, field_data);
-        }
+        self.create_struct_field_apis(struct_name, struct_entry, false, false, function_data);
 
         // Create mutable borrow from mutable
-        let fields_borrow_mut_map =
-            self.create_struct_field_apis(struct_name, struct_entry, true, true);
-        for (field_name, field_data) in fields_borrow_mut_map {
-            let fun_id = FunId::new(field_data.name);
-            struct_field_borrow_mut_map.insert(field_name, fun_id);
-            function_data.insert(fun_id, field_data);
-        }
+        self.create_struct_field_apis(struct_name, struct_entry, true, true, function_data);
 
         // Create immutable borrow from mutable
-        let fields_borrow_immut_from_mut_map =
-            self.create_struct_field_apis(struct_name, struct_entry, true, false);
-        for (field_name, field_data) in fields_borrow_immut_from_mut_map {
-            let fun_id = FunId::new(field_data.name);
-            struct_field_borrow_immut_from_mut_map.insert(field_name, fun_id);
-            function_data.insert(fun_id, field_data);
-        }
-
-        (
-            struct_field_borrow_map,
-            struct_field_borrow_mut_map,
-            struct_field_borrow_immut_from_mut_map,
-        )
+        self.create_struct_field_apis(struct_name, struct_entry, true, false, function_data);
     }
 
     /// Creates the test variant API map for enum structs
@@ -4353,17 +4343,14 @@ impl ModuleBuilder<'_, '_> {
         struct_name: Symbol,
         struct_entry: &StructEntry,
         function_data: &mut BTreeMap<FunId, FunctionData>,
-    ) -> BTreeMap<Symbol, FunId> {
-        let mut struct_test_variant_api = BTreeMap::new();
+    ) {
         if matches!(struct_entry.layout, StructLayout::Variants(_)) {
             let test_variant_api = self.create_struct_test_variant_api(struct_name, struct_entry);
-            for (variant_name, fun_data) in test_variant_api {
+            for (_, fun_data) in test_variant_api {
                 let fun_id = FunId::new(fun_data.name);
-                struct_test_variant_api.insert(variant_name, fun_id);
                 function_data.insert(fun_id, fun_data);
             }
         }
-        struct_test_variant_api
     }
 }
 
