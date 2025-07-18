@@ -16,7 +16,7 @@ module aptos_experimental::pre_cancellation_tracker {
     const MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL: u64 = 10;
 
     struct PreCancellationTracker has store {
-        pre_cancellation_window_micros: u64,
+        pre_cancellation_window_secs: u64,
         // Map of order IDs with expiration time to a boolean indicating if the order is active.
         expiration_with_order_ids: BigOrderedMap<ExpirationAndOrderId, bool>,
         // Map of order Ids to their corresponding expiration time.
@@ -28,9 +28,9 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    public fun new_pre_cancellation_tracker(expiration_time_micros: u64): PreCancellationTracker {
+    public fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
         PreCancellationTracker {
-            pre_cancellation_window_micros: expiration_time_micros,
+            pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: big_ordered_map::new_with_reusable(),
             account_order_ids: big_ordered_map::new_with_reusable()
         }
@@ -53,7 +53,7 @@ module aptos_experimental::pre_cancellation_tracker {
             tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
         };
         let current_time = aptos_std::timestamp::now_microseconds();
-        let expiration_time = current_time + tracker.pre_cancellation_window_micros;
+        let expiration_time = current_time + tracker.pre_cancellation_window_secs;
         let order_id_with_expiration = ExpirationAndOrderId {
             expiration_time,
             account_order_id
@@ -71,7 +71,7 @@ module aptos_experimental::pre_cancellation_tracker {
         let account_order_id = new_account_client_order_id(account, client_order_id);
         let expiration_time_option = tracker.account_order_ids.get(&account_order_id);
         if (expiration_time_option.is_some()) {
-            let current_time = aptos_std::timestamp::now_microseconds();
+            let current_time = aptos_std::timestamp::now_seconds();
             let expiration_time = expiration_time_option.destroy_some();
             if (current_time > expiration_time) {
                 // This is possible as garbage collection may not be able to garbage collect all expired orders
@@ -89,7 +89,7 @@ module aptos_experimental::pre_cancellation_tracker {
 
     public fun garbage_collect(tracker: &mut PreCancellationTracker) {
         let i = 0;
-        let current_time = aptos_std::timestamp::now_microseconds();
+        let current_time = aptos_std::timestamp::now_seconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL
             && !tracker.expiration_with_order_ids.is_empty()) {
             let (front_k, _) = tracker.expiration_with_order_ids.borrow_front();
@@ -108,7 +108,7 @@ module aptos_experimental::pre_cancellation_tracker {
         // This function is used to destroy the tracker in tests.
         // In production, the tracker will be garbage collected automatically.
         let PreCancellationTracker {
-            pre_cancellation_window_micros: _,
+            pre_cancellation_window_secs: _,
             expiration_with_order_ids: order_ids_with_expiration,
             account_order_ids
         } = tracker;
@@ -122,7 +122,7 @@ module aptos_experimental::pre_cancellation_tracker {
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Set short expiration for test purposes
-        let expiration_window = 100_000; // 100 milliseconds
+        let expiration_window = 100; // 100 seconds
         let tracker = new_pre_cancellation_tracker(expiration_window);
 
         let client_order_id = 42;
@@ -147,7 +147,7 @@ module aptos_experimental::pre_cancellation_tracker {
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         // Set very short expiration for test
-        let expiration_window = 10_000; // 10 milliseconds
+        let expiration_window = 10; // 10 seconds
         let tracker = new_pre_cancellation_tracker(expiration_window);
 
         let addr = signer::address_of(account);
@@ -155,8 +155,8 @@ module aptos_experimental::pre_cancellation_tracker {
 
         // Pre-cancel the order
         pre_cancel_order_for_tracker(&mut tracker, account, client_order_id);
-        let initial_time = timestamp::now_microseconds();
-        timestamp::update_global_time_for_test(initial_time + 5000);
+        let initial_time = timestamp::now_seconds();
+        timestamp::update_global_time_for_test_secs(initial_time + 5);
         // Should be considered pre-cancelled before expiration
         let is_cancelled = is_pre_cancelled(&mut tracker, addr, client_order_id);
         assert!(is_cancelled);
@@ -175,7 +175,7 @@ module aptos_experimental::pre_cancellation_tracker {
         account: &signer, aptos_framework: &signer
     ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        let expiration_window = 5_000;
+        let expiration_window = 5;
         let tracker = new_pre_cancellation_tracker(expiration_window);
         let addr = signer::address_of(account);
 
@@ -193,8 +193,8 @@ module aptos_experimental::pre_cancellation_tracker {
         };
 
         // Wait to let them expire
-        let initial_time = timestamp::now_microseconds();
-        timestamp::update_global_time_for_test(initial_time + expiration_window + 1);
+        let initial_time = timestamp::now_seconds();
+        timestamp::update_global_time_for_test_secs(initial_time + expiration_window + 1);
 
         let j = 0;
         // Before garbage collection, we should still have them in account_order_ids

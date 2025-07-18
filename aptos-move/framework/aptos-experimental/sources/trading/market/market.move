@@ -122,7 +122,7 @@ module aptos_experimental::market {
             /// Whether to allow sending all events for the markett
             allow_events_emission: bool,
             /// Pre cancellation window in microseconds
-            pre_cancellation_window_micros: u64
+            pre_cancellation_window_secs: u64
         }
     }
 
@@ -214,7 +214,7 @@ module aptos_experimental::market {
         MarketConfig::V1 {
             allow_self_trade: allow_self_matching,
             allow_events_emission,
-            pre_cancellation_window_micros,
+            pre_cancellation_window_secs: pre_cancellation_window_micros,
         }
     }
 
@@ -223,7 +223,7 @@ module aptos_experimental::market {
     ): Market<M> {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
-        let pre_cancellation_window = config.pre_cancellation_window_micros;
+        let pre_cancellation_window = config.pre_cancellation_window_secs;
         let pre_cancellation_tracker = table::new();
         pre_cancellation_tracker.add(
             PRE_CANCELLATION_TRACKER_KEY,
@@ -1104,7 +1104,7 @@ module aptos_experimental::market {
             order_book,
             pre_cancellation_tracker,
         } = self;
-        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_micros: _ } = config;
+        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _ } = config;
         destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
         pre_cancellation_tracker.drop_unchecked();
         order_book.destroy_order_book()
