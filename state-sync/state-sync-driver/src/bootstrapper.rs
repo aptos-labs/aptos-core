@@ -598,6 +598,8 @@ impl<
         result
     }
 
+    // TODO: don't drop the auxiliary infos here!
+
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
         let state_sync_driver_config = &self.driver_configuration.config;
@@ -628,7 +630,11 @@ impl<
                     );
                     self.process_transaction_or_output_payload(
                         notification_metadata,
-                        Some(transactions_with_proof),
+                        Some(
+                            transactions_with_proof
+                                .get_transaction_list_with_proof()
+                                .clone(),
+                        ),
                         None,
                         payload_start_version,
                     )
@@ -644,7 +650,11 @@ impl<
                     self.process_transaction_or_output_payload(
                         notification_metadata,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(
+                            transaction_outputs_with_proof
+                                .get_output_list_with_proof()
+                                .clone(),
+                        ),
                         payload_start_version,
                     )
                     .await?;

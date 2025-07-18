@@ -198,6 +198,8 @@ impl<
         result
     }
 
+    // TODO: don't drop the auxiliary infos here!
+
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(
         &mut self,
@@ -223,7 +225,11 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(
+                            transaction_outputs_with_proof
+                                .get_output_list_with_proof()
+                                .clone(),
+                        ),
                         payload_start_version,
                     )
                     .await?;
@@ -242,7 +248,11 @@ impl<
                         consensus_sync_request.clone(),
                         notification_metadata,
                         ledger_info_with_sigs,
-                        Some(transactions_with_proof),
+                        Some(
+                            transactions_with_proof
+                                .get_transaction_list_with_proof()
+                                .clone(),
+                        ),
                         None,
                         payload_start_version,
                     )
