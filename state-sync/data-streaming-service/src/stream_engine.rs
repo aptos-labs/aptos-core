@@ -518,10 +518,10 @@ impl ContinuousTransactionStreamEngine {
         // Check the number of received versions
         let num_received_versions = match &client_response_payload {
             ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             _ => invalid_response_type!(client_response_payload),
         };
@@ -1674,10 +1674,10 @@ impl TransactionStreamEngine {
         // Check the number of received versions
         let num_received_versions = match client_response_payload {
             ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             _ => invalid_response_type!(client_response_payload),
         };
@@ -2243,14 +2243,14 @@ fn extract_new_versions_and_target(
             transactions_with_proof,
             target_ledger_info,
         )) => (
-            transactions_with_proof.transactions.len(),
+            transactions_with_proof.get_num_transactions(),
             target_ledger_info.clone(),
         ),
         ResponsePayload::NewTransactionOutputsWithProof((
             outputs_with_proof,
             target_ledger_info,
         )) => (
-            outputs_with_proof.transactions_and_outputs.len(),
+            outputs_with_proof.get_num_outputs(),
             target_ledger_info.clone(),
         ),
         response_payload => {
