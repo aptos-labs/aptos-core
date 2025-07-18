@@ -1,4 +1,3 @@
-
 module 0x99::enum_complex {
     enum Admin has drop {
         Superuser,
@@ -143,3 +142,6 @@ module 0x99::enum_simple {
         ()
     }
 }
+
+
+============ recompilation succeeded ========

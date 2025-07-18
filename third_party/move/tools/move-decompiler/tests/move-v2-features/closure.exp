@@ -1,4 +1,3 @@
-
 module 0x99::basic_enum {
     enum FV<T> has key {
         V1 {
@@ -186,3 +185,11 @@ module 0x99::nested_lambda {
         y + (c as u8)
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid character
+   ┌─ closure.move:37:32
+   │
+37 │     fun __lambda__1__test(param$0: u64): u64 {
+   │                                ^ Invalid character: `$`

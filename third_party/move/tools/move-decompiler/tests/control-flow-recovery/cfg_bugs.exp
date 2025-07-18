@@ -1,0 +1,14 @@
+module 0x99::return_test {
+    public fun contains(e: u64, v: vector<u64>): bool {
+        let _t4;
+        let _t2;
+        _t2 = 0;
+        _t4 = false;
+        while (!(!(_t2 < 0x1::vector::length<u64>(&v)) || 0x1::vector::borrow<u64>(&v, _t2) == &e)) _t2 = _t2 + 1;
+        _t4 = true;
+        _t4
+    }
+}
+
+
+============ recompilation succeeded ========

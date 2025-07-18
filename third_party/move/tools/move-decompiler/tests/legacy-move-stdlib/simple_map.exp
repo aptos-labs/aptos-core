@@ -1,4 +1,3 @@
-
 module 0x1::simple_map {
     use 0x1::option;
     use 0x1::error;
@@ -152,3 +151,6 @@ module 0x1::simple_map {
         (option::some<Key>(_t34), option::some<Value>(_t35))
     }
 }
+
+
+============ recompilation succeeded ========
