@@ -440,7 +440,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     SyntaxChoice::ASM => {
                         // TODO(#16582): generate source info for .masm file
                         self.compiled_state()
-                            .add_and_generate_interface_file(module);
+                            .add_without_source_file(named_addr_opt, module);
                     },
                 };
                 Ok(merge_output(warnings_opt, output))
@@ -686,6 +686,25 @@ impl<'a> CompiledState<'a> {
         let processed = ProcessedModule {
             module,
             source_file: Some(source_file),
+        };
+        self.modules.insert(id, processed);
+    }
+
+    pub fn add_without_source_file(
+        &mut self,
+        named_addr_opt: Option<Symbol>,
+        module: CompiledModule,
+    ) {
+        let id = module.self_id();
+        self.check_not_precompiled(&id);
+        if let Some(named_addr) = named_addr_opt {
+            self.compiled_module_named_address_mapping
+                .insert(id.clone(), named_addr);
+        }
+
+        let processed = ProcessedModule {
+            module,
+            source_file: None,
         };
         self.modules.insert(id, processed);
     }

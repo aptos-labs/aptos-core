@@ -8,16 +8,19 @@ use crate::{
     module_builder::{ModuleBuilder, ModuleBuilderOptions},
     syntax,
     syntax::{
-        map_diag, Argument, AsmResult, Diag, Fun, Instruction, Loc, Local, Type, Unit, UnitId,
-        Value,
+        map_diag, Argument, AsmResult, Decl, Diag, Fun, Instruction, Loc, PartialIdent, Struct,
+        StructLayout, Type, Unit, UnitId, Value,
     },
     ModuleOrScript,
 };
 use either::Either;
 use move_binary_format::{
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandleIndex, LocalIndex,
-        SignatureIndex, SignatureToken, TableIndex,
+        Bytecode, CodeOffset, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, LocalIndex, MemberCount, SignatureIndex,
+        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
+        StructVariantHandleIndex, StructVariantInstantiationIndex, TableIndex, TypeSignature,
+        VariantDefinition, VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
     CompiledModule,
 };
@@ -28,10 +31,10 @@ struct Assembler<'a> {
     builder: ModuleBuilder<'a>,
     diags: Vec<Diag>,
     /// Context available during processing of a function.
-    fun_context: Option<FunctionContext>,
+    resolution_context: Option<ResolutionContext>,
 }
 
-struct FunctionContext {
+struct ResolutionContext {
     ty_param_map: BTreeMap<String, u16>,
     local_map: BTreeMap<String, (LocalIndex, SignatureToken)>,
 }
@@ -44,7 +47,7 @@ pub(crate) fn compile<'a>(
     let mut compiler = Assembler {
         builder: ModuleBuilder::new(options, context_modules, ast.name.module_opt()),
         diags: vec![],
-        fun_context: None,
+        resolution_context: None,
     };
     compiler.unit(&ast);
     if compiler.diags.is_empty() {
@@ -63,6 +66,7 @@ impl<'a> Assembler<'a> {
             name: _,
             address_aliases,
             module_aliases,
+            structs,
             functions,
         } = ast;
         // Register aliases
@@ -75,17 +79,77 @@ impl<'a> Assembler<'a> {
             self.add_diags(Loc::new(0, 0), res);
         }
 
+        // Declare structs
+        for str in structs {
+            self.declare_struct(str)
+        }
+
         // Declare functions
         for fun in functions {
             self.declare_fun(fun);
         }
 
-        // Define code for functions
         if self.diags.is_empty() {
+            // Define layout for structs
+            for (pos, str) in structs.iter().enumerate() {
+                self.define_struct(StructDefinitionIndex::new(pos as TableIndex), str)
+            }
+
+            // Define code for functions
             for (pos, fun) in functions.iter().enumerate() {
                 self.define_fun(FunctionDefinitionIndex::new(pos as TableIndex), fun)
             }
         }
+    }
+
+    fn declare_struct(&mut self, str: &Struct) {
+        self.setup_struct(str);
+        let res = self.builder.declare_struct(
+            str.name.clone(),
+            str.type_params
+                .iter()
+                .map(|(_, constraints, is_phantom)| (*constraints, *is_phantom))
+                .collect(),
+            str.abilities,
+        );
+        self.add_diags(str.loc, res);
+    }
+
+    fn define_struct(&mut self, idx: StructDefinitionIndex, str: &Struct) {
+        self.setup_struct(str);
+        let layout = match &str.layout {
+            StructLayout::Singleton(fields) => {
+                StructFieldInformation::Declared(self.translate_fields(fields))
+            },
+            StructLayout::Variants(variants) => {
+                let mut result = vec![];
+                for (loc, name, fields) in variants {
+                    let name_res = self.builder.name_index(name.clone());
+                    if let Some(name) = self.add_diags(*loc, name_res) {
+                        result.push(VariantDefinition {
+                            name,
+                            fields: self.translate_fields(fields),
+                        })
+                    }
+                }
+                StructFieldInformation::DeclaredVariants(result)
+            },
+        };
+        self.builder.define_struct_layout(idx, layout)
+    }
+
+    fn translate_fields(&mut self, fields: &[Decl]) -> Vec<FieldDefinition> {
+        let mut result = vec![];
+        for field in fields {
+            let name_res = self.builder.name_index(field.name.clone());
+            if let Some(name) = self.add_diags(field.loc, name_res) {
+                result.push(FieldDefinition {
+                    name,
+                    signature: TypeSignature(self.build_type(field.loc, &field.ty)),
+                })
+            }
+        }
+        result
     }
 
     fn declare_fun(&mut self, fun: &Fun) {
@@ -104,8 +168,10 @@ impl<'a> Assembler<'a> {
             .collect();
         let res = self.builder.signature_index(result_tys);
         let result_sign = self.add_diags(fun.loc, res).unwrap_or_default();
+        let acquires_res = self.acquires(fun.acquires.iter());
+        let acquires = self.add_diags(fun.loc, acquires_res).unwrap_or_default();
         let res = self.builder.declare_fun(
-            false, // TODO(#16582): entry
+            fun.is_entry,
             fun.name.clone(),
             fun.visibility,
             param_sign,
@@ -114,35 +180,52 @@ impl<'a> Assembler<'a> {
                 .iter()
                 .map(|(_, abilities)| *abilities)
                 .collect(),
+            acquires,
         );
         self.add_diags(fun.loc, res);
     }
 
+    fn acquires<'b>(
+        &mut self,
+        ids: impl Iterator<Item = &'b Identifier>,
+    ) -> anyhow::Result<Vec<StructDefinitionIndex>> {
+        ids.map(|id| self.builder.resolve_struct_def(id.as_ident_str()))
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
+
     fn setup_fun(&mut self, fun: &Fun) {
-        let ty_param_map = fun
-            .type_params
-            .iter()
-            .enumerate()
-            .map(|(pos, (id, _))| (id.to_string(), pos as u16))
-            .collect();
-        self.fun_context = Some(FunctionContext {
-            ty_param_map, // This is needed for build_type called below
-            local_map: Default::default(),
-        });
-        self.fun_context.as_mut().unwrap().local_map = fun
+        self.setup_type_params(fun.type_params.iter().map(|(id, _)| id));
+        self.resolution_context.as_mut().unwrap().local_map = fun
             .params
             .iter()
             .chain(fun.locals.iter())
             .enumerate()
-            .map(|(pos, Local { loc, name, ty })| {
+            .map(|(pos, Decl { loc, name, ty })| {
                 let ty = self.build_type(*loc, ty);
                 (name.to_string(), (pos as LocalIndex, ty))
             })
             .collect();
     }
 
-    fn require_fun(&self) -> &FunctionContext {
-        self.fun_context.as_ref().expect("function context")
+    fn setup_struct(&mut self, str: &Struct) {
+        self.setup_type_params(str.type_params.iter().map(|(name, _, _)| name))
+    }
+
+    fn setup_type_params<'b>(&mut self, params: impl Iterator<Item = &'b Identifier>) {
+        let ty_param_map = params
+            .enumerate()
+            .map(|(pos, id)| (id.to_string(), pos as u16))
+            .collect();
+        self.resolution_context = Some(ResolutionContext {
+            ty_param_map,
+            local_map: Default::default(),
+        });
+    }
+
+    fn require_resolution_context(&self) -> &ResolutionContext {
+        self.resolution_context
+            .as_ref()
+            .expect("resolution context")
     }
 
     fn define_fun(&mut self, def_idx: FunctionDefinitionIndex, fun: &Fun) {
@@ -185,7 +268,7 @@ impl<'a> Assembler<'a> {
                 // Define locals signature.
                 let locals_start = fun.params.len();
                 let mut locals: Vec<(LocalIndex, SignatureToken)> = self
-                    .require_fun()
+                    .require_resolution_context()
                     .local_map
                     .clone()
                     .into_iter()
@@ -232,12 +315,31 @@ impl<'a> Assembler<'a> {
         let tr_inst = |comp: &mut Self, inst: Option<&Vec<Type>>| -> Option<Vec<SignatureToken>> {
             inst.map(|tys| tys.iter().map(|t| comp.build_type(loc, t)).collect())
         };
+        let tr_named =
+            |comp: &mut Self, name: &PartialIdent, inst: Option<&Vec<Type>>| -> SignatureToken {
+                let res = comp.builder.resolve_struct(&name.address, &name.id_parts);
+                if let Some(shdl_idx) = comp.add_diags(loc, res) {
+                    match tr_inst(comp, inst) {
+                        Some(tys) => SignatureToken::StructInstantiation(shdl_idx, tys),
+                        None => SignatureToken::Struct(shdl_idx),
+                    }
+                } else {
+                    // error reported
+                    SignatureToken::Bool
+                }
+            };
         match ty {
             Type::Named(partial_id, opt_inst) => {
                 if partial_id.address.is_none() && partial_id.id_parts.len() == 1 {
                     match partial_id.id_parts[0].as_str() {
-                        s if self.require_fun().ty_param_map.contains_key(s) => {
-                            SignatureToken::TypeParameter(self.require_fun().ty_param_map[s])
+                        s if self
+                            .require_resolution_context()
+                            .ty_param_map
+                            .contains_key(s) =>
+                        {
+                            SignatureToken::TypeParameter(
+                                self.require_resolution_context().ty_param_map[s],
+                            )
                         },
                         "u8" => {
                             ck_inst(self, None, opt_inst.as_ref());
@@ -285,14 +387,10 @@ impl<'a> Assembler<'a> {
                                 SignatureToken::Bool
                             }
                         },
-                        _ => {
-                            self.error(loc, "structs NYI");
-                            SignatureToken::Bool
-                        },
+                        _ => tr_named(self, partial_id, opt_inst.as_ref()),
                     }
                 } else {
-                    self.error(loc, "structs NYI type");
-                    SignatureToken::Bool
+                    tr_named(self, partial_id, opt_inst.as_ref())
                 }
             },
             Type::Ref(is_mut, ty) => {
@@ -337,7 +435,7 @@ impl<'a> Assembler<'a> {
                     _ => unreachable!(),
                 };
                 let arg = self.args1(instr)?;
-                let label = self.simple_id(instr, arg)?;
+                let label = self.simple_id(instr, arg, " for label")?;
                 if let Some(label_offs) = label_defs.get(&label) {
                     mk_instr(*label_offs)
                 } else {
@@ -376,7 +474,6 @@ impl<'a> Assembler<'a> {
                 let num = self.number(instr, arg, U256::max_value())?;
                 LdU256(num)
             },
-
             "cast_u8" => {
                 self.args0(instr)?;
                 CastU8
@@ -457,7 +554,7 @@ impl<'a> Assembler<'a> {
                 let arg = self.args1(instr)?;
                 MutBorrowLoc(self.local(instr, arg)?)
             },
-            "imm_borrow_loc" => {
+            "borrow_loc" => {
                 let arg = self.args1(instr)?;
                 ImmBorrowLoc(self.local(instr, arg)?)
             },
@@ -608,6 +705,135 @@ impl<'a> Assembler<'a> {
                 let sign_idx = self.type_index(instr, arg)?;
                 CallClosure(sign_idx)
             },
+            "pack" | "unpack" => {
+                let (gen_op, op): (
+                    fn(StructDefInstantiationIndex) -> Bytecode,
+                    fn(StructDefinitionIndex) -> Bytecode,
+                ) = match instr_name.as_str() {
+                    "pack" => (PackGeneric, Pack),
+                    "unpack" => (UnpackGeneric, Unpack),
+                    _ => unreachable!(),
+                };
+                let arg = self.args1(instr)?;
+                let (def_idx, targs_opt) = self.struct_ref(instr, arg)?;
+                if let Some(targs) = targs_opt {
+                    let res = self.builder.struct_def_inst_index(def_idx, targs);
+                    let inst_idx = self.add_diags(instr.loc, res)?;
+                    gen_op(inst_idx)
+                } else {
+                    op(def_idx)
+                }
+            },
+            "pack_variant" | "unpack_variant" | "test_variant" => {
+                let (gen_op, op): (
+                    fn(StructVariantInstantiationIndex) -> Bytecode,
+                    fn(StructVariantHandleIndex) -> Bytecode,
+                ) = match instr_name.as_str() {
+                    "pack_variant" => (PackVariantGeneric, PackVariant),
+                    "unpack_variant" => (UnpackVariantGeneric, UnpackVariant),
+                    "test_variant" => (TestVariantGeneric, TestVariant),
+                    _ => unreachable!(),
+                };
+                let [arg1, arg2] = self.args2(instr)?;
+                let (def_idx, targs_opt) = self.struct_ref(instr, arg1)?;
+                let variant_idx = self.struct_variant(instr, def_idx, arg2)?;
+                if let Some(targs) = targs_opt {
+                    let inst_idx = self.add_diags(
+                        instr.loc,
+                        self.builder.variant_inst_index(variant_idx, targs),
+                    )?;
+                    gen_op(inst_idx)
+                } else {
+                    op(variant_idx)
+                }
+            },
+            "borrow_field" | "mut_borrow_field" => {
+                let (gen_op, op): (
+                    fn(FieldInstantiationIndex) -> Bytecode,
+                    fn(FieldHandleIndex) -> Bytecode,
+                ) = match instr_name.as_str() {
+                    "borrow_field" => (ImmBorrowFieldGeneric, ImmBorrowField),
+                    "mut_borrow_field" => (MutBorrowFieldGeneric, MutBorrowField),
+                    _ => unreachable!(),
+                };
+                let [arg1, arg2] = self.args2(instr)?;
+                let (def_idx, targs_opt) = self.struct_ref(instr, arg1)?;
+                let field_name = self.simple_id(instr, arg2, " for field")?;
+                let field_offs = self.add_diags(
+                    instr.loc,
+                    self.builder
+                        .resolve_field(def_idx, None, field_name.as_ident_str()),
+                )?;
+                let hdl_idx =
+                    self.add_diags(instr.loc, self.builder.field_index(def_idx, field_offs))?;
+                if let Some(targs) = targs_opt {
+                    let inst_idx =
+                        self.add_diags(instr.loc, self.builder.field_inst_index(hdl_idx, targs))?;
+                    gen_op(inst_idx)
+                } else {
+                    op(hdl_idx)
+                }
+            },
+            "borrow_variant_field" | "mut_borrow_variant_field" => {
+                let (gen_op, op): (
+                    fn(VariantFieldInstantiationIndex) -> Bytecode,
+                    fn(VariantFieldHandleIndex) -> Bytecode,
+                ) = match instr_name.as_str() {
+                    "borrow_variant_field" => (ImmBorrowVariantFieldGeneric, ImmBorrowVariantField),
+                    "mut_borrow_variant_field" => {
+                        (MutBorrowVariantFieldGeneric, MutBorrowVariantField)
+                    },
+                    _ => unreachable!(),
+                };
+                if instr.args.len() < 2 {
+                    self.error(
+                        instr.loc,
+                        "expected at least 2 arguments for variant field borrow",
+                    );
+                    return None;
+                }
+                let (def_idx, targs_opt) = self.struct_ref(instr, &instr.args[0])?;
+
+                let (variants, field_offs) = self.variants(instr, def_idx)?;
+                let hdl_idx = self.add_diags(
+                    instr.loc,
+                    self.builder
+                        .variant_field_index(def_idx, variants, field_offs),
+                )?;
+                if let Some(targs) = targs_opt {
+                    let inst_idx = self.add_diags(
+                        instr.loc,
+                        self.builder.variant_field_inst_index(hdl_idx, targs),
+                    )?;
+                    gen_op(inst_idx)
+                } else {
+                    op(hdl_idx)
+                }
+            },
+            "borrow_global" | "mut_borrow_global" | "exists" | "move_from" | "move_to" => {
+                let (gen_op, op): (
+                    fn(StructDefInstantiationIndex) -> Bytecode,
+                    fn(StructDefinitionIndex) -> Bytecode,
+                ) = match instr_name.as_str() {
+                    "borrow_global" => (ImmBorrowGlobalGeneric, ImmBorrowGlobal),
+                    "mut_borrow_global" => (MutBorrowGlobalGeneric, MutBorrowGlobal),
+                    "exists" => (ExistsGeneric, Exists),
+                    "move_from" => (MoveFromGeneric, MoveFrom),
+                    "move_to" => (MoveToGeneric, MoveTo),
+                    _ => unreachable!(),
+                };
+                let arg = self.args1(instr)?;
+                let (def_idx, targs_opt) = self.struct_ref(instr, arg)?;
+                if let Some(targs) = targs_opt {
+                    let inst_idx = self.add_diags(
+                        instr.loc,
+                        self.builder.struct_def_inst_index(def_idx, targs),
+                    )?;
+                    gen_op(inst_idx)
+                } else {
+                    op(def_idx)
+                }
+            },
             _ => {
                 self.error(instr.loc, format!("unknown instruction `{}`", instr.name));
                 return None;
@@ -616,13 +842,70 @@ impl<'a> Assembler<'a> {
         Some(instr)
     }
 
-    fn simple_id(&mut self, instr: &Instruction, arg: &Argument) -> Option<Identifier> {
+    fn variants(
+        &mut self,
+        instr: &Instruction,
+        def_idx: StructDefinitionIndex,
+    ) -> Option<(Vec<VariantIndex>, MemberCount)> {
+        let mut variants = vec![];
+        let mut field_offs = None;
+        for field in &instr.args[1..] {
+            match field {
+                Argument::Id(
+                    PartialIdent {
+                        address: None,
+                        id_parts,
+                    },
+                    None,
+                ) if id_parts.len() == 2 => {
+                    let variant_idx = self.add_diags(
+                        instr.loc,
+                        self.builder
+                            .resolve_variant(def_idx, id_parts[0].as_ident_str()),
+                    )?;
+                    variants.push(variant_idx);
+                    let offs = self.add_diags(
+                        instr.loc,
+                        self.builder.resolve_field(
+                            def_idx,
+                            Some(variant_idx),
+                            id_parts[1].as_ident_str(),
+                        ),
+                    )?;
+                    if field_offs.map(|cur| cur == offs).unwrap_or(true) {
+                        field_offs = Some(offs)
+                    } else {
+                        self.error(
+                            instr.loc,
+                            format!(
+                                "variants of fields must be \
+                        at some position, previous was {} while this is {}",
+                                field_offs.unwrap(),
+                                offs
+                            ),
+                        );
+                        return None;
+                    }
+                },
+                _ => {
+                    self.error(
+                        instr.loc,
+                        "expected `<variant>::<field>` to describe field of variant",
+                    );
+                    return None;
+                },
+            }
+        }
+        Some((variants, field_offs?))
+    }
+
+    fn simple_id(&mut self, instr: &Instruction, arg: &Argument, ctx: &str) -> Option<Identifier> {
         match arg {
             Argument::Id(pid, None) if pid.address.is_none() && pid.id_parts.len() == 1 => {
                 Some(pid.id_parts[0].clone())
             },
             _ => {
-                self.error(instr.loc, "expected simple identifier");
+                self.error(instr.loc, format!("expected simple identifier{}", ctx));
                 None
             },
         }
@@ -648,9 +931,54 @@ impl<'a> Assembler<'a> {
         }
     }
 
+    fn struct_ref(
+        &mut self,
+        instr: &Instruction,
+        arg: &Argument,
+    ) -> Option<(StructDefinitionIndex, Option<Vec<SignatureToken>>)> {
+        match arg {
+            Argument::Id(
+                PartialIdent {
+                    address: None,
+                    id_parts,
+                },
+                targs,
+            ) if id_parts.len() == 1 => {
+                let res = self.builder.resolve_struct_def(&id_parts[0]);
+                let idx = self.add_diags(instr.loc, res)?;
+                let targs = targs.as_ref().map(|tys| {
+                    tys.iter()
+                        .map(|ty| self.build_type(instr.loc, ty))
+                        .collect()
+                });
+                Some((idx, targs))
+            },
+            _ => {
+                self.error(
+                    instr.loc,
+                    "expected simple struct name with optional type instantiation",
+                );
+                None
+            },
+        }
+    }
+
+    fn struct_variant(
+        &mut self,
+        instr: &Instruction,
+        def_idx: StructDefinitionIndex,
+        variant: &Argument,
+    ) -> Option<StructVariantHandleIndex> {
+        let name = self.simple_id(instr, variant, " for variant")?;
+        let res = self.builder.resolve_variant(def_idx, name.as_ident_str());
+        let variant_idx = self.add_diags(instr.loc, res)?;
+        let res = self.builder.variant_index(def_idx, variant_idx);
+        self.add_diags(instr.loc, res)
+    }
+
     fn local(&mut self, instr: &Instruction, arg: &Argument) -> Option<LocalIndex> {
-        let id = self.simple_id(instr, arg)?;
-        if let Some((idx, _)) = self.require_fun().local_map.get(id.as_str()) {
+        let id = self.simple_id(instr, arg, " for local")?;
+        if let Some((idx, _)) = self.require_resolution_context().local_map.get(id.as_str()) {
             Some(*idx)
         } else {
             self.error(instr.loc, format!("unknown local `{}`", id));

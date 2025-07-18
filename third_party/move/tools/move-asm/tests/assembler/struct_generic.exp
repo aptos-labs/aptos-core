@@ -1,0 +1,37 @@
+processed 1 task
+
+task 0 'publish'. lines 1-26:
+
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 66.test {
+struct S<Ty0> has drop {
+	_1: u64,
+	_2: Ty0
+}
+
+pack_and_select(): u8 /* def_idx: 0 */ {
+B0:
+	0: LdU64(3)
+	1: LdU8(2)
+	2: PackGeneric[0](S<u8>)
+	3: Call select(S<u8>): u8
+	4: Ret
+}
+select(Arg0: S<u8>): u8 /* def_idx: 1 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: S<u8>)
+	1: ImmBorrowFieldGeneric[0](S._2: Ty0)
+	2: ReadRef
+	3: Ret
+}
+pack_and_unpack(): u64 * u8 /* def_idx: 2 */ {
+B0:
+	0: LdU64(3)
+	1: LdU8(2)
+	2: PackGeneric[0](S<u8>)
+	3: UnpackGeneric[0](S<u8>)
+	4: Ret
+}
+}
+== END Bytecode ==
