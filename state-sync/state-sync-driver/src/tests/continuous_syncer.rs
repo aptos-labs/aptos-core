@@ -29,7 +29,9 @@ use aptos_data_streaming_service::{
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::Epoch;
 use aptos_time_service::TimeService;
-use aptos_types::transaction::{TransactionOutputListWithProof, Version};
+use aptos_types::transaction::{
+    TransactionOutputListWithProof, TransactionOutputListWithProofV2, Version,
+};
 use claims::assert_matches;
 use futures::SinkExt;
 use mockall::{predicate::eq, Sequence};
@@ -181,7 +183,7 @@ async fn test_data_stream_transactions_with_sync_duration() {
         notification_id,
         DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
-            TransactionOutputListWithProof::new_empty(),
+            TransactionOutputListWithProofV2::new_empty(),
         ),
     );
     notification_sender_1.send(data_notification).await.unwrap();
@@ -262,7 +264,7 @@ async fn test_data_stream_transactions_with_sync_target() {
         notification_id,
         DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
-            TransactionOutputListWithProof::new_empty(),
+            TransactionOutputListWithProofV2::new_empty(),
         ),
     );
     notification_sender_1.send(data_notification).await.unwrap();
@@ -341,7 +343,7 @@ async fn test_data_stream_transaction_outputs() {
         notification_id,
         DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
-            transaction_output_with_proof,
+            TransactionOutputListWithProofV2::new_from_v1(transaction_output_with_proof),
         ),
     );
     notification_sender_1.send(data_notification).await.unwrap();
@@ -423,7 +425,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_duration() {
         notification_id,
         DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
-            TransactionOutputListWithProof::new_empty(),
+            TransactionOutputListWithProofV2::new_empty(),
         ),
     );
     notification_sender_1.send(data_notification).await.unwrap();
@@ -504,7 +506,7 @@ async fn test_data_stream_transactions_or_outputs_with_sync_target() {
         notification_id,
         DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
-            TransactionOutputListWithProof::new_empty(),
+            TransactionOutputListWithProofV2::new_empty(),
         ),
     );
     notification_sender_1.send(data_notification).await.unwrap();
