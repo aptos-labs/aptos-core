@@ -1660,11 +1660,7 @@ where
                 }
             }
         }
-        Transaction::block_epilogue_v1(
-            block_id,
-            block_end_info.to_persistent(),
-            FeeDistribution::new(amount),
-        )
+        Transaction::block_epilogue_v1(block_id, block_end_info, FeeDistribution::new(amount))
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.
