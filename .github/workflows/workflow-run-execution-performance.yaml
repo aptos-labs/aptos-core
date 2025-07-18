@@ -80,6 +80,7 @@ on:
         - MAINNET
         - MAINNET_LARGE_DB
         - EXECUTORS
+        - ORDER_BOOK
         type: choice
         description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
       SKIP_MOVE_E2E:
