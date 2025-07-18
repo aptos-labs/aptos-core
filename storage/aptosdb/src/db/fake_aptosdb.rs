@@ -1184,21 +1184,20 @@ mod tests {
     ) -> Result<()> {
         // Verify the first transaction/output versions match
         ensure!(
-            txn_outputs_with_proof.first_transaction_output_version
-                == first_transaction_output_version,
+            txn_outputs_with_proof.get_first_output_version() == first_transaction_output_version,
             "First transaction and output version ({:?}) doesn't match given version ({:?}).",
-            txn_outputs_with_proof.first_transaction_output_version,
+            txn_outputs_with_proof.get_first_output_version(),
             first_transaction_output_version,
         );
 
         // Verify the lengths of the transaction(output)s and transaction infos match
         ensure!(
             txn_outputs_with_proof.proof.transaction_infos.len()
-                == txn_outputs_with_proof.transactions_and_outputs.len(),
+                == txn_outputs_with_proof.get_num_outputs(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions and outputs ({}).",
             txn_outputs_with_proof.proof.transaction_infos.len(),
-            txn_outputs_with_proof.transactions_and_outputs.len(),
+            txn_outputs_with_proof.get_num_outputs(),
         );
 
         // Verify the events, status, gas used and transaction hashes.
@@ -1247,19 +1246,19 @@ mod tests {
     ) -> Result<()> {
         // Verify the first transaction versions match
         ensure!(
-            txn_list.first_transaction_version == first_transaction_version,
+            txn_list.get_first_transaction_version() == first_transaction_version,
             "First transaction version ({:?}) doesn't match given version ({:?}).",
-            txn_list.first_transaction_version,
+            txn_list.get_first_transaction_version(),
             first_transaction_version,
         );
 
         // Verify the lengths of the transactions and transaction infos match
         ensure!(
-            txn_list.proof.transaction_infos.len() == txn_list.transactions.len(),
+            txn_list.proof.transaction_infos.len() == txn_list.get_num_transactions(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions ({}).",
             txn_list.proof.transaction_infos.len(),
-            txn_list.transactions.len(),
+            txn_list.get_num_transactions(),
         );
 
         // Verify the transaction hashes match those of the transaction infos

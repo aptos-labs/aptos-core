@@ -105,7 +105,7 @@ pub fn validate_db_data(
             .unwrap();
         verify_batch_txn_events(&txns, &internal_db, start)
             .unwrap_or_else(|_| panic!("{}, {} failed to verify", start, end));
-        assert_eq!(txns.transactions.len() as u64, num_of_txns);
+        assert_eq!(txns.get_num_transactions() as u64, num_of_txns);
     });
 
     Ok(())

@@ -7,7 +7,7 @@ use aptos_data_client::interface::{Response, ResponsePayload};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{
     fmt::{Debug, Formatter},
@@ -39,13 +39,16 @@ impl DataNotification {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataPayload {
-    ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
-    ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
+    ContinuousTransactionOutputsWithProof(
+        LedgerInfoWithSignatures,
+        TransactionOutputListWithProofV2,
+    ),
+    ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProofV2),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     EndOfStream,
     StateValuesWithProof(StateValueChunkWithProof),
-    TransactionOutputsWithProof(TransactionOutputListWithProof),
-    TransactionsWithProof(TransactionListWithProof),
+    TransactionOutputsWithProof(TransactionOutputListWithProofV2),
+    TransactionsWithProof(TransactionListWithProofV2),
 }
 
 /// A request that has been sent to the Aptos data client.

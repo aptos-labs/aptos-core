@@ -228,8 +228,8 @@ mod test {
 
             let txn_list_with_proof = db.get_transactions(0, db_version + 1, db_version, true).unwrap();
             prop_assert_eq!(txn_list_with_proof.transactions.len() as u64, db_version + 1);
-            prop_assert_eq!(txn_list_with_proof.events.unwrap().len() as u64, db_version + 1);
-            prop_assert_eq!(txn_list_with_proof.first_transaction_version, Some(0));
+            prop_assert_eq!(txn_list_with_proof.clone().events.unwrap().len() as u64, db_version + 1);
+            prop_assert_eq!(txn_list_with_proof.get_first_transaction_version(), Some(0));
 
             let state_checkpoint_version = db.get_latest_state_checkpoint_version().unwrap().unwrap();
             let state_leaf_count = db.get_state_item_count(state_checkpoint_version).unwrap();

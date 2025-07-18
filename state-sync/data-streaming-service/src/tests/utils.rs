@@ -566,11 +566,9 @@ impl AptosDataClientInterface for MockAptosDataClient {
 
         // Create the output list with proof
         let output_list_with_proof = create_output_list_with_proof(start_version, end_version);
-        let output_list_with_proof_v2 =
-            TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof);
 
         // Create and send a data client response
-        Ok(create_data_client_response(output_list_with_proof_v2))
+        Ok(create_data_client_response(output_list_with_proof))
     }
 
     async fn get_transactions_with_proof(
@@ -599,11 +597,9 @@ impl AptosDataClientInterface for MockAptosDataClient {
         // Create the transaction list with proof
         let transaction_list_with_proof =
             create_transaction_list_with_proof(start_version, end_version, include_events);
-        let transaction_list_with_proof_v2 =
-            TransactionListWithProofV2::new_from_v1(transaction_list_with_proof);
 
         // Create and send a data client response
-        Ok(create_data_client_response(transaction_list_with_proof_v2))
+        Ok(create_data_client_response(transaction_list_with_proof))
     }
 
     async fn get_transactions_or_outputs_with_proof(
@@ -1073,7 +1069,7 @@ pub fn create_transaction_list_with_proof(
     start_version: u64,
     end_version: u64,
     include_events: bool,
-) -> TransactionListWithProof {
+) -> TransactionListWithProofV2 {
     // Include events if required
     let events = if include_events { Some(vec![]) } else { None };
 
@@ -1089,27 +1085,35 @@ pub fn create_transaction_list_with_proof(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
-    transaction_list_with_proof
+    TransactionListWithProofV2::new_from_v1(transaction_list_with_proof)
 }
 
 /// Creates an output list with proof for testing
 pub fn create_output_list_with_proof(
     start_version: u64,
     end_version: u64,
-) -> TransactionOutputListWithProof {
+) -> TransactionOutputListWithProofV2 {
+    // Create a transaction list with proof
     let transaction_list_with_proof =
         create_transaction_list_with_proof(start_version, end_version, false);
+
+    // Create a transaction output list with proof
     let transactions_and_outputs = transaction_list_with_proof
+        .get_transaction_list_with_proof()
         .transactions
         .iter()
         .map(|txn| (txn.clone(), create_transaction_output()))
         .collect();
-
-    TransactionOutputListWithProof::new(
+    let output_list_with_proof = TransactionOutputListWithProof::new(
         transactions_and_outputs,
         Some(start_version),
-        transaction_list_with_proof.proof,
-    )
+        transaction_list_with_proof
+            .get_transaction_list_with_proof()
+            .proof
+            .clone(),
+    );
+
+    TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof)
 }
 
 /// Returns true iff the server should return transactions

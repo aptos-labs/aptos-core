@@ -598,6 +598,8 @@ impl<
         result
     }
 
+    // TODO: don't drop the auxiliary infos here!
+
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
         let state_sync_driver_config = &self.driver_configuration.config;
@@ -620,14 +622,19 @@ impl<
                     .await?;
                 },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
                     );
                     self.process_transaction_or_output_payload(
                         notification_metadata,
-                        Some(transactions_with_proof),
+                        Some(
+                            transactions_with_proof
+                                .get_transaction_list_with_proof()
+                                .clone(),
+                        ),
                         None,
                         payload_start_version,
                     )
@@ -635,7 +642,7 @@ impl<
                 },
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -643,7 +650,11 @@ impl<
                     self.process_transaction_or_output_payload(
                         notification_metadata,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(
+                            transaction_outputs_with_proof
+                                .get_output_list_with_proof()
+                                .clone(),
+                        ),
                         payload_start_version,
                     )
                     .await?;
@@ -1375,9 +1386,7 @@ impl<
         let num_versions = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                    transaction_outputs_with_proof
-                        .transactions_and_outputs
-                        .len()
+                    transaction_outputs_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1391,7 +1400,7 @@ impl<
             },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof.transactions.len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1405,9 +1414,9 @@ impl<
             },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof.transactions.len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
-                    output_list_with_proof.transactions_and_outputs.len()
+                    output_list_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,

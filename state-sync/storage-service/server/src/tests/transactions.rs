@@ -341,16 +341,13 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64, use
             let num_response_bytes = bcs::serialized_size(&response).unwrap() as u64;
             let num_transactions = match response.get_data_response().unwrap() {
                 DataResponse::TransactionsWithProof(transactions_with_proof) => {
-                    transactions_with_proof.transactions.len() as u64
+                    transactions_with_proof.get_num_transactions() as u64
                 },
                 DataResponse::TransactionDataWithProof(transaction_data_with_proof) => {
                     let transaction_list_with_proof_v2 = transaction_data_with_proof
                         .transaction_list_with_proof
                         .unwrap();
-                    transaction_list_with_proof_v2
-                        .get_transaction_list_with_proof()
-                        .transactions
-                        .len() as u64
+                    transaction_list_with_proof_v2.get_num_transactions() as u64
                 },
                 _ => panic!("Expected transactions with proof but got: {:?}", response),
             };

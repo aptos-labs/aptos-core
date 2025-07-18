@@ -129,7 +129,7 @@ impl StorageReader {
     ) -> Result<TransactionDataWithProofResponse, Error> {
         // Verify that the first transaction version exists
         let first_transaction_version = transaction_list_with_proof
-            .first_transaction_version
+            .get_first_transaction_version()
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered(
                     "First transaction version is missing in the response!".into(),
@@ -137,7 +137,7 @@ impl StorageReader {
             })?;
 
         // Get the persisted auxiliary infos for the transactions
-        let num_infos_to_fetch = transaction_list_with_proof.transactions.len();
+        let num_infos_to_fetch = transaction_list_with_proof.get_num_transactions();
         let persisted_auxiliary_infos =
             self.fetch_persisted_auxiliary_infos(first_transaction_version, num_infos_to_fetch)?;
 
@@ -165,7 +165,7 @@ impl StorageReader {
     ) -> Result<TransactionDataWithProofResponse, Error> {
         // Verify that the first transaction output version exists
         let first_transaction_output_version = transaction_output_list_with_proof
-            .first_transaction_output_version
+            .get_first_output_version()
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered(
                     "First transaction output version is missing in the response!".into(),
@@ -173,9 +173,7 @@ impl StorageReader {
             })?;
 
         // Get the persisted auxiliary infos
-        let num_infos_to_fetch = transaction_output_list_with_proof
-            .transactions_and_outputs
-            .len();
+        let num_infos_to_fetch = transaction_output_list_with_proof.get_num_outputs();
         let persisted_auxiliary_infos = self.fetch_persisted_auxiliary_infos(
             first_transaction_output_version,
             num_infos_to_fetch,

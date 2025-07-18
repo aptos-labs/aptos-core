@@ -2,17 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
-use aptos_storage_service_types::{
-    responses::{TransactionOrOutputListWithProof, TransactionOrOutputListWithProofV2},
-    Epoch,
-};
+use aptos_storage_service_types::{responses::TransactionOrOutputListWithProofV2, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{
-        TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
-        TransactionOutputListWithProofV2, Version,
-    },
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -270,12 +264,12 @@ impl<T> Response<T> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
-    NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
-    NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionOutputsWithProof((TransactionOutputListWithProofV2, LedgerInfoWithSignatures)),
+    NewTransactionsWithProof((TransactionListWithProofV2, LedgerInfoWithSignatures)),
     NumberOfStates(u64),
     StateValuesWithProof(StateValueChunkWithProof),
-    TransactionOutputsWithProof(TransactionOutputListWithProof),
-    TransactionsWithProof(TransactionListWithProof),
+    TransactionOutputsWithProof(TransactionOutputListWithProofV2),
+    TransactionsWithProof(TransactionListWithProofV2),
 }
 
 impl ResponsePayload {
@@ -301,10 +295,10 @@ impl ResponsePayload {
                 epoch_ending_ledger_infos.len()
             },
             Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::NewTransactionsWithProof((transactions_with_proof, _)) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             Self::NumberOfStates(_) => {
                 1 // The number of states is a single u64
@@ -313,10 +307,10 @@ impl ResponsePayload {
                 state_values_with_proof.raw_values.len()
             },
             Self::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
         }
     }
@@ -334,23 +328,23 @@ impl From<Vec<LedgerInfoWithSignatures>> for ResponsePayload {
     }
 }
 
-impl From<(TransactionOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
-    fn from(inner: (TransactionOutputListWithProof, LedgerInfoWithSignatures)) -> Self {
+impl From<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionOutputListWithProofV2, LedgerInfoWithSignatures)) -> Self {
         Self::NewTransactionOutputsWithProof(inner)
     }
 }
 
-impl From<(TransactionListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
-    fn from(inner: (TransactionListWithProof, LedgerInfoWithSignatures)) -> Self {
+impl From<(TransactionListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionListWithProofV2, LedgerInfoWithSignatures)) -> Self {
         Self::NewTransactionsWithProof(inner)
     }
 }
 
-impl TryFrom<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+impl TryFrom<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
     type Error = Error;
 
     fn try_from(
-        inner: (TransactionOrOutputListWithProof, LedgerInfoWithSignatures),
+        inner: (TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures),
     ) -> error::Result<Self, Error> {
         let ((transaction_list, output_list), ledger_info) = inner;
         if let Some(transaction_list) = transaction_list {
@@ -377,22 +371,22 @@ impl From<u64> for ResponsePayload {
     }
 }
 
-impl From<TransactionOutputListWithProof> for ResponsePayload {
-    fn from(inner: TransactionOutputListWithProof) -> Self {
+impl From<TransactionOutputListWithProofV2> for ResponsePayload {
+    fn from(inner: TransactionOutputListWithProofV2) -> Self {
         Self::TransactionOutputsWithProof(inner)
     }
 }
 
-impl From<TransactionListWithProof> for ResponsePayload {
-    fn from(inner: TransactionListWithProof) -> Self {
+impl From<TransactionListWithProofV2> for ResponsePayload {
+    fn from(inner: TransactionListWithProofV2) -> Self {
         Self::TransactionsWithProof(inner)
     }
 }
 
-impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
+impl TryFrom<TransactionOrOutputListWithProofV2> for ResponsePayload {
     type Error = Error;
 
-    fn try_from(inner: TransactionOrOutputListWithProof) -> error::Result<Self, Error> {
+    fn try_from(inner: TransactionOrOutputListWithProofV2) -> error::Result<Self, Error> {
         let (transaction_list, output_list) = inner;
         if let Some(transaction_list) = transaction_list {
             Ok(Self::TransactionsWithProof(transaction_list))

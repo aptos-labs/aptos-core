@@ -198,6 +198,8 @@ impl<
         result
     }
 
+    // TODO: don't drop the auxiliary infos here!
+
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(
         &mut self,
@@ -213,7 +215,7 @@ impl<
                     transaction_outputs_with_proof,
                 ) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -223,7 +225,11 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(transaction_outputs_with_proof),
+                        Some(
+                            transaction_outputs_with_proof
+                                .get_output_list_with_proof()
+                                .clone(),
+                        ),
                         payload_start_version,
                     )
                     .await?;
@@ -232,7 +238,8 @@ impl<
                     ledger_info_with_sigs,
                     transactions_with_proof,
                 ) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -241,7 +248,11 @@ impl<
                         consensus_sync_request.clone(),
                         notification_metadata,
                         ledger_info_with_sigs,
-                        Some(transactions_with_proof),
+                        Some(
+                            transactions_with_proof
+                                .get_transaction_list_with_proof()
+                                .clone(),
+                        ),
                         None,
                         payload_start_version,
                     )
