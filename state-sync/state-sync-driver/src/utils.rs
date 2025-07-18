@@ -436,7 +436,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface>(
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_list_with_proof: TransactionListWithProof,
 ) -> Result<usize, Error> {
-    let num_transactions = transaction_list_with_proof.transactions.len();
+    let num_transactions = transaction_list_with_proof.get_num_transactions();
     storage_synchronizer
         .execute_transactions(
             notification_metadata,
@@ -457,9 +457,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_outputs_with_proof: TransactionOutputListWithProof,
 ) -> Result<usize, Error> {
-    let num_transaction_outputs = transaction_outputs_with_proof
-        .transactions_and_outputs
-        .len();
+    let num_transaction_outputs = transaction_outputs_with_proof.get_num_outputs();
     storage_synchronizer
         .apply_transaction_outputs(
             notification_metadata,

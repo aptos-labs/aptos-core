@@ -213,7 +213,7 @@ impl<
                     transaction_outputs_with_proof,
                 ) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -232,7 +232,8 @@ impl<
                     ledger_info_with_sigs,
                     transactions_with_proof,
                 ) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,

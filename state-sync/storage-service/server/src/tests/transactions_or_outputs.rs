@@ -517,7 +517,7 @@ fn check_output_response_bytes(
     outputs_with_proof: &TransactionOutputListWithProof,
 ) {
     let num_response_bytes = bcs::serialized_size(&outputs_with_proof).unwrap() as u64;
-    let num_outputs = outputs_with_proof.transactions_and_outputs.len() as u64;
+    let num_outputs = outputs_with_proof.get_num_outputs() as u64;
 
     if num_response_bytes > network_limit_bytes {
         assert_eq!(num_outputs, 1); // Data cannot be reduced more than a single item
@@ -534,7 +534,7 @@ fn check_transaction_response_bytes(
     transactions_with_proof: &TransactionListWithProof,
 ) {
     let num_response_bytes = bcs::serialized_size(&transactions_with_proof).unwrap() as u64;
-    let num_transactions = transactions_with_proof.transactions.len() as u64;
+    let num_transactions = transactions_with_proof.get_num_transactions() as u64;
 
     if num_response_bytes > network_limit_bytes {
         assert_eq!(num_transactions, 1); // Data cannot be reduced more than a single item

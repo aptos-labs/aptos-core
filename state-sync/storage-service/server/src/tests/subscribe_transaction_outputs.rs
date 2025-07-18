@@ -598,7 +598,7 @@ async fn test_subscribe_transaction_outputs_streaming_epoch_change() {
         for stream_request_index in 0..max_num_active_subscriptions {
             // Determine the target ledger info for the response
             let first_output_version = output_lists_with_proofs[stream_request_index as usize]
-                .first_transaction_output_version
+                .get_first_output_version()
                 .unwrap();
             let target_ledger_info = if first_output_version > epoch_change_version {
                 highest_ledger_info.clone()

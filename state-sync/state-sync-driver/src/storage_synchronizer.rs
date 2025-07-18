@@ -990,7 +990,7 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     // Apply the output chunk
-    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+    let num_outputs = outputs_with_proof.get_num_outputs();
     let result = tokio::task::spawn_blocking(move || {
         chunk_executor.enqueue_chunk_by_transaction_outputs(
             outputs_with_proof,
@@ -1030,7 +1030,7 @@ async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     // Execute the transaction chunk
-    let num_transactions = transactions_with_proof.transactions.len();
+    let num_transactions = transactions_with_proof.get_num_transactions();
     let result = tokio::task::spawn_blocking(move || {
         chunk_executor.enqueue_chunk_by_execution(
             transactions_with_proof,

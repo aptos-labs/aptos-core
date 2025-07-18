@@ -127,7 +127,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         if !cfg!(feature = "consensus-only-perf-test") {
             txn_list_with_proof.verify(
                 verified_target_li.ledger_info(),
-                txn_list_with_proof.first_transaction_version,
+                txn_list_with_proof.get_first_transaction_version(),
             )?;
         }
 
@@ -167,7 +167,7 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["apply_chunk__verify"]);
             txn_output_list_with_proof.verify(
                 verified_target_li.ledger_info(),
-                txn_output_list_with_proof.first_transaction_output_version,
+                txn_output_list_with_proof.get_first_output_version(),
             )
         })?;
 

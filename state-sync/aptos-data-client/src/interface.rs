@@ -301,10 +301,10 @@ impl ResponsePayload {
                 epoch_ending_ledger_infos.len()
             },
             Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::NewTransactionsWithProof((transactions_with_proof, _)) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             Self::NumberOfStates(_) => {
                 1 // The number of states is a single u64
@@ -313,10 +313,10 @@ impl ResponsePayload {
                 state_values_with_proof.raw_values.len()
             },
             Self::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
         }
     }
