@@ -186,11 +186,11 @@ async fn test_notifications_continuous_outputs_target() {
                 assert_eq!(ledger_info.epoch(), next_expected_epoch);
 
                 // Verify the output start version matches the expected version
-                let first_output_version = outputs_with_proofs.first_transaction_output_version;
+                let first_output_version = outputs_with_proofs.get_first_output_version();
                 assert_eq!(Some(next_expected_version), first_output_version);
 
                 // Update the next expected version
-                let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+                let num_outputs = outputs_with_proofs.get_num_outputs() as u64;
                 next_expected_version += num_outputs;
 
                 // Update epochs if we've hit the epoch end
@@ -234,11 +234,11 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                 outputs_with_proofs,
             ) => {
                 // Verify the first output version
-                let first_output_version = outputs_with_proofs.first_transaction_output_version;
+                let first_output_version = outputs_with_proofs.get_first_output_version();
                 assert_eq!(Some(next_expected_version), first_output_version);
 
                 // Update the next expected version
-                let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+                let num_outputs = outputs_with_proofs.get_num_outputs() as u64;
                 next_expected_version += num_outputs;
 
                 // Update the next expected epoch if we've hit the epoch end
@@ -356,14 +356,15 @@ async fn test_notifications_continuous_transactions_target() {
                 assert_eq!(ledger_info.epoch(), next_expected_epoch);
 
                 // Verify the transaction start version matches the expected version
-                let first_transaction_version = transactions_with_proof.first_transaction_version;
+                let first_transaction_version =
+                    transactions_with_proof.get_first_transaction_version();
                 assert_eq!(Some(next_expected_version), first_transaction_version);
 
                 // Verify the payload contains events
-                assert_some!(transactions_with_proof.events);
+                assert!(transactions_with_proof.events.is_some());
 
                 // Update the next expected version
-                let num_transactions = transactions_with_proof.transactions.len() as u64;
+                let num_transactions = transactions_with_proof.get_num_transactions() as u64;
                 next_expected_version += num_transactions;
 
                 // Update epochs if we've hit the epoch end
@@ -409,11 +410,12 @@ async fn test_notifications_continuous_transactions_multiple_streams() {
                 transactions_with_proofs,
             ) => {
                 // Verify the first transaction version
-                let first_transaction_version = transactions_with_proofs.first_transaction_version;
+                let first_transaction_version =
+                    transactions_with_proofs.get_first_transaction_version();
                 assert_eq!(Some(next_expected_version), first_transaction_version);
 
                 // Update the next expected version
-                let num_transactions = transactions_with_proofs.transactions.len() as u64;
+                let num_transactions = transactions_with_proofs.get_num_transactions() as u64;
                 next_expected_version += num_transactions;
 
                 // Update the next expected epoch if we've hit the epoch end
@@ -550,12 +552,12 @@ async fn test_notifications_continuous_transactions_or_outputs_target() {
             transactions_with_proof
                 .clone()
                 .unwrap()
-                .first_transaction_version
+                .get_first_transaction_version()
         } else {
             outputs_with_proof
                 .clone()
                 .unwrap()
-                .first_transaction_output_version
+                .get_first_output_version()
         };
         assert_eq!(Some(next_expected_version), first_version);
 
@@ -566,13 +568,12 @@ async fn test_notifications_continuous_transactions_or_outputs_target() {
 
         // Update the next expected version
         let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof.clone().unwrap().transactions.len() as u64
-        } else {
-            outputs_with_proof
+            transactions_with_proof
                 .clone()
                 .unwrap()
-                .transactions_and_outputs
-                .len() as u64
+                .get_num_transactions() as u64
+        } else {
+            outputs_with_proof.clone().unwrap().get_num_outputs() as u64
         };
         next_expected_version += num_transactions;
 
@@ -626,24 +627,23 @@ async fn test_notifications_continuous_transactions_or_outputs_multiple_streams(
             transactions_with_proof
                 .clone()
                 .unwrap()
-                .first_transaction_version
+                .get_first_transaction_version()
         } else {
             outputs_with_proof
                 .clone()
                 .unwrap()
-                .first_transaction_output_version
+                .get_first_output_version()
         };
         assert_eq!(Some(next_expected_version), first_version);
 
         // Update the next expected version
         let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof.clone().unwrap().transactions.len() as u64
-        } else {
-            outputs_with_proof
+            transactions_with_proof
                 .clone()
                 .unwrap()
-                .transactions_and_outputs
-                .len() as u64
+                .get_num_transactions() as u64
+        } else {
+            outputs_with_proof.clone().unwrap().get_num_outputs() as u64
         };
         next_expected_version += num_transactions;
 
@@ -1083,11 +1083,11 @@ async fn test_notifications_transaction_outputs_multiple_streams() {
         match data_notification.data_payload {
             DataPayload::TransactionOutputsWithProof(outputs_with_proof) => {
                 // Verify the first transaction output version
-                let first_output_version = outputs_with_proof.first_transaction_output_version;
+                let first_output_version = outputs_with_proof.get_first_output_version();
                 assert_eq!(Some(next_expected_version), first_output_version);
 
                 // Update the next expected version
-                next_expected_version += outputs_with_proof.transactions_and_outputs.len() as u64;
+                next_expected_version += outputs_with_proof.get_num_outputs() as u64;
 
                 // Terminate the stream if we haven't reached the end
                 if next_expected_version < MAX_ADVERTISED_TRANSACTION_OUTPUT {
@@ -1196,11 +1196,12 @@ async fn test_notifications_transactions_multiple_streams() {
         match data_notification.data_payload {
             DataPayload::TransactionsWithProof(transactions_with_proof) => {
                 // Verify the first transaction version
-                let first_transaction_version = transactions_with_proof.first_transaction_version;
+                let first_transaction_version =
+                    transactions_with_proof.get_first_transaction_version();
                 assert_eq!(Some(next_expected_version), first_transaction_version);
 
                 // Update the next expected version
-                next_expected_version += transactions_with_proof.transactions.len() as u64;
+                next_expected_version += transactions_with_proof.get_num_transactions() as u64;
 
                 // Terminate the stream if we haven't reached the end
                 if next_expected_version < MAX_ADVERTISED_TRANSACTION {
@@ -1911,16 +1912,13 @@ fn verify_continuous_outputs_with_proof(
     assert_eq!(ledger_info.epoch(), expected_epoch);
 
     // Verify the output start version matches the expected version
-    let first_output_version = outputs_with_proofs
-        .get_output_list_with_proof()
-        .first_transaction_output_version;
+    let first_output_version = outputs_with_proofs.get_first_output_version();
     assert_eq!(Some(expected_version), first_output_version);
 
     // Calculate the next expected version
     let num_outputs = outputs_with_proofs
         .get_output_list_with_proof()
-        .transactions_and_outputs
-        .len() as u64;
+        .get_num_outputs() as u64;
     let next_expected_version = expected_version + num_outputs;
 
     // Update epochs if we've hit the epoch end
@@ -1949,11 +1947,11 @@ fn verify_continuous_transactions_with_proof(
     assert_eq!(ledger_info.epoch(), expected_epoch);
 
     // Verify the transaction start version matches the expected version
-    let first_transaction_version = transactions_with_proofs.first_transaction_version;
+    let first_transaction_version = transactions_with_proofs.get_first_transaction_version();
     assert_eq!(Some(expected_version), first_transaction_version);
 
     // Calculate the next expected version
-    let num_transactions = transactions_with_proofs.transactions.len() as u64;
+    let num_transactions = transactions_with_proofs.get_num_transactions() as u64;
     let next_expected_version = expected_version + num_transactions;
 
     // Update epochs if we've hit the epoch end
@@ -1984,11 +1982,11 @@ async fn verify_output_notifications(
         match data_notification.data_payload {
             DataPayload::TransactionOutputsWithProof(outputs_with_proof) => {
                 // Verify the transaction output start version matches the expected version
-                let first_output_version = outputs_with_proof.first_transaction_output_version;
+                let first_output_version = outputs_with_proof.get_first_output_version();
                 assert_eq!(Some(next_expected_version), first_output_version);
 
                 // Calculate the next expected version
-                let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                let num_outputs = outputs_with_proof.get_num_outputs();
                 next_expected_version += num_outputs as u64;
             },
             DataPayload::EndOfStream => {
@@ -2014,11 +2012,12 @@ async fn verify_transaction_notifications(
         match data_notification.data_payload {
             DataPayload::TransactionsWithProof(transactions_with_proof) => {
                 // Verify the transaction start version matches the expected version
-                let first_transaction_version = transactions_with_proof.first_transaction_version;
+                let first_transaction_version =
+                    transactions_with_proof.get_first_transaction_version();
                 assert_eq!(Some(next_expected_version), first_transaction_version);
 
                 // Calculate the next expected version
-                let num_transactions = transactions_with_proof.transactions.len();
+                let num_transactions = transactions_with_proof.get_num_transactions();
                 next_expected_version += num_transactions as u64;
             },
             DataPayload::EndOfStream => {

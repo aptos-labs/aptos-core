@@ -621,7 +621,8 @@ impl<
                 },
                 // TODO(joshlind): Update to V2 type.
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -639,7 +640,7 @@ impl<
                 // TODO(joshlind): Update to V2 type.
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -1388,10 +1389,7 @@ impl<
         let num_versions = match self.get_bootstrapping_mode() {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-                    transaction_outputs_with_proof
-                        .get_output_list_with_proof()
-                        .transactions_and_outputs
-                        .len()
+                    transaction_outputs_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1405,10 +1403,7 @@ impl<
             },
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof
-                        .get_transaction_list_with_proof()
-                        .transactions
-                        .len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,
@@ -1422,15 +1417,9 @@ impl<
             },
             BootstrappingMode::ExecuteOrApplyFromGenesis => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
-                    transaction_list_with_proof
-                        .get_transaction_list_with_proof()
-                        .transactions
-                        .len()
+                    transaction_list_with_proof.get_num_transactions()
                 } else if let Some(output_list_with_proof) = transaction_outputs_with_proof {
-                    output_list_with_proof
-                        .get_output_list_with_proof()
-                        .transactions_and_outputs
-                        .len()
+                    output_list_with_proof.get_num_outputs()
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_id,

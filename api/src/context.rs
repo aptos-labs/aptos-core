@@ -842,7 +842,7 @@ impl Context {
             .0;
 
         let txn_start_version = data
-            .first_transaction_output_version
+            .get_first_output_version()
             .ok_or_else(|| format_err!("no start version from database"))?;
         ensure!(
             txn_start_version == start_version,
