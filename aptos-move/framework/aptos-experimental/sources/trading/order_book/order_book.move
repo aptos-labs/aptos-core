@@ -389,6 +389,27 @@ module aptos_experimental::order_book {
         self.orders.add(order_id, order_with_state);
     }
 
+    public fun get_order_metadata<M: store + copy + drop>(
+        self: &OrderBook<M>, order_id: OrderIdType
+    ): Option<M> {
+        if (!self.orders.contains(&order_id)) {
+            return option::none();
+        };
+        option::some(self.orders.borrow(&order_id).get_metadata_from_state())
+    }
+
+    public fun set_order_metadata<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_id: OrderIdType, metadata: M
+    ) {
+        if (!self.orders.contains(&order_id)) {
+            return;
+        };
+
+        let order_with_state = self.orders.remove(&order_id);
+        order_with_state.set_metadata_in_state(metadata);
+        self.orders.add(order_id, order_with_state);
+    }
+
     public fun is_active_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): bool {
@@ -598,6 +619,10 @@ module aptos_experimental::order_book {
     }
 
     struct TestMetadata has store, copy, drop {}
+
+    struct TestMetadataWithId has store, copy, drop {
+        id: u64
+    }
 
     // ============================= Tests ====================================
 
@@ -1457,6 +1482,42 @@ module aptos_experimental::order_book {
         // Verify order was decreased with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(2)) == 400);
 
+        order_book.destroy_order_book();
+    }
+
+    #[test]
+    fun test_get_and_set_order_metadata() {
+        let order_book = new_order_book<TestMetadataWithId>();
+
+        // Place an active order
+        let order_req = OrderRequest::V1 {
+            account: @0xAA,
+            order_id: new_order_id_type(1),
+            client_order_id: option::none(),
+            price: 100,
+            orig_size: 1000,
+            remaining_size: 1000,
+            is_bid: false,
+            trigger_condition: option::none(),
+            metadata: TestMetadataWithId {id: 1}
+        };
+        order_book.place_maker_order(order_req);
+        // Verify order was placed with correct metadata
+        let metadata = order_book.get_order_metadata(new_order_id_type(1));
+        assert!(metadata.is_some());
+        assert!(metadata.destroy_some().id == 1);
+
+        // Update order metadata
+        let updated_metadata = TestMetadataWithId {id: 2};
+        order_book.set_order_metadata(new_order_id_type(1), updated_metadata);
+        // Verify order metadata was updated
+        let metadata = order_book.get_order_metadata(new_order_id_type(1));
+        assert!(metadata.is_some());
+        assert!(metadata.destroy_some().id == 2);
+
+        // Try to get metadata for non-existing order
+        let non_existing_metadata = order_book.get_order_metadata(new_order_id_type(999));
+        assert!(non_existing_metadata.is_none());
         order_book.destroy_order_book();
     }
 }
