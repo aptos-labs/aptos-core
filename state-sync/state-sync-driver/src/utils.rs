@@ -29,7 +29,7 @@ use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use futures::StreamExt;
 use std::{
@@ -434,7 +434,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface>(
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
-    transaction_list_with_proof: TransactionListWithProof,
+    transaction_list_with_proof: TransactionListWithProofV2,
 ) -> Result<usize, Error> {
     let num_transactions = transaction_list_with_proof.get_num_transactions();
     storage_synchronizer
@@ -455,7 +455,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
     notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
-    transaction_outputs_with_proof: TransactionOutputListWithProof,
+    transaction_outputs_with_proof: TransactionOutputListWithProofV2,
 ) -> Result<usize, Error> {
     let num_transaction_outputs = transaction_outputs_with_proof.get_num_outputs();
     storage_synchronizer

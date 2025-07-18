@@ -23,7 +23,7 @@ use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{sync::Arc, time::Duration};
 
@@ -198,8 +198,6 @@ impl<
         result
     }
 
-    // TODO: don't drop the auxiliary infos here!
-
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(
         &mut self,
@@ -225,11 +223,7 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(
-                            transaction_outputs_with_proof
-                                .get_output_list_with_proof()
-                                .clone(),
-                        ),
+                        Some(transaction_outputs_with_proof),
                         payload_start_version,
                     )
                     .await?;
@@ -248,11 +242,7 @@ impl<
                         consensus_sync_request.clone(),
                         notification_metadata,
                         ledger_info_with_sigs,
-                        Some(
-                            transactions_with_proof
-                                .get_transaction_list_with_proof()
-                                .clone(),
-                        ),
+                        Some(transactions_with_proof),
                         None,
                         payload_start_version,
                     )
@@ -288,8 +278,8 @@ impl<
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
         notification_metadata: NotificationMetadata,
         ledger_info_with_signatures: LedgerInfoWithSignatures,
-        transaction_list_with_proof: Option<TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version

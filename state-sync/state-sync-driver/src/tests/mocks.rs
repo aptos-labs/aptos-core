@@ -36,15 +36,15 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, TransactionListWithProof, TransactionListWithProofV2,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionWithProof,
+        Version,
     },
 };
 use async_trait::async_trait;
 use mockall::mock;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-
 // TODO(joshlind): if we see these as generally useful, we should
 // modify the definitions in the rest of the code.
 
@@ -454,7 +454,7 @@ mock! {
         async fn apply_transaction_outputs(
             &mut self,
             notification_metadata: NotificationMetadata,
-            output_list_with_proof: TransactionOutputListWithProof,
+            output_list_with_proof: TransactionOutputListWithProofV2,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<(), crate::error::Error>;
@@ -462,7 +462,7 @@ mock! {
         async fn execute_transactions(
             &mut self,
             notification_metadata: NotificationMetadata,
-            transaction_list_with_proof: TransactionListWithProof,
+            transaction_list_with_proof: TransactionListWithProofV2,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<(), crate::error::Error>;
@@ -471,7 +471,7 @@ mock! {
             &mut self,
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
-            target_output_with_proof: TransactionOutputListWithProof,
+            target_output_with_proof: TransactionOutputListWithProofV2,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;

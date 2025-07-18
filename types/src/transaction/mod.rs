@@ -2280,6 +2280,19 @@ impl TransactionListWithProofV2 {
             },
         }
     }
+
+    /// Verifies the transaction list v2 using the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos.verify(ledger_info, first_transaction_version)
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -2539,6 +2552,20 @@ impl TransactionOutputListWithProofV2 {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.persisted_auxiliary_infos
+            },
+        }
+    }
+
+    /// Verifies the transaction output list v2 using the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .verify(ledger_info, first_transaction_output_version)
             },
         }
     }
