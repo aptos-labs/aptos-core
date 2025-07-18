@@ -1190,8 +1190,7 @@ fn create_commit_notification(
 ) -> CommitNotification {
     let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
         target_output_with_proof
-            .into_parts()
-            .0
+            .consume_output_list_with_proof()
             .transactions_and_outputs
             .into_iter()
             .unzip();
