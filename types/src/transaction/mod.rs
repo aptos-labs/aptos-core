@@ -2234,11 +2234,20 @@ impl TransactionListWithProofV2 {
         Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_empty())
     }
 
-    /// A convenience function to create a v2 list from a v1 list.
+    /// A convenience function to create a v2 list from a v1 list
     pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
         Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_from_v1(
             transaction_list_with_proof,
         ))
+    }
+
+    /// Consumes and returns the inner transaction list with proof
+    pub fn consume_transaction_list_with_proof(self) -> TransactionListWithProof {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos.transaction_list_with_proof
+            },
+        }
     }
 
     /// Returns the first version in the transaction list
@@ -2281,7 +2290,7 @@ impl TransactionListWithProofV2 {
         }
     }
 
-    /// Splits the transaction list with proof v2 into its components.
+    /// Splits the transaction list with proof v2 into its components
     pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
@@ -2291,7 +2300,7 @@ impl TransactionListWithProofV2 {
         }
     }
 
-    /// Verifies the transaction list with proof v2 against the given ledger info.
+    /// Verifies the transaction list with proof v2 against the given ledger info
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,
@@ -2517,13 +2526,22 @@ impl TransactionOutputListWithProofV2 {
         )
     }
 
-    /// A convenience function to create a v2 output list from a v1 list.
+    /// A convenience function to create a v2 output list from a v1 list
     pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
         Self::TransactionOutputListWithAuxiliaryInfos(
             TransactionOutputListWithAuxiliaryInfos::new_from_v1(
                 transaction_output_list_with_proof,
             ),
         )
+    }
+
+    /// Consumes and returns the inner transaction output list
+    pub fn consume_output_list_with_proof(self) -> TransactionOutputListWithProof {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+        }
     }
 
     /// Returns the first version in the transaction output list
@@ -2566,7 +2584,7 @@ impl TransactionOutputListWithProofV2 {
         }
     }
 
-    /// Splits the transaction output list with proof v2 into its components.
+    /// Splits the transaction output list with proof v2 into its components
     pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
@@ -2576,7 +2594,7 @@ impl TransactionOutputListWithProofV2 {
         }
     }
 
-    /// Verifies the transaction output list with proof v2 against the given ledger info.
+    /// Verifies the transaction output list with proof v2 against the given ledger info
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,

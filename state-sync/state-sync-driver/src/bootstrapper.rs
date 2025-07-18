@@ -619,7 +619,6 @@ impl<
                     )
                     .await?;
                 },
-                // TODO(joshlind): Update to V2 type.
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
                     let payload_start_version =
                         transactions_with_proof.get_first_transaction_version();
@@ -629,15 +628,12 @@ impl<
                     );
                     self.process_transaction_or_output_payload(
                         notification_metadata,
-                        Some(TransactionListWithProofV2::new_from_v1(
-                            transactions_with_proof,
-                        )),
+                        Some(transactions_with_proof),
                         None,
                         payload_start_version,
                     )
                     .await?;
                 },
-                // TODO(joshlind): Update to V2 type.
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
                         transaction_outputs_with_proof.get_first_output_version();
@@ -648,9 +644,7 @@ impl<
                     self.process_transaction_or_output_payload(
                         notification_metadata,
                         None,
-                        Some(TransactionOutputListWithProofV2::new_from_v1(
-                            transaction_outputs_with_proof,
-                        )),
+                        Some(transaction_outputs_with_proof),
                         payload_start_version,
                     )
                     .await?;
