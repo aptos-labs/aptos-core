@@ -626,7 +626,8 @@ async fn test_execute_transactions_commit_send_error() {
 #[should_panic]
 async fn test_initialize_state_synchronizer_missing_info() {
     // Create test data that is missing transaction infos
-    let (mut output_list_with_proof, _) = create_output_list_with_proof().into_parts();
+    let mut output_list_with_proof =
+        create_output_list_with_proof().consume_output_list_with_proof();
     output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
     let output_list_with_proof =
         TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof);

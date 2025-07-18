@@ -208,7 +208,6 @@ impl<
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
-                // TODO(joshlind): Update to V2 type.
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     transaction_outputs_with_proof,
@@ -224,9 +223,7 @@ impl<
                         notification_metadata,
                         ledger_info_with_sigs,
                         None,
-                        Some(TransactionOutputListWithProofV2::new_from_v1(
-                            transaction_outputs_with_proof,
-                        )),
+                        Some(transaction_outputs_with_proof),
                         payload_start_version,
                     )
                     .await?;
@@ -246,9 +243,7 @@ impl<
                         consensus_sync_request.clone(),
                         notification_metadata,
                         ledger_info_with_sigs,
-                        Some(TransactionListWithProofV2::new_from_v1(
-                            transactions_with_proof,
-                        )),
+                        Some(transactions_with_proof),
                         None,
                         payload_start_version,
                     )
