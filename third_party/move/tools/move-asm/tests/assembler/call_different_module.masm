@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test1
+
+public fun f(x: u64): u64
+    move_loc x
+    ret
+
+
+//# publish --print-bytecode
+module 0x66::test2
+use 0x66::test1 as tm
+
+fun g(): u64
+    ld_u64 10
+    call tm::f
+    ret

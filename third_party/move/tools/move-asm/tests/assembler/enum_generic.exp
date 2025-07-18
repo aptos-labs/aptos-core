@@ -1,0 +1,43 @@
+processed 1 task
+
+task 0 'publish'. lines 1-30:
+
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 66.test {
+enum E<Ty0> has drop {
+ V1{
+	_1: Ty0,
+	_2: u8
+ },
+ V2{
+	_1: Ty0,
+	_2: u32
+ }
+}
+
+pack_and_select(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: LdU8(2)
+	2: PackVariantGeneric[0](E/V1<u64>)
+	3: Call select(E<u64>): u64
+	4: Ret
+}
+select(Arg0: E<u64>): u64 /* def_idx: 1 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: E<u64>)
+	1: ImmBorrowVariantFieldGeneric[0](V1._1|V2._1: Ty0)
+	2: ReadRef
+	3: Ret
+}
+pack_and_unpack(): u64 * u32 /* def_idx: 2 */ {
+B0:
+	0: LdU64(1)
+	1: LdU8(2)
+	2: PackVariantGeneric[0](E/V1<u64>)
+	3: UnpackVariantGeneric[1](E/V2<u64>)
+	4: Ret
+}
+}
+== END Bytecode ==
