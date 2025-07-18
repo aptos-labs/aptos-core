@@ -1,3 +1,5 @@
+// Copyright (C) -- Supra 2025
+#[test_only]
 module 0x2::fungible_asset_tests {
     #[test_only]
     use std::option;
