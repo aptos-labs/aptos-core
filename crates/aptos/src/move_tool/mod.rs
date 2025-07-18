@@ -644,7 +644,7 @@ pub struct IncludedArtifactsArgs {
     /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
     /// as much.
     #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
-    pub(crate) included_artifacts: IncludedArtifacts,
+    pub included_artifacts: IncludedArtifacts,
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain
@@ -756,7 +756,7 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    pub(crate) fn build_options(
+    pub fn build_options(
         self,
         dev: bool,
         skip_fetch_latest_git_deps: bool,

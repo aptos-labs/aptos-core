@@ -443,7 +443,7 @@ impl SupraCommand for SubmitProposal {
 }
 
 /// Retrieve the Metadata from the given URL
-async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
+pub async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
     let client = reqwest::ClientBuilder::default()
         .tls_built_in_root_certs(true)
         .build()
@@ -806,8 +806,8 @@ impl SupraCommand for ApproveExecutionHash {
 pub struct ProposalMetadata {
     title: String,
     description: String,
-    source_code_url: String,
-    discussion_url: String,
+    pub source_code_url: String,
+    pub discussion_url: String,
 }
 
 impl std::fmt::Display for ProposalMetadata {
@@ -975,7 +975,7 @@ pub struct CompileScriptFunction {
 }
 
 impl CompileScriptFunction {
-    pub(crate) fn compile(
+    pub fn compile(
         &self,
         script_name: &str,
         prompt_options: PromptOptions,

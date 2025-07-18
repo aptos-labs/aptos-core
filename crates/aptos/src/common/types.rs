@@ -1068,7 +1068,7 @@ pub struct MovePackageDir {
     /// to no ability to pull git dependencies.  This will allow overriding
     /// this for local development.
     #[clap(long)]
-    pub(crate) skip_fetch_latest_git_deps: bool,
+    pub skip_fetch_latest_git_deps: bool,
 
     /// Specify the version of the bytecode the compiler is going to emit.
     #[clap(long)]
@@ -2259,5 +2259,5 @@ pub struct OverrideSizeCheckOption {
     /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
     /// will still be blocked from publishing.
     #[clap(long)]
-    pub(crate) override_size_check: bool,
+    pub override_size_check: bool,
 }
