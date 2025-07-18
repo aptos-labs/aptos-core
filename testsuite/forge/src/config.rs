@@ -6,10 +6,7 @@ use crate::{
     success_criteria::{MetricsThreshold, SuccessCriteria, SystemMetricsThreshold},
     *,
 };
-use aptos_config::config::{
-    ExecutionBackpressureGasLimitConfig, ExecutionBackpressureTxnLimitConfig, NodeConfig,
-    OverrideNodeConfig,
-};
+use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_framework::ReleaseBundle;
 use std::{num::NonZeroUsize, sync::Arc};
 
@@ -246,18 +243,18 @@ impl ForgeConfig {
             helm_values["fullnode"]["config"]["consensus_observer"]
                 ["subscription_peer_change_interval_ms"] = 5_000.into();
 
-            // enable opt proposal
-            helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
-                true.into();
+            // TODO(ibalajiarun): Disable opt proposal in 1.33 to maintain config compatability.
+            // helm_values["validator"]["config"]["consensus"]["enable_optimistic_proposal_tx"] =
+            //     true.into();
 
-            let mut txn_limit_backpressure = ExecutionBackpressureTxnLimitConfig::default();
-            txn_limit_backpressure.lookback_config.target_block_time_ms = 63;
-            let mut gas_limit_backpressure = ExecutionBackpressureGasLimitConfig::default();
-            gas_limit_backpressure.lookback_config.target_block_time_ms = 63;
-            helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
-                ["txn_limit"] = serde_yaml::to_value(&txn_limit_backpressure).unwrap();
-            helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
-                ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
+            // let mut txn_limit_backpressure = ExecutionBackpressureTxnLimitConfig::default();
+            // txn_limit_backpressure.lookback_config.target_block_time_ms = 63;
+            // let mut gas_limit_backpressure = ExecutionBackpressureGasLimitConfig::default();
+            // gas_limit_backpressure.lookback_config.target_block_time_ms = 63;
+            // helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
+            //     ["txn_limit"] = serde_yaml::to_value(&txn_limit_backpressure).unwrap();
+            // helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
+            //     ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
         }))
     }
 
