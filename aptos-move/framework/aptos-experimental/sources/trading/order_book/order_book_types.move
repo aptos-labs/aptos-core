@@ -233,6 +233,12 @@ module aptos_experimental::order_book_types {
         self.order.metadata
     }
 
+    public fun set_metadata_in_state<M: store + copy + drop>(
+        self: &mut OrderWithState<M>, metadata: M
+    ) {
+        self.order.metadata = metadata;
+    }
+
     public fun get_order_id<M: store + copy + drop>(self: &Order<M>): OrderIdType {
         self.order_id
     }

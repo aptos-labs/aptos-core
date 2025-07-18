@@ -100,6 +100,8 @@ module aptos_experimental::market_types {
             cleanup_order_f: |address, OrderIdType, bool, u64| has drop + copy,
             /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
             decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+            /// get a string representation of order metadata to be used in events
+            get_order_metadata_string: |M| String has drop + copy
         }
     }
 
@@ -126,13 +128,16 @@ module aptos_experimental::market_types {
         cleanup_order_f: |address, OrderIdType, bool, u64| has drop + copy,
         /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
         decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+        /// get a string representation of order metadata to be used in events
+        get_order_metadata_string: |M| String has drop + copy
     ): MarketClearinghouseCallbacks<M> {
         MarketClearinghouseCallbacks::V1 {
             settle_trade_f,
             validate_order_placement_f,
             place_maker_order_f,
             cleanup_order_f,
-            decrease_order_size_f
+            decrease_order_size_f,
+            get_order_metadata_string
         }
     }
 
@@ -203,5 +208,11 @@ module aptos_experimental::market_types {
         price: u64,
         size: u64,) {
         (self.decrease_order_size_f)(account, order_id, is_bid, price, size)
+    }
+
+    public(friend) fun get_order_metadata_string<M: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M>,
+        order_metadata: M): String {
+        (self.get_order_metadata_string)(order_metadata)
     }
 }
