@@ -687,7 +687,7 @@ pub struct FunctionDefinition {
     pub function: FunctionHandleIndex,
     /// The visibility of this function.
     pub visibility: Visibility,
-    /// Marker if the function is intended as an entry function. That is
+    /// Marker if the function is intended as an entry function.
     pub is_entry: bool,
     /// List of locally defined types (declared in this module) with the `Key` ability
     /// that the procedure might access, either through: BorrowGlobal, MoveFrom, or transitively
@@ -709,7 +709,7 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
-    // Deprecated public bit, deprecated in favor a the Visibility enum
+    // Deprecated public bit, deprecated in favor of the Visibility enum
     pub const DEPRECATED_PUBLIC_BIT: u8 = 0b01;
     /// An entry function, intended to be used as an entry point to execution
     pub const ENTRY: u8 = 0b100;
