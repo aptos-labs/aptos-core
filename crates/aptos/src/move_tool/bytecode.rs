@@ -28,6 +28,7 @@ use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use move_querier::querier::{Querier, QuerierCommand};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -59,6 +60,20 @@ pub struct Disassemble {
 /// 2. Decompile the package bytecode with `aptos decompile --package-path PackName/bytecode_modules`
 #[derive(Debug, Parser)]
 pub struct Decompile {
+    #[clap(flatten)]
+    pub command: BytecodeCommand,
+}
+
+/// Query the Move package for information like call graph and dependency graph
+///
+/// For example, if you want to generate the call graphs for bytecode `example.mv`:
+/// run `aptos move query [query comamnd] --bytecode-path /path/to/example.mv`.  Available `query command` include:
+/// (1) `--dump-dep-graph`: dump the inter-module dependency graph for the package/bytecode;
+/// (2) `--dump-call-graph`: dump the inter-module call graph for the package/bytecode;
+#[derive(Debug, Parser)]
+pub struct Query {
+    #[clap(flatten)]
+    pub sub_command: QuerierCommand,
     #[clap(flatten)]
     pub command: BytecodeCommand,
 }
@@ -114,6 +129,14 @@ pub struct BytecodeCommandInput {
 enum BytecodeCommandType {
     Disassemble,
     Decompile,
+    Query,
+}
+
+/// Secondary, optionl, tool-specific sub-sub-commands
+#[derive(Debug, Clone)]
+enum SecondaryOption {
+    // Commands to run when `query` a bytecode file.
+    Query(QuerierCommand),
 }
 
 #[async_trait]
@@ -138,6 +161,22 @@ impl CliCommand<String> for Decompile {
     }
 }
 
+#[async_trait]
+impl CliCommand<String> for Query {
+    fn command_name(&self) -> &'static str {
+        "Query"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<String> {
+        self.command
+            .execute_as_package(
+                BytecodeCommandType::Query,
+                Some(SecondaryOption::Query(self.sub_command)),
+            )
+            .await
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct BytecodeMetadata {
     aptos_metadata: Option<RuntimeModuleMetadataV1>,
@@ -147,36 +186,16 @@ struct BytecodeMetadata {
 
 impl BytecodeCommand {
     async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
-        let inputs = if let Some(path) = self.input.bytecode_path.clone() {
-            vec![path]
-        } else if let Some(path) = self.input.package_path.clone() {
-            read_dir_files(path.as_path(), |p| {
-                p.extension()
-                    .map(|s| s == MOVE_COMPILED_EXTENSION)
-                    .unwrap_or_default()
-            })?
-        } else {
-            unreachable!("arguments required by clap")
-        };
+        let inputs = self.prepare_input()?;
 
         if self.print_metadata_only && self.input.bytecode_path.is_some() {
             return self.print_metadata(&inputs[0]);
         }
 
-        let mut report = vec![];
-        let mut last_out_dir = String::new();
+        let mut report: Vec<String> = vec![];
+        let mut last_output_file = PathBuf::new();
         for bytecode_path in inputs {
             let bytecode_path = bytecode_path.as_path();
-            let extension = bytecode_path
-                .extension()
-                .context("Missing file extension for bytecode file")?;
-            if extension != MOVE_COMPILED_EXTENSION {
-                return Err(CliError::UnexpectedError(format!(
-                    "Bad source file extension {:?}; expected {}",
-                    extension, MOVE_COMPILED_EXTENSION
-                )));
-            }
-
             let (output, extension) = match command_type {
                 BytecodeCommandType::Disassemble => {
                     (self.disassemble(bytecode_path)?, DISASSEMBLER_EXTENSION)
@@ -184,31 +203,15 @@ impl BytecodeCommand {
                 BytecodeCommandType::Decompile => {
                     (self.decompile(bytecode_path)?, DECOMPILER_EXTENSION)
                 },
+                _ => {
+                    unreachable!(
+                        "Command not supported on this mode to process modules individually"
+                    )
+                },
             };
-
-            let output_dir = if let Some(dir) = self.output_dir.clone() {
-                dir
-            } else {
-                bytecode_path.parent().expect("has parent dir").to_owned()
-            };
-            last_out_dir = output_dir.display().to_string();
-
-            let output_file = output_dir
-                .join(bytecode_path.file_name().expect("file name"))
-                .with_extension(extension);
-            check_if_file_exists(output_file.as_path(), self.prompt_options)?;
-
-            // Create the directory if it doesn't exist
-            create_dir_if_not_exist(output_dir.as_path())?;
-
-            // write to file
-            write_to_user_only_file(
-                output_file.as_path(),
-                &output_file.display().to_string(),
-                output.as_bytes(),
-            )?;
+            last_output_file = self.save_output(bytecode_path, extension.to_string(), output)?;
             report.push(
-                output_file
+                last_output_file
                     .file_name()
                     .expect("file name")
                     .to_string_lossy()
@@ -218,9 +221,98 @@ impl BytecodeCommand {
 
         Ok(match report.len() {
             0 => "no bytecode modules found".to_owned(),
-            1 => format!("{}/{}", last_out_dir, report[0]),
-            _ => format!("{}/{{{}}}", last_out_dir, report.into_iter().join(",")),
+            1 => format!(
+                "{}/{}",
+                last_output_file.parent().unwrap().display(),
+                report[0]
+            ),
+            _ => format!(
+                "{}/{{{}}}",
+                last_output_file.parent().unwrap().display(),
+                report.into_iter().join(",")
+            ),
         })
+    }
+
+    /// Process the input files as a package, instead of as separate bytecode files.
+    /// This is necessary for operations like cross-module call graph generation
+    /// Compared to execute(), this function takes an additional argument `secondary_options`,
+    /// creating an interface to pass command-specific options.
+    /// It is suggested that execute() also supports such options
+    async fn execute_as_package(
+        self,
+        command_type: BytecodeCommandType,
+        secondary_options: Option<SecondaryOption>,
+    ) -> CliTypedResult<String> {
+        let inputs = self.prepare_input()?;
+        if self.print_metadata_only && self.input.bytecode_path.is_some() {
+            return self.print_metadata(&inputs[0]);
+        }
+
+        let (output, extension) = match command_type {
+            BytecodeCommandType::Query => {
+                // SecondaryOption only has the variant of QueryOptions as of April 15, 2025
+                // If more variants are to be added, the following code must be updated
+                self.query(&inputs, match secondary_options {
+                    Some(SecondaryOption::Query(sub_command)) => Some(sub_command),
+                    _ => None,
+                })?
+            },
+            _ => {
+                unreachable!("Command not supported on this mode to process modules as a package")
+            },
+        };
+
+        if output.is_empty() {
+            Ok("no applicable bytecode module/script found".to_string())
+        } else {
+            let output_file_template = if let Some(path) = self.input.bytecode_path.clone() {
+                path.clone()
+            } else if let Some(mut path) = self.input.package_path.clone() {
+                path.push("result");
+                path.clone()
+            } else {
+                unreachable!(
+                    "BytecodeCommandInput is reuqired by clap,
+                        ensuring this is unreachable"
+                )
+            };
+
+            let output_file = self.save_output(
+                output_file_template.as_path(),
+                extension.to_string(),
+                output.to_string(),
+            )?;
+            Ok(output_file.display().to_string())
+        }
+    }
+
+    /// Collect the group of bytecode files to process
+    /// based on user specified bytecode-path or package-path
+    fn prepare_input(&self) -> Result<Vec<PathBuf>, CliError> {
+        if let Some(path) = self.input.bytecode_path.clone() {
+            let extension = path
+                .extension()
+                .context("Missing file extension for bytecode file")?;
+            if extension != MOVE_COMPILED_EXTENSION {
+                return Err(CliError::UnexpectedError(format!(
+                    "Bad bytecode file extension {:?}; expected {}",
+                    extension, MOVE_COMPILED_EXTENSION
+                )));
+            }
+            Ok(vec![path])
+        } else if let Some(path) = self.input.package_path.clone() {
+            read_dir_files(path.as_path(), |p| {
+                p.extension()
+                    .map(|s| s == MOVE_COMPILED_EXTENSION)
+                    .unwrap_or_default()
+            })
+        } else {
+            unreachable!(
+                "BytecodeCommandInput is reuqired by clap,
+                ensuring this is unreachable"
+            )
+        }
     }
 
     fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
@@ -258,6 +350,47 @@ impl BytecodeCommand {
             serde_json::to_string_pretty(&metadata).expect("expect metadata")
         );
         Ok("ok".to_string())
+    }
+
+    /// Save `output` to disk
+    /// Target file path construction:
+    /// (1) If output path is given by uses:
+    ///     append the filename to the given output file,
+    ///     and replace the extension with the given one
+    /// (2) If output path is not given:
+    ///     simply replace the extension of `output_file_template`
+    ///     with the given one
+    fn save_output(
+        &self,
+        output_file_template: &Path,
+        extension: String,
+        output: String,
+    ) -> Result<PathBuf, CliError> {
+        let output_dir = if let Some(dir) = self.output_dir.clone() {
+            dir
+        } else {
+            output_file_template
+                .parent()
+                .expect("has parent dir")
+                .to_owned()
+        };
+
+        let output_file = output_dir
+            .join(output_file_template.file_name().expect("file name"))
+            .with_extension(extension);
+        check_if_file_exists(output_file.as_path(), self.prompt_options)?;
+
+        // Create the directory if it doesn't exist
+        create_dir_if_not_exist(output_dir.as_path())?;
+
+        // write to file
+        write_to_user_only_file(
+            output_file.as_path(),
+            &output_file.display().to_string(),
+            output.as_bytes(),
+        )?;
+
+        Ok(output_file)
     }
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
@@ -377,6 +510,43 @@ impl BytecodeCommand {
                 out.status,
                 String::from_utf8(out.stderr).unwrap_or_default()
             )))
+        }
+    }
+
+    /// Query the move package based on user-provided commands
+    fn query(
+        &self,
+        package: &Vec<PathBuf>,
+        query_command: Option<QuerierCommand>,
+    ) -> Result<(String, &'static str), CliError> {
+        // If query command is provided
+        if let Some(query_command) = query_command {
+            let extension = query_command.extension();
+            let mut querier = Querier::new(query_command);
+
+            // If bytecode-path is given, assuming the parent folder
+            //      is where source maps are stored
+            // If package-path is given, assuming source maps
+            //      are saved in the same folder
+            let source_map_path = if let Some(path) = self.input.bytecode_path.clone() {
+                path.parent().expect("has parent dir").to_owned()
+            } else if let Some(path) = self.input.package_path.clone() {
+                path
+            } else {
+                unreachable!(
+                    "BytecodeCommandInput is reuqired by clap,
+                        ensuring this is unreachable"
+                )
+            };
+
+            // Load bytecode files into the package
+            querier.load_package(package, source_map_path)?;
+            let res = querier.query()?;
+            Ok((res, extension))
+        } else {
+            Err(CliError::CommandArgumentError(
+                "No query command provided".to_string(),
+            ))
         }
     }
 
