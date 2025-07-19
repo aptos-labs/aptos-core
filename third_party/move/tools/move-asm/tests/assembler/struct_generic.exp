@@ -3,35 +3,34 @@ processed 1 task
 task 0 'publish'. lines 1-26:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test {
-struct S<Ty0> has drop {
-	_1: u64,
-	_2: Ty0
-}
+// Bytecode version v7
+module 0x66::test
+struct S<T0>
+  _1: u64
+  _2: T0
 
-pack_and_select(): u8 /* def_idx: 0 */ {
-B0:
-	0: LdU64(3)
-	1: LdU8(2)
-	2: PackGeneric[0](S<u8>)
-	3: Call select(S<u8>): u8
-	4: Ret
-}
-select(Arg0: S<u8>): u8 /* def_idx: 1 */ {
-B0:
-	0: ImmBorrowLoc[0](Arg0: S<u8>)
-	1: ImmBorrowFieldGeneric[0](S._2: Ty0)
-	2: ReadRef
-	3: Ret
-}
-pack_and_unpack(): u64 * u8 /* def_idx: 2 */ {
-B0:
-	0: LdU64(3)
-	1: LdU8(2)
-	2: PackGeneric[0](S<u8>)
-	3: UnpackGeneric[0](S<u8>)
-	4: Ret
-}
-}
+// Function definition at index 0
+fun pack_and_select(): u8
+    ld_u64 3
+    ld_u8 2
+    pack S<u8>
+    call test::select
+    ret
+
+// Function definition at index 1
+fun select(l0: test::S<u8>): u8
+    borrow_loc l0
+    borrow_field S<u8>, _2
+    read_ref
+    ret
+
+// Function definition at index 2
+fun pack_and_unpack(): (u64,u8)
+    ld_u64 3
+    ld_u8 2
+    pack S<u8>
+    unpack S<u8>
+    ret
+
+
 == END Bytecode ==
