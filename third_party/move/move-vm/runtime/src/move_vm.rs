@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
     dispatch_loader,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
@@ -24,7 +24,6 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
@@ -59,12 +58,11 @@ impl MoveVM {
     pub fn execute_loaded_function(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
-        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         dispatch_loader!(module_storage, loader, {
             Self::execute_loaded_function_impl(
@@ -76,7 +74,6 @@ impl MoveVM {
                 traversal_context,
                 extensions,
                 module_storage,
-                resource_resolver,
             )
         })
     }
@@ -84,13 +81,12 @@ impl MoveVM {
     pub fn execute_loaded_function_impl(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         loader: &impl Loader,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         module_storage: &impl ModuleStorage,
-        resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = module_storage.runtime_environment().vm_config();
         let ty_builder = &vm_config.ty_builder;
@@ -118,7 +114,6 @@ impl MoveVM {
                 data_cache,
                 module_storage,
                 &ty_depth_checker,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,

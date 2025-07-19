@@ -10,12 +10,15 @@ use crate::{
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
-        session::user_transaction_sessions::{
-            abort_hook::AbortHookSession,
-            epilogue::EpilogueSession,
-            prologue::PrologueSession,
-            session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
-            user::UserSession,
+        session::{
+            user_transaction_sessions::{
+                abort_hook::AbortHookSession,
+                epilogue::EpilogueSession,
+                prologue::PrologueSession,
+                session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
+                user::UserSession,
+            },
+            LegacySessionAdapter,
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
@@ -23,9 +26,10 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
+    v2::{AptosSimulationVMv2, AptosVMv2, AptosViewVMv2},
     verifier::{
-        event_validation, native_validation, resource_groups, transaction_arg_validation,
-        view_function,
+        event_validation, native_validation, resource_groups, script_validation,
+        transaction_arg_validation, view_function,
     },
     VMBlockExecutor, VMValidator,
 };
@@ -56,7 +60,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
@@ -66,7 +70,6 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
         TimedFeatureFlag, TimedFeatures,
     },
-    randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
@@ -112,7 +115,6 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
-    file_format::CompiledScript,
     CompiledModule,
 };
 use move_core_types::{
@@ -232,7 +234,7 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 
 /// Checks if a given transaction is a governance proposal by checking if it has one of the
 /// approved execution hashes.
-fn is_approved_gov_script(
+pub(crate) fn is_approved_gov_script(
     resolver: &impl ConfigStorage,
     txn: &SignedTransaction,
     txn_metadata: &TransactionMetadata,
@@ -248,6 +250,11 @@ fn is_approved_gov_script(
     } else {
         false
     }
+}
+
+pub enum AptosVmWrapper {
+    V1(AptosVM),
+    V2(AptosVMv2),
 }
 
 pub struct AptosVM {
@@ -800,12 +807,19 @@ impl AptosVM {
 
         // Check that unstable bytecode cannot be executed on mainnet and verify events.
         let script = func.owner_as_script()?;
-        self.reject_unstable_bytecode_for_script(script)?;
+        script_validation::reject_unstable_bytecode_for_script(script, self.chain_id())?;
         event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
+        // Note: historically, context was not used for arg validation or construction.
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context_for_arg_construction = TraversalContext::new(&traversal_storage);
+
         let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            code_storage,
+            &mut LegacySessionAdapter::new(
+                session,
+                code_storage,
+                &mut traversal_context_for_arg_construction,
+            ),
             serialized_signers,
             convert_txn_args(serialized_script.args()),
             &func,
@@ -878,9 +892,17 @@ impl AptosVM {
 
         let struct_constructors_enabled =
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+
+        // Note: historically, context was not used for arg validation or construction.
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context_for_arg_construction = TraversalContext::new(&traversal_storage);
+
         let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            module_storage,
+            &mut LegacySessionAdapter::new(
+                session,
+                module_storage,
+                &mut traversal_context_for_arg_construction,
+            ),
             serialized_signers,
             entry_fn.args().to_vec(),
             &function,
@@ -1078,39 +1100,8 @@ impl AptosVM {
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
-        let invariant_violation_error = || {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("MultiSig transaction error".to_string())
-                .finish(Location::Undefined)
-        };
-        let provided_payload = match executable {
-            TransactionExecutableRef::EntryFunction(entry_func) => {
-                // TODO[Orderless]: For backward compatibility reasons, still using `MultisigTransactionPayload` here.
-                // Find a way to deprecate this.
-                bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
-                    entry_func.clone(),
-                ))
-                .map_err(|_| invariant_violation_error())?
-            },
-            TransactionExecutableRef::Empty => {
-                // Default to empty bytes if payload is not provided.
-                if self
-                    .features()
-                    .is_abort_if_multisig_payload_mismatch_enabled()
-                {
-                    vec![]
-                } else {
-                    bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
-                }
-            },
-            TransactionExecutableRef::Script(_) => {
-                let s = VMStatus::error(
-                    StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support script payload".to_string()),
-                );
-                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
-            },
-        };
+        let provided_payload = executable.get_provided_payload_bytes(self.features())?;
+
         // Failures here will be propagated back.
         let payload_bytes: Vec<Vec<u8>> = session
             .execute(|session| {
@@ -1544,20 +1535,6 @@ impl AptosVM {
                             )
                             .finish(Location::Undefined));
                     }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
-    pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
-        if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata(script) {
-                if metadata.unstable {
-                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
-                        .with_message("script marked unstable cannot be run on mainnet".to_string())
-                        .finish(Location::Script));
                 }
             }
         }
@@ -2182,9 +2159,7 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata), None);
 
-        let args = serialize_values(
-            &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
-        );
+        let args = serialize_values(&block_metadata.get_prologue_move_args());
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2234,40 +2209,7 @@ impl AptosVM {
             None,
         );
 
-        let block_metadata_with_randomness = match block_metadata_ext {
-            BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(v1) => v1,
-        };
-
-        let BlockMetadataWithRandomness {
-            id,
-            epoch,
-            round,
-            proposer,
-            previous_block_votes_bitvec,
-            failed_proposer_indices,
-            timestamp_usecs,
-            randomness,
-        } = block_metadata_with_randomness;
-
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
+        let args = block_metadata_ext.get_prologue_move_args();
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2381,6 +2323,38 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
+        if env.features().is_aptos_vm_v2_enabled() {
+            let vm = AptosViewVMv2::new(&env);
+            vm.execute_view_function(
+                state_view,
+                module_id,
+                func_name,
+                type_args,
+                arguments,
+                max_gas_amount,
+            )
+        } else {
+            Self::execute_view_function_v1(
+                state_view,
+                env,
+                module_id,
+                func_name,
+                type_args,
+                arguments,
+                max_gas_amount,
+            )
+        }
+    }
+
+    fn execute_view_function_v1(
+        state_view: &impl StateView,
+        env: AptosEnvironment,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        max_gas_amount: u64,
+    ) -> ViewFunctionOutput {
         let vm = AptosVM::new(&env, state_view);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -2488,9 +2462,17 @@ impl AptosVM {
         let func = module_storage.load_function(&module_id, &func_name, &ty_args)?;
         let metadata = get_metadata(&func.owner_as_module()?.metadata);
 
+        // Note: historically, context was not used for arg validation or construction.
+        let traversal_storage_for_arg_construction = TraversalStorage::new();
+        let mut traversal_context_for_arg_construction =
+            TraversalContext::new(&traversal_storage_for_arg_construction);
+
         let arguments = view_function::validate_view_function(
-            session,
-            module_storage,
+            &mut LegacySessionAdapter::new(
+                session,
+                module_storage,
+                &mut traversal_context_for_arg_construction,
+            ),
             arguments,
             func_name.as_ident_str(),
             &func,
@@ -2865,7 +2847,7 @@ impl VMValidator for AptosVM {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
-        module_storage: &impl ModuleStorage,
+        module_storage: &impl AptosModuleStorage,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -2997,12 +2979,29 @@ impl AptosSimulationVM {
         transaction: &SignedTransaction,
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
+        let env = AptosEnvironment::new(state_view);
+        if env.features().is_aptos_vm_v2_enabled() {
+            let vm = AptosSimulationVMv2::new(&env);
+            vm.simulate_user_transaction(transaction, state_view)
+        } else {
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction_v1(
+                transaction,
+                state_view,
+                env,
+            )
+        }
+    }
+
+    fn create_vm_and_simulate_signed_transaction_v1(
+        transaction: &SignedTransaction,
+        state_view: &impl StateView,
+        env: AptosEnvironment,
+    ) -> (VMStatus, TransactionOutput) {
         assert_err!(
             transaction.verify_signature(),
             "Simulated transaction should not have a valid signature"
         );
 
-        let env = AptosEnvironment::new(state_view);
         let mut vm = AptosVM::new(&env, state_view);
         vm.is_simulation = true;
 

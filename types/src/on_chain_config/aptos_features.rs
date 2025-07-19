@@ -143,6 +143,7 @@ pub enum FeatureFlag {
 
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
+    APTOS_VM_V2 = 98,
 }
 
 impl FeatureFlag {
@@ -241,6 +242,7 @@ impl FeatureFlag {
             FeatureFlag::ORDERLESS_TRANSACTIONS,
             FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::APTOS_VM_V2,
         ]
     }
 }
@@ -423,6 +425,10 @@ impl Features {
 
     pub fn is_distribute_transaction_fee_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    pub fn is_aptos_vm_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::APTOS_VM_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
