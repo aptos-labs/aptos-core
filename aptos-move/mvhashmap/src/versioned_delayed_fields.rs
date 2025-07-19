@@ -7,7 +7,6 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, ReadPosition},
 };
 use aptos_types::error::{code_invariant_error, PanicError, PanicOr};
-use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -115,17 +114,8 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 
     fn remove(&mut self, txn_idx: TxnIndex) {
-        let deleted_entry = self.versioned_map.remove(&txn_idx);
-        // Entries should only be deleted if the transaction that produced them is
-        // aborted and re-executed, but abort must have marked the entry as an Estimate.
-        assert_matches!(
-            deleted_entry
-                .expect("Entry must exist to be removed")
-                .as_ref()
-                .deref(),
-            VersionEntry::Estimate(_),
-            "Removed entry must be an Estimate",
-        );
+        self.versioned_map.remove(&txn_idx);
+
         // Incarnation changed output behavior, disable reading through estimates optimization.
         self.read_estimate_deltas = false;
     }
@@ -698,18 +688,6 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             },
         }
     }
-
-    pub fn remove_all_at_or_after_for_epilogue(
-        &self,
-        txn_idx: TxnIndex,
-        epilogue_txn_idx: TxnIndex,
-    ) {
-        for mut entry in self.values.iter_mut() {
-            entry.value_mut().versioned_map.split_off(&txn_idx);
-        }
-        self.next_idx_to_commit
-            .store(epilogue_txn_idx, Ordering::SeqCst);
-    }
 }
 
 impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
@@ -754,7 +732,7 @@ mod test {
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
     };
     use aptos_types::delayed_fields::SnapshotToStringFormula;
-    use claims::{assert_err_eq, assert_ok_eq, assert_some};
+    use claims::{assert_err_eq, assert_matches, assert_ok_eq, assert_some};
     use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
@@ -1162,22 +1140,6 @@ mod test {
 
             assert_read_derived_dependent_apply!(v.read(12), 3, 11, test_formula());
         }
-    }
-
-    #[should_panic]
-    #[test_case(NO_ENTRY)]
-    #[test_case(VALUE_AGGREGATOR)]
-    #[test_case(VALUE_SNAPSHOT)]
-    #[test_case(VALUE_DERIVED)]
-    #[test_case(APPLY_AGGREGATOR)]
-    #[test_case(APPLY_SNAPSHOT)]
-    #[test_case(APPLY_DERIVED)]
-    fn remove_non_estimate(type_index: usize) {
-        let mut v = VersionedValue::new(None);
-        if let Some(entry) = aggregator_entry(type_index) {
-            v.insert_speculative_value(10, entry).unwrap();
-        }
-        v.remove(10);
     }
 
     #[test]
