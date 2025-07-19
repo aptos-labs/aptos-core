@@ -3,7 +3,6 @@
 
 #![allow(dead_code)]
 
-use super::helpers::UserAccount;
 use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{
@@ -12,17 +11,16 @@ use aptos_framework::natives::code::{
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
+use fuzzer::UserAccount;
 use libfuzzer_sys::Corpus;
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
-};
+use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
 use move_core_types::{
-    language_storage::{ModuleId, TypeTag},
-    value::MoveValue,
+    language_storage::ModuleId,
     vm_status::{StatusCode, StatusType, VMStatus},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+pub const BYTECODE_VERSION: u32 = 8;
 
 // Used to fuzz the MoveVM
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
@@ -56,28 +54,6 @@ impl FuzzerRunnableAuthenticator {
             } => *sender,
         }
     }
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub enum ExecVariant {
-    Script {
-        script: CompiledScript,
-        type_args: Vec<TypeTag>,
-        args: Vec<MoveValue>,
-    },
-    CallFunction {
-        module: ModuleId,
-        function: FunctionDefinitionIndex,
-        type_args: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-    },
-}
-
-#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
-pub struct RunnableState {
-    pub dep_modules: Vec<CompiledModule>,
-    pub exec_variant: ExecVariant,
-    pub tx_auth_type: FuzzerRunnableAuthenticator,
 }
 
 // used for ordering modules topologically
@@ -145,7 +121,7 @@ fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload
     for module in modules {
         let mut module_code: Vec<u8> = vec![];
         module
-            .serialize(&mut module_code)
+            .serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
             .expect("Module must serialize");
         pkg_code.push(module_code);
     }

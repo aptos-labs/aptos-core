@@ -11,6 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-framework = { workspace = true, optional = true }
 clap = { workspace = true, features = ["derive"] }
 either = { workspace = true }
 legacy-move-compiler = { workspace = true }
@@ -36,6 +37,11 @@ regex = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 
+# Optional dependencies for fuzzing
+arbitrary = { workspace = true, optional = true }
+bcs = { workspace = true, optional = true }
+dearbitrary = { workspace = true, optional = true }
+
 [dev-dependencies]
 datatest-stable = { workspace = true }
 difference = { workspace = true }
@@ -46,3 +52,4 @@ harness = false
 
 [features]
 failpoints = ['move-vm-runtime/failpoints']
+fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]
