@@ -15,10 +15,9 @@ use aptos_config::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, GetNewTransactionDataWithProofRequest, NewTransactionOutputsWithProofRequest,
+        DataRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StorageServiceRequest, TransactionData, TransactionDataRequestType,
-        TransactionOrOutputData,
+        StorageServiceRequest,
     },
     responses::StorageServerSummary,
 };
@@ -426,16 +425,12 @@ fn create_optimistic_fetch_data_request(
     match random_number % 3 {
         0 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionData(TransactionData {
-                        include_events: true,
-                    });
-                DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-                    transaction_data_request_type,
+                DataRequest::get_new_transaction_data_with_proof(
                     known_version,
                     known_epoch,
-                    max_response_bytes: 0,
-                })
+                    true,
+                    0,
+                )
             } else {
                 DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                     known_version,
@@ -446,14 +441,11 @@ fn create_optimistic_fetch_data_request(
         },
         1 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOutputData;
-                DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-                    transaction_data_request_type,
+                DataRequest::get_new_transaction_output_data_with_proof(
                     known_version,
                     known_epoch,
-                    max_response_bytes: 0,
-                })
+                    0,
+                )
             } else {
                 DataRequest::GetNewTransactionOutputsWithProof(
                     NewTransactionOutputsWithProofRequest {
@@ -465,16 +457,12 @@ fn create_optimistic_fetch_data_request(
         },
         2 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-                        include_events: true,
-                    });
-                DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-                    transaction_data_request_type,
+                DataRequest::get_new_transaction_or_output_data_with_proof(
                     known_version,
                     known_epoch,
-                    max_response_bytes: 0,
-                })
+                    true,
+                    0,
+                )
             } else {
                 DataRequest::GetNewTransactionsOrOutputsWithProof(
                     NewTransactionsOrOutputsWithProofRequest {

@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
-use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, Epoch};
+use aptos_storage_service_types::{
+    responses::{TransactionOrOutputListWithProof, TransactionOrOutputListWithProofV2},
+    Epoch,
+};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, Version,
+    },
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -41,7 +47,7 @@ pub trait AptosDataClientInterface {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -53,7 +59,7 @@ pub trait AptosDataClientInterface {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction or output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -65,7 +71,7 @@ pub trait AptosDataClientInterface {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches the number of states at the specified version.
     async fn get_number_of_states(
@@ -98,7 +104,7 @@ pub trait AptosDataClientInterface {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOutputListWithProofV2>>;
 
     /// Fetches a transaction list with proof, with transactions from
     /// start to end versions (inclusive). The proof is relative to the
@@ -113,7 +119,7 @@ pub trait AptosDataClientInterface {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionListWithProof>>;
+    ) -> error::Result<Response<TransactionListWithProofV2>>;
 
     /// Fetches a transaction or output list with proof, with data from
     /// start to end versions (inclusive). The proof is relative to the
@@ -128,7 +134,7 @@ pub trait AptosDataClientInterface {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOrOutputListWithProofV2>>;
 
     /// Subscribes to new transaction output lists with proofs. Subscriptions
     /// start at `known_version + 1` and `known_epoch` (inclusive), as
@@ -139,7 +145,7 @@ pub trait AptosDataClientInterface {
         &self,
         subscription_request_metadata: SubscriptionRequestMetadata,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Subscribes to new transaction lists with proofs. Subscriptions start
     /// at `known_version + 1` and `known_epoch` (inclusive), as specified
@@ -152,7 +158,7 @@ pub trait AptosDataClientInterface {
         subscription_request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Subscribes to new transaction or output lists with proofs. Subscriptions
     /// start at `known_version + 1` and `known_epoch` (inclusive), as
@@ -165,7 +171,7 @@ pub trait AptosDataClientInterface {
         subscription_request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 }
 
 /// Subscription stream metadata associated with each subscription request

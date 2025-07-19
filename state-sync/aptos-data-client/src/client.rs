@@ -42,7 +42,7 @@ use aptos_storage_service_types::{
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
-    responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof},
+    responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProofV2},
     Epoch, StorageServiceMessage,
 };
 use aptos_time_service::TimeService;
@@ -50,7 +50,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
@@ -150,9 +150,20 @@ impl AptosDataClient {
         self.data_client_config.max_num_output_reductions
     }
 
+    /// Returns the maximum number of bytes that can be returned in a single response
+    fn get_max_response_bytes(&self) -> u64 {
+        self.data_client_config.max_response_bytes
+    }
+
     /// Returns the peers and metadata struct
     pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
         self.storage_service_client.get_peers_and_metadata()
+    }
+
+    /// Returns true iff transaction v2 is enabled, and
+    /// the client should use transaction v2 data requests.
+    fn is_transaction_v2_enabled(&self) -> bool {
+        self.data_client_config.enable_transaction_data_v2
     }
 
     /// Updates the metrics and logs for peer states. This includes
@@ -452,6 +463,9 @@ impl AptosDataClient {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            DataRequest::SubscribeTransactionDataWithProof(request) => {
                 request.subscription_stream_metadata.subscription_stream_id
             },
             data_request => {
@@ -939,13 +953,20 @@ impl AptosDataClientInterface for AptosDataClient {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
+    ) -> crate::error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>
     {
-        let data_request =
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_new_transaction_output_data_with_proof(
+                known_version,
+                known_epoch,
+                self.get_max_response_bytes(),
+            )
+        } else {
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
                 known_epoch,
-            });
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -956,13 +977,22 @@ impl AptosDataClientInterface for AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
-        let data_request =
+    ) -> crate::error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>
+    {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_new_transaction_data_with_proof(
+                known_version,
+                known_epoch,
+                include_events,
+                self.get_max_response_bytes(),
+            )
+        } else {
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version,
                 known_epoch,
                 include_events,
-            });
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -973,16 +1003,26 @@ impl AptosDataClientInterface for AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
-    {
-        let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
-            NewTransactionsOrOutputsWithProofRequest {
+    ) -> crate::error::Result<
+        Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>,
+    > {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_new_transaction_or_output_data_with_proof(
                 known_version,
                 known_epoch,
                 include_events,
-                max_num_output_reductions: self.get_max_num_output_reductions(),
-            },
-        );
+                self.get_max_response_bytes(),
+            )
+        } else {
+            DataRequest::GetNewTransactionsOrOutputsWithProof(
+                NewTransactionsOrOutputsWithProofRequest {
+                    known_version,
+                    known_epoch,
+                    include_events,
+                    max_num_output_reductions: self.get_max_num_output_reductions(),
+                },
+            )
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1019,13 +1059,21 @@ impl AptosDataClientInterface for AptosDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<TransactionOutputListWithProof>> {
-        let data_request =
+    ) -> crate::error::Result<Response<TransactionOutputListWithProofV2>> {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_transaction_output_data_with_proof(
+                proof_version,
+                start_version,
+                end_version,
+                self.get_max_response_bytes(),
+            )
+        } else {
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 end_version,
-            });
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1037,13 +1085,23 @@ impl AptosDataClientInterface for AptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<TransactionListWithProof>> {
-        let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-            proof_version,
-            start_version,
-            end_version,
-            include_events,
-        });
+    ) -> crate::error::Result<Response<TransactionListWithProofV2>> {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_transaction_data_with_proof(
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+                self.get_max_response_bytes(),
+            )
+        } else {
+            DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1055,15 +1113,24 @@ impl AptosDataClientInterface for AptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<TransactionOrOutputListWithProof>> {
-        let data_request =
+    ) -> crate::error::Result<Response<TransactionOrOutputListWithProofV2>> {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::get_transaction_or_output_data_with_proof(
+                proof_version,
+                start_version,
+                end_version,
+                include_events,
+                self.get_max_response_bytes(),
+            )
+        } else {
             DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 end_version,
                 include_events,
                 max_num_output_reductions: self.get_max_num_output_reductions(),
-            });
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1072,19 +1139,27 @@ impl AptosDataClientInterface for AptosDataClient {
         &self,
         request_metadata: SubscriptionRequestMetadata,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
+    ) -> crate::error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>
     {
         let subscription_stream_metadata = SubscriptionStreamMetadata {
             known_version_at_stream_start: request_metadata.known_version_at_stream_start,
             known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
             subscription_stream_id: request_metadata.subscription_stream_id,
         };
-        let data_request = DataRequest::SubscribeTransactionOutputsWithProof(
-            SubscribeTransactionOutputsWithProofRequest {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::subscribe_transaction_output_data_with_proof(
                 subscription_stream_metadata,
-                subscription_stream_index: request_metadata.subscription_stream_index,
-            },
-        );
+                request_metadata.subscription_stream_index,
+                self.get_max_response_bytes(),
+            )
+        } else {
+            DataRequest::SubscribeTransactionOutputsWithProof(
+                SubscribeTransactionOutputsWithProofRequest {
+                    subscription_stream_metadata,
+                    subscription_stream_index: request_metadata.subscription_stream_index,
+                },
+            )
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1094,18 +1169,27 @@ impl AptosDataClientInterface for AptosDataClient {
         request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>
+    {
         let subscription_stream_metadata = SubscriptionStreamMetadata {
             known_version_at_stream_start: request_metadata.known_version_at_stream_start,
             known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
             subscription_stream_id: request_metadata.subscription_stream_id,
         };
-        let data_request =
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::subscribe_transaction_data_with_proof(
+                subscription_stream_metadata,
+                request_metadata.subscription_stream_index,
+                include_events,
+                self.get_max_response_bytes(),
+            )
+        } else {
             DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
                 subscription_stream_metadata,
                 include_events,
                 subscription_stream_index: request_metadata.subscription_stream_index,
-            });
+            })
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
@@ -1115,21 +1199,31 @@ impl AptosDataClientInterface for AptosDataClient {
         request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
-    {
+    ) -> crate::error::Result<
+        Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>,
+    > {
         let subscription_stream_metadata = SubscriptionStreamMetadata {
             known_version_at_stream_start: request_metadata.known_version_at_stream_start,
             known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
             subscription_stream_id: request_metadata.subscription_stream_id,
         };
-        let data_request = DataRequest::SubscribeTransactionsOrOutputsWithProof(
-            SubscribeTransactionsOrOutputsWithProofRequest {
+        let data_request = if self.is_transaction_v2_enabled() {
+            DataRequest::subscribe_transaction_or_output_data_with_proof(
                 subscription_stream_metadata,
+                request_metadata.subscription_stream_index,
                 include_events,
-                max_num_output_reductions: self.get_max_num_output_reductions(),
-                subscription_stream_index: request_metadata.subscription_stream_index,
-            },
-        );
+                self.get_max_response_bytes(),
+            )
+        } else {
+            DataRequest::SubscribeTransactionsOrOutputsWithProof(
+                SubscribeTransactionsOrOutputsWithProofRequest {
+                    subscription_stream_metadata,
+                    include_events,
+                    max_num_output_reductions: self.get_max_num_output_reductions(),
+                    subscription_stream_index: request_metadata.subscription_stream_index,
+                },
+            )
+        };
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }

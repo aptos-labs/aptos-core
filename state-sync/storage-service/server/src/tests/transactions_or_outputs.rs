@@ -4,10 +4,7 @@
 use crate::tests::{mock, mock::MockClient, utils};
 use aptos_config::config::StorageServiceConfig;
 use aptos_storage_service_types::{
-    requests::{
-        DataRequest, GetTransactionDataWithProofRequest, TransactionDataRequestType,
-        TransactionOrOutputData, TransactionsOrOutputsWithProofRequest,
-    },
+    requests::{DataRequest, TransactionsOrOutputsWithProofRequest},
     responses::{DataResponse, StorageServiceResponse, TransactionDataResponseType},
     StorageServiceError,
 };
@@ -327,17 +324,13 @@ async fn get_transactions_or_outputs_with_proof(
     use_request_v2: bool,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = if use_request_v2 {
-        let transaction_data_request_type =
-            TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-                include_events,
-            });
-        DataRequest::GetTransactionDataWithProof(GetTransactionDataWithProofRequest {
-            transaction_data_request_type,
+        DataRequest::get_transaction_or_output_data_with_proof(
             proof_version,
             start_version,
             end_version,
-            max_response_bytes: 0,
-        })
+            include_events,
+            0,
+        )
     } else {
         DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
             proof_version,

@@ -8,5 +8,6 @@ mod multi_fetch;
 mod peers;
 mod poller;
 mod priority;
+mod request_v2;
 mod utils;
 mod weighted_selection;
