@@ -26,8 +26,8 @@ use aptos_types::{
     },
     transaction::{
         AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -139,7 +139,7 @@ pub trait DbReader: Send + Sync {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProofV2>;
 
         /// See [AptosDB::get_transaction_by_hash].
         ///
@@ -198,7 +198,7 @@ pub trait DbReader: Send + Sync {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProofV2>;
 
         /// Returns events by given event key
         fn get_events(
@@ -559,7 +559,7 @@ pub trait DbWriter: Send + Sync {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         unimplemented!()

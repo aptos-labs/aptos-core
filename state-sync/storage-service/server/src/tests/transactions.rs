@@ -25,10 +25,6 @@ async fn test_get_transactions_with_proof() {
                     end_version,
                     proof_version,
                     include_events,
-                );
-                let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                    start_version,
-                    end_version,
                     use_request_v2,
                 );
 
@@ -41,8 +37,6 @@ async fn test_get_transactions_with_proof() {
                     proof_version,
                     include_events,
                     transaction_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
 
                 // Create a storage service config
@@ -71,7 +65,6 @@ async fn test_get_transactions_with_proof() {
                 utils::verify_transaction_with_proof_response(
                     use_request_v2,
                     transaction_list_with_proof,
-                    persisted_auxiliary_infos,
                     response,
                 );
             }
@@ -97,9 +90,8 @@ async fn test_get_transactions_with_chunk_proof_limit() {
                 end_version,
                 proof_version,
                 include_events,
+                use_request_v2,
             );
-            let persisted_auxiliary_infos =
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
 
             // Create the mock db reader
             let mut db_reader = mock::create_mock_db_reader();
@@ -110,8 +102,6 @@ async fn test_get_transactions_with_chunk_proof_limit() {
                 proof_version,
                 include_events,
                 transaction_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
 
             // Create a storage service config
@@ -140,7 +130,6 @@ async fn test_get_transactions_with_chunk_proof_limit() {
             utils::verify_transaction_with_proof_response(
                 use_request_v2,
                 transaction_list_with_proof,
-                persisted_auxiliary_infos,
                 response,
             );
         }
@@ -279,6 +268,7 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64, use
                     chunk_size,
                     min_bytes_per_transaction,
                     include_events,
+                    use_request_v2,
                 );
                 db_reader
                     .expect_get_transactions()
@@ -291,22 +281,6 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64, use
                     )
                     .in_sequence(&mut expectation_sequence)
                     .returning(move |_, _, _, _| Ok(transaction_list_with_proof.clone()));
-
-                // Expect a call to get persisted auxiliary infos if v2 is enabled
-                if use_request_v2 {
-                    let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                        start_version,
-                        start_version + chunk_size - 1,
-                        use_request_v2,
-                    )
-                    .unwrap();
-                    let persisted_auxiliary_infos = persisted_auxiliary_infos.into_iter().map(Ok);
-                    db_reader
-                        .expect_get_persisted_auxiliary_info_iterator()
-                        .times(1)
-                        .with(eq(start_version), eq(chunk_size as usize))
-                        .returning(move |_, _| Ok(Box::new(persisted_auxiliary_infos.clone())));
-                }
 
                 chunk_size /= 2;
             }

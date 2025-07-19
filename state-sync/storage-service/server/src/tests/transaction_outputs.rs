@@ -11,7 +11,7 @@ use aptos_storage_service_types::{
     responses::{DataResponse, StorageServiceResponse, TransactionDataResponseType},
     StorageServiceError,
 };
-use aptos_types::transaction::{PersistedAuxiliaryInfo, TransactionOutputListWithProof};
+use aptos_types::transaction::TransactionOutputListWithProofV2;
 use claims::assert_matches;
 use mockall::{predicate::eq, Sequence};
 
@@ -27,10 +27,12 @@ async fn test_get_transaction_outputs_with_proof() {
             let start_version = 0;
             let end_version = start_version + chunk_size - 1;
             let proof_version = end_version;
-            let output_list_with_proof =
-                utils::create_output_list_with_proof(start_version, end_version, proof_version);
-            let persisted_auxiliary_infos =
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
+            let output_list_with_proof = utils::create_output_list_with_proof(
+                start_version,
+                end_version,
+                proof_version,
+                use_request_v2,
+            );
 
             // Create the mock db reader
             let mut db_reader = mock::create_mock_db_reader();
@@ -40,8 +42,6 @@ async fn test_get_transaction_outputs_with_proof() {
                 chunk_size,
                 proof_version,
                 output_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
 
             // Create a storage service config
@@ -66,12 +66,7 @@ async fn test_get_transaction_outputs_with_proof() {
             .unwrap();
 
             // Verify the response is correct
-            verify_output_with_proof_response(
-                use_request_v2,
-                output_list_with_proof,
-                persisted_auxiliary_infos,
-                response,
-            );
+            verify_output_with_proof_response(use_request_v2, output_list_with_proof, response);
         }
     }
 }
@@ -87,10 +82,12 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
         let start_version = 0;
         let end_version = start_version + max_output_chunk_size - 1;
         let proof_version = end_version;
-        let output_list_with_proof =
-            utils::create_output_list_with_proof(start_version, end_version, proof_version);
-        let persisted_auxiliary_infos =
-            utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
+        let output_list_with_proof = utils::create_output_list_with_proof(
+            start_version,
+            end_version,
+            proof_version,
+            use_request_v2,
+        );
 
         // Create the mock db reader
         let mut db_reader = mock::create_mock_db_reader();
@@ -100,8 +97,6 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
             max_output_chunk_size,
             proof_version,
             output_list_with_proof.clone(),
-            use_request_v2,
-            persisted_auxiliary_infos.clone(),
         );
 
         // Create a storage service config
@@ -126,12 +121,7 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
         .unwrap();
 
         // Verify the response is correct
-        verify_output_with_proof_response(
-            use_request_v2,
-            output_list_with_proof,
-            persisted_auxiliary_infos,
-            response,
-        );
+        verify_output_with_proof_response(use_request_v2, output_list_with_proof, response);
     }
 }
 
@@ -288,6 +278,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
                 start_version,
                 chunk_size,
                 min_bytes_per_output,
+                use_request_v2,
             );
             db_reader
                 .expect_get_transaction_outputs()
@@ -295,22 +286,6 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
                 .with(eq(start_version), eq(chunk_size), eq(proof_version))
                 .in_sequence(&mut expectation_sequence)
                 .returning(move |_, _, _| Ok(output_list_with_proof.clone()));
-
-            // Expect a call to get persisted auxiliary infos if v2 is enabled
-            if use_request_v2 {
-                let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                    start_version,
-                    start_version + chunk_size - 1,
-                    use_request_v2,
-                )
-                .unwrap();
-                let persisted_auxiliary_infos = persisted_auxiliary_infos.into_iter().map(Ok);
-                db_reader
-                    .expect_get_persisted_auxiliary_info_iterator()
-                    .times(1)
-                    .with(eq(start_version), eq(chunk_size as usize))
-                    .returning(move |_, _| Ok(Box::new(persisted_auxiliary_infos.clone())));
-            }
 
             chunk_size /= 2;
         }
@@ -369,8 +344,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
 /// Verifies the response for a transaction output with proof request
 fn verify_output_with_proof_response(
     use_request_v2: bool,
-    output_list_with_proof: TransactionOutputListWithProof,
-    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
+    output_list_with_proof: TransactionOutputListWithProofV2,
     response: StorageServiceResponse,
 ) {
     // Get the data response
@@ -391,7 +365,10 @@ fn verify_output_with_proof_response(
     // Verify the response data
     match data_response {
         DataResponse::TransactionOutputsWithProof(outputs_with_proof) => {
-            assert_eq!(outputs_with_proof, output_list_with_proof)
+            assert_eq!(
+                outputs_with_proof,
+                output_list_with_proof.get_output_list_with_proof().clone()
+            )
         },
         DataResponse::TransactionDataWithProof(transaction_data_with_proof) => {
             // Verify the data type
@@ -405,17 +382,11 @@ fn verify_output_with_proof_response(
                 .transaction_list_with_proof
                 .is_none());
 
-            // Verify the outputs and auxiliary infos
-            let output_list_with_proof_v2 = transaction_data_with_proof
-                .transaction_output_list_with_proof
-                .unwrap();
             assert_eq!(
-                output_list_with_proof_v2.get_output_list_with_proof(),
-                &output_list_with_proof
-            );
-            assert_eq!(
-                output_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                &persisted_auxiliary_infos.unwrap(),
+                transaction_data_with_proof
+                    .transaction_output_list_with_proof
+                    .unwrap(),
+                output_list_with_proof
             );
         },
         _ => panic!(
