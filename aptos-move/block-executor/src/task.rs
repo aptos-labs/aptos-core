@@ -137,18 +137,29 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn resource_group_write_set(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-        ResourceGroupSize,
-        BTreeMap<
-            <Self::Txn as Transaction>::Tag,
-            (
-                <Self::Txn as Transaction>::Value,
-                Option<Arc<MoveTypeLayout>>,
-            ),
-        >,
-    )>;
+    ) -> impl Iterator<
+        Item = (
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+            ResourceGroupSize,
+            BTreeMap<
+                <Self::Txn as Transaction>::Tag,
+                (
+                    <Self::Txn as Transaction>::Value,
+                    Option<Arc<MoveTypeLayout>>,
+                ),
+            >,
+        ),
+    >;
+
+    fn resource_group_key_and_tags_ref(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &<Self::Txn as Transaction>::Key,
+            HashSet<&<Self::Txn as Transaction>::Tag>,
+        ),
+    >;
 
     fn resource_group_metadata_ops(
         &self,
@@ -157,7 +168,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         <Self::Txn as Transaction>::Value,
     )> {
         self.resource_group_write_set()
-            .into_iter()
             .map(|(key, op, _, _)| (key, op))
             .collect()
     }
@@ -168,7 +178,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Execution output for transactions that should be discarded.
     fn discard_output(discard_code: StatusCode) -> Self;
 
-    fn materialize_agg_v1(
+    // !!![CAUTION]!!! This method should never be used in parallel execution.
+    fn legacy_sequential_materialize_agg_v1(
         &self,
         view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     );
@@ -176,6 +187,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized deltas and group updates
     /// (recorded in output separately) are incorporated into the transaction output.
+    /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
+    /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,

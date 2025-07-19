@@ -9,7 +9,7 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
-use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
@@ -47,6 +47,7 @@ macro_rules! forward_on_success_or_skip_rest {
             })
     }};
 }
+
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
@@ -58,8 +59,6 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,
-    resource_group_keys_and_tags:
-        Vec<CachePadded<ExplicitSyncWrapper<Vec<(T::Key, HashSet<T::Tag>)>>>>,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
@@ -76,9 +75,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             arced_resource_writes: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
-            resource_group_keys_and_tags: (0..num_txns)
-                .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
-                .collect(),
         }
     }
 
@@ -88,10 +84,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
-        group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)>,
     ) {
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
-        *self.resource_group_keys_and_tags[txn_idx as usize].acquire() = group_keys_and_tags;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
     }
@@ -229,25 +223,51 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // BlockSTMv1 method, avoids cloning the tags by calling mark_estimate on reference.
-    pub(crate) fn mark_estimate_group_keys_and_tags(
+    /// Returns an error if callback returns an error.
+    pub(crate) fn for_each_resource_group_key_and_tags<F>(
         &self,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         txn_idx: TxnIndex,
-    ) {
-        for (key, tags) in self.resource_group_keys_and_tags[txn_idx as usize]
-            .acquire()
-            .dereference()
-            .iter()
-        {
-            versioned_cache
-                .group_data()
-                .mark_estimate(key, txn_idx, tags);
+        mut callback: F,
+    ) -> Result<(), PanicError>
+    where
+        F: FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+    {
+        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
+            match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    for (key, tags) in t.resource_group_key_and_tags_ref() {
+                        callback(key, tags)?;
+                    }
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                    // No resource group keys for failed transactions
+                },
+            }
         }
+        Ok(())
     }
 
-    pub(crate) fn modified_group_keys(&self, txn_idx: TxnIndex) -> Vec<(T::Key, HashSet<T::Tag>)> {
-        std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
+    pub(crate) fn modified_group_key_and_tags_cloned(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Vec<(T::Key, HashSet<T::Tag>)> {
+        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
+            match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
+                    .resource_group_key_and_tags_ref()
+                    .map(|(key, tags)| (key.clone(), tags.into_iter().cloned().collect()))
+                    .collect(),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                    vec![]
+                },
+            }
+        } else {
+            vec![]
+        }
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from

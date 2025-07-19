@@ -12,18 +12,18 @@ use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
     errors::BlockExecutionError,
     executor::BlockExecutor,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutorTask, TransactionOutput as BlockExecutorTransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
-use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
-    error::PanicError,
+    error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -47,7 +47,10 @@ use once_cell::sync::{Lazy, OnceCell};
 use std::{
     collections::{BTreeMap, HashSet},
     marker::PhantomData,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 use vm_wrapper::AptosExecutorTask;
 
@@ -65,17 +68,51 @@ static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 /// transformed into TransactionOutput type that is returned.
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
-    // Note: should these mutexes be changed to ExplicitSyncSwapper?
-    vm_output: Mutex<Option<VMOutput>>,
+    // BlockSTM maintains an invariant that executions of the same txn (with different
+    // incarnations) do not happen concurrently, at the end of which vm_output is
+    // recorded. Multiple workers / threads can concurrently access the recorded
+    // output (e.g. for validation and post-processing purposes), but these accesses
+    // are read-only until incorporate_materialized_txn_output is called (or
+    // set_txn_output_for_non_dynamic_change_set, which does not commonly happen).
+    //
+    // One notable exception is legacy_sequential_materialize_agg_v1, which modifies
+    // vm_output but is only used in sequential execution.
+    //
+    // The most important invariant provided by the system is that calls accessing
+    // vm_output fully complete before incorporate_materialized_txn_output is called,
+    // and some methods that first access committed output and (if unset) then vm_output,
+    // are only done so to support both sequential and parallel execution flows
+    // (in some cases sequential materializes earlier).
+    // TODO(BlockSTMv2): unify the patterns across sequential and parallel execution,
+    // and enforce invariants w. PanicError.
+    vm_output: ExplicitSyncWrapper<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
+
+    // For defensive purposes, since vm_output is not under a lock, if there is a bug
+    // and a reading interface that is supposed to always finish before materialization
+    // calls that take vm_output (and store committed_output), we can use this flag to
+    // make sure there is no data race w. read. We achieve this by setting the flag
+    // at the beginning of the materialization APIs and checking at the end of the
+    // read-only interfaces.
+    vm_output_taken: AtomicBool,
 }
 
 impl AptosTransactionOutput {
     pub fn new(output: VMOutput) -> Self {
         Self {
-            vm_output: Mutex::new(Some(output)),
+            vm_output: ExplicitSyncWrapper::new(Some(output)),
             committed_output: OnceCell::new(),
+            vm_output_taken: AtomicBool::new(false),
         }
+    }
+
+    /// Helper method to get vm_output using fence_and_dereference.
+    /// TODO: change all callers to use PanicError, currently unwrapping.
+    fn get_vm_output(&self) -> Result<&VMOutput, PanicError> {
+        self.vm_output
+            .fence_and_dereference()
+            .as_ref()
+            .ok_or_else(|| code_invariant_error("VM output must be set"))
     }
 
     pub(crate) fn committed_output(&self) -> &TransactionOutput {
@@ -90,7 +127,8 @@ impl AptosTransactionOutput {
             // This is currently used because we do not commit skip_output() transactions.
             None => self
                 .vm_output
-                .lock()
+                .acquire()
+                .dereference_mut()
                 .take()
                 .expect("Output must be set")
                 .into_transaction_output()
@@ -114,198 +152,19 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         )))
     }
 
-    // TODO: get rid of the cloning data-structures in the following APIs.
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn resource_group_write_set(
-        &self,
-    ) -> Vec<(
-        StateKey,
-        WriteOp,
-        ResourceGroupSize,
-        BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-    )> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get resource group writes")
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some((
-                        key.clone(),
-                        group_write.metadata_op().clone(),
-                        group_write
-                            .maybe_group_op_size()
-                            .unwrap_or(ResourceGroupSize::zero_combined()),
-                        group_write
-                            .inner_ops()
-                            .iter()
-                            .map(|(tag, (op, maybe_layout))| {
-                                (tag.clone(), (op.clone(), maybe_layout.clone()))
-                            })
-                            .collect(),
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
-    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get metadata ops")
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
-                    Some((key.clone(), group_write.metadata_op().clone()))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn resource_write_set(&self) -> Vec<(StateKey, Arc<WriteOp>, Option<Arc<MoveTypeLayout>>)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get resource writes")
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(write_op) => {
-                    Some((key.clone(), Arc::new(write_op.clone()), None))
-                },
-                AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
-                    key.clone(),
-                    Arc::new(write.write_op.clone()),
-                    Some(write.layout.clone()),
-                )),
-                _ => None,
-            })
-            .collect()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get module writes")
-            .module_write_set()
-            .values()
-            .cloned()
-            .collect()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get aggregator V1 writes")
-            .aggregator_v1_write_set()
-            .clone()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_delta_set(&self) -> Vec<(StateKey, DeltaOp)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get deltas")
-            .aggregator_v1_delta_set()
-            .iter()
-            .map(|(key, op)| (key.clone(), *op))
-            .collect()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get aggregator change set")
-            .delayed_field_change_set()
-            .clone()
-    }
-
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output to be set to get reads")
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
-                    Some((key.clone(), change.metadata.clone(), change.layout.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output to be set to get reads")
-            .resource_write_set()
-            .iter()
-            .flat_map(|(key, write)| {
-                if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) =
-                    write
-                {
-                    Some((key.clone(), change.metadata.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output must be set to get events")
-            .events()
-            .to_vec()
-    }
-
-    fn materialize_agg_v1(&self, view: &impl TAggregatorV1View<Identifier = StateKey>) {
-        self.vm_output
-            .lock()
-            .as_mut()
-            .expect("Output must be set to incorporate materialized data")
-            .try_materialize(view)
-            .expect("Delta materialization failed");
-    }
-
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
     ) -> Result<(), PanicError> {
+        self.vm_output_taken.store(true, Ordering::Relaxed);
         assert!(
             self.committed_output
                 .set(
                     self.vm_output
-                        .lock()
+                        .acquire()
+                        .dereference_mut()
                         .take()
                         .expect("Output must be set to incorporate materialized data")
                         .into_transaction_output_with_materialized_write_set(
@@ -321,11 +180,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {
+        self.vm_output_taken.store(true, Ordering::Relaxed);
         assert!(
             self.committed_output
                 .set(
                     self.vm_output
-                        .lock()
+                        .acquire()
+                        .dereference_mut()
                         .take()
                         .expect("Output must be set to incorporate materialized data")
                         .into_transaction_output()
@@ -336,9 +197,30 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
+    // This legacy method is only used in sequential execution, which is why modifying the
+    // vm_output is safe.
+    // TODO: convert to the same flow as parallel execution and remove this method.
+    fn legacy_sequential_materialize_agg_v1(
+        &self,
+        view: &impl TAggregatorV1View<Identifier = StateKey>,
+    ) {
+        self.vm_output
+            .dereference_mut()
+            .as_mut()
+            .expect("Output must be set")
+            .try_materialize(view)
+            .expect("Delta materialization failed");
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+    }
+
+    /// TODO: Make these methods only rely on vm_output or committed_output, so we can
+    /// program defensively against buggy access patterns.
+
     /// Returns the fee statement of the transaction.
-    ///
-    /// TODO(gelash): Consider defensive access pattern to committed_output / vm_output.
     fn fee_statement(&self) -> FeeStatement {
         if let Some(committed_output) = self.committed_output.get() {
             if let Ok(Some(fee_statement)) = committed_output.try_extract_fee_statement() {
@@ -346,12 +228,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             }
             return FeeStatement::zero();
         }
-        *self
-            .vm_output
-            .lock()
-            .as_ref()
-            .expect("Output to be set to get fee statement")
-            .fee_statement()
+        *self.get_vm_output().unwrap().fee_statement()
     }
 
     /// Returns true iff the TransactionsStatus is Retry.
@@ -359,12 +236,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         if let Some(committed_output) = self.committed_output.get() {
             committed_output.status().is_retry()
         } else {
-            self.vm_output
-                .lock()
-                .as_ref()
-                .expect("Either vm_output or committed_output must exist.")
-                .status()
-                .is_retry()
+            self.get_vm_output().unwrap().status().is_retry()
         }
     }
 
@@ -384,30 +256,286 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 .as_kept_status()
                 .map_or(false, |status| status.is_success())
         } else {
-            self.vm_output
-                .lock()
-                .as_ref()
-                .expect("Either vm_output or committed_output must exist.")
+            self.get_vm_output()
+                .unwrap()
                 .status()
                 .as_kept_status()
                 .map_or(false, |status| status.is_success())
         }
     }
 
+    /// !!! [CAUTION] !!!: methods below should never be called after or concurrently with
+    /// incorporating materialized output, as materialization consumes vm_output.
+    /// This is additionally enforced by vm_output_taken flag.
+    /// TODO: get rid of cloning data-structures as much as possible, use PanicError.
+    fn resource_group_write_set(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            StateKey,
+            WriteOp,
+            ResourceGroupSize,
+            BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        ),
+    > {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                // TODO: consider storing these separately so we don't have to always
+                // transfer all writes.
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((
+                        key.clone(),
+                        group_write.metadata_op().clone(),
+                        group_write
+                            .maybe_group_op_size()
+                            .unwrap_or(ResourceGroupSize::zero_combined()),
+                        group_write
+                            .inner_ops()
+                            .iter()
+                            .map(|(tag, (op, maybe_layout))| {
+                                (tag.clone(), (op.clone(), maybe_layout.clone()))
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            });
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    fn resource_group_key_and_tags_ref(
+        &self,
+    ) -> impl Iterator<Item = (&StateKey, HashSet<&StructTag>)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                // TODO: consider storing these separately so we don't have to always
+                // transfer all writes.
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    let tags = group_write.inner_ops().keys().collect();
+                    Some((key, tags))
+                } else {
+                    None
+                }
+            });
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((key.clone(), group_write.metadata_op().clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn resource_write_set(&self) -> Vec<(StateKey, Arc<WriteOp>, Option<Arc<MoveTypeLayout>>)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| match write {
+                AbstractResourceWriteOp::Write(write_op) => {
+                    Some((key.clone(), Arc::new(write_op.clone()), None))
+                },
+                AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
+                    key.clone(),
+                    Arc::new(write.write_op.clone()),
+                    Some(write.layout.clone()),
+                )),
+                _ => None,
+            })
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn module_write_set(&self) -> Vec<ModuleWrite<WriteOp>> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .module_write_set()
+            .values()
+            .cloned()
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .aggregator_v1_write_set()
+            .clone();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn aggregator_v1_delta_set(&self) -> Vec<(StateKey, DeltaOp)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .aggregator_v1_delta_set()
+            .iter()
+            .map(|(key, op)| (key.clone(), *op))
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .delayed_field_change_set()
+            .clone();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
+                    Some((key.clone(), change.metadata.clone(), change.layout.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
+        let ret = self
+            .get_vm_output()
+            .unwrap()
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) =
+                    write
+                {
+                    Some((key.clone(), change.metadata.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
+    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        let ret = self.get_vm_output().unwrap().events().to_vec();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
+    }
+
     fn output_approx_size(&self) -> u64 {
-        let vm_output = self.vm_output.lock();
-        vm_output
-            .as_ref()
-            .expect("Output to be set to get approximate size")
-            .materialized_size()
+        let ret = self.get_vm_output().unwrap().materialized_size();
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
+
+        ret
     }
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
-        let vm_output = self.vm_output.lock();
-        let output = vm_output
-            .as_ref()
-            .expect("Output to be set to get write summary");
-
+        let output = self.get_vm_output().unwrap();
         let mut writes = HashSet::new();
 
         for (state_key, write) in output.resource_write_set() {
@@ -433,6 +561,11 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         for identifier in output.delayed_field_change_set().keys() {
             writes.insert(InputOutputKey::DelayedField(*identifier));
         }
+
+        assert!(
+            !self.vm_output_taken.load(Ordering::Relaxed),
+            "Must complete before vm output is taken"
+        );
 
         writes
     }
