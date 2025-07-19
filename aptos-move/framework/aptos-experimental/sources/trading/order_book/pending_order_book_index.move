@@ -21,7 +21,7 @@ module aptos_experimental::pending_order_book_index {
         V1 {
             // Order to trigger when the oracle price move less than
             price_move_down_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
-            // Orders to trigger whem the oracle price move greater than
+            // Orders to trigger when the oracle price move greater than
             price_move_up_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
             // time_based_index: BigOrderedMap<BidKey<TimestampType>, ActiveBidData>,
             // Orders to trigger when the time is greater than
