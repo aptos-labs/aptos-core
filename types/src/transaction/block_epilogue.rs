@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    state_store::{state_key::StateKey, state_slot::StateSlot},
+    state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS},
     transaction::TransactionOutput,
     write_set::{HotStateOp, WriteSet},
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use derive_more::Deref;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -23,7 +25,7 @@ pub enum BlockEpiloguePayload {
     },
     V1 {
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     },
 }
@@ -98,7 +100,7 @@ impl BlockEndInfo {
 
 /// Wrapper type to temporarily host the hot_state_ops which will not serialize until
 /// the hot state is made entirely deterministic
-#[derive(Debug, Deref)]
+#[derive(Clone, Debug, Deref, Eq, PartialEq)]
 pub struct TBlockEndInfoExt<Key: Debug> {
     #[deref]
     inner: BlockEndInfo,
@@ -109,6 +111,7 @@ pub struct TBlockEndInfoExt<Key: Debug> {
     /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
     ///                 serialize the promoted and evicted keys in the transaction.
     slots_to_make_hot: BTreeMap<Key, StateSlot>,
+    slots_to_evict: [Vec<Key>; NUM_STATE_SHARDS],
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
@@ -118,18 +121,72 @@ impl<Key: Debug> TBlockEndInfoExt<Key> {
         Self {
             inner: BlockEndInfo::new_empty(),
             slots_to_make_hot: BTreeMap::new(),
+            slots_to_evict: [(); NUM_STATE_SHARDS].map(|_| Vec::new()),
         }
     }
 
-    pub fn new(inner: BlockEndInfo, slots_to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
+    pub fn new(
+        inner: BlockEndInfo,
+        slots_to_make_hot: BTreeMap<Key, StateSlot>,
+        slots_to_evict: [Vec<Key>; NUM_STATE_SHARDS],
+    ) -> Self {
         Self {
             inner,
             slots_to_make_hot,
+            slots_to_evict,
         }
     }
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
+    }
+}
+
+impl<Key> Serialize for TBlockEndInfoExt<Key>
+where
+    Key: Debug,
+{
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<'de, Key> Deserialize<'de> for TBlockEndInfoExt<Key>
+where
+    Key: Debug,
+{
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = BlockEndInfo::deserialize(deserializer)?;
+        Ok(Self {
+            inner,
+            slots_to_make_hot: BTreeMap::new(),
+            slots_to_evict: [(); NUM_STATE_SHARDS].map(|_| Vec::new()),
+        })
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl<Key> proptest::arbitrary::Arbitrary for TBlockEndInfoExt<Key>
+where
+    Key: Debug,
+{
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        any::<BlockEndInfo>()
+            .prop_map(|inner| Self {
+                inner,
+                slots_to_make_hot: BTreeMap::new(),
+                slots_to_evict: [(); NUM_STATE_SHARDS].map(|_| Vec::new()),
+            })
+            .boxed()
     }
 }
 

@@ -4,8 +4,11 @@
 use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::transaction::PersistedAuxiliaryInfo;
-use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
+use aptos_types::{
+    block_info::BlockHeight,
+    state_store::state_slot::StateSlot,
+    transaction::{IndexedTransactionSummary, PersistedAuxiliaryInfo},
+};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
@@ -376,7 +379,10 @@ impl DbReader for AptosDB {
                 .ledger_db
                 .persisted_auxiliary_info_db()
                 .get_persisted_auxiliary_info_iter(start_version, num_persisted_auxiliary_info)?;
-            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>)
+            Ok(Box::new(iter)
+                as Box<
+                    dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_,
+                >)
         })
     }
 
