@@ -173,7 +173,7 @@ fn native_emitted_events_by_handle(
                 })
         })
         .collect::<SafeNativeResult<Vec<Value>>>()?;
-    Ok(smallvec![Value::vector_for_testing_only(events)])
+    Ok(smallvec![Value::vector_unchecked(events)?])
 }
 
 #[cfg(feature = "testing")]
@@ -208,7 +208,7 @@ fn native_emitted_events(
                 })
         })
         .collect::<SafeNativeResult<Vec<Value>>>()?;
-    Ok(smallvec![Value::vector_for_testing_only(events)])
+    Ok(smallvec![Value::vector_unchecked(events)?])
 }
 
 #[inline]
