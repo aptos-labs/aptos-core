@@ -195,7 +195,7 @@ spec aptos_framework::transaction_validation {
     }
 
     /// Aborts if length of public key hashed vector
-    /// not equal the number of singers.
+    /// not equal the number of signers.
     spec multi_agent_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
