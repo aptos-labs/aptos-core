@@ -200,12 +200,11 @@ fn main() -> Result<()> {
     let return_values = MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut TransactionDataCache::empty(&storage),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut extensions,
         &code_storage,
-        &storage,
     )?;
     println!("{:?}", return_values);
 

@@ -5,6 +5,7 @@ use crate::{
     aptos_vm::get_system_transaction_output,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
+    session::Session,
     system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
     validator_txns::dkg::{
         ExecutionFailure::{Expected, Unexpected},

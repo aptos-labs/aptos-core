@@ -20,12 +20,15 @@ use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
-    value::MoveTypeLayout, vm_status::StatusCode,
+    language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode,
 };
 // ===========================================================================================
 // Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
-use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_runtime::{
+    native_extensions::{ValueHistory, VersionControlledNativeExtension},
+    native_functions::NativeFunctionTable,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -64,11 +67,17 @@ const _NOT_EMPTY: u64 = (102 << 8) + _ECATEGORY_INVALID_STATE as u64;
 
 /// A structure representing mutable data of the NativeTableContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
-#[derive(Default)]
 struct TableData {
-    new_tables: BTreeMap<TableHandle, TableInfo>,
-    removed_tables: BTreeSet<TableHandle>,
+    next_version: u32,
+    saved_versions: SmallVec<[u32; 2]>,
+    current_version: u32,
+
     tables: BTreeMap<TableHandle, Table>,
+    /// All tables created in this context.
+    new_tables: BTreeMap<TableHandle, ValueHistory<TableInfo>>,
+    new_tables_counter: u32,
+
+    removed_tables: BTreeMap<TableHandle, ValueHistory<()>>,
 }
 
 /// A structure containing information about the layout of a value stored in a
@@ -84,7 +93,7 @@ struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
     value_layout_info: LayoutInfo,
-    content: BTreeMap<Vec<u8>, GlobalValue>,
+    content: BTreeMap<Vec<u8>, ValueHistory<GlobalValue>>,
 }
 
 /// The field index of the `handle` field in the `Table` Move struct.
@@ -106,6 +115,21 @@ pub struct TableChange {
 // =========================================================================================
 // Implementation of Native Table Context
 
+impl<'a> VersionControlledNativeExtension for NativeTableContext<'a> {
+    fn undo(&mut self) {
+        self.table_data.borrow_mut().undo();
+    }
+
+    fn save(&mut self) {
+        self.table_data.borrow_mut().save();
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_hash = *txn_hash;
+        self.table_data.borrow_mut().new_tables_counter = 0;
+    }
+}
+
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
@@ -118,15 +142,17 @@ impl<'a> NativeTableContext<'a> {
     }
 
     /// Computes the change set from a NativeTableContext.
-    pub fn into_change_set(
+    pub fn legacy_into_change_set(
         self,
         function_value_extension: &impl FunctionValueExtension,
     ) -> PartialVMResult<TableChangeSet> {
         let NativeTableContext { table_data, .. } = self;
         let TableData {
+            current_version,
             new_tables,
             removed_tables,
             tables,
+            ..
         } = table_data.into_inner();
         let mut changes = BTreeMap::new();
         for (handle, table) in tables {
@@ -137,7 +163,11 @@ impl<'a> NativeTableContext<'a> {
             } = table;
             let mut entries = BTreeMap::new();
             for (key, gv) in content {
-                let op = match gv.into_effect() {
+                let op = match gv
+                    .into_last(current_version)
+                    .expect("At least one version always exists in history")
+                    .into_effect()
+                {
                     Some(op) => op,
                     None => continue,
                 };
@@ -172,6 +202,16 @@ impl<'a> NativeTableContext<'a> {
                 changes.insert(handle, TableChange { entries });
             }
         }
+
+        let new_tables = new_tables
+            .into_iter()
+            .filter_map(|(h, v)| v.into_last(current_version).map(|info| (h, info)))
+            .collect();
+        let removed_tables = removed_tables
+            .into_iter()
+            .filter_map(|(h, mut v)| v.last(current_version).map(|_| h))
+            .collect();
+
         Ok(TableChangeSet {
             new_tables,
             removed_tables,
@@ -205,6 +245,62 @@ impl TableData {
             Entry::Occupied(e) => e.into_mut(),
         })
     }
+
+    fn undo(&mut self) {
+        if self.saved_versions.len() > 1 {
+            self.saved_versions.pop();
+            self.current_version = *self
+                .saved_versions
+                .last()
+                .expect("Saved version must exist");
+        }
+    }
+
+    fn save(&mut self) {
+        self.current_version = self.next_version;
+        self.saved_versions.push(self.current_version);
+        self.next_version += 1;
+    }
+
+    fn create_table(
+        &mut self,
+        handle: TableHandle,
+        key_type: TypeTag,
+        value_type: TypeTag,
+    ) -> bool {
+        let current_version = self.current_version;
+        let result = self
+            .new_tables
+            .entry(handle)
+            .or_insert_with(ValueHistory::new)
+            .set(current_version, TableInfo::new(key_type, value_type));
+        self.new_tables_counter += 1;
+        result
+    }
+
+    fn remove_table(&mut self, handle: TableHandle) -> bool {
+        let current_version = self.current_version;
+        self.removed_tables
+            .entry(handle)
+            .or_insert_with(ValueHistory::new)
+            .set(current_version, ())
+    }
+}
+
+impl Default for TableData {
+    fn default() -> Self {
+        Self {
+            next_version: 1,
+            saved_versions: smallvec![0],
+            current_version: 0,
+            tables: BTreeMap::new(),
+
+            new_tables: BTreeMap::new(),
+            new_tables_counter: 0,
+
+            removed_tables: BTreeMap::new(),
+        }
+    }
 }
 
 impl LayoutInfo {
@@ -224,6 +320,7 @@ impl Table {
         function_value_extension: &dyn FunctionValueExtension,
         table_context: &NativeTableContext,
         key: Vec<u8>,
+        current_version: u32,
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
@@ -255,9 +352,23 @@ impl Table {
                     },
                     None => (GlobalValue::none(), None),
                 };
-                (entry.insert(gv), Some(loaded))
+
+                let mut value = ValueHistory::new();
+                value.set(current_version, gv);
+
+                let h = entry.insert(value);
+                let gv = h
+                    .last_mut(current_version)
+                    .expect("Global value must be set");
+                (gv, Some(loaded))
             },
-            Entry::Occupied(entry) => (entry.into_mut(), None),
+            Entry::Occupied(entry) => {
+                let e = entry.into_mut();
+                let gv = e
+                    .last_mut(current_version)
+                    .expect("If history exists, there should be at least one value");
+                (gv, None)
+            },
         })
     }
 }
@@ -339,18 +450,14 @@ fn native_new_table_handle(
     // produced so far, sha256 this to produce a unique handle. Given the txn hash
     // is unique, this should create a unique and deterministic global id.
     let mut digest = Sha3_256::new();
-    let table_len = table_data.new_tables.len() as u32; // cast usize to u32 to ensure same length
     Digest::update(&mut digest, table_context.txn_hash);
-    Digest::update(&mut digest, table_len.to_be_bytes());
+    Digest::update(&mut digest, table_data.new_tables_counter.to_be_bytes());
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
         .map_err(|_| partial_extension_error("Unable to create table handle"))?;
     let key_type = context.type_to_type_tag(&ty_args[0])?;
     let value_type = context.type_to_type_tag(&ty_args[1])?;
-    assert!(table_data
-        .new_tables
-        .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
-        .is_none());
+    assert!(table_data.create_table(TableHandle(handle), key_type, value_type));
 
     Ok(smallvec![Value::address(handle)])
 }
@@ -368,6 +475,7 @@ fn native_add_box(
     let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.current_version;
 
     let val = args.pop_back().unwrap();
     let key = args.pop_back().unwrap();
@@ -378,8 +486,12 @@ fn native_add_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -422,6 +534,7 @@ fn native_borrow_box(
     let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.current_version;
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -431,8 +544,12 @@ fn native_borrow_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -475,6 +592,7 @@ fn native_contains_box(
     let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.current_version;
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -484,8 +602,12 @@ fn native_contains_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -522,6 +644,7 @@ fn native_remove_box(
     let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.current_version;
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -531,8 +654,12 @@ fn native_remove_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -578,8 +705,7 @@ fn native_destroy_empty_box(
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
     // TODO: Can the following line be removed?
     table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
-
-    assert!(table_data.removed_tables.insert(handle));
+    assert!(table_data.remove_table(handle));
 
     Ok(smallvec![])
 }
@@ -665,4 +791,100 @@ fn deserialize_value(
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(msg.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    fn table_handle(addr: &str) -> TableHandle {
+        TableHandle(AccountAddress::from_str(addr).unwrap())
+    }
+
+    #[test]
+    fn test_save_and_undo() {
+        let mut table_data = TableData::default();
+        assert_eq!(table_data.current_version, 0);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0]);
+
+        table_data.save();
+        assert_eq!(table_data.current_version, 1);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0, 1]);
+
+        table_data.save();
+        assert_eq!(table_data.current_version, 2);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0, 1, 2]);
+
+        table_data.undo();
+        assert_eq!(table_data.current_version, 1);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0, 1]);
+
+        table_data.save();
+        assert_eq!(table_data.current_version, 3);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0, 1, 3]);
+
+        table_data.undo();
+        table_data.undo();
+        assert_eq!(table_data.current_version, 0);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0]);
+
+        // These are no-ops.
+        table_data.undo();
+        table_data.undo();
+        assert_eq!(table_data.current_version, 0);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0]);
+
+        table_data.save();
+        assert_eq!(table_data.current_version, 4);
+        assert_eq!(table_data.saved_versions.clone().into_vec(), vec![0, 4]);
+    }
+
+    #[test]
+    fn test_created_tables() {}
+
+    #[test]
+    fn test_removed_tables() {
+        let mut table_data = TableData::default();
+
+        // Valid for version 0.
+        assert!(table_data.remove_table(table_handle("0x1")));
+        assert!(table_data.remove_table(table_handle("0x2")));
+        table_data.save();
+
+        // Valid for version 1.
+        assert!(table_data.remove_table(table_handle("0x3")));
+        table_data.undo();
+
+        // Valid for version 0.
+        assert!(table_data.remove_table(table_handle("0x4")));
+        table_data.save();
+
+        // Valid for version 2.
+        assert!(table_data.remove_table(table_handle("0x3")));
+
+        let history = table_data
+            .removed_tables
+            .remove(&table_handle("0x1"))
+            .unwrap();
+        assert_eq!(history.versions(), vec![0]);
+
+        let history = table_data
+            .removed_tables
+            .remove(&table_handle("0x2"))
+            .unwrap();
+        assert_eq!(history.versions(), vec![0]);
+
+        let history = table_data
+            .removed_tables
+            .remove(&table_handle("0x3"))
+            .unwrap();
+        assert_eq!(history.versions(), vec![1, 2]);
+
+        let history = table_data
+            .removed_tables
+            .remove(&table_handle("0x4"))
+            .unwrap();
+        assert_eq!(history.versions(), vec![0]);
+    }
 }

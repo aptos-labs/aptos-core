@@ -14,7 +14,9 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension, native_functions::NativeFunction,
+};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -26,15 +28,61 @@ use std::collections::VecDeque;
 /// Error code from `0x1::events.move`, returned when event creation fails.
 pub const ECANNOT_CREATE_EVENT: u64 = 1;
 
-/// Cached emitted module events.
 #[derive(Default, Tid)]
 pub struct NativeEventContext {
+    /// Cached emitted module events.
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+    /// Checkpoints for events containing saved lengths of event vector. In case some effects needs
+    /// to be undone, the latest length can be used to truncate the event vector.
+    checkpoints: Vec<usize>,
+}
+
+impl VersionControlledNativeExtension for NativeEventContext {
+    fn undo(&mut self) {
+        if let Some(saved_len) = self.checkpoints.pop() {
+            self.events.truncate(saved_len)
+        }
+    }
+
+    fn save(&mut self) {
+        self.checkpoints.push(self.events.len());
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        // No-op: nothing needs to be updated.
+    }
 }
 
 impl NativeEventContext {
     pub fn into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        assert!(
+            self.checkpoints.is_empty(),
+            "Events should not be saved when consumed"
+        );
         self.events
+    }
+
+    /// Returns iterator over all events seen so far.
+    pub fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events.iter().map(|(event, _)| event)
+    }
+
+    /// Extracts all events. Leaves events saved from the latest checkpoint if any.
+    pub fn take_events(&mut self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        if let Some(saved_len) = self.checkpoints.last() {
+            // In case we have some previous events saved, we need to keep them.
+            let saved_events = self
+                .events
+                .iter()
+                .take(*saved_len)
+                .cloned()
+                .collect::<Vec<_>>();
+            let all_events = std::mem::take(&mut self.events);
+            self.events.extend(saved_events);
+            all_events
+        } else {
+            std::mem::take(&mut self.events)
+        }
     }
 
     #[cfg(feature = "testing")]
