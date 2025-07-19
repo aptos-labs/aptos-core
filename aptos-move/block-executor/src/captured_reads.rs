@@ -550,8 +550,6 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
 
-    #[deprecated]
-    pub(crate) deprecated_module_reads: Vec<T::Key>,
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an observed
@@ -575,13 +573,11 @@ impl<T: Transaction, K, DC, VC, S> Default for CapturedReads<T, K, DC, VC, S> {
 }
 
 impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
-    #[allow(deprecated)]
     pub(crate) fn new(blockstm_v2_incarnation: Option<Incarnation>) -> Self {
         Self {
             data_reads: HashMap::new(),
             group_reads: HashMap::new(),
             delayed_field_reads: HashMap::new(),
-            deprecated_module_reads: Vec::new(),
             module_reads: hashbrown::HashMap::new(),
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
@@ -916,7 +912,7 @@ where
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
             // We use fetch_data even with BlockSTMv2, because we don't want to record reads.
-            match data_map.fetch_data(k, idx_to_validate) {
+            match data_map.fetch_data_no_record(k, idx_to_validate) {
                 Ok(Versioned(version, v)) => {
                     matches!(
                         self.data_read_comparator
@@ -1124,10 +1120,6 @@ where
         }
 
         // TODO(loader_v2): Test summaries are the same.
-        #[allow(deprecated)]
-        for key in &self.deprecated_module_reads {
-            ret.insert(InputOutputKey::Resource(key.clone()));
-        }
         for key in self.module_reads.keys() {
             let key = T::Key::from_address_and_module_name(key.address(), key.name());
             ret.insert(InputOutputKey::Resource(key));
