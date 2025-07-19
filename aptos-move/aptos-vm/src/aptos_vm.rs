@@ -2810,6 +2810,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                blockstm_v2: false,
                 concurrency_level: AptosVM::get_concurrency_level(),
                 allow_fallback: true,
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
