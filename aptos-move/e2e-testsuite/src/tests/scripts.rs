@@ -26,7 +26,7 @@ fn script_code_unverifiable() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -76,7 +76,7 @@ fn script_none_existing_module_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -156,7 +156,7 @@ fn script_non_existing_function_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -236,7 +236,7 @@ fn script_bad_sig_function_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -317,7 +317,7 @@ fn script_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -383,7 +383,7 @@ fn script_nested_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -450,7 +450,7 @@ fn forbid_script_emitting_events() {
     let mut executor = FakeExecutor::from_head_genesis();
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create an event-emitting script
