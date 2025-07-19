@@ -65,7 +65,8 @@ pub trait TResourceView {
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64>;
+    // Returns None if resource does not exist and its size otherwise
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>>;
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool>;
 }
@@ -225,11 +226,11 @@ where
         )
     }
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
         self.get_state_value(state_key).map_or_else(
             |e| Err(map_storage_error(state_key, e)),
             |maybe_state_value| {
-                Ok(maybe_state_value.map_or(0, |state_value| state_value.size() as u64))
+                Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
             },
         )
     }

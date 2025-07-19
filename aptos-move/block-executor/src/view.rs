@@ -1568,7 +1568,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'
             })
     }
 
-    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<u64> {
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Unknown,
@@ -1576,7 +1576,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'
         )
         .map(|res| {
             if let ReadResult::ResourceSize(v) = res {
-                v.unwrap_or(0)
+                v
             } else {
                 unreachable!("Read result must be ResourceSize kind")
             }
