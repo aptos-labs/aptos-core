@@ -6,6 +6,7 @@ use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
+use move_binary_format::file_format::Visibility;
 use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
@@ -656,25 +657,67 @@ impl Generator<'_> {
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
             let struct_id = wrapper_struct.get_qualified_id();
-            if struct_id.module_id != self.func_env.module_env.get_id() {
-                self.error(
-                    id,
-                    format!(
-                    "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value ",
-                    wrapper_struct.get_full_name_str(),
-                    self.func_env.env().get_module(struct_id.module_id).get_full_name_str(),
-                    ),
-                )
+            let self_mid = self.func_env.module_env.get_id();
+            let lang_v2_4 = self
+                .env()
+                .language_version()
+                .is_at_least(LanguageVersion::V2_4);
+            let is_cross_module = struct_id.module_id != self_mid;
+            if is_cross_module {
+                let wrapper_name = wrapper_struct.get_full_name_str();
+                let module_name = self
+                    .func_env
+                    .env()
+                    .get_module(struct_id.module_id)
+                    .get_full_name_str();
+
+                let err_msg = if !lang_v2_4 {
+                    Some(format!(
+                        "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value",
+                        wrapper_name, module_name,
+                    ))
+                } else {
+                    match wrapper_struct.get_visibility() {
+                        Visibility::Private => Some(format!(
+                            "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value",
+                            wrapper_name, module_name,
+                        )),
+                        Visibility::Friend if !wrapper_struct.module_env.has_friend(&self_mid) => {
+                            let visibility_str = if wrapper_struct.has_package_visibility() {
+                                "package"
+                            } else {
+                                "friend"
+                            };
+                            Some(format!(
+                                "wrapper struct `{}` (defined in a different module `{}`) has {} visibility so the wrapped function value cannot be invoked here",
+                                wrapper_name, module_name, visibility_str,
+                            ))
+                        }
+                        _ => None,
+                    }
+                };
+
+                if let Some(msg) = err_msg {
+                    self.error(id, msg);
+                }
             }
             let inst = inst.to_vec();
+            let mid = struct_id.module_id;
+            let sid = struct_id.id;
+            let oper = if lang_v2_4 && is_cross_module {
+                let struct_env = self.func_env.env().get_struct(mid.qualified(sid));
+                let fun_name = format!(
+                    "unpack${}",
+                    struct_env.get_name().display(self.env().symbol_pool())
+                );
+                let fun_symbol = self.env().symbol_pool().make(&fun_name);
+                let fun_id = FunId::new(fun_symbol);
+                BytecodeOperation::Function(mid, fun_id, inst.clone())
+            } else {
+                BytecodeOperation::Unpack(mid, sid, inst.clone())
+            };
             self.emit_with(id, |attr| {
-                Bytecode::Call(
-                    attr,
-                    vec![raw_fun_temp],
-                    BytecodeOperation::Unpack(struct_id.module_id, struct_id.id, inst),
-                    vec![fun_temp],
-                    None,
-                )
+                Bytecode::Call(attr, vec![raw_fun_temp], oper, vec![fun_temp], None)
             });
             arg_temps.push(raw_fun_temp)
         } else {
@@ -709,10 +752,30 @@ impl Generator<'_> {
             },
             Operation::Pack(mid, sid, variant) => {
                 let inst = self.env().get_node_instantiation(id);
-                let oper = if let Some(variant) = variant {
-                    BytecodeOperation::PackVariant(*mid, *sid, *variant, inst)
+                let is_cross_module = self
+                    .env()
+                    .language_version()
+                    .is_at_least(LanguageVersion::V2_4)
+                    && self.func_env.module_env.get_id() != *mid;
+                let struct_env = self.func_env.env().get_struct(mid.qualified(*sid));
+                let variant_name = if let Some(variant) = variant {
+                    format!("${}", variant.display(self.env().symbol_pool())).to_string()
                 } else {
-                    BytecodeOperation::Pack(*mid, *sid, inst)
+                    "".to_string()
+                };
+                let fun_name = self.env().symbol_pool().make(&format!(
+                    "{}${}{}",
+                    "pack",
+                    struct_env.get_name().display(self.env().symbol_pool()),
+                    variant_name,
+                ));
+                let fun_id = FunId::new(fun_name);
+                let oper = match (variant, is_cross_module) {
+                    (_, true) => BytecodeOperation::Function(*mid, fun_id, inst),
+                    (Some(variant), _) => {
+                        BytecodeOperation::PackVariant(*mid, *sid, *variant, inst)
+                    },
+                    (None, _) => BytecodeOperation::Pack(*mid, *sid, inst),
                 };
                 self.gen_op_call(targets, id, oper, args)
             },
@@ -864,17 +927,51 @@ impl Generator<'_> {
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
                 if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
-                    if wrapper_mid != *mid {
-                        self.error(
-                            id,
-                            format!(
+                    let wrapper_struct = self.env().get_struct(wrapper_mid.qualified(wrapper_sid));
+                    let is_cross_module = wrapper_mid != *mid;
+                    let lang_v2_4 = self
+                        .env()
+                        .language_version()
+                        .is_at_least(LanguageVersion::V2_4);
+
+                    if is_cross_module {
+                        let wrapper_name = wrapper_struct.get_full_name_str();
+                        let module_name = self
+                            .func_env
+                            .env()
+                            .get_module(wrapper_mid)
+                            .get_full_name_str();
+
+                        let err_msg = if !lang_v2_4 {
+                            Some(format!(
                                 "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
-                                target_ty.display(&self.func_env.get_type_display_ctx()),
-                                self.func_env.env().get_module(wrapper_mid).get_full_name_str(),
-                                ),
-                        );
+                                target_ty.display(&self.func_env.get_type_display_ctx()), module_name,
+                            ))
+                        } else {
+                            match wrapper_struct.get_visibility() {
+                                Visibility::Private => Some(format!(
+                                    "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
+                                    target_ty.display(&self.func_env.get_type_display_ctx()), module_name,
+                                )),
+                                Visibility::Friend if !wrapper_struct.module_env.has_friend(mid) => {
+                                    let visibility_str = if wrapper_struct.has_package_visibility() {
+                                        "package"
+                                    } else {
+                                        "friend"
+                                    };
+                                    Some(format!(
+                                        "wrapper struct `{}` (defined in a different module `{}`) has {} visibility so cannot be implicitly packed here",
+                                        wrapper_name, module_name, visibility_str,
+                                    ))
+                                }
+                                _ => None,
+                            }
+                        };
+
+                        if let Some(msg) = err_msg {
+                            self.error(id, msg);
+                        }
                     }
-                    // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()
                         .get_struct(wrapper_mid.qualified(wrapper_sid))
@@ -887,14 +984,23 @@ impl Generator<'_> {
                         BytecodeOperation::Closure(*mid, *fid, inst, *mask),
                         args,
                     );
+                    let struct_env = self
+                        .func_env
+                        .env()
+                        .get_struct(wrapper_mid.qualified(wrapper_sid));
+                    let oper = if is_cross_module && lang_v2_4 {
+                        let fun_name = self.env().symbol_pool().make(&format!(
+                            "{}${}",
+                            "pack",
+                            struct_env.get_name().display(self.env().symbol_pool()),
+                        ));
+                        let fun_id = FunId::new(fun_name);
+                        BytecodeOperation::Function(wrapper_mid, fun_id, wrapper_inst.clone())
+                    } else {
+                        BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst)
+                    };
                     self.emit_with(id, |attr| {
-                        Bytecode::Call(
-                            attr,
-                            targets,
-                            BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst),
-                            vec![temp],
-                            None,
-                        )
+                        Bytecode::Call(attr, targets, oper, vec![temp], None)
                     })
                 } else {
                     self.gen_op_call(
@@ -1461,7 +1567,133 @@ impl Generator<'_> {
         src: TempIndex,
     ) {
         let struct_env = self.env().get_struct(str.to_qualified_id());
+        let mid = str.module_id;
+        let replace_api = self
+            .env()
+            .language_version()
+            .is_at_least(LanguageVersion::V2_4)
+            && self.func_env.module_env.get_id() != mid;
+        if replace_api {
+            let symbol_pool = self.env().symbol_pool();
+            let dest_type = self.temp_type(dest);
+            let arg_type = self.temp_type(src);
+            let fun_name = symbol_pool.make(&format!(
+                "borrow{}from{}${}${}",
+                if dest_type.is_mutable_reference() {
+                    "_mut_"
+                } else {
+                    "_"
+                },
+                if arg_type.is_mutable_reference() {
+                    "_mut"
+                } else {
+                    ""
+                },
+                struct_env.get_name().display(symbol_pool),
+                struct_env
+                    .get_field(fields[0])
+                    .get_name()
+                    .display(symbol_pool)
+            ));
+            let fun_id = FunId::new(fun_name);
+            if self.env().get_module(mid).find_function(fun_name).is_some() {
+                self.emit_call(
+                    id,
+                    vec![dest],
+                    BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
+                    vec![src],
+                );
+                return;
+            }
+        }
+
         if struct_env.has_variants() {
+            if replace_api {
+                let symbol_pool = self.env().symbol_pool();
+                let struct_name = struct_env.get_name().display(symbol_pool).to_string();
+                let mut ordered_groups = vec![];
+                for fid in fields {
+                    let offset = struct_env.get_field(*fid).get_offset();
+                    let field_name = struct_env
+                        .get_field(*fid)
+                        .get_name()
+                        .display(symbol_pool)
+                        .to_string();
+                    ordered_groups.push((offset, (fid, field_name)));
+                }
+                let mut bool_temp: Option<TempIndex> = None;
+                let end_label = if ordered_groups.len() > 1 {
+                    Some(self.new_label(id))
+                } else {
+                    None
+                };
+                while let Some((_, (field_id, field_name))) = ordered_groups.pop() {
+                    let variant = self
+                        .env()
+                        .get_struct(str.to_qualified_id())
+                        .get_field(*field_id)
+                        .get_variant()
+                        .expect("variant name defined");
+                    let next_group_label = if !ordered_groups.is_empty() {
+                        let next_group_label = self.new_label(id);
+                        let this_group_label = self.new_label(id);
+                        let variants = vec![variant];
+                        self.gen_test_variants_operation(
+                            id,
+                            &mut bool_temp,
+                            this_group_label,
+                            &str,
+                            variants,
+                            src,
+                        );
+                        // Ending here means no test succeeded
+                        self.emit_with(id, |attr| Bytecode::Jump(attr, next_group_label));
+                        // Ending here means some test succeeded
+                        self.emit_with(id, |attr| Bytecode::Label(attr, this_group_label));
+                        Some(next_group_label)
+                    } else {
+                        None
+                    };
+
+                    let symbol_pool = self.env().symbol_pool();
+                    let dest_type = self.temp_type(dest);
+                    let arg_type = self.temp_type(src);
+                    let fun_name = symbol_pool.make(&format!(
+                        "borrow{}from{}${}${}${}",
+                        if dest_type.is_mutable_reference() {
+                            "_mut_"
+                        } else {
+                            "_"
+                        },
+                        if arg_type.is_mutable_reference() {
+                            "_mut"
+                        } else {
+                            ""
+                        },
+                        struct_name,
+                        field_name,
+                        variant.display(symbol_pool)
+                    ));
+                    let fun_id = FunId::new(fun_name);
+                    self.emit_call(
+                        id,
+                        vec![dest],
+                        BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
+                        vec![src],
+                    );
+                    if let Some(label) = next_group_label {
+                        // Jump to end label
+                        self.emit_with(id, |attr| Bytecode::Jump(attr, end_label.unwrap()));
+                        // Next group continues here
+                        self.emit_with(id, |attr| Bytecode::Label(attr, label))
+                    }
+                }
+                if let Some(label) = end_label {
+                    self.emit_with(id, |attr| Bytecode::Label(attr, label))
+                }
+                return;
+            }
+
             // Not all the fields in this operation maybe at the same offset, however,
             // bytecode only supports selection of multiple variant fields at the same
             // offset. A switch need to be generated over fields at the same offset.
@@ -1553,13 +1785,48 @@ impl Generator<'_> {
     ) {
         let bool_temp =
             *bool_temp.get_or_insert_with(|| self.new_temp(Type::new_prim(PrimitiveType::Bool)));
+        let mid = str.module_id;
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let mut variant_operations = Vec::new();
+
+        let src_ty = self.temp_type(src).clone();
+        let conversion_flag = src_ty.is_mutable_reference();
+        let cross_module = self
+            .env()
+            .language_version()
+            .is_at_least(LanguageVersion::V2_4)
+            && self.func_env.module_env.get_id() != mid;
         for variant in variants {
-            self.emit_call(
-                id,
-                vec![bool_temp],
-                BytecodeOperation::TestVariant(str.module_id, str.id, variant, str.inst.clone()),
-                vec![src],
+            let oper = if cross_module {
+                let fun_name = self.env().symbol_pool().make(&format!(
+                    "test_variant${}${}",
+                    struct_env.get_name().display(self.env().symbol_pool()),
+                    variant.display(self.env().symbol_pool())
+                ));
+                let fun_id = FunId::new(fun_name);
+                BytecodeOperation::Function(mid, fun_id, str.inst.to_owned())
+            } else {
+                BytecodeOperation::TestVariant(str.module_id, str.id, variant, str.inst.clone())
+            };
+            variant_operations.push((variant, oper));
+        }
+        // Now perform the mutable operations
+        let mut src = src;
+        if conversion_flag && cross_module {
+            let target_ty = Type::Reference(
+                ReferenceKind::Immutable,
+                Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
             );
+            src = if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &src_ty) {
+                self.emit_call(id, vec![new_temp], oper, vec![src]);
+                new_temp
+            } else {
+                src
+            }
+        }
+
+        for (_, oper) in variant_operations {
+            self.emit_call(id, vec![bool_temp], oper, vec![src]);
             self.branch_to_exit_if_true(id, bool_temp, success_label)
         }
     }
@@ -1578,7 +1845,10 @@ impl Generator<'_> {
         debug_assert!(fields
             .iter()
             .all(|id| struct_env.get_field(*id).get_offset() == offset));
-        let oper = if struct_env.has_variants() {
+        let has_variants = struct_env.has_variants();
+        let mid = str.module_id;
+
+        let oper = if has_variants {
             let variants = fields
                 .iter()
                 .map(|id| {
@@ -1588,10 +1858,9 @@ impl Generator<'_> {
                         .expect("variant field has variant name")
                 })
                 .collect_vec();
-            BytecodeOperation::BorrowVariantField(str.module_id, str.id, variants, str.inst, offset)
+            BytecodeOperation::BorrowVariantField(mid, str.id, variants, str.inst, offset)
         } else {
-            // Regular BorrowField
-            BytecodeOperation::BorrowField(str.module_id, str.id, str.inst, offset)
+            BytecodeOperation::BorrowField(mid, str.id, str.inst, offset)
         };
         self.emit_call(id, vec![dest], oper, vec![src])
     }
@@ -1947,17 +2216,43 @@ impl Generator<'_> {
                     },
                 ) = (variant, match_mode)
                 {
-                    self.emit_call(
-                        *id,
-                        vec![*bool_temp],
+                    let mid = str.module_id;
+                    let struct_env = self.env().get_struct(str.to_qualified_id());
+                    let src_ty = self.temp_type(value).clone();
+                    let conversion_flag = src_ty.is_mutable_reference();
+                    let cross_module = self
+                        .env()
+                        .language_version()
+                        .is_at_least(LanguageVersion::V2_4)
+                        && self.func_env.module_env.get_id() != mid;
+                    let oper = if cross_module {
+                        let fun_name = self.env().symbol_pool().make(&format!(
+                            "test_variant${}${}",
+                            struct_env.get_name().display(self.env().symbol_pool()),
+                            variant.display(self.env().symbol_pool())
+                        ));
+                        let fun_id = FunId::new(fun_name);
+                        BytecodeOperation::Function(mid, fun_id, str.inst.to_owned())
+                    } else {
                         BytecodeOperation::TestVariant(
                             str.module_id,
                             str.id,
                             *variant,
                             str.inst.clone(),
-                        ),
-                        vec![value],
-                    );
+                        )
+                    };
+                    let mut test_value = value;
+                    if conversion_flag && cross_module {
+                        let target_ty = Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
+                        );
+                        if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &src_ty) {
+                            self.emit_call(*id, vec![new_temp], oper, vec![test_value]);
+                            test_value = new_temp;
+                        }
+                    }
+                    self.emit_call(*id, vec![*bool_temp], oper, vec![test_value]);
                     self.branch_to_exit_if_false(*id, *bool_temp, *exit_path);
                 }
                 let ref_kind = self.temp_type(value).ref_kind();
@@ -1983,21 +2278,62 @@ impl Generator<'_> {
                         sub_matches.len(),
                         "contiguous allocation of temps for unpack"
                     );
-                    self.emit_call(
-                        *id,
-                        sub_matches.values().map(|(temp, ..)| *temp).collect(),
-                        if let Some(variant) = variant {
-                            BytecodeOperation::UnpackVariant(
-                                str.module_id,
-                                str.id,
-                                *variant,
-                                str.inst.to_owned(),
-                            )
-                        } else {
-                            BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned())
-                        },
-                        vec![values[0]],
-                    );
+
+                    let args = sub_matches.values().map(|(temp, ..)| *temp).collect();
+                    let mid = str.module_id;
+                    let sid = str.id;
+                    let inst = str.inst.to_owned();
+                    let self_mid = self.func_env.module_env.get_id();
+
+                    let oper = {
+                        let struct_env = self.func_env.env().get_struct(mid.qualified(sid));
+                        let use_function = self
+                            .env()
+                            .language_version()
+                            .is_at_least(LanguageVersion::V2_4)
+                            && self_mid != mid;
+
+                        let get_function = |variant: Option<Symbol>| {
+                            let variant_name = if let Some(variant) = variant {
+                                format!("${}", variant.display(self.env().symbol_pool()))
+                                    .to_string()
+                            } else {
+                                "".to_string()
+                            };
+                            let fun_name = self.env().symbol_pool().make(&format!(
+                                "{}${}{}",
+                                "unpack",
+                                struct_env.get_name().display(self.env().symbol_pool()),
+                                variant_name,
+                            ));
+                            let fun_id = FunId::new(fun_name);
+                            BytecodeOperation::Function(mid, fun_id, inst.clone())
+                        };
+
+                        match variant {
+                            Some(variant_id) => {
+                                if use_function {
+                                    get_function(Some(*variant_id))
+                                } else {
+                                    BytecodeOperation::UnpackVariant(
+                                        mid,
+                                        sid,
+                                        *variant_id,
+                                        inst.clone(),
+                                    )
+                                }
+                            },
+                            None => {
+                                if use_function {
+                                    get_function(None)
+                                } else {
+                                    BytecodeOperation::Unpack(mid, sid, inst.clone())
+                                }
+                            },
+                        }
+                    };
+
+                    self.emit_call(*id, args, oper, vec![values[0]]);
                 }
                 for (_, (temp, cont_opt)) in sub_matches.into_iter() {
                     if let Some(cont_pat) = cont_opt {
@@ -2042,15 +2378,55 @@ impl Generator<'_> {
         ref_kind: ReferenceKind,
     ) {
         let struct_env = self.env().get_struct(str.to_qualified_id());
-        let fields = struct_env
+        let mid = str.module_id;
+        let replace_api = self
+            .env()
+            .language_version()
+            .is_at_least(LanguageVersion::V2_4)
+            && self.func_env.module_env.get_id() != mid;
+
+        // Precompute field offsets and names
+        let field_infos: Vec<(usize, Symbol)> = struct_env
             .get_fields_optional_variant(variant)
-            .map(|f| f.get_offset())
-            .collect_vec();
+            .map(|f| (f.get_offset(), f.get_name()))
+            .collect();
+
+        let struct_name_str = struct_env
+            .get_name()
+            .display(self.env().symbol_pool())
+            .to_string();
         for (pos, (temp, _)) in sub_matches {
-            let field_offset = fields[*pos];
+            let (offset, field_name) = &field_infos[*pos];
+            let dest_type = self.temp_type(*temp);
+            let src_type = self.temp_type(arg);
+            let field_name_str = field_name.display(self.env().symbol_pool()).to_string();
+            let fun_str = format!(
+                "borrow{}from{}${}${}",
+                if dest_type.is_mutable_reference() {
+                    "_mut_"
+                } else {
+                    "_"
+                },
+                if src_type.is_mutable_reference() {
+                    "_mut"
+                } else {
+                    ""
+                },
+                struct_name_str,
+                field_name_str
+            );
+            let fun_name = self.env().symbol_pool().make(&fun_str);
+            let fun_id = FunId::new(fun_name);
+
+            let oper = if replace_api {
+                BytecodeOperation::Function(mid, fun_id, str.inst.clone())
+            } else {
+                self.make_field_borrow(str, variant, *offset)
+            };
+
             self.with_reference_mode(|gen, entering| {
                 if entering {
-                    gen.reference_mode_kind = ref_kind
+                    gen.reference_mode_kind = ref_kind;
                 }
                 if !gen.temp_type(*temp).is_reference() {
                     gen.env().diag(
@@ -2059,28 +2435,26 @@ impl Generator<'_> {
                         "Unpacking a reference to a struct must return the references of fields",
                     );
                 }
-                gen.emit_call(
-                    *id,
-                    vec![*temp],
-                    if let Some(var) = variant {
-                        BytecodeOperation::BorrowVariantField(
-                            str.module_id,
-                            str.id,
-                            vec![var],
-                            str.inst.to_owned(),
-                            field_offset,
-                        )
-                    } else {
-                        BytecodeOperation::BorrowField(
-                            str.module_id,
-                            str.id,
-                            str.inst.to_owned(),
-                            field_offset,
-                        )
-                    },
-                    vec![arg],
-                );
-            })
+                gen.emit_call(*id, vec![*temp], oper, vec![arg]);
+            });
+        }
+    }
+
+    fn make_field_borrow(
+        &self,
+        str: &QualifiedInstId<StructId>,
+        variant: Option<Symbol>,
+        offset: usize,
+    ) -> BytecodeOperation {
+        match variant {
+            Some(var) => BytecodeOperation::BorrowVariantField(
+                str.module_id,
+                str.id,
+                vec![var],
+                str.inst.clone(),
+                offset,
+            ),
+            None => BytecodeOperation::BorrowField(str.module_id, str.id, str.inst.clone(), offset),
         }
     }
 

@@ -1,0 +1,470 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+    friend fun pack$S($x: u64): S {
+        pack m::S($x)
+    }
+    friend fun unpack$S($s: S): (u64) {
+        {
+          let m::S{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun borrow_from$S$x($s: &S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun borrow_mut_from_mut$S$x($s: &mut S): &mut u64 {
+        Borrow(Mutable)(select m::S.x($s))
+    }
+    friend fun borrow_from_mut$S$x($s: &mut S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun pack$Wrapper$V1($0: u64): Wrapper {
+        pack m::Wrapper::V1($0)
+    }
+    friend fun pack$Wrapper$V2($0: u64): Wrapper {
+        pack m::Wrapper::V2($0)
+    }
+    friend fun unpack$Wrapper$V1($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V1{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack$Wrapper$V2($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V2{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun borrow_from$Wrapper$0($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_mut_from_mut$Wrapper$0($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_from_mut$Wrapper$0($s: &mut Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun test_variant$Wrapper$V1($s: &Wrapper): bool {
+        test_variants m::Wrapper::V1($s)
+    }
+    friend fun test_variant$Wrapper$V2($s: &Wrapper): bool {
+        test_variants m::Wrapper::V2($s)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+    friend fun pack$T($x: u64): T {
+        pack m_friend::T($x)
+    }
+    friend fun unpack$T($s: T): (u64) {
+        {
+          let m_friend::T{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun borrow_from$T$x($s: &T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_mut_from_mut$T$x($s: &mut T): &mut u64 {
+        Borrow(Mutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_from_mut$T$x($s: &mut T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    friend 0xc0ffee::n2;
+    friend 0xc0ffee::n3;
+    friend 0xc0ffee::n4;
+    friend 0xc0ffee::n5;
+    friend 0xc0ffee::n6;
+    friend 0xc0ffee::n7;
+    struct S {
+        x: u64,
+    }
+    enum Wrapper has drop {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        Wrapper::V1(x)
+    }
+    friend fun pack$S($x: u64): S {
+        S{x: $x}
+    }
+    friend fun unpack$S($s: S): (u64) {
+        let S{x: x} = $s;
+        (x)
+    }
+    friend fun borrow_from$S$x($s: &S): &u64 {
+        &$s.x
+    }
+    friend fun borrow_mut_from_mut$S$x($s: &mut S): &mut u64 {
+        &mut $s.x
+    }
+    friend fun borrow_from_mut$S$x($s: &mut S): &u64 {
+        &$s.x
+    }
+    friend fun pack$Wrapper$V1($0: u64): Wrapper {
+        Wrapper::V1($0)
+    }
+    friend fun pack$Wrapper$V2($0: u64): Wrapper {
+        Wrapper::V2($0)
+    }
+    friend fun unpack$Wrapper$V1($s: Wrapper): (u64) {
+        let Wrapper::V1(0) = $s;
+        (0)
+    }
+    friend fun unpack$Wrapper$V2($s: Wrapper): (u64) {
+        let Wrapper::V2(0) = $s;
+        (0)
+    }
+    friend fun borrow_from$Wrapper$0($s: &Wrapper): &u64 {
+        &$s.0
+    }
+    friend fun borrow_mut_from_mut$Wrapper$0($s: &mut Wrapper): &mut u64 {
+        &mut $s.0
+    }
+    friend fun borrow_from_mut$Wrapper$0($s: &mut Wrapper): &u64 {
+        &$s.0
+    }
+    friend fun test_variant$Wrapper$V1($s: &Wrapper): bool {
+        $s is V1
+    }
+    friend fun test_variant$Wrapper$V2($s: &Wrapper): bool {
+        $s is V2
+    }
+}
+module 0xc0ffee::m_friend {
+    friend 0xc0ffee::n_friend;
+    struct T {
+        x: u64,
+    }
+    friend fun pack$T($x: u64): T {
+        T{x: $x}
+    }
+    friend fun unpack$T($s: T): (u64) {
+        let T{x: x} = $s;
+        (x)
+    }
+    friend fun borrow_from$T$x($s: &T): &u64 {
+        &$s.x
+    }
+    friend fun borrow_mut_from_mut$T$x($s: &mut T): &mut u64 {
+        &mut $s.x
+    }
+    friend fun borrow_from_mut$T$x($s: &mut T): &u64 {
+        &$s.x
+    }
+}
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    fun test() {
+        let x = m::make(22);
+        if (x.0 == 22) () else abort 1;
+    }
+}
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m;
+    fun test_pack() {
+        let _x = m::Wrapper::V1(22);
+    }
+}
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m;
+    fun test_unpack(w: m::Wrapper) {
+        let m::Wrapper::V1(_x) = w;
+    }
+}
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m;
+    fun test_select_variant(w: m::Wrapper): u64 {
+        w.0
+    }
+}
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m;
+    fun test_test_variant(w: m::Wrapper): bool {
+        w is V1
+    }
+}
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m;
+    fun test_match(w: m::Wrapper): bool {
+        match (w) {
+            m::Wrapper::V1(_) => true,
+            m::Wrapper::V2(_) => false,
+        }
+    }
+}
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m;
+    fun test_pack_struct(): m::S {
+        m::S{x: 22}
+    }
+}
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend;
+    fun test_pack_friend_struct(): m_friend::T {
+        m_friend::T{x: 22}
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+    friend fun pack$S($x: u64): S {
+        pack m::S($x)
+    }
+    friend fun unpack$S($s: S): (u64) {
+        {
+          let m::S{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun borrow_from$S$x($s: &S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun borrow_mut_from_mut$S$x($s: &mut S): &mut u64 {
+        Borrow(Mutable)(select m::S.x($s))
+    }
+    friend fun borrow_from_mut$S$x($s: &mut S): &u64 {
+        Borrow(Immutable)(select m::S.x($s))
+    }
+    friend fun pack$Wrapper$V1($0: u64): Wrapper {
+        pack m::Wrapper::V1($0)
+    }
+    friend fun pack$Wrapper$V2($0: u64): Wrapper {
+        pack m::Wrapper::V2($0)
+    }
+    friend fun unpack$Wrapper$V1($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V1{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun unpack$Wrapper$V2($s: Wrapper): (u64) {
+        {
+          let m::Wrapper::V2{ 0 } = $s;
+          Tuple(0)
+        }
+    }
+    friend fun borrow_from$Wrapper$0($s: &Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_mut_from_mut$Wrapper$0($s: &mut Wrapper): &mut u64 {
+        Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun borrow_from_mut$Wrapper$0($s: &mut Wrapper): &u64 {
+        Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0($s))
+    }
+    friend fun test_variant$Wrapper$V1($s: &Wrapper): bool {
+        test_variants m::Wrapper::V1($s)
+    }
+    friend fun test_variant$Wrapper$V2($s: &Wrapper): bool {
+        test_variants m::Wrapper::V2($s)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+    friend fun pack$T($x: u64): T {
+        pack m_friend::T($x)
+    }
+    friend fun unpack$T($s: T): (u64) {
+        {
+          let m_friend::T{ x } = $s;
+          Tuple(x)
+        }
+    }
+    friend fun borrow_from$T$x($s: &T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_mut_from_mut$T$x($s: &mut T): &mut u64 {
+        Borrow(Mutable)(select m_friend::T.x($s))
+    }
+    friend fun borrow_from_mut$T$x($s: &mut T): &u64 {
+        Borrow(Immutable)(select m_friend::T.x($s))
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+
+============ bytecode verification succeeded ========

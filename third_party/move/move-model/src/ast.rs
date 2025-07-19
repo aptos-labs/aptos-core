@@ -1755,14 +1755,56 @@ impl ExpData {
         None
     }
 
-    /// Collect struct-related operations
-    pub fn struct_usage(&self, usage: &mut BTreeSet<QualifiedId<StructId>>) {
+    /// Collect struct-related operations including unpacking
+    pub fn struct_usage(&self, env: &GlobalEnv, usage: &mut BTreeSet<QualifiedId<StructId>>) {
         self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
-                    Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid, _) => {
+                    SelectVariants(mid, sid, ..)
+                    | TestVariants(mid, sid, ..)
+                    | Select(mid, sid, ..)
+                    | UpdateField(mid, sid, ..)
+                    | Pack(mid, sid, _) => {
                         usage.insert(mid.qualified(*sid));
+                    },
+                    _ => {},
+                }
+            } else {
+                match e {
+                    ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
+                        if let Pattern::Struct(_, qid, _, _) = pat {
+                            usage.insert(qid.to_qualified_id());
+                        }
+                    },
+                    ExpData::Lambda(id, pat, _, _, _) => {
+                        let fun_ty = env.get_node_type(*id);
+                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                            usage.insert(wrapper_struct.get_qualified_id());
+                        }
+                        if let Pattern::Struct(_, qid, _, _) = pat {
+                            usage.insert(qid.to_qualified_id());
+                        }
+                    },
+                    ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
+                        for (pat, _) in pattern_tuple {
+                            if let Pattern::Struct(_, qid, _, _) = pat {
+                                usage.insert(qid.to_qualified_id());
+                            }
+                        }
+                    },
+                    ExpData::Match(_, _, arms) => {
+                        for arm in arms.iter() {
+                            if let Pattern::Struct(_, qid, _, _) = &arm.pattern {
+                                usage.insert(qid.to_qualified_id());
+                            }
+                        }
+                    },
+                    ExpData::Invoke(_, exp, _) => {
+                        let fun_ty = env.get_node_type(exp.node_id());
+                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                            usage.insert(wrapper_struct.get_qualified_id());
+                        }
                     },
                     _ => {},
                 }
