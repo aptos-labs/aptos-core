@@ -3,6 +3,7 @@
 
 //! Disassembler for Move bytecode.
 
+use crate::value::AsmValue;
 use anyhow::bail;
 use move_binary_format::{
     access::ModuleAccess,
@@ -85,6 +86,13 @@ impl<T: fmt::Write> Disassembler<T> {
                 }
             )?;
             dis.reverse_module_aliases.insert(id, short_name);
+        }
+
+        // Process friend declarations
+        for friend in module.module().friend_decls.iter() {
+            let addr = module.module().address_identifier_at(friend.address);
+            let name = module.module().identifier_at(friend.name);
+            writeln!(dis.out, "friend {}::{}", addr, name)?
         }
 
         // Process struct and function definitions
@@ -219,6 +227,19 @@ impl<T: fmt::Write> Disassembler<T> {
     // Functions
 
     fn fun(&mut self, fdef: FunctionDefinitionView<CompiledModule>) -> anyhow::Result<()> {
+        if !fdef.attributes().is_empty() {
+            self.list(
+                fdef.attributes(),
+                |dis, _, attr| {
+                    write!(dis.out, "{}", attr)?;
+                    Ok(())
+                },
+                "#[",
+                ",",
+                "]",
+            )?;
+            write!(self.out, " ")?
+        }
         // Function header
         if fdef.is_entry() {
             self.out.write_str("entry ")?
@@ -346,14 +367,19 @@ impl<T: fmt::Write> Disassembler<T> {
             CastU128 => write!(self.out, "cast_u128")?,
             CastU256 => write!(self.out, "cast_u256")?,
             LdConst(hdl) => {
-                write!(self.out, "ld_const ")?;
+                write!(self.out, "ld_const")?;
                 let cons = module.constant_at(*hdl);
+                write!(self.out, "<")?;
                 self.type_(module, &cons.type_)?;
-                write!(
-                    self.out,
-                    ", {}",
-                    value_from_bcs(module, &cons.type_, &cons.data)?
-                )?
+                write!(self.out, ">")?;
+                if let Some(val) = cons
+                    .deserialize_constant()
+                    .and_then(|v| AsmValue::from_move_value(&v).ok())
+                {
+                    write!(self.out, " {}", val)?
+                } else {
+                    write!(self.out, " <invalid constant>")?
+                }
             },
             LdTrue => write!(self.out, "ld_true")?,
             LdFalse => write!(self.out, "ld_false")?,
@@ -693,13 +719,4 @@ fn type_param_name(idx: usize) -> String {
 
 fn local_name(idx: LocalIndex) -> String {
     format!("l{}", idx)
-}
-
-fn value_from_bcs(
-    _module: &CompiledModule,
-    _ty: &SignatureToken,
-    _bcs: &[u8],
-) -> anyhow::Result<String> {
-    // TODO(#16582): implement this
-    bail!("value bcs not implemented")
 }

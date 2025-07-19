@@ -49,7 +49,7 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, fmt::Formatter};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -380,6 +380,15 @@ impl FunctionAttribute {
             with.contains(&FunctionAttribute::Persistent)
         } else {
             true
+        }
+    }
+}
+
+impl fmt::Display for FunctionAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            FunctionAttribute::Persistent => write!(f, "persistent"),
+            FunctionAttribute::ModuleLock => write!(f, "module_lock"),
         }
     }
 }

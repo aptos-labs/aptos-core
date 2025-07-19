@@ -1,0 +1,9 @@
+//# print-bytecode --input module
+
+// Notice we cannot actually test friend publishing since the test framework doesn't support module bundles,
+// but at least we can test assembling and printing
+module 0x66::test1
+friend 0x66::test2
+friend fun f(): u8
+    ld_u8 255
+    ret

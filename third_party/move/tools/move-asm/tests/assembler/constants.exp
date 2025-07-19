@@ -1,0 +1,84 @@
+processed 1 task
+
+task 0 'publish'. lines 1-62:
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+fun f_u8(): u8
+    ld_u8 255
+    ret
+
+// Function definition at index 1
+fun f_u16(): u16
+    ld_u16 65535
+    ret
+
+// Function definition at index 2
+fun f_u32(): u32
+    ld_u32 4294967295
+    ret
+
+// Function definition at index 3
+fun f_u64(): u64
+    ld_u64 18446744073709551615
+    ret
+
+// Function definition at index 4
+fun f_u128(): u128
+    ld_u128 340282366920938463463374607431768211455
+    ret
+
+// Function definition at index 5
+fun f_u256(): u256
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ret
+
+// Function definition at index 6
+fun c_u8(): u8
+    ld_const<u8> 255
+    ret
+
+// Function definition at index 7
+fun c_u16(): u16
+    ld_const<u16> 65535
+    ret
+
+// Function definition at index 8
+fun c_u32(): u32
+    ld_const<u32> 4294967295
+    ret
+
+// Function definition at index 9
+fun c_u64(): u64
+    ld_const<u64> 18446744073709551615
+    ret
+
+// Function definition at index 10
+fun c_u128(): u128
+    ld_const<u128> 340282366920938463463374607431768211455
+    ret
+
+// Function definition at index 11
+fun c_u256(): u256
+    ld_const<u256> 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ret
+
+// Function definition at index 12
+fun c_vec_u8(): vector<u8>
+    ld_const<vector<u8>> [255,0]
+    ret
+
+// Function definition at index 13
+fun c_vec_address(): vector<address>
+    ld_const<vector<address>> [102,51966]
+    ret
+
+// Function definition at index 14
+fun c_vec_vec_address(): vector<vector<address>>
+    ld_const<vector<vector<address>>> [[102],[51966],[]]
+    ret
+
+
+== END Bytecode ==

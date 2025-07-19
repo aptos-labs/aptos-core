@@ -1,0 +1,12 @@
+processed 1 task
+
+task 0 'print-bytecode'. lines 1-9:
+// Bytecode version v7
+module 0x66::test1
+friend 0x0000000000000000000000000000000000000000000000000000000000000066::test2
+// Function definition at index 0
+friend fun f(): u8
+    ld_u8 255
+    ret
+
+
