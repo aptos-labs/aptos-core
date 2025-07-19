@@ -323,7 +323,7 @@ fn test_commit_transaction() {
         7
     );
     assert_eq!(pool.transactions.priority_index.size(), 6);
-    // Transction with sequence number 5 goes to parking lot
+    // Transaction with sequence number 5 goes to parking lot
     assert_eq!(pool.get_parking_lot_size(), 1);
     // Nonce based transactions won't create an account_sequence_numbers entry
     assert_eq!(pool.transactions.account_sequence_numbers.len(), 2);
