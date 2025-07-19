@@ -190,6 +190,7 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
+    "testsuite/benchmark-workloads/package-generator",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/fuzzer",
