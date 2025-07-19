@@ -6,6 +6,7 @@
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod known_to_abort;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -25,10 +26,11 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<known_to_abort::KnownToAbort>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
-        Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
+        Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
         Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
