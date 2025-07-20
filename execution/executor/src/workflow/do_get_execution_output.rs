@@ -116,6 +116,10 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
+        let nv = state_view.next_version();
+        let memorized = state_view.memorized_reads();
+        let num_reads: usize = memorized.shards.iter().map(|s| s.len()).sum();
+        info!("nv: {nv}. # memorized keys: {num_reads}");
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         Parser::parse(

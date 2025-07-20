@@ -1318,6 +1318,9 @@ where
             num_txns,
         );
 
+        let mut keys_written = HashSet::new();
+        let mut keys_read = HashSet::new();
+
         for idx in 0..num_txns {
             let txn = signature_verified_block.get_txn(idx as TxnIndex);
             let latest_view = LatestView::<T, S>::new(
@@ -1397,11 +1400,13 @@ where
                             )
                         });
 
-                    block_limit_processor.accumulate_fee_statement(
+                    let (kw, kr) = block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
                         approx_output_size,
                     );
+                    keys_written = &keys_written | &kw;
+                    keys_read = &keys_read | &kr;
 
                     output.materialize_agg_v1(&latest_view);
                     assert_eq!(
@@ -1584,6 +1589,12 @@ where
                 break;
             }
         }
+        info!(
+            "next_version: {}. num_keys_written: {}. num_keys_read: {}",
+            base_view.next_version(),
+            keys_written.len(),
+            keys_read.len()
+        );
 
         block_limit_processor
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
@@ -1630,7 +1641,7 @@ where
     ) -> BlockExecutionResult<TBlockOutput<E::Output, T::Key>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
-        if self.config.local.concurrency_level > 1 {
+        if false {
             let parallel_result = self.execute_transactions_parallel(
                 signature_verified_block,
                 base_view,

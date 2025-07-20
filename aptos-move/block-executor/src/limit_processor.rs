@@ -66,7 +66,13 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         fee_statement: FeeStatement,
         txn_read_write_summary: Option<ReadWriteSummary<T>>,
         approx_output_size: Option<u64>,
+    ) -> (
+        std::collections::HashSet<T::Key>,
+        std::collections::HashSet<T::Key>,
     ) {
+        let mut keys_written = std::collections::HashSet::new();
+        let mut keys_read = std::collections::HashSet::new();
+
         self.accumulated_fee_statement
             .add_fee_statement(&fee_statement);
         self.txn_fee_statements.push(fee_statement);
@@ -89,7 +95,9 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
             if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+                let (kw, kr) = x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+                keys_written = kw;
+                keys_read = kr;
             }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
@@ -115,6 +123,8 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         } else {
             assert_none!(approx_output_size);
         }
+
+        (keys_written, keys_read)
     }
 
     fn block_gas_limit(&self) -> Option<u64> {
@@ -292,7 +302,9 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
         let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
-            x.get_slots_to_make_hot()
+            let slots = x.get_slots_to_make_hot();
+            info!("number of slots to make hot: {}", slots.len());
+            slots
         } else {
             error!("BlockHotStateOpAccumulator is not set.");
             BTreeMap::new()
