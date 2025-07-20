@@ -753,13 +753,28 @@ where
 
     fn resource_group_write_set(
         &self,
-    ) -> Vec<(
+    ) -> HashMap<
         K,
-        ValueType,
-        ResourceGroupSize,
-        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
-    )> {
-        self.group_writes.clone()
+        (
+            ValueType,
+            ResourceGroupSize,
+            BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+        ),
+    > {
+        self.group_writes
+            .iter()
+            .map(|(key, value, size, ops)| (key.clone(), (value.clone(), *size, ops.clone())))
+            .collect()
+    }
+
+    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
+    where
+        F: FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
+    {
+        for (key, _, _, ops) in self.group_writes.iter() {
+            callback(key, ops.iter().map(|(tag, _)| tag).collect())?;
+        }
+        Ok(())
     }
 
     fn skip_output() -> Self {
@@ -787,7 +802,7 @@ where
         HashSet::new()
     }
 
-    fn materialize_agg_v1(
+    fn legacy_sequential_materialize_agg_v1(
         &self,
         _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     ) {

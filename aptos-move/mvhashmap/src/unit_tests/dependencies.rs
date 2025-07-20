@@ -170,9 +170,11 @@ fn test_dependencies(
                     };
 
                     if let Some((key, txn_idx, incarnation)) = maybe_perform_read {
-                        let speculative_read_value =
-                            map.data()
-                                .fetch_data_and_record(&KeyType(key), txn_idx, incarnation);
+                        let speculative_read_value = map.data().fetch_data_and_record_dependency(
+                            &KeyType(key),
+                            txn_idx,
+                            incarnation,
+                        );
                         let correct = match speculative_read_value {
                             Ok(MVDataOutput::Versioned(_version, value)) => {
                                 let correct = baseline
