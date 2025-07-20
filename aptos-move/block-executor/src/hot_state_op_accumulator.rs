@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
     state_store::{state_slot::StateSlot, TStateView},
@@ -39,6 +39,7 @@ where
     const REFRESH_INTERVAL_VERSIONS: usize = 1_000_000;
 
     pub fn new(base_view: &'base_view BaseView) -> Self {
+        info!("Constructing new BlockHotStateOpAccumulator");
         Self::new_with_config(
             base_view,
             Self::MAX_PROMOTIONS_PER_BLOCK,
@@ -65,17 +66,29 @@ where
         &mut self,
         writes: impl Iterator<Item = &'a Key>,
         read_only: impl Iterator<Item = &'a Key>,
-    ) where
+    ) -> (
+        std::collections::HashSet<Key>,
+        std::collections::HashSet<Key>,
+    )
+    where
         Key: 'a,
     {
+        let fv = self.first_version;
+        let nv = self.base_view.next_version();
+        let mut keys_written = std::collections::HashSet::new();
         for key in writes {
+            keys_written.insert(key.clone());
+            // info!("fv: {fv}. nv: {nv}. key written to: {:?}", key);
             if self.to_make_hot.remove(key).is_some() {
                 COUNTER.inc_with(&["promotion_removed_by_write"]);
             }
             self.writes.get_or_insert_owned(key);
         }
 
+        let mut keys_read = std::collections::HashSet::new();
         for key in read_only {
+            keys_read.insert(key.clone());
+            // info!("fv: {fv}. nv: {nv}. key read only: {:?}", key);
             if self.to_make_hot.len() >= self.max_promotions_per_block {
                 COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
@@ -124,6 +137,8 @@ where
                 self.to_make_hot.insert(key.clone(), slot);
             }
         }
+
+        (keys_written, keys_read)
     }
 
     pub fn get_slots_to_make_hot(&self) -> BTreeMap<Key, StateSlot> {

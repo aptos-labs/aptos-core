@@ -109,6 +109,14 @@ impl DoGetExecutionOutput {
         let append_state_checkpoint_to_block =
             transaction_slice_metadata.append_state_checkpoint_to_block();
         let txn_provider = DefaultTxnProvider::new(transactions);
+        let nv = state_view.next_version();
+        let num_reads: usize = state_view
+            .memorized_reads()
+            .shards
+            .iter()
+            .map(|s| s.len())
+            .sum();
+        info!("nv: {nv}. before execute_block: # memorized keys: {num_reads}");
         let block_output = Self::execute_block::<V>(
             executor,
             &txn_provider,
@@ -116,6 +124,13 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
+        let num_reads: usize = state_view
+            .memorized_reads()
+            .shards
+            .iter()
+            .map(|s| s.len())
+            .sum();
+        info!("nv: {nv}. after execute_block: # memorized keys: {num_reads}");
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         Parser::parse(

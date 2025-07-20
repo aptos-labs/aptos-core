@@ -170,6 +170,7 @@ impl CachedStateView {
 
     pub fn prime_cache(&self, updates: &StateUpdateRefs) -> Result<()> {
         let _timer = TIMER.timer_with(&["prime_state_cache"]);
+        return Ok(());
 
         IO_POOL.install(|| {
             if let Some(updates) = &updates.for_last_checkpoint {
