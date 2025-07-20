@@ -92,6 +92,15 @@ pub enum BaseStateOp {
 }
 
 impl BaseStateOp {
+    pub fn to_printable(&self) -> &'static str {
+        match self {
+            BaseStateOp::Creation(_) => "Creation",
+            BaseStateOp::Modification(_) => "Modification",
+            BaseStateOp::Deletion(_) => "Deletion",
+            BaseStateOp::MakeHot { .. } => "MakeHot",
+        }
+    }
+
     pub fn as_state_value_opt(&self) -> Option<&StateValue> {
         use BaseStateOp::*;
 

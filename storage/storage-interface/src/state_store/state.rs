@@ -17,6 +17,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
@@ -137,7 +138,10 @@ impl State {
             .map(|(cache, overlay, updates)| {
                 let new_items = updates
                     .iter()
-                    .map(|(k, u)| ((*k).clone(), u.to_result_slot()))
+                    .map(|(k, u)| {
+                        info!("write op type: {}", u.state_op.to_printable());
+                        ((*k).clone(), u.to_result_slot())
+                    })
                     .collect_vec();
 
                 (
