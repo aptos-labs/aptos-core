@@ -55,23 +55,29 @@ pub(crate) fn run_tests_with_groups(
     let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
     // Run parallel execution tests
-    for maybe_block_gas_limit in gas_limits {
-        for _ in 0..num_executions_parallel {
-            let output = execute_block_parallel::<
-                MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-                NonEmptyGroupDataView<KeyType<[u8; 32]>>,
-                DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
-            >(
-                executor_thread_pool.clone(),
-                maybe_block_gas_limit,
-                &txn_provider,
-                data_view,
-                None,
-                false,
-            );
+    for block_stm_v2 in [false, true] {
+        for i in 0..num_executions_parallel {
+            for maybe_block_gas_limit in &gas_limits {
+                if *maybe_block_gas_limit == Some(0) && i > 0 {
+                    continue;
+                }
 
-            BaselineOutput::generate(txn_provider.get_txns(), maybe_block_gas_limit)
-                .assert_parallel_output(&output);
+                let output = execute_block_parallel::<
+                    MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                    NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                >(
+                    executor_thread_pool.clone(),
+                    *maybe_block_gas_limit,
+                    &txn_provider,
+                    data_view,
+                    None,
+                    block_stm_v2,
+                );
+
+                BaselineOutput::generate(txn_provider.get_txns(), *maybe_block_gas_limit)
+                    .assert_parallel_output(&output);
+            }
         }
     }
 
@@ -109,7 +115,8 @@ pub(crate) fn run_tests_with_groups(
     }
 }
 
-// TODO: Change some tests (e.g. second and fifth) to use gas limit: needs to handle error in mock executor.
+// TODO(BlockSTMv2): split number of test runs based on number of random generations and
+// number of executions per generated randomness.
 #[test_case(50, 100, None, None, None, false, 30, 15 ; "basic group test")]
 #[test_case(50, 1000, None, None, None, false, 20, 10 ; "basic group test 2")]
 #[test_case(50, 1000, None, None, None, true, 20, 10 ; "basic group test 2 with gas limit")]
