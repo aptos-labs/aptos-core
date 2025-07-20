@@ -1007,7 +1007,7 @@ where
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
+                match group_map.fetch_tagged_data_no_record(key, tag, idx_to_validate) {
                     Ok((version, v)) => {
                         matches!(
                             self.data_read_comparator.compare_data_reads(
