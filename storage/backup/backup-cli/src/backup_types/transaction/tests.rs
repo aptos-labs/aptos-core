@@ -128,7 +128,9 @@ fn end_to_end() {
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     let ouptputlist = tgt_db
         .get_transaction_outputs(0, target_version, target_version)
-        .unwrap();
+        .unwrap()
+        .into_parts()
+        .0;
 
     for (restore_ws, org_ws) in zip_eq(
         ouptputlist
@@ -145,14 +147,16 @@ fn end_to_end() {
     }
 
     assert_eq!(tgt_db.expect_synced_version(), target_version);
-    let recovered_transactions = tgt_db
+    // TODO(grao): Test PersistedAuxiliaryInfo here.
+    let (recovered_transactions, _) = tgt_db
         .get_transactions(
             0,
             target_version,
             target_version,
             true, /* fetch_events */
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
 
     assert_eq!(
         recovered_transactions.transactions,
