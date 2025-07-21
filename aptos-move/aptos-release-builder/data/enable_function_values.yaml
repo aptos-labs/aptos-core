@@ -1,5 +1,5 @@
 remote_endpoint: ~
-name: "v1.33"
+name: "v1.33-enable-function-values"
 proposals:
   - name: enable_function_values
     metadata:
