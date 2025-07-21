@@ -12,7 +12,6 @@ module poc::fv_ref {
 
         // closure capturing x: DropCopy
         let a: ||u64 has drop = ||{
-            std::debug::print(&1111);
             let DropCopy = x;
             1
         };

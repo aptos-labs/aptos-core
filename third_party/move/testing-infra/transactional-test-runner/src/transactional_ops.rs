@@ -19,7 +19,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         CompiledModule, CompiledScript, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandle, SignatureToken,
+        FunctionHandle, SignatureToken, Visibility,
     },
 };
 use move_command_line_common::{
@@ -406,6 +406,22 @@ fn signature_token_to_move_type_string_for_wrapper(
             "vector<{}>",
             signature_token_to_move_type_string_for_wrapper(inner_token, module)?
         )),
+        SignatureToken::Function(args, returns, abilities) => {
+            let args_str = args
+                .iter()
+                .map(|t| signature_token_to_move_type_string_for_wrapper(t, module))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            let returns_str = returns
+                .iter()
+                .map(|t| signature_token_to_move_type_string_for_wrapper(t, module))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(format!(
+                "|{}|{}{}",
+                args_str.join(", "),
+                returns_str.join(", "),
+                abilities.display_postfix()
+            ))
+        },
         SignatureToken::Struct(sh_idx) => {
             let struct_handle = module.struct_handle_at(*sh_idx);
             let mh = module.module_handle_at(struct_handle.module);
@@ -446,16 +462,6 @@ fn signature_token_to_move_type_string_for_wrapper(
             "&mut {}",
             signature_token_to_move_type_string_for_wrapper(inner_token, module)?
         )),
-        _ => {
-            let msg = format!(
-                "[transactional_ops] Unsupported signature token for wrapper: {:?}",
-                token
-            );
-            if std::env::var("DEBUG").is_ok() {
-                println!("{}", msg);
-            }
-            Err(anyhow::anyhow!(msg))
-        },
     }
 }
 
@@ -467,7 +473,14 @@ fn generate_script_wrapper_for_non_entry_function(
     target_func_handle: &FunctionHandle,
     _target_type_args: &[TypeTag],
 ) -> anyhow::Result<String> {
+
     let func_name_ident = target_module.identifier_at(target_func_handle.name);
+
+    // skip if the function is not public
+    if _target_func_def.visibility != Visibility::Public {
+        return Err(anyhow::anyhow!("Function {} is not public", func_name_ident.to_string()));
+    }
+
     let module_handle = target_module.module_handle_at(target_func_handle.module);
     let module_name_ident = target_module.identifier_at(module_handle.name);
     let module_addr_literal = target_module
@@ -475,7 +488,15 @@ fn generate_script_wrapper_for_non_entry_function(
         .to_hex_literal();
 
     let parameters_sig = target_module.signature_at(target_func_handle.parameters);
-    let mut script_params_str_parts = vec!["s: &signer".to_string()];
+    let return_sig = target_module.signature_at(target_func_handle.return_);
+
+    let has_signer_by_value = parameters_sig.0.iter().any(|t| *t == SignatureToken::Signer);
+    let script_signer_param = if has_signer_by_value {
+        "s: signer"
+    } else {
+        "s: &signer"
+    };
+    let mut script_params_str_parts = vec![script_signer_param.to_string()];
     let mut call_args_str_parts = vec![];
 
     for (i, param_token) in parameters_sig.0.iter().enumerate() {
@@ -486,7 +507,11 @@ fn generate_script_wrapper_for_non_entry_function(
             SignatureToken::Reference(inner_token)
                 if matches!(**inner_token, SignatureToken::Signer) =>
             {
-                call_args_str_parts.push("s".to_string());
+                if has_signer_by_value {
+                    call_args_str_parts.push("&s".to_string());
+                } else {
+                    call_args_str_parts.push("s".to_string());
+                }
             },
             _ => {
                 let type_str =
@@ -506,13 +531,34 @@ fn generate_script_wrapper_for_non_entry_function(
         format!("<{}>", params.join(", "))
     };
 
-    let type_arguments_call_str = if target_func_handle.type_parameters.is_empty() {
-        String::new()
+    // Check if the function returns a unit type (empty tuple)
+    let is_unit_return = return_sig.0.is_empty();
+
+    // Generate the function call line based on return type
+    let function_call_line = if is_unit_return {
+        // For unit return types, don't assign to a variable
+        format!("{}::{}{}({});",
+            module_name_ident,
+            func_name_ident,
+            type_parameters_decl_str,
+            call_args_str_parts.join(", ")
+        )
     } else {
-        let type_args_for_call: Vec<String> = (0..target_func_handle.type_parameters.len())
-            .map(|i| format!("T{}", i))
-            .collect();
-        format!("<{}>", type_args_for_call.join(", "))
+        // For non-unit return types, assign to a variable.
+        // If multiple values are returned, destructure the tuple.
+        let num_return_values = return_sig.0.len();
+        let bindings = if num_return_values > 1 {
+            format!("({})", vec!["_"; num_return_values].join(", "))
+        } else {
+            "_".to_string()
+        };
+        format!("let {} = {}::{}{}({});",
+            bindings,
+            module_name_ident,
+            func_name_ident,
+            type_parameters_decl_str,
+            call_args_str_parts.join(", ")
+        )
     };
 
     let script_source = format!(
@@ -521,7 +567,7 @@ script {{
     use {}::{};
 
     fun main{}({}) {{
-        let _ = {}::{}{}({});
+        {}
     }}
 }}
         "#,
@@ -529,10 +575,7 @@ script {{
         module_name_ident,
         type_parameters_decl_str,
         script_params_str_parts.join(", "),
-        module_name_ident,
-        func_name_ident,
-        type_arguments_call_str,
-        call_args_str_parts.join(", ")
+        function_call_line
     );
 
     if std::env::var("DEBUG").is_ok() {
