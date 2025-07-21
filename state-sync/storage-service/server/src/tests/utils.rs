@@ -32,7 +32,7 @@ use aptos_storage_service_types::{
     },
     responses::{
         CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse,
-        TransactionDataResponseType,
+        TransactionDataResponseType, TransactionDataWithProofResponse,
     },
     Epoch, StorageServiceError,
 };
@@ -48,8 +48,10 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
     transaction::{
         ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionListWithAuxiliaryInfos,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
     write_set::WriteSet,
@@ -136,27 +138,34 @@ pub fn create_output_list_using_sizes(
     start_version: u64,
     num_outputs: u64,
     min_bytes_per_output: u64,
-) -> TransactionOutputListWithProof {
+    use_request_v2: bool,
+) -> TransactionOutputListWithProofV2 {
     // Create a test transaction list that enforces the given size requirements
-    let transaction_list_with_proof = create_transaction_list_using_sizes(
-        start_version,
-        num_outputs,
-        min_bytes_per_output,
-        false,
-    );
+    let (transaction_list_with_proof, persisted_auxiliary_info) =
+        create_transaction_list_using_sizes(
+            start_version,
+            num_outputs,
+            min_bytes_per_output,
+            false,
+            use_request_v2,
+        )
+        .into_parts();
 
     // Create a test transaction and output list
     let transactions_and_outputs = transaction_list_with_proof
         .transactions
-        .iter()
-        .map(|txn| (txn.clone(), create_test_transaction_output()))
+        .into_iter()
+        .map(|txn| (txn, create_test_transaction_output()))
         .collect();
 
-    TransactionOutputListWithProof::new(
-        transactions_and_outputs,
-        Some(start_version),
-        transaction_list_with_proof.proof,
-    )
+    TransactionOutputListWithProofV2::new(TransactionOutputListWithAuxiliaryInfos::new(
+        TransactionOutputListWithProof::new(
+            transactions_and_outputs,
+            Some(start_version),
+            transaction_list_with_proof.proof,
+        ),
+        persisted_auxiliary_info,
+    ))
 }
 
 /// Creates a test transaction output list with proof
@@ -164,20 +173,31 @@ pub fn create_output_list_with_proof(
     start_version: u64,
     end_version: u64,
     proof_version: u64,
-) -> TransactionOutputListWithProof {
-    let transaction_list_with_proof =
-        create_transaction_list_with_proof(start_version, end_version, proof_version, false);
+    use_request_v2: bool,
+) -> TransactionOutputListWithProofV2 {
+    let (transaction_list_with_proof, persisted_auxiliary_info) =
+        create_transaction_list_with_proof(
+            start_version,
+            end_version,
+            proof_version,
+            false,
+            use_request_v2,
+        )
+        .into_parts();
     let transactions_and_outputs = transaction_list_with_proof
         .transactions
         .iter()
         .map(|txn| (txn.clone(), create_test_transaction_output()))
         .collect();
 
-    TransactionOutputListWithProof::new(
-        transactions_and_outputs,
-        Some(start_version),
-        transaction_list_with_proof.proof,
-    )
+    TransactionOutputListWithProofV2::new(TransactionOutputListWithAuxiliaryInfos::new(
+        TransactionOutputListWithProof::new(
+            transactions_and_outputs,
+            Some(start_version),
+            transaction_list_with_proof.proof,
+        ),
+        persisted_auxiliary_info,
+    ))
 }
 
 /// Creates and returns a list of persisted auxiliary infos (if request v2 is enabled)
@@ -185,19 +205,14 @@ pub fn create_persisted_auxiliary_infos(
     start_version: u64,
     end_version: u64,
     use_request_v2: bool,
-) -> Option<Vec<PersistedAuxiliaryInfo>> {
-    // Check if request v2 is enabled
-    if !use_request_v2 {
-        return None;
-    }
-
+) -> Vec<PersistedAuxiliaryInfo> {
     // Calculate the number of auxiliary infos
     let num_auxiliary_infos = end_version - start_version + 1;
 
     // Create a list of auxiliary infos
     let mut persisted_auxiliary_infos = vec![];
     for i in 0..num_auxiliary_infos {
-        let persisted_auxiliary_info = if utils::get_random_u64() % 2 == 0 {
+        let persisted_auxiliary_info = if utils::get_random_u64() % 2 == 0 && use_request_v2 {
             PersistedAuxiliaryInfo::V1 {
                 transaction_index: i as u32,
             }
@@ -208,7 +223,7 @@ pub fn create_persisted_auxiliary_infos(
     }
 
     // Return the list of auxiliary infos
-    Some(persisted_auxiliary_infos)
+    persisted_auxiliary_infos
 }
 
 /// Creates a vector of entries from first_index to last_index (inclusive)
@@ -275,7 +290,9 @@ pub fn create_transaction_list_using_sizes(
     num_transactions: u64,
     min_bytes_per_transaction: u64,
     include_events: bool,
-) -> TransactionListWithProof {
+    use_request_v2: bool,
+) -> TransactionListWithProofV2 {
+    let end_version = start_version + num_transactions - 1;
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
     let random_bytes: Vec<u8> = (0..min_bytes_per_transaction)
@@ -287,7 +304,7 @@ pub fn create_transaction_list_using_sizes(
 
     // Create the requested transactions
     let mut transactions = vec![];
-    for sequence_number in start_version..=start_version + num_transactions - 1 {
+    for sequence_number in start_version..=end_version {
         transactions.push(create_test_transaction(
             sequence_number,
             random_bytes.clone(),
@@ -300,7 +317,10 @@ pub fn create_transaction_list_using_sizes(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
-    transaction_list_with_proof
+    TransactionListWithProofV2::new(TransactionListWithAuxiliaryInfos::new(
+        transaction_list_with_proof,
+        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2),
+    ))
 }
 
 /// Creates a test transaction output list with proof
@@ -309,7 +329,8 @@ pub fn create_transaction_list_with_proof(
     end_version: u64,
     _proof_version: u64,
     include_events: bool,
-) -> TransactionListWithProof {
+    use_request_v2: bool,
+) -> TransactionListWithProofV2 {
     // Include events if required
     let events = if include_events { Some(vec![]) } else { None };
 
@@ -325,7 +346,10 @@ pub fn create_transaction_list_with_proof(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
-    transaction_list_with_proof
+    TransactionListWithProofV2::new(TransactionListWithAuxiliaryInfos::new(
+        transaction_list_with_proof,
+        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2),
+    ))
 }
 
 /// Creates a test transaction output
@@ -344,16 +368,26 @@ fn create_test_transaction_output() -> TransactionOutput {
 /// list (depending on if `fallback_to_transactions` is set).
 pub fn configure_network_chunk_limit(
     fallback_to_transactions: bool,
-    output_list_with_proof: &TransactionOutputListWithProof,
-    transaction_list_with_proof: &TransactionListWithProof,
+    output_list_with_proof: &TransactionOutputListWithProofV2,
+    transaction_list_with_proof: &TransactionListWithProofV2,
     enable_transaction_data_v2: bool,
 ) -> StorageServiceConfig {
     let max_network_chunk_bytes = if fallback_to_transactions {
+        let response = TransactionDataWithProofResponse {
+            transaction_data_response_type: TransactionDataResponseType::TransactionData,
+            transaction_list_with_proof: Some(transaction_list_with_proof.clone()),
+            transaction_output_list_with_proof: None,
+        };
         // Network limit is only big enough for the transaction list
-        bcs::serialized_size(&transaction_list_with_proof).unwrap() as u64 + 1
+        bcs::serialized_size(&response).unwrap() as u64 + 1
     } else {
         // Network limit is big enough for the output list
-        bcs::serialized_size(&output_list_with_proof).unwrap() as u64 + 1
+        let response = TransactionDataWithProofResponse {
+            transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+            transaction_list_with_proof: None,
+            transaction_output_list_with_proof: Some(output_list_with_proof.clone()),
+        };
+        bcs::serialized_size(&response).unwrap() as u64 + 1
     };
     StorageServiceConfig {
         max_network_chunk_bytes,
@@ -391,9 +425,7 @@ pub fn expect_get_transaction_outputs(
     start_version: u64,
     num_items: u64,
     proof_version: u64,
-    output_list: TransactionOutputListWithProof,
-    use_request_v2: bool,
-    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
+    output_list: TransactionOutputListWithProofV2,
 ) {
     // Expect a call to get transaction outputs with proof
     mock_db
@@ -401,16 +433,6 @@ pub fn expect_get_transaction_outputs(
         .times(1)
         .with(eq(start_version), eq(num_items), eq(proof_version))
         .returning(move |_, _, _| Ok(output_list.clone()));
-
-    // If the request is v2, also expect a call to get auxiliary info
-    if use_request_v2 {
-        let persisted_auxiliary_info_iter = persisted_auxiliary_infos.unwrap().into_iter().map(Ok);
-        mock_db
-            .expect_get_persisted_auxiliary_info_iterator()
-            .times(1)
-            .with(eq(start_version), eq(num_items as usize))
-            .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iter.clone())));
-    }
 }
 
 /// Sets an expectation on the given mock db for a call to fetch transactions
@@ -420,9 +442,7 @@ pub fn expect_get_transactions(
     num_items: u64,
     proof_version: u64,
     include_events: bool,
-    transaction_list: TransactionListWithProof,
-    use_request_v2: bool,
-    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
+    transaction_list: TransactionListWithProofV2,
 ) {
     // Expect a call to get transactions with proof
     mock_db
@@ -435,16 +455,6 @@ pub fn expect_get_transactions(
             eq(include_events),
         )
         .returning(move |_, _, _, _| Ok(transaction_list.clone()));
-
-    // If the request is v2, also expect a call to get auxiliary info
-    if use_request_v2 {
-        let persisted_auxiliary_info_iter = persisted_auxiliary_infos.unwrap().into_iter().map(Ok);
-        mock_db
-            .expect_get_persisted_auxiliary_info_iterator()
-            .times(1)
-            .with(eq(start_version), eq(num_items as usize))
-            .returning(move |_, _| Ok(Box::new(persisted_auxiliary_info_iter.clone())));
-    }
 }
 
 /// Extracts the peer and network ids from an optional peer network id
@@ -932,9 +942,8 @@ pub async fn verify_new_transaction_outputs_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
     use_request_v2: bool,
-    expected_output_list_with_proof: TransactionOutputListWithProof,
+    expected_output_list_with_proof: TransactionOutputListWithProofV2,
     expected_ledger_info: LedgerInfoWithSignatures,
-    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
     // Get the data response
     let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
@@ -955,7 +964,12 @@ pub async fn verify_new_transaction_outputs_with_proof(
     // Verify the response data
     match data_response {
         DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
-            assert_eq!(outputs_with_proof, expected_output_list_with_proof);
+            assert_eq!(
+                outputs_with_proof,
+                expected_output_list_with_proof
+                    .get_output_list_with_proof()
+                    .clone()
+            );
             assert_eq!(ledger_info, expected_ledger_info);
         },
         DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
@@ -976,17 +990,11 @@ pub async fn verify_new_transaction_outputs_with_proof(
                 .transaction_list_with_proof
                 .is_none());
 
-            // Verify the outputs and auxiliary infos
-            let output_list_with_proof_v2 = new_transaction_data_with_proof_response
-                .transaction_output_list_with_proof
-                .unwrap();
             assert_eq!(
-                output_list_with_proof_v2.get_output_list_with_proof(),
-                &expected_output_list_with_proof
-            );
-            assert_eq!(
-                output_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                &expected_persisted_auxiliary_infos.unwrap(),
+                new_transaction_data_with_proof_response
+                    .transaction_output_list_with_proof
+                    .unwrap(),
+                expected_output_list_with_proof
             );
         },
         _ => panic!(
@@ -1002,9 +1010,8 @@ pub async fn verify_new_transactions_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
     use_request_v2: bool,
-    expected_transactions_with_proof: TransactionListWithProof,
+    expected_transactions_with_proof: TransactionListWithProofV2,
     expected_ledger_info: LedgerInfoWithSignatures,
-    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
     // Get the data response
     let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
@@ -1025,7 +1032,12 @@ pub async fn verify_new_transactions_with_proof(
     // Verify the response data
     match data_response {
         DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
-            assert_eq!(transactions_with_proof, expected_transactions_with_proof);
+            assert_eq!(
+                transactions_with_proof,
+                expected_transactions_with_proof
+                    .get_transaction_list_with_proof()
+                    .clone()
+            );
             assert_eq!(ledger_info, expected_ledger_info);
         },
         DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
@@ -1046,17 +1058,11 @@ pub async fn verify_new_transactions_with_proof(
                 .transaction_output_list_with_proof
                 .is_none());
 
-            // Verify the transactions and auxiliary infos
-            let transaction_list_with_proof_v2 = new_transaction_data_with_proof_response
-                .transaction_list_with_proof
-                .unwrap();
             assert_eq!(
-                transaction_list_with_proof_v2.get_transaction_list_with_proof(),
-                &expected_transactions_with_proof
-            );
-            assert_eq!(
-                transaction_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                &expected_persisted_auxiliary_infos.unwrap(),
+                new_transaction_data_with_proof_response
+                    .transaction_list_with_proof
+                    .unwrap(),
+                expected_transactions_with_proof
             );
         },
         _ => panic!(
@@ -1072,10 +1078,9 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<Bytes, RpcError>>,
     use_request_v2: bool,
-    expected_transaction_list_with_proof: Option<TransactionListWithProof>,
-    expected_output_list_with_proof: Option<TransactionOutputListWithProof>,
+    expected_transaction_list_with_proof: Option<TransactionListWithProofV2>,
+    expected_output_list_with_proof: Option<TransactionOutputListWithProofV2>,
     expected_ledger_info: LedgerInfoWithSignatures,
-    expected_persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
 ) {
     // Get the data response
     let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
@@ -1106,8 +1111,12 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
             assert_eq!(
                 transactions_with_proof,
                 expected_transaction_list_with_proof
+                    .map(|t| t.get_transaction_list_with_proof().clone())
             );
-            assert_eq!(outputs_with_proof, expected_output_list_with_proof);
+            assert_eq!(
+                outputs_with_proof,
+                expected_output_list_with_proof.map(|t| t.get_output_list_with_proof().clone())
+            );
         },
         DataResponse::NewTransactionDataWithProof(new_transaction_data_with_proof_response) => {
             // Verify the ledger info
@@ -1128,12 +1137,8 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
                     .transaction_output_list_with_proof
                     .is_none());
                 assert_eq!(
-                    transactions_with_proof_v2.get_transaction_list_with_proof(),
-                    &expected_transaction_list_with_proof.unwrap()
-                );
-                assert_eq!(
-                    transactions_with_proof_v2.get_persisted_auxiliary_infos(),
-                    &expected_persisted_auxiliary_infos.unwrap(),
+                    transactions_with_proof_v2,
+                    expected_transaction_list_with_proof.unwrap()
                 );
             } else if let Some(outputs_with_proof_v2) =
                 new_transaction_data_with_proof_response.transaction_output_list_with_proof
@@ -1146,12 +1151,8 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
                     .transaction_list_with_proof
                     .is_none());
                 assert_eq!(
-                    outputs_with_proof_v2.get_output_list_with_proof(),
-                    &expected_output_list_with_proof.unwrap()
-                );
-                assert_eq!(
-                    outputs_with_proof_v2.get_persisted_auxiliary_infos(),
-                    &expected_persisted_auxiliary_infos.unwrap(),
+                    outputs_with_proof_v2,
+                    expected_output_list_with_proof.unwrap()
                 );
             } else {
                 panic!("Expected either transactions or outputs with proof, but got neither!");
@@ -1167,8 +1168,7 @@ pub async fn verify_new_transactions_or_outputs_with_proof(
 /// Verifies the response for a transaction with proof request
 pub fn verify_transaction_with_proof_response(
     use_request_v2: bool,
-    transaction_list_with_proof: TransactionListWithProof,
-    persisted_auxiliary_infos: Option<Vec<PersistedAuxiliaryInfo>>,
+    transaction_list_with_proof: TransactionListWithProofV2,
     response: StorageServiceResponse,
 ) {
     // Get the data response
@@ -1189,7 +1189,12 @@ pub fn verify_transaction_with_proof_response(
     // Verify the response data
     match data_response {
         DataResponse::TransactionsWithProof(transactions_with_proof) => {
-            assert_eq!(transactions_with_proof, transaction_list_with_proof)
+            assert_eq!(
+                transactions_with_proof,
+                transaction_list_with_proof
+                    .get_transaction_list_with_proof()
+                    .clone()
+            )
         },
         DataResponse::TransactionDataWithProof(transaction_data_with_proof) => {
             // Verify the data type
@@ -1203,17 +1208,11 @@ pub fn verify_transaction_with_proof_response(
                 .transaction_output_list_with_proof
                 .is_none());
 
-            // Verify the transactions and auxiliary infos
-            let transaction_list_with_proof_v2 = transaction_data_with_proof
-                .transaction_list_with_proof
-                .unwrap();
             assert_eq!(
-                transaction_list_with_proof_v2.get_transaction_list_with_proof(),
-                &transaction_list_with_proof
-            );
-            assert_eq!(
-                transaction_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                &persisted_auxiliary_infos.unwrap(),
+                transaction_data_with_proof
+                    .transaction_list_with_proof
+                    .unwrap(),
+                transaction_list_with_proof
             );
         },
         _ => panic!("Expected transactions with proof but got: {:?}", response),
@@ -1232,8 +1231,7 @@ pub fn verify_no_subscription_responses(
 /// Verifies that a response is received for a given stream request index
 /// and that the response contains the correct data.
 pub async fn verify_output_subscription_response(
-    expected_output_lists_with_proofs: Vec<TransactionOutputListWithProof>,
-    expected_persisted_auxiliary_infos: Vec<Option<Vec<PersistedAuxiliaryInfo>>>,
+    expected_output_lists_with_proofs: Vec<TransactionOutputListWithProofV2>,
     expected_target_ledger_info: LedgerInfoWithSignatures,
     mock_client: &mut MockClient,
     response_receivers: &mut HashMap<u64, Receiver<Result<Bytes, RpcError>>>,
@@ -1247,7 +1245,6 @@ pub async fn verify_output_subscription_response(
         use_request_v2,
         expected_output_lists_with_proofs[stream_request_index as usize].clone(),
         expected_target_ledger_info,
-        expected_persisted_auxiliary_infos[stream_request_index as usize].clone(),
     )
     .await;
 }

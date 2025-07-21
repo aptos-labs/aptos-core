@@ -89,9 +89,10 @@ impl DbWriter for AptosDB {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
+        let (output_with_proof, persisted_aux_info) = output_with_proof.into_parts();
         gauged_api("finalize_state_snapshot", || {
             // Ensure the output with proof only contains a single transaction output and info
             let num_transaction_outputs = output_with_proof.transactions_and_outputs.len();
@@ -148,6 +149,7 @@ impl DbWriter for AptosDB {
                 self.ledger_db.clone(),
                 version,
                 &transactions,
+                &persisted_aux_info,
                 &transaction_infos,
                 &events,
                 wsets,

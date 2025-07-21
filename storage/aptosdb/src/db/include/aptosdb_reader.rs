@@ -4,8 +4,13 @@
 use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::transaction::PersistedAuxiliaryInfo;
-use aptos_types::{block_info::BlockHeight, transaction::IndexedTransactionSummary};
+use aptos_types::{
+    block_info::BlockHeight,
+    transaction::{
+        IndexedTransactionSummary, TransactionListWithAuxiliaryInfos, TransactionListWithProofV2,
+        TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+    },
+};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
@@ -213,12 +218,12 @@ impl DbReader for AptosDB {
         limit: u64,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionListWithProof> {
+    ) -> Result<TransactionListWithProofV2> {
         gauged_api("get_transactions", || {
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
-                return Ok(TransactionListWithProof::new_empty());
+                return Ok(TransactionListWithProofV2::new_empty());
             }
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
@@ -243,6 +248,15 @@ impl DbReader for AptosDB {
             } else {
                 None
             };
+            let persisted_aux_info = (start_version..start_version + limit)
+                .map(|version| {
+                    Ok(self
+                        .ledger_db
+                        .persisted_auxiliary_info_db()
+                        .get_persisted_auxiliary_info(version)?
+                        .unwrap_or(PersistedAuxiliaryInfo::None))
+                })
+                .collect::<Result<Vec<_>>>()?;
             let proof = TransactionInfoListWithProof::new(
                 self.ledger_db
                     .transaction_accumulator_db()
@@ -250,11 +264,11 @@ impl DbReader for AptosDB {
                 txn_infos,
             );
 
-            Ok(TransactionListWithProof::new(
-                txns,
-                events,
-                Some(start_version),
-                proof,
+            Ok(TransactionListWithProofV2::new(
+                TransactionListWithAuxiliaryInfos::new(
+                    TransactionListWithProof::new(txns, events, Some(start_version), proof),
+                    persisted_aux_info,
+                ),
             ))
         })
     }
@@ -310,19 +324,20 @@ impl DbReader for AptosDB {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof> {
-        gauged_api("get_transactions_outputs", || {
+    ) -> Result<TransactionOutputListWithProofV2> {
+        gauged_api("get_transaction_outputs", || {
             error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
 
             if start_version > ledger_version || limit == 0 {
-                return Ok(TransactionOutputListWithProof::new_empty());
+                return Ok(TransactionOutputListWithProofV2::new_empty());
             }
 
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
-            let (txn_infos, txns_and_outputs) = (start_version..start_version + limit)
+            let (txn_infos, txns_and_outputs, persisted_aux_info) = (start_version
+                ..start_version + limit)
                 .map(|version| {
                     let txn_info = self
                         .ledger_db
@@ -343,11 +358,16 @@ impl DbReader for AptosDB {
                         txn_info.status().clone().into(),
                         auxiliary_data,
                     );
-                    Ok((txn_info, (txn, txn_output)))
+                    let persisted_aux_info = self
+                        .ledger_db
+                        .persisted_auxiliary_info_db()
+                        .get_persisted_auxiliary_info(version)?
+                        .unwrap_or(PersistedAuxiliaryInfo::None);
+                    Ok((txn_info, (txn, txn_output), persisted_aux_info))
                 })
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
-                .unzip();
+                .multiunzip();
             let proof = TransactionInfoListWithProof::new(
                 self.ledger_db
                     .transaction_accumulator_db()
@@ -355,10 +375,15 @@ impl DbReader for AptosDB {
                 txn_infos,
             );
 
-            Ok(TransactionOutputListWithProof::new(
-                txns_and_outputs,
-                Some(start_version),
-                proof,
+            Ok(TransactionOutputListWithProofV2::new(
+                TransactionOutputListWithAuxiliaryInfos::new(
+                    TransactionOutputListWithProof::new(
+                        txns_and_outputs,
+                        Some(start_version),
+                        proof,
+                    ),
+                    persisted_aux_info,
+                ),
             ))
         })
     }
@@ -376,7 +401,10 @@ impl DbReader for AptosDB {
                 .ledger_db
                 .persisted_auxiliary_info_db()
                 .get_persisted_auxiliary_info_iter(start_version, num_persisted_auxiliary_info)?;
-            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>)
+            Ok(Box::new(iter)
+                as Box<
+                    dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_,
+                >)
         })
     }
 
