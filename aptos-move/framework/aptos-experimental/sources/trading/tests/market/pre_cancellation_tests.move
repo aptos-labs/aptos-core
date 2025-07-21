@@ -16,7 +16,7 @@ module aptos_experimental::pre_cancellation_tests {
     };
     use aptos_experimental::market::{new_market, new_market_config, cancel_order_with_client_id};
 
-    const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
+    const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
 
     #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
     public fun test_pre_cancellation_success(
@@ -30,7 +30,7 @@ module aptos_experimental::pre_cancellation_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -98,7 +98,7 @@ module aptos_experimental::pre_cancellation_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -149,7 +149,7 @@ module aptos_experimental::pre_cancellation_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_SECS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -169,8 +169,8 @@ module aptos_experimental::pre_cancellation_tests {
                 option::some(1000),
                 &test_market_callbacks()
             );
-        let initial_time = timestamp::now_microseconds();
-        timestamp::update_global_time_for_test(initial_time + 5000000); // 5 seconds later
+        let initial_time = timestamp::now_seconds();
+        timestamp::update_global_time_for_test_secs(initial_time + 5); // 5 seconds later
         // Should be considered pre-cancelled before expiration
         // Place another order with same client order ID and verify that it is not cancelled
         let _ =

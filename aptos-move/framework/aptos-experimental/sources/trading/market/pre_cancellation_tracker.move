@@ -169,7 +169,7 @@ module aptos_experimental::pre_cancellation_tracker {
         assert!(is_cancelled);
 
         // Wait for expiration
-        timestamp::update_global_time_for_test(initial_time + expiration_window + 1);
+        timestamp::update_global_time_for_test_secs(initial_time + expiration_window + 1);
 
         // Should be considered not pre-cancelled after expiration
         let is_cancelled = is_pre_cancelled(&mut tracker, addr, client_order_id);
