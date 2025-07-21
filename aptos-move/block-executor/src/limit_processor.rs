@@ -8,7 +8,7 @@ use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::TStateView,
+    state_store::{TStateView, NUM_STATE_SHARDS},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -42,6 +42,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        println!(
+            "BlockGasLimitProcessor::new. block_gas_limit_type: {:?}",
+            block_gas_limit_type
+        );
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
             .then(|| BlockHotStateOpAccumulator::new(base_view));
@@ -89,6 +93,8 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
             if let Some(x) = &mut self.hot_state_op_accumulator {
+                // TODO(wqfish): probably need to order these to eliminate randomness.
+                // (These are `HashSet` right now.)
                 x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
             }
             self.txn_read_write_summaries.push(rw_summary);
@@ -291,14 +297,14 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
-        let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
-            x.get_slots_to_make_hot()
+        let (to_make_hot, to_evict) = if let Some(x) = &self.hot_state_op_accumulator {
+            (x.get_slots_to_make_hot(), x.get_eviction())
         } else {
             warn!("BlockHotStateOpAccumulator is not set.");
-            BTreeMap::new()
+            (BTreeMap::new(), [(); NUM_STATE_SHARDS].map(|_| Vec::new()))
         };
 
-        TBlockEndInfoExt::new(inner, slots_to_make_hot)
+        TBlockEndInfoExt::new(inner, to_make_hot, to_evict)
     }
 }
 
