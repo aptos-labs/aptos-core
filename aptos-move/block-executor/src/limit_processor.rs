@@ -88,6 +88,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
+            info!("rw summary: {:?}", rw_summary);
             if let Some(x) = &mut self.hot_state_op_accumulator {
                 x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
             }

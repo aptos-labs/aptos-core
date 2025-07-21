@@ -2298,7 +2298,7 @@ where
                 return Ok(output);
             }
 
-            if !self.config.local.allow_fallback {
+            if true {
                 panic!("Parallel execution failed and fallback is not allowed");
             }
 
