@@ -1,5 +1,5 @@
 [package]
-name = 'ambassador'
+name = 'ambassador_token'
 version = '1.0.0'
 
 # do not change to "_", concrete address needed for module-publish testing framework
