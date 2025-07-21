@@ -40,5 +40,4 @@ module 0x1::error {
     }
 }
 
-
 ============ recompilation succeeded ========

@@ -61,5 +61,4 @@ module 0x1::string {
     }
 }
 
-
 ============ recompilation succeeded ========
