@@ -14,7 +14,7 @@ use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_std::iterable::Iterable;
 use bytes::Bytes;
-use itertools::Either;
+use itertools::{EitherOrBoth, Itertools};
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -560,17 +560,11 @@ impl Debug for HotStateOp {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
-pub enum WriteSet {
-    Value(ValueWriteSet),
-    /// TODO(HotState): this variant silently serializes to an empty ValueWriteSet for now.
-    Hotness(BTreeMap<StateKey, HotStateOp>),
-}
-
-impl Default for WriteSet {
-    fn default() -> Self {
-        Self::Value(ValueWriteSet::default())
-    }
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq)]
+pub struct WriteSet {
+    value: ValueWriteSet,
+    /// TODO(HotState): this field is not serialized for now.
+    hotness: BTreeMap<StateKey, HotStateOp>,
 }
 
 impl Serialize for WriteSet {
@@ -578,10 +572,7 @@ impl Serialize for WriteSet {
     where
         S: Serializer,
     {
-        match self {
-            WriteSet::Value(ws) => ws.serialize(serializer),
-            WriteSet::Hotness(_hot_state_ops) => ValueWriteSet::default().serialize(serializer),
-        }
+        self.value.serialize(serializer)
     }
 }
 
@@ -590,38 +581,35 @@ impl<'de> Deserialize<'de> for WriteSet {
     where
         D: Deserializer<'de>,
     {
-        let ws = ValueWriteSet::deserialize(deserializer)?;
-        Ok(WriteSet::Value(ws))
+        let value = ValueWriteSet::deserialize(deserializer)?;
+        Ok(Self {
+            value,
+            hotness: BTreeMap::new(),
+        })
     }
 }
 
 impl WriteSet {
-    pub fn expect_into_v0(self) -> WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    fn into_v0(self) -> WriteSetV0 {
+        match self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
-    pub fn expect_v0(&self) -> &WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    pub fn as_v0(&self) -> &WriteSetV0 {
+        match &self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
-    pub fn expect_v0_mut(&mut self) -> &mut WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+    fn as_v0_mut(&mut self) -> &mut WriteSetV0 {
+        match &mut self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
     pub fn into_mut(self) -> WriteSetMut {
-        self.expect_into_v0().0
+        self.into_v0().0
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -641,7 +629,7 @@ impl WriteSet {
     }
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.expect_v0()
+        self.as_v0()
             .iter()
             .map(|(key, op)| (key, op.as_state_value_opt()))
     }
@@ -654,62 +642,53 @@ impl WriteSet {
     }
 
     pub fn update_total_supply(&mut self, value: u128) {
-        self.expect_v0_mut().update_total_supply(value);
+        self.as_v0_mut().update_total_supply(value);
     }
 
     pub fn get_write_op(&self, state_key: &StateKey) -> Option<&WriteOp> {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.get(state_key),
-            WriteSet::Hotness(_) => None,
-        }
+        self.as_v0().get(state_key)
     }
 
     pub fn get_total_supply(&self) -> Option<u128> {
-        self.expect_v0().get_total_supply()
+        self.as_v0().get_total_supply()
     }
 
     pub fn is_empty(&self) -> bool {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws.is_empty(),
-            WriteSet::Hotness(ws) => ws.is_empty(),
-        }
+        self.as_v0().is_empty() && self.hotness.is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.expect_into_v0().0.write_set
+        self.into_v0().0.write_set
     }
 
     pub fn expect_write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.expect_v0().0.write_set.iter()
+        self.as_v0().0.write_set.iter()
     }
 
     pub fn write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        const EMPTY: &[(&StateKey, &WriteOp)] = &[];
-
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.iter()),
-            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().copied()),
-        }
+        self.as_v0().iter()
     }
 
     pub fn into_write_op_iter(self) -> impl Iterator<Item = (StateKey, WriteOp)> {
-        const EMPTY: &[(StateKey, WriteOp)] = &[];
-
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => Either::Left(ws.into_write_op_iter()),
-            WriteSet::Hotness(_) => Either::Right(EMPTY.iter().cloned()),
-        }
+        self.into_v0().into_write_op_iter()
     }
 
     pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => {
-                Either::Left(ws.iter().map(|(key, op)| (key, op.as_base_op())))
-            },
-            WriteSet::Hotness(ws) => {
-                Either::Right(ws.iter().map(|(key, op)| (key, op.as_base_op())))
-            },
-        }
+        self.as_v0()
+            .iter()
+            .map(|(key, op)| (key, op.as_base_op()))
+            .merge_join_by(
+                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                |a, b| a.0.cmp(b.0),
+            )
+            .map(|entry| match entry {
+                EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
+                EitherOrBoth::Both(e, _) => {
+                    // Most likely this won't happen. If a key is written to, it should not be made
+                    // hot or evicted.
+                    e
+                },
+            })
     }
 }
 
@@ -809,7 +788,10 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet::Value(ValueWriteSet::V0(WriteSetV0(self))))
+        Ok(WriteSet {
+            value: ValueWriteSet::V0(WriteSetV0(self)),
+            hotness: BTreeMap::new(),
+        })
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
