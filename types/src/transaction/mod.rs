@@ -2219,6 +2219,30 @@ impl TransactionListWithProofV2 {
         Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos)
     }
 
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_empty())
+    }
+
+    /// A convenience function to create a v2 list from a v1 list.
+    pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_from_v1(
+            transaction_list_with_proof,
+        ))
+    }
+
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+        }
+    }
+
     /// Returns a reference to the inner transaction list with proof
     pub fn get_transaction_list_with_proof(&self) -> &TransactionListWithProof {
         match self {
@@ -2234,6 +2258,15 @@ impl TransactionListWithProofV2 {
             Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
                 &transaction_list_with_auxiliary_infos.persisted_auxiliary_infos
             },
+        }
+    }
+
+    pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
+                txn_list_with_auxiliary_infos.transaction_list_with_proof,
+                txn_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
         }
     }
 }
@@ -2433,6 +2466,34 @@ impl TransactionOutputListWithProofV2 {
         Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
     }
 
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_empty(),
+        )
+    }
+
+    /// A convenience function to create a v2 output list from a v1 list.
+    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_from_v1(
+                transaction_output_list_with_proof,
+            ),
+        )
+    }
+
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+        }
+    }
+
     /// Returns a reference to the inner transaction output list with proof
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
@@ -2448,6 +2509,15 @@ impl TransactionOutputListWithProofV2 {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.persisted_auxiliary_infos
             },
+        }
+    }
+
+    pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof,
+                output_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
         }
     }
 }

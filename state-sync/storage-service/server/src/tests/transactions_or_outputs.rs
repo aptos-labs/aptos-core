@@ -12,7 +12,8 @@ use aptos_storage_service_types::{
     StorageServiceError,
 };
 use aptos_types::transaction::{
-    PersistedAuxiliaryInfo, TransactionListWithProof, TransactionOutputListWithProof,
+    TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
+    TransactionOutputListWithProofV2,
 };
 use claims::assert_matches;
 use mockall::{predicate::eq, Sequence};
@@ -31,17 +32,17 @@ async fn test_get_transactions_or_outputs_with_proof() {
                 let start_version = 0;
                 let end_version = start_version + chunk_size - 1;
                 let proof_version = end_version;
-                let output_list_with_proof =
-                    utils::create_output_list_with_proof(start_version, end_version, proof_version);
+                let output_list_with_proof = utils::create_output_list_with_proof(
+                    start_version,
+                    end_version,
+                    proof_version,
+                    use_request_v2,
+                );
                 let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                     start_version,
                     end_version,
                     proof_version,
                     false,
-                );
-                let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                    start_version,
-                    end_version,
                     use_request_v2,
                 );
 
@@ -55,8 +56,6 @@ async fn test_get_transactions_or_outputs_with_proof() {
                         (chunk_size as u32 / (u32::pow(2, i as u32))) as u64,
                         proof_version,
                         output_list_with_proof.clone(),
-                        use_request_v2,
-                        persisted_auxiliary_infos.clone(),
                     );
                 }
                 if fallback_to_transactions {
@@ -67,8 +66,6 @@ async fn test_get_transactions_or_outputs_with_proof() {
                         proof_version,
                         false,
                         transaction_list_with_proof.clone(),
-                        use_request_v2,
-                        persisted_auxiliary_infos.clone(),
                     );
                 }
 
@@ -104,7 +101,6 @@ async fn test_get_transactions_or_outputs_with_proof() {
                     fallback_to_transactions,
                     &output_list_with_proof,
                     &transaction_list_with_proof,
-                    &persisted_auxiliary_infos,
                     &response,
                 );
             }
@@ -127,16 +123,19 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
             let start_version = 0;
             let end_version = start_version + max_output_chunk_size - 1;
             let proof_version = end_version;
-            let output_list_with_proof =
-                utils::create_output_list_with_proof(start_version, end_version, proof_version);
+            let output_list_with_proof = utils::create_output_list_with_proof(
+                start_version,
+                end_version,
+                proof_version,
+                use_request_v2,
+            );
             let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                 start_version,
                 end_version,
                 proof_version,
                 false,
+                use_request_v2,
             );
-            let persisted_auxiliary_infos =
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
 
             // Create the mock db reader
             let mut db_reader = mock::create_mock_db_reader();
@@ -146,8 +145,6 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
                 max_output_chunk_size,
                 proof_version,
                 output_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
             if fallback_to_transactions {
                 utils::expect_get_transactions(
@@ -157,8 +154,6 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
                     proof_version,
                     false,
                     transaction_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
             }
 
@@ -194,7 +189,6 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
                 fallback_to_transactions,
                 &output_list_with_proof,
                 &transaction_list_with_proof,
-                &persisted_auxiliary_infos,
                 &response,
             );
         }
@@ -382,6 +376,7 @@ async fn get_transactions_or_outputs_with_proof_network_limit(
                     start_version,
                     chunk_size,
                     min_bytes_per_output,
+                    use_request_v2,
                 );
                 db_reader
                     .expect_get_transaction_outputs()
@@ -401,6 +396,7 @@ async fn get_transactions_or_outputs_with_proof_network_limit(
                     chunk_size,
                     min_bytes_per_transaction,
                     include_events,
+                    use_request_v2,
                 );
                 db_reader
                     .expect_get_transactions()
@@ -414,26 +410,6 @@ async fn get_transactions_or_outputs_with_proof_network_limit(
                     .in_sequence(&mut expectation_sequence)
                     .returning(move |_, _, _, _| Ok(transaction_list_with_proof.clone()));
                 chunk_size /= 2;
-            }
-
-            // Expect calls to get persisted auxiliary infos if v2 is enabled
-            if use_request_v2 {
-                let mut chunk_size = max_transaction_size;
-                while chunk_size >= 1 {
-                    let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                        start_version,
-                        start_version + chunk_size - 1,
-                        use_request_v2,
-                    )
-                    .unwrap();
-                    let persisted_auxiliary_infos = persisted_auxiliary_infos.into_iter().map(Ok);
-                    db_reader
-                        .expect_get_persisted_auxiliary_info_iterator()
-                        .times(1)
-                        .with(eq(start_version), eq(chunk_size as usize))
-                        .returning(move |_, _| Ok(Box::new(persisted_auxiliary_infos.clone())));
-                    chunk_size /= 2;
-                }
             }
 
             // Create the storage client and server
@@ -556,9 +532,8 @@ fn check_transaction_response_bytes(
 fn verify_transactions_or_output_response(
     use_request_v2: bool,
     fallback_to_transactions: bool,
-    output_list_with_proof: &TransactionOutputListWithProof,
-    transaction_list_with_proof: &TransactionListWithProof,
-    persisted_auxiliary_infos: &Option<Vec<PersistedAuxiliaryInfo>>,
+    output_list_with_proof: &TransactionOutputListWithProofV2,
+    transaction_list_with_proof: &TransactionListWithProofV2,
     response: &StorageServiceResponse,
 ) {
     // Get the data response
@@ -585,10 +560,15 @@ fn verify_transactions_or_output_response(
             if fallback_to_transactions {
                 assert_eq!(
                     transactions_with_proof.unwrap(),
-                    transaction_list_with_proof.clone()
+                    transaction_list_with_proof
+                        .get_transaction_list_with_proof()
+                        .clone()
                 );
             } else {
-                assert_eq!(outputs_with_proof.unwrap(), output_list_with_proof.clone());
+                assert_eq!(
+                    outputs_with_proof.unwrap(),
+                    output_list_with_proof.get_output_list_with_proof().clone(),
+                );
             }
         },
         DataResponse::TransactionDataWithProof(transaction_data_with_proof) => {
@@ -599,17 +579,11 @@ fn verify_transactions_or_output_response(
                     TransactionDataResponseType::TransactionData
                 );
 
-                // Verify the transaction data and auxiliary infos
-                let transaction_list_with_proof_v2 = transaction_data_with_proof
-                    .transaction_list_with_proof
-                    .unwrap();
                 assert_eq!(
-                    transaction_list_with_proof_v2.get_transaction_list_with_proof(),
-                    transaction_list_with_proof
-                );
-                assert_eq!(
-                    transaction_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                    &persisted_auxiliary_infos.clone().unwrap(),
+                    transaction_data_with_proof
+                        .transaction_list_with_proof
+                        .unwrap(),
+                    transaction_list_with_proof.clone()
                 );
             } else {
                 // Verify the data type
@@ -618,17 +592,11 @@ fn verify_transactions_or_output_response(
                     TransactionDataResponseType::TransactionOutputData
                 );
 
-                // Verify the output data and auxiliary infos
-                let output_list_with_proof_v2 = transaction_data_with_proof
-                    .transaction_output_list_with_proof
-                    .unwrap();
                 assert_eq!(
-                    output_list_with_proof_v2.get_output_list_with_proof(),
-                    output_list_with_proof
-                );
-                assert_eq!(
-                    output_list_with_proof_v2.get_persisted_auxiliary_infos(),
-                    &persisted_auxiliary_infos.clone().unwrap(),
+                    transaction_data_with_proof
+                        .transaction_output_list_with_proof
+                        .unwrap(),
+                    output_list_with_proof.clone()
                 );
             }
         },

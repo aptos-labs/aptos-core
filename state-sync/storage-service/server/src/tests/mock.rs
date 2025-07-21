@@ -42,8 +42,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -240,7 +240,7 @@ mock! {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> aptos_storage_interface::Result<TransactionListWithProof>;
+        ) -> aptos_storage_interface::Result<TransactionListWithProofV2>;
 
         fn get_transaction_by_hash(
             &self,
@@ -265,7 +265,7 @@ mock! {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> aptos_storage_interface::Result<TransactionOutputListWithProof>;
+        ) -> aptos_storage_interface::Result<TransactionOutputListWithProofV2>;
 
         fn get_events(
             &self,

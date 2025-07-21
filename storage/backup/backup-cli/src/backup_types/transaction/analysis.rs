@@ -5,7 +5,7 @@
 use anyhow::Result;
 use aptos_types::{
     contract_event::ContractEvent,
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::{TransactionWrite, WriteSet},
 };
 use serde::Serialize;
@@ -69,6 +69,7 @@ impl TransactionAnalysis {
         &mut self,
         version: Version,
         txn: &Transaction,
+        _persisted_aux_info: &PersistedAuxiliaryInfo,
         _txn_info: &TransactionInfo,
         events: &[ContractEvent],
         write_set: &WriteSet,
