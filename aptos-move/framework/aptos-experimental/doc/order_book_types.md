@@ -7,6 +7,7 @@
 
 
 -  [Struct `OrderIdType`](#0x7_order_book_types_OrderIdType)
+-  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
@@ -19,6 +20,7 @@
 -  [Function `get_slippage_pct_precision`](#0x7_order_book_types_get_slippage_pct_precision)
 -  [Function `new_time_based_trigger_condition`](#0x7_order_book_types_new_time_based_trigger_condition)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
+-  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
 -  [Function `new_ascending_id_generator`](#0x7_order_book_types_new_ascending_id_generator)
 -  [Function `next_ascending_id`](#0x7_order_book_types_next_ascending_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
@@ -82,6 +84,39 @@
 <dl>
 <dt>
 <code>order_id: u128</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_order_book_types_AccountClientOrderId"></a>
+
+## Struct `AccountClientOrderId`
+
+
+
+<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>client_order_id: u64</code>
 </dt>
 <dd>
 
@@ -632,6 +667,32 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_id_type">new_order_id_type</a>(order_id: u128): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> {
     <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_new_account_client_order_id"></a>
+
+## Function `new_account_client_order_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64
+): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
+    <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
 }
 </code></pre>
 

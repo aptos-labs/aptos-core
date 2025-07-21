@@ -24,6 +24,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::order_book`](order_book.md#0x7_order_book)
 -  [`0x7::order_book_types`](order_book_types.md#0x7_order_book_types)
 -  [`0x7::pending_order_book_index`](pending_order_book_index.md#0x7_pending_order_book_index)
+-  [`0x7::pre_cancellation_tracker`](pre_cancellation_tracker.md#0x7_pre_cancellation_tracker)
 -  [`0x7::ristretto255_twisted_elgamal`](ristretto255_twisted_elgamal.md#0x7_ristretto255_twisted_elgamal)
 -  [`0x7::sigma_protos`](sigma_protos.md#0x7_sigma_protos)
 -  [`0x7::test_derivable_account_abstraction_ed25519_hex`](test_derivable_account_abstraction_ed25519_hex.md#0x7_test_derivable_account_abstraction_ed25519_hex)
