@@ -401,7 +401,7 @@ async fn test_data_stream_state_values() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
+        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof().into_parts().0),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 
@@ -473,7 +473,7 @@ async fn test_data_stream_transactions() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionsWithProof(create_transaction_list_with_proof()),
+        DataPayload::TransactionsWithProof(create_transaction_list_with_proof().into_parts().0),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 
@@ -1230,7 +1230,7 @@ async fn test_snapshot_sync_existing_state() {
     // Send an invalid notification (incorrect data type)
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof()),
+        DataPayload::TransactionOutputsWithProof(create_output_list_with_proof().into_parts().0),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 

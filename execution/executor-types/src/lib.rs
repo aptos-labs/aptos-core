@@ -15,8 +15,8 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_key::StateKey,
     transaction::{
-        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
@@ -47,7 +47,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     #[cfg(any(test, feature = "fuzzing"))]
     fn execute_chunk(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -62,7 +62,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     #[cfg(any(test, feature = "fuzzing"))]
     fn apply_chunk(
         &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
+        txn_output_list_with_proof: TransactionOutputListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -82,7 +82,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     /// transaction accumulator.
     fn enqueue_chunk_by_execution(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
@@ -92,7 +92,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     /// transaction outputs directly to get the executed result.
     fn enqueue_chunk_by_transaction_outputs(
         &self,
-        txn_output_list_with_proof: TransactionOutputListWithProof,
+        txn_output_list_with_proof: TransactionOutputListWithProofV2,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
