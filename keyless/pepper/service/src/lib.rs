@@ -403,7 +403,7 @@ async fn process_common(
     ) // Signature verification happens here.
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
-    // If the pepper request is is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    // If the pepper request is from an account manager, and has a target aud specified, compute the pepper for the target aud.
     let mut aud_overridden = false;
     let mut final_aud = claims.claims.aud.clone();
     if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {

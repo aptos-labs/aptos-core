@@ -298,7 +298,7 @@ impl Mempool {
         // The time at which the transaction was inserted into the mempool of the
         // downstream node (sender of the mempool transaction) in millis since epoch
         ready_time_at_sender: Option<u64>,
-        // The prority of this node for the peer that sent the transaction
+        // The priority of this node for the peer that sent the transaction
         priority: Option<BroadcastPeerPriority>,
     ) -> MempoolStatus {
         trace!(
