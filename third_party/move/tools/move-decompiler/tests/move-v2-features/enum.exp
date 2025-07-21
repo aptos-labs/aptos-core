@@ -143,5 +143,4 @@ module 0x99::enum_simple {
     }
 }
 
-
 ============ recompilation succeeded ========

@@ -65,5 +65,4 @@ module 0x1::bit_vector {
     }
 }
 
-
 ============ recompilation succeeded ========

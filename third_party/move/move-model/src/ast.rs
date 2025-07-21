@@ -1319,6 +1319,31 @@ impl ExpData {
         LoopNestRewriter {
             loop_depth: 0,
             delta,
+            rewrite: Self::default_nest_rewrite,
+        }
+        .rewrite_exp(self.clone().into_exp())
+    }
+
+    fn default_nest_rewrite(exp: Exp, _: usize, nest: usize, cont: bool, delta: isize) -> Exp {
+        let new_nest = (nest as isize) + delta;
+        assert!(
+            new_nest >= 0,
+            "loop removed which has break/continue references?"
+        );
+        ExpData::LoopCont(exp.node_id(), new_nest as usize, cont).into_exp()
+    }
+
+    /// A customizable version of `rewrite_loop_nest`, allowing to specify how
+    /// the rewriting is done.
+    pub fn customizable_rewrite_loop_nest(
+        &self,
+        delta: isize,
+        rewrite: fn(Exp, usize, usize, bool, isize) -> Exp,
+    ) -> Exp {
+        LoopNestRewriter {
+            loop_depth: 0,
+            delta,
+            rewrite,
         }
         .rewrite_exp(self.clone().into_exp())
     }
@@ -1853,18 +1878,14 @@ impl ExpRewriterFunctions for ExpRewriter<'_> {
 struct LoopNestRewriter {
     loop_depth: usize,
     delta: isize,
+    rewrite: fn(Exp, usize, usize, bool, isize) -> Exp, // args: expression, current loop depth, nest of the loop-cont, whether it is a continue, delta to be adjusted on the nest
 }
 
 impl ExpRewriterFunctions for LoopNestRewriter {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match exp.as_ref() {
-            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
-                let new_nest = (*nest as isize) + self.delta;
-                assert!(
-                    new_nest >= 0,
-                    "loop removed which has break/continue references?"
-                );
-                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
+            ExpData::LoopCont(_, nest, cont) if *nest >= self.loop_depth => {
+                (self.rewrite)(exp.clone(), self.loop_depth, *nest, *cont, self.delta)
             },
             ExpData::Loop(_, _) => {
                 self.loop_depth += 1;

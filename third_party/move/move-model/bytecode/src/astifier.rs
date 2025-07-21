@@ -864,7 +864,10 @@ impl Generator {
         }) {
             // Insert nested in the other block.
             self.block_stack
-                .insert(self.block_stack.len() - idx, block_info)
+                .insert(self.block_stack.len() - idx, block_info);
+            // This block can become a new loop between an inner `LoopCont` and its target `Loop`.
+            // We need to increase the `LoopCont`'s nest depth to account for the new loop.
+            self.adjust_loop_nest_depth(idx)
         } else {
             // Insert at top-level, beneath the virtual root block
             self.block_stack.insert(1, block_info)
@@ -876,6 +879,58 @@ impl Generator {
     fn label_comes_after(&self, ctx: &Context, label: Label, other_label: Label) -> bool {
         self.block_order[&ctx.block_of_label(label)]
             > self.block_order[&ctx.block_of_label(other_label)]
+    }
+
+    /// Adjust the nest depth of `LoopCont` statements that are affected by a newly inserted block (which is expected to be a loop)
+    /// Given the following pattern
+    /// ```Move
+    /// Loop_n {
+    ///     ...
+    ///   Loop_1 {
+    ///     Loop_0 {
+    ///       LoopCont[x]
+    ///     }
+    ///   }
+    /// }
+    /// and assuming we insert a new block `Loop_t`
+    /// - 0 <= `t` <= n, and is represented by the function argument `idx` below.
+    /// - If `t` <= `x`, we rewrite ` LoopCont[x]` to `LoopCont[x + 1]`.
+    ///     - Why: the pattern above means the new block is inserted between the `LoopCont` and its target loop,
+    ///       so we must increase the loop nest depth of `LoopCont` to make sure it refers to the right loop.
+    ///
+    fn adjust_loop_nest_depth(&mut self, idx: usize) {
+        for (i, inner) in self.block_stack.iter_mut().rev().enumerate() {
+            // We only need to worry about the `LoopCont` statements nested inside the newly added block.
+            if i < idx {
+                // Iterate over all statements in an inner loop
+                for val in inner.stms.iter_mut() {
+                    // A customized loop nest rewrite function where
+                    // - `nest - loop_depth` represents `x` in the pattern above
+                    // - `delta` represents `t` in the pattern above
+                    let rewrite = |exp: Exp,
+                                   loop_depth: usize,
+                                   nest: usize,
+                                   cont: bool,
+                                   delta: isize|
+                     -> Exp {
+                        let x = (nest - loop_depth) as isize;
+                        let increase = x - delta;
+
+                        if increase >= 0 {
+                            ExpData::LoopCont(exp.node_id(), nest + 1, cont).into_exp()
+                        } else {
+                            exp.clone()
+                        }
+                    };
+
+                    // Rewrite a statement where `idx - i` tells the distance between the target `LoopCont` and the newly added block,
+                    //   representing `delta`.
+                    *val = val
+                        .clone()
+                        .customizable_rewrite_loop_nest((idx - i) as isize, rewrite)
+                }
+            }
+        }
     }
 
     fn find_continue_nest(&self, _ctx: &Context, label: Label) -> Option<usize> {

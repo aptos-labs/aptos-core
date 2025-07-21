@@ -10,14 +10,28 @@ module 0x1::vector {
     public fun contains<Element>(self: &vector<Element>, e: &Element): bool {
         let _t2;
         _t2 = 0;
-        while (!(!(_t2 < length<Element>(self)) || borrow<Element>(self, _t2) == e)) _t2 = _t2 + 1;
-        true
+        'l0: loop {
+            loop {
+                if (!(_t2 < length<Element>(self))) break 'l0;
+                if (borrow<Element>(self, _t2) == e) break;
+                _t2 = _t2 + 1
+            };
+            return true
+        };
+        false
     }
     public fun index_of<Element>(self: &vector<Element>, e: &Element): (bool, u64) {
         let _t2;
         _t2 = 0;
-        while (!(!(_t2 < length<Element>(self)) || borrow<Element>(self, _t2) == e)) _t2 = _t2 + 1;
-        (true, _t2)
+        'l0: loop {
+            loop {
+                if (!(_t2 < length<Element>(self))) break 'l0;
+                if (borrow<Element>(self, _t2) == e) break;
+                _t2 = _t2 + 1
+            };
+            return (true, _t2)
+        };
+        (false, 0)
     }
     public fun range(start: u64, end: u64): vector<u64> {
         range_with_step(start, end, 1)
@@ -154,9 +168,9 @@ module 0x1::vector {
 --- unable to recompile the decompiled code:
 exiting with stackless-bytecode checks failed
 error: cannot freeze value which is still mutably borrowed
-   ┌─ vector.move:40:67
+   ┌─ vector.move:54:67
    │
-40 │         reverse_slice<Element>(self, 0, length<Element>(/*freeze*/self));
+54 │         reverse_slice<Element>(self, 0, length<Element>(/*freeze*/self));
    │         ----------------------------------------------------------^^^^--
    │         │                      │                                  │
    │         │                      │                                  implicitly frozen here
@@ -164,9 +178,9 @@ error: cannot freeze value which is still mutably borrowed
    │         conflicting reference used here
 
 error: cannot freeze value which is still mutably borrowed
-    ┌─ vector.move:103:71
+    ┌─ vector.move:117:71
     │
-103 │         rotate_slice<Element>(self, 0, rot, length<Element>(/*freeze*/self))
+117 │         rotate_slice<Element>(self, 0, rot, length<Element>(/*freeze*/self))
     │         --------------------------------------------------------------^^^^--
     │         │                     │                                       │
     │         │                     │                                       implicitly frozen here
@@ -174,9 +188,9 @@ error: cannot freeze value which is still mutably borrowed
     │         conflicting reference used here
 
 error: cannot freeze value which is still mutably borrowed
-    ┌─ vector.move:131:58
+    ┌─ vector.move:145:58
     │
-131 │         swap<Element>(self, i, length<Element>(/*freeze*/self) - 1);
+145 │         swap<Element>(self, i, length<Element>(/*freeze*/self) - 1);
     │         -------------------------------------------------^^^^------
     │         │             │                                  │
     │         │             │                                  implicitly frozen here

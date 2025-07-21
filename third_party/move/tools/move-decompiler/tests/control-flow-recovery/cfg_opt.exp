@@ -17,5 +17,4 @@ module 0x99::cfg_opt_simple {
     }
 }
 
-
 ============ recompilation succeeded ========
