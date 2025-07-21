@@ -15,7 +15,7 @@ use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
-use move_asm::{self, ModuleOrScript};
+use move_asm::assembler;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
@@ -242,6 +242,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         language_version,
                         experiments,
                         vm_config: _,
+                        use_masm: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -318,6 +319,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         language_version,
                         experiments: v2_experiments,
                         vm_config: _,
+                        use_masm: _,
                     } => compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -386,12 +388,22 @@ pub trait MoveTestAdapter<'a>: Sized {
                     PrintBytecodeInputChoice::Script => {
                         let (script, _warning_opt) =
                             self.compile_script(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_script(String::new(), &script)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Script(&script))
+                                .disassemble()?
+                        }
                     },
                     PrintBytecodeInputChoice::Module => {
                         let (_data, _named_addr_opt, module, _warnings_opt) =
                             self.compile_module(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_module(String::new(), &module)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Module(&module))
+                                .disassemble()?
+                        }
                     },
                 };
                 Ok(Some(result))
@@ -409,10 +421,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 self.register_temp_filename(&data);
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_module(String::new(), &module)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
@@ -461,10 +477,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (script, warning_opt) =
                     self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Script(&script));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_script(String::new(), &script)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
@@ -877,11 +897,11 @@ fn compile_asm_script<'a>(
 fn compile_asm<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
     path: &str,
-) -> Result<ModuleOrScript> {
-    let options = move_asm::Options::default();
+) -> Result<assembler::ModuleOrScript> {
+    let options = assembler::Options::default();
     let source = fs::read_to_string(path)?;
-    move_asm::assemble(&options, &source, deps)
-        .map_err(|diags| anyhow!(move_asm::diag_to_string("test", &source, diags)))
+    assembler::assemble(&options, &source, deps)
+        .map_err(|diags| anyhow!(assembler::diag_to_string("test", &source, diags)))
 }
 
 pub fn run_test_impl<'a, Adapter>(

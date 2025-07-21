@@ -3,24 +3,21 @@ processed 1 task
 task 0 'publish'. lines 1-14:
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.test {
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+fun f(l0: u64)
+l1: copy_loc l0
+    ld_u64 0
+    gt
+    br_false l0
+    copy_loc l0
+    // @5
+    ld_u64 1
+    sub
+    st_loc l0
+    branch l1
+l0: ret
 
 
-f(Arg0: u64) /* def_idx: 0 */ {
-B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: LdU64(0)
-	2: Gt
-	3: BrFalse(9)
-B1:
-	4: CopyLoc[0](Arg0: u64)
-	5: LdU64(1)
-	6: Sub
-	7: StLoc[0](Arg0: u64)
-	8: Branch(0)
-B2:
-	9: Ret
-}
-}
 == END Bytecode ==

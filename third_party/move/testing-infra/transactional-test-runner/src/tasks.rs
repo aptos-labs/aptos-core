@@ -207,7 +207,8 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
-    /// Select Move source ("move") source or MoveIR ("mvir").  Is inferred from filename if absent.
+    /// Select Move source ("move"), MoveIR ("mvir"), or Move Assembler ("masm").  Is inferred
+    /// from filename if absent.
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
 }

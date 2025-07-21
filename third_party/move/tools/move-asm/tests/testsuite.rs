@@ -22,7 +22,8 @@ fn main() {
         .map(|p| {
             let prompt = format!("move-asm-txn::{}", p.display());
             Trial::test(prompt, move || {
-                vm_test_harness::run_test(&p).map_err(|err| format!("{:?}", err).into())
+                vm_test_harness::run_test_print_bytecode_with_masm(&p)
+                    .map_err(|err| format!("{:?}", err).into())
             })
         })
         .collect_vec();
