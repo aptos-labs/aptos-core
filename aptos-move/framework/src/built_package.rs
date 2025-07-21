@@ -431,6 +431,16 @@ impl BuiltPackage {
             .collect()
     }
 
+    /// Returns an iterator over the bytecode for the modules of the built package, along with the
+    /// module names.
+    pub fn module_code_iter<'a>(&'a self) -> impl Iterator<Item = (String, Vec<u8>)> + 'a {
+        self.package.root_modules().map(|unit_with_source| {
+            let bytecode_version = self.options.inferred_bytecode_version();
+            let code = unit_with_source.unit.serialize(Some(bytecode_version));
+            (unit_with_source.unit.name().as_str().to_string(), code)
+        })
+    }
+
     /// Returns the abis for this package, if available.
     pub fn extract_abis(&self) -> Option<Vec<EntryABI>> {
         self.package.compiled_abis.as_ref().map(|abis| {

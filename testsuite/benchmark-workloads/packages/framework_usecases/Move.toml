@@ -1,0 +1,12 @@
+[package]
+name = "framework_usecases"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../aptos-move/framework/aptos-framework" }
+AptosToken = { local = "../../../../aptos-move/framework/aptos-token" }
+AptosTokenObjects = { local = "../../../../aptos-move/framework/aptos-token-objects" }
+
+# testing exchanging of constant address works as well.
+[addresses]
+publisher_address = "0xABCD"
