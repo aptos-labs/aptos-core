@@ -321,7 +321,7 @@ fn recompile_decompiled_code(
         .collect();
 
     run_move_compiler_for_analysis(error_writer, compiler_options)?;
-    Ok("\n============ recompilation succeeded ========\n".to_string())
+    Ok("============ recompilation succeeded ========\n".to_string())
 }
 
 /// Get a list of dependencies that exclude the target file itself

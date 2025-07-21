@@ -1316,9 +1316,34 @@ impl ExpData {
     ///
     /// If this is needed elsewhere we can move it out, currently it's a local helper.
     pub fn rewrite_loop_nest(&self, delta: isize) -> Exp {
+        self.customizable_rewrite_loop_nest(delta, Self::default_nest_rewrite)
+    }
+
+    /// A commonly used rewriter for adjusting nesting level of `LoopCont`
+    /// - `exp`: the target `LoopCont` expression to rewrite
+    /// - `nest`: the current nesting level of the loop
+    /// - `cont`: whether this is a `continue` or `break`
+    /// - `delta`: the delta to add to the nesting level; cound be negative
+    fn default_nest_rewrite(exp: Exp, _: usize, nest: usize, cont: bool, delta: isize) -> Exp {
+        let new_nest = (nest as isize) + delta;
+        assert!(
+            new_nest >= 0,
+            "loop removed which has break/continue references?"
+        );
+        ExpData::LoopCont(exp.node_id(), new_nest as usize, cont).into_exp()
+    }
+
+    /// A customizable version of `rewrite_loop_nest`, allowing to specify how
+    /// the rewriting is done.
+    pub fn customizable_rewrite_loop_nest(
+        &self,
+        delta: isize,
+        rewrite: fn(Exp, usize, usize, bool, isize) -> Exp,
+    ) -> Exp {
         LoopNestRewriter {
             loop_depth: 0,
             delta,
+            rewrite,
         }
         .rewrite_exp(self.clone().into_exp())
     }
@@ -1853,18 +1878,15 @@ impl ExpRewriterFunctions for ExpRewriter<'_> {
 struct LoopNestRewriter {
     loop_depth: usize,
     delta: isize,
+    /// Args: target `LoopCont` expression, current depth of loop, nest level of `LoopCont`, continue or not, delta to add to nest level
+    rewrite: fn(Exp, usize, usize, bool, isize) -> Exp,
 }
 
 impl ExpRewriterFunctions for LoopNestRewriter {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match exp.as_ref() {
-            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
-                let new_nest = (*nest as isize) + self.delta;
-                assert!(
-                    new_nest >= 0,
-                    "loop removed which has break/continue references?"
-                );
-                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
+            ExpData::LoopCont(_, nest, cont) if *nest >= self.loop_depth => {
+                (self.rewrite)(exp.clone(), self.loop_depth, *nest, *cont, self.delta)
             },
             ExpData::Loop(_, _) => {
                 self.loop_depth += 1;
