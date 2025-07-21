@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.6.1]
+- Enable function values in the compiler by setting default language version to 2.2 and byte code version to 8.
+
 ## [7.6.0]
 - Sets up confidential assets for localnet under the experimental address 0x7
 
