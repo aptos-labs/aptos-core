@@ -30,7 +30,7 @@ use move_binary_format::{
     },
     file_format_common::VERSION_DEFAULT,
     internals::ModuleIndex,
-    module_to_script::convert_module_to_script,
+    module_script_conversion::module_into_script,
     views::{
         FunctionDefinitionView, FunctionHandleView, ModuleHandleView, ModuleView,
         StructDefinitionView, StructHandleView,
@@ -216,7 +216,7 @@ impl<'a> ModuleBuilder<'a> {
     /// Return result as a script.
     pub fn into_script(self) -> Result<CompiledScript> {
         if let Some(handle) = self.main_handle.replace(None) {
-            convert_module_to_script(self.into_module()?, handle)
+            module_into_script(self.into_module()?, handle)
         } else {
             bail!("a script cannot be built from a module")
         }
