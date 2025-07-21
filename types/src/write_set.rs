@@ -561,15 +561,18 @@ impl Debug for HotStateOp {
 }
 
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
-pub enum WriteSet {
-    Value(ValueWriteSet),
-    /// TODO(HotState): this variant silently serializes to an empty ValueWriteSet for now.
-    Hotness(BTreeMap<StateKey, HotStateOp>),
+pub struct WriteSet {
+    value: ValueWriteSet,
+    /// TODO(HotState): this variant is not serialized for now.
+    hotness: BTreeMap<StateKey, HotStateOp>,
 }
 
 impl Default for WriteSet {
     fn default() -> Self {
-        Self::Value(ValueWriteSet::default())
+        Self {
+            value: ValueWriteSet::default(),
+            hotness: BTreeMap::new(),
+        }
     }
 }
 
@@ -578,10 +581,7 @@ impl Serialize for WriteSet {
     where
         S: Serializer,
     {
-        match self {
-            WriteSet::Value(ws) => ws.serialize(serializer),
-            WriteSet::Hotness(_hot_state_ops) => ValueWriteSet::default().serialize(serializer),
-        }
+        self.value.serialize(serializer)
     }
 }
 
@@ -590,33 +590,30 @@ impl<'de> Deserialize<'de> for WriteSet {
     where
         D: Deserializer<'de>,
     {
-        let ws = ValueWriteSet::deserialize(deserializer)?;
-        Ok(WriteSet::Value(ws))
+        let value = ValueWriteSet::deserialize(deserializer)?;
+        Ok(Self {
+            value,
+            hotness: BTreeMap::new(),
+        })
     }
 }
 
 impl WriteSet {
     pub fn expect_into_v0(self) -> WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        match self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
     pub fn expect_v0(&self) -> &WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        match &self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
     pub fn expect_v0_mut(&mut self) -> &mut WriteSetV0 {
-        match self {
-            WriteSet::Value(ValueWriteSet::V0(ws)) => ws,
-            // TODO(HotState):
-            WriteSet::Hotness(_) => panic!("hot state ops touched unexpectedly"),
+        match &mut self.value {
+            ValueWriteSet::V0(ws) => ws,
         }
     }
 
