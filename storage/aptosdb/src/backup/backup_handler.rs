@@ -62,6 +62,10 @@ impl BackupHandler {
             .ledger_db
             .write_set_db()
             .get_write_set_iter(start_version, num_transactions)?;
+        let mut persisted_aux_info_iter = self
+            .ledger_db
+            .persisted_auxiliary_info_db()
+            .get_persisted_auxiliary_info_iter(start_version, num_transactions)?;
 
         let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
@@ -85,7 +89,14 @@ impl BackupHandler {
                     version
                 ))
             })??;
+            let _persisted_aux_info = persisted_aux_info_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "PersistedAuxiliaryInfo not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
             BACKUP_TXN_VERSION.set(version as i64);
+            // TODO(grao): Returns persisted aux info.
             Ok((txn, txn_info, event_vec, write_set))
         });
         Ok(zipped)

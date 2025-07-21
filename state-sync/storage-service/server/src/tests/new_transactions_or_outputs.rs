@@ -35,16 +35,13 @@ async fn test_get_new_transactions_or_outputs() {
                     peer_version + 1,
                     highest_version,
                     highest_version,
+                    use_request_v2,
                 );
                 let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                     peer_version + 1,
                     highest_version,
                     highest_version,
                     false,
-                );
-                let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                    peer_version + 1,
-                    highest_version,
                     use_request_v2,
                 );
 
@@ -59,8 +56,6 @@ async fn test_get_new_transactions_or_outputs() {
                     highest_version - peer_version,
                     highest_version,
                     output_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
                 if fallback_to_transactions {
                     utils::expect_get_transactions(
@@ -70,8 +65,6 @@ async fn test_get_new_transactions_or_outputs() {
                         highest_version,
                         false,
                         transaction_list_with_proof.clone(),
-                        use_request_v2,
-                        persisted_auxiliary_infos.clone(),
                     );
                 }
 
@@ -122,7 +115,6 @@ async fn test_get_new_transactions_or_outputs() {
                         Some(transaction_list_with_proof),
                         None,
                         highest_ledger_info,
-                        persisted_auxiliary_infos,
                     )
                     .await;
                 } else {
@@ -133,7 +125,6 @@ async fn test_get_new_transactions_or_outputs() {
                         None,
                         Some(output_list_with_proof),
                         highest_ledger_info,
-                        persisted_auxiliary_infos,
                     )
                     .await;
                 }
@@ -164,32 +155,26 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                     peer_version_1 + 1,
                     highest_version,
                     highest_version,
+                    use_request_v2,
                 );
                 let output_list_with_proof_2 = utils::create_output_list_with_proof(
                     peer_version_2 + 1,
                     highest_version,
                     highest_version,
+                    use_request_v2,
                 );
                 let transaction_list_with_proof_1 = utils::create_transaction_list_with_proof(
                     peer_version_1 + 1,
                     highest_version,
                     highest_version,
                     false,
+                    use_request_v2,
                 );
                 let transaction_list_with_proof_2 = utils::create_transaction_list_with_proof(
                     peer_version_2 + 1,
                     highest_version,
                     highest_version,
                     false,
-                );
-                let persisted_auxiliary_infos_1 = utils::create_persisted_auxiliary_infos(
-                    peer_version_1 + 1,
-                    highest_version,
-                    use_request_v2,
-                );
-                let persisted_auxiliary_infos_2 = utils::create_persisted_auxiliary_infos(
-                    peer_version_2 + 1,
-                    highest_version,
                     use_request_v2,
                 );
 
@@ -204,8 +189,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                     highest_version - peer_version_1,
                     highest_version,
                     output_list_with_proof_1.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos_1.clone(),
                 );
                 utils::expect_get_transaction_outputs(
                     &mut db_reader,
@@ -213,8 +196,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                     highest_version - peer_version_2,
                     highest_version,
                     output_list_with_proof_2.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos_2.clone(),
                 );
                 if fallback_to_transactions {
                     utils::expect_get_transactions(
@@ -224,8 +205,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         highest_version,
                         false,
                         transaction_list_with_proof_1.clone(),
-                        use_request_v2,
-                        persisted_auxiliary_infos_1.clone(),
                     );
                     utils::expect_get_transactions(
                         &mut db_reader,
@@ -234,8 +213,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         highest_version,
                         false,
                         transaction_list_with_proof_2.clone(),
-                        use_request_v2,
-                        persisted_auxiliary_infos_2.clone(),
                     );
                 }
 
@@ -303,7 +280,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         Some(transaction_list_with_proof_1.clone()),
                         None,
                         highest_ledger_info.clone(),
-                        persisted_auxiliary_infos_1.clone(),
                     )
                     .await;
                     utils::verify_new_transactions_or_outputs_with_proof(
@@ -313,7 +289,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         Some(transaction_list_with_proof_2.clone()),
                         None,
                         highest_ledger_info,
-                        persisted_auxiliary_infos_2.clone(),
                     )
                     .await;
                 } else {
@@ -324,7 +299,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         None,
                         Some(output_list_with_proof_1.clone()),
                         highest_ledger_info.clone(),
-                        persisted_auxiliary_infos_1.clone(),
                     )
                     .await;
                     utils::verify_new_transactions_or_outputs_with_proof(
@@ -334,7 +308,6 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                         None,
                         Some(output_list_with_proof_2.clone()),
                         highest_ledger_info,
-                        persisted_auxiliary_infos_2.clone(),
                     )
                     .await;
                 }
@@ -393,16 +366,13 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
                 peer_version + 1,
                 epoch_change_version,
                 epoch_change_version,
+                use_request_v2,
             );
             let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                 peer_version + 1,
                 epoch_change_version,
                 epoch_change_version,
                 false,
-            );
-            let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                peer_version + 1,
-                epoch_change_version,
                 use_request_v2,
             );
 
@@ -423,8 +393,6 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
                 epoch_change_version - peer_version,
                 epoch_change_version,
                 output_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
             if fallback_to_transactions {
                 utils::expect_get_transactions(
@@ -434,8 +402,6 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
                     epoch_change_version,
                     false,
                     transaction_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
             }
 
@@ -482,7 +448,6 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
                     Some(transaction_list_with_proof),
                     None,
                     epoch_change_proof.ledger_info_with_sigs[0].clone(),
-                    persisted_auxiliary_infos.clone(),
                 )
                 .await;
             } else {
@@ -493,7 +458,6 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
                     None,
                     Some(output_list_with_proof),
                     epoch_change_proof.ledger_info_with_sigs[0].clone(),
-                    persisted_auxiliary_infos.clone(),
                 )
                 .await;
             }
@@ -520,16 +484,13 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
                 peer_version + 1,
                 peer_version + max_transaction_output_chunk_size,
                 highest_version,
+                use_request_v2,
             );
             let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                 peer_version + 1,
                 peer_version + max_transaction_output_chunk_size,
                 peer_version + max_transaction_output_chunk_size,
                 false,
-            );
-            let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                peer_version + 1,
-                peer_version + max_transaction_output_chunk_size,
                 use_request_v2,
             );
 
@@ -546,8 +507,6 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
                     (max_transaction_output_chunk_size as u32 / (u32::pow(2, i as u32))) as u64,
                     highest_version,
                     output_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
             }
             if fallback_to_transactions {
@@ -558,8 +517,6 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
                     highest_version,
                     false,
                     transaction_list_with_proof.clone(),
-                    use_request_v2,
-                    persisted_auxiliary_infos.clone(),
                 );
             }
 
@@ -610,7 +567,6 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
                     Some(transaction_list_with_proof),
                     None,
                     highest_ledger_info,
-                    persisted_auxiliary_infos.clone(),
                 )
                 .await;
             } else {
@@ -621,7 +577,6 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
                     None,
                     Some(output_list_with_proof),
                     highest_ledger_info,
-                    persisted_auxiliary_infos.clone(),
                 )
                 .await;
             }

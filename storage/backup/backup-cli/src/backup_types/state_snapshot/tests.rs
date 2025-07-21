@@ -46,6 +46,8 @@ fn end_to_end() {
     let state_root_hash = src_db
         .get_transactions(version, 1, version, false)
         .unwrap()
+        .into_parts()
+        .0
         .proof
         .transaction_infos
         .pop()
