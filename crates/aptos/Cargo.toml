@@ -85,6 +85,7 @@ poem = { workspace = true }
 # https://github.com/aptos-labs/aptos-core/pull/12568
 # processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "5244b84fa5ed872e5280dc8df032d744d62ad29d", default-features = false }
 rand = { workspace = true }
+regex = { workspace = true }
 reqwest = { workspace = true }
 self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = ["archive-zip", "compression-zip-deflate"] }
 serde = { workspace = true }

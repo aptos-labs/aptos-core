@@ -305,6 +305,7 @@ dependencies = [
  "pathsearch",
  "poem",
  "rand 0.7.3",
+ "regex",
  "reqwest",
  "self_update",
  "serde",
