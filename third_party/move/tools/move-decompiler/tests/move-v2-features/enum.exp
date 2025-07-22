@@ -139,7 +139,8 @@ module 0x99::enum_simple {
         _t2
     }
     fun example_destroy_shapes() {
-        ()
+        destroy_empty(Shape::Circle{radius: 0});
+        destroy_empty(Shape::Rectangle{width: 0,height: 0});
     }
 }
 
