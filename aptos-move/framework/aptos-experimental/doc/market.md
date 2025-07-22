@@ -229,7 +229,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
  Whether to allow sending all events for the markett
 </dd>
 <dt>
-<code>pre_cancellation_window_micros: u64</code>
+<code>pre_cancellation_window_secs: u64</code>
 </dt>
 <dd>
  Pre cancellation window in microseconds
@@ -342,7 +342,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 </dd>
 <dt>
-<code>metadata: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>metadata_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -850,7 +850,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_new_market_config">new_market_config</a>(allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_micros: u64): <a href="market.md#0x7_market_MarketConfig">market::MarketConfig</a>
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_new_market_config">new_market_config</a>(allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64): <a href="market.md#0x7_market_MarketConfig">market::MarketConfig</a>
 </code></pre>
 
 
@@ -860,12 +860,12 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_new_market_config">new_market_config</a>(
-    allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_micros: u64
+    allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
 ): <a href="market.md#0x7_market_MarketConfig">MarketConfig</a> {
     MarketConfig::V1 {
         allow_self_trade: allow_self_matching,
         allow_events_emission,
-        pre_cancellation_window_micros,
+        pre_cancellation_window_secs,
     }
 }
 </code></pre>
@@ -894,7 +894,7 @@ TimeBased(time): The order is triggered when the current time is greater than or
 ): <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt; {
     // requiring signers, and not addresses, purely <b>to</b> guarantee different dexes
     // cannot polute events <b>to</b> each other, accidentally or maliciously.
-    <b>let</b> pre_cancellation_window = config.pre_cancellation_window_micros;
+    <b>let</b> pre_cancellation_window = config.pre_cancellation_window_secs;
     <b>let</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a> = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>();
     <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a>.add(
         <a href="market.md#0x7_market_PRE_CANCELLATION_TRACKER_KEY">PRE_CANCELLATION_TRACKER_KEY</a>,
@@ -1279,7 +1279,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
-        <b>let</b> metadata_str = callbacks.get_order_metadata_string(metadata);
+        <b>let</b> metadata_bytes = callbacks.get_order_metadata_bytes(metadata);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="market.md#0x7_market_OrderEvent">OrderEvent</a> {
                 parent: self.parent,
@@ -1295,7 +1295,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 is_taker,
                 status,
                 details: *details,
-                metadata: metadata_str
+                metadata_bytes
             }
         );
     };
@@ -1794,6 +1794,7 @@ of fill limit violation  in the previous transaction and the order is just a con
 
     <b>if</b> (client_order_id.is_some()) {
         <b>if</b> (self.<a href="order_book.md#0x7_order_book">order_book</a>.client_order_id_exists(user_addr, client_order_id.destroy_some())) {
+            // Client provided a client order id that already <b>exists</b> in the order book
             <b>return</b> self.<a href="market.md#0x7_market_cancel_order_internal">cancel_order_internal</a>(
                 user_addr,
                 limit_price,
@@ -1889,7 +1890,7 @@ of fill limit violation  in the previous transaction and the order is just a con
         <b>if</b> (taker_cancellation_reason.is_some()) {
             <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
                 order_id,
-                remaining_size,
+                remaining_size: 0, // 0 because the order is cancelled
                 cancel_reason: taker_cancellation_reason,
                 fill_sizes
             }
