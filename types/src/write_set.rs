@@ -685,6 +685,14 @@ impl WriteSet {
                 },
             )
     }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
+    }
 }
 
 /// `WriteSet` contains all access paths that one transaction modifies. Each of them is a `WriteOp`
