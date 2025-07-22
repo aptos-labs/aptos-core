@@ -29,8 +29,8 @@ use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalRequestV2,
-        BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY, NUM_RETRIES,
-        RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
+        BlockRetrievalResponse, BlockRetrievalStatus, MAX_NUM_PEERS_MISSING_BLOCK_ID,
+        NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -660,7 +660,9 @@ impl BlockRetriever {
     ) -> anyhow::Result<BlockRetrievalResponse> {
         let mut failed_attempt = 0_u32;
         let mut cur_retry = 0;
+        let mut block_id_not_found_count = 0;
 
+        let max_peers_missing_block_id = min(peers.len(), MAX_NUM_PEERS_MISSING_BLOCK_ID);
         let num_retries = NUM_RETRIES;
         let request_num_peers = NUM_PEERS_PER_RETRY;
         let retry_interval = Duration::from_millis(RETRY_INTERVAL_MSEC);
@@ -710,14 +712,14 @@ impl BlockRetriever {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        // send batch request to a set of peers of size request_num_peers (or 1 for the first time)
+                        // send batch request to a set of peers of size request_num_peers (or 2 for the first time)
                         let next_peers = if cur_retry < num_retries {
                             let first_attempt = cur_retry == 0;
                             cur_retry += 1;
                             self.pick_peers(
                                 first_attempt,
                                 &mut peers,
-                                if first_attempt { 1 } else {request_num_peers}
+                                if first_attempt { 2 } else {request_num_peers}
                             )
                         } else {
                             Vec::new()
@@ -747,7 +749,22 @@ impl BlockRetriever {
                     }
                     Some((peer, response)) = futures.next() => {
                         match response {
-                            Ok(result) => return Ok(result),
+                            Ok(result) => {
+                                match result.status() {
+                                    BlockRetrievalStatus::IdNotFound => {
+                                        warn!(remote_peer = peer, block_id = block_id, "Block Id could not be found on peer");
+                                        block_id_not_found_count += 1;
+                                        if block_id_not_found_count >= max_peers_missing_block_id {
+                                            return Ok(result);
+                                        }
+                                    },
+                                    BlockRetrievalStatus::NotEnoughBlocks => {
+                                        warn!(remote_peer = peer, block_id = block_id, "All required blocks couldn't be fetched from peer");
+                                        return Ok(result);
+                                    },
+                                    _ => return Ok(result),
+                                }
+                            },
                             e => {
                                 warn!(
                                     remote_peer = peer,

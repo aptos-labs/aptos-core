@@ -14,6 +14,7 @@ pub const NUM_RETRIES: usize = 5;
 pub const NUM_PEERS_PER_RETRY: usize = 3;
 pub const RETRY_INTERVAL_MSEC: u64 = 500;
 pub const RPC_TIMEOUT_MSEC: u64 = 5000;
+pub const MAX_NUM_PEERS_MISSING_BLOCK_ID: usize = 10;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockRetrievalRequest {

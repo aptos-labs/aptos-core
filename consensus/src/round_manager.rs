@@ -432,8 +432,7 @@ impl RoundManager {
             .push(new_round_event.reason.clone());
 
         // Process pending opt proposal for the new round.
-        // The existence of pending optimistic proposal and being the current proposer are mutually
-        // exclusive. Note that the opt proposal is checked for valid proposer before inserting into
+        // Note that the opt proposal is checked for valid proposer before inserting into
         // the pending queue.
         if let Some(opt_proposal) = self.pending_opt_proposals.remove(&new_round) {
             self.opt_proposal_loopback_tx
@@ -442,7 +441,8 @@ impl RoundManager {
                 .expect("Sending to a self loopback unbounded channel cannot fail");
         }
 
-        // If the current proposer is the leading, try to propose a regular block if not opt proposed already
+        // If the current proposer is the leading, try to propose a regular block if not opt
+        // proposed already
         if is_current_proposer
             && self
                 .proposal_generator
