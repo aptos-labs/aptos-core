@@ -10,7 +10,7 @@ use move_binary_format::{
         AddressSpecifier, CompiledModule, CompiledScript, FunctionHandle, IdentifierIndex,
         ResourceSpecifier, Signature, SignatureIndex, SignatureToken, TableIndex,
     },
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_7, VERSION_MAX},
 };
 use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
@@ -125,7 +125,7 @@ fn simple_script_round_trip_version_failure() {
     let s = simple_script_with_access_specifiers();
     let mut serialized = Vec::with_capacity(2048);
     let err = s
-        .serialize_for_version(Some(VERSION_DEFAULT), &mut serialized)
+        .serialize_for_version(Some(VERSION_7), &mut serialized)
         .expect_err("serialization should not work");
     assert!(err
         .to_string()
