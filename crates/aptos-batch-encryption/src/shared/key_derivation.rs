@@ -17,6 +17,7 @@ use anyhow::Result;
 
 
 pub struct BIBEMasterSecretKeyShare {
+    mpk_g2: G2Affine,
     shamir_share: ShamirShare,
     player: Player,
 }
@@ -81,7 +82,7 @@ pub fn keygen<R: RngCore + CryptoRng>(
         .zip(players.clone())
         .map(|(shamir_share, player)| 
             (
-                BIBEMasterSecretKeyShare { shamir_share, player },
+                BIBEMasterSecretKeyShare { mpk_g2: mpk.0, shamir_share, player },
                 BIBEVerificationKey { mpk_g2: mpk.0, vk_g2: (G2Affine::generator() * shamir_share.y).into(), player },
             )
         ).collect();
@@ -91,7 +92,7 @@ pub fn keygen<R: RngCore + CryptoRng>(
 
 impl BIBEMasterSecretKeyShare {
     pub fn derive_decryption_key_share(&self, digest: &Digest) -> Result<BIBEDecryptionKeyShare> {
-        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(G2Affine::from(G2Affine::generator() * self.shamir_share.y))?;
+        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(self.mpk_g2)?;
 
         Ok(BIBEDecryptionKeyShare {
             signature_share: ShamirGroupShare {
