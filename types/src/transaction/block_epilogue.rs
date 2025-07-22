@@ -1,12 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    state_store::{state_key::StateKey, state_slot::StateSlot},
-    transaction::TransactionOutput,
-    write_set::{HotStateOp, WriteSet},
-};
-use anyhow::Result;
+use crate::state_store::{state_key::StateKey, state_slot::StateSlot};
 use aptos_crypto::HashValue;
 use derive_more::Deref;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -108,6 +103,7 @@ pub struct TBlockEndInfoExt<Key: Debug> {
     /// TODO(HotState): add evictions
     /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
     ///                 serialize the promoted and evicted keys in the transaction.
+    #[allow(dead_code)]
     slots_to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
@@ -130,18 +126,5 @@ impl<Key: Debug> TBlockEndInfoExt<Key> {
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
-    }
-}
-
-impl BlockEndInfoExt {
-    pub fn to_transaction_output(&self) -> Result<TransactionOutput> {
-        let write_ops = self
-            .slots_to_make_hot
-            .iter()
-            .map(|(key, slot)| Ok((key.clone(), HotStateOp::make_hot(slot.clone()))))
-            .collect::<Result<_>>()?;
-        Ok(TransactionOutput::new_success_with_write_set(
-            WriteSet::Hotness(write_ops),
-        ))
     }
 }
