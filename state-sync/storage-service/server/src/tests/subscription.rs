@@ -16,11 +16,9 @@ use aptos_config::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, SubscribeTransactionDataWithProofRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        SubscriptionStreamMetadata, TransactionData, TransactionDataRequestType,
-        TransactionOrOutputData,
+        SubscriptionStreamMetadata,
     },
     responses::StorageServerSummary,
     StorageServiceError,
@@ -1087,17 +1085,11 @@ fn create_subscription_data_request(
     match random_number % 3 {
         0 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionData(TransactionData {
-                        include_events: true,
-                    });
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    true,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
@@ -1109,15 +1101,10 @@ fn create_subscription_data_request(
         },
         1 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOutputData;
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_output_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionOutputsWithProof(
@@ -1130,17 +1117,11 @@ fn create_subscription_data_request(
         },
         2 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-                        include_events: true,
-                    });
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_or_output_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    true,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionsOrOutputsWithProof(

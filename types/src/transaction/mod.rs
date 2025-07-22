@@ -2231,18 +2231,6 @@ impl TransactionListWithProofV2 {
         ))
     }
 
-    pub fn verify(
-        &self,
-        ledger_info: &LedgerInfo,
-        first_transaction_output_version: Option<Version>,
-    ) -> Result<()> {
-        match self {
-            Self::TransactionListWithAuxiliaryInfos(inner) => {
-                inner.verify(ledger_info, first_transaction_output_version)
-            },
-        }
-    }
-
     /// Returns a reference to the inner transaction list with proof
     pub fn get_transaction_list_with_proof(&self) -> &TransactionListWithProof {
         match self {
@@ -2261,12 +2249,26 @@ impl TransactionListWithProofV2 {
         }
     }
 
+    /// Splits the transaction list with proof v2 into its components.
     pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
                 txn_list_with_auxiliary_infos.transaction_list_with_proof,
                 txn_list_with_auxiliary_infos.persisted_auxiliary_infos,
             ),
+        }
+    }
+
+    /// Verifies the transaction list with proof v2 against the given ledger info.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
         }
     }
 }
@@ -2482,18 +2484,6 @@ impl TransactionOutputListWithProofV2 {
         )
     }
 
-    pub fn verify(
-        &self,
-        ledger_info: &LedgerInfo,
-        first_transaction_output_version: Option<Version>,
-    ) -> Result<()> {
-        match self {
-            Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
-                inner.verify(ledger_info, first_transaction_output_version)
-            },
-        }
-    }
-
     /// Returns a reference to the inner transaction output list with proof
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
@@ -2512,12 +2502,26 @@ impl TransactionOutputListWithProofV2 {
         }
     }
 
+    /// Splits the transaction output list with proof v2 into its components.
     pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
                 output_list_with_auxiliary_infos.transaction_output_list_with_proof,
                 output_list_with_auxiliary_infos.persisted_auxiliary_infos,
             ),
+        }
+    }
+
+    /// Verifies the transaction output list with proof v2 against the given ledger info.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
         }
     }
 }
@@ -2546,7 +2550,7 @@ impl TransactionOutputListWithAuxiliaryInfos {
 
     /// A convenience function to create a v2 output list from a
     /// v1 list. In this case, all auxiliary infos are set to None.
-    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+    fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
         let num_transaction_infos = transaction_output_list_with_proof
             .proof
             .transaction_infos
