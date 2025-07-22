@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics::TIMER, state_store::versioned_state_value::StateUpdateRef};
+use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
@@ -11,7 +12,7 @@ use aptos_types::{
 use arr_macro::arr;
 use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
@@ -204,11 +205,37 @@ impl<'kv> StateUpdateRefs<'kv> {
             .par_iter_mut()
             .zip_eq(ret.shards.par_iter_mut())
             .for_each(|(shard_iter, dedupped)| {
-                dedupped.extend(
-                    shard_iter
-                        // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                        .take_while_ref(|(_k, u)| u.version < end_version),
-                )
+                // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
+                for (k, u) in shard_iter.take_while_ref(|(_k, u)| u.version < end_version) {
+                    // If it's a value write op (Creation/Modification/Deletion), just insert and
+                    // overwrite the previous op.
+                    if u.state_op.is_value_write_op() {
+                        dedupped.insert(k, u);
+                        continue;
+                    }
+
+                    // If we see a hotness op, we check if there is a value write op with the same
+                    // key before. This is unlikely, but if it does happen (e.g. if the write
+                    // summary is missing keys), we do not want the hot state promotion to
+                    // overwrite the write.
+                    match dedupped.entry(k) {
+                        Entry::Occupied(mut entry) => {
+                            let prev_op = &entry.get().state_op;
+                            warn!(
+                                "Key: {:?}. Previous write op: {}. Current write op: {}",
+                                k,
+                                prev_op.as_ref(),
+                                u.state_op.as_ref()
+                            );
+                            if !prev_op.is_value_write_op() {
+                                entry.insert(u);
+                            }
+                        },
+                        Entry::Vacant(entry) => {
+                            entry.insert(u);
+                        },
+                    }
+                }
             });
         ret
     }

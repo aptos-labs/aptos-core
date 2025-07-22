@@ -18,6 +18,7 @@ use aptos_block_executor::{
     types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
+use aptos_logger::info;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -30,7 +31,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    write_set::WriteOp,
+    write_set::{HotStateOp, WriteOp},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
@@ -523,7 +524,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<S::Key, TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -555,11 +556,30 @@ impl<
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
-                let output_vec: Vec<_> = transaction_outputs
+                let (transaction_outputs, block_epilogue_txn, to_make_hot) =
+                    block_output.into_inner();
+                let mut output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect();
+                if block_epilogue_txn.is_some() {
+                    // Attach the hotness changes to block epilogue's output.
+                    let epilogue_output = output_vec
+                        .last_mut()
+                        .expect("transaction_outputs must be non-empty when epilogue exists");
+                    assert!(
+                        epilogue_output.status().is_keep(),
+                        "Block epilogue must be kept."
+                    );
+                    info!("before adding hotness: {:?}", epilogue_output.write_set());
+                    epilogue_output.add_hotness(
+                        to_make_hot
+                            .into_iter()
+                            .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
+                            .collect(),
+                    );
+                    info!("after adding hotness: {:?}", epilogue_output.write_set());
+                }
 
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
@@ -570,7 +590,11 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
+                Ok(BlockOutput::new(
+                    output_vec,
+                    block_epilogue_txn,
+                    BTreeMap::new(),
+                ))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,
@@ -595,7 +619,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<S::Key, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
