@@ -46,10 +46,11 @@ impl SignatureVerifiedTransaction {
     }
 
     pub fn borrow_into_inner(&self) -> &Transaction {
-        match self {
-            SignatureVerifiedTransaction::Valid(ref txn) => txn,
-            SignatureVerifiedTransaction::Invalid(ref txn) => txn,
-        }
+        unimplemented!();
+        // match self {
+        //     SignatureVerifiedTransaction::Valid(ref txn) => txn,
+        //     SignatureVerifiedTransaction::Invalid(ref txn) => txn,
+        // }
     }
 
     pub fn is_valid(&self) -> bool {

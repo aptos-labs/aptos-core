@@ -868,7 +868,7 @@ impl Arbitrary for TransactionToCommit {
             any_with::<AccountInfoUniverse>(1),
             any::<TransactionToCommitGen>(),
         )
-            .prop_map(|(mut universe, gen)| gen.materialize(&mut universe))
+            .prop_map(|(mut universe, r#gen)| r#gen.materialize(&mut universe))
             .boxed()
     }
 }

@@ -115,7 +115,7 @@ pub fn silent_display(source: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
-    let gen = quote! {
+    let r#gen = quote! {
         // In order to ensure that secrets are never leaked, Display is elided
         impl #impl_generics ::std::fmt::Display for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -123,7 +123,7 @@ pub fn silent_display(source: TokenStream) -> TokenStream {
             }
         }
     };
-    gen.into()
+    r#gen.into()
 }
 
 #[proc_macro_derive(SilentDebug)]
@@ -132,7 +132,7 @@ pub fn silent_debug(source: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
-    let gen = quote! {
+    let r#gen = quote! {
         // In order to ensure that secrets are never leaked, Debug is elided
         impl #impl_generics ::std::fmt::Debug for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -140,7 +140,7 @@ pub fn silent_debug(source: TokenStream) -> TokenStream {
             }
         }
     };
-    gen.into()
+    r#gen.into()
 }
 
 #[proc_macro_attribute]
@@ -154,7 +154,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = find_key_name(&ast, name.to_string());
-    let gen = quote! {
+    let r#gen = quote! {
         impl<'de> ::serde::Deserialize<'de> for #name {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
@@ -180,7 +180,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
             }
         }
     };
-    gen.into()
+    r#gen.into()
 }
 
 /// Serialize into a human readable format where applicable
@@ -189,7 +189,7 @@ pub fn serialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = find_key_name(&ast, name.to_string());
-    let gen = quote! {
+    let r#gen = quote! {
         impl ::serde::Serialize for #name {
             fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
@@ -209,7 +209,7 @@ pub fn serialize_key(source: TokenStream) -> TokenStream {
             }
         }
     };
-    gen.into()
+    r#gen.into()
 }
 
 fn find_key_name(ast: &DeriveInput, name: String) -> String {

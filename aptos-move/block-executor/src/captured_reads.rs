@@ -109,18 +109,19 @@ impl<V> DataRead<V> {
 
 impl<V: TransactionWrite> DataRead<V> {
     fn merge_metadata_and_size(&mut self, other: &DataRead<V>) -> bool {
-        if let DataRead::ResourceSize(size) = other {
-            if let DataRead::Metadata(ref mut metadata) = self {
-                *self = DataRead::MetadataAndResourceSize(std::mem::take(metadata), *size);
-                return true;
-            }
-        }
-        if let DataRead::Metadata(metadata) = other {
-            if let DataRead::ResourceSize(ref mut size) = self {
-                *self = DataRead::MetadataAndResourceSize(metadata.clone(), std::mem::take(size));
-                return true;
-            }
-        }
+        unimplemented!();
+        // if let DataRead::ResourceSize(size) = other {
+        //     if let DataRead::Metadata(ref mut metadata) = self {
+        //         *self = DataRead::MetadataAndResourceSize(std::mem::take(metadata), *size);
+        //         return true;
+        //     }
+        // }
+        // if let DataRead::Metadata(metadata) = other {
+        //     if let DataRead::ResourceSize(ref mut size) = self {
+        //         *self = DataRead::MetadataAndResourceSize(metadata.clone(), std::mem::take(size));
+        //         return true;
+        //     }
+        // }
         false
     }
 
