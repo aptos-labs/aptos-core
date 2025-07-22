@@ -2074,6 +2074,30 @@ struct AssignTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
+impl AssignTransformer<'_> {
+    /// Check if an expression is safe to eliminate, assuming its result is never used.
+    /// [TODO]: Refine the list for better optimization
+    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
+        let mut is_safe = true;
+        exp.visit_post_order(&mut |e| {
+            use ExpData::*;
+            use Operation::*;
+            match e {
+                LocalVar(..)
+                | Value(..)
+                | Temporary(..)
+                | Call(_, Freeze(..), _)
+                | Call(_, Borrow(ReferenceKind::Immutable), _) => {},
+                _ => {
+                    is_safe = false;
+                },
+            }
+            is_safe // stop if already not safe
+        });
+        is_safe // return the final safe status
+    }
+}
+
 #[allow(unused)]
 struct FreeVariableBinder<'a> {
     /// Usage information about variables in the expression
@@ -2135,6 +2159,12 @@ impl AssignTransformer<'_> {
                         substitution.insert(
                             *var,
                             self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+
+                        // Check if the RHS of an assignment to a non-used var is safe to eliminate
+                        // We must substitute the variable in the RHS before checking it, as those variables will get eliminated together with the RHS!
+                        if stm_usage.read_count(*var) == 0 && !self.safe_to_eliminate(&self.builder.unfold(&substitution, rhs.clone())) {
+                            new_stms.push(self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+                        }
                     },
                 // Check whether an assignment can be transformed into a let
                 // TODO: refine to the correct implementation, the below doesn't work
@@ -2151,6 +2181,8 @@ impl AssignTransformer<'_> {
                 }
                  */
                 _ => {
+                    // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
+                    // Extra checks are needed to ensure safety.
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
                 },
