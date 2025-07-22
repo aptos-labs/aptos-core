@@ -228,7 +228,6 @@ impl<
                     )
                     .await?;
                 },
-                // TODO(joshlind): Update to V2 type.
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,

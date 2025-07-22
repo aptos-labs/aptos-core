@@ -272,8 +272,9 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
             let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, self.config.max_network_chunk_bytes)?;
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
             if !overflow_frame {
                 return Ok(response);
             } else {
@@ -281,8 +282,8 @@ impl StorageReaderInterface for StorageReader {
                     DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_transactions_to_fetch = num_transactions_to_fetch / 2;
-                debug!("The request for {:?} transactions was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_transactions_to_fetch, num_bytes, new_num_transactions_to_fetch);
+                debug!("The request for {:?} transactions was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_transactions_to_fetch, num_bytes, max_network_chunk_bytes, new_num_transactions_to_fetch);
                 num_transactions_to_fetch = new_num_transactions_to_fetch; // Try again with half the amount of data
             }
         }
@@ -323,10 +324,9 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &epoch_change_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&epoch_change_proof, max_network_chunk_bytes)?;
             if !overflow_frame {
                 return Ok(epoch_change_proof);
             } else {
@@ -334,8 +334,8 @@ impl StorageReaderInterface for StorageReader {
                     DataResponse::EpochEndingLedgerInfos(epoch_change_proof).get_label(),
                 );
                 let new_num_ledger_infos_to_fetch = num_ledger_infos_to_fetch / 2;
-                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_ledger_infos_to_fetch, num_bytes, new_num_ledger_infos_to_fetch);
+                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_ledger_infos_to_fetch, num_bytes, max_network_chunk_bytes, new_num_ledger_infos_to_fetch);
                 num_ledger_infos_to_fetch = new_num_ledger_infos_to_fetch; // Try again with half the amount of data
             }
         }
@@ -374,8 +374,9 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
             let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, self.config.max_network_chunk_bytes)?;
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
             if !overflow_frame {
                 return Ok(response);
             } else {
@@ -383,8 +384,8 @@ impl StorageReaderInterface for StorageReader {
                     DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_outputs_to_fetch, num_bytes, new_num_outputs_to_fetch);
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, new_num_outputs_to_fetch);
                 num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
             }
         }
@@ -423,8 +424,10 @@ impl StorageReaderInterface for StorageReader {
                 transaction_list_with_proof: None,
                 transaction_output_list_with_proof: Some(output_list_with_proof),
             };
+
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
             let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, self.config.max_network_chunk_bytes)?;
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
 
             if !overflow_frame {
                 return Ok(response);
@@ -435,8 +438,8 @@ impl StorageReaderInterface for StorageReader {
                     DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}). Current number of data reductions: {:?}",
-                    num_outputs_to_fetch, num_bytes, num_output_reductions);
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Current number of data reductions: {:?}",
+                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, num_output_reductions);
                 num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
                 num_output_reductions += 1;
             }
@@ -530,9 +533,10 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &state_value_chunk_with_proof,
-                self.config.max_network_chunk_bytes,
+                max_network_chunk_bytes,
             )?;
             if !overflow_frame {
                 return Ok(state_value_chunk_with_proof);
@@ -542,8 +546,8 @@ impl StorageReaderInterface for StorageReader {
                         .get_label(),
                 );
                 let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
-                debug!("The request for {:?} state values was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_state_values_to_fetch, num_bytes, new_num_state_values_to_fetch);
+                debug!("The request for {:?} state values was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_state_values_to_fetch, num_bytes, max_network_chunk_bytes, new_num_state_values_to_fetch);
                 num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
             }
         }
