@@ -11,7 +11,7 @@ use aptos_types::{
 use arr_macro::arr;
 use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
@@ -41,10 +41,13 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             versions_seen += 1;
 
             for (key, write_op) in update_iter.into_iter() {
-                shards[key.get_shard_id()].push((key, StateUpdateRef {
-                    version,
-                    state_op: write_op,
-                }));
+                shards[key.get_shard_id()].push((
+                    key,
+                    StateUpdateRef {
+                        version,
+                        state_op: write_op,
+                    },
+                ));
             }
         }
         assert_eq!(versions_seen, num_versions);
@@ -204,11 +207,24 @@ impl<'kv> StateUpdateRefs<'kv> {
             .par_iter_mut()
             .zip_eq(ret.shards.par_iter_mut())
             .for_each(|(shard_iter, dedupped)| {
-                dedupped.extend(
-                    shard_iter
-                        // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                        .take_while_ref(|(_k, u)| u.version < end_version),
-                )
+                // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
+                for (k, u) in shard_iter.take_while_ref(|(_k, u)| u.version < end_version) {
+                    if u.state_op.is_value_write_op() {
+                        dedupped.insert(k, u);
+                        continue;
+                    }
+
+                    match dedupped.entry(k) {
+                        Entry::Occupied(mut entry) => {
+                            if !entry.get().state_op.is_value_write_op() {
+                                entry.insert(u);
+                            }
+                        },
+                        Entry::Vacant(entry) => {
+                            entry.insert(u);
+                        },
+                    }
+                }
             });
         ret
     }

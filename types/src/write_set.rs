@@ -14,7 +14,7 @@ use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_std::iterable::Iterable;
 use bytes::Bytes;
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -677,13 +677,27 @@ impl WriteSet {
         self.as_v0()
             .iter()
             .map(|(key, op)| (key, op.as_base_op()))
-            .merge_by(
+            .merge_join_by(
                 self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
-                |a, b| {
-                    assert_ne!(a.0, b.0, "key should not appear in both value and hotness");
-                    a.0 < b.0
-                },
+                |a, b| a.0.cmp(b.0),
             )
+            .map(|entry| {
+                // It seems like it's possible to have a key that is both in `value` and `hotness`
+                // (because of inaccurate read write summary). If this happens we discard the
+                // hotness change, and the recently written keys will be made hot anyway.
+                match entry {
+                    EitherOrBoth::Left(e) | EitherOrBoth::Right(e) => e,
+                    EitherOrBoth::Both(e, _) => e,
+                }
+            })
+    }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
     }
 }
 
