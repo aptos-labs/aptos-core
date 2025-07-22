@@ -32,7 +32,7 @@ impl GcsFileStoreOperator {
         service_account_path: String,
         enable_compression: bool,
     ) -> Self {
-        env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
+        unsafe { env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path) };
         let storage_format = if enable_compression {
             StorageFormat::Lz4CompressedProto
         } else {

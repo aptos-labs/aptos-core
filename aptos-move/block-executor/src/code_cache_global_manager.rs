@@ -285,34 +285,35 @@ fn prefetch_aptos_framework(
     state_view: &impl StateView,
     guard: &mut AptosModuleCacheManagerGuard,
 ) -> Result<(), PanicError> {
-    let code_storage = state_view.as_aptos_code_storage(guard.environment());
-
-    cfg_if! {
-        if #[cfg(fuzzing)] {
-            let maybe_loaded = code_storage.fetch_module_skip_verification(
-                &AccountAddress::ONE,
-                ident_str!("transaction_validation"),
-            ).map_err(|err| {
-                PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-            })?;
-        } else {
-            let maybe_loaded = code_storage
-                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
-                .map_err(|err| {
-                    PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-                })?;
-        }
-    }
-
-    if maybe_loaded.is_some() {
-        // Framework must have been loaded. Drain verified modules from local cache into
-        // global cache.
-        let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
-        guard
-            .module_cache_mut()
-            .insert_verified(verified_module_code_iter)?;
-    }
     Ok(())
+    // let code_storage = state_view.as_aptos_code_storage(guard.environment());
+
+    // cfg_if! {
+    //     if #[cfg(fuzzing)] {
+    //         let maybe_loaded = code_storage.fetch_module_skip_verification(
+    //             &AccountAddress::ONE,
+    //             ident_str!("transaction_validation"),
+    //         ).map_err(|err| {
+    //             PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+    //         })?;
+    //     } else {
+    //         let maybe_loaded = code_storage
+    //             .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+    //             .map_err(|err| {
+    //                 PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+    //             })?;
+    //     }
+    // }
+
+    // if maybe_loaded.is_some() {
+    //     // Framework must have been loaded. Drain verified modules from local cache into
+    //     // global cache.
+    //     let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
+    //     guard
+    //         .module_cache_mut()
+    //         .insert_verified(verified_module_code_iter)?;
+    // }
+    // Ok(())
 }
 
 #[cfg(test)]
