@@ -105,6 +105,8 @@ fn hmac_kdf(otp_source: impl AsRef<[u8]>) -> GenericArray<u8, <Sha256 as OutputS
 }
 
 
+/// hash-2-curve for bn254. Taken from p. 23 of 
+/// https://wahby.net/bls-hash-ches19-talk.pdf
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine>
 {
     for ctr in 0..u64::MAX {
@@ -121,10 +123,10 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine>
             x3b += <ark_bn254::Config as BnConfig>::G1Config::mul_by_a(x);
         };
 
-        if x3b.legendre().is_qr() {
+        if let Some(x3b_sqrt) = x3b.sqrt() {
             return Ok(G1Affine::new(
                 x, 
-                x3b.sqrt().unwrap() // I think unwrap is safe here b/c x3b is qr.
+                x3b_sqrt
             ))
         }
     }
