@@ -3,6 +3,7 @@
 
 //! Disassembler for Move bytecode.
 
+use crate::value::AsmValue;
 use anyhow::bail;
 use move_binary_format::{
     access::ModuleAccess,
@@ -87,6 +88,13 @@ impl<T: fmt::Write> Disassembler<T> {
             dis.reverse_module_aliases.insert(id, short_name);
         }
 
+        // Process friend declarations
+        for friend in module.module().friend_decls.iter() {
+            let addr = module.module().address_identifier_at(friend.address);
+            let name = module.module().identifier_at(friend.name);
+            writeln!(dis.out, "friend {}::{}", addr.short_str_lossless(), name)?
+        }
+
         // Process struct and function definitions
         for str in module.structs() {
             dis.struct_(str)?;
@@ -115,7 +123,7 @@ impl<T: fmt::Write> Disassembler<T> {
                 str.type_parameters().as_slice(),
                 |dis, idx, tparam| dis.type_param_decl(tparam.is_phantom, idx, tparam.constraints),
                 "<",
-                ",",
+                ", ",
                 ">",
             )?
         }
@@ -179,12 +187,18 @@ impl<T: fmt::Write> Disassembler<T> {
                 self.out.write_str(">")?;
             },
             Function(params, result, abilities) => {
-                self.list(params, |dis, _, e| dis.type_(module, e), "|", ",", "|")?;
+                self.list(
+                    params,
+                    |dis, _, e| dis.type_in_function_type(module, e),
+                    "|",
+                    ", ",
+                    "|",
+                )?;
                 match result.len().cmp(&1) {
                     Ordering::Less => {},
                     Ordering::Equal => self.type_(module, &result[0])?,
                     Ordering::Greater => {
-                        self.list(result, |dis, _, e| dis.type_(module, e), "(", ",", ")")?;
+                        self.list(result, |dis, _, e| dis.type_(module, e), "(", ", ", ")")?;
                     },
                 }
                 self.out
@@ -199,7 +213,7 @@ impl<T: fmt::Write> Disassembler<T> {
                     view.name()
                 )?;
                 if let StructInstantiation(_, inst) = ty {
-                    self.list(inst, |dis, _, e| dis.type_(module, e), "<", ",", ">")?
+                    self.list(inst, |dis, _, e| dis.type_(module, e), "<", ", ", ">")?
                 }
             },
             Reference(elem_ty) => {
@@ -215,10 +229,39 @@ impl<T: fmt::Write> Disassembler<T> {
         Ok(())
     }
 
+    fn type_in_function_type(
+        &mut self,
+        module: &CompiledModule,
+        ty: &SignatureToken,
+    ) -> anyhow::Result<()> {
+        // The parser cannot deal with `||||`, it must be written as `|(||)|`.
+        if matches!(ty, SignatureToken::Function(..)) {
+            write!(self.out, "(")?;
+            self.type_(module, ty)?;
+            write!(self.out, ")")?;
+            Ok(())
+        } else {
+            self.type_(module, ty)
+        }
+    }
+
     // --------------------------------------------------------------------------------------
     // Functions
 
     fn fun(&mut self, fdef: FunctionDefinitionView<CompiledModule>) -> anyhow::Result<()> {
+        if !fdef.attributes().is_empty() {
+            self.list(
+                fdef.attributes(),
+                |dis, _, attr| {
+                    write!(dis.out, "{}", attr)?;
+                    Ok(())
+                },
+                "#[",
+                ", ",
+                "]",
+            )?;
+            write!(self.out, " ")?
+        }
         // Function header
         if fdef.is_entry() {
             self.out.write_str("entry ")?
@@ -234,7 +277,7 @@ impl<T: fmt::Write> Disassembler<T> {
                 fdef.type_parameters().as_slice(),
                 |dis, idx, abilities| dis.type_param_decl(false, idx, *abilities),
                 "<",
-                ",",
+                ", ",
                 ">",
             )?
         }
@@ -246,7 +289,7 @@ impl<T: fmt::Write> Disassembler<T> {
                 dis.type_(fdef.module(), ty.signature_token())
             },
             "(",
-            ",",
+            ", ",
             ")",
         )?;
         if fdef.return_count() > 0 {
@@ -256,7 +299,7 @@ impl<T: fmt::Write> Disassembler<T> {
                     &fdef.return_tokens().collect::<Vec<_>>(),
                     |dis, _, ty| dis.type_(fdef.module(), ty.signature_token()),
                     "(",
-                    ",",
+                    ", ",
                     ")",
                 )?
             } else {
@@ -346,14 +389,19 @@ impl<T: fmt::Write> Disassembler<T> {
             CastU128 => write!(self.out, "cast_u128")?,
             CastU256 => write!(self.out, "cast_u256")?,
             LdConst(hdl) => {
-                write!(self.out, "ld_const ")?;
+                write!(self.out, "ld_const")?;
                 let cons = module.constant_at(*hdl);
+                write!(self.out, "<")?;
                 self.type_(module, &cons.type_)?;
-                write!(
-                    self.out,
-                    ", {}",
-                    value_from_bcs(module, &cons.type_, &cons.data)?
-                )?
+                write!(self.out, ">")?;
+                if let Some(val) = cons
+                    .deserialize_constant()
+                    .and_then(|v| AsmValue::from_move_value(&v).ok())
+                {
+                    write!(self.out, " {}", val)?
+                } else {
+                    write!(self.out, " <invalid constant>")?
+                }
             },
             LdTrue => write!(self.out, "ld_true")?,
             LdFalse => write!(self.out, "ld_false")?,
@@ -651,7 +699,7 @@ impl<T: fmt::Write> Disassembler<T> {
 
     fn ty_args(&mut self, module: &CompiledModule, sign_idx: SignatureIndex) -> anyhow::Result<()> {
         let sign = module.signature_at(sign_idx);
-        self.list(&sign.0, |dis, _, e| dis.type_(module, e), "<", ",", ">")
+        self.list(&sign.0, |dis, _, e| dis.type_(module, e), "<", ", ", ">")
     }
 
     // --------------------------------------------------------------------------------------
@@ -693,13 +741,4 @@ fn type_param_name(idx: usize) -> String {
 
 fn local_name(idx: LocalIndex) -> String {
     format!("l{}", idx)
-}
-
-fn value_from_bcs(
-    _module: &CompiledModule,
-    _ty: &SignatureToken,
-    _bcs: &[u8],
-) -> anyhow::Result<String> {
-    // TODO(#16582): implement this
-    bail!("value bcs not implemented")
 }

@@ -6,7 +6,7 @@ task 0 'publish'. lines 1-7:
 // Bytecode version v7
 module 0x66::test
 // Function definition at index 0
-fun f<T0,T1>(l0: T0,l1: T1): (T0,T1)
+fun f<T0, T1>(l0: T0, l1: T1): (T0, T1)
     move_loc l0
     move_loc l1
     ret

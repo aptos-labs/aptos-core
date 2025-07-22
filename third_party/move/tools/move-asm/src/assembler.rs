@@ -9,7 +9,7 @@ use crate::{
     syntax,
     syntax::{
         map_diag, Argument, AsmResult, Decl, Diag, Fun, Instruction, Loc, PartialIdent, Struct,
-        StructLayout, Type, Unit, UnitId, Value,
+        StructLayout, Type, Unit, UnitId,
     },
 };
 use anyhow::{anyhow, bail};
@@ -33,7 +33,6 @@ use move_binary_format::{
 };
 use move_core_types::{function::ClosureMask, identifier::Identifier, u256::U256};
 use std::{collections::BTreeMap, fs, io::Write, path::PathBuf};
-
 // ===================================================================================
 // Driver
 
@@ -180,6 +179,7 @@ impl<'a> Assembler<'a> {
             name: _,
             address_aliases,
             module_aliases,
+            friend_modules,
             structs,
             functions,
         } = ast;
@@ -190,6 +190,12 @@ impl<'a> Assembler<'a> {
         }
         for (n, m) in module_aliases {
             let res = self.builder.declare_module_alias(n, m);
+            self.add_diags(Loc::new(0, 0), res);
+        }
+
+        // Register friend modules
+        for m in friend_modules {
+            let res = self.builder.declare_friend_module(m);
             self.add_diags(Loc::new(0, 0), res);
         }
 
@@ -288,6 +294,7 @@ impl<'a> Assembler<'a> {
             fun.is_entry,
             fun.name.clone(),
             fun.visibility,
+            fun.attributes.clone(),
             param_sign,
             result_sign,
             fun.type_params
@@ -615,10 +622,17 @@ impl<'a> Assembler<'a> {
             "ld_const" => {
                 let [arg1, arg2] = self.args2(instr)?;
                 let ty = self.type_(instr, arg1)?;
-                let val = self.value_bcs(instr, arg2, &ty)?;
-                let res = self.builder.const_index(val, ty);
-                let idx = self.add_diags(instr.loc, res)?;
-                LdConst(idx)
+                if let Argument::Constant(val) = arg2 {
+                    let move_value = self.add_diags(instr.loc, val.to_move_value(&ty))?;
+                    let bcs = move_value
+                        .simple_serialize()
+                        .expect("value serialization succeeds");
+                    let idx = self.add_diags(instr.loc, self.builder.const_index(bcs, ty))?;
+                    LdConst(idx)
+                } else {
+                    self.error(instr.loc, "expected a constant value");
+                    return None;
+                }
             },
             "ld_false" => {
                 self.args0(instr)?;
@@ -1100,16 +1114,8 @@ impl<'a> Assembler<'a> {
     }
 
     fn number(&mut self, instr: &Instruction, arg: &Argument, max: U256) -> Option<U256> {
-        if let Argument::Constant(Value::Number(n)) = arg {
-            if *n <= max {
-                Some(*n)
-            } else {
-                self.error(
-                    instr.loc,
-                    format!("number {} out of range (max {})", n, max),
-                );
-                None
-            }
+        if let Argument::Constant(val) = arg {
+            self.add_diags(instr.loc, val.check_number(max))
         } else {
             self.error(instr.loc, "expected number argument");
             None
@@ -1129,20 +1135,6 @@ impl<'a> Assembler<'a> {
         let ty = self.type_(instr, arg)?;
         let res = self.builder.signature_index(vec![ty]);
         self.add_diags(instr.loc, res)
-    }
-
-    fn value_bcs(
-        &mut self,
-        instr: &Instruction,
-        arg: &Argument,
-        _ty: &SignatureToken,
-    ) -> Option<Vec<u8>> {
-        if let Argument::Constant(Value::Bytes(bytes)) = arg {
-            Some(bytes.clone())
-        } else {
-            self.error(instr.loc, "expected byte blob");
-            None
-        }
     }
 
     fn args0(&mut self, instr: &Instruction) -> Option<()> {

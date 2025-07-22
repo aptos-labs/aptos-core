@@ -5,3 +5,4 @@ pub mod assembler;
 pub mod disassembler;
 pub mod module_builder;
 pub mod syntax;
+pub mod value;
