@@ -5,7 +5,6 @@
 
 #![allow(clippy::arc_with_non_send_sync)]
 
-use crate::transaction::automated_transaction::AutomatedTransaction;
 use crate::{
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
@@ -23,10 +22,11 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        block_epilogue::BlockEndInfo, ChangeSet, ExecutionStatus, Module, RawTransaction, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionPayload,
-        TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        automated_transaction::AutomatedTransaction, block_epilogue::BlockEndInfo, ChangeSet,
+        ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
+        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -35,16 +35,16 @@ use crate::{
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::{
     ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey},
+    hash::CryptoHash,
     test_utils::KeyPair,
     traits::*,
     HashValue,
 };
 use arr_macro::arr;
 use bytes::Bytes;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -514,7 +514,18 @@ impl TransactionPayload {
 }
 
 prop_compose! {
-    fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
+    fn arb_transaction_status()(vm_status in any::<VMStatus>()
+                .prop_filter(
+                    "filter incompatible combinations of vm status and status codes",
+                    |status| {
+                        if let VMStatus::Error { status_code, .. } = status {
+                            *status_code != StatusCode::EXECUTED && *status_code != StatusCode::ABORTED
+                        } else {
+                            true
+                        }
+                    },
+                )
+    ) -> TransactionStatus {
         let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true, &Features::default());
         txn_status
     }

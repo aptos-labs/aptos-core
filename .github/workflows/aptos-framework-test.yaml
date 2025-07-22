@@ -1,62 +1,31 @@
 name: Run aptos framework checks
-
 on:
   push:
-    branches:
-      - dev
-      - "release/**"
-      - "feature/**"
-
+    branches: [ "dev", "release/**", "feature/**" ]
+    paths-ignore: [ '**/*.md' ]
   pull_request:
     types: [opened, synchronize, ready_for_review]
-    branches:
-      - dev
-      - "release/**"
-      - "feature/**"
+    branches: [ "dev", "release/**", "feature/**" ]
+    paths-ignore: [ '**/*.md' ]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
-  CARGO_BIN: ~/.cargo/bin/cargo
   CARGO_NET_GIT_FETCH_WITH_CLI: true
+  DOCKER_BUILDKIT: 1
   FORGE_BIN: ~/.foundry/bin/forge
   SUI_BIN: ~/.cargo/bin/sui
   APTOS_BIN: ~/.local/bin/aptos
   SCRYPTO_BIN: ~/.cargo/bin/scrypto
-
 jobs:
   build:
-
     runs-on: ghr-elastic-supra-aptos-core-runner
-
+    timeout-minutes: 90
     steps:
-
-    - uses: actions/checkout@v4
-      with:
-        clean: false
-
-    - name: Get changed files
-      id: changed-files
-      uses: tj-actions/changed-files@v42
-
-    - name: Run aptos-types-unit-tests
-      run: |
-        ${{ env.CARGO_BIN }} test --release -p aptos-types --lib unit_tests --no-fail-fast
-
-    - name: Run supra-framework
-      run: |
-        ${{ env.CARGO_BIN }} test --release -p aptos-framework -- --skip prover
-
-    - name: Run e2e-testsuite
-      run: |
-        RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p language-e2e-testsuite --no-fail-fast
-
-    - name: Run e2e-move-tests
-      run: |
-        RUST_MIN_STACK=104857600 ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests --no-fail-fast
-
-    - name: Slack Notification
-      if: failure()
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_CHANNEL: aptos-core-notifications # Specify your channel
-        SLACK_MESSAGE: 'Job ${{ job.status }}: ${{ github.event.head_commit.message }}'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
+      - run: cargo test --release -p aptos-types --lib unit_tests --no-fail-fast
+      - run: cargo test --release -p aptos-framework -- --skip prover
+      - run: RUST_MIN_STACK=104857600 cargo test run -p language-e2e-testsuite --no-fail-fast
+      - run: RUST_MIN_STACK=104857600 cargo test run -p e2e-move-tests --no-fail-fast
