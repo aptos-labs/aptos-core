@@ -17,25 +17,30 @@
 //! unit :=
 //!   { address_alias LF }
 //!   ( "module" QID | "script" ) LF
-//!   { const_def | struct_def | fun_def }
-//!
-//! const_def := "const" ID ":" type "=" VALUE LF
+//!   { "uses" QID [ "as" ID ] }
+//!   { struct_def | fun_def }
 //!
 //! struct_def :=
-//!   "struct" ID [ type_args ] fields LF
-//! | "enum" ID [ type_args ] LF { INDENT ID fields LF }
+//!   "struct" ID [ type_args ] LF { field }
+//! | "enum" ID [ type_args ] LF variant { variant }
 //!
+//! field ::=
+//!   INDENT ID ":" type LF
 //!
-//! fields :=
-//!   "(" LIST(type) ")"
-//! | "{" LIST(local) "}"
+//! variant ::=
+//!   INDENT ID LF { INDENT ID ":" type LF }
 //!
 //!
 //! fun_def :=
 //!   fun_modifier "fun" ID [ type_args ] "(" [ LIST(local) ] ")" [ tuple_type ] LF
 //!   { INDENT "local" local LF } { instruction LF }
 //!
-//! fun_modifier := [ [ "public" | "friend" ] "entry" ]
+//! fun_modifier :=
+//!   [ "#[" attribute "]"
+//!   [ "entry" ]
+//!   [ "public" | "friend" ]
+//!
+//! attribute := ID
 //!
 //! local := ID ":" type
 //!
@@ -43,7 +48,7 @@
 //!   "|" [ LIST(type) ] "|" [ tuple_type ]  | simple_type
 //!
 //! tuple_type :=
-//!     simple_type | "(" LIST(simple_type) ")"
+//!     type | "(" LIST(type) ")"
 //!
 //! simple_type :=
 //!   QID [ type_args ] | "(" type ")"
@@ -62,9 +67,10 @@
 //!   VALUE | QID [ type_args ] | type_args
 //!```
 
+use crate::value::AsmValue;
 use codespan::{RawIndex, Span};
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{FunctionAttribute, Visibility};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -117,6 +123,8 @@ pub struct Unit {
     pub address_aliases: Vec<(Identifier, AccountAddress)>,
     /// A list of module aliases.
     pub module_aliases: Vec<(Identifier, ModuleId)>,
+    /// Friend modules
+    pub friend_modules: Vec<ModuleId>,
     /// List of struct definitions (including enums, which are technically
     /// a special form of struct).
     pub structs: Vec<Struct>,
@@ -164,6 +172,7 @@ pub struct Fun {
     pub name: Identifier,
     pub visibility: Visibility,
     pub is_entry: bool,
+    pub attributes: Vec<FunctionAttribute>,
     pub type_params: Vec<(Identifier, AbilitySet)>,
     pub params: Vec<Decl>,
     pub locals: Vec<Decl>,
@@ -171,6 +180,7 @@ pub struct Fun {
     pub acquires: Vec<Identifier>,
     pub instrs: Vec<Instruction>,
 }
+
 #[derive(Debug)]
 pub enum Type {
     Named(PartialIdent, Option<Vec<Type>>),
@@ -204,15 +214,9 @@ pub struct Instruction {
 
 #[derive(Debug)]
 pub enum Argument {
-    Constant(Value),
+    Constant(AsmValue),
     Id(PartialIdent, Option<Vec<Type>>),
     Type(Type),
-}
-
-#[derive(Debug)]
-pub enum Value {
-    Number(U256),
-    Bytes(Vec<u8>),
 }
 
 // ==========================================================================================
@@ -266,15 +270,20 @@ impl AsmParser {
     }
 
     fn lookahead_special(&self, sp: &str) -> bool {
-        matches!(&self.tokens[0].1, Token::Special(s) if s == sp)
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Special(s) if s == sp)
+    }
+
+    fn lookahead_special_2(&self, sp: &str) -> bool {
+        self.tokens.len() > 1 && matches!(&self.tokens[1].1, Token::Special(s) if s == sp)
     }
 
     fn lookahead_newline(&self) -> bool {
-        matches!(&self.tokens[0].1, Token::Newline)
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline)
     }
 
+    #[allow(unused)]
     fn lookahead_soft_kw(&self, kw: &str) -> bool {
-        matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
     }
 
     fn expect(&mut self, tok: &Token) -> AsmResult<()> {
@@ -336,19 +345,28 @@ impl AsmParser {
         Ok(result)
     }
 
-    fn value(&mut self) -> AsmResult<Value> {
+    fn value(&mut self) -> AsmResult<AsmValue> {
         if let Token::Number(num) = &self.next {
             let num = *num;
             self.advance()?;
-            Ok(Value::Number(num))
+            Ok(AsmValue::Number(num))
+        } else if self.is_special("[") {
+            self.advance()?;
+            let elems = if self.is_value() {
+                self.list(Self::value, ",")?
+            } else {
+                vec![]
+            };
+            self.expect_special("]")?;
+            Ok(AsmValue::Vector(elems))
         } else {
-            // TODO(#16582): byte strings
             Err(error(self.next_loc, "expected value"))
         }
     }
 
     fn is_value(&self) -> bool {
         matches!(&self.next, Token::Number(..))
+            || matches!(&self.next, Token::Special(s) if s == "[")
     }
 
     fn address(&mut self) -> AsmResult<AccountAddress> {
@@ -395,7 +413,12 @@ impl AsmParser {
     }
 
     fn type_(&mut self) -> AsmResult<Type> {
-        if self.is_partial_ident() {
+        if self.is_special("(") {
+            self.advance()?;
+            let ty = self.type_()?;
+            self.expect_special(")")?;
+            Ok(ty)
+        } else if self.is_partial_ident() {
             let pid = self.partial_ident()?;
             let ty_args = self.type_args_opt()?;
             Ok(Type::Named(pid, ty_args))
@@ -434,7 +457,7 @@ impl AsmParser {
     }
 
     fn is_type(&self) -> bool {
-        self.is_partial_ident()
+        self.is_partial_ident() || self.is_special("&") || self.is_special("(")
     }
 
     fn type_list(&mut self) -> AsmResult<Vec<Type>> {
@@ -442,13 +465,13 @@ impl AsmParser {
     }
 
     fn type_tuple(&mut self) -> AsmResult<Vec<Type>> {
-        if self.is_type() {
-            Ok(vec![self.type_()?])
-        } else if self.is_special("(") {
+        if self.is_special("(") {
             self.advance()?;
             let res = self.type_list()?;
             self.expect_special(")")?;
             Ok(res)
+        } else if self.is_type() {
+            Ok(vec![self.type_()?])
         } else {
             Err(error(self.next_loc, "expected type or type tuple"))
         }
@@ -541,6 +564,34 @@ impl AsmParser {
         })
     }
 
+    fn attributes(&mut self) -> AsmResult<Vec<FunctionAttribute>> {
+        if self.is_special("#") && self.lookahead_special("[") {
+            self.advance()?;
+            self.advance()?;
+            let attrs = self.list(
+                |parser| {
+                    let attr = if parser.is_soft_kw("persistent") {
+                        FunctionAttribute::Persistent
+                    } else if parser.is_soft_kw("module_lock") {
+                        FunctionAttribute::ModuleLock
+                    } else {
+                        return Err(error(
+                            parser.next_loc,
+                            "expected function attribute `persistent` or `module_lock`",
+                        ));
+                    };
+                    parser.advance()?;
+                    Ok(attr)
+                },
+                ",",
+            )?;
+            self.expect_special("]")?;
+            Ok(attrs)
+        } else {
+            Ok(vec![])
+        }
+    }
+
     fn decl(&mut self) -> AsmResult<Decl> {
         let loc = self.next_loc;
         let name = self.ident()?;
@@ -582,7 +633,24 @@ impl AsmParser {
             None
         };
         let args = if self.is_argument() {
-            self.list(Self::argument, ",")?
+            // Special case if first argument is type (`<t>`): in this case we do not require
+            // a comma, so we can write `ld_const <T> val
+            if self.is_special("<") {
+                let first = self.argument()?;
+                let mut args = if self.is_special(",") {
+                    // We still allow a comma
+                    self.advance()?;
+                    self.list(Self::argument, ",")?
+                } else if self.is_value() {
+                    self.list(Self::argument, ",")?
+                } else {
+                    vec![]
+                };
+                args.insert(0, first);
+                args
+            } else {
+                self.list(Self::argument, ",")?
+            }
         } else {
             vec![]
         };
@@ -680,14 +748,19 @@ impl AsmParser {
         Ok((loc, id, ty_params, abilities))
     }
 
-    fn is_fun(&self) -> bool {
+    fn is_first_of_fun(&self) -> bool {
+        // Notice when this is called we already checked for structs,
+        // so we only check for the start token (because of modifiers
+        // and attributes, we would need a deep lookahead otherwise)
         self.is_soft_kw("fun")
             || self.is_soft_kw("entry")
-            || (self.is_soft_kw("public") || self.is_soft_kw("friend"))
-                && self.lookahead_soft_kw("fun")
+            || self.is_soft_kw("public")
+            || self.is_soft_kw("friend")
+            || self.is_special("#") && self.lookahead_special("[")
     }
 
     fn fun(&mut self) -> AsmResult<Fun> {
+        let attributes = self.attributes()?;
         let is_entry = if self.is_soft_kw("entry") {
             self.advance()?;
             true
@@ -749,6 +822,7 @@ impl AsmParser {
             name,
             visibility,
             is_entry,
+            attributes,
             type_params,
             params,
             locals,
@@ -830,6 +904,15 @@ impl AsmParser {
             module_aliases.push((name, module));
         }
 
+        // Parse friend modules
+        let mut friend_modules = vec![];
+        while self.is_soft_kw("friend") && self.lookahead_special_2("::") {
+            self.advance()?;
+            let module = self.module_id(&address_alias_map)?;
+            self.expect_newline()?;
+            friend_modules.push(module);
+        }
+
         // Parse definitions
         let mut structs = vec![];
         let mut functions = vec![];
@@ -837,7 +920,7 @@ impl AsmParser {
         while !self.is_tok(&Token::End) {
             if self.is_struct_or_enum() {
                 structs.push(self.struct_or_enum()?)
-            } else if self.is_fun() {
+            } else if self.is_first_of_fun() {
                 functions.push(self.fun()?)
             } else {
                 return Err(error(
@@ -851,6 +934,7 @@ impl AsmParser {
             name,
             address_aliases,
             module_aliases,
+            friend_modules,
             structs,
             functions,
         })
@@ -967,7 +1051,7 @@ fn id_cont(ch: char) -> bool {
 fn special(ch: char) -> bool {
     matches!(
         ch,
-        '(' | ')' | '<' | '>' | ',' | ':' | '|' | '+' | '=' | '&'
+        '(' | ')' | '<' | '>' | '[' | ']' | ',' | ':' | '|' | '+' | '=' | '&' | '#'
     )
 }
 

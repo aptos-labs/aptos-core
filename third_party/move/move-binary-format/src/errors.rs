@@ -10,6 +10,7 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
+use once_cell::sync::Lazy;
 use std::fmt;
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
@@ -382,12 +383,21 @@ impl PartialVMError {
             indices,
             offsets,
         } = *self.0;
-        let bt = std::backtrace::Backtrace::capture();
-        let message = if std::backtrace::BacktraceStatus::Captured == bt.status() {
-            if let Some(message) = message {
-                Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+        static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| {
+            std::env::var("MOVE_TEST_DEBUG").map_or(false, |v| matches!(v.as_str(), "true" | "1"))
+        });
+        let message = if *MOVE_TEST_DEBUG {
+            // Do this only if env var is set. Otherwise, we cannot use the output in baseline files
+            // since it is not deterministic.
+            let bt = std::backtrace::Backtrace::capture();
+            if std::backtrace::BacktraceStatus::Captured == bt.status() {
+                if let Some(message) = message {
+                    Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+                } else {
+                    Some(format!("Backtrace: {:#?}", bt).to_string())
+                }
             } else {
-                Some(format!("Backtrace: {:#?}", bt).to_string())
+                message
             }
         } else {
             message
