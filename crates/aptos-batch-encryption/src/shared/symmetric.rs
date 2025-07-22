@@ -114,9 +114,10 @@ fn hmac_kdf(otp_source: impl AsRef<[u8]>) -> GenericArray<u8, <Sha256 as OutputS
 /// and (x, -y), or to exactly zero curve points. So there are
 /// |G2|/2 \approx |F_q|/2 possible x coordinates for the points
 /// on G2. This means that each iteration of the below algorithm
-/// has approximately probability 1/2 of succeeding (modeling the
-/// hash as a random oracle), and thus the probability of failure
-/// of this fn is 1/2^256.
+/// has approximately probability 1/2 of succeeding on a random
+/// input (modeling the hash as a random oracle), and thus the
+/// probability of failure of this fn is 1/2^256 on a random
+/// input.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine>
 {
     for ctr in 0..u8::MAX {
