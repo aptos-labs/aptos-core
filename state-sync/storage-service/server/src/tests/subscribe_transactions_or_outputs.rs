@@ -19,8 +19,6 @@ use futures::channel::oneshot::Receiver;
 use std::collections::HashMap;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
-// TODO(joshlind): Fix test.
 async fn test_subscribe_transactions_or_outputs_different_network() {
     // Test both v1 and v2 data requests
     for use_request_v2 in [false, true] {
@@ -479,8 +477,6 @@ async fn test_subscribe_transactions_or_outputs_max_chunk() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
-// TODO(joshlind): Fix test.
 async fn test_subscribe_transaction_or_outputs_streaming() {
     // Test both v1 and v2 data requests
     for use_request_v2 in [false, true] {
@@ -635,8 +631,6 @@ async fn test_subscribe_transaction_or_outputs_streaming() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
-// TODO(joshlind): Fix test.
 async fn test_subscribe_transactions_or_outputs_streaming_epoch_change() {
     // Test both v1 and v2 data requests
     for use_request_v2 in [false, true] {
@@ -825,8 +819,6 @@ async fn test_subscribe_transactions_or_outputs_streaming_epoch_change() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore]
-// TODO(joshlind): Fix test.
 async fn test_subscribe_transaction_or_outputs_streaming_loop() {
     // Test both v1 and v2 data requests
     for use_request_v2 in [false, true] {
