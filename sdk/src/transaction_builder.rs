@@ -84,9 +84,12 @@ impl TransactionBuilder {
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
-        self.payload = self
-            .payload
-            .upgrade_payload(use_txn_payload_v2_format, use_orderless_transactions);
+        let rng = &mut rand::thread_rng();
+        self.payload = self.payload.upgrade_payload(
+            rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        );
         if use_orderless_transactions {
             self.sequence_number = self.sequence_number.map(|_| u64::MAX);
         }

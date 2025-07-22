@@ -16,13 +16,22 @@ fn single_peer_to_peer_with_event() {
     ::aptos_logger::Logger::init_for_testing();
     let mut executor = FakeExecutor::from_head_genesis();
     // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    let receiver = executor.create_raw_account_data(100_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
+    let receiver = executor.create_raw_account_data(100_000, Some(10));
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
     let transfer_amount = 1_000;
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0);
+    let txn = peer_to_peer_txn(
+        sender.account(),
+        receiver.account(),
+        Some(10),
+        transfer_amount,
+        0,
+        executor.get_block_time_seconds(), // current_time
+        false,
+        false,
+    );
 
     // execute transaction
     let output = executor.execute_transaction(txn);
@@ -55,8 +64,8 @@ fn few_peer_to_peer_with_event() {
     let mut executor = FakeExecutor::from_head_genesis();
 
     // create and publish a sender with 3_000_000 coins and a receiver with 3_000_000 coins
-    let sender = executor.create_raw_account_data(3_000_000, 10);
-    let receiver = executor.create_raw_account_data(3_000_000, 10);
+    let sender = executor.create_raw_account_data(3_000_000, Some(10));
+    let receiver = executor.create_raw_account_data(3_000_000, Some(10));
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
@@ -64,10 +73,46 @@ fn few_peer_to_peer_with_event() {
 
     // execute transaction
     let txns: Vec<SignedTransaction> = vec![
-        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
-        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
-        peer_to_peer_txn(sender.account(), receiver.account(), 12, transfer_amount, 0),
-        peer_to_peer_txn(sender.account(), receiver.account(), 13, transfer_amount, 0),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(10),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(11),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(12),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        ),
+        peer_to_peer_txn(
+            sender.account(),
+            receiver.account(),
+            Some(13),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        ),
     ];
     let output = executor.execute_block(txns).unwrap();
     for (idx, txn_output) in output.iter().enumerate() {
@@ -152,7 +197,16 @@ pub(crate) fn create_cyclic_transfers(
         let seq_num = sender_resource.sequence_number();
         let receiver = &accounts[(i + 1) % count];
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount, 0);
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        );
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }
@@ -179,7 +233,16 @@ fn create_one_to_many_transfers(
     for (i, receiver) in accounts.iter().enumerate().take(count).skip(1) {
         // let receiver = &accounts[i];
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num + i as u64 - 1, transfer_amount, 0);
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num + i as u64 - 1),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        );
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }
@@ -206,7 +269,16 @@ fn create_many_to_one_transfers(
             .expect("sender must exist");
         let seq_num = sender_resource.sequence_number();
 
-        let txn = peer_to_peer_txn(sender, receiver, seq_num, transfer_amount, 0);
+        let txn = peer_to_peer_txn(
+            sender,
+            receiver,
+            Some(seq_num),
+            transfer_amount,
+            0,
+            executor.get_block_time_seconds(), // current_time
+            false,
+            false,
+        );
         txns.push(txn);
         txns_info.push(TxnInfo::new(sender, receiver, transfer_amount));
     }
@@ -280,7 +352,7 @@ fn cycle_peer_to_peer() {
     let account_size = 100usize;
     let initial_balance = 2_000_000u64;
     let initial_seq_num = 10u64;
-    let accounts = executor.create_accounts(account_size, initial_balance, initial_seq_num);
+    let accounts = executor.create_accounts(account_size, initial_balance, Some(initial_seq_num));
 
     // set up the transactions
     let transfer_amount = 1_000;
@@ -310,7 +382,7 @@ fn cycle_peer_to_peer_multi_block() {
     let account_size = 100usize;
     let initial_balance = 1_000_000u64;
     let initial_seq_num = 10u64;
-    let accounts = executor.create_accounts(account_size, initial_balance, initial_seq_num);
+    let accounts = executor.create_accounts(account_size, initial_balance, Some(initial_seq_num));
 
     // set up the transactions
     let transfer_amount = 1_000;
@@ -354,7 +426,7 @@ fn one_to_many_peer_to_peer() {
     let account_size = 100usize;
     let initial_balance = 100_000_000u64;
     let initial_seq_num = 10u64;
-    let accounts = executor.create_accounts(account_size, initial_balance, initial_seq_num);
+    let accounts = executor.create_accounts(account_size, initial_balance, Some(initial_seq_num));
 
     // set up the transactions
     let transfer_amount = 1_000;
@@ -398,7 +470,7 @@ fn many_to_one_peer_to_peer() {
     let account_size = 100usize;
     let initial_balance = 1_000_000u64;
     let initial_seq_num = 10u64;
-    let accounts = executor.create_accounts(account_size, initial_balance, initial_seq_num);
+    let accounts = executor.create_accounts(account_size, initial_balance, Some(initial_seq_num));
 
     // set up the transactions
     let transfer_amount = 1_000;
