@@ -67,17 +67,17 @@ fun c_u256(): u256
 
 // Function definition at index 12
 fun c_vec_u8(): vector<u8>
-    ld_const<vector<u8>> [255,0]
+    ld_const<vector<u8>> [255, 0]
     ret
 
 // Function definition at index 13
 fun c_vec_address(): vector<address>
-    ld_const<vector<address>> [102,51966]
+    ld_const<vector<address>> [102, 51966]
     ret
 
 // Function definition at index 14
 fun c_vec_vec_address(): vector<vector<address>>
-    ld_const<vector<vector<address>>> [[102],[51966],[]]
+    ld_const<vector<vector<address>>> [[102], [51966], []]
     ret
 
 

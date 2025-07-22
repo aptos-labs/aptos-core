@@ -413,7 +413,12 @@ impl AsmParser {
     }
 
     fn type_(&mut self) -> AsmResult<Type> {
-        if self.is_partial_ident() {
+        if self.is_special("(") {
+            self.advance()?;
+            let ty = self.type_()?;
+            self.expect_special(")")?;
+            Ok(ty)
+        } else if self.is_partial_ident() {
             let pid = self.partial_ident()?;
             let ty_args = self.type_args_opt()?;
             Ok(Type::Named(pid, ty_args))
@@ -452,7 +457,7 @@ impl AsmParser {
     }
 
     fn is_type(&self) -> bool {
-        self.is_partial_ident() || self.is_special("&") || self.is_special("|")
+        self.is_partial_ident() || self.is_special("&") || self.is_special("(")
     }
 
     fn type_list(&mut self) -> AsmResult<Vec<Type>> {
@@ -460,13 +465,13 @@ impl AsmParser {
     }
 
     fn type_tuple(&mut self) -> AsmResult<Vec<Type>> {
-        if self.is_type() {
-            Ok(vec![self.type_()?])
-        } else if self.is_special("(") {
+        if self.is_special("(") {
             self.advance()?;
             let res = self.type_list()?;
             self.expect_special(")")?;
             Ok(res)
+        } else if self.is_type() {
+            Ok(vec![self.type_()?])
         } else {
             Err(error(self.next_loc, "expected type or type tuple"))
         }

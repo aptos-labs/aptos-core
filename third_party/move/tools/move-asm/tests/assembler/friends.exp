@@ -1,12 +1,37 @@
-processed 1 task
+processed 3 tasks
 
-task 0 'print-bytecode'. lines 1-9:
+task 0 'publish'. lines 1-2:
+
+== BEGIN Bytecode ==
 // Bytecode version v7
 module 0x66::test1
-friend 0x0000000000000000000000000000000000000000000000000000000000000066::test2
+
+== END Bytecode ==
+
+task 1 'publish'. lines 4-9:
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test2
+friend 66::test1
 // Function definition at index 0
-friend fun f(): u8
+friend fun friend_fun(): u8
     ld_u8 255
     ret
 
 
+== END Bytecode ==
+
+task 2 'publish'. lines 11-15:
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test1
+use 0x66::test2
+// Function definition at index 0
+fun added_fun(): u8
+    call test2::friend_fun
+    ret
+
+
+== END Bytecode ==

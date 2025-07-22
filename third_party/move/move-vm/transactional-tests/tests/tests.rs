@@ -70,7 +70,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             language_version: LanguageVersion::latest(),
             vm_config: vm_config_for_tests(VerifierConfig::production()),
             include: &[],
-            exclude: &["/paranoid-tests/"],
+            exclude: &["paranoid-tests"],
         },
         TestConfig {
             name: "paranoid-mode-only",
@@ -81,17 +81,6 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             // Importantly, paranoid checks are enabled.
             vm_config: vm_config_for_tests(VerifierConfig::unbounded()),
             include: &["paranoid-tests"],
-            exclude: &[],
-        },
-        TestConfig {
-            name: "paranoid",
-            runner: Arc::new(SkipBytecodeVerifierRunner),
-            experiments: &[],
-            language_version: LanguageVersion::latest(),
-            // Verifier config is irrelevant here, because we disable verifier for these tests.
-            // Importantly, paranoid checks are enabled.
-            vm_config: vm_config_for_tests(VerifierConfig::unbounded()),
-            include: &["/function_values_safety/"],
             exclude: &[],
         },
     ]
@@ -112,7 +101,7 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// `test.mvir`) to the same baseline file `test.exp` *unless* there is an entry in this array
 /// matching the path of `test.move` or `test.mvir`. If there is such an entry, then each config
 /// "foo" will have a separate baseline output file `test.foo.exp`.
-const SEPARATE_BASELINE: &[&str] = &["/function_values_safety/"];
+const SEPARATE_BASELINE: &[&str] = &[];
 
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
@@ -152,7 +141,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") || p.ends_with(".mvir") || p.ends_with(".masm") {
+            if p.ends_with(".move") || p.ends_with(".mvir") {
                 Some(p)
             } else {
                 None

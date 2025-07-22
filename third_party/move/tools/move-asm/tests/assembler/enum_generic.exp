@@ -29,7 +29,7 @@ fun select(l0: test::E<u64>): u64
     ret
 
 // Function definition at index 2
-fun pack_and_unpack(): (u64,u32)
+fun pack_and_unpack(): (u64, u32)
     ld_u64 1
     ld_u8 2
     pack_variant E<u64>, V1

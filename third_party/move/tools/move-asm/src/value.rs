@@ -23,7 +23,7 @@ impl fmt::Display for AsmValue {
                 write!(f, "[")?;
                 for (p, v) in vs.iter().enumerate() {
                     if p > 0 {
-                        write!(f, ",")?
+                        write!(f, ", ")?
                     }
                     write!(f, "{}", v)?
                 }
@@ -72,7 +72,13 @@ impl AsmValue {
                     Err(anyhow!("expected vector value"))
                 }
             },
-            _ => Err(anyhow!("invalid type for constant value")),
+            SignatureToken::Signer
+            | SignatureToken::Function(_, _, _)
+            | SignatureToken::Struct(_)
+            | SignatureToken::StructInstantiation(_, _)
+            | SignatureToken::Reference(_)
+            | SignatureToken::MutableReference(_)
+            | SignatureToken::TypeParameter(_) => Err(anyhow!("invalid type for constant value")),
         }
     }
 

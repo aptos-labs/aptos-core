@@ -25,7 +25,7 @@ fun select(l0: test::S<u8>): u8
     ret
 
 // Function definition at index 2
-fun pack_and_unpack(): (u64,u8)
+fun pack_and_unpack(): (u64, u8)
     ld_u64 3
     ld_u8 2
     pack S<u8>
