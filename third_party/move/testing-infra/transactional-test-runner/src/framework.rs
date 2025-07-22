@@ -444,19 +444,12 @@ pub trait MoveTestAdapter<'a>: Sized {
                 }
                 let data_path = data.path().to_str().unwrap();
                 match syntax {
-                    SyntaxChoice::Source => self.compiled_state().add_with_source_file(
-                        named_addr_opt,
-                        module,
-                        (data_path.to_owned(), data),
-                    ),
+                    SyntaxChoice::Source | SyntaxChoice::ASM => self
+                        .compiled_state()
+                        .add_with_source_file(named_addr_opt, module, (data_path.to_owned(), data)),
                     SyntaxChoice::IR => {
                         self.compiled_state()
                             .add_and_generate_interface_file(module);
-                    },
-                    SyntaxChoice::ASM => {
-                        // TODO(#16582): generate source info for .masm file
-                        self.compiled_state()
-                            .add_without_source_file(named_addr_opt, module);
                     },
                 };
                 Ok(merge_output(warnings_opt, output))

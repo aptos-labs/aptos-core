@@ -11915,6 +11915,7 @@ dependencies = [
  "indexmap 2.7.0",
  "move-bytecode-spec",
  "move-core-types",
+ "once_cell",
  "proptest",
  "proptest-derive",
  "ref-cast",

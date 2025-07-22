@@ -18,10 +18,10 @@ use move_binary_format::{
     file_format::{
         AddressIdentifierIndex, Bytecode, CodeUnit, CompiledScript, Constant, ConstantPoolIndex,
         FieldDefinition, FieldHandle, FieldHandleIndex, FieldInstantiation,
-        FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex, FunctionHandle,
-        FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex,
-        MemberCount, ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        FieldInstantiationIndex, FunctionAttribute, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
+        IdentifierIndex, MemberCount, ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
         StructDefinitionIndex, StructFieldInformation, StructHandle, StructHandleIndex,
         StructTypeParameter, StructVariantHandle, StructVariantHandleIndex,
         StructVariantInstantiation, StructVariantInstantiationIndex, TableIndex,
@@ -252,6 +252,21 @@ impl<'a> ModuleBuilder<'a> {
         }
     }
 
+    /// Declares a friend module
+    pub fn declare_friend_module(&mut self, module: &ModuleId) -> Result<()> {
+        let address = self.address_index(module.address)?;
+        let name = self.name_index(module.name.clone())?;
+        let handle = ModuleHandle { address, name };
+        if self.options.validate && self.module.borrow().friend_decls.contains(&handle) {
+            bail!("duplicate friend module `{}`", module.short_str_lossless())
+        }
+        self.module
+            .borrow_mut()
+            .friend_decls
+            .push(ModuleHandle { address, name });
+        Ok(())
+    }
+
     /// Declares a struct and adds it to the builder. The struct initially does not have any
     /// layout associated.
     pub fn declare_struct(
@@ -317,12 +332,12 @@ impl<'a> ModuleBuilder<'a> {
 
     /// Declares a function and adds it to the builder. The function
     /// initially does not have any code associated.
-    /// TODO(#16582): attributes and access specifiers
     pub fn declare_fun(
         &self,
         is_entry: bool,
         name: Identifier,
         visibility: Visibility,
+        attributes: Vec<FunctionAttribute>,
         parameters: SignatureIndex,
         return_: SignatureIndex,
         type_parameters: Vec<AbilitySet>,
@@ -331,6 +346,9 @@ impl<'a> ModuleBuilder<'a> {
         if self.options.validate {
             let module_ref = self.module.borrow();
             let module = &*module_ref;
+            if self.is_script() && !module.function_defs.is_empty() {
+                bail!("script can have only one function definition")
+            }
             for fdef in &module.function_defs {
                 let view = FunctionDefinitionView::new(module, fdef);
                 if view.name() == name.as_ref() {
@@ -347,7 +365,7 @@ impl<'a> ModuleBuilder<'a> {
             return_,
             type_parameters,
             access_specifiers: None,
-            attributes: vec![],
+            attributes,
         };
         let fhdl_idx = if self.is_script() {
             *self.main_handle.borrow_mut() = Some(fhdl);
