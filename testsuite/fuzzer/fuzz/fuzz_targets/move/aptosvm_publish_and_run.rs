@@ -381,8 +381,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         ExecutionStatus::Success => (),
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation
-                    || e.status_type() == StatusType::Unknown
+                if (e.status_type() == StatusType::InvariantViolation
+                    || e.status_type() == StatusType::Unknown)
                         && *e != StatusCode::TYPE_RESOLUTION_FAILURE
                         && *e != StatusCode::STORAGE_ERROR
                 {
