@@ -73,7 +73,7 @@ static SET_OPERATOR_EVENT_TAG: Lazy<TypeTag> =
 static UPDATE_VOTER_EVENT_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateVoter").unwrap());
 static DISTRIBUTE_STAKING_REWARDS_TAG: Lazy<TypeTag> =
-    Lazy::new(|| parse_type_tag("0x1::stake::DistributeRewards").unwrap());
+    Lazy::new(|| parse_type_tag("0x1::staking_contract::Distribute").unwrap());
 static UPDATE_COMMISSION_TAG: Lazy<TypeTag> =
     Lazy::new(|| parse_type_tag("0x1::staking_contract::UpdateCommission").unwrap());
 
