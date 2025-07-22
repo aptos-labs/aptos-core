@@ -90,17 +90,17 @@ pub fn keygen<R: RngCore + CryptoRng>(
 }
 
 impl BIBEMasterSecretKeyShare {
-    pub fn derive_decryption_key_share(&self, digest: &Digest) -> BIBEDecryptionKeyShare {
-        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(G2Affine::from(G2Affine::generator() * self.shamir_share.y));
+    pub fn derive_decryption_key_share(&self, digest: &Digest) -> Result<BIBEDecryptionKeyShare> {
+        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(G2Affine::from(G2Affine::generator() * self.shamir_share.y))?;
 
-        BIBEDecryptionKeyShare {
+        Ok(BIBEDecryptionKeyShare {
             signature_share: ShamirGroupShare {
                 x: self.shamir_share.x,
                 g_y: G1Affine::from((digest.as_g1() + hashed_encryption_key) * self.shamir_share.y)
             },
             digest_g1: digest.as_g1(),
             player: self.player
-        }
+        })
     }
 }
 
@@ -110,8 +110,8 @@ fn verify_bls(
     digest: &Digest,
     offset: G2Affine,
     signature: G1Affine,
-) -> Result<(), ()> {
-    let hashed_offset : G1Affine = symmetric::hash_g2_element(offset);
+) -> Result<()> {
+    let hashed_offset : G1Affine = symmetric::hash_g2_element(offset)?;
 
     if PairingSetting::pairing( 
         digest.as_g1() + hashed_offset,
@@ -122,7 +122,7 @@ fn verify_bls(
     ) {
         Ok(())
     } else {
-        Err(())
+        Err(anyhow::anyhow!("bls verification error"))
     }
 }
 
@@ -210,7 +210,7 @@ mod tests {
         let mut dk_shares = vec![];
 
         for (msk_share, vk) in msk_shares.into_iter().zip(vks) {
-            let dk_share = msk_share.derive_decryption_key_share(&digest);
+            let dk_share = msk_share.derive_decryption_key_share(&digest).unwrap();
             vk.verify_decryption_key_share(&digest, &dk_share)
                 .expect("Each decryption key share should verify");
             dk_shares.push(dk_share);

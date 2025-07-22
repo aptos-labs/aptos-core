@@ -1,12 +1,14 @@
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, Aes256Gcm, AesGcm, Key, KeySizeUser, Nonce};
+use ark_bn254::Bn254;
 use serde::{Deserialize, Serialize};
-use crate::group::G2Affine;
+use crate::group::{G2Affine, Config};
 use ark_serialize::CanonicalSerialize as _;
 use hmac::{Hmac, Mac};
-use ark_ec::{hashing::{curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher, HashToCurve}, AffineRepr as _};
-use ark_ff::field_hashers::DefaultFieldHasher;
+use ark_ec::{bn::BnConfig, short_weierstrass::SWCurveConfig, hashing::{curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher, HashToCurve}, AffineRepr as _};
+use ark_ff::{Field, field_hashers::{DefaultFieldHasher, HashToField}};
 use rand_core::{CryptoRng, RngCore};
-use crate::{errors::BatchEncryptionError, group::{G1Affine, G1Config, G1Projective}, traits::Plaintext};
+use ark_std::Zero;
+use crate::{errors::BatchEncryptionError, group::{G1Affine, G1Config, G1Projective, Fq}, traits::Plaintext};
 use sha2::{digest::{consts::{B0, B1, U16}, generic_array::{functional::FunctionalSequence as _, sequence::Split, GenericArray}, typenum::{UInt, UTerm}, OutputSizeUser}, Sha256};
 use anyhow::Result;
 
@@ -103,27 +105,31 @@ fn hmac_kdf(otp_source: impl AsRef<[u8]>) -> GenericArray<u8, <Sha256 as OutputS
 }
 
 
-pub fn hash_g2_element(g2_element: G2Affine) -> G1Affine
+pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine>
 {
-    let mut hash_source_bytes = Vec::new();
-    g2_element.serialize_compressed(&mut hash_source_bytes).unwrap();
+    for ctr in 0..u64::MAX {
+        let mut hash_source_bytes = Vec::new();
+        g2_element.serialize_compressed(&mut hash_source_bytes).unwrap();
+        let mut ctr_bytes = Vec::from(ctr.to_be_bytes());
+        hash_source_bytes.append(&mut ctr_bytes); 
+        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
+        let [x] : [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
 
+        // Rust does not optimise away addition with zero
+        let mut x3b = <ark_bn254::Config as BnConfig>::G1Config::add_b(x.square() * x);
+        if !<ark_bn254::Config as BnConfig>::G1Config::COEFF_A.is_zero() {
+            x3b += <ark_bn254::Config as BnConfig>::G1Config::mul_by_a(x);
+        };
 
-    // TODO: implement a version of this for bn254, b/c it looks like hashing to group is not
-    // implemented for this curve in arkworks
-    // Might be possible to use the implementation in this repo: 
-    // https://github.com/hashcloak/bn254-hash-to-curve/
-    
-    // using empty domain separator b/c this is a test implementation
-    //let hasher : MapToCurveBasedHasher<G1Projective, DefaultFieldHasher<Sha256>, WBMap<G1Config>  >
-    //    = HashToCurve::new(&[]).unwrap(); // I believe should never panic here b/c we
-    //                                      // are hashing w/ a supported curve?
-    //let hashed_g1_elt : G1Affine = 
-    //    hasher.hash(&hash_source_bytes)
-    //    .unwrap(); // Again, I don't think this should ever panic
-    //             
-    //hashed_g1_elt.into()
-    G1Affine::generator()
+        if x3b.legendre().is_qr() {
+            return Ok(G1Affine::new(
+                x, 
+                x3b.sqrt().unwrap() // I think unwrap is safe here b/c x3b is qr.
+            ))
+        }
+    }
+
+    Err(BatchEncryptionError::Hash2CurveFailure)?
 }
 
 #[cfg(test)]

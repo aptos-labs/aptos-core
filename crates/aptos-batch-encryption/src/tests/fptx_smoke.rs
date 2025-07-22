@@ -23,7 +23,7 @@ fn smoke() {
     FPTX::eval_proofs_compute_all(&mut pfs, &tp);
 
     let dk_shares : Vec<<FPTX as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares.into_iter()
-        .map(|msk_share| msk_share.derive_decryption_key_share(&d))
+        .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
         .collect();
 
     dk_shares.iter()

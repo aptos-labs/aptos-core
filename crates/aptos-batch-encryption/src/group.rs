@@ -9,7 +9,9 @@ pub use ark_bn254::{
     G1Affine, 
     G2Affine, 
     G1Projective, 
-    G2Projective
+    G2Projective,
+    Fq,
+    Config,
 };
 
 
@@ -21,6 +23,8 @@ pub use ark_bn254::{
 //    G1Affine, 
 //    G2Affine, 
 //    G1Projective, 
-//    G2Projective
+//    G2Projective,
+//    Fq,
+//    Config
 //};
 

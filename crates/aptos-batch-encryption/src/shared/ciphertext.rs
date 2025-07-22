@@ -123,7 +123,7 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
     fn bibe_encrypt<R: RngCore + CryptoRng>(&self, rng: &mut R, plaintext: &impl Plaintext, id: I) -> Result<BIBECiphertext<I>>
     {
         let r = vec![Fr::rand(rng), Fr::rand(rng)];
-        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2());
+        let hashed_encryption_key : G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2())?;
 
         let ct_1 = [
             (G2Affine::generator() * r[0] + self.sig_mpk_g2() * r[1]).into(),
@@ -224,7 +224,7 @@ pub mod tests {
 
         let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
 
-        let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest)], &tc).unwrap();
+        let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()], &tc).unwrap();
 
         let decrypted_plaintext : String = dk.bibe_decrypt(&ct, pfs.get(&FreeRootId::new(Fr::zero())).unwrap()).unwrap();
 
@@ -247,7 +247,7 @@ pub mod tests {
         let (digest, mut pfs) = dk.digest(&mut ids, 0).unwrap();
         pfs.compute_all();
 
-        let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest)], &tc).unwrap();
+        let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()], &tc).unwrap();
 
         let decrypted_plaintext : String = dk.decrypt(&ct, &pfs).unwrap();
 

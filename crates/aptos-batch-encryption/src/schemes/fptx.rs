@@ -137,7 +137,7 @@ impl BatchThresholdEncryption for FPTX {
     fn derive_decryption_key_share(
         msk_share: &Self::MasterSecretKeyShare, 
         digest: &Self::Digest, 
-        ) -> Self::DecryptionKeyShare {
+        ) -> Result<Self::DecryptionKeyShare> {
         msk_share.derive_decryption_key_share(digest)
     }
 

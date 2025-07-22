@@ -82,7 +82,7 @@ pub trait BatchThresholdEncryption {
     fn derive_decryption_key_share(
         msk_share: &Self::MasterSecretKeyShare, 
         digest: &Self::Digest, 
-        ) -> Self::DecryptionKeyShare;
+        ) -> Result<Self::DecryptionKeyShare>;
 
 
     fn verify_decryption_key_share(
