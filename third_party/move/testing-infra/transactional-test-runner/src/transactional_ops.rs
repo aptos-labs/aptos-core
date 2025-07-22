@@ -105,12 +105,12 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
     // All of these are required minimal functions to be implemented
     fn publish_module(
         &mut self,
-        module: CompiledModule,
+        _module: CompiledModule,
         _named_addr_opt: Option<Identifier>,
         _gas_budget: Option<u64>,
         _extra: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
-        Ok((None, module))
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     fn execute_script(
@@ -122,7 +122,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
     ) -> Result<Option<String>> {
-        Ok(None)
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     fn call_function(
@@ -135,10 +135,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        Ok((None, SerializedReturnValues {
-            mutable_reference_outputs: vec![],
-            return_values: vec![],
-        }))
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     fn view_data(
@@ -148,18 +145,18 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _resource: &IdentStr,
         _type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        Ok("".to_string())
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     fn handle_subcommand(
         &mut self,
         _subcommand: TaskInput<Self::Subcommand>,
     ) -> Result<Option<String>> {
-        Ok(None)
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     fn deserialize(&self, _bytes: &[u8], _layout: &MoveTypeLayout) -> Option<Value> {
-        None
+        unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
     // We need this to set the compiler version to the latest version
