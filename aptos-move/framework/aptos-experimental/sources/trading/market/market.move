@@ -502,7 +502,7 @@ module aptos_experimental::market {
         order_id: OrderIdType,
         maker_cancellation_reason: String,
         unsettled_size: u64,
-        metdata: M,
+        metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
@@ -518,7 +518,7 @@ module aptos_experimental::market {
             false,
             market_types::order_status_cancelled(),
             &maker_cancellation_reason,
-            metdata,
+            metadata,
             callbacks
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
