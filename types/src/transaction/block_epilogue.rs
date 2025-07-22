@@ -93,8 +93,8 @@ impl BlockEndInfo {
 
 /// Wrapper type to temporarily host the hot_state_ops which will not serialize until
 /// the hot state is made entirely deterministic
-#[derive(Debug, Deref)]
-pub struct TBlockEndInfoExt<Key: Debug> {
+#[derive(Clone, Debug, Deref)]
+pub struct TBlockEndInfoExt<Key: Clone + Debug> {
     #[deref]
     inner: BlockEndInfo,
     /// TODO(HotState): remove
@@ -103,13 +103,12 @@ pub struct TBlockEndInfoExt<Key: Debug> {
     /// TODO(HotState): add evictions
     /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
     ///                 serialize the promoted and evicted keys in the transaction.
-    #[allow(dead_code)]
-    slots_to_make_hot: BTreeMap<Key, StateSlot>,
+    pub slots_to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
 
-impl<Key: Debug> TBlockEndInfoExt<Key> {
+impl<Key: Clone + Debug> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
             inner: BlockEndInfo::new_empty(),
