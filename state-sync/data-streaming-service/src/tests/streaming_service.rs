@@ -576,12 +576,9 @@ async fn test_notifications_continuous_transactions_or_outputs_target() {
 
         // Update the next expected version
         let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof
-                .clone()
-                .unwrap()
-                .get_num_transactions() as u64
+            transactions_with_proof.unwrap().get_num_transactions() as u64
         } else {
-            outputs_with_proof.clone().unwrap().get_num_outputs() as u64
+            outputs_with_proof.unwrap().get_num_outputs() as u64
         };
         next_expected_version += num_transactions;
 
@@ -646,12 +643,9 @@ async fn test_notifications_continuous_transactions_or_outputs_multiple_streams(
 
         // Update the next expected version
         let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof
-                .clone()
-                .unwrap()
-                .get_num_transactions() as u64
+            transactions_with_proof.unwrap().get_num_transactions() as u64
         } else {
-            outputs_with_proof.clone().unwrap().get_num_outputs() as u64
+            outputs_with_proof.unwrap().get_num_outputs() as u64
         };
         next_expected_version += num_transactions;
 
