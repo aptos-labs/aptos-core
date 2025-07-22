@@ -107,12 +107,22 @@ fn hmac_kdf(otp_source: impl AsRef<[u8]>) -> GenericArray<u8, <Sha256 as OutputS
 
 /// hash-2-curve for bn254. Taken from p. 23 of 
 /// https://wahby.net/bls-hash-ches19-talk.pdf
+/// 
+/// On the number of iterations: In bn254, the order of G1 is
+/// approximately the same as the size of the field Fq. Every
+/// x coordinate either maps to exactly two curve points (x, y)
+/// and (x, -y), or to exactly zero curve points. So there are
+/// |G2|/2 \approx |F_q|/2 possible x coordinates for the points
+/// on G2. This means that each iteration of the below algorithm
+/// has approximately probability 1/2 of succeeding (modeling the
+/// hash as a random oracle), and thus the probability of failure
+/// of this fn is 1/2^256.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine>
 {
-    for ctr in 0..u64::MAX {
+    for ctr in 0..u8::MAX {
         let mut hash_source_bytes = Vec::new();
         g2_element.serialize_compressed(&mut hash_source_bytes).unwrap();
-        let mut ctr_bytes = Vec::from(ctr.to_be_bytes());
+        let mut ctr_bytes = Vec::from([ctr]);
         hash_source_bytes.append(&mut ctr_bytes); 
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
         let [x] : [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
