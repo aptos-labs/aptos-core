@@ -5,10 +5,7 @@ use crate::{
     optimistic_fetch::OptimisticFetchRequest,
     storage::StorageReader,
     subscription::SubscriptionStreamRequests,
-    tests::{
-        mock::{MockClient, MockDatabaseReader},
-        utils,
-    },
+    tests::mock::{MockClient, MockDatabaseReader},
     StorageServiceServer,
 };
 use aptos_config::{
@@ -210,7 +207,7 @@ pub fn create_persisted_auxiliary_infos(
     // Create a list of auxiliary infos
     let mut persisted_auxiliary_infos = vec![];
     for i in 0..num_auxiliary_infos {
-        let persisted_auxiliary_info = if utils::get_random_u64() % 2 == 0 && use_request_v2 {
+        let persisted_auxiliary_info = if use_request_v2 {
             PersistedAuxiliaryInfo::V1 {
                 transaction_index: i as u32,
             }
@@ -315,9 +312,13 @@ pub fn create_transaction_list_using_sizes(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
+    // Create the auxiliary infos
+    let auxiliary_infos =
+        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
+
     TransactionListWithProofV2::new(TransactionListWithAuxiliaryInfos::new(
         transaction_list_with_proof,
-        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2),
+        auxiliary_infos,
     ))
 }
 
@@ -344,9 +345,13 @@ pub fn create_transaction_list_with_proof(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
+    // Create the auxiliary infos
+    let auxiliary_infos =
+        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
+
     TransactionListWithProofV2::new(TransactionListWithAuxiliaryInfos::new(
         transaction_list_with_proof,
-        create_persisted_auxiliary_infos(start_version, end_version, use_request_v2),
+        auxiliary_infos,
     ))
 }
 
