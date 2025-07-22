@@ -1415,7 +1415,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, maker_order: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, maker_address: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, unsettled_size: u64, metdata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="market.md#0x7_market_cancel_maker_order_internal">cancel_maker_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, maker_order: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, maker_address: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, maker_cancellation_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, unsettled_size: u64, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1432,7 +1432,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     order_id: OrderIdType,
     maker_cancellation_reason: String,
     unsettled_size: u64,
-    metdata: M,
+    metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>let</b> maker_cancel_size = unsettled_size + maker_order.<a href="market.md#0x7_market_get_remaining_size">get_remaining_size</a>();
@@ -1448,7 +1448,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         <b>false</b>,
         <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
         &maker_cancellation_reason,
-        metdata,
+        metadata,
         callbacks
     );
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
