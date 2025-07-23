@@ -131,11 +131,10 @@ loop {
 return _t1
 
 --- Var-Bound Generated AST
+if (Not(Gt(length, 0))) Abort(1);
+if (Not(Lt(length, 100))) Abort(2);
 {
-  let _t1: u64;
-  if (Not(Gt(length, 0))) Abort(1);
-  if (Not(Lt(length, 100))) Abort(2);
-  _t1: u64 = 0;
+  let _t1: u64 = 0;
   loop {
     if (Not(Lt(_t1, length))) break;
     _t1: u64 = Add(_t1, 1);
@@ -147,10 +146,9 @@ return _t1
 === Sourcified Output ============================================
 module 0x815::m {
     public fun f(length: u64): u64 {
-        let _t1;
         if (!(length > 0)) abort 1;
         if (!(length < 100)) abort 2;
-        _t1 = 0;
+        let _t1 = 0;
         while (_t1 < length) _t1 = _t1 + 1;
         _t1
     }

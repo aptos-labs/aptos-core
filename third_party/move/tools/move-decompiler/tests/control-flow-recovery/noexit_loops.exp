@@ -8,8 +8,7 @@ module 0x99::noexit_loops {
         ()
     }
     fun f1() {
-        let _t0;
-        _t0 = 0;
+        let _t0 = 0;
         loop _t0 = _t0 + 1
     }
     fun f10() {
@@ -40,13 +39,11 @@ module 0x99::noexit_loops {
         loop continue
     }
     fun f2(): u64 {
-        let _t0;
-        _t0 = 1 + 1;
+        let _t0 = 1 + 1;
         loop _t0 = _t0 + 1
     }
     fun f3(): u64 {
-        let _t0;
-        _t0 = 1;
+        let _t0 = 1;
         loop _t0 = _t0 + foo(_t0)
     }
     fun foo(x: u64): u64 {

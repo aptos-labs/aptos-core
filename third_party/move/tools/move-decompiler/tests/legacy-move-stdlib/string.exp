@@ -18,13 +18,11 @@ module 0x1::string {
         vector::append<u8>(&mut self.bytes, *&(&r).bytes);
     }
     public fun insert(self: &mut String, at: u64, o: String) {
-        let _t6;
         let _t4;
-        let _t3;
-        _t3 = &self.bytes;
+        let _t3 = &self.bytes;
         if (at <= vector::length<u8>(_t3)) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
         if (!_t4) abort 2;
-        _t6 = sub_string(/*freeze*/self, 0, at);
+        let _t6 = sub_string(/*freeze*/self, 0, at);
         append(&mut _t6, o);
         append(&mut _t6, sub_string(/*freeze*/self, at, length(/*freeze*/self)));
         *self = _t6;
@@ -34,8 +32,7 @@ module 0x1::string {
         let _t7;
         let _t6;
         let _t5;
-        let _t3;
-        _t3 = &self.bytes;
+        let _t3 = &self.bytes;
         if (j <= vector::length<u8>(_t3)) _t5 = i <= j else _t5 = false;
         if (_t5) _t6 = internal_is_char_boundary(_t3, i) else _t6 = false;
         if (_t6) _t7 = internal_is_char_boundary(_t3, j) else _t7 = false;

@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    struct X has key {
+    }
+    fun f() {
+        borrow_global_mut(0x1);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ function_acquires_trailing_comma.move:5:27
+  │
+5 │         borrow_global_mut(0x1);
+  │                           ^^^

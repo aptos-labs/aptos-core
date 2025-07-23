@@ -1,0 +1,15 @@
+module 0x42::bit_vector_infer {
+    public fun new(_length: u64) {
+        _length = 1;
+        if (_length > 0) _length - 1;
+        0x1::vector::push_back<bool>(&mut 0x1::vector::empty<bool>(), false);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: expected expression with no value but found `u64`
+  ┌─ inline_spec_inference_bitvector.move:4:9
+  │
+4 │         if (_length > 0) _length - 1;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

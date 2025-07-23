@@ -1,0 +1,21 @@
+module 0x8675309::M {
+    fun t1(cond: bool, u: &u64, u_mut: &mut u64) {
+        if (!cond) {
+            /*freeze*/u_mut;
+            /*freeze*/u_mut
+        };
+        if (cond) /*freeze*/u_mut else /*freeze*/u_mut;
+        if (cond) /*freeze*/u_mut else /*freeze*/u_mut;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: expected expression with no value but found `&mut u64`
+  ┌─ if_branches_subtype.move:3:9
+  │
+3 │ ╭         if (!cond) {
+4 │ │             /*freeze*/u_mut;
+5 │ │             /*freeze*/u_mut
+6 │ │         };
+  │ ╰─────────^

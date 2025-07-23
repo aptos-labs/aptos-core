@@ -1,0 +1,51 @@
+module 0x815::m {
+    enum CommonFields has drop {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            y: u8,
+            z: u32,
+        }
+        Baz {
+            y: u8,
+        }
+    }
+    fun update_common_field(): u64 {
+        let _t0 = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        &mut (&mut _t0).x = 15;
+        *&(&_t0).x
+    }
+    fun update_common_field_different_offset(): u8 {
+        let _t5;
+        let _t3;
+        let _t0 = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        let _t2 = &mut _t0;
+        if ((_t2 is Foo) || (_t2 is Bar)) _t3 = &mut _t2.y else _t3 = &mut _t2.y;
+        *_t3 = 15u8;
+        let _t4 = &_t0;
+        if ((_t4 is Foo) || (_t4 is Bar)) _t5 = &_t4.y else _t5 = &_t4.y;
+        *_t5
+    }
+    fun update_non_common_field(): u32 {
+        let _t0 = CommonFields::Bar{x: 30,y: 40u8,z: 50u32};
+        &mut (&mut _t0).z = 15u32;
+        *&(&_t0).z
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ bug_14300_update_variant_select.move:18:9
+   │
+18 │         &mut (&mut _t0).x = 15;
+   │         ^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+   ┌─ bug_14300_update_variant_select.move:34:9
+   │
+34 │         &mut (&mut _t0).z = 15u32;
+   │         ^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
