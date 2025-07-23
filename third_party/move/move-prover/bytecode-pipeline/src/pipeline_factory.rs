@@ -8,11 +8,15 @@ use crate::{
     eliminate_imm_refs::EliminateImmRefsProcessor,
     global_invariant_analysis::GlobalInvariantAnalysisProcessor,
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
-    inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
-    memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
+    inconsistency_check::InconsistencyCheckInstrumenter,
+    loop_analysis::LoopAnalysisProcessor,
+    memory_instrumentation::MemoryInstrumentationProcessor,
+    mono_analysis::MonoAnalysisProcessor,
     mut_ref_instrumentation::MutRefInstrumenter,
-    number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
+    number_operation_analysis::NumberOperationProcessor,
+    options::ProverOptions,
     spec_instrumentation::SpecInstrumentationProcessor,
+    variant_context_analysis::VariantContextAnalysisProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
@@ -51,6 +55,8 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         GlobalInvariantAnalysisProcessor::new(),
         GlobalInvariantInstrumentationProcessor::new(),
         WellFormedInstrumentationProcessor::new(),
+        // variant context analysis (must come before data invariant instrumentation)
+        VariantContextAnalysisProcessor::new(),
         DataInvariantInstrumentationProcessor::new(),
         // monomorphization
         MonoAnalysisProcessor::new(),

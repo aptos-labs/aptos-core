@@ -12,12 +12,13 @@
 //! instructions introduced by memory instrumentation, as well as the Pack instructions.
 
 use crate::options::ProverOptions;
+use crate::variant_context_analysis::{VariantContextAnnotation, VariantContext};
 use move_model::{
     ast,
     ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
     metadata::LanguageVersion,
-    model::{FunctionEnv, Loc, NodeId, StructEnv},
+    model::{FunctionEnv, Loc, NodeId, StructEnv, QualifiedInstId},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
     well_known,
@@ -28,6 +29,7 @@ use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Operation, PropKind},
 };
+use move_model::symbol::Symbol;
 
 const INVARIANT_FAILS_MESSAGE: &str = "data invariant does not hold";
 
@@ -112,6 +114,7 @@ impl<'a> Instrumenter<'a> {
                     .emit(Call(id, dests, Pack(mid, sid, targs), srcs, aa));
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, struct_temp);
+
             },
             Call(id, dests, PackVariant(mid, sid, variant, targs), srcs, aa)
                 if self.for_verification =>
@@ -131,7 +134,27 @@ impl<'a> Instrumenter<'a> {
                 // Emit a shallow assert of the data invariant.
                 self.emit_data_invariant_for_temp(false, PropKind::Assert, srcs[0]);
             },
-            Call(_, _, PackRefDeep, srcs, _) if self.for_verification => {
+            Call(id, _, PackRefDeep, srcs, _) if self.for_verification => {
+                eprintln!("DEBUG: Processing PackRefDeep instruction: Call({:?}, PackRefDeep, {:?}, _)", id, srcs);
+                // Get the type of the value being processed
+                let env = self.builder.global_env();
+                let ty = env.get_node_type(self.builder.mk_temporary(srcs[0]).node_id());
+                eprintln!("DEBUG: PackRefDeep for type {:?}", ty);
+
+                // Get the source location of this instruction from the node ID
+                let temp_node_id = self.builder.mk_temporary(srcs[0]).node_id();
+                let node_loc = env.get_node_loc(temp_node_id);
+                eprintln!("DEBUG: PackRefDeep at source location: {}", node_loc.display(env));
+
+                // Check if this is an enum type
+                if let Type::Struct(mid, sid, _) = ty.skip_reference() {
+                    let struct_env = env.get_module(*mid).into_struct(*sid);
+                    if struct_env.has_variants() {
+                        eprintln!("DEBUG: PackRefDeep for enum struct {} - need variant context",
+                                 struct_env.get_name().display(env.symbol_pool()).to_string());
+                    }
+                }
+
                 // Emit a deep assert of the data invariant.
                 self.emit_data_invariant_for_temp(true, PropKind::Assert, srcs[0]);
             },
@@ -181,6 +204,16 @@ impl<'a> Instrumenter<'a> {
     }
 
     fn translate_invariant(&self, deep: bool, value: Exp) -> Vec<(Loc, Exp)> {
+        self.translate_invariant_with_variant(deep, value, None)
+    }
+
+    /// New helper: propagate parent enum/variant context
+    fn translate_invariant_with_variant(
+        &self,
+        deep: bool,
+        value: Exp,
+        parent_enum_variant: Option<(Type, Symbol, Exp)>,
+    ) -> Vec<(Loc, Exp)> {
         let env = self.builder.global_env();
         let ty = env.get_node_type(value.node_id());
         match ty.skip_reference() {
@@ -194,10 +227,6 @@ impl<'a> Instrumenter<'a> {
                     let spec_fun_get = decl
                         .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_GET)
                         .expect("intrinsic map_get function");
-
-                    // When dealing with a map, we cannot maintain individual locations for
-                    // invariants. Instead we choose just one as a representative.
-                    // TODO(refactoring): we should use the spec block position instead.
                     let mut loc = env.unknown_loc();
                     let quant = self.builder.mk_map_quant_opt(
                         QuantKind::Forall,
@@ -206,12 +235,11 @@ impl<'a> Instrumenter<'a> {
                         &targs[0],
                         &targs[1],
                         &mut |e| {
-                            let invs = self.translate_invariant(deep, e);
+                            let invs = self.translate_invariant_with_variant(deep, e, parent_enum_variant.clone());
                             if !invs.is_empty() {
                                 loc = invs[0].0.clone();
                             }
-                            self.builder
-                                .mk_join_bool(ast::Operation::And, invs.into_iter().map(|(_, e)| e))
+                            self.builder.mk_join_bool(ast::Operation::And, invs.into_iter().map(|(_, e)| e))
                         },
                     );
                     if let Some(e) = quant {
@@ -220,24 +248,18 @@ impl<'a> Instrumenter<'a> {
                         vec![]
                     }
                 } else {
-                    self.translate_invariant_for_struct(deep, value, struct_env, targs)
+                    self.translate_invariant_for_struct_with_variant(deep, value, struct_env, targs, parent_enum_variant)
                 }
             },
             Type::Vector(ety) => {
-                // When dealing with a vector, we cannot maintain individual locations for
-                // invariants. Instead we choose just one as a representative.
-                // TODO(refactoring): we should use the spec block position instead.
                 let mut loc = env.unknown_loc();
-                let quant =
-                    self.builder
-                        .mk_vector_quant_opt(QuantKind::Forall, value, ety, &mut |elem| {
-                            let invs = self.translate_invariant(deep, elem);
-                            if !invs.is_empty() {
-                                loc = invs[0].0.clone();
-                            }
-                            self.builder
-                                .mk_join_bool(ast::Operation::And, invs.into_iter().map(|(_, e)| e))
-                        });
+                let quant = self.builder.mk_vector_quant_opt(QuantKind::Forall, value, ety, &mut |elem| {
+                    let invs = self.translate_invariant_with_variant(deep, elem, parent_enum_variant.clone());
+                    if !invs.is_empty() {
+                        loc = invs[0].0.clone();
+                    }
+                    self.builder.mk_join_bool(ast::Operation::And, invs.into_iter().map(|(_, e)| e))
+                });
                 if let Some(e) = quant {
                     vec![(loc, e)]
                 } else {
@@ -255,6 +277,18 @@ impl<'a> Instrumenter<'a> {
         struct_env: StructEnv<'_>,
         targs: &[Type],
     ) -> Vec<(Loc, Exp)> {
+        self.translate_invariant_for_struct_with_variant(deep, value, struct_env, targs, None)
+    }
+
+    /// New helper: propagate parent enum/variant context
+    fn translate_invariant_for_struct_with_variant(
+        &self,
+        deep: bool,
+        value: Exp,
+        struct_env: StructEnv<'_>,
+        targs: &[Type],
+        parent_enum_variant: Option<(Type, Symbol, Exp)>,
+    ) -> Vec<(Loc, Exp)> {
         use ast::Operation::*;
         use ExpData::*;
 
@@ -263,16 +297,11 @@ impl<'a> Instrumenter<'a> {
             .global_env()
             .language_version()
             .is_at_least(LanguageVersion::V2_0);
-        // First generate a conjunction for all invariants on this struct.
         let mut result = vec![];
         for cond in struct_env
             .get_spec()
             .filter_kind(ConditionKind::StructInvariant)
         {
-            // Rewrite the invariant expression, inserting `value` for the struct target.
-            // By convention, selection from the target is represented as a `Select` operation with
-            // an empty argument list. It is guaranteed that this uniquely identifies the
-            // target, as any other `Select` will have exactly one argument.
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
                 LocalVar(_, var) => {
                     if lang_ver_ge_2
@@ -291,25 +320,96 @@ impl<'a> Instrumenter<'a> {
                 ),
                 _ => RewriteResult::Unchanged(e),
             };
-            // Also instantiate types.
             let env = self.builder.global_env();
             let node_rewriter = &mut |id: NodeId| ExpData::instantiate_node(env, id, targs);
-
-            let exp =
-                ExpData::rewrite_exp_and_node_id(cond.exp.clone(), exp_rewriter, node_rewriter);
-            result.push((cond.loc.clone(), exp));
+            let exp = ExpData::rewrite_exp_and_node_id(cond.exp.clone(), exp_rewriter, node_rewriter);
+            let mut guarded_exp = exp.clone();
+            // If this is a field of an enum variant, guard with a TestVariant
+            if let Some((enum_ty, variant_sym, enum_val)) = &parent_enum_variant {
+                // Build: (TestVariant(enum_val, variant_sym) ==> exp)
+                let test = self.mk_test_variant(enum_ty.clone(), enum_val.clone(), *variant_sym);
+                guarded_exp = self.builder.mk_implies(test, exp);
+            }
+            result.push((cond.loc.clone(), guarded_exp));
         }
-
-        // If this is deep, recurse over all fields.
         if deep {
-            for field_env in struct_env.get_fields() {
-                let field_exp = self
-                    .builder
-                    .mk_field_select(&field_env, targs, value.clone());
-                result.extend(self.translate_invariant(deep, field_exp));
+            if struct_env.has_variants() {
+                let variant_context = self.builder.data.annotations.get::<VariantContextAnnotation>();
+                if variant_context.is_none() {
+                    return result;
+                }
+                let variant_annotation = variant_context.unwrap();
+                let current_offset = self.builder.data.code.len() as u16;
+                let temp_idx = match value.as_ref() {
+                    ExpData::LocalVar(_, var) => {
+                        let temp_index = var.display(self.builder.global_env().symbol_pool()).to_string();
+                        temp_index.parse::<usize>().ok()
+                    },
+                    ExpData::Temporary(_, temp) => {
+                        Some(*temp)
+                    },
+                    _ => None
+                };
+                if let Some(temp_idx) = temp_idx {
+                    let struct_id = QualifiedInstId {
+                        module_id: struct_env.module_env.get_id(),
+                        id: struct_env.get_id(),
+                        inst: targs.to_vec(),
+                    };
+                    let mut most_recent_context: Option<&VariantContext> = None;
+                    let mut most_recent_offset = 0;
+                    for (offset, context) in variant_annotation.get_all_contexts() {
+                        if context.has_variant(&struct_id, temp_idx) && *offset <= current_offset {
+                            if *offset > most_recent_offset {
+                                most_recent_offset = *offset;
+                                most_recent_context = Some(context);
+                            }
+                        }
+                    }
+                    if let Some(context) = most_recent_context {
+                        if let Some(active_variant) = context.get_variant(&struct_id, temp_idx) {
+                            for field_env in struct_env.get_fields_of_variant(active_variant) {
+                                let field_exp = self
+                                    .builder
+                                    .mk_field_select(&field_env, targs, value.clone());
+                                // Pass enum type, variant symbol, and enum value as parent context
+                                let enum_ty = Type::Struct(struct_env.module_env.get_id(), struct_env.get_id(), targs.to_vec());
+                                result.extend(self.translate_invariant_with_variant(deep, field_exp, Some((enum_ty, active_variant, value.clone()))));
+                            }
+                            return result;
+                        }
+                    }
+                    return result;
+                } else {
+                    return result;
+                }
+            } else {
+                for field_env in struct_env.get_fields() {
+                    let field_exp = self
+                        .builder
+                        .mk_field_select(&field_env, targs, value.clone());
+                    result.extend(self.translate_invariant_with_variant(deep, field_exp, parent_enum_variant.clone()));
+                }
             }
         }
-
         result
+    }
+
+    /// Helper to build a TestVariant expression
+    fn mk_test_variant(&self, enum_ty: Type, enum_val: Exp, variant: Symbol) -> Exp {
+        use ast::Operation;
+        use ExpData;
+        // Extract module and struct id from enum_ty
+        if let Type::Struct(mid, sid, _) = &enum_ty {
+            let node_id = self.builder.global_env().new_node(self.builder.global_env().unknown_loc(), enum_ty.clone());
+            ExpData::Call(
+                node_id,
+                Operation::TestVariants(*mid, *sid, vec![variant]),
+                vec![enum_val],
+            )
+            .into_exp()
+        } else {
+            panic!("mk_test_variant called with non-enum type");
+        }
     }
 }
