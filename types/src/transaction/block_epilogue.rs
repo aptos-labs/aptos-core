@@ -103,8 +103,7 @@ pub struct TBlockEndInfoExt<Key: Debug> {
     /// TODO(HotState): add evictions
     /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
     ///                 serialize the promoted and evicted keys in the transaction.
-    #[allow(dead_code)]
-    slots_to_make_hot: BTreeMap<Key, StateSlot>,
+    pub slots_to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;

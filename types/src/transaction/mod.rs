@@ -17,7 +17,7 @@ use crate::{
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
-    write_set::WriteSet,
+    write_set::{HotStateOp, WriteSet},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -36,6 +36,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
+    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
@@ -1474,6 +1475,10 @@ impl TransactionStatus {
         matches!(self, Self::Discard(_))
     }
 
+    pub fn is_keep(&self) -> bool {
+        matches!(self, Self::Keep(_))
+    }
+
     pub fn is_retry(&self) -> bool {
         matches!(self, Self::Retry)
     }
@@ -1803,6 +1808,10 @@ impl TransactionOutput {
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
+    }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        self.write_set.add_hotness(hotness);
     }
 }
 
