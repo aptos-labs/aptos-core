@@ -1,0 +1,27 @@
+module 0x42::map_opt {
+    use 0x1::option;
+    public fun map<Element: drop, OtherElement>(t: option::Option<Element>, f: |Element|(OtherElement) has drop): option::Option<OtherElement> {
+        let _t2;
+        if (option::is_some<Element>(&t)) _t2 = option::some<OtherElement>(f(option::extract<Element>(&mut t))) else _t2 = option::none<OtherElement>();
+        _t2
+    }
+}
+
+module 0x42::Test {
+    use 0x42::map_opt;
+    use 0x1::option;
+    public fun test(): u64 {
+        option::extract<u64>(&mut map_opt::map<u64,u64>(option::some<u64>(1), |arg0| __lambda__1__test(arg0)))
+    }
+    fun __lambda__1__test(e: u64): u64 {
+        e + 1
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid name
+   ┌─ options.move:16:9
+   │
+16 │     fun __lambda__1__test(e: u64): u64 {
+   │         ^^^^^^^^^^^^^^^^^ Invalid function name '__lambda__1__test'. Function names cannot start with '_'

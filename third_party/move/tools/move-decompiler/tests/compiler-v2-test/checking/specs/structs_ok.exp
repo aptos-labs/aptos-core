@@ -1,0 +1,31 @@
+module 0x42::M {
+    struct T has key {
+        x: u64,
+    }
+    struct G<T> {
+        x: T,
+        y: bool,
+    }
+    struct R has drop {
+        s: S,
+    }
+    struct S has drop {
+        x: u64,
+        y: bool,
+        z: vector<u64>,
+    }
+    public fun f(r: R): T {
+        T{x: *&&(&r).s.x}
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+   ┌─ structs_ok.move:18:15
+   │
+18 │         T{x: *&&(&r).s.x}
+   │               ^^
+   │               │
+   │               Unexpected '&&'
+   │               Expected an expression term

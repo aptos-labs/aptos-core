@@ -1,0 +1,64 @@
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun test(): u64 {
+        test1(7) + test1(2)
+    }
+    fun test1(r: u64): u64 {
+        let _t1;
+        if (r < 4) _t1 = r else _t1 = 3;
+        let _t3 = &mut _t1;
+        *_t3 = 10;
+        let _t4 = r;
+        _t3 = &mut _t4;
+        *_t3 = *_t3 + 1;
+        let _t2 = _t4;
+        _t3 = &mut (_t2 + 0);
+        *_t3 = *_t3 + 2;
+        _t3 = &mut _t2;
+        *_t3 = *_t3 + 4;
+        _t3 = &mut _t2;
+        *_t3 = *_t3 + 8;
+        _t3 = &mut _t2;
+        *_t3 = *_t3 + 16;
+        _t2
+    }
+    fun test1b(r: S): u64 {
+        let _t2;
+        if (*&(&r).f < 4) _t2 = r else _t2 = S{f: 3};
+        let _t3 = &mut _t2;
+        &mut (&mut *_t3).f = 10;
+        let _t5 = r;
+        _t3 = &mut _t5;
+        &mut (&mut *_t3).f = *&(&*_t3).f + 1;
+        let _t8 = _t5;
+        let _t9 = &mut (&mut _t8).f;
+        *_t9 = *_t9 + 1;
+        let _t10 = _t8;
+        _t9 = &mut *&(&_t10).f;
+        *_t9 = *_t9 + 1;
+        _t9 = &mut *&(&_t10).f;
+        *_t9 = *_t9 + 8;
+        _t9 = &mut *&(&_t10).f;
+        *_t9 = *_t9 + 16;
+        *&(&_t10).f
+    }
+    public fun testb(): u64 {
+        test1b(S{f: 7}) + test1b(S{f: 2})
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ conditional_borrow.move:31:9
+   │
+31 │         &mut (&mut *_t3).f = 10;
+   │         ^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+   ┌─ conditional_borrow.move:34:9
+   │
+34 │         &mut (&mut *_t3).f = *&(&*_t3).f + 1;
+   │         ^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

@@ -1,0 +1,51 @@
+module 0x8675309::M {
+    struct B {
+        f: bool,
+    }
+    struct P {
+        b1: B,
+        b2: B,
+    }
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun t(r1: &mut u64, r2: &mut u64, s: &mut S) {
+        /*freeze*/r1 == /*freeze*/r1;
+        /*freeze*/r1 == /*freeze*/r2;
+        /*freeze*/r2 == /*freeze*/r2;
+        /*freeze*/r2 == /*freeze*/r2;
+        /*freeze*/r1 != /*freeze*/r1;
+        /*freeze*/r1 != /*freeze*/r2;
+        /*freeze*/r2 != /*freeze*/r2;
+        /*freeze*/r2 != /*freeze*/r2;
+        /*freeze*/&mut s.f == /*freeze*/&mut s.f;
+        /*freeze*/&mut s.f == /*freeze*/&mut s.g;
+        /*freeze*/&mut s.g == /*freeze*/&mut s.f;
+        /*freeze*/&mut s.g == /*freeze*/&mut s.g;
+        /*freeze*/&mut s.f != /*freeze*/&mut s.f;
+        /*freeze*/&mut s.f != /*freeze*/&mut s.g;
+        /*freeze*/&mut s.g != /*freeze*/&mut s.f;
+        /*freeze*/&mut s.g != /*freeze*/&mut s.g;
+    }
+    fun t1(p: &mut P) {
+        &mut &mut p.b1.f = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
+    }
+    fun t2(p: &mut P) {
+        &mut &mut p.b1.f = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ mutable_eq_and_neq.move:32:9
+   │
+32 │         &mut &mut p.b1.f = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
+   │         ^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+   ┌─ mutable_eq_and_neq.move:35:9
+   │
+35 │         &mut &mut p.b1.f = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
+   │         ^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

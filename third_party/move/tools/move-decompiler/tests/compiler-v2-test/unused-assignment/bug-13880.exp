@@ -1,0 +1,83 @@
+module 0x42::create_signer {
+    friend native fun create_signer(addr: address): signer;
+}
+
+module 0x42::error {
+    public fun permission_denied(i: u64): u64 {
+        i
+    }
+}
+
+module 0x42::event {
+    struct EventHandle<phantom T: drop + store> has store {
+        counter: u64,
+        guid: u64,
+    }
+    public fun emit<T: drop + store>(_msg: T) {
+        ()
+    }
+    public fun emit_event<T: drop + store>(_handle_ref: &mut EventHandle<T>, _msg: T) {
+        ()
+    }
+}
+
+module 0x42::signer {
+    public fun address_of(s: &signer): address {
+        *borrow_address(s)
+    }
+    public native fun borrow_address(s: &signer): &address;
+}
+
+module 0x42::object {
+    use 0x42::create_signer;
+    use 0x42::event;
+    use 0x42::signer;
+    struct Object<phantom T> has copy, drop, store {
+        inner: address,
+    }
+    struct ObjectCore has key {
+        guid_creation_num: u64,
+        owner: address,
+        transfer_events: event::EventHandle<TransferEvent>,
+    }
+    struct TransferEvent has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+    struct TombStone has key {
+        original_owner: address,
+    }
+    struct Transfer has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+    public fun owner<T: key>(object: Object<T>): address {
+        if (!exists(*&(&object).inner)) abort 5;
+        *&borrow_global(*&(&object).inner).owner
+    }
+    public entry fun burn<T: key>(owner: &signer, object: Object<T>, a1: bool) {
+        let _t3 = signer::address_of(owner);
+        if (!is_owner<T>(object, _t3)) abort 4;
+        let _t4 = *&(&object).inner;
+        move_to(TombStone{original_owner: _t3}, &create_signer::create_signer(_t4));
+        let _t7 = borrow_global_mut(_t4);
+        if (*&_t7.owner != 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff) {
+            if (a1) event::emit<Transfer>(Transfer{object: _t4,from: *&_t7.owner,to: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            event::emit_event<TransferEvent>(&mut _t7.transfer_events, TransferEvent{object: _t4,from: *&_t7.owner,to: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            &mut _t7.owner = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        };
+    }
+    public fun is_owner<T: key>(object: Object<T>, owner: address): bool {
+        owner<T>(object) == owner
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ bug-13880.move:69:13
+   │
+69 │             &mut _t7.owner = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+   │             ^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
