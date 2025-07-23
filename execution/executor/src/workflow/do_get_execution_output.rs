@@ -117,8 +117,16 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (mut transaction_outputs, block_epilogue_txn, slots_to_make_hot) =
+            block_output.into_inner();
+        info!("slots_to_make_hot: {:?}", slots_to_make_hot);
         let (transactions, mut auxiliary_info) = txn_provider.into_inner();
+        info!(
+            "outputs.len(): {}, transactions.len(): {}. auxiliary_info.len(): {}",
+            transaction_outputs.len(),
+            transactions.len(),
+            auxiliary_info.len(),
+        );
         let mut transactions = transactions
             .into_iter()
             .map(|t| t.into_inner())
@@ -127,6 +135,8 @@ impl DoGetExecutionOutput {
             transactions.push(block_epilogue_txn);
             // TODO(grao): Double check if we want to put anything into AuxiliaryInfo here.
             auxiliary_info.push(AuxiliaryInfo::new_empty());
+            // let o = transaction_outputs.last_mut().unwrap();
+            // info!("o: {o:?}");
         }
 
         Parser::parse(
@@ -242,7 +252,7 @@ impl DoGetExecutionOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
         Ok(executor.execute_block(
             txn_provider,
@@ -345,12 +355,19 @@ impl Parser {
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
+            info!("raw output: {:?}", transaction_outputs);
             let to_commit = TransactionsWithOutput::new(
                 transactions,
                 transaction_outputs,
                 persisted_auxiliary_info,
             );
-            TransactionsToKeep::index(first_version, to_commit, has_reconfig)
+            let tc = TransactionsToKeep::index(first_version, to_commit, has_reconfig);
+            info!(
+                "indexed output: {:?}",
+                tc.state_update_refs().for_last_checkpoint
+            );
+            info!("indexed output: {:?}", tc.state_update_refs().for_latest);
+            tc
         };
         let next_epoch_state = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);
