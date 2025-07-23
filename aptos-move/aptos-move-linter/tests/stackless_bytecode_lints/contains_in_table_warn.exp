@@ -1,0 +1,1795 @@
+Aborting with compilation errors:
+exiting with context checking errors
+warning: unused alias
+  ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:3:20
+  │
+3 │     use aptos_std::table;
+  │                    ^^^^^ Unused 'use' of alias 'table'. Consider removing it
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:4:9
+  │
+4 │     use std::bcs::to_bytes;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:5:9
+  │
+5 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:6:9
+  │
+6 │     use std::string::String;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:40:62
+   │
+40 │         assert!(type_info::type_name<T>() == self.type_name, error::invalid_argument(ETYPE_MISMATCH));
+   │                                                              ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.spec.move:8:13
+  │
+8 │         use std::bcs;
+  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.spec.move:13:19
+   │
+13 │             data: bcs::serialize<T>(x)
+   │                   ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:12:9
+   │
+12 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:13:9
+   │
+13 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:14:9
+   │
+14 │     use std::option::{Self, Option};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:15:9
+   │
+15 │     use std::string::{Self, String};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:55:23
+   │
+55 │                 abort error::invalid_argument(EMALFORMED_DATA)
+   │                       ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:61:27
+   │
+61 │                     abort error::invalid_argument(EMALFORMED_DATA)
+   │                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:68:23
+   │
+68 │                 abort error::invalid_argument(EMALFORMED_DATA)
+   │                       ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:72:15
+   │
+72 │         abort error::out_of_range(EOUT_OF_BYTES)
+   │               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:77:52
+   │
+77 │         assert!(stream.cur < stream.data.length(), error::out_of_range(EOUT_OF_BYTES));
+   │                                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:85:19
+   │
+85 │             abort error::invalid_argument(EMALFORMED_DATA)
+   │                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:97:44
+   │
+97 │         assert!(cur + 32 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+   │                                            ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:110:38
+    │
+110 │         assert!(cur < data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:124:43
+    │
+124 │         assert!(cur + 2 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:140:43
+    │
+140 │         assert!(cur + 4 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:158:43
+    │
+158 │         assert!(cur + 8 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:180:44
+    │
+180 │         assert!(cur + 16 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                            ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:210:44
+    │
+210 │         assert!(cur + 32 <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                            ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:264:17
+    │
+264 │         let v = vector::empty();
+    │                 ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:281:45
+    │
+281 │         assert!(cur + len <= data.length(), error::out_of_range(EOUT_OF_BYTES));
+    │                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:283:19
+    │
+283 │         let res = string::utf8(data.slice(cur, cur + len));
+    │                   ^^^^^^ Unbound module or type alias 'string'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:296:13
+    │
+296 │             option::some(elem_deserializer(stream))
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:298:13
+    │
+298 │             option::none()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:75:9
+   │
+75 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:76:9
+   │
+76 │     use std::signer;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:77:9
+   │
+77 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:110:20
+    │
+110 │         let addr = signer::address_of(owner);
+    │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:111:51
+    │
+111 │         assert!(!exists<CapState<Feature>>(addr), error::already_exists(ECAPABILITY_ALREADY_EXISTS));
+    │                                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:112:65
+    │
+112 │         move_to<CapState<Feature>>(owner, CapState { delegates: vector::empty() });
+    │                                                                 ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:133:20
+    │
+133 │         let addr = signer::address_of(requester);
+    │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:137:59
+    │
+137 │             assert!(exists<CapState<Feature>>(root_addr), error::invalid_state(EDELEGATE));
+    │                                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:139:17
+    │
+139 │                 error::invalid_state(EDELEGATE));
+    │                 ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:142:54
+    │
+142 │             assert!(exists<CapState<Feature>>(addr), error::not_found(ECAPABILITY_NOT_FOUND));
+    │                                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:163:20
+    │
+163 │         let addr = signer::address_of(to);
+    │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:18:20
+   │
+18 │         let addr = signer::address_of(owner);
+   │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:24:20
+   │
+24 │         let addr = signer::address_of(requester);
+   │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:32:20
+   │
+32 │         let addr = signer::address_of(requester);
+   │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:43:60
+   │
+43 │         aborts_if spec_has_delegate_cap<Feature>(addr) && !vector::spec_contains(spec_delegates<Feature>(root_addr), addr);
+   │                                                            ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:48:20
+   │
+48 │         let addr = signer::address_of(to);
+   │                    ^^^^^^ Unbound module or type alias 'signer'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:51:64
+   │
+51 │         ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> vector::spec_contains(spec_delegates<Feature>(self.root), addr);
+   │                                                                ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.spec.move:67:17
+   │
+67 │         ensures vector::spec_contains(v, x);
+   │                 ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.move:3:9
+  │
+3 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.move:30:26
+   │
+30 │         let left_bytes = bcs::to_bytes(left);
+   │                          ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.move:31:27
+   │
+31 │         let right_bytes = bcs::to_bytes(right);
+   │                           ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.spec.move:25:26
+   │
+25 │         let left_bytes = bcs::to_bytes(left);
+   │                          ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.spec.move:26:27
+   │
+26 │         let right_bytes = bcs::to_bytes(right);
+   │                           ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:4:9
+  │
+4 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:5:9
+  │
+5 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:6:9
+  │
+6 │     use std::string::String;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:22:19
+   │
+22 │             data: bcs::to_bytes(&x)
+   │                   ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:28:62
+   │
+28 │         assert!(type_info::type_name<T>() == self.type_name, error::invalid_argument(ETYPE_MISMATCH));
+   │                                                              ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.spec.move:8:13
+  │
+8 │         use std::bcs;
+  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.spec.move:14:19
+   │
+14 │             data: bcs::serialize<T>(x)
+   │                   ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:8:9
+  │
+8 │     use std::option::{Self, Option};
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:89:13
+   │
+89 │             option::some(PublicKey {
+   │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:93:13
+   │
+93 │             option::none<PublicKey>()
+   │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:117:13
+    │
+117 │             option::some(PublicKeyWithPoP {
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:121:13
+    │
+121 │             option::none<PublicKeyWithPoP>()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:180:13
+    │
+180 │             option::some(
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:186:13
+    │
+186 │             option::none<AggrOrMultiSignature>()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:39:9
+   │
+39 │     use std::option::{Option, some, none};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:40:9
+   │
+40 │     use std::features;
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:280:13
+    │
+280 │         if (features::cryptography_algebra_enabled()) return;
+    │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:6:9
+  │
+6 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:8:9
+  │
+8 │     use std::option::{Self, Option};
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:81:13
+   │
+81 │             option::some(ValidatedPublicKey {
+   │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:85:13
+   │
+85 │             option::none<ValidatedPublicKey>()
+   │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:148:77
+    │
+148 │         signature_verify_strict_internal(signature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
+    │                                                                             ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.spec.move:19:36
+   │
+19 │         ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+   │                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.spec.move:20:37
+   │
+20 │         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
+   │                                     ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.spec.move:76:23
+   │
+76 │         let message = bcs::serialize(encoded);
+   │                       ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/federated_keyless.move:6:9
+  │
+6 │     use aptos_std::error;
+  │         ^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0xFF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/federated_keyless.move:40:58
+   │
+40 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_FEDERATED_KEYLESS_PUBLIC_KEY_EXTRA_BYTES));
+   │                                                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:5:9
+  │
+5 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:6:9
+  │
+6 │     use std::string::{Self, String};
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:54:58
+   │
+54 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_KEYLESS_PUBLIC_KEY_EXTRA_BYTES));
+   │                                                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:67:17
+   │
+67 │         assert!(string::bytes(&iss).length() <= MAX_ISSUER_UTF8_BYTES_LENGTH, error::invalid_argument(E_INVALID_ISSUER_UTF8_BYTES_LENGTH));
+   │                 ^^^^^^ Unbound module or type alias 'string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:67:79
+   │
+67 │         assert!(string::bytes(&iss).length() <= MAX_ISSUER_UTF8_BYTES_LENGTH, error::invalid_argument(E_INVALID_ISSUER_UTF8_BYTES_LENGTH));
+   │                                                                               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:68:61
+   │
+68 │         assert!(idc.length() == ID_COMMITMENT_BYTES_LENGTH, error::invalid_argument(E_INVALID_ID_COMMITMENT_BYTES_LENGTH));
+   │                                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:5:9
+  │
+5 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:6:9
+  │
+6 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:7:9
+  │
+7 │     use std::features;
+  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:8:9
+  │
+8 │     use std::option::{Self, Option};
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:132:59
+    │
+132 │         assert!(num_sub_pks <= MAX_NUMBER_OF_PUBLIC_KEYS, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
+    │                                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:133:80
+    │
+133 │         assert!(len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES, error::invalid_argument(E_WRONG_PUBKEY_SIZE));
+    │                                                                                ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:144:13
+    │
+144 │             option::some(ValidatedPublicKey {
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:148:13
+    │
+148 │             option::none<ValidatedPublicKey>()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:154:14
+    │
+154 │         if (!features::multi_ed25519_pk_validate_v2_enabled()) {
+    │              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:155:19
+    │
+155 │             abort(error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
+    │                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:159:13
+    │
+159 │             option::some(ValidatedPublicKey {
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:163:13
+    │
+163 │             option::none<ValidatedPublicKey>()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:170:85
+    │
+170 │             bytes.length() % INDIVIDUAL_SIGNATURE_NUM_BYTES == BITMAP_NUM_OF_BYTES, error::invalid_argument(E_WRONG_SIGNATURE_SIZE));
+    │                                                                                     ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:232:82
+    │
+232 │         signature_verify_strict_internal(multisignature.bytes, public_key.bytes, bcs::to_bytes(&encoded))
+    │                                                                                  ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:285:20
+    │
+285 │             return option::none<u8>()
+    │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:293:20
+    │
+293 │             return option::none<u8>()
+    │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:295:20
+    │
+295 │             return option::none<u8>()
+    │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:297:20
+    │
+297 │             return option::some(threshold_byte)
+    │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:22:36
+   │
+22 │         ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+   │                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:23:37
+   │
+23 │         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
+   │                                     ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:28:36
+   │
+28 │         ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+   │                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:29:37
+   │
+29 │         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
+   │                                     ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:110:13
+    │
+110 │             option::none<u8>()
+    │             ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:116:17
+    │
+116 │                 option::none<u8>()
+    │                 ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:118:17
+    │
+118 │                 option::none<u8>()
+    │                 ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:120:17
+    │
+120 │                 option::spec_some(threshold_byte)
+    │                 ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move:139:23
+    │
+139 │         let message = bcs::serialize(encoded);
+    │                       ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:6:9
+  │
+6 │     use std::hash;
+  │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::hash'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:7:9
+  │
+7 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:8:9
+  │
+8 │     use std::bcs_stream;
+  │         ^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs_stream'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:9:9
+  │
+9 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:52:22
+   │
+52 │         let stream = bcs_stream::new(bytes);
+   │                      ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:54:18
+   │
+54 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_MULTI_KEY_EXTRA_BYTES));
+   │                  ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:54:58
+   │
+54 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_MULTI_KEY_EXTRA_BYTES));
+   │                                                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:63:13
+   │
+63 │             error::invalid_argument(E_INVALID_MULTI_KEY_NO_KEYS)
+   │             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:67:13
+   │
+67 │             error::invalid_argument(E_INVALID_MULTI_KEY_TOO_MANY_KEYS)
+   │             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:71:13
+   │
+71 │             error::invalid_argument(E_INVALID_MULTI_KEY_SIGNATURES_REQUIRED)
+   │             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:77:51
+   │
+77 │     public fun deserialize_multi_key(stream: &mut bcs_stream::BCSStream): MultiKey {
+   │                                                   ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:78:27
+   │
+78 │         let public_keys = bcs_stream::deserialize_vector(stream, |x| single_key::deserialize_any_public_key(x));
+   │                           ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:79:35
+   │
+79 │         let signatures_required = bcs_stream::deserialize_u8(stream);
+   │                                   ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:85:24
+   │
+85 │         let pk_bytes = bcs::to_bytes(self);
+   │                        ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:87:9
+   │
+87 │         hash::sha3_256(pk_bytes)
+   │         ^^^^ Unbound module or type alias 'hash'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:41:9
+   │
+41 │     use std::features;
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:42:9
+   │
+42 │     use std::option::Option;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:222:13
+    │
+222 │         if(!features::bulletproofs_enabled()) {
+    │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:310:13
+    │
+310 │         if(!features::bulletproofs_enabled()) {
+    │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:11:9
+   │
+11 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:12:9
+   │
+12 │     use std::features;
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:110:17
+    │
+110 │         assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+    │                 ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:110:51
+    │
+110 │         assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+    │                                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:111:38
+    │
+111 │         assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
+    │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:150:17
+    │
+150 │         assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+    │                 ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:150:57
+    │
+150 │         assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+    │                                                         ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:151:38
+    │
+151 │         assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
+    │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:13:9
+   │
+13 │     use std::option::Option;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:14:9
+   │
+14 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:120:21
+    │
+120 │         let bytes = vector::empty<u8>();
+    │                     ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.move:8:9
+  │
+8 │     use std::option::Option;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/secp256k1.move:4:9
+  │
+4 │     use std::option::Option;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:10:9
+   │
+10 │     use aptos_std::bcs;
+   │         ^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0xFF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:12:9
+   │
+12 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:13:9
+   │
+13 │     use std::hash;
+   │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::hash'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:69:58
+   │
+69 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_SINGLE_KEY_EXTRA_BYTES));
+   │                                                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:91:19
+   │
+91 │             abort error::invalid_argument(E_INVALID_PUBLIC_KEY_TYPE);
+   │                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:112:24
+    │
+112 │         let pk_bytes = bcs::to_bytes(self);
+    │                        ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:114:9
+    │
+114 │         hash::sha3_256(pk_bytes)
+    │         ^^^^ Unbound module or type alias 'hash'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:2:9
+  │
+2 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:3:9
+  │
+3 │     use std::vector;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:28:34
+   │
+28 │         assert!(bucket_size > 0, error::invalid_argument(EZERO_BUCKET_SIZE));
+   │                                  ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:46:34
+   │
+46 │         assert!(self.is_empty(), error::invalid_argument(EVECTOR_NOT_EMPTY));
+   │                                  ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:66:36
+   │
+66 │         assert!(i < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+   │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:73:36
+   │
+73 │         assert!(i < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+   │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:100:43
+    │
+100 │             self.buckets.add(num_buckets, vector::empty());
+    │                                           ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:112:35
+    │
+112 │         assert!(!self.is_empty(), error::invalid_state(EVECTOR_EMPTY));
+    │                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:130:26
+    │
+130 │         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:171:36
+    │
+171 │         assert!(i < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:190:57
+    │
+190 │         assert!(i < self.length() && j < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                                                         ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:11:9
+   │
+11 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:12:9
+   │
+12 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:19:9
+   │
+19 │     use std::option::{Self, Option};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:76:46
+   │
+76 │         assert!(split_load_threshold <= 100, error::invalid_argument(EINVALID_LOAD_THRESHOLD_PERCENT));
+   │                                              ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:78:24
+   │
+78 │         buckets.add(0, vector::empty());
+   │                        ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:102:33
+    │
+102 │         assert!(self.size == 0, error::invalid_argument(ENOT_EMPTY));
+    │                                 ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:118:39
+    │
+118 │         *self.buckets.borrow_mut(0) = vector::empty();
+    │                                       ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:137:43
+    │
+137 │         assert!(bucket.length() <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
+    │                                           ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:141:13
+    │
+141 │         }), error::invalid_argument(EALREADY_EXIST));
+    │             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:235:20
+    │
+235 │             (keys, option::some(starting_bucket_index), option::some(starting_vector_index));
+    │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:235:57
+    │
+235 │             (keys, option::some(starting_bucket_index), option::some(starting_vector_index));
+    │                                                         ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:247:36
+    │
+247 │                             (keys, option::some(bucket_index), option::some(0))
+    │                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:247:64
+    │
+247 │                             (keys, option::some(bucket_index), option::some(0))
+    │                                                                ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:249:36
+    │
+249 │                             (keys, option::none(), option::none())
+    │                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:249:52
+    │
+249 │                             (keys, option::none(), option::none())
+    │                                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:252:32
+    │
+252 │                         (keys, option::some(bucket_index), option::some(vector_index))
+    │                                ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:252:60
+    │
+252 │                         (keys, option::some(bucket_index), option::some(vector_index))
+    │                                                            ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:258:16
+    │
+258 │         (keys, option::none(), option::none())
+    │                ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:258:32
+    │
+258 │         (keys, option::none(), option::none())
+    │                                ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:307:15
+    │
+307 │         abort error::invalid_argument(ENOT_FOUND)
+    │               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:332:15
+    │
+332 │         abort error::invalid_argument(ENOT_FOUND)
+    │               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:372:15
+    │
+372 │         abort error::invalid_argument(ENOT_FOUND)
+    │               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:400:13
+    │
+400 │             error::invalid_argument(EINVALID_LOAD_THRESHOLD_PERCENT)
+    │             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:407:41
+    │
+407 │         assert!(target_bucket_size > 0, error::invalid_argument(EINVALID_TARGET_BUCKET_SIZE));
+    │                                         ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:2:9
+  │
+2 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:6:9
+  │
+6 │     use std::option::{Self, Option};
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:44:22
+   │
+44 │             big_vec: option::none(),
+   │                      ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:45:30
+   │
+45 │             inline_capacity: option::none(),
+   │                              ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:46:26
+   │
+46 │             bucket_size: option::none(),
+   │                          ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:53:34
+   │
+53 │         assert!(bucket_size > 0, error::invalid_argument(EZERO_BUCKET_SIZE));
+   │                                  ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:56:22
+   │
+56 │             big_vec: option::none(),
+   │                      ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:57:30
+   │
+57 │             inline_capacity: option::some(inline_capacity),
+   │                              ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:58:26
+   │
+58 │             bucket_size: option::some(bucket_size),
+   │                          ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:72:34
+   │
+72 │         assert!(self.is_empty(), error::invalid_argument(EVECTOR_NOT_EMPTY));
+   │                                  ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:95:36
+   │
+95 │         assert!(i < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+   │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:107:36
+    │
+107 │         assert!(i < self.length(), error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:180:35
+    │
+180 │         assert!(!self.is_empty(), error::invalid_state(EVECTOR_EMPTY));
+    │                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:201:26
+    │
+201 │         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:223:26
+    │
+223 │         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:258:26
+    │
+258 │         assert!(j < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+    │                          ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.spec.move:16:68
+   │
+16 │         aborts_if self.big_vec.is_some() && len(self.inline_vec) + option::spec_borrow(
+   │                                                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:19:9
+   │
+19 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:21:9
+   │
+21 │     use std::option::{Self, Option};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:72:20
+   │
+72 │             slots: option::none(),
+   │                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:81:36
+   │
+81 │         assert!(self.should_reuse, error::invalid_argument(ECANNOT_HAVE_SPARES_WITHOUT_REUSE));
+   │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:89:36
+   │
+89 │         assert!(self.should_reuse, error::invalid_argument(ECANNOT_HAVE_SPARES_WITHOUT_REUSE));
+   │                                    ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/debug.move:3:9
+  │
+3 │     use std::string::String;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/from_bcs.move:14:9
+   │
+14 │     use std::string::{Self, String};
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/from_bcs.move:58:17
+   │
+58 │         assert!(string::internal_check_utf8(s.bytes()), EINVALID_UTF8);
+   │                 ^^^^^^ Unbound module or type alias 'string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:10:9
+   │
+10 │     use std::bcs;
+   │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:11:9
+   │
+11 │     use std::features;
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:29:21
+   │
+29 │         let bytes = bcs::to_bytes(v);
+   │                     ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:39:13
+   │
+39 │         if(!features::sha_512_and_ripemd_160_enabled()) {
+   │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:48:13
+   │
+48 │         if(!features::sha_512_and_ripemd_160_enabled()) {
+   │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:61:13
+   │
+61 │         if(!features::sha_512_and_ripemd_160_enabled()) {
+   │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:70:13
+   │
+70 │         if(!features::blake2b_256_enabled()) {
+   │             ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:40:41
+   │
+40 │         ensures result == spec_sip_hash(bcs::serialize(v));
+   │                                         ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:69:20
+   │
+69 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                    ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:69:46
+   │
+69 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                                              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:75:20
+   │
+75 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                    ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:75:46
+   │
+75 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                                              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:81:20
+   │
+81 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                    ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:81:46
+   │
+81 │         aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
+   │                                              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:93:20
+   │
+93 │         aborts_if !features::spec_is_enabled(features::BLAKE2B_256_NATIVE);
+   │                    ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.spec.move:93:46
+   │
+93 │         aborts_if !features::spec_is_enabled(features::BLAKE2B_256_NATIVE);
+   │                                              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:4:9
+  │
+4 │     use std::fixed_point32::FixedPoint32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:5:9
+  │
+5 │     use std::fixed_point32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:116:9
+    │
+116 │         fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
+    │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:4:9
+  │
+4 │     use std::fixed_point32::FixedPoint32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:5:9
+  │
+5 │     use std::fixed_point32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:114:9
+    │
+114 │         fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
+    │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:3:9
+  │
+3 │     use std::fixed_point32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:4:9
+  │
+4 │     use std::fixed_point32::FixedPoint32;
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:18:9
+   │
+18 │         fixed_point32::create_from_raw_value((math128::sqrt(y << 32) as u64))
+   │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:24:9
+   │
+24 │         fixed_point32::create_from_raw_value((exp_raw(raw_value) as u64))
+   │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:37:9
+   │
+37 │         fixed_point32::create_from_raw_value((x * LN2 >> 32 as u64))
+   │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:43:9
+   │
+43 │         fixed_point32::create_from_raw_value((pow_raw(raw_value, (n as u128)) as u64))
+   │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:51:9
+   │
+51 │         fixed_point32::create_from_raw_value (math64::mul_div(a, b, c))
+   │         ^^^^^^^^^^^^^ Unbound module or type alias 'fixed_point32'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:18:9
+   │
+18 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:19:9
+   │
+19 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:70:27
+   │
+70 │             shareholders: vector::empty<address>(),
+   │                           ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:77:40
+   │
+77 │         assert!(self.total_coins == 0, error::invalid_state(EPOOL_IS_NOT_EMPTY));
+   │                                        ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:138:61
+    │
+138 │         assert!(MAX_U64 - self.total_coins >= coins_amount, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
+    │                                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:139:60
+    │
+139 │         assert!(MAX_U64 - self.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
+    │                                                            ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:153:61
+    │
+153 │             assert!(MAX_U64 - current_shares >= new_shares, error::invalid_argument(ESHAREHOLDER_SHARES_OVERFLOW));
+    │                                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:160:17
+    │
+160 │                 error::invalid_state(ETOO_MANY_SHAREHOLDERS),
+    │                 ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:173:45
+    │
+173 │         assert!(self.contains(shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:174:63
+    │
+174 │         assert!(self.shares(shareholder) >= shares_to_redeem, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:193:47
+    │
+193 │         assert!(self.contains(shareholder_1), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:194:67
+    │
+194 │         assert!(self.shares(shareholder_1) >= shares_to_transfer, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:203:45
+    │
+203 │         assert!(self.contains(shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:204:57
+    │
+204 │         assert!(self.shares(shareholder) >= num_shares, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                         ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.spec.move:17:61
+   │
+17 │             (simple_map::spec_contains_key(shares, addr) == vector::spec_contains(shareholders, addr));
+   │                                                             ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.spec.move:102:13
+    │
+102 │             vector::eq_push_back(self.shareholders, old(self.shareholders), shareholder);
+    │             ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.spec.move:186:44
+    │
+186 │         ensures remaining_shares == 0 ==> !vector::spec_contains(self.shareholders, shareholder);
+    │                                            ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:18:9
+   │
+18 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:74:40
+   │
+74 │         assert!(self.total_coins == 0, error::invalid_state(EPOOL_IS_NOT_EMPTY));
+   │                                        ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:129:61
+    │
+129 │         assert!(MAX_U64 - self.total_coins >= coins_amount, error::invalid_argument(EPOOL_TOTAL_COINS_OVERFLOW));
+    │                                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:130:61
+    │
+130 │         assert!(MAX_U128 - self.total_shares >= new_shares, error::invalid_argument(EPOOL_TOTAL_SHARES_OVERFLOW));
+    │                                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:144:62
+    │
+144 │             assert!(MAX_U128 - current_shares >= new_shares, error::invalid_argument(ESHAREHOLDER_SHARES_OVERFLOW));
+    │                                                              ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:158:45
+    │
+158 │         assert!(self.contains(shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:159:63
+    │
+159 │         assert!(self.shares(shareholder) >= shares_to_redeem, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:178:47
+    │
+178 │         assert!(self.contains(shareholder_1), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                               ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:179:67
+    │
+179 │         assert!(self.shares(shareholder_1) >= shares_to_transfer, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:188:45
+    │
+188 │         assert!(self.contains(shareholder), error::invalid_argument(ESHAREHOLDER_NOT_FOUND));
+    │                                             ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:189:57
+    │
+189 │         assert!(self.shares(shareholder) >= num_shares, error::invalid_argument(EINSUFFICIENT_SHARES));
+    │                                                         ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:11:9
+   │
+11 │     use std::error;
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:12:9
+   │
+12 │     use std::option;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:13:9
+   │
+13 │     use std::vector;
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:38:19
+   │
+38 │             data: vector::empty(),
+   │                   ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:64:38
+   │
+64 │         assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+   │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:74:38
+   │
+74 │         assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+   │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:99:38
+   │
+99 │         assert!(maybe_idx.is_none(), error::invalid_argument(EKEY_ALREADY_EXISTS));
+   │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:154:33
+    │
+154 │         let keys: vector<Key> = vector::empty();
+    │                                 ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:155:37
+    │
+155 │         let values: vector<Value> = vector::empty();
+    │                                     ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:183:38
+    │
+183 │         assert!(maybe_idx.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+    │                                      ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:192:8
+    │
+192 │     ): option::Option<u64> {
+    │        ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:197:24
+    │
+197 │                 return option::some(i)
+    │                        ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:200:9
+    │
+200 │         option::none<u64>()
+    │         ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:87:77
+   │
+87 │         ensures [abstract] forall k: Key: spec_contains_key(result, k) <==> vector::spec_contains(keys, k);
+   │                                                                             ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:96:28
+   │
+96 │             forall k: Key: vector::spec_contains(result_1, k) <==>
+   │                            ^^^^^^ Unbound module or type alias 'vector'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:110:67
+    │
+110 │         ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_1);
+    │                                                                   ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:111:67
+    │
+111 │         ensures [abstract] !spec_contains_key(old(self), key) ==> option::is_none(result_2);
+    │                                                                   ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:114:68
+    │
+114 │         ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_1)) && (option::spec_borrow(result_1) == key));
+    │                                                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:114:99
+    │
+114 │         ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_1)) && (option::spec_borrow(result_1) == key));
+    │                                                                                                   ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:115:68
+    │
+115 │         ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_2)) && (option::spec_borrow(result_2) == spec_get(old(
+    │                                                                    ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.spec.move:115:99
+    │
+115 │         ensures [abstract] spec_contains_key(old(self), key) ==> ((option::is_some(result_2)) && (option::spec_borrow(result_2) == spec_get(old(
+    │                                                                                                   ^^^^^^ Unbound module or type alias 'option'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/string_utils.move:3:9
+  │
+3 │     use std::string::String;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/table_with_length.move:4:9
+  │
+4 │     use std::error;
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/table_with_length.move:29:35
+   │
+29 │         assert!(self.length == 0, error::invalid_state(ENOT_EMPTY));
+   │                                   ^^^^^ Unbound module or type alias 'error'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:2:9
+  │
+2 │     use std::bcs;
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:3:9
+  │
+3 │     use std::features;
+  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+
+error: unbound module
+  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:4:9
+  │
+4 │     use std::string::String;
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:45:14
+   │
+45 │         if (!features::aptos_stdlib_chain_id_enabled()) {
+   │              ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:70:9
+   │
+70 │         bcs::serialized_size(val_ref)
+   │         ^^^ Unbound module or type alias 'bcs'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.spec.move:15:20
+   │
+15 │         aborts_if !features::spec_is_enabled(features::APTOS_STD_CHAIN_ID_NATIVES);
+   │                    ^^^^^^^^ Unbound module or type alias 'features'
+
+error: unbound module
+   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.spec.move:15:46
+   │
+15 │         aborts_if !features::spec_is_enabled(features::APTOS_STD_CHAIN_ID_NATIVES);
+   │                                              ^^^^^^^^ Unbound module or type alias 'features'
