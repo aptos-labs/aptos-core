@@ -157,7 +157,9 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             return Ok((bytes.map(|bytes| bytes.len() as u64), bytes_loaded));
         }
         let state_key = resource_state_key(address, struct_tag)?;
-        let size = self.executor_view.get_resource_state_value_size(&state_key)?;
+        let size = self
+            .executor_view
+            .get_resource_state_value_size(&state_key)?;
         Ok((size, size.unwrap_or(0) as usize))
     }
 }

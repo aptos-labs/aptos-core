@@ -3,20 +3,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext, storage::{
+    module_traversal::TraversalContext,
+    storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
-    }, ModuleStorage, RuntimeEnvironment
+    },
+    ModuleStorage, RuntimeEnvironment,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
-    account_address::AccountAddress, effects::{AccountChanges, ChangeSet, Changes}, gas_algebra::NumBytes, language_storage::{StructTag, TypeTag}, metadata::Metadata, value::MoveTypeLayout, vm_status::StatusCode
+    account_address::AccountAddress,
+    effects::{AccountChanges, ChangeSet, Changes},
+    gas_algebra::NumBytes,
+    language_storage::{StructTag, TypeTag},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::GasMeter, loaded_data::runtime_types::Type, resolver::ResourceResolver, value_serde::{FunctionValueExtension, ValueSerDeContext}, values::{GlobalValue, Value}, views::TypeView
+    gas::GasMeter,
+    loaded_data::runtime_types::Type,
+    resolver::ResourceResolver,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::{GlobalValue, Value},
+    views::TypeView,
 };
-use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry};
+use std::collections::btree_map::{BTreeMap, Entry};
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
     ty: &'a Type,
@@ -154,19 +166,6 @@ impl TransactionDataCache {
         Ok(change_set)
     }
 
-    // fn upgrade_cache_entry(
-    //     &mut self,
-    //     module_storage: &dyn ModuleStorage,
-    //     resource_resolver: &dyn ResourceResolver,
-    //     maybe_gas_meter: Option<&mut impl GasMeter>,
-    //     _traversal_context: &mut TraversalContext,
-    //     addr: &AccountAddress,
-    //     ty: &Type,
-    //     load_data: bool,
-    //     cache_entry: &mut OccupiedEntry<'_, Type, DataCacheEntry>
-    // ) -> PartialVMResult<()> {
-    // }
-
     fn create_cached_info(
         load_data: bool,
         resource_resolver: &dyn ResourceResolver,
@@ -186,10 +185,10 @@ impl TransactionDataCache {
                 // storage, in turn ensures that all delayed field values are pre-processed.
                 resource_resolver.get_resource_bytes_with_metadata_and_layout(
                     addr,
-                    &struct_tag,
+                    struct_tag,
                     &metadata,
                     if contains_delayed_fields {
-                        Some(&layout)
+                        Some(layout)
                     } else {
                         None
                     },
@@ -202,7 +201,7 @@ impl TransactionDataCache {
                     let val = ValueSerDeContext::new(max_value_nest_depth)
                         .with_func_args_deserialization(&function_value_extension)
                         .with_delayed_fields_serde()
-                        .deserialize(&blob, &layout)
+                        .deserialize(&blob, layout)
                         .ok_or_else(|| {
                             let msg = format!(
                                 "Failed to deserialize resource {} at {}!",
@@ -218,16 +217,17 @@ impl TransactionDataCache {
             };
             (CachedInformation::Value(value), bytes_loaded)
         } else {
-            let (size, bytes_loaded) = resource_resolver.get_resource_size_with_metadata_and_layout(
-                addr,
-                &struct_tag,
-                &metadata,
-                if contains_delayed_fields {
-                    Some(&layout)
-                } else {
-                    None
-                },
-            )?;
+            let (size, bytes_loaded) = resource_resolver
+                .get_resource_size_with_metadata_and_layout(
+                    addr,
+                    struct_tag,
+                    &metadata,
+                    if contains_delayed_fields {
+                        Some(layout)
+                    } else {
+                        None
+                    },
+                )?;
             (CachedInformation::SizeOnly(size), bytes_loaded)
         })
     }
@@ -236,14 +236,6 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     /// If `load_data` is false, only resource existence information will be retrieved
-    ///
-    /// Possible cases:
-    /// 1. User called exists, nothing is cached - fetch size, charge for size
-    /// 2. User called exists, SizeOnly is cached - do nothing, no charge
-    /// 3. User called exists, Value is cached - do nothing, no charge
-    /// 4. User called borrow, nothing is cached - fetch bytes, charge for size and bytes
-    /// 5. User called borrow, SizeOnly is cached - fetch bytes, charge for bytes
-    /// 6. User called borrow, Value is cached - do nothing, no charge
     pub(crate) fn create_and_insert_or_upgrade_and_charge_data_cache_entry(
         &mut self,
         module_storage: &dyn ModuleStorage,
@@ -254,7 +246,7 @@ impl TransactionDataCache {
         ty: &Type,
         load_data: bool,
     ) -> PartialVMResult<(&CachedInformation, NumBytes)> {
-        let existing_entry = self.account_map.entry(addr.clone()).or_default().entry(ty.clone());
+        let existing_entry = self.account_map.entry(*addr).or_default().entry(ty.clone());
 
         let (entry, bytes_loaded) = match existing_entry {
             Entry::Vacant(vacant_entry) => {
@@ -284,7 +276,7 @@ impl TransactionDataCache {
                 let num_bytes_loaded = NumBytes::new(bytes_loaded as u64);
                 if let Some(gas_meter) = maybe_gas_meter {
                     gas_meter.charge_load_resource(
-                        addr.clone(),
+                        *addr,
                         TypeWithRuntimeEnvironment {
                             ty,
                             runtime_environment: module_storage.runtime_environment(),
@@ -322,7 +314,7 @@ impl TransactionDataCache {
 
                     if let Some(gas_meter) = maybe_gas_meter {
                         gas_meter.charge_load_resource(
-                            addr.clone(),
+                            *addr,
                             TypeWithRuntimeEnvironment {
                                 ty,
                                 runtime_environment: module_storage.runtime_environment(),
@@ -372,36 +364,6 @@ impl TransactionDataCache {
         match self.find_entry(addr, ty) {
             None => false,
             Some(entry) => matches!(entry.value, CachedInformation::Value(_)),
-        }
-    }
-
-    /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
-    /// entry already for the specified address-type pair.
-    fn insert_resource(
-        &mut self,
-        addr: AccountAddress,
-        ty: Type,
-        data_cache_entry: DataCacheEntry,
-    ) -> PartialVMResult<&mut DataCacheEntry> {
-        match self.account_map.entry(addr).or_default().entry(ty.clone()) {
-            Entry::Vacant(entry) => {
-                let v = entry.insert(data_cache_entry);
-                Ok(v)
-            },
-            Entry::Occupied(mut entry) => {
-                if matches!(entry.get().value, CachedInformation::SizeOnly(_))
-                    && matches!(data_cache_entry.value, CachedInformation::Value(_))
-                {
-                    entry.insert(data_cache_entry);
-                    let v = entry.into_mut();
-                    Ok(v)
-                } else {
-                    let msg = format!("Entry for {:?} at {} already exists", ty, addr);
-                    let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg);
-                    Err(err)
-                }
-            },
         }
     }
 

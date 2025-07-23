@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
-    data_cache::{TransactionDataCache},
+    data_cache::TransactionDataCache,
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
