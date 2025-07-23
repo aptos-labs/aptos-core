@@ -1,28 +1,28 @@
 Aborting with compilation errors:
 exiting with context checking errors
 warning: unused alias
-  ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:3:20
+  ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:2:20
   │
-3 │     use aptos_std::table;
+2 │     use aptos_std::table;
   │                    ^^^^^ Unused 'use' of alias 'table'. Consider removing it
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:4:9
   │
 4 │     use std::bcs::to_bytes;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:5:9
   │
 5 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:6:9
   │
 6 │     use std::string::String;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.move:40:62
@@ -34,7 +34,7 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.spec.move:8:13
   │
 8 │         use std::bcs;
-  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/any.spec.move:13:19
@@ -46,25 +46,25 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:12:9
    │
 12 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:13:9
    │
 13 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:14:9
    │
 14 │     use std::option::{Self, Option};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:15:9
    │
 15 │     use std::string::{Self, String};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/bcs_stream.move:55:23
@@ -178,19 +178,19 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:75:9
    │
 75 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:76:9
    │
 76 │     use std::signer;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::signer'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::signer'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:77:9
    │
 77 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/capability.move:110:20
@@ -286,7 +286,7 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.move:3:9
   │
 3 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/comparator.move:30:26
@@ -316,19 +316,19 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:4:9
   │
 4 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:5:9
   │
 5 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:6:9
   │
 6 │     use std::string::String;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.move:22:19
@@ -346,7 +346,7 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.spec.move:8:13
   │
 8 │         use std::bcs;
-  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │             ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/copyable_any.spec.move:14:19
@@ -358,7 +358,7 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:8:9
   │
 8 │     use std::option::{Self, Option};
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/bls12381.move:89:13
@@ -400,13 +400,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:39:9
    │
 39 │     use std::option::{Option, some, none};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:40:9
    │
 40 │     use std::features;
-   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/crypto_algebra.move:280:13
@@ -418,13 +418,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:6:9
   │
 6 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:8:9
   │
 8 │     use std::option::{Self, Option};
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ed25519.move:81:13
@@ -466,7 +466,7 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/federated_keyless.move:6:9
   │
 6 │     use aptos_std::error;
-  │         ^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0xFF)::error'
+  │         ^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/federated_keyless.move:40:58
@@ -478,13 +478,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:5:9
   │
 5 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:6:9
   │
 6 │     use std::string::{Self, String};
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/keyless.move:54:58
@@ -514,25 +514,25 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:5:9
   │
 5 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:6:9
   │
 6 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:7:9
   │
 7 │     use std::features;
-  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:8:9
   │
 8 │     use std::option::{Self, Option};
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_ed25519.move:132:59
@@ -676,37 +676,19 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:6:9
   │
 6 │     use std::hash;
-  │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::hash'
+  │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::hash'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:7:9
   │
 7 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
-
-error: unbound module
-  ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:8:9
-  │
-8 │     use std::bcs_stream;
-  │         ^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs_stream'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:9:9
   │
 9 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
-
-error: unbound module
-   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:52:22
-   │
-52 │         let stream = bcs_stream::new(bytes);
-   │                      ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
-
-error: unbound module
-   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:54:18
-   │
-54 │         assert!(!bcs_stream::has_remaining(&mut stream), error::invalid_argument(E_INVALID_MULTI_KEY_EXTRA_BYTES));
-   │                  ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:54:58
@@ -733,24 +715,6 @@ error: unbound module
    │             ^^^^^ Unbound module or type alias 'error'
 
 error: unbound module
-   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:77:51
-   │
-77 │     public fun deserialize_multi_key(stream: &mut bcs_stream::BCSStream): MultiKey {
-   │                                                   ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
-
-error: unbound module
-   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:78:27
-   │
-78 │         let public_keys = bcs_stream::deserialize_vector(stream, |x| single_key::deserialize_any_public_key(x));
-   │                           ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
-
-error: unbound module
-   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:79:35
-   │
-79 │         let signatures_required = bcs_stream::deserialize_u8(stream);
-   │                                   ^^^^^^^^^^ Unbound module or type alias 'bcs_stream'
-
-error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/multi_key.move:85:24
    │
 85 │         let pk_bytes = bcs::to_bytes(self);
@@ -766,13 +730,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:41:9
    │
 41 │     use std::features;
-   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:42:9
    │
 42 │     use std::option::Option;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255.move:222:13
@@ -790,13 +754,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:11:9
    │
 11 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:12:9
    │
 12 │     use std::features;
-   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move:110:17
@@ -838,13 +802,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:13:9
    │
 13 │     use std::option::Option;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:14:9
    │
 14 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_elgamal.move:120:21
@@ -856,31 +820,31 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.move:8:9
   │
 8 │     use std::option::Option;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/secp256k1.move:4:9
   │
 4 │     use std::option::Option;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:10:9
    │
 10 │     use aptos_std::bcs;
-   │         ^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0xFF)::bcs'
+   │         ^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(aptos_std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:12:9
    │
 12 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:13:9
    │
 13 │     use std::hash;
-   │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::hash'
+   │         ^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::hash'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/cryptography/single_key.move:69:58
@@ -910,13 +874,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:2:9
   │
 2 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:3:9
   │
 3 │     use std::vector;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/big_vector.move:28:34
@@ -976,19 +940,19 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:11:9
    │
 11 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:12:9
    │
 12 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:19:9
    │
 19 │     use std::option::{Self, Option};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_table.move:76:46
@@ -1120,13 +1084,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:2:9
   │
 2 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:6:9
   │
 6 │     use std::option::{Self, Option};
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/smart_vector.move:44:22
@@ -1222,13 +1186,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:19:9
    │
 19 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:21:9
    │
 21 │     use std::option::{Self, Option};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move:72:20
@@ -1252,13 +1216,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/debug.move:3:9
   │
 3 │     use std::string::String;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/from_bcs.move:14:9
    │
 14 │     use std::string::{Self, String};
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/from_bcs.move:58:17
@@ -1270,13 +1234,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:10:9
    │
 10 │     use std::bcs;
-   │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+   │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:11:9
    │
 11 │     use std::features;
-   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+   │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/hash.move:29:21
@@ -1366,13 +1330,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:4:9
   │
 4 │     use std::fixed_point32::FixedPoint32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:5:9
   │
 5 │     use std::fixed_point32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math128.move:116:9
@@ -1384,13 +1348,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:4:9
   │
 4 │     use std::fixed_point32::FixedPoint32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:5:9
   │
 5 │     use std::fixed_point32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
     ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math64.move:114:9
@@ -1402,13 +1366,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:3:9
   │
 3 │     use std::fixed_point32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:4:9
   │
 4 │     use std::fixed_point32::FixedPoint32;
-  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::fixed_point32'
+  │         ^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::fixed_point32'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/math_fixed.move:18:9
@@ -1444,13 +1408,13 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:18:9
    │
 18 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:19:9
    │
 19 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64.move:70:27
@@ -1546,7 +1510,7 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:18:9
    │
 18 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/pool_u64_unbound.move:74:40
@@ -1612,19 +1576,19 @@ error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:11:9
    │
 11 │     use std::error;
-   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+   │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:12:9
    │
 12 │     use std::option;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::option'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::option'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:13:9
    │
 13 │     use std::vector;
-   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::vector'
+   │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::vector'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/simple_map.move:38:19
@@ -1738,13 +1702,13 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/string_utils.move:3:9
   │
 3 │     use std::string::String;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/table_with_length.move:4:9
   │
 4 │     use std::error;
-  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::error'
+  │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::error'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/table_with_length.move:29:35
@@ -1756,19 +1720,19 @@ error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:2:9
   │
 2 │     use std::bcs;
-  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::bcs'
+  │         ^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::bcs'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:3:9
   │
 3 │     use std::features;
-  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::features'
+  │         ^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::features'
 
 error: unbound module
   ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:4:9
   │
 4 │     use std::string::String;
-  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0xF)::string'
+  │         ^^^^^^^^^^^ Invalid 'use'. Unbound module: '(std=0x1)::string'
 
 error: unbound module
    ┌─ /Users/josegarcia/Desktop/aptos-core/aptos-move/aptos-move-linter/../framework/aptos-stdlib/sources/type_info.move:45:14
