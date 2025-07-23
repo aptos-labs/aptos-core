@@ -3,31 +3,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage::{
+    module_traversal::TraversalContext, storage::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
-    },
-    ModuleStorage,
+    }, ModuleStorage, RuntimeEnvironment
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
-    account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes},
-    gas_algebra::NumBytes,
-    language_storage::{StructTag, TypeTag},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, effects::{AccountChanges, ChangeSet, Changes}, gas_algebra::NumBytes, language_storage::{StructTag, TypeTag}, metadata::Metadata, value::MoveTypeLayout, vm_status::StatusCode
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
-    value_serde::{FunctionValueExtension, ValueSerDeContext},
-    values::{GlobalValue, Value},
+    gas::GasMeter, loaded_data::runtime_types::Type, resolver::ResourceResolver, value_serde::{FunctionValueExtension, ValueSerDeContext}, values::{GlobalValue, Value}, views::TypeView
 };
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry};
 
-enum CachedInformation {
+struct TypeWithRuntimeEnvironment<'a, 'b> {
+    ty: &'a Type,
+    runtime_environment: &'b RuntimeEnvironment,
+}
+
+impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
+    fn to_type_tag(&self) -> TypeTag {
+        self.runtime_environment.ty_to_ty_tag(self.ty).unwrap()
+    }
+}
+
+pub(crate) enum CachedInformation {
     Value(GlobalValue),
     /// If resource exists then store its size, None otherwise
     SizeOnly(Option<u64>),
@@ -42,32 +44,30 @@ impl CachedInformation {
             )),
         }
     }
+
+    pub(crate) fn exists(&self) -> PartialVMResult<bool> {
+        match &self {
+            CachedInformation::SizeOnly(e) => Ok(e.is_some()),
+            CachedInformation::Value(v) => v.exists(),
+        }
+    }
+
+    pub(crate) fn maybe_value(&self) -> Option<&GlobalValue> {
+        match &self {
+            CachedInformation::SizeOnly(_) => None,
+            CachedInformation::Value(v) => Some(v),
+        }
+    }
 }
 
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
-pub(crate) struct DataCacheEntry {
+struct DataCacheEntry {
     struct_tag: StructTag,
     layout: MoveTypeLayout,
     contains_delayed_fields: bool,
     value: CachedInformation,
-}
-
-impl DataCacheEntry {
-    pub(crate) fn maybe_value(&self) -> Option<&GlobalValue> {
-        match &self.value {
-            CachedInformation::SizeOnly(_) => None,
-            CachedInformation::Value(v) => Some(v),
-        }
-    }
-
-    pub(crate) fn exists(&self) -> PartialVMResult<bool> {
-        match &self.value {
-            CachedInformation::SizeOnly(e) => Ok(e.is_some()),
-            CachedInformation::Value(v) => v.exists(),
-        }
-    }
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -154,34 +154,33 @@ impl TransactionDataCache {
         Ok(change_set)
     }
 
-    /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
-    /// Also returns the size of the loaded resource in bytes. This method does not add the entry
-    /// to the cache - it is the caller's responsibility to add it there.
-    /// If `load_data` is false, only resource existence information will be retrieved
-    pub(crate) fn create_data_cache_entry(
-        module_storage: &dyn ModuleStorage,
-        resource_resolver: &dyn ResourceResolver,
-        addr: &AccountAddress,
-        ty: &Type,
+    // fn upgrade_cache_entry(
+    //     &mut self,
+    //     module_storage: &dyn ModuleStorage,
+    //     resource_resolver: &dyn ResourceResolver,
+    //     maybe_gas_meter: Option<&mut impl GasMeter>,
+    //     _traversal_context: &mut TraversalContext,
+    //     addr: &AccountAddress,
+    //     ty: &Type,
+    //     load_data: bool,
+    //     cache_entry: &mut OccupiedEntry<'_, Type, DataCacheEntry>
+    // ) -> PartialVMResult<()> {
+    // }
+
+    fn create_cached_info(
         load_data: bool,
-    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
-            TypeTag::Struct(struct_tag) => *struct_tag,
-            _ => {
-                // Since every resource is a struct, the tag must be also a struct tag.
-                return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
-            },
-        };
-
-        // TODO(Gas): Shall we charge for this?
-        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)?;
-
+        resource_resolver: &dyn ResourceResolver,
+        module_storage: &dyn ModuleStorage,
+        struct_tag: &StructTag,
+        addr: &AccountAddress,
+        layout: &MoveTypeLayout,
+        contains_delayed_fields: bool,
+    ) -> PartialVMResult<(CachedInformation, usize)> {
         let metadata = module_storage
             .fetch_existing_module_metadata(&struct_tag.address, struct_tag.module.as_ident_str())
             .map_err(|err| err.to_partial())?;
 
-        let (cached_info, bytes_loaded) = if load_data {
+        Ok(if load_data {
             let (data, bytes_loaded) = {
                 // If we need to process delayed fields, we pass type layout to remote storage. Remote
                 // storage, in turn ensures that all delayed field values are pre-processed.
@@ -230,15 +229,120 @@ impl TransactionDataCache {
                 },
             )?;
             (CachedInformation::SizeOnly(size), bytes_loaded)
+        })
+    }
+
+    /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
+    /// Also returns the size of the loaded resource in bytes. This method does not add the entry
+    /// to the cache - it is the caller's responsibility to add it there.
+    /// If `load_data` is false, only resource existence information will be retrieved
+    ///
+    /// Possible cases:
+    /// 1. User called exists, nothing is cached - fetch size, charge for size
+    /// 2. User called exists, SizeOnly is cached - do nothing, no charge
+    /// 3. User called exists, Value is cached - do nothing, no charge
+    /// 4. User called borrow, nothing is cached - fetch bytes, charge for size and bytes
+    /// 5. User called borrow, SizeOnly is cached - fetch bytes, charge for bytes
+    /// 6. User called borrow, Value is cached - do nothing, no charge
+    pub(crate) fn create_and_insert_or_upgrade_and_charge_data_cache_entry(
+        &mut self,
+        module_storage: &dyn ModuleStorage,
+        resource_resolver: &dyn ResourceResolver,
+        maybe_gas_meter: Option<&mut impl GasMeter>,
+        _traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+        load_data: bool,
+    ) -> PartialVMResult<(&CachedInformation, NumBytes)> {
+        let existing_entry = self.account_map.entry(addr.clone()).or_default().entry(ty.clone());
+
+        let (entry, bytes_loaded) = match existing_entry {
+            Entry::Vacant(vacant_entry) => {
+                // Nothing is cached: charge for size and potentially bytes
+                let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
+                    TypeTag::Struct(struct_tag) => *struct_tag,
+                    _ => {
+                        // Since every resource is a struct, the tag must be also a struct tag.
+                        return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
+                    },
+                };
+
+                // TODO(Gas): Shall we charge for this?
+                let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
+                    .type_to_type_layout_with_identifier_mappings(ty)?;
+
+                let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
+                    load_data,
+                    resource_resolver,
+                    module_storage,
+                    &struct_tag,
+                    addr,
+                    &layout,
+                    contains_delayed_fields,
+                )?;
+
+                let num_bytes_loaded = NumBytes::new(bytes_loaded as u64);
+                if let Some(gas_meter) = maybe_gas_meter {
+                    gas_meter.charge_load_resource(
+                        addr.clone(),
+                        TypeWithRuntimeEnvironment {
+                            ty,
+                            runtime_environment: module_storage.runtime_environment(),
+                        },
+                        match cached_info.maybe_value() {
+                            None => None,
+                            Some(v) => v.view(),
+                        },
+                        num_bytes_loaded,
+                    )?;
+                }
+
+                let new_entry = DataCacheEntry {
+                    struct_tag,
+                    layout,
+                    contains_delayed_fields,
+                    value: cached_info,
+                };
+
+                (vacant_entry.insert(new_entry), num_bytes_loaded)
+            },
+            Entry::Occupied(mut occupied_entry) => {
+                // If entry already exists we might only need to upgrade it from SizeOnly to Value and charge for bytes
+                let num_bytes_loaded = NumBytes::zero();
+                if load_data && !matches!(occupied_entry.get().value, CachedInformation::Value(_)) {
+                    let (cached_info, _) = TransactionDataCache::create_cached_info(
+                        load_data,
+                        resource_resolver,
+                        module_storage,
+                        &occupied_entry.get().struct_tag,
+                        addr,
+                        &occupied_entry.get().layout,
+                        occupied_entry.get().contains_delayed_fields,
+                    )?;
+
+                    if let Some(gas_meter) = maybe_gas_meter {
+                        gas_meter.charge_load_resource(
+                            addr.clone(),
+                            TypeWithRuntimeEnvironment {
+                                ty,
+                                runtime_environment: module_storage.runtime_environment(),
+                            },
+                            match cached_info.maybe_value() {
+                                None => None,
+                                Some(v) => v.view(),
+                            },
+                            num_bytes_loaded,
+                        )?;
+                    }
+
+                    occupied_entry.get_mut().value = cached_info;
+                }
+
+                (occupied_entry.into_mut(), num_bytes_loaded)
+            },
         };
 
-        let entry = DataCacheEntry {
-            struct_tag,
-            layout,
-            contains_delayed_fields,
-            value: cached_info,
-        };
-        Ok((entry, NumBytes::new(bytes_loaded as u64)))
+        Ok((&entry.value, bytes_loaded))
     }
 
     fn find_entry(&self, addr: &AccountAddress, ty: &Type) -> Option<&DataCacheEntry> {
@@ -273,23 +377,24 @@ impl TransactionDataCache {
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
     /// entry already for the specified address-type pair.
-    pub(crate) fn insert_resource(
+    fn insert_resource(
         &mut self,
         addr: AccountAddress,
         ty: Type,
         data_cache_entry: DataCacheEntry,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<&mut DataCacheEntry> {
         match self.account_map.entry(addr).or_default().entry(ty.clone()) {
             Entry::Vacant(entry) => {
-                entry.insert(data_cache_entry);
-                Ok(())
+                let v = entry.insert(data_cache_entry);
+                Ok(v)
             },
             Entry::Occupied(mut entry) => {
                 if matches!(entry.get().value, CachedInformation::SizeOnly(_))
                     && matches!(data_cache_entry.value, CachedInformation::Value(_))
                 {
                     entry.insert(data_cache_entry);
-                    Ok(())
+                    let v = entry.into_mut();
+                    Ok(v)
                 } else {
                     let msg = format!("Entry for {:?} at {} already exists", ty, addr);
                     let err = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -323,7 +428,7 @@ impl TransactionDataCache {
         ty: &Type,
     ) -> PartialVMResult<bool> {
         if let Some(entry) = self.find_entry_mut(addr, ty) {
-            return entry.exists();
+            return entry.value.exists();
         }
 
         let msg = format!("Resource for {:?} at {} must exist", ty, addr);

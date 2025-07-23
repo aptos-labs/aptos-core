@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::{TransactionDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -1077,42 +1077,6 @@ where
         self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
-    /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
-    /// of bytes loaded.
-    fn create_and_charge_and_insert_data_cache_entry<'c>(
-        &self,
-        data_cache: &'c mut TransactionDataCache,
-        resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
-        gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-        load_data: bool,
-    ) -> PartialVMResult<()> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-            module_storage,
-            resource_resolver,
-            &addr,
-            ty,
-            load_data,
-        )?;
-        gas_meter.charge_load_resource(
-            addr,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment: module_storage.runtime_environment(),
-            },
-            match entry.maybe_value() {
-                None => None,
-                Some(v) => v.view(),
-            },
-            bytes_loaded,
-        )?;
-        data_cache.insert_resource(addr, ty.clone(), entry)?;
-        Ok(())
-    }
-
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
         &self,
@@ -1125,13 +1089,12 @@ where
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         if !data_cache.contains_resource_data(&addr, ty) {
-            self.create_and_charge_and_insert_data_cache_entry(
-                data_cache,
-                resource_resolver,
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 module_storage,
-                gas_meter,
+                resource_resolver,
+                Some(gas_meter),
                 traversal_context,
-                addr,
+                &addr,
                 ty,
                 true,
             )?;
@@ -1150,13 +1113,12 @@ where
         ty: &Type,
     ) -> PartialVMResult<bool> {
         if !data_cache.contains_resource_existence(&addr, ty) {
-            self.create_and_charge_and_insert_data_cache_entry(
-                data_cache,
-                resource_resolver,
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 module_storage,
-                gas_meter,
+                resource_resolver,
+                Some(gas_meter),
                 traversal_context,
-                addr,
+                &addr,
                 ty,
                 false,
             )?;

@@ -32,7 +32,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter},
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, GasMeter, NativeGasMeter, UnmeteredGasMeter},
     loaded_data::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
@@ -162,16 +162,16 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         //   it in the data cache.
         Ok(
             if !self.data_store.contains_resource_existence(&address, ty) {
-                let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                let (entry, bytes_loaded) = self.data_store.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                     self.module_storage,
                     self.resource_resolver,
+                    None::<&mut UnmeteredGasMeter>,
+                    self.traversal_context,
                     &address,
                     ty,
                     false,
                 )?;
                 let exists = entry.exists()?;
-                self.data_store
-                    .insert_resource(address, ty.clone(), entry)?;
                 (exists, Some(bytes_loaded))
             } else {
                 let exists = self.data_store.get_resource_existence(&address, ty)?;
