@@ -17,7 +17,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,15 @@ impl BackupHandler {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<
-        impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
+        impl Iterator<
+                Item = Result<(
+                    Transaction,
+                    PersistedAuxiliaryInfo,
+                    TransactionInfo,
+                    Vec<ContractEvent>,
+                    WriteSet,
+                )>,
+            > + '_,
     > {
         let txn_iter = self
             .ledger_db
@@ -89,15 +97,14 @@ impl BackupHandler {
                     version
                 ))
             })??;
-            let _persisted_aux_info = persisted_aux_info_iter.next().ok_or_else(|| {
+            let persisted_aux_info = persisted_aux_info_iter.next().ok_or_else(|| {
                 AptosDbError::NotFound(format!(
                     "PersistedAuxiliaryInfo not found when Transaction exists, version {}",
                     version
                 ))
             })??;
             BACKUP_TXN_VERSION.set(version as i64);
-            // TODO(grao): Returns persisted aux info.
-            Ok((txn, txn_info, event_vec, write_set))
+            Ok((txn, persisted_aux_info, txn_info, event_vec, write_set))
         });
         Ok(zipped)
     }
