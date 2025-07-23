@@ -27,6 +27,7 @@ use crate::{
 };
 use fail::fail_point;
 use move_binary_format::{
+    errors,
     errors::*,
     file_format::{
         AccessKind, Bytecode, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
@@ -1380,6 +1381,7 @@ where
         // We do not consider speculative invariant violations.
         if err.status_type() == StatusType::InvariantViolation
             && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+            && !errors::is_stable_test_display()
         {
             let location = err.location().clone();
             let state = self.internal_state_str(current_frame);

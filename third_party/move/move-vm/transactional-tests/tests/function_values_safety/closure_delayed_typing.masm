@@ -1,0 +1,85 @@
+//# publish
+module 0x66::helpers
+
+public fun f(captured: u64, delayed: &u64): u64
+    move_loc captured
+    move_loc delayed
+    read_ref
+    add
+    ret
+
+public fun g(delayed: &u64, captured: u64): u64
+    move_loc captured
+    move_loc delayed
+    read_ref
+    add
+    ret
+
+public fun assert3(x: u64)
+    move_loc x
+    ld_u64 3
+    eq
+    br_true l
+    ld_u64 255
+    abort
+ l: ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun ok()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure 0x66::helpers::f, 1
+    call_closure<|&u64|u64>
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_delayed_ty()
+    local delayed: u32
+    ld_u32 1
+    st_loc delayed
+    borrow_loc delayed // ERROR
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|&u64|u64> // ... discovered here
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun ok_reversed_mask()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::g, 2
+    call_closure<|&u64|u64>
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_delayed_ty_reversed_mask()
+    local delayed: u32
+    ld_u32 1
+    st_loc delayed
+    borrow_loc delayed // ERROR here
+    ld_u64 2
+    pack_closure helpers::g, 2
+    call_closure<|&u64|u64>
+    call helpers::assert3
+    ret

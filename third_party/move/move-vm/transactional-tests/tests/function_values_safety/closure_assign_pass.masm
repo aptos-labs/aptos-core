@@ -1,0 +1,64 @@
+//# publish
+module 0x66::helpers
+
+public fun f_copy_drop_store(): |u64|u32 has copy+drop+store
+    pack_closure 0x66::helpers::action, 0
+    ret
+
+public fun f(): |u64|u32
+    pack_closure 0x66::helpers::action, 0
+    ret
+
+#[persistent] fun action(x: u64): u32
+    move_loc x
+    cast_u32
+    ld_u32 20
+    add
+    ret
+
+public fun exec_twice(f: |u64|u32 has copy, x: u64): u32
+    copy_loc x
+    copy_loc f
+    call_closure<|u64|u32>
+    move_loc x
+    move_loc f
+    call_closure<|u64|u32>
+    add
+    ret
+
+
+public fun assert_eq(x: u32, y:u32)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+ r: ret
+
+
+//# run --verbose
+script
+
+use 0x66::helpers as h
+
+fun ok()
+    call h::f_copy_drop_store
+    ld_u64 5
+    call h::exec_twice
+    ld_u32 50
+    call 0x66::helpers::assert_eq
+    ret
+
+//# run --verbose
+script
+
+use 0x66::helpers as h
+
+fun error()
+    call h::f
+    ld_u64 5
+    call h::exec_twice
+    ld_u32 50
+    call 0x66::helpers::assert_eq
+    ret

@@ -1,0 +1,45 @@
+processed 7 tasks
+
+task 2 'run'. lines 49-62:
+Error: Script execution failed with VMError: {
+    message: captured argument type mismatch,
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+    exec_state: None,
+}
+
+task 4 'run'. lines 79-92:
+Error: Script execution failed with VMError: {
+    message: captured argument type mismatch,
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+    exec_state: None,
+}
+
+task 5 'run'. lines 94-107:
+Error: Script execution failed with VMError: {
+    message: captured argument must not be a reference,
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: None,
+}
+
+task 6 'run'. lines 109-122:
+Error: Script execution failed with VMError: {
+    message: captured argument must not be a reference,
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: None,
+}
