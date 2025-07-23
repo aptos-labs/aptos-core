@@ -40,7 +40,6 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -1135,7 +1134,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
         let code = self.inner.view_existing_module(module_id)?;
-        let func = code.function_handle_at(FunctionHandleIndex::new(*function));
+        let function_def = code
+            .function_defs
+            .get(*function as usize)
+            .ok_or_else(|| anyhow::anyhow!("could not find function at index{}", function))?;
+        let func = code.function_handle_at(function_def.function);
         let id = code.identifier_at(func.name);
         Ok(id.to_string())
     }
