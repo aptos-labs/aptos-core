@@ -4125,6 +4125,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",

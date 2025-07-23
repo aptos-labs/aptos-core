@@ -117,7 +117,8 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn, slots_to_make_hot) =
+            block_output.into_inner();
         let (transactions, mut auxiliary_info) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -242,7 +243,7 @@ impl DoGetExecutionOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
         Ok(executor.execute_block(
             txn_provider,
