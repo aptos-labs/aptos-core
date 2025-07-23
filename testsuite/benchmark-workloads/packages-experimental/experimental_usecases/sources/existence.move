@@ -100,4 +100,12 @@ module 0xABCD::existence {
         let v = very_long_function(100);
         a.b1.super_a.a1 = a.b1.super_a.a1 + v;
     }
+
+    public entry fun check_and_modify() acquires C {
+        if (exists<C>(@0xABCD)) {
+            let a = borrow_global_mut<C>(@0xABCD);
+            let v = very_long_function(10);
+            a.b1.super_a.a1 = a.b1.super_a.a1 + v;
+        }
+    }
 }

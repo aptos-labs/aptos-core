@@ -100,6 +100,7 @@ pub enum TransactionTypeArg {
     ExistenceCheck50Pct,
     ExistenceCheck80Pct,
     ExistenceCheck100Pct,
+    CheckAndModify,
 }
 
 impl TransactionTypeArg {
@@ -437,6 +438,9 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::ExistenceCheck {
                     modify_frequency: 1.0,
                 })
+            },
+            TransactionTypeArg::CheckAndModify => {
+                call_custom_module(EntryPoints::CheckAndModify)
             },
         }
     }
