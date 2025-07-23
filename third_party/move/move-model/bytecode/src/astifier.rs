@@ -2043,18 +2043,29 @@ impl IfElseTransformer<'_> {
 
 /// A rewriter which eliminates single and unused assignments.
 pub fn transform_assigns(target: &FunctionTarget, exp: Exp) -> Exp {
-    let usage = analyze_usage(target, exp.as_ref());
+    let post_usage = analyze_post_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
-    AssignTransformer { usage, builder }.rewrite_exp(exp)
+    AssignTransformer {
+        usage: post_usage,
+        builder,
+    }
+    .rewrite_exp(exp)
 }
 
 /// A rewriter which binds free variables.
 pub fn bind_free_vars(target: &FunctionTarget, exp: Exp) -> Exp {
-    let usage = analyze_usage(target, exp.as_ref());
+    let usage = analyze_global_usage(target, exp.as_ref());
+    if usage.is_empty() {
+        // If there are no free variables, we can return the expression as is.
+        return exp;
+    }
+    // Let's make sure the input expression is a sequence
+    assert!(matches!(exp.as_ref(), ExpData::Sequence(_, _)));
     let builder = ExpBuilder::new(target.global_env());
     FreeVariableBinder {
         usage,
         builder,
+        bound: BTreeSet::new(),
         // Parameters set to be bound
         bound_vars: vec![target
             .get_parameters()
@@ -2080,16 +2091,6 @@ impl AssignTransformer<'_> {
             ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..)
         )
     }
-}
-
-#[allow(unused)]
-struct FreeVariableBinder<'a> {
-    /// Usage information about variables in the expression
-    usage: BTreeMap<NodeId, UsageInfo>,
-    /// The expression builder.
-    builder: ExpBuilder<'a>,
-    /// Variables which are bound in outer scopes
-    bound_vars: Vec<BTreeSet<Symbol>>,
 }
 
 impl ExpRewriterFunctions for AssignTransformer<'_> {
@@ -2148,20 +2149,6 @@ impl AssignTransformer<'_> {
                             new_stms.push(self.builder.unfold(&substitution, rhs.clone()));
                         }
                     },
-                // Check whether an assignment can be transformed into a let
-                // TODO: refine to the correct implementation, the below doesn't work
-                //   if variable is already assigned (need reaching definitions).
-                /*
-                ExpData::Assign(_, pat, rhs)
-                // None of the variables in the pattern is used after the block
-                if pat.vars().into_iter().all(|(_, var)| after_block_usage.read_count(var) == 0) => {
-                    // Save building the block for later when we have the rest of the sequence
-                    blocks.push((new_stms, pat.clone(),
-                                 self.rewrite_exp(
-                                     self.builder.unfold(&substitution, rhs.clone()))));
-                    new_stms = vec![];
-                }
-                 */
                 _ => {
                     // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
                     // Extra checks are needed to ensure safety.
@@ -2183,21 +2170,152 @@ impl AssignTransformer<'_> {
     }
 }
 
+#[allow(unused)]
+struct FreeVariableBinder<'a> {
+    /// Usage information about variables in the expression
+    usage: BTreeMap<Symbol, BTreeSet<NodeId>>,
+    /// The expression builder.
+    builder: ExpBuilder<'a>,
+    /// Variables which have been bound inside a given expression
+    bound: BTreeSet<Symbol>,
+    /// Variables which are bound in outer scopes
+    bound_vars: Vec<BTreeSet<Symbol>>,
+}
+
 impl ExpRewriterFunctions for FreeVariableBinder<'_> {
     fn rewrite_exp(&mut self, mut exp: Exp) -> Exp {
-        // TODO: this currently just adds lets on outermost level.
-        //   Refine this to push lets down to leafs.
-        let mut bound = BTreeSet::new();
-        exp.clone().visit_free_local_vars(|node_id, var| {
-            if bound.insert(var) && !self.bound_vars.iter().any(|b| b.contains(&var)) {
-                exp = self.builder.block(
-                    Pattern::Var(self.builder.clone_node_id(node_id), var),
-                    None,
-                    exp.clone(),
-                );
+        // Skip non-seq expressions
+        if !matches!(exp.as_ref(), ExpData::Sequence(_, _)) {
+            return self.rewrite_exp_descent(exp);
+        }
+
+        // Collect the free variables used in this sequence.
+        let mut free_vars = BTreeMap::new();
+        exp.visit_free_local_vars(|node_id, var| {
+            // if not already bound, keep track of it
+            if !self.bound_vars.iter().any(|b| b.contains(&var)) {
+                free_vars
+                    .entry(var)
+                    .or_insert_with(BTreeSet::new)
+                    .insert(node_id);
             }
         });
+
+        // try to bind free variables to descendant sequences first
+        //  so that the variables are declared in a smaller scope.
+        exp = self.rewrite_exp_descent(exp.clone());
+
+        // Try to collect free vars that should be bound in this sequence, using two conditions:
+        //   1. the var is only used in this sequence
+        //   2. the var has not been bound to the sequence's descendants
+        free_vars = free_vars
+            .into_iter()
+            .filter(|(var, node_ids)| {
+                self.all_usage_contained(*var, node_ids) && self.bound.insert(*var)
+            })
+            .collect();
+
+        let ExpData::Sequence(_, stmts) = exp.as_ref() else {
+            unreachable!("exp must be a sequence here!");
+        };
+
+        // Let's bind the free variables who first usage is a definition
+        let default_loc = self.builder.env().get_node_loc(exp.node_id());
+        exp = self.builder.seq(
+            &default_loc,
+            self.bind_defined_vars(stmts, &mut free_vars, &default_loc),
+        );
+
+        // Let's bind the remaning free variables at the beginning of the sequence
+        for (var, node_ids) in &free_vars {
+            exp = self.builder.block(
+                Pattern::Var(
+                    self.builder.clone_node_id(
+                        node_ids
+                            .iter()
+                            .next()
+                            .expect("a free var must be used at least once")
+                            .clone(),
+                    ),
+                    *var,
+                ),
+                None,
+                exp.clone(),
+            );
+        }
         exp
+    }
+}
+
+impl<'a> FreeVariableBinder<'a> {
+    /// Check if all usages of variable `var` are contained in `exp`.
+    fn all_usage_contained(&self, target_var: Symbol, local_var_usage: &BTreeSet<NodeId>) -> bool {
+        self.usage
+            .get(&target_var)
+            .map_or(true, |global_usage| *global_usage == *local_var_usage)
+    }
+
+    /// Given a sequence of statements and a list of free vars that can be safely bound to the sequence,
+    /// binds a free var with its definition IF the definition is the var's FIRST usage in the sequence.
+    fn bind_defined_vars(
+        &self,
+        stmts: &Vec<Exp>,
+        free_vars: &mut BTreeMap<Symbol, BTreeSet<NodeId>>,
+        loc: &Loc,
+    ) -> Vec<Exp> {
+        let mut blocks = vec![];
+        // Indicate which variables have been visited
+        let mut visited = BTreeSet::new();
+        let mut new_stmts = vec![];
+        for stmt in stmts {
+            match stmt.as_ref() {
+                ExpData::Assign(_, pat, rhs) => {
+                    // Mark all the vars that are used in the RHS
+                    rhs.visit_free_local_vars(|_, var| {
+                        visited.insert(var);
+                    });
+                    // If all vars in the pattern can be bound in this sequence, and they are first used in this assignment,
+                    //  we can bind them with this assignment (definition).
+                    if pat.vars().into_iter().all(|(_, var)| {
+                        free_vars.iter().any(|(free_var, _)| *free_var == var)
+                            && !visited.contains(&var)
+                    }) {
+                        // save the statements processed so far and record that a new block needs to be created
+                        blocks.push((new_stmts, pat.clone(), rhs.clone()));
+                        for var in pat.vars() {
+                            // mark the var has been bound and visited
+                            free_vars.remove(&var.1);
+                            visited.insert(var.1);
+                        }
+                        // reset the statement tracker for next block
+                        new_stmts = vec![];
+                    } else {
+                        // For all non-boundable vars, mark them as used
+                        for var in pat.vars() {
+                            visited.insert(var.1);
+                        }
+                        new_stmts.push(stmt.clone());
+                    }
+                },
+                _ => {
+                    // For all non-assignment exps, mark the involved vars as used
+                    stmt.visit_free_local_vars(|_, var| {
+                        visited.insert(var);
+                    });
+                    new_stmts.push(stmt.clone());
+                },
+            }
+        }
+
+        // Now let's assemble a new list of statements with block expressions
+        while let Some((prev_stmts, pat, def)) = blocks.pop() {
+            let block = self
+                .builder
+                .block(pat, Some(def), self.builder.seq(loc, new_stmts));
+            new_stmts = prev_stmts;
+            new_stmts.push(block)
+        }
+        new_stmts
     }
 }
 
@@ -2206,53 +2324,24 @@ impl ExpRewriterFunctions for FreeVariableBinder<'_> {
 /// Usage information about variables in an expression.
 #[derive(Default, Clone, AbstractDomain)]
 struct UsageInfo {
-    /// Variables which are read by and after this expression.
+    /// Map recording which expressions read a variable, before/after a given expression.
     reads: MapDomain<Symbol, SetDomain<NodeId>>,
-    /// Variables which are written by or after this expression.
+    /// Map recording which expressions write to a variable, before/after a given expression.
     writes: MapDomain<Symbol, SetDomain<NodeId>>,
-    /// Variables which are borrowed by or after this expression, immutable or mutable.
+    /// Map recording which expressions borrow a variable, immutable or mutable, before/after a given expression.
     borrows: MapDomain<Symbol, SetDomain<NodeId>>,
 }
 
-/// Analyze the expression for variable usage and returns a map from node id
-/// to the info.
-fn analyze_usage(_target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId, UsageInfo> {
-    let mut step_fun = |state: &mut UsageInfo, e: &ExpData| {
-        use ExpData::*;
-        match e {
-            Assign(id, pat, rhs) => {
-                for (_, var) in pat.vars() {
-                    state.add_write(var, *id)
-                }
-                rhs.visit_free_local_vars(|id, var| state.add_read(var, id))
-            },
-            Block(id, pat, binding, body) => {
-                if let Some(b) = binding {
-                    b.visit_free_local_vars(|id, var| state.add_read(var, id))
-                }
-                for (_, var) in pat.vars() {
-                    state.add_write(var, *id)
-                }
-                body.visit_free_local_vars(|id, var| state.add_read(var, id))
-            },
-            Call(_, Operation::Borrow(kind), args) => args[0].visit_free_local_vars(|id, var| {
-                // Args supposed to be only a single variable, and marking everything in
-                // this exp as borrowed is safe.
-                if *kind == ReferenceKind::Mutable {
-                    state.add_write(var, id)
-                }
-                state.add_borrow(var, id);
-            }),
-            _ => e.visit_free_local_vars(|id, var| state.add_read(var, id)),
-        }
-    };
+/// Analyze an expression for variable usage and return a map showing the usage info AFTER each descendant expression
+fn analyze_post_usage(_target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId, UsageInfo> {
+    let mut step_fun = |state: &mut UsageInfo, e: &ExpData| fetch_usage(state, e);
     let mut analyzer = FixpointAnalyser::new(false, &mut step_fun);
     analyzer.run_until_fixpoint(exp);
     let mut post_state = BTreeMap::new();
     analyzer.compute_post_state(&mut post_state, exp, UsageInfo::default());
     if DEBUG {
         debug!(
-            "usage: {}",
+            "post exp usage: {}",
             exp.display_with_annotator(_target.global_env(), &|id| {
                 if let Some(u) = post_state.get(&id) {
                     u.debug_print(_target.global_env())
@@ -2263,6 +2352,52 @@ fn analyze_usage(_target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId, Us
         );
     }
     post_state
+}
+
+/// Analyze an expression and return which expression descendants use each variable
+fn analyze_global_usage(
+    _target: &FunctionTarget,
+    exp: &ExpData,
+) -> BTreeMap<Symbol, BTreeSet<NodeId>> {
+    let mut var_usage = BTreeMap::new();
+    exp.visit_free_local_vars(|node_id, var| {
+        var_usage
+            .entry(var)
+            .or_insert_with(BTreeSet::new)
+            .insert(node_id);
+    });
+    var_usage
+}
+
+/// Helper function to gather variable usage
+fn fetch_usage(state: &mut UsageInfo, e: &ExpData) {
+    use ExpData::*;
+    match e {
+        Assign(id, pat, rhs) => {
+            for (_, var) in pat.vars() {
+                state.add_write(var, *id)
+            }
+            rhs.visit_free_local_vars(|id, var| state.add_read(var, id))
+        },
+        Block(id, pat, binding, body) => {
+            if let Some(b) = binding {
+                b.visit_free_local_vars(|id, var| state.add_read(var, id))
+            }
+            for (_, var) in pat.vars() {
+                state.add_write(var, *id)
+            }
+            body.visit_free_local_vars(|id, var| state.add_read(var, id))
+        },
+        Call(_, Operation::Borrow(kind), args) => args[0].visit_free_local_vars(|id, var| {
+            // Args supposed to be only a single variable, and marking everything in
+            // this exp as borrowed is safe.
+            if *kind == ReferenceKind::Mutable {
+                state.add_write(var, id)
+            }
+            state.add_borrow(var, id);
+        }),
+        _ => e.visit_free_local_vars(|id, var| state.add_read(var, id)),
+    }
 }
 
 impl UsageInfo {

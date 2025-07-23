@@ -58,8 +58,7 @@ return _t1
 
 --- Var-Bound Generated AST
 {
-  let _t1: u8;
-  _t1: u8 = 0;
+  let _t1: u8 = 0;
   if (c) _t1: u8 = 1;
   return _t1
 }
@@ -568,8 +567,7 @@ return _t1
 === Sourcified Output ============================================
 module 0x815::m {
     fun if_1(c: bool): u8 {
-        let _t1;
-        _t1 = 0u8;
+        let _t1 = 0u8;
         if (c) _t1 = 1u8;
         _t1
     }
