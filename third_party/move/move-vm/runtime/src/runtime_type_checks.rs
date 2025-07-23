@@ -264,12 +264,25 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?;
             },
             Bytecode::CallClosure(sig_idx) => {
+                // SECURITY FIX: Enhanced closure type checking
+                if operand_stack.is_empty() {
+                    return Err(PartialVMError::new(StatusCode::STACK_UNDERFLOW)
+                        .with_message("closure call on empty stack".to_string()));
+                }
+                
                 // For closure, we need to check the type of the closure on
                 // top of the stack. The argument types are checked when the frame
                 // is constructed in the interpreter, using the same code as for regular
                 // calls.
                 let (expected_ty, _) = ty_cache.get_signature_index_type(*sig_idx, frame)?;
                 let given_ty = operand_stack.pop_ty()?;
+                
+                // SECURITY FIX: Validate closure type structure
+                if !matches!(given_ty.as_ref(), Type::Function(_, _, _)) {
+                    return Err(PartialVMError::new(StatusCode::CALL_TYPE_MISMATCH_ERROR)
+                        .with_message("expected closure type, got non-function type".to_string()));
+                }
+                
                 given_ty.paranoid_check_assignable(expected_ty)?;
             },
             Bytecode::Branch(_) => (),

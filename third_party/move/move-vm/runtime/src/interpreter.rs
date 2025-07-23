@@ -156,12 +156,13 @@ where
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<Vec<Value>> {
+        let vm_config = module_storage.runtime_environment().vm_config();
         let interpreter = InterpreterImpl {
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
-            vm_config: module_storage.runtime_environment().vm_config(),
+            vm_config,
             access_control: AccessControlState::default(),
-            reentrancy_checker: ReentrancyChecker::default(),
+            reentrancy_checker: ReentrancyChecker::new(vm_config.max_closure_call_depth),
             ty_depth_checker,
         };
 
@@ -740,18 +741,34 @@ where
         mask: ClosureMask,
         mut captured: Vec<Value>,
     ) -> PartialVMResult<Frame> {
+        // SECURITY FIX: Validate closure mask consistency
+        self.validate_closure_mask(&function, &mask, captured.len())?;
+        
         let mut locals = Locals::new(function.local_tys().len());
         let num_param_tys = function.param_tys().len();
+        
+        // SECURITY FIX: Validate parameter count matches function signature
+        if num_param_tys > ClosureMask::MAX_ARGS {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("function parameter count exceeds maximum allowed".to_string()));
+        }
+        
         for i in (0..num_param_tys).rev() {
             let is_captured = mask.is_captured(i);
             let value = if is_captured {
                 captured.pop().ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("inconsistent closure mask".to_string())
+                        .with_message("inconsistent closure mask: missing captured argument".to_string())
                 })?
             } else {
                 self.operand_stack.pop()?
             };
+            
+            // SECURITY FIX: Validate captured values are not references
+            if is_captured {
+                self.validate_captured_value(&value, i)?;
+            }
+            
             locals.store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)?;
 
             let ty_args = function.ty_args();
@@ -773,6 +790,13 @@ where
                 }
             }
         }
+        
+        // SECURITY FIX: Ensure all captured arguments were used
+        if !captured.is_empty() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("excess captured arguments in closure".to_string()));
+        }
+        
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
@@ -781,6 +805,95 @@ where
             locals,
             frame_cache,
         )
+    }
+
+    /// SECURITY FIX: Validate closure mask consistency
+    fn validate_closure_mask(
+        &self,
+        function: &LoadedFunction,
+        mask: &ClosureMask,
+        captured_count: usize,
+    ) -> PartialVMResult<()> {
+        let param_count = function.param_tys().len();
+        let expected_captured = mask.captured_count() as usize;
+        
+        // Validate captured count matches mask
+        if expected_captured != captured_count {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message(format!(
+                    "closure mask inconsistency: expected {} captured args, got {}",
+                    expected_captured, captured_count
+                )));
+        }
+        
+        // Validate mask doesn't exceed parameter count
+        if mask.max_captured().unwrap_or(0) >= param_count {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("closure mask references non-existent parameter".to_string()));
+        }
+        
+        // Validate mask is well-formed (no gaps in captured arguments)
+        let mut last_captured = None;
+        for i in 0..param_count {
+            if mask.is_captured(i) {
+                if let Some(last) = last_captured {
+                    if i > last + 1 {
+                        return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message("closure mask has gaps in captured arguments".to_string()));
+                    }
+                }
+                last_captured = Some(i);
+            }
+        }
+        
+        // SECURITY FIX: Check against VM config limits
+        if self.vm_config.enable_closure_security_checks {
+            if captured_count > self.vm_config.max_captured_args_per_closure {
+                return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                    .with_message(format!(
+                        "closure captured too many arguments: {} > {}",
+                        captured_count,
+                        self.vm_config.max_captured_args_per_closure
+                    )));
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// SECURITY FIX: Validate captured values meet security requirements
+    fn validate_captured_value(&self, value: &Value, param_index: usize) -> PartialVMResult<()> {
+        // Check for reference types (should not be captured)
+        if value.is_reference() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message(format!(
+                    "captured argument {} cannot be a reference",
+                    param_index
+                )));
+        }
+        
+        // Check for delayed values (should not be captured)
+        if value.is_delayed_value() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message(format!(
+                    "captured argument {} cannot be a delayed value",
+                    param_index
+                )));
+        }
+        
+        // Check value depth to prevent deep nesting attacks
+        let depth = value.value_depth();
+        if let Some(max_depth) = self.vm_config.max_value_nest_depth {
+            if depth > max_depth {
+                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!(
+                        "captured argument {} exceeds maximum value depth",
+                        param_index
+                    )));
+            }
+        }
+        
+        Ok(())
     }
 
     /// Call a native functions.
@@ -1671,6 +1784,11 @@ impl Stack {
             );
         }
         Ok(())
+    }
+
+    /// SECURITY FIX: Check if stack is empty
+    pub(crate) fn is_empty(&self) -> bool {
+        self.value.is_empty()
     }
 }
 

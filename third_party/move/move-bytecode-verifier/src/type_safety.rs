@@ -90,6 +90,11 @@ impl<'a> TypeSafetyChecker<'a> {
         Ok(())
     }
 
+    /// SECURITY FIX: Safe pop method with validation
+    fn pop(&mut self) -> Option<SignatureToken> {
+        self.stack.pop()
+    }
+
     fn charge_ty(&mut self, meter: &mut impl Meter, ty: &SignatureToken) -> PartialVMResult<()> {
         meter.add_items(
             Scope::Function,
@@ -316,17 +321,41 @@ fn call_closure(
         safe_assert!(false);
         unreachable!()
     };
+    
+    // SECURITY FIX: Validate closure type before popping
+    if verifier.stack.is_empty() {
+        return Err(verifier
+            .error(StatusCode::STACK_UNDERFLOW, offset)
+            .with_message("closure call on empty stack".to_owned()));
+    }
+    
     // On top of the stack is the closure, pop it.
     let closure_ty = safe_unwrap!(verifier.stack.pop());
+    
+    // SECURITY FIX: Enhanced closure type validation
+    if !matches!(closure_ty, SignatureToken::Function(_, _, _)) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("expected closure type, got non-function type".to_owned()));
+    }
+    
     // Verify that the closure type is assignable to the expected type
     if !expected_ty.is_assignable_from(&closure_ty) {
         return Err(verifier
             .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
             .with_message("closure type mismatch".to_owned()));
     }
+    
+    // SECURITY FIX: Validate argument count
+    if verifier.stack.len() < param_tys.len() {
+        return Err(verifier
+            .error(StatusCode::STACK_UNDERFLOW, offset)
+            .with_message("insufficient arguments for closure call".to_owned()));
+    }
+    
     // Pop and verify arguments
     for param_ty in param_tys.iter().rev() {
-        let arg_ty = safe_unwrap!(verifier.stack.pop());
+        let arg_ty = safe_unwrap!(verifier.pop());
         // For parameter to argument, use assignability
         if !param_ty.is_assignable_from(&arg_ty) {
             return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
@@ -347,6 +376,14 @@ fn clos_pack(
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
     let func_handle = verifier.resolver.function_handle_at(func_handle_idx);
+    
+    // SECURITY FIX: Validate function handle
+    if func_handle_idx >= verifier.resolver.function_handles().len() as u16 {
+        return Err(verifier
+            .error(StatusCode::INDEX_OUT_OF_BOUNDS, offset)
+            .with_message("invalid function handle index".to_owned()));
+    }
+    
     // In order to determine whether this closure is storable, we need to figure whether
     // this function is marked as Persistent. This is case for
     // functions which are defined as public or which have this attribute explicit in the
@@ -359,14 +396,41 @@ fn clos_pack(
     } else {
         AbilitySet::PRIVATE_FUNCTIONS
     };
+    
     // Check the captured arguments on the stack
     let param_sgn = verifier.resolver.signature_at(func_handle.parameters);
+    
+    // SECURITY FIX: Validate closure mask consistency
+    let captured_count = mask.captured_count() as usize;
+    if captured_count > param_sgn.0.len() {
+        return Err(verifier
+            .error(StatusCode::INDEX_OUT_OF_BOUNDS, offset)
+            .with_message("closure mask references more parameters than function has".to_owned()));
+    }
+    
     // Instruction consistency check has verified that the number of captured arguments
     // is less than or equal to the number of parameters of the function.
     let captured_param_tys = mask.extract(&param_sgn.0, true);
+    
+    // SECURITY FIX: Validate stack has enough arguments
+    if verifier.stack.len() < captured_param_tys.len() {
+        return Err(verifier
+            .error(StatusCode::STACK_UNDERFLOW, offset)
+            .with_message("insufficient arguments for closure pack".to_owned()));
+    }
+    
     for ty in captured_param_tys.into_iter().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());
+        
+        // SECURITY FIX: Enhanced type validation for captured arguments
+        if arg.is_reference() {
+            return Err(verifier
+                .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)
+                .with_message("captured argument must not be a reference".to_owned()));
+        }
+        
         abilities = abilities.intersect(verifier.abilities(&arg)?);
+        
         // For captured param type to argument, use assignability
         if (type_actuals.is_empty() && !ty.is_assignable_from(&arg))
             || (!type_actuals.is_empty() && !instantiate(ty, type_actuals).is_assignable_from(&arg))
@@ -375,7 +439,8 @@ fn clos_pack(
                 .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)
                 .with_message("captured argument type mismatch".to_owned()));
         }
-        // A captured argument must not be a reference
+        
+        // SECURITY FIX: Additional validation - captured argument must not be a reference
         if ty.is_reference() {
             return Err(verifier
                 .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)

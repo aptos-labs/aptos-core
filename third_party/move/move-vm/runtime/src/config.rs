@@ -32,6 +32,12 @@ pub struct VMConfig {
     pub use_call_tree_and_instruction_cache: bool,
     pub enable_lazy_loading: bool,
     pub enable_depth_checks: bool,
+    /// SECURITY FIX: Maximum closure call depth to prevent stack overflow attacks
+    pub max_closure_call_depth: usize,
+    /// SECURITY FIX: Enable enhanced closure security checks
+    pub enable_closure_security_checks: bool,
+    /// SECURITY FIX: Maximum captured arguments per closure
+    pub max_captured_args_per_closure: usize,
 }
 
 impl Default for VMConfig {
@@ -52,6 +58,10 @@ impl Default for VMConfig {
             use_call_tree_and_instruction_cache: true,
             enable_lazy_loading: false,
             enable_depth_checks: true,
+            // SECURITY FIX: Default security settings for closures
+            max_closure_call_depth: 100,
+            enable_closure_security_checks: true,
+            max_captured_args_per_closure: 64,
         }
     }
 }

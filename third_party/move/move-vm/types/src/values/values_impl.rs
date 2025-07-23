@@ -316,6 +316,18 @@ impl Container {
             ValueImpl::Address(x),
         ])))
     }
+
+    /// SECURITY FIX: Get the depth of this container for security validation
+    fn value_depth(&self) -> u64 {
+        match self {
+            Self::Vec(r) | Self::Struct(r) | Self::Locals(r) => {
+                let max_depth = r.borrow().iter().map(|v| v.value_depth()).max().unwrap_or(0);
+                max_depth + 1
+            },
+            Self::VecU8(_) | Self::VecU16(_) | Self::VecU32(_) | Self::VecU64(_) |
+            Self::VecU128(_) | Self::VecU256(_) | Self::VecBool(_) | Self::VecAddress(_) => 2,
+        }
+    }
 }
 
 /***************************************************************************************
@@ -349,6 +361,11 @@ impl ContainerRef {
         if let Self::Global { status, .. } = self {
             *status.borrow_mut() = GlobalDataStatus::Dirty
         }
+    }
+
+    /// SECURITY FIX: Get the depth of this container reference for security validation
+    fn value_depth(&self) -> u64 {
+        self.container().value_depth() + 1
     }
 }
 
@@ -393,6 +410,20 @@ impl ValueImpl {
         Self: VMValueRef<T>,
     {
         VMValueRef::value_ref(self)
+    }
+
+    /// SECURITY FIX: Get the depth of this value for security validation
+    fn value_depth(&self) -> u64 {
+        match self {
+            ValueImpl::Invalid => 0,
+            ValueImpl::U8(_) | ValueImpl::U16(_) | ValueImpl::U32(_) | ValueImpl::U64(_) |
+            ValueImpl::U128(_) | ValueImpl::U256(_) | ValueImpl::Bool(_) | ValueImpl::Address(_) |
+            ValueImpl::DelayedFieldID { .. } => 1,
+            ValueImpl::Container(c) => c.value_depth(),
+            ValueImpl::ContainerRef(r) => r.value_depth(),
+            ValueImpl::IndexedRef(r) => r.value_depth(),
+            ValueImpl::ClosureValue(c) => c.value_depth(),
+        }
     }
 }
 
@@ -505,6 +536,11 @@ impl IndexedRef {
             idx: self.idx,
             container_ref: self.container_ref.copy_by_ref(),
         }
+    }
+
+    /// SECURITY FIX: Get the depth of this indexed reference for security validation
+    fn value_depth(&self) -> u64 {
+        self.container_ref.value_depth() + 1
     }
 }
 
@@ -2131,6 +2167,21 @@ impl Value {
         Self: VMValueCast<T>,
     {
         VMValueCast::cast(self)
+    }
+
+    /// SECURITY FIX: Check if this value is a reference
+    pub fn is_reference(&self) -> bool {
+        matches!(self.0, ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_))
+    }
+
+    /// SECURITY FIX: Check if this value is a delayed value
+    pub fn is_delayed_value(&self) -> bool {
+        matches!(self.0, ValueImpl::DelayedFieldID { .. })
+    }
+
+    /// SECURITY FIX: Get the depth of this value for security validation
+    pub fn value_depth(&self) -> u64 {
+        self.0.value_depth()
     }
 }
 
@@ -4510,6 +4561,13 @@ impl Closure {
             }
         }
         Ok(())
+    }
+
+    /// SECURITY FIX: Get the depth of this closure for security validation
+    fn value_depth(&self) -> u64 {
+        let Self(_, captured) = self;
+        let max_captured_depth = captured.iter().map(|v| v.value_depth()).max().unwrap_or(0);
+        max_captured_depth + 1
     }
 }
 
