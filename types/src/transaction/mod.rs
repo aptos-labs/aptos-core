@@ -63,7 +63,6 @@ use crate::{
     keyless::FederatedKeylessPublicKey,
     on_chain_config::{FeatureFlag, Features},
     proof::accumulator::InMemoryEventAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
@@ -1808,10 +1807,6 @@ impl TransactionOutput {
     pub fn has_new_epoch_event(&self) -> bool {
         self.events.iter().any(ContractEvent::is_new_epoch_event)
     }
-
-    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.write_set.state_update_refs()
-    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
@@ -2078,10 +2073,6 @@ impl TransactionToCommit {
 
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
-    }
-
-    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.write_set.state_update_refs()
     }
 
     pub fn events(&self) -> &[ContractEvent] {
