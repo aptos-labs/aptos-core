@@ -7,7 +7,7 @@ use crate::{
         epoch_ending::restore::EpochHistory,
         transaction::{
             analysis::TransactionAnalysis,
-            manifest::{TransactionBackup, TransactionChunk},
+            manifest::{TransactionBackup, TransactionChunk, TransactionChunkFormat},
         },
     },
     metrics::{
@@ -111,11 +111,27 @@ impl LoadedChunk {
         let mut write_sets = Vec::new();
 
         while let Some(record_bytes) = file.read_record_bytes().await? {
-            let (txn, txn_info, events, write_set): (_, _, _, WriteSet) =
-                bcs::from_bytes(&record_bytes)?;
+            let (txn, aux_info, txn_info, events, write_set): (
+                _,
+                PersistedAuxiliaryInfo,
+                _,
+                _,
+                WriteSet,
+            ) = match manifest.format {
+                TransactionChunkFormat::V0 => {
+                    let (txn, txn_info, events, write_set) = bcs::from_bytes(&record_bytes)?;
+                    (
+                        txn,
+                        PersistedAuxiliaryInfo::None,
+                        txn_info,
+                        events,
+                        write_set,
+                    )
+                },
+                TransactionChunkFormat::V1 => bcs::from_bytes(&record_bytes)?,
+            };
             txns.push(txn);
-            // TODO(grao): Handle PersistedAuxiliaryInfo here.
-            persisted_aux_info.push(PersistedAuxiliaryInfo::None);
+            persisted_aux_info.push(aux_info);
             txn_infos.push(txn_info);
             event_vecs.push(events);
             write_sets.push(write_set);
