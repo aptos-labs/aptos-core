@@ -1,0 +1,9 @@
+[package]
+name = "Test"
+version = "0.0.0"
+
+[addresses]
+my_addr = "_"
+
+[dependencies]
+AptosStdlib = { local = "../../../../framework/aptos-stdlib" }
