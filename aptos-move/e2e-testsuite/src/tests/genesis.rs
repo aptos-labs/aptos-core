@@ -15,7 +15,7 @@ fn no_deletion_in_genesis() {
     let genesis = GENESIS_CHANGE_SET_HEAD.clone();
     assert!(!genesis
         .write_set()
-        .expect_v0()
+        .as_v0()
         .iter()
         .any(|(_, op)| op.is_deletion()))
 }

@@ -28,7 +28,7 @@ use aptos_data_streaming_service::{
 };
 use aptos_time_service::TimeService;
 use aptos_types::{
-    transaction::{TransactionOutputListWithProof, Version},
+    transaction::{TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
 use claims::{assert_matches, assert_none, assert_ok};
@@ -545,7 +545,7 @@ async fn test_data_stream_transaction_outputs() {
     // Send an invalid output along the stream
     let data_notification = DataNotification::new(
         notification_id,
-        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProof::new_empty()),
+        DataPayload::TransactionOutputsWithProof(TransactionOutputListWithProofV2::new_empty()),
     );
     notification_sender_1.send(data_notification).await.unwrap();
 

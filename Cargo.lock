@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.6.0"
+version = "7.6.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -4571,6 +4571,7 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -11914,6 +11915,7 @@ dependencies = [
  "indexmap 2.7.0",
  "move-bytecode-spec",
  "move-core-types",
+ "once_cell",
  "proptest",
  "proptest-derive",
  "ref-cast",
@@ -13503,6 +13505,18 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "package-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-transaction-workloads-lib",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "move-package",
 ]
 
 [[package]]

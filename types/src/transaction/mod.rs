@@ -2139,6 +2139,16 @@ impl TransactionListWithProof {
         )
     }
 
+    /// Returns the first version in the transaction list
+    pub fn get_first_transaction_version(&self) -> Option<Version> {
+        self.first_transaction_version
+    }
+
+    /// Returns the number of transactions in the transaction list
+    pub fn get_num_transactions(&self) -> usize {
+        self.transactions.len()
+    }
+
     /// Verifies the transaction list with proof using the given `ledger_info`.
     /// This method will ensure:
     /// 1. All transactions exist on the given `ledger_info`.
@@ -2153,19 +2163,19 @@ impl TransactionListWithProof {
     ) -> Result<()> {
         // Verify the first transaction versions match
         ensure!(
-            self.first_transaction_version == first_transaction_version,
+            self.get_first_transaction_version() == first_transaction_version,
             "First transaction version ({:?}) doesn't match given version ({:?}).",
-            self.first_transaction_version,
+            self.get_first_transaction_version(),
             first_transaction_version,
         );
 
         // Verify the lengths of the transactions and transaction infos match
         ensure!(
-            self.proof.transaction_infos.len() == self.transactions.len(),
+            self.proof.transaction_infos.len() == self.get_num_transactions(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions ({}).",
             self.proof.transaction_infos.len(),
-            self.transactions.len(),
+            self.get_num_transactions(),
         );
 
         // Verify the transaction hashes match those of the transaction infos
@@ -2187,15 +2197,15 @@ impl TransactionListWithProof {
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_version)?;
+            .verify(ledger_info, self.get_first_transaction_version())?;
 
         // Verify the events if they exist.
         if let Some(event_lists) = &self.events {
             ensure!(
-                event_lists.len() == self.transactions.len(),
+                event_lists.len() == self.get_num_transactions(),
                 "The length of event_lists ({}) does not match the number of transactions ({}).",
                 event_lists.len(),
-                self.transactions.len(),
+                self.get_num_transactions(),
             );
             event_lists
                 .into_par_iter()
@@ -2219,6 +2229,49 @@ impl TransactionListWithProofV2 {
         Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos)
     }
 
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_empty())
+    }
+
+    /// A convenience function to create a v2 list from a v1 list
+    pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_from_v1(
+            transaction_list_with_proof,
+        ))
+    }
+
+    /// Consumes and returns the inner transaction list with proof
+    pub fn consume_transaction_list_with_proof(self) -> TransactionListWithProof {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos.transaction_list_with_proof
+            },
+        }
+    }
+
+    /// Returns the first version in the transaction list
+    pub fn get_first_transaction_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .get_first_transaction_version()
+            },
+        }
+    }
+
+    /// Returns the number of transactions in the transaction list
+    pub fn get_num_transactions(&self) -> usize {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .get_num_transactions()
+            },
+        }
+    }
+
     /// Returns a reference to the inner transaction list with proof
     pub fn get_transaction_list_with_proof(&self) -> &TransactionListWithProof {
         match self {
@@ -2233,6 +2286,29 @@ impl TransactionListWithProofV2 {
         match self {
             Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
                 &transaction_list_with_auxiliary_infos.persisted_auxiliary_infos
+            },
+        }
+    }
+
+    /// Splits the transaction list with proof v2 into its components
+    pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
+                txn_list_with_auxiliary_infos.transaction_list_with_proof,
+                txn_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
+        }
+    }
+
+    /// Verifies the transaction list with proof v2 against the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
             },
         }
     }
@@ -2317,6 +2393,16 @@ impl TransactionOutputListWithProof {
         Self::new(vec![], None, TransactionInfoListWithProof::new_empty())
     }
 
+    /// Returns the first version in the transaction output list
+    pub fn get_first_output_version(&self) -> Option<Version> {
+        self.first_transaction_output_version
+    }
+
+    /// Returns the number of outputs in the transaction output list
+    pub fn get_num_outputs(&self) -> usize {
+        self.transactions_and_outputs.len()
+    }
+
     /// Verifies the transaction output list with proof using the given `ledger_info`.
     /// This method will ensure:
     /// 1. All transaction infos exist on the given `ledger_info`.
@@ -2332,19 +2418,19 @@ impl TransactionOutputListWithProof {
     ) -> Result<()> {
         // Verify the first transaction output versions match
         ensure!(
-            self.first_transaction_output_version == first_transaction_output_version,
+            self.get_first_output_version() == first_transaction_output_version,
             "First transaction and output version ({:?}) doesn't match given version ({:?}).",
-            self.first_transaction_output_version,
+            self.get_first_output_version(),
             first_transaction_output_version,
         );
 
         // Verify the lengths of the transactions and outputs match the transaction infos
         ensure!(
-            self.proof.transaction_infos.len() == self.transactions_and_outputs.len(),
+            self.proof.transaction_infos.len() == self.get_num_outputs(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions and outputs ({}).",
             self.proof.transaction_infos.len(),
-            self.transactions_and_outputs.len(),
+            self.get_num_outputs(),
         );
 
         // Verify the events, write set, status, gas used and transaction hashes.
@@ -2396,7 +2482,7 @@ impl TransactionOutputListWithProof {
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_output_version)?;
+            .verify(ledger_info, self.get_first_output_version())?;
 
         Ok(())
     }
@@ -2433,6 +2519,53 @@ impl TransactionOutputListWithProofV2 {
         Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
     }
 
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_empty(),
+        )
+    }
+
+    /// A convenience function to create a v2 output list from a v1 list
+    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_from_v1(
+                transaction_output_list_with_proof,
+            ),
+        )
+    }
+
+    /// Consumes and returns the inner transaction output list
+    pub fn consume_output_list_with_proof(self) -> TransactionOutputListWithProof {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+        }
+    }
+
+    /// Returns the first version in the transaction output list
+    pub fn get_first_output_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .get_first_output_version()
+            },
+        }
+    }
+
+    /// Returns the number of outputs in the transaction output list
+    pub fn get_num_outputs(&self) -> usize {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .get_num_outputs()
+            },
+        }
+    }
+
     /// Returns a reference to the inner transaction output list with proof
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
@@ -2447,6 +2580,29 @@ impl TransactionOutputListWithProofV2 {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.persisted_auxiliary_infos
+            },
+        }
+    }
+
+    /// Splits the transaction output list with proof v2 into its components
+    pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof,
+                output_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
+        }
+    }
+
+    /// Verifies the transaction output list with proof v2 against the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
             },
         }
     }
@@ -2476,7 +2632,7 @@ impl TransactionOutputListWithAuxiliaryInfos {
 
     /// A convenience function to create a v2 output list from a
     /// v1 list. In this case, all auxiliary infos are set to None.
-    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+    fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
         let num_transaction_infos = transaction_output_list_with_proof
             .proof
             .transaction_infos

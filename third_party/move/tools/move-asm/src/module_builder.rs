@@ -17,21 +17,31 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         AddressIdentifierIndex, Bytecode, CodeUnit, CompiledScript, Constant, ConstantPoolIndex,
-        FunctionDefinition, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
-        FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, ModuleHandle,
-        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructHandle,
-        StructHandleIndex, TableIndex, Visibility,
+        FieldDefinition, FieldHandle, FieldHandleIndex, FieldInstantiation,
+        FieldInstantiationIndex, FunctionAttribute, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
+        IdentifierIndex, MemberCount, ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructHandle, StructHandleIndex,
+        StructTypeParameter, StructVariantHandle, StructVariantHandleIndex,
+        StructVariantInstantiation, StructVariantInstantiationIndex, TableIndex,
+        VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation,
+        VariantFieldInstantiationIndex, VariantIndex, Visibility,
     },
     file_format_common::VERSION_DEFAULT,
     internals::ModuleIndex,
-    module_to_script::convert_module_to_script,
+    module_script_conversion::module_into_script,
     views::{
-        FunctionDefinitionView, FunctionHandleView, ModuleHandleView, ModuleView, StructHandleView,
+        FunctionDefinitionView, FunctionHandleView, ModuleHandleView, ModuleView,
+        StructDefinitionView, StructHandleView,
     },
     CompiledModule,
 };
 use move_core_types::{
-    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier, language_storage,
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage,
     language_storage::ModuleId,
 };
 use std::{
@@ -96,6 +106,30 @@ pub struct ModuleBuilder<'a> {
     signature_to_idx: RefCell<BTreeMap<Signature, SignatureIndex>>,
     /// A mapping for constants.
     cons_to_idx: RefCell<BTreeMap<(Vec<u8>, SignatureToken), ConstantPoolIndex>>,
+    /// A mapping from struct instantiations to indices.
+    struct_def_inst_to_idx:
+        RefCell<BTreeMap<(StructDefinitionIndex, SignatureIndex), StructDefInstantiationIndex>>,
+    /// A mapping from fields to indices. Notice that MemberCount is used in the VM for
+    /// representing field offsets.
+    field_to_idx: RefCell<BTreeMap<(StructDefinitionIndex, MemberCount), FieldHandleIndex>>,
+    /// A mapping from generic fields to indices.
+    field_inst_to_idx:
+        RefCell<BTreeMap<(FieldHandleIndex, SignatureIndex), FieldInstantiationIndex>>,
+    /// A mapping from fields with applicable variants and offset to index.
+    variant_field_to_idx: RefCell<
+        BTreeMap<(StructDefinitionIndex, Vec<VariantIndex>, MemberCount), VariantFieldHandleIndex>,
+    >,
+    /// A mapping from field instantiations with applicable variants and offset to index.
+    variant_field_inst_to_idx: RefCell<
+        BTreeMap<(VariantFieldHandleIndex, SignatureIndex), VariantFieldInstantiationIndex>,
+    >,
+    /// A mapping from variants to index.
+    struct_variant_to_idx:
+        RefCell<BTreeMap<(StructDefinitionIndex, VariantIndex), StructVariantHandleIndex>>,
+    /// A mapping from variant instantiations to index.
+    struct_variant_inst_to_idx: RefCell<
+        BTreeMap<(StructVariantHandleIndex, SignatureIndex), StructVariantInstantiationIndex>,
+    >,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -182,7 +216,7 @@ impl<'a> ModuleBuilder<'a> {
     /// Return result as a script.
     pub fn into_script(self) -> Result<CompiledScript> {
         if let Some(handle) = self.main_handle.replace(None) {
-            convert_module_to_script(self.into_module()?, handle)
+            module_into_script(self.into_module()?, handle)
         } else {
             bail!("a script cannot be built from a module")
         }
@@ -218,21 +252,103 @@ impl<'a> ModuleBuilder<'a> {
         }
     }
 
+    /// Declares a friend module
+    pub fn declare_friend_module(&mut self, module: &ModuleId) -> Result<()> {
+        let address = self.address_index(module.address)?;
+        let name = self.name_index(module.name.clone())?;
+        let handle = ModuleHandle { address, name };
+        if self.options.validate && self.module.borrow().friend_decls.contains(&handle) {
+            bail!("duplicate friend module `{}`", module.short_str_lossless())
+        }
+        self.module
+            .borrow_mut()
+            .friend_decls
+            .push(ModuleHandle { address, name });
+        Ok(())
+    }
+
+    /// Declares a struct and adds it to the builder. The struct initially does not have any
+    /// layout associated.
+    pub fn declare_struct(
+        &mut self,
+        name: Identifier,
+        type_parameters: Vec<(AbilitySet, bool)>,
+        abilities: AbilitySet,
+    ) -> Result<StructDefinitionIndex> {
+        if self.is_script() {
+            bail!("script cannot have struct definitions")
+        }
+        if self.options.validate {
+            let module_ref = self.module.borrow();
+            let module = &*module_ref;
+            for sdef in &module.struct_defs {
+                let view = StructDefinitionView::new(module, sdef);
+                if view.name() == name.as_ref() {
+                    bail!("duplicate struct definition `{}`", name);
+                }
+            }
+        }
+        let full_name = self.this_module_id(name.clone());
+        let name_idx = self.name_index(name.clone())?;
+        let shdl = StructHandle {
+            module: self.this_module_idx,
+            name: name_idx,
+            abilities,
+            type_parameters: type_parameters
+                .into_iter()
+                .map(|(constraints, is_phantom)| StructTypeParameter {
+                    constraints,
+                    is_phantom,
+                })
+                .collect(),
+        };
+        let shdl_idx = self.index(
+            &mut self.module.borrow_mut().struct_handles,
+            &mut self.struct_to_idx.borrow_mut(),
+            full_name,
+            shdl,
+            StructHandleIndex,
+            "struct handle",
+        )?;
+        let sdef = StructDefinition {
+            struct_handle: shdl_idx,
+            // Will be later set by `define_struct_layout`
+            field_information: StructFieldInformation::Native,
+        };
+        let new_idx = self.module.borrow().struct_defs.len();
+        self.bounds_check(new_idx, TableIndex::MAX, "struct definition index")?;
+        let sidx = StructDefinitionIndex(new_idx as TableIndex);
+        self.module.borrow_mut().struct_defs.push(sdef);
+        Ok(sidx)
+    }
+
+    pub fn define_struct_layout(
+        &self,
+        def_idx: StructDefinitionIndex,
+        layout: StructFieldInformation,
+    ) {
+        self.module.borrow_mut().struct_defs[def_idx.0 as usize].field_information = layout
+    }
+
     /// Declares a function and adds it to the builder. The function
     /// initially does not have any code associated.
-    /// TODO(#16582): attributes and access specifiers
     pub fn declare_fun(
         &self,
         is_entry: bool,
         name: Identifier,
         visibility: Visibility,
+        attributes: Vec<FunctionAttribute>,
         parameters: SignatureIndex,
         return_: SignatureIndex,
         type_parameters: Vec<AbilitySet>,
+        acquires_global_resources: Vec<StructDefinitionIndex>,
     ) -> Result<FunctionDefinitionIndex> {
         if self.options.validate {
             let module_ref = self.module.borrow();
             let module = &*module_ref;
+            if self.is_script() && !module.function_defs.is_empty() {
+                bail!("script can have only one function definition")
+            }
             for fdef in &module.function_defs {
                 let view = FunctionDefinitionView::new(module, fdef);
                 if view.name() == name.as_ref() {
@@ -249,7 +365,7 @@ impl<'a> ModuleBuilder<'a> {
             return_,
             type_parameters,
             access_specifiers: None,
-            attributes: vec![],
+            attributes,
         };
         let fhdl_idx = if self.is_script() {
             *self.main_handle.borrow_mut() = Some(fhdl);
@@ -268,7 +384,7 @@ impl<'a> ModuleBuilder<'a> {
             function: fhdl_idx,
             visibility,
             is_entry,
-            acquires_global_resources: vec![],
+            acquires_global_resources,
             code: None,
         };
         let new_idx = self.module.borrow().function_defs.len();
@@ -323,11 +439,15 @@ impl<'a> ModuleBuilder<'a> {
     // ==========================================================================================
     // Resolving Names
 
+    // TODO(#16582): The resolution algorithms here use linear search over tables. If better
+    //   performance is a requirement, we should introduce lookup maps to speed this up.
+
     /// Resolves a module name, where the name is specified to some extent.
     /// - If an address is given, one further name part needs to be present
     ///   for the module.
-    /// - If no address is given two name parts must be present, the first
+    /// - If no address is given and there are two parts, the first
     ///   an address alias, the 2nd the module name.
+    /// - If no address and one name part, the name must be a module alias
     pub fn resolve_module(
         &self,
         address_opt: &Option<AccountAddress>,
@@ -339,15 +459,27 @@ impl<'a> ModuleBuilder<'a> {
                 bail!("expected one name part after address")
             }
             ModuleId::new(*addr, name_parts[0].clone())
-        } else if name_parts.len() == 2 {
-            // The first name must be an address alias
-            if let Some(addr) = self.address_aliases.get(&name_parts[0]) {
-                ModuleId::new(*addr, name_parts[1].clone())
-            } else {
-                bail!("undeclared address alias `{}`", name_parts[0])
-            }
         } else {
-            bail!("expected two name parts")
+            match name_parts.len() {
+                2 => {
+                    // The first name must be an address alias
+                    if let Some(addr) = self.address_aliases.get(&name_parts[0]) {
+                        ModuleId::new(*addr, name_parts[1].clone())
+                    } else {
+                        bail!("undeclared address alias `{}`", name_parts[0])
+                    }
+                },
+                1 => {
+                    if let Some(module) = self.module_aliases.get(&name_parts[0]) {
+                        module.clone()
+                    } else {
+                        bail!("undeclared module alias `{}`", name_parts[0])
+                    }
+                },
+                _ => {
+                    bail!("expected two name parts")
+                },
+            }
         };
         if self.context_modules.contains_key(&id) || self.this_module() == id {
             Ok(id)
@@ -390,6 +522,107 @@ impl<'a> ModuleBuilder<'a> {
                 module_id,
                 id: name_parts[name_parts.len() - 1].clone(),
             })
+        }
+    }
+
+    /// Same as `resolve_fun` but for structs.
+    pub fn resolve_struct(
+        &self,
+        address_opt: &Option<AccountAddress>,
+        name_parts: &[Identifier],
+    ) -> Result<StructHandleIndex> {
+        if address_opt.is_none() && name_parts.len() == 1 {
+            // A simple name can only be resolved into a struct within this module.
+            let module = self.module.borrow();
+            for sdef in &module.struct_defs {
+                let view = StructDefinitionView::new(&*module, sdef);
+                if view.name() == name_parts[0].as_ref() {
+                    return self.struct_index(QualifiedId {
+                        module_id: self.this_module(),
+                        id: name_parts[0].clone(),
+                    });
+                }
+            }
+            bail!(
+                "undeclared struct `{}` in `{}`",
+                name_parts[0],
+                self.this_module()
+            )
+        } else {
+            // Pass address and name prefix to resolve_module.
+            let module_id =
+                self.resolve_module(address_opt, &name_parts[0..name_parts.len() - 1])?;
+            self.struct_index(QualifiedId {
+                module_id,
+                id: name_parts[name_parts.len() - 1].clone(),
+            })
+        }
+    }
+
+    /// Resolves a struct definition in the current module from a simple name.
+    pub fn resolve_struct_def(&self, name: &IdentStr) -> Result<StructDefinitionIndex> {
+        let module = self.module.borrow();
+        for (pos, sdef) in module.struct_defs.iter().enumerate() {
+            let view = StructDefinitionView::new(&*module, sdef);
+            if view.name() == name {
+                return Ok(StructDefinitionIndex(pos as TableIndex));
+            }
+        }
+        Err(anyhow!("undeclared struct `{}` in current module", name))
+    }
+
+    /// Resolves variant name into variant index.
+    pub fn resolve_variant(
+        &self,
+        struct_def: StructDefinitionIndex,
+        variant_name: &IdentStr,
+    ) -> Result<VariantIndex> {
+        let module = self.module.borrow();
+        if let StructFieldInformation::DeclaredVariants(variants) =
+            &module.struct_defs[struct_def.into_index()].field_information
+        {
+            for (pos, variant) in variants.iter().enumerate() {
+                let name = module.identifier_at(variant.name);
+                if name == variant_name {
+                    return Ok(pos as VariantIndex);
+                }
+            }
+        }
+        Err(anyhow!("undeclared variant `{}`", variant_name))
+    }
+
+    pub fn resolve_field(
+        &self,
+        struct_def: StructDefinitionIndex,
+        variant_opt: Option<VariantIndex>,
+        field_name: &IdentStr,
+    ) -> Result<MemberCount> {
+        let module_ref = self.module.borrow();
+        let module = &*module_ref;
+        let find_field = |fields: &[FieldDefinition]| -> Result<MemberCount> {
+            for (pos, field) in fields.iter().enumerate() {
+                let name = module.identifier_at(field.name);
+                if name == field_name {
+                    return Ok(pos as MemberCount);
+                }
+            }
+            Err(anyhow!("undeclared field `{}`", field_name))
+        };
+        match (
+            &module.struct_defs[struct_def.into_index()].field_information,
+            variant_opt,
+        ) {
+            (StructFieldInformation::Declared(fields), None) => find_field(fields),
+            (StructFieldInformation::DeclaredVariants(variants), Some(n))
+                if (n as usize) < variants.len() =>
+            {
+                find_field(&variants[n as usize].fields)
+            },
+            _ => Err(if variant_opt.is_some() {
+                anyhow!("need variant for field selection of enum")
+            } else {
+                anyhow!("invalid variant for field selection of struct")
+            }),
         }
     }
 }
@@ -469,8 +702,8 @@ impl<'a> ModuleBuilder<'a> {
             return Ok(idx);
         }
         if id.module_id == self.this_module() {
-            // All functions in this module should be already in fun_to_idx via
-            // declare_fun; so this is known to be undefined.
+            // All functions in this module should be already in struct_to_idx via
+            // declare_struct; so this is known to be undefined.
             bail!("unknown struct `{}` in the current module", id.id)
         }
         let hdl = self.import_struct_handle(&id)?;
@@ -481,6 +714,142 @@ impl<'a> ModuleBuilder<'a> {
             hdl,
             StructHandleIndex,
             "struct handle",
+        )
+    }
+
+    pub fn struct_def_inst_index(
+        &self,
+        def: StructDefinitionIndex,
+        targs: Vec<SignatureToken>,
+    ) -> Result<StructDefInstantiationIndex> {
+        let type_parameters = self.signature_index(targs)?;
+        let entry = StructDefInstantiation {
+            def,
+            type_parameters,
+        };
+        self.index(
+            &mut self.module.borrow_mut().struct_def_instantiations,
+            &mut self.struct_def_inst_to_idx.borrow_mut(),
+            (def, type_parameters),
+            entry,
+            StructDefInstantiationIndex,
+            "struct handle",
+        )
+    }
+
+    pub fn field_index(
+        &self,
+        owner: StructDefinitionIndex,
+        field: MemberCount,
+    ) -> Result<FieldHandleIndex> {
+        let entry = FieldHandle { owner, field };
+        self.index(
+            &mut self.module.borrow_mut().field_handles,
+            &mut self.field_to_idx.borrow_mut(),
+            (owner, field),
+            entry,
+            FieldHandleIndex,
+            "field handle",
+        )
+    }
+
+    pub fn field_inst_index(
+        &self,
+        handle: FieldHandleIndex,
+        type_parameters: Vec<SignatureToken>,
+    ) -> Result<FieldInstantiationIndex> {
+        let type_parameters = self.signature_index(type_parameters)?;
+        let entry = FieldInstantiation {
+            handle,
+            type_parameters,
+        };
+        self.index(
+            &mut self.module.borrow_mut().field_instantiations,
+            &mut self.field_inst_to_idx.borrow_mut(),
+            (handle, type_parameters),
+            entry,
+            FieldInstantiationIndex,
+            "generic field handle",
+        )
+    }
+
+    pub fn variant_field_index(
+        &self,
+        struct_index: StructDefinitionIndex,
+        variants: Vec<VariantIndex>,
+        field: MemberCount,
+    ) -> Result<VariantFieldHandleIndex> {
+        let entry = VariantFieldHandle {
+            struct_index,
+            variants: variants.clone(),
+            field,
+        };
+        self.index(
+            &mut self.module.borrow_mut().variant_field_handles,
+            &mut self.variant_field_to_idx.borrow_mut(),
+            (struct_index, variants, field),
+            entry,
+            VariantFieldHandleIndex,
+            "variant field handle",
+        )
+    }
+
+    pub fn variant_field_inst_index(
+        &self,
+        handle: VariantFieldHandleIndex,
+        type_parameters: Vec<SignatureToken>,
+    ) -> Result<VariantFieldInstantiationIndex> {
+        let type_parameters = self.signature_index(type_parameters)?;
+        let entry = VariantFieldInstantiation {
+            handle,
+            type_parameters,
+        };
+        self.index(
+            &mut self.module.borrow_mut().variant_field_instantiations,
+            &mut self.variant_field_inst_to_idx.borrow_mut(),
+            (handle, type_parameters),
+            entry,
+            VariantFieldInstantiationIndex,
+            "generic variant field handle",
+        )
+    }
+
+    pub fn variant_index(
+        &self,
+        struct_index: StructDefinitionIndex,
+        variant: VariantIndex,
+    ) -> Result<StructVariantHandleIndex> {
+        let entry = StructVariantHandle {
+            struct_index,
+            variant,
+        };
+        self.index(
+            &mut self.module.borrow_mut().struct_variant_handles,
+            &mut self.struct_variant_to_idx.borrow_mut(),
+            (struct_index, variant),
+            entry,
+            StructVariantHandleIndex,
+            "struct variant handle",
+        )
+    }
+
+    pub fn variant_inst_index(
+        &self,
+        handle: StructVariantHandleIndex,
+        type_parameters: Vec<SignatureToken>,
+    ) -> Result<StructVariantInstantiationIndex> {
+        let type_parameters = self.signature_index(type_parameters)?;
+        let entry = StructVariantInstantiation {
+            handle,
+            type_parameters,
+        };
+        self.index(
+            &mut self.module.borrow_mut().struct_variant_instantiations,
+            &mut self.struct_variant_inst_to_idx.borrow_mut(),
+            (handle, type_parameters),
+            entry,
+            StructVariantInstantiationIndex,
+            "generic struct variant handle",
         )
     }
 

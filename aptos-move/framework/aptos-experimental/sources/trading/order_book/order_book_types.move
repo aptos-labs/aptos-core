@@ -25,6 +25,11 @@ module aptos_experimental::order_book_types {
         order_id: u128
     }
 
+    struct AccountClientOrderId has store, copy, drop {
+        account: address,
+        client_order_id: u64
+    }
+
     // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
     struct UniqueIdxType has store, copy, drop {
         idx: u128
@@ -99,6 +104,12 @@ module aptos_experimental::order_book_types {
 
     public fun new_order_id_type(order_id: u128): OrderIdType {
         OrderIdType { order_id }
+    }
+
+    public fun new_account_client_order_id(
+        account: address, client_order_id: u64
+    ): AccountClientOrderId {
+        AccountClientOrderId { account, client_order_id }
     }
 
     public(friend) fun new_ascending_id_generator(): AscendingIdGenerator {
@@ -220,6 +231,12 @@ module aptos_experimental::order_book_types {
         self: &OrderWithState<M>
     ): M {
         self.order.metadata
+    }
+
+    public fun set_metadata_in_state<M: store + copy + drop>(
+        self: &mut OrderWithState<M>, metadata: M
+    ) {
+        self.order.metadata = metadata;
     }
 
     public fun get_order_id<M: store + copy + drop>(self: &Order<M>): OrderIdType {

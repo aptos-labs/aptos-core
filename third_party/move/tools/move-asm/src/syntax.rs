@@ -17,16 +17,30 @@
 //! unit :=
 //!   { address_alias LF }
 //!   ( "module" QID | "script" ) LF
+//!   { "uses" QID [ "as" ID ] }
 //!   { struct_def | fun_def }
 //!
 //! struct_def :=
-//!   /*TBD*/
+//!   "struct" ID [ type_args ] LF { field }
+//! | "enum" ID [ type_args ] LF variant { variant }
+//!
+//! field ::=
+//!   INDENT ID ":" type LF
+//!
+//! variant ::=
+//!   INDENT ID LF { INDENT ID ":" type LF }
+//!
 //!
 //! fun_def :=
-//!   fun_modifier "fun" ID "(" [ LIST(local) ] ")" [ tuple_type ] LF
-//!   { "local" local LF } { instruction LF }
+//!   fun_modifier "fun" ID [ type_args ] "(" [ LIST(local) ] ")" [ tuple_type ] LF
+//!   { INDENT "local" local LF } { instruction LF }
 //!
-//! fun_modifier := [ [ "public" | "friend" ] "entry" ]
+//! fun_modifier :=
+//!   [ "#[" attribute "]"
+//!   [ "entry" ]
+//!   [ "public" | "friend" ]
+//!
+//! attribute := ID
 //!
 //! local := ID ":" type
 //!
@@ -34,7 +48,7 @@
 //!   "|" [ LIST(type) ] "|" [ tuple_type ]  | simple_type
 //!
 //! tuple_type :=
-//!     simple_type | "(" LIST(simple_type) ")"
+//!     type | "(" LIST(type) ")"
 //!
 //! simple_type :=
 //!   QID [ type_args ] | "(" type ")"
@@ -43,6 +57,7 @@
 //!   "<" LIST(type) ">"
 //!
 //! instruction :=
+//!   // Allow lables to prefix instructions without indent
 //!   ( INDENT | LOOKAHEAD(ID ":") )
 //!   opcode [ LIST(argument) ]
 //!
@@ -52,9 +67,10 @@
 //!   VALUE | QID [ type_args ] | type_args
 //!```
 
+use crate::value::AsmValue;
 use codespan::{RawIndex, Span};
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{FunctionAttribute, Visibility};
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -98,7 +114,7 @@ pub(crate) fn map_diag<A>(result: anyhow::Result<A>) -> AsmResult<A> {
 // ==========================================================================================
 // Abstract Syntax
 
-/// Represents the AST for an assembly source
+/// Represents the AST for assembler source unit.
 #[derive(Debug)]
 pub struct Unit {
     /// The name, either script or module.
@@ -107,7 +123,12 @@ pub struct Unit {
     pub address_aliases: Vec<(Identifier, AccountAddress)>,
     /// A list of module aliases.
     pub module_aliases: Vec<(Identifier, ModuleId)>,
-    /// List of functions.
+    /// Friend modules
+    pub friend_modules: Vec<ModuleId>,
+    /// List of struct definitions (including enums, which are technically
+    /// a special form of struct).
+    pub structs: Vec<Struct>,
+    /// List of function definitions.
     pub functions: Vec<Fun>,
 }
 
@@ -127,14 +148,36 @@ impl UnitId {
 }
 
 #[derive(Debug)]
+pub struct Struct {
+    pub loc: Loc,
+    pub name: Identifier,
+    /// Each type parameter is a triple `(name, constraints, is_phantom)`
+    pub type_params: Vec<(Identifier, AbilitySet, bool)>,
+    pub abilities: AbilitySet,
+    pub layout: StructLayout,
+}
+
+#[derive(Debug)]
+pub enum StructLayout {
+    // A struct with a set of field declarations.
+    Singleton(Vec<Decl>),
+    // An enum with a list of variants, each one
+    // represented by a name and a list fields.
+    Variants(Vec<(Loc, Identifier, Vec<Decl>)>),
+}
+
+#[derive(Debug)]
 pub struct Fun {
     pub loc: Loc,
     pub name: Identifier,
     pub visibility: Visibility,
+    pub is_entry: bool,
+    pub attributes: Vec<FunctionAttribute>,
     pub type_params: Vec<(Identifier, AbilitySet)>,
-    pub params: Vec<Local>,
-    pub locals: Vec<Local>,
+    pub params: Vec<Decl>,
+    pub locals: Vec<Decl>,
     pub result: Vec<Type>,
+    pub acquires: Vec<Identifier>,
     pub instrs: Vec<Instruction>,
 }
 
@@ -155,7 +198,7 @@ pub struct PartialIdent {
 }
 
 #[derive(Debug)]
-pub struct Local {
+pub struct Decl {
     pub loc: Loc,
     pub name: Identifier,
     pub ty: Type,
@@ -171,15 +214,9 @@ pub struct Instruction {
 
 #[derive(Debug)]
 pub enum Argument {
-    Constant(Value),
+    Constant(AsmValue),
     Id(PartialIdent, Option<Vec<Type>>),
     Type(Type),
-}
-
-#[derive(Debug)]
-pub enum Value {
-    Number(U256),
-    Bytes(Vec<u8>),
 }
 
 // ==========================================================================================
@@ -233,7 +270,20 @@ impl AsmParser {
     }
 
     fn lookahead_special(&self, sp: &str) -> bool {
-        matches!(&self.tokens[0].1, Token::Special(s) if s == sp)
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Special(s) if s == sp)
+    }
+
+    fn lookahead_special_2(&self, sp: &str) -> bool {
+        self.tokens.len() > 1 && matches!(&self.tokens[1].1, Token::Special(s) if s == sp)
+    }
+
+    fn lookahead_newline(&self) -> bool {
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline)
+    }
+
+    #[allow(unused)]
+    fn lookahead_soft_kw(&self, kw: &str) -> bool {
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
     }
 
     fn expect(&mut self, tok: &Token) -> AsmResult<()> {
@@ -295,11 +345,20 @@ impl AsmParser {
         Ok(result)
     }
 
-    fn value(&mut self) -> AsmResult<Value> {
+    fn value(&mut self) -> AsmResult<AsmValue> {
         if let Token::Number(num) = &self.next {
             let num = *num;
             self.advance()?;
-            Ok(Value::Number(num))
+            Ok(AsmValue::Number(num))
+        } else if self.is_special("[") {
+            self.advance()?;
+            let elems = if self.is_value() {
+                self.list(Self::value, ",")?
+            } else {
+                vec![]
+            };
+            self.expect_special("]")?;
+            Ok(AsmValue::Vector(elems))
         } else {
             Err(error(self.next_loc, "expected value"))
         }
@@ -307,6 +366,7 @@ impl AsmParser {
 
     fn is_value(&self) -> bool {
         matches!(&self.next, Token::Number(..))
+            || matches!(&self.next, Token::Special(s) if s == "[")
     }
 
     fn address(&mut self) -> AsmResult<AccountAddress> {
@@ -353,7 +413,12 @@ impl AsmParser {
     }
 
     fn type_(&mut self) -> AsmResult<Type> {
-        if self.is_partial_ident() {
+        if self.is_special("(") {
+            self.advance()?;
+            let ty = self.type_()?;
+            self.expect_special(")")?;
+            Ok(ty)
+        } else if self.is_partial_ident() {
             let pid = self.partial_ident()?;
             let ty_args = self.type_args_opt()?;
             Ok(Type::Named(pid, ty_args))
@@ -392,7 +457,7 @@ impl AsmParser {
     }
 
     fn is_type(&self) -> bool {
-        self.is_partial_ident()
+        self.is_partial_ident() || self.is_special("&") || self.is_special("(")
     }
 
     fn type_list(&mut self) -> AsmResult<Vec<Type>> {
@@ -400,13 +465,13 @@ impl AsmParser {
     }
 
     fn type_tuple(&mut self) -> AsmResult<Vec<Type>> {
-        if self.is_type() {
-            Ok(vec![self.type_()?])
-        } else if self.is_special("(") {
+        if self.is_special("(") {
             self.advance()?;
             let res = self.type_list()?;
             self.expect_special(")")?;
             Ok(res)
+        } else if self.is_type() {
+            Ok(vec![self.type_()?])
         } else {
             Err(error(self.next_loc, "expected type or type tuple"))
         }
@@ -452,13 +517,26 @@ impl AsmParser {
         Ok(ab)
     }
 
-    fn type_params(&mut self) -> AsmResult<Vec<(Identifier, AbilitySet)>> {
+    fn type_params(
+        &mut self,
+        allow_phantom: bool,
+    ) -> AsmResult<Vec<(Identifier, AbilitySet, bool)>> {
         if !self.is_special("<") {
             return Ok(vec![]);
         }
         self.advance()?;
         let result = self.list(
             |parser| {
+                let is_phantom = if allow_phantom {
+                    if parser.is_soft_kw("phantom") {
+                        parser.advance()?;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
                 let name = parser.ident()?;
                 let abs = if parser.is_special(":") {
                     parser.advance()?;
@@ -466,7 +544,7 @@ impl AsmParser {
                 } else {
                     AbilitySet::EMPTY
                 };
-                Ok((name, abs))
+                Ok((name, abs, is_phantom))
             },
             ",",
         )?;
@@ -486,12 +564,40 @@ impl AsmParser {
         })
     }
 
-    fn local_decl(&mut self) -> AsmResult<Local> {
+    fn attributes(&mut self) -> AsmResult<Vec<FunctionAttribute>> {
+        if self.is_special("#") && self.lookahead_special("[") {
+            self.advance()?;
+            self.advance()?;
+            let attrs = self.list(
+                |parser| {
+                    let attr = if parser.is_soft_kw("persistent") {
+                        FunctionAttribute::Persistent
+                    } else if parser.is_soft_kw("module_lock") {
+                        FunctionAttribute::ModuleLock
+                    } else {
+                        return Err(error(
+                            parser.next_loc,
+                            "expected function attribute `persistent` or `module_lock`",
+                        ));
+                    };
+                    parser.advance()?;
+                    Ok(attr)
+                },
+                ",",
+            )?;
+            self.expect_special("]")?;
+            Ok(attrs)
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn decl(&mut self) -> AsmResult<Decl> {
         let loc = self.next_loc;
         let name = self.ident()?;
         self.expect_special(":")?;
         let ty = self.type_()?;
-        Ok(Local { loc, name, ty })
+        Ok(Decl { loc, name, ty })
     }
 
     fn argument(&mut self) -> AsmResult<Argument> {
@@ -500,7 +606,7 @@ impl AsmParser {
             let ty = self.type_()?;
             self.expect_special(">")?;
             Ok(Argument::Type(ty))
-        } else if self.is_value() {
+        } else if self.is_value() && !self.lookahead_special("::") {
             let val = self.value()?;
             Ok(Argument::Constant(val))
         } else {
@@ -527,7 +633,24 @@ impl AsmParser {
             None
         };
         let args = if self.is_argument() {
-            self.list(Self::argument, ",")?
+            // Special case if first argument is type (`<t>`): in this case we do not require
+            // a comma, so we can write `ld_const <T> val
+            if self.is_special("<") {
+                let first = self.argument()?;
+                let mut args = if self.is_special(",") {
+                    // We still allow a comma
+                    self.advance()?;
+                    self.list(Self::argument, ",")?
+                } else if self.is_value() {
+                    self.list(Self::argument, ",")?
+                } else {
+                    vec![]
+                };
+                args.insert(0, first);
+                args
+            } else {
+                self.list(Self::argument, ",")?
+            }
         } else {
             vec![]
         };
@@ -541,19 +664,121 @@ impl AsmParser {
         })
     }
 
-    fn is_fun(&self) -> bool {
-        self.is_soft_kw("fun") || self.is_soft_kw("public") || self.is_soft_kw("friend")
+    fn is_struct_or_enum(&self) -> bool {
+        self.is_soft_kw("struct") || self.is_soft_kw("enum")
+    }
+
+    fn struct_or_enum(&mut self) -> AsmResult<Struct> {
+        if self.is_soft_kw("struct") {
+            self.advance()?;
+            let (loc, name, type_params, abilities) = self.struct_header()?;
+            self.expect_newline()?;
+            let mut fields = vec![];
+            while self.is_indent() {
+                self.advance()?;
+                fields.push(self.decl()?);
+                self.expect_newline()?
+            }
+            Ok(Struct {
+                loc,
+                name,
+                type_params,
+                abilities,
+                layout: StructLayout::Singleton(fields),
+            })
+        } else {
+            self.expect_soft_kw("enum")?;
+            let (loc, name, type_params, abilities) = self.struct_header()?;
+            self.expect_newline()?;
+            let mut variants = vec![];
+            let mut cur_variant_name = None;
+            let mut cur_loc = Loc::new(0, 0);
+            let mut cur_fields = vec![];
+            while self.is_indent() {
+                self.advance()?;
+                if self.is_ident() && self.lookahead_newline() {
+                    // New enum variant
+                    let next_loc = self.next_loc;
+                    let variant_name = self.ident()?;
+                    if let Some(name) = cur_variant_name {
+                        variants.push((cur_loc, name, cur_fields));
+                    }
+                    cur_loc = next_loc;
+                    cur_variant_name = Some(variant_name);
+                    cur_fields = vec![]
+                } else {
+                    // Field for current_variant variant
+                    cur_fields.push(self.decl()?)
+                }
+                self.expect_newline()?;
+            }
+            if let Some(name) = cur_variant_name {
+                variants.push((cur_loc, name, cur_fields));
+            }
+            if variants.is_empty() {
+                return Err(error(loc, "enum type must have at least one variant"));
+            }
+            Ok(Struct {
+                loc,
+                name,
+                type_params,
+                abilities,
+                layout: StructLayout::Variants(variants),
+            })
+        }
+    }
+
+    fn struct_header(
+        &mut self,
+    ) -> AsmResult<(
+        Loc,
+        Identifier,
+        Vec<(Identifier, AbilitySet, bool)>,
+        AbilitySet,
+    )> {
+        let loc = self.next_loc;
+        let id = self.ident()?;
+        let ty_params = self.type_params(true /*allow_phantom*/)?;
+        let abilities = if self.is_soft_kw("has") {
+            self.advance()?;
+            self.abilities()?
+        } else {
+            AbilitySet::EMPTY
+        };
+        Ok((loc, id, ty_params, abilities))
+    }
+
+    fn is_first_of_fun(&self) -> bool {
+        // Notice when this is called we already checked for structs,
+        // so we only check for the start token (because of modifiers
+        // and attributes, we would need a deep lookahead otherwise)
+        self.is_soft_kw("fun")
+            || self.is_soft_kw("entry")
+            || self.is_soft_kw("public")
+            || self.is_soft_kw("friend")
+            || self.is_special("#") && self.lookahead_special("[")
     }
 
     fn fun(&mut self) -> AsmResult<Fun> {
+        let attributes = self.attributes()?;
+        let is_entry = if self.is_soft_kw("entry") {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
         let visibility = self.visibility()?;
         self.expect_soft_kw("fun")?;
         let loc = self.next_loc;
         let name = self.ident()?;
-        let type_params = self.type_params()?;
+        let type_params = self
+            .type_params(false /* allow_phantom*/)?
+            .into_iter()
+            .map(|(id, ab, _)| (id, ab))
+            .collect();
         self.expect_special("(")?;
         let params = if self.is_ident() {
-            self.list(Self::local_decl, ",")?
+            self.list(Self::decl, ",")?
         } else {
             vec![]
         };
@@ -561,6 +786,12 @@ impl AsmParser {
         let result = if self.is_special(":") {
             self.advance()?;
             self.type_tuple()?
+        } else {
+            vec![]
+        };
+        let acquires = if self.is_soft_kw("acquires") {
+            self.advance()?;
+            self.list(Self::ident, ",")?
         } else {
             vec![]
         };
@@ -579,7 +810,7 @@ impl AsmParser {
                     ));
                 }
                 self.advance()?;
-                let local = self.local_decl()?;
+                let local = self.decl()?;
                 locals.push(local);
             } else {
                 instrs.push(self.instr()?)
@@ -590,10 +821,13 @@ impl AsmParser {
             loc,
             name,
             visibility,
+            is_entry,
+            attributes,
             type_params,
             params,
             locals,
             result,
+            acquires,
             instrs,
         })
     }
@@ -628,7 +862,7 @@ impl AsmParser {
         while self.is_tok(&Token::Newline) {
             self.advance()?
         }
-        // Parse address and module aliases
+        // Parse address aliases
         let mut address_aliases = vec![];
         while self.is_soft_kw("address") {
             self.advance()?;
@@ -642,15 +876,7 @@ impl AsmParser {
             .iter()
             .map(|(name, addr)| (name.as_ident_str(), *addr))
             .collect();
-        let mut module_aliases = vec![];
-        while self.is_soft_kw("use") {
-            self.advance()?;
-            let module = self.module_id(&address_alias_map)?;
-            self.expect_soft_kw("as")?;
-            let name = self.ident()?;
-            self.expect_newline()?;
-            module_aliases.push((name, module));
-        }
+
         // Parse module header
         let name = if self.is_soft_kw("module") {
             self.advance()?;
@@ -662,16 +888,54 @@ impl AsmParser {
             return Err(error(self.next_loc, "expected `module` or `script` header"));
         };
         self.expect_newline()?;
+
+        // Parse module aliases
+        let mut module_aliases = vec![];
+        while self.is_soft_kw("use") {
+            self.advance()?;
+            let module = self.module_id(&address_alias_map)?;
+            let name = if self.is_soft_kw("as") {
+                self.advance()?;
+                self.ident()?
+            } else {
+                module.name.clone()
+            };
+            self.expect_newline()?;
+            module_aliases.push((name, module));
+        }
+
+        // Parse friend modules
+        let mut friend_modules = vec![];
+        while self.is_soft_kw("friend") && self.lookahead_special_2("::") {
+            self.advance()?;
+            let module = self.module_id(&address_alias_map)?;
+            self.expect_newline()?;
+            friend_modules.push(module);
+        }
+
         // Parse definitions
+        let mut structs = vec![];
         let mut functions = vec![];
-        while self.is_fun() {
-            functions.push(self.fun()?)
+
+        while !self.is_tok(&Token::End) {
+            if self.is_struct_or_enum() {
+                structs.push(self.struct_or_enum()?)
+            } else if self.is_first_of_fun() {
+                functions.push(self.fun()?)
+            } else {
+                return Err(error(
+                    self.next_loc,
+                    "expected function or struct declaration",
+                ));
+            }
         }
         self.expect(&Token::End)?;
         Ok(Unit {
             name,
             address_aliases,
             module_aliases,
+            friend_modules,
+            structs,
             functions,
         })
     }
@@ -785,7 +1049,10 @@ fn id_cont(ch: char) -> bool {
 }
 
 fn special(ch: char) -> bool {
-    matches!(ch, '(' | ')' | '<' | '>' | ',' | ':' | '|' | '+' | '=')
+    matches!(
+        ch,
+        '(' | ')' | '<' | '>' | '[' | ']' | ',' | ':' | '|' | '+' | '=' | '&' | '#'
+    )
 }
 
 impl Display for Token {

@@ -511,14 +511,17 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         request: &TransactionOutputsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let transaction_output_list_with_proof = self.storage.get_transaction_outputs_with_proof(
+        let response = self.storage.get_transaction_outputs_with_proof(
             request.proof_version,
             request.start_version,
             request.end_version,
         )?;
 
         Ok(DataResponse::TransactionOutputsWithProof(
-            transaction_output_list_with_proof,
+            response
+                .transaction_output_list_with_proof
+                .unwrap()
+                .consume_output_list_with_proof(),
         ))
     }
 
@@ -526,32 +529,40 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         request: &TransactionsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let transactions_with_proof = self.storage.get_transactions_with_proof(
+        let response = self.storage.get_transactions_with_proof(
             request.proof_version,
             request.start_version,
             request.end_version,
             request.include_events,
         )?;
 
-        Ok(DataResponse::TransactionsWithProof(transactions_with_proof))
+        Ok(DataResponse::TransactionsWithProof(
+            response
+                .transaction_list_with_proof
+                .unwrap()
+                .consume_transaction_list_with_proof(),
+        ))
     }
 
     fn get_transactions_or_outputs_with_proof(
         &self,
         request: &TransactionsOrOutputsWithProofRequest,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let (transactions_with_proof, outputs_with_proof) =
-            self.storage.get_transactions_or_outputs_with_proof(
-                request.proof_version,
-                request.start_version,
-                request.end_version,
-                request.include_events,
-                request.max_num_output_reductions,
-            )?;
+        let response = self.storage.get_transactions_or_outputs_with_proof(
+            request.proof_version,
+            request.start_version,
+            request.end_version,
+            request.include_events,
+            request.max_num_output_reductions,
+        )?;
 
         Ok(DataResponse::TransactionsOrOutputsWithProof((
-            transactions_with_proof,
-            outputs_with_proof,
+            response
+                .transaction_list_with_proof
+                .map(|t| t.consume_transaction_list_with_proof()),
+            response
+                .transaction_output_list_with_proof
+                .map(|t| t.consume_output_list_with_proof()),
         )))
     }
 

@@ -7,8 +7,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_storage_service_types::requests::{
-    DataRequest, GetNewTransactionDataWithProofRequest, NewTransactionOutputsWithProofRequest,
-    StorageServiceRequest, TransactionDataRequestType,
+    DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest,
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
@@ -33,10 +32,6 @@ async fn test_get_new_transaction_outputs() {
                 peer_version + 1,
                 highest_version,
                 highest_version,
-            );
-            let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-                peer_version + 1,
-                highest_version,
                 use_request_v2,
             );
 
@@ -51,8 +46,6 @@ async fn test_get_new_transaction_outputs() {
                 highest_version - peer_version,
                 highest_version,
                 output_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
 
             // Create a storage service config
@@ -94,7 +87,6 @@ async fn test_get_new_transaction_outputs() {
                 use_request_v2,
                 output_list_with_proof,
                 highest_ledger_info,
-                persisted_auxiliary_infos,
             )
             .await;
         }
@@ -121,19 +113,11 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 peer_version_1 + 1,
                 highest_version,
                 highest_version,
+                use_request_v2,
             );
             let output_list_with_proof_2 = utils::create_output_list_with_proof(
                 peer_version_2 + 1,
                 highest_version,
-                highest_version,
-            );
-            let persisted_auxiliary_infos_1 = utils::create_persisted_auxiliary_infos(
-                peer_version_1 + 1,
-                highest_version,
-                use_request_v2,
-            );
-            let persisted_auxiliary_infos_2 = utils::create_persisted_auxiliary_infos(
-                peer_version_2 + 1,
                 highest_version,
                 use_request_v2,
             );
@@ -149,8 +133,6 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 highest_version - peer_version_1,
                 highest_version,
                 output_list_with_proof_1.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos_1.clone(),
             );
             utils::expect_get_transaction_outputs(
                 &mut db_reader,
@@ -158,8 +140,6 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 highest_version - peer_version_2,
                 highest_version,
                 output_list_with_proof_2.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos_2.clone(),
             );
 
             // Create a storage service config
@@ -216,7 +196,6 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 use_request_v2,
                 output_list_with_proof_1,
                 highest_ledger_info.clone(),
-                persisted_auxiliary_infos_1,
             )
             .await;
             utils::verify_new_transaction_outputs_with_proof(
@@ -225,7 +204,6 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 use_request_v2,
                 output_list_with_proof_2,
                 highest_ledger_info,
-                persisted_auxiliary_infos_2,
             )
             .await;
         }
@@ -278,10 +256,6 @@ async fn test_get_new_transaction_outputs_epoch_change() {
             peer_version + 1,
             epoch_change_version,
             epoch_change_version,
-        );
-        let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-            peer_version + 1,
-            epoch_change_version,
             use_request_v2,
         );
 
@@ -296,8 +270,6 @@ async fn test_get_new_transaction_outputs_epoch_change() {
             epoch_change_version - peer_version,
             epoch_change_version,
             output_list_with_proof.clone(),
-            use_request_v2,
-            persisted_auxiliary_infos.clone(),
         );
         utils::expect_get_epoch_ending_ledger_infos(
             &mut db_reader,
@@ -338,7 +310,6 @@ async fn test_get_new_transaction_outputs_epoch_change() {
             use_request_v2,
             output_list_with_proof,
             epoch_change_proof.ledger_info_with_sigs[0].clone(),
-            persisted_auxiliary_infos,
         )
         .await;
     }
@@ -368,10 +339,6 @@ async fn test_get_new_transaction_outputs_max_chunk() {
             peer_version + 1,
             peer_version + max_transaction_output_chunk_size,
             highest_version,
-        );
-        let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-            peer_version + 1,
-            peer_version + max_transaction_output_chunk_size,
             use_request_v2,
         );
 
@@ -384,8 +351,6 @@ async fn test_get_new_transaction_outputs_max_chunk() {
             max_transaction_output_chunk_size,
             highest_version,
             output_list_with_proof.clone(),
-            use_request_v2,
-            persisted_auxiliary_infos.clone(),
         );
 
         // Create the storage client and server
@@ -421,7 +386,6 @@ async fn test_get_new_transaction_outputs_max_chunk() {
             use_request_v2,
             output_list_with_proof,
             highest_ledger_info,
-            persisted_auxiliary_infos,
         )
         .await;
     }
@@ -454,13 +418,7 @@ async fn get_new_outputs_with_proof_for_peer(
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     // Create the data request
     let data_request = if use_request_v2 {
-        let transaction_data_request_type = TransactionDataRequestType::TransactionOutputData;
-        DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-            transaction_data_request_type,
-            known_version,
-            known_epoch,
-            max_response_bytes: 0,
-        })
+        DataRequest::get_new_transaction_output_data_with_proof(known_version, known_epoch, 0)
     } else {
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,

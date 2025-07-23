@@ -1,0 +1,36 @@
+processed 1 task
+
+task 0 'publish'. lines 1-26:
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test
+struct S
+  _1: u64
+  _2: u8
+
+// Function definition at index 0
+fun pack_and_select(): u8
+    ld_u64 3
+    ld_u8 2
+    pack S
+    call test::select
+    ret
+
+// Function definition at index 1
+fun select(l0: test::S): u8
+    borrow_loc l0
+    borrow_field S, _2
+    read_ref
+    ret
+
+// Function definition at index 2
+fun pack_and_unpack(): (u64, u8)
+    ld_u64 3
+    ld_u8 2
+    pack S
+    unpack S
+    ret
+
+
+== END Bytecode ==

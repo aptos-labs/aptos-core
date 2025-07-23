@@ -26,7 +26,6 @@ async fn test_cachable_requests_compression() {
         // Create the mock db reader
         let mut db_reader = mock::create_mock_db_reader();
         let mut transaction_lists_with_proof = vec![];
-        let mut persisted_auxiliary_infos_list = vec![];
         for _ in compression_options {
             // Create and save test transaction lists
             let transaction_list_with_proof = utils::create_transaction_list_with_proof(
@@ -34,13 +33,9 @@ async fn test_cachable_requests_compression() {
                 end_version,
                 proof_version,
                 include_events,
+                use_request_v2,
             );
             transaction_lists_with_proof.push(transaction_list_with_proof.clone());
-
-            // Create and save persisted auxiliary infos
-            let persisted_auxiliary_infos =
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
-            persisted_auxiliary_infos_list.push(persisted_auxiliary_infos.clone());
 
             // Expect the data to be fetched from storage exactly once
             utils::expect_get_transactions(
@@ -50,8 +45,6 @@ async fn test_cachable_requests_compression() {
                 proof_version,
                 include_events,
                 transaction_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
         }
 
@@ -84,7 +77,6 @@ async fn test_cachable_requests_compression() {
                 utils::verify_transaction_with_proof_response(
                     use_request_v2,
                     transaction_lists_with_proof[i].clone(),
-                    persisted_auxiliary_infos_list[i].clone(),
                     response,
                 );
             }
@@ -105,7 +97,6 @@ async fn test_cachable_requests_data_versions() {
         // Create the mock db reader
         let mut db_reader = mock::create_mock_db_reader();
         let mut transaction_lists_with_proof = vec![];
-        let mut persisted_auxiliary_infos_list = vec![];
         for start_version in start_versions {
             // Create and save test transaction lists
             let transaction_list_with_proof = utils::create_transaction_list_with_proof(
@@ -113,13 +104,9 @@ async fn test_cachable_requests_data_versions() {
                 end_version,
                 proof_version,
                 include_events,
+                use_request_v2,
             );
             transaction_lists_with_proof.push(transaction_list_with_proof.clone());
-
-            // Create and save persisted auxiliary infos
-            let persisted_auxiliary_infos =
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2);
-            persisted_auxiliary_infos_list.push(persisted_auxiliary_infos.clone());
 
             // Expect the data to be fetched from storage once
             utils::expect_get_transactions(
@@ -129,8 +116,6 @@ async fn test_cachable_requests_data_versions() {
                 proof_version,
                 include_events,
                 transaction_list_with_proof.clone(),
-                use_request_v2,
-                persisted_auxiliary_infos.clone(),
             );
         }
 
@@ -163,7 +148,6 @@ async fn test_cachable_requests_data_versions() {
                 utils::verify_transaction_with_proof_response(
                     use_request_v2,
                     transaction_lists_with_proof[i].clone(),
-                    persisted_auxiliary_infos_list[i].clone(),
                     response,
                 );
             }

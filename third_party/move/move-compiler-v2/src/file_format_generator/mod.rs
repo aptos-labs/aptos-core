@@ -8,7 +8,7 @@ mod peephole_optimizer;
 use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use legacy_move_compiler::compiled_unit as CU;
 use module_generator::ModuleGenerator;
-use move_binary_format::{file_format as FF, internals::ModuleIndex};
+use move_binary_format::{file_format as FF, internals::ModuleIndex, module_script_conversion};
 use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
 use move_model::{ast::ModuleName, model::GlobalEnv};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
@@ -81,7 +81,7 @@ pub fn generate_file_format(
                     let module_name =
                         ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
                     script_index += 1;
-                    let module = move_model::script_into_module(
+                    let module = module_script_conversion::script_into_module(
                         script.clone(),
                         &module_name.name().display(env.symbol_pool()).to_string(),
                     );

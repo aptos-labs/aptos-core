@@ -3,14 +3,11 @@
 
 use crate::{
     requests::{
-        DataRequest, EpochEndingLedgerInfoRequest, GetNewTransactionDataWithProofRequest,
-        GetTransactionDataWithProofRequest, NewTransactionOutputsWithProofRequest,
+        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, SubscribeTransactionDataWithProofRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        SubscriptionStreamMetadata, TransactionData, TransactionDataRequestType,
-        TransactionOrOutputData, TransactionOutputsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
@@ -656,22 +653,27 @@ fn create_optimistic_fetch_request_v2(
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let transaction_data_request_type = if random_number % 3 == 0 {
-        TransactionDataRequestType::TransactionData(TransactionData {
-            include_events: false,
-        })
+    let data_request = if random_number % 3 == 0 {
+        DataRequest::get_new_transaction_data_with_proof(
+            known_version,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
     } else if random_number % 3 == 1 {
-        TransactionDataRequestType::TransactionOutputData
+        DataRequest::get_new_transaction_output_data_with_proof(
+            known_version,
+            get_random_u64(),
+            get_random_u64(),
+        )
     } else {
-        TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-            include_events: false,
-        })
+        DataRequest::get_new_transaction_or_output_data_with_proof(
+            known_version,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
     };
-    let data_request = create_new_transaction_data_request(
-        transaction_data_request_type,
-        known_version,
-        get_random_u64(),
-    );
     StorageServiceRequest::new(data_request, use_compression)
 }
 
@@ -698,12 +700,11 @@ fn create_outputs_request_v2(
     end_version: Version,
     use_compression: bool,
 ) -> StorageServiceRequest {
-    let transaction_data_request_type = TransactionDataRequestType::TransactionOutputData;
-    let data_request = create_transaction_data_request(
-        transaction_data_request_type,
+    let data_request = DataRequest::get_transaction_output_data_with_proof(
         proof_version,
         start_version,
         end_version,
+        get_random_u64(),
     );
     StorageServiceRequest::new(data_request, use_compression)
 }
@@ -763,67 +764,28 @@ fn create_subscription_request_v2(
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let transaction_data_request_type = if random_number % 3 == 0 {
-        TransactionDataRequestType::TransactionData(TransactionData {
-            include_events: false,
-        })
+    let data_request = if random_number % 3 == 0 {
+        DataRequest::subscribe_transaction_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
     } else if random_number % 3 == 1 {
-        TransactionDataRequestType::TransactionOutputData
+        DataRequest::subscribe_transaction_output_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            get_random_u64(),
+        )
     } else {
-        TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-            include_events: false,
-        })
+        DataRequest::subscribe_transaction_or_output_data_with_proof(
+            subscription_stream_metadata,
+            get_random_u64(),
+            false,
+            get_random_u64(),
+        )
     };
-    let data_request = create_transaction_subscription_data_request(
-        transaction_data_request_type,
-        subscription_stream_metadata,
-        get_random_u64(),
-    );
     StorageServiceRequest::new(data_request, use_compression)
-}
-
-/// Creates a request for transaction subscription data
-fn create_transaction_subscription_data_request(
-    transaction_data_request_type: TransactionDataRequestType,
-    subscription_stream_metadata: SubscriptionStreamMetadata,
-    subscription_stream_index: u64,
-) -> DataRequest {
-    DataRequest::SubscribeTransactionDataWithProof(SubscribeTransactionDataWithProofRequest {
-        transaction_data_request_type,
-        subscription_stream_metadata,
-        subscription_stream_index,
-        max_response_bytes: get_random_u64(),
-    })
-}
-
-/// Creates a request for new transaction data with proof
-fn create_new_transaction_data_request(
-    transaction_data_request_type: TransactionDataRequestType,
-    known_version: Version,
-    known_epoch: u64,
-) -> DataRequest {
-    DataRequest::GetNewTransactionDataWithProof(GetNewTransactionDataWithProofRequest {
-        transaction_data_request_type,
-        known_version,
-        known_epoch,
-        max_response_bytes: get_random_u64(),
-    })
-}
-
-/// Creates a request for transaction data with proof
-fn create_transaction_data_request(
-    transaction_data_request_type: TransactionDataRequestType,
-    proof_version: Version,
-    start_version: Version,
-    end_version: Version,
-) -> DataRequest {
-    DataRequest::GetTransactionDataWithProof(GetTransactionDataWithProofRequest {
-        transaction_data_request_type,
-        proof_version,
-        start_version,
-        end_version,
-        max_response_bytes: get_random_u64(),
-    })
 }
 
 /// Creates a request for transactions
@@ -849,15 +811,12 @@ fn create_transactions_request_v2(
     end_version: Version,
     use_compression: bool,
 ) -> StorageServiceRequest {
-    let transaction_data_request_type =
-        TransactionDataRequestType::TransactionData(TransactionData {
-            include_events: false,
-        });
-    let data_request = create_transaction_data_request(
-        transaction_data_request_type,
+    let data_request = DataRequest::get_transaction_data_with_proof(
         proof_version,
         start_version,
         end_version,
+        true,
+        get_random_u64(),
     );
     StorageServiceRequest::new(data_request, use_compression)
 }
@@ -887,15 +846,12 @@ fn create_transactions_or_outputs_request_v2(
     end_version: Version,
     use_compression: bool,
 ) -> StorageServiceRequest {
-    let transaction_data_request_type =
-        TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-            include_events: false,
-        });
-    let data_request = create_transaction_data_request(
-        transaction_data_request_type,
+    let data_request = DataRequest::get_transaction_or_output_data_with_proof(
         proof_version,
         start_version,
         end_version,
+        false,
+        get_random_u64(),
     );
     StorageServiceRequest::new(data_request, use_compression)
 }

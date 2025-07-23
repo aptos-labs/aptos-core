@@ -576,6 +576,13 @@ impl SpecTranslator<'_> {
                 ..self.clone()
             };
 
+            let skip_immutable_reference = |ty: &Type| {
+                if !ty.is_mutable_reference() {
+                    ty.skip_reference().clone()
+                } else {
+                    ty.clone()
+                }
+            };
             // Pairs of context parameter names and boogie types
             let param_decls = info
                 .free_vars
@@ -583,14 +590,15 @@ impl SpecTranslator<'_> {
                 .map(|(s, ty)| {
                     (
                         s.display(env.symbol_pool()).to_string(),
-                        boogie_type(env, ty.skip_reference()),
+                        boogie_type(env, &skip_immutable_reference(ty)),
                     )
                 })
-                .chain(
-                    info.used_temps
-                        .iter()
-                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty.skip_reference()))),
-                )
+                .chain(info.used_temps.iter().map(|(t, ty)| {
+                    (
+                        format!("$t{}", t),
+                        boogie_type(env, &skip_immutable_reference(ty)),
+                    )
+                }))
                 .chain(info.used_memory.iter().map(|(m, l)| {
                     let struct_env = &env.get_struct(m.to_qualified_id());
                     (
@@ -607,6 +615,11 @@ impl SpecTranslator<'_> {
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
                 let suffix = boogie_type_suffix(env, ty.skip_reference());
+                let n = if ty.is_mutable_reference() {
+                    format!("$Dereference({})", n)
+                } else {
+                    n.to_owned()
+                };
                 emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);
