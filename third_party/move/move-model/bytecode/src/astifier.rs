@@ -2043,18 +2043,19 @@ impl IfElseTransformer<'_> {
 
 /// A rewriter which eliminates single and unused assignments.
 pub fn transform_assigns(target: &FunctionTarget, exp: Exp) -> Exp {
-    let usage = analyze_usage(target, exp.as_ref());
+    let (post_usage, _) = analyze_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
-    AssignTransformer { usage, builder }.rewrite_exp(exp)
+    AssignTransformer { usage: post_usage, builder }.rewrite_exp(exp)
 }
 
 /// A rewriter which binds free variables.
 pub fn bind_free_vars(target: &FunctionTarget, exp: Exp) -> Exp {
-    let usage = analyze_usage(target, exp.as_ref());
+    let (_, usage) = analyze_usage(target, exp.as_ref());
     let builder = ExpBuilder::new(target.global_env());
     FreeVariableBinder {
         usage,
         builder,
+        bound: BTreeSet::new(),
         // Parameters set to be bound
         bound_vars: vec![target
             .get_parameters()
@@ -2080,16 +2081,6 @@ impl AssignTransformer<'_> {
             ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..)
         )
     }
-}
-
-#[allow(unused)]
-struct FreeVariableBinder<'a> {
-    /// Usage information about variables in the expression
-    usage: BTreeMap<NodeId, UsageInfo>,
-    /// The expression builder.
-    builder: ExpBuilder<'a>,
-    /// Variables which are bound in outer scopes
-    bound_vars: Vec<BTreeSet<Symbol>>,
 }
 
 impl ExpRewriterFunctions for AssignTransformer<'_> {
@@ -2183,21 +2174,83 @@ impl AssignTransformer<'_> {
     }
 }
 
+#[allow(unused)]
+struct FreeVariableBinder<'a> {
+    /// Usage information about variables in the expression
+    usage: UsageInfo,
+    /// The expression builder.
+    builder: ExpBuilder<'a>,
+    /// Variables which are bound in this scope
+    bound: BTreeSet<Symbol>,
+    /// Variables which are bound in outer scopes
+    bound_vars: Vec<BTreeSet<Symbol>>,
+}
+
 impl ExpRewriterFunctions for FreeVariableBinder<'_> {
     fn rewrite_exp(&mut self, mut exp: Exp) -> Exp {
-        // TODO: this currently just adds lets on outermost level.
-        //   Refine this to push lets down to leafs.
-        let mut bound = BTreeSet::new();
+
+        // Not a sequence, go down the expression
+        if !matches!(
+            exp.as_ref(),
+            ExpData::Sequence(_, _)
+         ) {
+            return self.rewrite_exp_descent(exp);
+         }
+
+        let mut free_vars = BTreeSet::new();
+
+        // Collect the free variables "belonging to" this sequence.
         exp.clone().visit_free_local_vars(|node_id, var| {
-            if bound.insert(var) && !self.bound_vars.iter().any(|b| b.contains(&var)) {
-                exp = self.builder.block(
-                    Pattern::Var(self.builder.clone_node_id(node_id), var),
-                    None,
-                    exp.clone(),
-                );
+            // if not handled, keep track of it
+            if !self.bound_vars.iter().any(|b| b.contains(&var)) {
+                free_vars.insert((node_id, var));
             }
         });
+
+        // process the descendants first.
+        exp = self.rewrite_exp_descent(exp);
+
+        // now add declarations for the free variables
+        for (node_id, var) in &free_vars {
+            // If the variable is already bound, skip it.
+            // If the variable is not only used in this sequence, skip it.
+            if !self.all_usage_contained(*var, exp.clone()) || !self.bound.insert(*var)  {
+                continue;
+            }
+
+            // Add a binding for the variable.
+            exp = self.builder.block(
+                    Pattern::Var(self.builder.clone_node_id(*node_id), *var),
+                    None,
+                    exp.clone(),
+            );
+        }
         exp
+    }
+}
+
+impl<'a> FreeVariableBinder<'a> {
+
+    fn all_usage_contained(&self, var: Symbol, exp: Exp) -> bool {
+        self.usage.uses
+            .get(&var)
+            .map(|s| {
+                s.iter().all(|id| {
+                    // Check if the usage is contained in the current expression
+                    let mut contained = false;
+                    let mut visitor = |exp: &ExpData| {
+                        if exp.node_id() == *id {
+                            print!("[Debug] Found usage of {:?} in exp {:?}\n\n", var, exp.node_id());
+                            contained = true;
+                            return false;
+                        }
+                        true
+                    };
+                    exp.visit_pre_order(&mut visitor);
+                    contained
+                })
+            })
+            .unwrap_or(true) // If no usage, then trivially true
     }
 }
 
@@ -2212,11 +2265,13 @@ struct UsageInfo {
     writes: MapDomain<Symbol, SetDomain<NodeId>>,
     /// Variables which are borrowed by or after this expression, immutable or mutable.
     borrows: MapDomain<Symbol, SetDomain<NodeId>>,
+    /// Tracking which expressions use a variable, globally
+    uses: MapDomain<Symbol, SetDomain<NodeId>>,
 }
 
 /// Analyze the expression for variable usage and returns a map from node id
 /// to the info.
-fn analyze_usage(_target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId, UsageInfo> {
+fn analyze_usage(_target: &FunctionTarget, exp: &ExpData) -> (BTreeMap<NodeId, UsageInfo>,  UsageInfo) {
     let mut step_fun = |state: &mut UsageInfo, e: &ExpData| {
         use ExpData::*;
         match e {
@@ -2262,22 +2317,29 @@ fn analyze_usage(_target: &FunctionTarget, exp: &ExpData) -> BTreeMap<NodeId, Us
             })
         );
     }
-    post_state
+    (post_state, analyzer.use_state)
 }
 
 impl UsageInfo {
     fn add_read(&mut self, var: Symbol, id: NodeId) {
         self.reads.entry(var).or_default().insert(id);
+        self.add_use(var, id);
     }
 
     fn add_borrow(&mut self, var: Symbol, id: NodeId) {
         self.borrows.entry(var).or_default().insert(id);
+        self.add_use(var, id);
     }
 
     fn add_write(&mut self, var: Symbol, id: NodeId) {
         self.reads.remove(&var);
         self.borrows.remove(&var);
         self.writes.entry(var).or_default().insert(id);
+        self.add_use(var, id);
+    }
+
+    fn add_use(&mut self, var: Symbol, id: NodeId) {
+        self.uses.entry(var).or_default().insert(id);
     }
 
     fn read_count(&self, var: Symbol) -> usize {
@@ -2345,6 +2407,7 @@ impl UsageInfo {
 
 struct FixpointAnalyser<'a, D, F> {
     forward: bool,
+    use_state: D,
     state: BTreeMap<NodeId, D>,
     changed: JoinResult,
     cont_to_loop: BTreeMap<NodeId, NodeId>,
@@ -2360,6 +2423,7 @@ where
     fn new(forward: bool, step_fun: &'a mut F) -> Self {
         Self {
             forward,
+            use_state: D::default(),
             state: BTreeMap::new(),
             changed: JoinResult::Unchanged,
             cont_to_loop: BTreeMap::new(),
@@ -2374,6 +2438,7 @@ where
             let mut state = D::default();
             self.changed = JoinResult::Unchanged;
             self.run(&mut state, exp);
+            self.use_state.join(&state);
             if self.changed == JoinResult::Unchanged {
                 break;
             }
