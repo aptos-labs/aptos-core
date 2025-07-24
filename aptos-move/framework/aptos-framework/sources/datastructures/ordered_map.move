@@ -1262,7 +1262,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-	public fun test_ordered_map_append_5() {
+	public fun test_ordered_map_append_6() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
         let other = new_from(vector[0, 2, 4, 6], vector[0, 200, 400, 600]);
         map.append(other);
