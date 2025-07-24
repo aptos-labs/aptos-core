@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{hash::Hash, marker::PhantomData};
 
 use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
 use rand_core::{CryptoRng, RngCore};
@@ -18,7 +18,7 @@ use ed25519_dalek::Verifier;
 
 use super::{digest::EvalProofs, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub struct BIBECiphertext<I: Id> {
     pub id: I,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -60,11 +60,19 @@ pub trait BIBECTDecrypt<I: Id, P: Plaintext> {
         ) -> Result<P>;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct Ciphertext<I: Id> {
     vk: VerifyingKey,
     bibe_ct: BIBECiphertext<I>,
     signature: Signature,
+}
+
+impl<I: Id> Hash for Ciphertext<I> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.vk.hash(state);
+        self.bibe_ct.hash(state);
+        self.signature.to_bytes().hash(state);
+    }
 }
 
 
