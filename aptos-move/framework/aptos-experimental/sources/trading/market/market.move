@@ -1122,6 +1122,24 @@ module aptos_experimental::market {
         self.order_book.set_order_metadata(order_id, metadata);
     }
 
+    public fun get_order_metadata_by_client_id<M: store + copy + drop>(
+        self: &Market<M>, user: address, client_order_id: u64
+    ): Option<M> {
+        let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
+        if (order_id.is_none()) {
+            return option::none();
+        };
+        return self.get_order_metadata(order_id.destroy_some())
+    }
+
+    public fun set_order_metadata_by_client_id<M: store + copy + drop>(
+        self: &mut Market<M>, user: address, client_order_id: u64, metadata: M
+    ) {
+        let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
+        assert!(order_id.is_some(), EORDER_DOES_NOT_EXIST);
+        self.set_order_metadata(order_id.destroy_some(), metadata);
+    }
+
     /// Returns all the pending order ready to be executed based on the oracle price. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_price_based_orders<M: store + copy + drop>(

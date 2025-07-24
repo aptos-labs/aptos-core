@@ -46,7 +46,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1000),
                 &test_market_callbacks()
             );
@@ -62,7 +62,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1000),
                 &test_market_callbacks()
             );
@@ -79,7 +79,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 false, // Order should not be cancelled
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1002),
                 &test_market_callbacks()
             );
@@ -113,7 +113,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1000),
                 &test_market_callbacks()
             );
@@ -165,7 +165,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 true, // Order should be cancelled as it was pre-cancelled
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1000),
                 &test_market_callbacks()
             );
@@ -184,7 +184,7 @@ module aptos_experimental::pre_cancellation_tests {
                 &mut event_store,
                 false,
                 false, // Order should not be cancelled as it was pre-cancelled after expiration
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 option::some(1000),
                 &test_market_callbacks()
             );

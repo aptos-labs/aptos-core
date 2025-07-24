@@ -389,6 +389,17 @@ module aptos_experimental::order_book {
         self.orders.add(order_id, order_with_state);
     }
 
+    public fun get_order_id_by_client_id<M: store + copy + drop>(
+        self: &OrderBook<M>, order_creator: address, client_order_id: u64
+    ): Option<OrderIdType> {
+        let account_client_order_id =
+            new_account_client_order_id(order_creator, client_order_id);
+        if (!self.client_order_ids.contains(&account_client_order_id)) {
+            return option::none();
+        };
+        option::some(*self.client_order_ids.borrow(&account_client_order_id))
+    }
+
     public fun get_order_metadata<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderIdType
     ): Option<M> {
@@ -401,10 +412,7 @@ module aptos_experimental::order_book {
     public fun set_order_metadata<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
-        if (!self.orders.contains(&order_id)) {
-            return;
-        };
-
+        assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
         order_with_state.set_metadata_in_state(metadata);
         self.orders.add(order_id, order_with_state);
