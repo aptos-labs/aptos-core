@@ -10,7 +10,7 @@ public fun pack(f: |u64|u32): R
     ret
 
 public fun f_store_drop(): |u64|u32 has store+drop
-    pack_closure 0x66::helpers::action, 0
+    pack_closure action, 0
     ret
 
 #[persistent] fun action(x: u64): u32

@@ -1,6 +1,6 @@
 processed 3 tasks
 
-task 2 'run'. lines 54-68:
+task 2 'run'. lines 53-66:
 Error: Script execution failed with VMError: {
     message: Expected type &|u64|u32 has copy, got &mut |u64|u32 has copy + drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

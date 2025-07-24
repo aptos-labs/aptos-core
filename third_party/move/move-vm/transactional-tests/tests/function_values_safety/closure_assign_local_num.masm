@@ -1,15 +1,37 @@
 //# publish
 module 0x66::helpers
 
+// Uses pseudo captured structure to force a constructed
+// closure to have abilities. Note that declaration of
+// types (like return type) do not matter for paranoid
+// mode, rather it uses the actual type of the values
+// on the stack.
+
+struct CopyDropStore has copy+drop+store
+    dummy: bool
+struct Drop has drop
+    dummy: bool
+
 public fun f_copy_drop_store(): |u64|u32 has copy+drop+store
-    pack_closure 0x66::helpers::action, 0
+    ld_true
+    pack CopyDropStore
+    pack_closure action_CopyDropStore, 1
     ret
 
-public fun f(): |u64|u32
-    pack_closure 0x66::helpers::action, 0
+public fun f(): |u64|u32 has drop
+    ld_true
+    pack Drop
+    pack_closure action_Drop, 1
     ret
 
-#[persistent] fun action(x: u64): u32
+#[persistent] fun action_CopyDropStore(_s: CopyDropStore, x: u64): u32
+    move_loc x
+    cast_u32
+    ld_u32 20
+    add
+    ret
+
+#[persistent] fun action_Drop(_s: Drop, x: u64): u32
     move_loc x
     cast_u32
     ld_u32 20
@@ -28,25 +50,27 @@ public fun assert_eq(x: u32, y:u32)
 
 //# run --verbose
 script
+use 0x66::helpers
 
 fun ok()
     local f: |u64|u32 has copy+drop
-    call 0x66::helpers::f_copy_drop_store
+    call helpers::f_copy_drop_store
     st_loc f
     ld_u64 5
     move_loc f
     call_closure<|u64|u32>
     ld_u32 25
-    call 0x66::helpers::assert_eq
+    call helpers::assert_eq
     ret
 
 //# run --verbose
 script
+use 0x66::helpers
 
 fun not_assignable()
     local f: |u64|u32 has copy+drop
-    call 0x66::helpers::f
-    st_loc f
+    call helpers::f
+    st_loc f            // ERROR
     ld_u64 5
     copy_loc f
     call_closure<|u64|u32>
@@ -54,5 +78,5 @@ fun not_assignable()
     move_loc f
     call_closure<|u64|u32>
     ld_u32 45
-    call 0x66::helpers::assert_eq
+    call helpers::assert_eq
     ret

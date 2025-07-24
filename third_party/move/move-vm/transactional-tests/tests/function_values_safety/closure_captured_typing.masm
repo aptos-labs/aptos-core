@@ -41,7 +41,7 @@ fun ok()
     st_loc delayed
     borrow_loc delayed
     ld_u64 2
-    pack_closure 0x66::helpers::f, 1
+    pack_closure helpers::f, 1
     call_closure<|&u64|u64>
     call helpers::assert3
     ret
@@ -115,8 +115,8 @@ fun wrong_captured_mut_ref()
     ld_u64 1
     st_loc captured
     mut_borrow_loc captured
-    pack_closure 0x66::helpers::h, 1 // ERROR
+    pack_closure helpers::h, 1 // ERROR
     ld_u64 2
     call_closure<|&u64|u64>
-    call 0x66::helpers::assert3
+    call helpers::assert3
     ret

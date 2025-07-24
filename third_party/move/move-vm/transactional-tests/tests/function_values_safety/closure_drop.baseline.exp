@@ -1,6 +1,6 @@
 processed 3 tasks
 
-task 2 'run'. lines 52-61:
+task 2 'run'. lines 51-59:
 Error: Script execution failed with VMError: {
     message: None,
     major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,

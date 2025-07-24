@@ -34,7 +34,7 @@ fun ok()
     st_loc delayed
     borrow_loc delayed
     ld_u64 2
-    pack_closure 0x66::helpers::f, 1
+    pack_closure helpers::f, 1
     call_closure<|&u64|u64>
     call helpers::assert3
     ret

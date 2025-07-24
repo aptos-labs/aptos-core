@@ -1,8 +1,6 @@
 //# publish
 module 0x66::helpers
 
-// Declares some helper functions used by later tests
-
 struct Fungible
     x: u64
 

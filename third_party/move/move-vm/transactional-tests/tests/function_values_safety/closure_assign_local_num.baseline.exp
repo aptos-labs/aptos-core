@@ -1,6 +1,6 @@
 processed 3 tasks
 
-task 2 'run'. lines 43-58:
+task 2 'run'. lines 66-82:
 Error: Script execution failed with VMError: {
     message: None,
     major_status: STLOC_TYPE_MISMATCH_ERROR,
