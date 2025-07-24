@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{group::{Fr, G1Affine, G1Projective, G2Affine, PairingSetting}, shared::algebra::{fk_algorithm::EPTest as _, interpolate::vanishing_poly, mult_tree::{compute_mult_tree, quotient}}};
+use crate::{errors::BatchEncryptionError, group::{Fr, G1Affine, G1Projective, G2Affine, PairingSetting}, shared::algebra::{fk_algorithm::EPTest as _, interpolate::vanishing_poly, mult_tree::{compute_mult_tree, quotient}}};
 use crate::shared::ark_serialize::*;
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::rand::seq::index;
@@ -10,6 +10,7 @@ use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain,
 use ark_ff::{field_hashers::{DefaultFieldHasher, HashToField}, Field as _, PrimeField as _};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use anyhow::Result;
 
 use crate::{shared::algebra::fk_algorithm::FKDomain, shared::algebra::interpolate::interpolate};
 
@@ -96,29 +97,34 @@ impl IdSet for FreeRootIdSet {
         self.cached_mult_tree = Some(mult_tree);
     }
 
-    fn poly_coeffs(&self) -> Vec<Fr> {
-        if self.cached_poly_coeffs.is_none() {
-            panic!("Need to compute first");
-        }
-        self.cached_poly_coeffs.clone().unwrap()
+    fn poly_coeffs(&self) -> Option<Vec<Fr>> {
+        self.cached_poly_coeffs.clone()
     }
 
-    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> HashMap<Self::Id, G1Affine> {
+    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
         let pfs : Vec<G1Affine> = setup.fk_domain
-            .eval_proofs_at_x_coords_alt(&self.poly_coeffs(), &self.poly_roots, round)
+            .eval_proofs_at_x_coords_alt(
+                &self.poly_coeffs().ok_or(BatchEncryptionError::EvalProofsWithUncomputedCoefficients)?, 
+                &self.poly_roots, 
+                round)
             .iter()
             .map(|g| G1Affine::from(*g))
             .collect();
-        HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter())
+
+        Ok(HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter()))
     }
 
-    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> HashMap<Self::Id, G1Affine> {
+    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
         let pfs : Vec<G1Affine> = setup.fk_domain
-            .eval_proofs_at_x_coords_alt(&self.poly_coeffs(), &ids.into_iter().map(|id| id.x()).collect::<Vec<Fr>>(), round)
+            .eval_proofs_at_x_coords_alt(
+                &self.poly_coeffs().ok_or(BatchEncryptionError::EvalProofsWithUncomputedCoefficients)?,  
+                &ids.into_iter().map(|id| id.x()).collect::<Vec<Fr>>(), 
+                round)
             .iter()
             .map(|g| G1Affine::from(*g))
             .collect();
-        HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter())
+
+        Ok(HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter()))
     }
 
     fn as_vec(&self) -> Vec<Self::Id> {
@@ -127,7 +133,7 @@ impl IdSet for FreeRootIdSet {
             .collect()
     }
 
-    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> G1Affine {
+    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> Result<G1Affine> {
         if self.cached_mult_tree.is_none() {
             panic!("Need to compute first");
         }
@@ -138,6 +144,7 @@ impl IdSet for FreeRootIdSet {
         q_coeffs.push(Fr::zero());
 
 
-        G1Projective::msm(&setup.tau_powers_g1[round], &q_coeffs).unwrap().into()
+        Ok(G1Projective::msm(&setup.tau_powers_g1[round], &q_coeffs)
+            .unwrap().into())
     }
 }

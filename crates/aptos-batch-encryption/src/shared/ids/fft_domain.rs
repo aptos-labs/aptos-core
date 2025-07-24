@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use crate::group::{PairingSetting, Fr, G1Affine, G1Projective, G2Affine};
+use crate::{errors::BatchEncryptionError, group::{Fr, G1Affine, G1Projective, G2Affine, PairingSetting}};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ed25519_dalek::VerifyingKey;
 use num_traits::{Zero, One};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_ff::{field_hashers::{DefaultFieldHasher, HashToField}, Field as _, PrimeField as _};
 use sha2::Sha256;
+use anyhow::Result;
 
 use crate::{shared::algebra::fk_algorithm::FKDomain, shared::algebra::interpolate::interpolate};
 
@@ -116,20 +117,19 @@ impl<const N: usize> IdSet for FFTDomainIdSet<N> {
         self.cached_poly_coeffs = Some(coeffs);
     }
 
-    fn poly_coeffs(&self) -> Vec<Fr> {
-        if self.cached_poly_coeffs.is_none() {
-            panic!("Need to compute first");
-        }
-        self.cached_poly_coeffs.clone().unwrap()
+    fn poly_coeffs(&self) -> Option<Vec<Fr>> {
+        self.cached_poly_coeffs.clone()
     }
 
-    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> HashMap<Self::Id, G1Affine> {
+    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
         let pfs: Vec<(Self::Id, G1Affine)> = 
             self.as_vec().into_iter().zip(
-            setup.fk_domain.eval_proofs_at_roots_of_unity(&self.poly_coeffs(), round)
+            setup.fk_domain.eval_proofs_at_roots_of_unity(
+                &self.poly_coeffs().ok_or(BatchEncryptionError::EvalProofsWithUncomputedCoefficients)?, 
+                round)
             .iter().map(|g| G1Affine::from(*g))).collect();
 
-        HashMap::from_iter(pfs.into_iter())
+        Ok(HashMap::from_iter(pfs.into_iter()))
     }
 
     fn as_vec(&self) -> Vec<Self::Id> {
@@ -138,11 +138,11 @@ impl<const N: usize> IdSet for FFTDomainIdSet<N> {
             .map(move |(x,y)| FFTDomainId::new(&self, x, y)).collect()
     }
 
-    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> G1Affine {
+    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> Result<G1Affine> {
         unimplemented!()
     }
 
-    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> HashMap<Self::Id, G1Affine> {
+    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
         unimplemented!()
     }
 }

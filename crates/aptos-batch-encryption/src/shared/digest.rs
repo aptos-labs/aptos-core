@@ -109,7 +109,8 @@ impl DigestKey {
         } else {
 
             ids.compute_poly_coeffs();
-            let mut coeffs = ids.poly_coeffs();
+            // I believe this unwrap is safe since the previous line means it will never panic
+            let mut coeffs = ids.poly_coeffs().unwrap(); 
             coeffs.resize(self.tau_powers_g1[round].len(), Fr::zero());
 
             let digest = Digest { digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs).unwrap().into(), round };
@@ -147,15 +148,18 @@ impl<'a, IS: IdSet> EvalProofs<'a, IS> {
     }
 
     pub fn compute_all(&mut self) {
-        self.computed_proofs = self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round);
+        self.computed_proofs = self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round)
+        .expect("should always succeed b/c we only ever initialize EvalProofs w/ an id set w/ computed coeffs");
     }
 
     pub fn compute(&mut self, ids: &[IS::Id]) {
-        self.computed_proofs = self.ids.compute_eval_proofs_with_setup(self.digest_key, ids, self.digest.round);
+        self.computed_proofs = self.ids.compute_eval_proofs_with_setup(self.digest_key, ids, self.digest.round)
+        .expect("should always succeed b/c we only ever initialize EvalProofs w/ an id set w/ computed coeffs");
     }
 
     pub fn compute_single(&mut self, id : IS::Id) {
-        let pf = self.ids.compute_eval_proof_with_setup(self.digest_key, id, self.digest.round);
+        let pf = self.ids.compute_eval_proof_with_setup(self.digest_key, id, self.digest.round)
+        .expect("should always succeed b/c we only ever initialize EvalProofs w/ an id set w/ computed coeffs");
         self.computed_proofs.insert(id, pf);
     }
 
