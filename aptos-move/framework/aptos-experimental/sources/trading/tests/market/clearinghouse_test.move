@@ -20,10 +20,12 @@ module aptos_experimental::clearinghouse_test {
     const E_ORDER_NOT_FOUND: u64 = 3;
     const E_ORDER_NOT_CLEANED_UP: u64 = 4;
 
-    struct TestOrderMetadata has store, copy, drop {}
+    struct TestOrderMetadata has store, copy, drop {
+        id: u64
+    }
 
-    public fun new_test_order_metadata(): TestOrderMetadata {
-        TestOrderMetadata {}
+    public fun new_test_order_metadata(id: u64): TestOrderMetadata {
+        TestOrderMetadata { id}
     }
 
     public fun get_order_metadata_bytes(
