@@ -381,9 +381,4 @@ spec aptos_std::i128 {
         ensures result ==> to_num(self) <= to_num(num2);
         ensures !result ==> to_num(self) > to_num(num2);
     }
-
-    spec twos_complement {
-        ensures v == 0 ==> result == 0;
-        ensures v > 0 ==> result + v == TWO_POW_128;
-    }
 }

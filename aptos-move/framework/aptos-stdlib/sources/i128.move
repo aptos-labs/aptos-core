@@ -52,7 +52,9 @@ module aptos_std::i128 {
     public fun add(self: I128, num2: I128): I128 {
         let sum = self.wrapping_add(num2);
         // overflow only if: (1) postive + postive = negative, OR (2) negative + negative = positive
-        let overflow = sign(self) == sign(num2) && sign(self) != sign(sum);assert!(!overflow, EOVERFLOW);
+        let self_sign = self.sign_internal();
+        let overflow = self_sign == num2.sign() && self_sign != sum.sign();
+        assert!(!overflow, EOVERFLOW);
         sum
     }
 
@@ -63,8 +65,10 @@ module aptos_std::i128 {
 
     /// Performs checked subtraction on two I128 numbers, asserting on overflow
     public fun sub(self: I128, num2: I128): I128 {
-        let difference = wrapping_sub(self, num2);
-        let overflow = sign(self) != sign(num2) && sign(self) != sign(difference);
+        let difference = self.wrapping_sub(num2);
+        // overflow only if: (1) positive - negative = negative, OR (2) negative - positive = positive
+        let self_sign = self.sign_internal();
+        let overflow = self_sign != num2.sign_internal() && self_sign != difference.sign_internal();
         assert!(!overflow, EOVERFLOW);
         difference
     }
@@ -72,7 +76,7 @@ module aptos_std::i128 {
     /// Performs multiplication on two I128 numbers
     public fun mul(self: I128, num2: I128): I128 {
         let product = (self.abs_u128() as u256) * (num2.abs_u128() as u256);
-        if (self.sign() != num2.sign()) {
+        if (self.sign_internal() != num2.sign_internal()) {
             assert!(product <= (BITS_MIN_I128 as u256), EOVERFLOW);
             neg_from((product as u128))
         } else {
@@ -88,7 +92,7 @@ module aptos_std::i128 {
     public fun div(self: I128, num2: I128): I128 {
         assert!(!num2.is_zero(), EDIVISION_BY_ZERO);
         let result = self.abs_u128() / num2.abs_u128();
-        if (self.sign() != num2.sign()) neg_from(result)
+        if (self.sign_internal() != num2.sign_internal()) neg_from(result)
         else from(result)
     }
 
@@ -101,7 +105,7 @@ module aptos_std::i128 {
 
     /// Returns the absolute value of an I128 number
     public fun abs(self: I128): I128 {
-        let bits = if (self.sign() == 0) { self.bits }
+        let bits = if (self.sign_internal() == 0) { self.bits }
         else {
             assert!(self.bits > BITS_MIN_I128, EOVERFLOW);
             twos_complement(self.bits)
@@ -111,7 +115,7 @@ module aptos_std::i128 {
 
     /// Returns the absolute value of an I128 number as a u128
     public fun abs_u128(self: I128): u128 {
-        if (self.sign() == 0) self.bits
+        if (self.sign_internal() == 0) self.bits
         else twos_complement(self.bits)
     }
 
@@ -136,7 +140,7 @@ module aptos_std::i128 {
                 result = result.mul(self);
             };
             self = self.mul(self);
-            exponent = exponent / 2;
+            exponent /= 2;
         };
         result
     }
@@ -158,7 +162,7 @@ module aptos_std::i128 {
 
     /// Returns the sign of an I128 number (0 for positive, 1 for negative)
     public fun sign(self: I128): u8 {
-        ((self.bits / BITS_MIN_I128) as u8)
+        self.sign_internal()
     }
 
     /// Creates and returns an I128 representing zero
@@ -173,13 +177,13 @@ module aptos_std::i128 {
 
     /// Checks if an I128 number is negative
     public fun is_neg(self: I128): bool {
-        self.sign() == 1
+        self.sign_internal() == 1
     }
 
     /// Compares two I128 numbers, returning LT, EQ, or GT
     public fun cmp(self: I128, num2: I128): u8 {
-        let sign1 = self.sign();
-        let sign2 = num2.sign();
+        let sign1 = self.sign_internal();
+        let sign2 = num2.sign_internal();
 
         if (sign1 > sign2) {
             LT
@@ -222,8 +226,12 @@ module aptos_std::i128 {
     /// Two's complement in order to dervie negative representation of bits
     /// It is overflow-proof because we hardcode 2's complement of 0 to be 0
     /// Which is fine for our specific use case
-    fun twos_complement(v: u128): u128 {
-        if (v == 0) 0
-        else MAX_U128 - v + 1
+    inline fun twos_complement(v: u128): u128 {
+        if (v == 0) 0 else MAX_U128 - v + 1
+    }
+
+    /// Returns the sign of an I128 number (0 for positive, 1 for negative)
+    inline fun sign_internal(self: I128): u8 {
+        ((self.bits / BITS_MIN_I128) as u8)
     }
 }

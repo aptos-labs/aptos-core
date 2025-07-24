@@ -52,7 +52,9 @@ module aptos_std::i64 {
     public fun add(self: I64, num2: I64): I64 {
         let sum = self.wrapping_add(num2);
         // overflow only if: (1) postive + postive = negative, OR (2) negative + negative = positive
-        let overflow = sign(self) == sign(num2) && sign(self) != sign(sum);assert!(!overflow, EOVERFLOW);
+        let self_sign = self.sign_internal();
+        let overflow = self_sign == num2.sign_internal() && self_sign != sum.sign_internal();
+        assert!(!overflow, EOVERFLOW);
         sum
     }
 
@@ -63,8 +65,10 @@ module aptos_std::i64 {
 
     /// Performs checked subtraction on two I64 numbers, asserting on overflow
     public fun sub(self: I64, num2: I64): I64 {
-        let difference = wrapping_sub(self, num2);
-        let overflow = sign(self) != sign(num2) && sign(self) != sign(difference);
+        let difference = self.wrapping_sub(num2);
+        // overflow only if: (1) positive - negative = negative, OR (2) negative - positive = positive
+        let self_sign = self.sign_internal();
+        let overflow = self_sign != num2.sign_internal() && self_sign != difference.sign_internal();
         assert!(!overflow, EOVERFLOW);
         difference
     }
@@ -72,7 +76,7 @@ module aptos_std::i64 {
     /// Performs multiplication on two I64 numbers
     public fun mul(self: I64, num2: I64): I64 {
         let product = (self.abs_u64() as u128) * (num2.abs_u64() as u128);
-        if (self.sign() != num2.sign()) {
+        if (self.sign_internal() != num2.sign_internal()) {
             assert!(product <= (BITS_MIN_I64 as u128), EOVERFLOW);
             neg_from((product as u64))
         } else {
@@ -88,7 +92,7 @@ module aptos_std::i64 {
     public fun div(self: I64, num2: I64): I64 {
         assert!(!num2.is_zero(), EDIVISION_BY_ZERO);
         let result = self.abs_u64() / num2.abs_u64();
-        if (self.sign() != num2.sign()) neg_from(result)
+        if (self.sign_internal() != num2.sign_internal()) neg_from(result)
         else from(result)
     }
 
@@ -96,12 +100,12 @@ module aptos_std::i64 {
     /// a mod b = a - b * (a / b)
     public fun mod(self: I64, num2: I64): I64 {
         let quotient = self.div(num2);
-        sub(self, num2.mul(quotient))
+        self.sub(num2.mul(quotient))
     }
 
     /// Returns the absolute value of an I64 number
     public fun abs(self: I64): I64 {
-        let bits = if (self.sign() == 0) { self.bits }
+        let bits = if (self.sign_internal() == 0) { self.bits }
         else {
             assert!(self.bits > BITS_MIN_I64, EOVERFLOW);
             twos_complement(self.bits)
@@ -111,7 +115,7 @@ module aptos_std::i64 {
 
     /// Returns the absolute value of an I64 number as a u64
     public fun abs_u64(self: I64): u64 {
-        if (self.sign() == 0) self.bits
+        if (self.sign_internal() == 0) self.bits
         else twos_complement(self.bits)
     }
 
@@ -136,7 +140,7 @@ module aptos_std::i64 {
                 result = result.mul(self);
             };
             self = self.mul(self);
-            exponent = exponent / 2;
+            exponent /= 2;
         };
         result
     }
@@ -158,7 +162,7 @@ module aptos_std::i64 {
 
     /// Returns the sign of an I64 number (0 for positive, 1 for negative)
     public fun sign(self: I64): u8 {
-        ((self.bits / BITS_MIN_I64) as u8)
+        self.sign_internal()
     }
 
     /// Creates and returns an I64 representing zero
@@ -173,13 +177,13 @@ module aptos_std::i64 {
 
     /// Checks if an I64 number is negative
     public fun is_neg(self: I64): bool {
-        self.sign() == 1
+        self.sign_internal() == 1
     }
 
     /// Compares two I64 numbers, returning LT, EQ, or GT
     public fun cmp(self: I64, num2: I64): u8 {
-        let sign1 = self.sign();
-        let sign2 = num2.sign();
+        let sign1 = self.sign_internal();
+        let sign2 = num2.sign_internal();
 
         if (sign1 > sign2) {
             LT
@@ -222,9 +226,12 @@ module aptos_std::i64 {
     /// Two's complement in order to dervie negative representation of bits
     /// It is overflow-proof because we hardcode 2's complement of 0 to be 0
     /// Which is fine for our specific use case
-    fun twos_complement(v: u64): u64 {
-        if (v == 0) 0
-        // (1 << 64) - v
-        else MAX_U64 - v + 1
+    inline fun twos_complement(v: u64): u64 {
+        if (v == 0) 0 else MAX_U64 - v + 1
+    }
+
+    /// Returns the sign of an I64 number (0 for positive, 1 for negative)
+    inline fun sign_internal(self: I64): u8 {
+        ((self.bits / BITS_MIN_I64) as u8)
     }
 }
