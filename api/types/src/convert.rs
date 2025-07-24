@@ -40,7 +40,6 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -1105,10 +1104,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 function,
                 code_offset,
             } => {
-                let func_name = match location {
+                let func_name_and_instruction = match location {
                     AbortLocation::Module(module_id) => self
-                        .explain_function_index(module_id, function)
-                        .map(|name| format!("{}::{}", abort_location_to_str(location), name))
+                        .explain_function_and_code_index(module_id, function, code_offset)
+                        .map(|name_and_instruction| {
+                            format!(
+                                "{}::{}",
+                                abort_location_to_str(location),
+                                name_and_instruction
+                            )
+                        })
                         .unwrap_or_else(|_| {
                             format!(
                                 "{}::<#{} function>",
@@ -1120,7 +1125,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 };
                 format!(
                     "Execution failed in {} at code offset {}",
-                    func_name, code_offset
+                    func_name_and_instruction, code_offset
                 )
             },
             ExecutionStatus::MiscellaneousError(code) => {
@@ -1133,10 +1138,26 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         }
     }
 
-    fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
+    fn explain_function_and_code_index(
+        &self,
+        module_id: &ModuleId,
+        function: &u16,
+        code_offset: &u16,
+    ) -> Result<String> {
         let code = self.inner.view_existing_module(module_id)?;
-        let func = code.function_handle_at(FunctionHandleIndex::new(*function));
+        let function_def = code
+            .function_defs
+            .get(*function as usize)
+            .ok_or_else(|| anyhow::anyhow!("could not find function at index {}", function))?;
+        let func = code.function_handle_at(function_def.function);
         let id = code.identifier_at(func.name);
+
+        if let Some(code) = function_def.code.as_ref() {
+            if let Some(instruction) = code.code.get(*code_offset as usize) {
+                return Ok(format!("{} (on instruction {:?})", id, instruction));
+            }
+        }
+
         Ok(id.to_string())
     }
 }
