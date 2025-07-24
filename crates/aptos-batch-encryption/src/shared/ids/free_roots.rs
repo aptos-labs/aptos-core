@@ -14,7 +14,7 @@ use anyhow::Result;
 
 use crate::{shared::algebra::fk_algorithm::FKDomain, shared::algebra::interpolate::interpolate};
 
-use super::{Id, IdSet};
+use super::{Id, IdSet, OssifiedIdSet};
 
 
 /// An ID in an [`ArbXIdSet`].
@@ -31,7 +31,8 @@ impl FreeRootId {
 }
 
 impl Id for FreeRootId {
-    type Set = FreeRootIdSet;
+    type Set = FreeRootIdSet<UncomputedCoeffs>;
+    type OssifiedSet = FreeRootIdSet<ComputedCoeffs>;
 
     fn x(&self) -> Fr {
         self.root_x
@@ -54,26 +55,32 @@ impl Id for FreeRootId {
 /// slower than [`FFTDomainIdSet`], but allows for creating IDs over a large space with
 /// low probability of collision.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct FreeRootIdSet {
+pub struct FreeRootIdSet<Coeffs> {
     pub poly_roots: Vec<Fr>,
     capacity: usize,
-    cached_poly_coeffs: Option<Vec<Fr>>,
-    cached_mult_tree: Option<Vec<Vec<DensePolynomial<Fr>>>>,
+    poly_coeffs: Coeffs,
 }
 
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct UncomputedCoeffs;
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct ComputedCoeffs {
+    coeffs: Vec<Fr>,
+    mult_tree: Vec<Vec<DensePolynomial<Fr>>>,
+}
 
 
-impl IdSet for FreeRootIdSet {
+impl IdSet for FreeRootIdSet<UncomputedCoeffs> {
     type Id = FreeRootId;
+    type OssifiedSet = FreeRootIdSet<ComputedCoeffs>;
 
     fn with_capacity(capacity: usize) -> Option<Self> {
         let capacity = capacity.next_power_of_two();
         Some(Self {
             poly_roots: Vec::new(),
             capacity,
-            cached_poly_coeffs: None,
-            cached_mult_tree: None,
+            poly_coeffs: UncomputedCoeffs,
         })
     }
 
@@ -88,43 +95,20 @@ impl IdSet for FreeRootIdSet {
             panic!("put a real error here.");
         }
         self.poly_roots.push(id.root_x);
-        self.cached_poly_coeffs = None;
     }
 
-    fn compute_poly_coeffs(&mut self) {
+    fn compute_poly_coeffs(&self) -> FreeRootIdSet<ComputedCoeffs> {
         let mult_tree = compute_mult_tree(&self.poly_roots);
-        self.cached_poly_coeffs = Some(mult_tree[mult_tree.len()-1][0].coeffs.clone());
-        self.cached_mult_tree = Some(mult_tree);
-    }
 
-    fn poly_coeffs(&self) -> Option<Vec<Fr>> {
-        self.cached_poly_coeffs.clone()
-    }
+        FreeRootIdSet {
+            poly_roots: self.poly_roots.clone(),
+            capacity: self.capacity,
+            poly_coeffs: ComputedCoeffs {
+                coeffs: mult_tree[mult_tree.len()-1][0].coeffs.clone(),
+                mult_tree
+            }
+        }
 
-    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
-        let pfs : Vec<G1Affine> = setup.fk_domain
-            .eval_proofs_at_x_coords_alt(
-                &self.poly_coeffs().ok_or(BatchEncryptionError::EvalProofsWithUncomputedCoefficients)?, 
-                &self.poly_roots, 
-                round)
-            .iter()
-            .map(|g| G1Affine::from(*g))
-            .collect();
-
-        Ok(HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter()))
-    }
-
-    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> Result<HashMap<Self::Id, G1Affine>> {
-        let pfs : Vec<G1Affine> = setup.fk_domain
-            .eval_proofs_at_x_coords_alt(
-                &self.poly_coeffs().ok_or(BatchEncryptionError::EvalProofsWithUncomputedCoefficients)?,  
-                &ids.into_iter().map(|id| id.x()).collect::<Vec<Fr>>(), 
-                round)
-            .iter()
-            .map(|g| G1Affine::from(*g))
-            .collect();
-
-        Ok(HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter()))
     }
 
     fn as_vec(&self) -> Vec<Self::Id> {
@@ -132,19 +116,57 @@ impl IdSet for FreeRootIdSet {
             .map(|root_x| FreeRootId::new(*root_x))
             .collect()
     }
+}
 
-    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> Result<G1Affine> {
-        if self.cached_mult_tree.is_none() {
-            panic!("Need to compute first");
-        }
+impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
+    type Id = FreeRootId;
+
+    fn as_vec(&self) -> Vec<Self::Id> {
+        self.poly_roots.iter()
+            .map(|root_x| FreeRootId::new(*root_x))
+            .collect()
+    }
+
+    fn poly_coeffs(&self) -> Vec<Fr> {
+        self.poly_coeffs.coeffs.clone()
+    }
+
+    fn compute_all_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, round: usize) -> HashMap<Self::Id, G1Affine> {
+        let pfs : Vec<G1Affine> = setup.fk_domain
+            .eval_proofs_at_x_coords_alt(
+                &self.poly_coeffs(), 
+                &self.poly_roots, 
+                round)
+            .iter()
+            .map(|g| G1Affine::from(*g))
+            .collect();
+
+        HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter())
+    }
+
+    fn compute_eval_proofs_with_setup(&self, setup: &crate::shared::digest::DigestKey, ids: &[Self::Id], round: usize) -> HashMap<Self::Id, G1Affine> {
+        let pfs : Vec<G1Affine> = setup.fk_domain
+            .eval_proofs_at_x_coords_alt(
+                &self.poly_coeffs(),
+                &ids.into_iter().map(|id| id.x()).collect::<Vec<Fr>>(), 
+                round)
+            .iter()
+            .map(|g| G1Affine::from(*g))
+            .collect();
+
+        HashMap::from_iter(self.as_vec().into_iter().zip(pfs).collect::<Vec<(Self::Id, G1Affine)>>().into_iter())
+    }
+
+
+    fn compute_eval_proof_with_setup(&self, setup: &crate::shared::digest::DigestKey, id: Self::Id, round: usize) -> G1Affine {
 
         let index_of_id = self.poly_roots.iter().position(|x| id.x() == *x).unwrap();
 
-        let mut q_coeffs = quotient(self.cached_mult_tree.as_ref().unwrap(), index_of_id).coeffs;
+        let mut q_coeffs = quotient(&self.poly_coeffs.mult_tree, index_of_id).coeffs;
         q_coeffs.push(Fr::zero());
 
 
-        Ok(G1Projective::msm(&setup.tau_powers_g1[round], &q_coeffs)
-            .unwrap().into())
+        G1Projective::msm(&setup.tau_powers_g1[round], &q_coeffs)
+            .unwrap().into()
     }
 }

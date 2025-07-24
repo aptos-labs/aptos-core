@@ -86,7 +86,7 @@ pub trait CTDecrypt<I: Id, P: Plaintext> {
     fn decrypt(
         &self,
         ct: &Ciphertext<I>,
-        eval_proofs: &EvalProofs<I::Set>,
+        eval_proofs: &EvalProofs<I::OssifiedSet>,
         ) -> Result<P>;
 }
 
@@ -189,7 +189,7 @@ impl<I: Id, P: Plaintext> CTDecrypt<I, P> for BIBEDecryptionKey {
     fn decrypt(
         &self,
         ct: &Ciphertext<I>,
-        eval_proofs: &EvalProofs<<I as Id>::Set>,
+        eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
         ) -> Result<P> {
 
         let pf = eval_proofs

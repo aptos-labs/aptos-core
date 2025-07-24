@@ -1,5 +1,6 @@
 use aptos_batch_encryption::group::Fr;
 use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
+use aptos_batch_encryption::shared::ids::free_roots::UncomputedCoeffs;
 use aptos_batch_encryption::shared::ids::*;
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use ark_std::{rand::thread_rng, UniformRand, Zero, One};
@@ -12,7 +13,7 @@ pub fn compute(c: &mut Criterion) {
 
     let mut rng = thread_rng();
     let setup = DigestKey::new(&mut rng, 8, 1).unwrap();
-    let mut ids : FFTDomainIdSet<8> = FFTDomainIdSet::with_capacity(8).unwrap();
+    let mut ids : FFTDomainIdSet<8, UncomputedCoeffs> = FFTDomainIdSet::with_capacity(8).unwrap();
     for x in 0..8 {
         ids.set(x, Fr::rand(&mut rng));
     }
@@ -25,7 +26,7 @@ pub fn compute(c: &mut Criterion) {
 
     let mut rng = thread_rng();
     let setup = DigestKey::new(&mut rng, 32, 1).unwrap();
-    let mut ids : FFTDomainIdSet<32> = FFTDomainIdSet::with_capacity(32).unwrap();
+    let mut ids : FFTDomainIdSet<32, UncomputedCoeffs> = FFTDomainIdSet::with_capacity(32).unwrap();
     for x in 0..32 {
         ids.set(x, Fr::rand(&mut rng));
     }
@@ -38,7 +39,7 @@ pub fn compute(c: &mut Criterion) {
 
     let mut rng = thread_rng();
     let setup = DigestKey::new(&mut rng, 128, 1).unwrap();
-    let mut ids : FFTDomainIdSet<128> = FFTDomainIdSet::with_capacity(128).unwrap();
+    let mut ids : FFTDomainIdSet<128, UncomputedCoeffs> = FFTDomainIdSet::with_capacity(128).unwrap();
     for x in 0..128 {
         ids.set(x, Fr::rand(&mut rng));
     }
@@ -51,7 +52,7 @@ pub fn compute(c: &mut Criterion) {
 
     let mut rng = thread_rng();
     let setup = DigestKey::new(&mut rng, 512, 1).unwrap();
-    let mut ids : FFTDomainIdSet<512> = FFTDomainIdSet::with_capacity(512).unwrap();
+    let mut ids : FFTDomainIdSet<512, UncomputedCoeffs> = FFTDomainIdSet::with_capacity(512).unwrap();
     for x in 0..512 {
         ids.set(x, Fr::rand(&mut rng));
     }

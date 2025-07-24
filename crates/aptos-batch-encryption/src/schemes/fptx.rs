@@ -15,6 +15,8 @@ use crate::shared::ciphertext::CTDecrypt;
 use crate::shared::ciphertext::CTEncrypt;
 use crate::shared::ciphertext::{BIBEEncryptionKey, Ciphertext};
 use crate::shared::digest::{Digest, EvalProofs};
+use crate::shared::ids::free_roots::ComputedCoeffs;
+use crate::shared::ids::free_roots::UncomputedCoeffs;
 use crate::shared::ids::{FreeRootId, FreeRootIdSet};
 use crate::shared::key_derivation::{self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare, BIBEVerificationKey};
 use crate::{group::*, shared::{digest::DigestKey, ids::{Id, IdSet}}, traits::{BatchThresholdEncryption, Plaintext}};
@@ -72,7 +74,7 @@ impl BatchThresholdEncryption for FPTX {
 
     type Digest = Digest;
 
-    type EvalProofs<'a> = EvalProofs<'a, FreeRootIdSet>;
+    type EvalProofs<'a> = EvalProofs<'a, FreeRootIdSet<ComputedCoeffs>>;
 
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
 
@@ -109,7 +111,7 @@ impl BatchThresholdEncryption for FPTX {
     fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
         -> anyhow::Result<(Self::Digest, Self::EvalProofs<'a>)> 
     {
-        let mut ids : FreeRootIdSet 
+        let mut ids : FreeRootIdSet<UncomputedCoeffs>
             = FreeRootIdSet::from_slice(
                 &cts
                 .into_iter()
