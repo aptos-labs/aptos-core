@@ -561,6 +561,11 @@ fn precompiled_v2_stdlib() -> &'static PrecompiledFilesModules {
     &PRECOMPILED_MOVE_STDLIB_V2
 }
 
+#[cfg(feature = "fuzzing")]
+pub fn precompiled_v2_stdlib_fuzzer() -> &'static PrecompiledFilesModules {
+    &PRECOMPILED_MOVE_STDLIB_V2
+}
+
 pub fn run_test_with_config(
     config: TestRunConfig,
     path: &Path,
