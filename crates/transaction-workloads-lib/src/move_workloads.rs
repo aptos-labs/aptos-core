@@ -265,6 +265,11 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    Large1119583,
+    UseLarge1119583,
+    Large2292160,
+    UseLarge2292160,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -334,6 +339,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::Large1119583 | EntryPoints::UseLarge1119583 => "large_1119583_bytes",
+            EntryPoints::Large2292160 | EntryPoints::UseLarge2292160 => "large_2292160_bytes",
         }
     }
 
@@ -402,6 +409,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::Large1119583 | EntryPoints::UseLarge1119583 => "M_73h4hygtFCC6ehxnwNaIb35otlueh2DXaLJBKLO4ZnEPR8u3vyPrLRa5PJQ7yUsunMiUbUuv3rX0iQqAlX9pz34ar6DmqMRoJFLjBnpR4W4efXJGSVNdeSOCGs44I0nfZDjJd3CinYR6xdyJ8GzXzBRXyUisLpY86H26wkrgX8N5AMyuh44sfOwKL1uFoIGH7rPRI9NO",
+            EntryPoints::Large2292160 | EntryPoints::UseLarge2292160 => "M_mODLc4F5EhUO5wuNC7O2poGJq8fzaoevIgnvPL6XvBNAscB2EmqAJUVunikpBR0wayC3OKkq34n4f643gcU5LMWS0l5pbbWsHjvuzSaTFs3Gsfq1o9e2zNpa1lvVXQSUBcIcdeCx3vWhKRy72y8H436EBw7NENeneZPdvOcyi3pHgAopZxEoCu4fGeUmEtkiVGzOKNmX",
         }
     }
 
@@ -866,6 +875,26 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::Large1119583 => {
+                get_payload(module_id, ident_str!("main").to_owned(), vec![
+                    bcs::to_bytes(&false).unwrap(),
+                ])
+            },
+            EntryPoints::UseLarge1119583 => {
+                get_payload(module_id, ident_str!("main").to_owned(), vec![
+                    bcs::to_bytes(&true).unwrap(),
+                ])
+            },
+            EntryPoints::Large2292160 => {
+                get_payload(module_id, ident_str!("main").to_owned(), vec![
+                    bcs::to_bytes(&false).unwrap(),
+                ])
+            },
+            EntryPoints::UseLarge2292160 => {
+                get_payload(module_id, ident_str!("main").to_owned(), vec![
+                    bcs::to_bytes(&true).unwrap(),
+                ])
+            },
         }
     }
 
@@ -987,6 +1016,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::Large1119583 |
+            EntryPoints::UseLarge1119583 |
+            EntryPoints::Large2292160 | EntryPoints::UseLarge2292160 => AutomaticArgs::None,
         }
     }
 }

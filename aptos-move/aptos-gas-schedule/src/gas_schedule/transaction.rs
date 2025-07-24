@@ -71,7 +71,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            64 * 1024
+            // For experiment only!
+            // 64 * 1024
+            1024 * 1024 * 1024
         ],
         [
             max_transaction_size_in_bytes_gov: NumBytes,
@@ -249,12 +251,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_num_dependencies: NumModules,
             { RELEASE_V1_10.. => "max_num_dependencies" },
-            768,
+            1000000,
         ],
         [
             max_total_dependency_size: NumBytes,
             { RELEASE_V1_10.. => "max_total_dependency_size" },
-            1024 * 1024 * 12 / 10, // 1.2 MB
+            1024 * 1024 * 1024,
         ],
         [
             keyless_base_cost: InternalGas,

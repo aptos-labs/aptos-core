@@ -1366,66 +1366,66 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= RELEASE_V1_10 {
-            // Charge old versions of existing modules, in case of upgrades.
-            for module in modules.iter() {
-                let addr = module.self_addr();
-                let name = module.self_name();
-
-                if !traversal_context.visit_if_not_special_address(addr, name) {
-                    continue;
-                }
-
-                let size_if_old_module_exists = module_storage
-                    .unmetered_get_module_size(addr, name)?
-                    .map(|v| v as u64);
-                if let Some(old_size) = size_if_old_module_exists {
-                    gas_meter
-                        .charge_dependency(false, addr, name, NumBytes::new(old_size))
-                        .map_err(|err| {
-                            err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
-                        })?;
-                }
-            }
-
-            // Charge all modules in the bundle that is about to be published.
-            for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
-                gas_meter
-                    .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(blob.code().len() as u64),
-                    )
-                    .map_err(|err| err.finish(Location::Undefined))?;
-            }
-
-            // Charge all dependencies.
-            //
-            // Must exclude the ones that are in the current bundle because they have not
-            // been published yet.
-            let module_ids_in_bundle = modules
-                .iter()
-                .map(|module| (module.self_addr(), module.self_name()))
-                .collect::<BTreeSet<_>>();
-
-            check_dependencies_and_charge_gas(
-                module_storage,
-                gas_meter,
-                traversal_context,
-                modules
-                    .iter()
-                    .flat_map(|module| {
-                        module
-                            .immediate_dependencies_iter()
-                            .chain(module.immediate_friends_iter())
-                    })
-                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-            )?;
-
-            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
-        }
+        // if self.gas_feature_version() >= RELEASE_V1_10 {
+        //     // Charge old versions of existing modules, in case of upgrades.
+        //     for module in modules.iter() {
+        //         let addr = module.self_addr();
+        //         let name = module.self_name();
+        //
+        //         if !traversal_context.visit_if_not_special_address(addr, name) {
+        //             continue;
+        //         }
+        //
+        //         let size_if_old_module_exists = module_storage
+        //             .unmetered_get_module_size(addr, name)?
+        //             .map(|v| v as u64);
+        //         if let Some(old_size) = size_if_old_module_exists {
+        //             gas_meter
+        //                 .charge_dependency(false, addr, name, NumBytes::new(old_size))
+        //                 .map_err(|err| {
+        //                     err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+        //                 })?;
+        //         }
+        //     }
+        //
+        //     // Charge all modules in the bundle that is about to be published.
+        //     for (module, blob) in modules.iter().zip(bundle.iter()) {
+        //         let module_id = &module.self_id();
+        //         gas_meter
+        //             .charge_dependency(
+        //                 true,
+        //                 module_id.address(),
+        //                 module_id.name(),
+        //                 NumBytes::new(blob.code().len() as u64),
+        //             )
+        //             .map_err(|err| err.finish(Location::Undefined))?;
+        //     }
+        //
+        //     // Charge all dependencies.
+        //     //
+        //     // Must exclude the ones that are in the current bundle because they have not
+        //     // been published yet.
+        //     let module_ids_in_bundle = modules
+        //         .iter()
+        //         .map(|module| (module.self_addr(), module.self_name()))
+        //         .collect::<BTreeSet<_>>();
+        //
+        //     check_dependencies_and_charge_gas(
+        //         module_storage,
+        //         gas_meter,
+        //         traversal_context,
+        //         modules
+        //             .iter()
+        //             .flat_map(|module| {
+        //                 module
+        //                     .immediate_dependencies_iter()
+        //                     .chain(module.immediate_friends_iter())
+        //             })
+        //             .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+        //     )?;
+        //
+        //     // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+        // }
 
         for (module, blob) in modules.iter().zip(bundle.iter()) {
             // TODO(Gas): Make budget configurable.

@@ -1,0 +1,6 @@
+[package]
+name = "large_1119583_bytes"
+version = "0.0.1"
+
+[addresses]
+addr = "0xABCD"

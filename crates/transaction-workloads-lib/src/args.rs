@@ -93,6 +93,10 @@ pub enum TransactionTypeArg {
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct,
+    Large1119583,
+    UseLarge1119583,
+    Large2292160,
+    UseLarge2292160,
 }
 
 impl TransactionTypeArg {
@@ -406,6 +410,10 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
+            TransactionTypeArg::Large1119583 => call_custom_module(EntryPoints::Large1119583),
+            TransactionTypeArg::UseLarge1119583 => call_custom_module(EntryPoints::UseLarge1119583),
+            TransactionTypeArg::Large2292160 => call_custom_module(EntryPoints::Large2292160),
+            TransactionTypeArg::UseLarge2292160 => call_custom_module(EntryPoints::UseLarge2292160),
         }
     }
 
