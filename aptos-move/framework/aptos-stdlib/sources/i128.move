@@ -1,5 +1,5 @@
 module aptos_std::i128 {
-    /// Resulted in Overflow
+    /// Arithmetic operation resulted in overflow (value outside the range [-2^127, 2^127 - 1])
     const EOVERFLOW: u64 = 1;
     /// Division by Zero is not allowed
     const EDIVISION_BY_ZERO: u64 = 2;
