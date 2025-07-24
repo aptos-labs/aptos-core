@@ -470,12 +470,14 @@ fn generate_script_wrapper_for_non_entry_function(
     target_func_handle: &FunctionHandle,
     _target_type_args: &[TypeTag],
 ) -> anyhow::Result<String> {
-
     let func_name_ident = target_module.identifier_at(target_func_handle.name);
 
     // skip if the function is not public
     if _target_func_def.visibility != Visibility::Public {
-        return Err(anyhow::anyhow!("Function {} is not public", func_name_ident.to_string()));
+        return Err(anyhow::anyhow!(
+            "Function {} is not public",
+            func_name_ident.to_string()
+        ));
     }
 
     let module_handle = target_module.module_handle_at(target_func_handle.module);
@@ -487,7 +489,10 @@ fn generate_script_wrapper_for_non_entry_function(
     let parameters_sig = target_module.signature_at(target_func_handle.parameters);
     let return_sig = target_module.signature_at(target_func_handle.return_);
 
-    let has_signer_by_value = parameters_sig.0.iter().any(|t| *t == SignatureToken::Signer);
+    let has_signer_by_value = parameters_sig
+        .0
+        .iter()
+        .any(|t| *t == SignatureToken::Signer);
     let script_signer_param = if has_signer_by_value {
         "s: signer"
     } else {
@@ -534,7 +539,8 @@ fn generate_script_wrapper_for_non_entry_function(
     // Generate the function call line based on return type
     let function_call_line = if is_unit_return {
         // For unit return types, don't assign to a variable
-        format!("{}::{}{}({});",
+        format!(
+            "{}::{}{}({});",
             module_name_ident,
             func_name_ident,
             type_parameters_decl_str,
@@ -549,7 +555,8 @@ fn generate_script_wrapper_for_non_entry_function(
         } else {
             "_".to_string()
         };
-        format!("let {} = {}::{}{}({});",
+        format!(
+            "let {} = {}::{}{}({});",
             bindings,
             module_name_ident,
             func_name_ident,

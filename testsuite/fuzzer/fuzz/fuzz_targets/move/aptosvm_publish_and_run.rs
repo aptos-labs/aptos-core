@@ -383,8 +383,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             if let Some(e) = e {
                 if (e.status_type() == StatusType::InvariantViolation
                     || e.status_type() == StatusType::Unknown)
-                        && *e != StatusCode::TYPE_RESOLUTION_FAILURE
-                        && *e != StatusCode::STORAGE_ERROR
+                    && *e != StatusCode::TYPE_RESOLUTION_FAILURE
+                    && *e != StatusCode::STORAGE_ERROR
                 {
                     panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
                 }
