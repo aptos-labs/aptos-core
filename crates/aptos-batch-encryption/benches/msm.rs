@@ -42,6 +42,23 @@ pub fn pairing(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, msm, pairing);
+pub fn gt_exp(c: &mut Criterion) {
+    let mut group = c.benchmark_group("gt_exp");
+    let mut rng = thread_rng();
+
+    for f_size in [1] {
+        let g1s = vec![ G1Affine::rand(&mut rng); f_size ];
+        let g2s = vec![ G2Affine::rand(&mut rng); f_size ];
+        let gt = PairingSetting::final_exponentiation(PairingSetting::multi_miller_loop(&g1s, &g2s)).unwrap();
+        let fr = Fr::rand(&mut rng);
+
+
+        group.bench_with_input(BenchmarkId::from_parameter(f_size), &(gt, fr), |b, input| {
+            b.iter(|| input.0 * input.1 );
+        });
+    }
+}
+
+criterion_group!(benches, msm, pairing, gt_exp);
 criterion_main!(benches);
 
