@@ -1,5 +1,5 @@
 
-use std::sync::mpsc::RecvTimeoutError;
+use std::{hash::Hash, sync::mpsc::RecvTimeoutError};
 
 use rand_core::{CryptoRng, RngCore};
 use rayon::ThreadPool;
@@ -23,7 +23,7 @@ pub trait BatchThresholdEncryption {
     /// but I think it makes sense not to expose the ID as part of the interface. (The round number
     /// must be exposed since it must be given as input to [`PublicKey::encrypt`], and must agree
     /// with the round number used when computing a decryption key.)
-    type Ciphertext: Serialize + DeserializeOwned;
+    type Ciphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize + Hash;
 
     /// The round number used when generating a digest. For security to hold, validators must only
     /// generate a single decryption key corresponding to a round number.
@@ -116,7 +116,7 @@ pub trait Plaintext: Serialize + DeserializeOwned + Send + Sync {}
 impl Plaintext for String {}
 
 
-#[derive(PartialEq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
 pub struct Player {
     id: usize,
 }

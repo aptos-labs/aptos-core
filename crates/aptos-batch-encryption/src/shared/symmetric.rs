@@ -19,14 +19,14 @@ type SymmetricCipher = Aes128Gcm;
 type SymmetricNonce = Nonce<<AesGcm<Aes128, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>> as AeadCore>::NonceSize>;
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct SymmetricKey(GenericArray<u8, KeySize>);
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePad(GenericArray<u8, KeySize>);
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
     nonce: SymmetricNonce,
     ct_body: Vec<u8>,

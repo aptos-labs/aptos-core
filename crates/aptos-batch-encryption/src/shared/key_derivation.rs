@@ -23,7 +23,7 @@ pub struct BIBEMasterSecretKeyShare {
 }
 
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BIBEDecryptionKeyShare {
     signature_share: ShamirGroupShare,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -31,8 +31,12 @@ pub struct BIBEDecryptionKeyShare {
     player: Player,
 }
 
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BIBEDecryptionKey {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub digest_g1: G1Affine,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub signature_g1: G1Affine,
 }
 
