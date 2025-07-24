@@ -33,6 +33,7 @@ types of pending orders are supported.
 -  [Function `place_pending_maker_order`](#0x7_order_book_place_pending_maker_order)
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_order_book_decrease_order_size)
+-  [Function `get_order_id_by_client_id`](#0x7_order_book_get_order_id_by_client_id)
 -  [Function `get_order_metadata`](#0x7_order_book_get_order_metadata)
 -  [Function `set_order_metadata`](#0x7_order_book_set_order_metadata)
 -  [Function `is_active_order`](#0x7_order_book_is_active_order)
@@ -928,6 +929,37 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 </details>
 
+<a id="0x7_order_book_get_order_id_by_client_id"></a>
+
+## Function `get_order_id_by_client_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64
+): Option&lt;OrderIdType&gt; {
+    <b>let</b> account_client_order_id =
+        new_account_client_order_id(order_creator, client_order_id);
+    <b>if</b> (!self.client_order_ids.contains(&account_client_order_id)) {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*self.client_order_ids.borrow(&account_client_order_id))
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_get_order_metadata"></a>
 
 ## Function `get_order_metadata`
@@ -975,10 +1007,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
 ) {
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b>;
-    };
-
+    <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
     <b>let</b> order_with_state = self.orders.remove(&order_id);
     order_with_state.set_metadata_in_state(metadata);
     self.orders.add(order_id, order_with_state);

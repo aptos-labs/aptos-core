@@ -96,6 +96,8 @@ TimeBased(time): The order is triggered when the current time is greater than or
 -  [Function `get_remaining_size`](#0x7_market_get_remaining_size)
 -  [Function `get_order_metadata`](#0x7_market_get_order_metadata)
 -  [Function `set_order_metadata`](#0x7_market_set_order_metadata)
+-  [Function `get_order_metadata_by_client_id`](#0x7_market_get_order_metadata_by_client_id)
+-  [Function `set_order_metadata_by_client_id`](#0x7_market_set_order_metadata_by_client_id)
 -  [Function `take_ready_price_based_orders`](#0x7_market_take_ready_price_based_orders)
 -  [Function `take_ready_time_based_orders`](#0x7_market_take_ready_time_based_orders)
 
@@ -2250,6 +2252,64 @@ Remaining size of the order in the order book.
     self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
 ) {
     self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_set_order_metadata">set_order_metadata</a>(order_id, metadata);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_get_order_metadata_by_client_id"></a>
+
+## Function `get_order_metadata_by_client_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_get_order_metadata_by_client_id">get_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_get_order_metadata_by_client_id">get_order_metadata_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64
+): Option&lt;M&gt; {
+    <b>let</b> order_id = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order_id_by_client_id(user, client_order_id);
+    <b>if</b> (order_id.is_none()) {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+    <b>return</b> self.<a href="market.md#0x7_market_get_order_metadata">get_order_metadata</a>(order_id.destroy_some())
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_set_order_metadata_by_client_id"></a>
+
+## Function `set_order_metadata_by_client_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market.md#0x7_market_Market">Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M
+) {
+    <b>let</b> order_id = self.<a href="order_book.md#0x7_order_book">order_book</a>.get_order_id_by_client_id(user, client_order_id);
+    <b>assert</b>!(order_id.is_some(), <a href="market.md#0x7_market_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
+    self.<a href="market.md#0x7_market_set_order_metadata">set_order_metadata</a>(order_id.destroy_some(), metadata);
 }
 </code></pre>
 
