@@ -9258,6 +9258,7 @@ name = "fuzzer"
 version = "0.1.0"
 dependencies = [
  "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-types",
  "arbitrary",
  "base64 0.21.7",
@@ -9268,6 +9269,8 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-core-types",
+ "move-model",
+ "move-transactional-test-runner",
  "rayon",
  "sha2 0.9.9",
  "walkdir",
@@ -9289,10 +9292,12 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "fuzzer",
  "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "move-transactional-test-runner",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -12596,8 +12601,12 @@ name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
+ "arbitrary",
+ "bcs 0.1.4",
  "clap 4.5.21",
  "datatest-stable",
+ "dearbitrary",
  "difference",
  "either",
  "legacy-move-compiler",
