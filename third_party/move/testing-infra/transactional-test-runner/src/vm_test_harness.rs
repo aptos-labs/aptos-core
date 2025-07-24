@@ -405,7 +405,7 @@ impl SimpleVMTestAdapter<'_> {
         let traversal_storage = TraversalStorage::new();
         let mut extensions = NativeContextExtensions::default();
 
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = TransactionDataCache::empty(true);
         let return_values = MoveVM::execute_loaded_function(
             function,
             args,

@@ -329,9 +329,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
             EntryPoints::OrderBook { .. }
             | EntryPoints::ExistenceCheck { .. }
-            | EntryPoints::CheckAndModify => {
-                "experimental_usecases"
-            },
+            | EntryPoints::CheckAndModify => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -886,7 +884,9 @@ impl EntryPointTrait for EntryPoints {
                     get_payload_void(module_id, ident_str!("check").to_owned())
                 }
             },
-            EntryPoints::CheckAndModify => get_payload_void(module_id, ident_str!("check_and_modify").to_owned()),
+            EntryPoints::CheckAndModify => {
+                get_payload_void(module_id, ident_str!("check_and_modify").to_owned())
+            },
         }
     }
 

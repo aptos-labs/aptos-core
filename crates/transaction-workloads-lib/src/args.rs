@@ -439,9 +439,7 @@ impl TransactionTypeArg {
                     modify_frequency: 1.0,
                 })
             },
-            TransactionTypeArg::CheckAndModify => {
-                call_custom_module(EntryPoints::CheckAndModify)
-            },
+            TransactionTypeArg::CheckAndModify => call_custom_module(EntryPoints::CheckAndModify),
         }
     }
 
