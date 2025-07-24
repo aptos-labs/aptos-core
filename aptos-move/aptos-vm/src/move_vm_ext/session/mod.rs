@@ -115,7 +115,7 @@ where
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
-            data_cache: TransactionDataCache::empty(),
+            data_cache: TransactionDataCache::empty(features.is_lightweight_resource_existence_enabled()),
             extensions,
             resolver,
             is_storage_slot_metadata_enabled,

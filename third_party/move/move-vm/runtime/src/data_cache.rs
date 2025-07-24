@@ -97,14 +97,16 @@ struct DataCacheEntry {
 /// and pass it to the Move VM.
 pub struct TransactionDataCache {
     account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
+    enable_resource_existence_optimization: bool,
 }
 
 impl TransactionDataCache {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub fn empty() -> Self {
+    pub fn empty(enable_resource_existence_optimization: bool) -> Self {
         TransactionDataCache {
             account_map: BTreeMap::new(),
+            enable_resource_existence_optimization,
         }
     }
 
@@ -244,8 +246,12 @@ impl TransactionDataCache {
         _traversal_context: &mut TraversalContext,
         addr: &AccountAddress,
         ty: &Type,
-        load_data: bool,
+        mut load_data: bool,
     ) -> PartialVMResult<(&CachedInformation, NumBytes)> {
+        if !self.enable_resource_existence_optimization {
+            // Without the feature flag we will always load and deserialize the whole resource
+            load_data = true;
+        }
         let existing_entry = self.account_map.entry(*addr).or_default().entry(ty.clone());
 
         let (entry, bytes_loaded) = match existing_entry {
