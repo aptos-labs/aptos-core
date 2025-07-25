@@ -1,11 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checks::error::ValidationError;
-use crate::types::api::MovementAptosRestClient;
+use crate::{checks::error::ValidationError, types::api::MovementAptosRestClient};
 use aptos_rest_client::aptos_api_types::ViewFunction;
-use move_core_types::identifier::Identifier;
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use std::str::FromStr;
 use tracing::debug;
 

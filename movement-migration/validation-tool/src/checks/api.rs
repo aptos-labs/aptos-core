@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::checks::api::active_feature_flags::GlobalFeatureCheck;
-use crate::types::api::MovementAptosRestClient;
+use crate::{
+    checks::api::active_feature_flags::GlobalFeatureCheck, types::api::MovementAptosRestClient,
+};
 use clap::Parser;
 
 mod active_feature_flags;

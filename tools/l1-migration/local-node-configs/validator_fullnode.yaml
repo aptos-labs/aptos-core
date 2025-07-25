@@ -1,0 +1,33 @@
+base:
+  data_dir: /Users/bowu/data/.maptos # update to your path
+  role: full_node
+  waypoint:
+    from_file: /Users/bowu/data/.maptos/mainnet/waypoint.txt # update to your path
+
+execution:
+  genesis_file_location: /Users/bowu/data/.maptos/mainnet/genesis.blob # update to your path
+  genesis_waypoint: 
+    from_file: /Users/bowu/data/.maptos/mainnet/genesis_waypoint.txt
+
+storage:
+  rocksdb_configs:
+    enable_storage_sharding: false
+
+full_node_networks:
+- network_id:
+    private: "vfn"
+  listen_address: "/ip4/0.0.0.0/tcp/6181"
+  seeds:
+    00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
+      addresses:
+      - "/ip4/100.112.207.119/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
+      role: "Validator"
+
+api:
+  enabled: true
+  address: 0.0.0.0:8080  # Different port from validator
+
+state_sync:
+  state_sync_driver:
+    bootstrapping_mode: DownloadLatestStates
+    continuous_syncing_mode: ApplyTransactionOutputs
