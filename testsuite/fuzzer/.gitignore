@@ -2,3 +2,4 @@
 *.crash
 perf.data
 perf.data.old
+test-casr-report/
