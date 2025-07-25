@@ -38,7 +38,9 @@ use move_core_types::{
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
     language_storage::TypeTag,
-    vm_status::{StatusCode, StatusType},
+    vm_status::{
+        sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
+    },
 };
 use move_vm_types::{
     debug_write, debug_writeln,
@@ -332,14 +334,18 @@ where
                         .map(|(_idx, val)| val)
                         .collect::<Vec<_>>();
 
-                    // TODO: Check if the error location is set correctly.
                     gas_meter
                         .charge_drop_frame(non_ref_vals.iter())
-                        .map_err(|e| self.set_location(e))?;
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    if RTTCheck::should_perform_checks() {
+                        self.check_return_tys(&mut current_frame)
+                            .map_err(|e| set_err_info!(current_frame, e))?;
+                    }
 
                     self.access_control
                         .exit_function(&current_frame.function)
-                        .map_err(|e| self.set_location(e))?;
+                        .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
                         self.reentrancy_checker
@@ -348,7 +354,7 @@ where
                                 &current_frame.function,
                                 current_frame.call_type(),
                             )
-                            .map_err(|e| self.set_location(e))?;
+                            .map_err(|e| set_err_info!(current_frame, e))?;
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -680,6 +686,38 @@ where
                 },
             }
         }
+    }
+
+    // Check whether the values on the operand stack have the expected return types.
+    fn check_return_tys(&self, current_frame: &mut Frame) -> PartialVMResult<()> {
+        let expected_ret_tys = current_frame.function.return_tys();
+        if self.call_stack.0.is_empty() && self.operand_stack.types.len() != expected_ret_tys.len()
+        {
+            // This is the outermost call on the stack, the type stack must contain exactly
+            // the expected number of returns.
+            return Err(PartialVMError::new_invariant_violation(
+                "unbalanced stack at end of execution",
+            )
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        if expected_ret_tys.is_empty() {
+            return Ok(());
+        }
+        let given_ret_tys = self.operand_stack.last_n_tys(expected_ret_tys.len())?;
+        for (expected, given) in expected_ret_tys.iter().zip(given_ret_tys) {
+            let ty_args = current_frame.function.ty_args();
+            if ty_args.is_empty() {
+                given.paranoid_check_assignable(expected)?;
+            } else {
+                let expected_inst = self
+                    .vm_config
+                    .ty_builder
+                    .create_ty_with_subst(expected, current_frame.function.ty_args())?;
+                given.paranoid_check_assignable(&expected_inst)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
@@ -1664,6 +1702,15 @@ impl Stack {
         Ok(args)
     }
 
+    fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
+        if self.types.len() < n {
+            return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("Failed to get last n arguments on the argument stack".to_string()));
+        }
+        let len = self.types.len();
+        Ok(&self.types[(len - n)..])
+    }
+
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
         if self.types.len() != self.value.len() {
             return Err(
@@ -2280,7 +2327,14 @@ impl Frame {
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
-
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack_closure(
+                                self.ty_builder(),
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        }
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             module_storage,
@@ -2292,15 +2346,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::closure(Box::new(lazy_function), captured))?;
-
-                        if RTTCheck::should_perform_checks() {
-                            verify_pack_closure(
-                                self.ty_builder(),
-                                &mut interpreter.operand_stack,
-                                &function,
-                                *mask,
-                            )?;
-                        }
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         gas_meter.charge_pack_closure(
