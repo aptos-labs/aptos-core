@@ -351,11 +351,14 @@ impl TransactionDataCache {
         }
     }
 
-    fn find_entry_mut(&mut self, addr: &AccountAddress, ty: &Type) -> Option<&mut DataCacheEntry> {
-        if let Some(account_cache) = self.account_map.get_mut(addr) {
-            account_cache.get_mut(ty)
-        } else {
-            None
+    fn expect_entry_mut(&mut self, addr: &AccountAddress, ty: &Type) -> PartialVMResult<&mut DataCacheEntry> {
+        match self.account_map.get_mut(addr).and_then(|account_cache| account_cache.get_mut(ty)) {
+            Some(entry) => Ok(entry),
+            None => {
+                let msg = format!("Resource entry for {:?} at {} must exist in data cache", ty, addr);
+                let err = PartialVMError::new_invariant_violation(msg);
+                Err(err)
+            }
         }
     }
 
@@ -380,14 +383,7 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&mut GlobalValue> {
-        if let Some(entry) = self.find_entry_mut(addr, ty) {
-            return entry.value.value_mut();
-        }
-
-        let msg = format!("Resource for {:?} at {} must exist", ty, addr);
-        let err =
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg);
-        Err(err)
+        self.expect_entry_mut(addr, ty).and_then(|entry| entry.value.value_mut())
     }
 
     pub(crate) fn get_resource_existence(
@@ -395,12 +391,6 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<bool> {
-        if let Some(entry) = self.find_entry_mut(addr, ty) {
-            return entry.value.exists();
-        }
-
-        let msg = format!("Resource for {:?} at {} must exist", ty, addr);
-        let err = PartialVMError::new_invariant_violation(msg);
-        Err(err)
+        self.expect_entry_mut(addr, ty).and_then(|entry| entry.value.exists())
     }
 }

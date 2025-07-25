@@ -415,31 +415,31 @@ impl TransactionTypeArg {
                 })
             },
             TransactionTypeArg::ExistenceCheck0Pct => {
-                call_custom_module(EntryPoints::ExistenceCheck {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 0.0,
                 })
             },
             TransactionTypeArg::ExistenceCheck20Pct => {
-                call_custom_module(EntryPoints::ExistenceCheck {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 0.2,
                 })
             },
             TransactionTypeArg::ExistenceCheck50Pct => {
-                call_custom_module(EntryPoints::ExistenceCheck {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 0.5,
                 })
             },
             TransactionTypeArg::ExistenceCheck80Pct => {
-                call_custom_module(EntryPoints::ExistenceCheck {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 0.8,
                 })
             },
             TransactionTypeArg::ExistenceCheck100Pct => {
-                call_custom_module(EntryPoints::ExistenceCheck {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 1.0,
                 })
             },
-            TransactionTypeArg::CheckAndModify => call_custom_module(EntryPoints::CheckAndModify),
+            TransactionTypeArg::CheckAndModify => call_custom_module(EntryPoints::CheckExistsAndModify),
         }
     }
 
