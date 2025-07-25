@@ -23,7 +23,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
+    resolver::{ResourceResolver, ResourceSizeInfo},
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
     views::TypeView,
@@ -176,7 +176,7 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         layout: &MoveTypeLayout,
         contains_delayed_fields: bool,
-    ) -> PartialVMResult<(CachedInformation, usize)> {
+    ) -> PartialVMResult<(CachedInformation, u64)> {
         let metadata = module_storage
             .fetch_existing_module_metadata(&struct_tag.address, struct_tag.module.as_ident_str())
             .map_err(|err| err.to_partial())?;
@@ -217,9 +217,9 @@ impl TransactionDataCache {
                 },
                 None => GlobalValue::none(),
             };
-            (CachedInformation::Value(value), bytes_loaded)
+            (CachedInformation::Value(value), bytes_loaded as u64)
         } else {
-            let (size, bytes_loaded) = resource_resolver
+            let ResourceSizeInfo{size, bytes_loaded} = resource_resolver
                 .get_resource_size_with_metadata_and_layout(
                     addr,
                     struct_tag,
