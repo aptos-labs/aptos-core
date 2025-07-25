@@ -69,14 +69,7 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
-        authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
-        block_epilogue::{BlockEpiloguePayload, FeeDistribution},
-        signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
-        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
-        WriteSetPayload,
+        authenticator::{AbstractAuthenticator, AbstractionAuthData, AnySignature, AuthenticationProof, MoveResourceAbstractionAuthData}, block_epilogue::{BlockEpiloguePayload, FeeDistribution}, signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, MultisigTransactionPayload, RawTransactionWithData, ReplayProtector, Script, SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput, WriteSetPayload
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -1610,25 +1603,18 @@ impl AptosVM {
         // Add fee payer.
         let fee_payer_signer = if let Some(fee_payer) = transaction_data.fee_payer {
             Some(match &transaction_data.fee_payer_authentication_proof {
-                Some(AuthenticationProof::Abstraction {
-                    function_info,
-                    auth_data,
-                }) => {
-                    let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
-                            self.features().is_account_abstraction_enabled()
-                        },
-                        AbstractionAuthData::DerivableV1 { .. } => {
-                            self.features().is_derivable_account_abstraction_enabled()
-                        },
-                    };
-                    if enabled {
+                // Does fee payer account address need to be verified somewhere?
+
+                AuthenticationProof::Abstraction(abstract_authenticator) => {
+                    let pair = self.extract_abstract_authenticator_args(transaction, abstract_authenticator)?;
+
+                    if let Some((function_info, move_auth_data)) = pair {
                         dispatchable_authenticate(
                             session,
                             gas_meter,
                             fee_payer,
-                            function_info.clone(),
-                            auth_data,
+                            function_info,
+                            &move_auth_data,
                             traversal_context,
                             module_storage,
                         )
@@ -1650,25 +1636,16 @@ impl AptosVM {
         };
         let sender_signers = itertools::zip_eq(senders, proofs)
             .map(|(sender, proof)| match proof {
-                AuthenticationProof::Abstraction {
-                    function_info,
-                    auth_data,
-                } => {
-                    let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
-                            self.features().is_account_abstraction_enabled()
-                        },
-                        AbstractionAuthData::DerivableV1 { .. } => {
-                            self.features().is_derivable_account_abstraction_enabled()
-                        },
-                    };
-                    if enabled {
+                AuthenticationProof::Abstraction(abstract_authenticator) => {
+                    let pair = self.extract_abstract_authenticator_args(transaction, abstract_authenticator)?;
+
+                    if let Some((function_info, move_auth_data)) = pair {
                         dispatchable_authenticate(
                             session,
                             gas_meter,
                             sender,
-                            function_info.clone(),
-                            auth_data,
+                            function_info,
+                            &move_auth_data,
                             traversal_context,
                             module_storage,
                         )
@@ -1729,6 +1706,50 @@ impl AptosVM {
             traversal_context,
         )?;
         Ok(serialized_signers)
+    }
+
+    fn extract_abstract_authenticator_args(&self, transaction: &SignedTransaction, abstract_authenticator: &AbstractAuthenticator) -> Result<Option<(FunctionInfo, MoveResourceAbstractionAuthData)>, VMStatus> {
+        let enabled = match abstract_authenticator {
+            AbstractAuthenticator::V1 { .. } => {
+                self.features().is_account_abstraction_enabled()
+            },
+            AbstractAuthenticator::DerivableV1 { .. } => {
+                self.features().is_derivable_account_abstraction_enabled()
+            },
+        };
+        let pair = if enabled {
+            let function_info = match abstract_authenticator {
+                AbstractAuthenticator::V1 { authentication_function, .. } => {
+                    authentication_function
+                },
+                AbstractAuthenticator::DerivableV1 { authentication_function, .. } => {
+                    authentication_function
+                },
+            };
+
+            let message = RawTransactionWithData::new_abstract_authenticator(transaction.raw_transaction_ref().clone(), function_info);
+            let signing_message_digest = HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
+
+            let move_auth_data = match abstract_authenticator {
+                AbstractAuthenticator::V1 { authentication_function: _, authenticator } => {
+                    MoveResourceAbstractionAuthData::V1 {
+                        signing_message_digest,
+                        authenticator,
+                    }
+                },
+                AbstractAuthenticator::DerivableV1 { authentication_function: _, abstract_signature, abstract_public_key } => {
+                    MoveResourceAbstractionAuthData::DerivableV1 {
+                        signing_message_digest,
+                        abstract_signature,
+                        abstract_public_key,
+                    }
+                },
+            };
+            Option::Some((function_info.clone(), move_auth_data))
+        } else {
+            Option::None
+        };
+        Ok(pair)
     }
 
     // Called when the execution of the user transaction fails, in order to discard the
@@ -3044,7 +3065,7 @@ fn dispatchable_authenticate(
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     function_info: FunctionInfo,
-    auth_data: &AbstractionAuthData,
+    auth_data: &MoveResourceAbstractionAuthData,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<u8>> {
