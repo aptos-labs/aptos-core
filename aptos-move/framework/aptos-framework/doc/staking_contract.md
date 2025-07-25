@@ -65,6 +65,7 @@ pool.
 -  [Function `commission_percentage`](#0x1_staking_contract_commission_percentage)
 -  [Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
 -  [Function `pending_distribution_counts`](#0x1_staking_contract_pending_distribution_counts)
+-  [Function `pending_distribution_amount`](#0x1_staking_contract_pending_distribution_amount)
 -  [Function `staking_contract_exists`](#0x1_staking_contract_staking_contract_exists)
 -  [Function `beneficiary_for_operator`](#0x1_staking_contract_beneficiary_for_operator)
 -  [Function `get_expected_stake_pool_address`](#0x1_staking_contract_get_expected_stake_pool_address)
@@ -99,6 +100,7 @@ pool.
     -  [Function `commission_percentage`](#@Specification_1_commission_percentage)
     -  [Function `staking_contract_amounts`](#@Specification_1_staking_contract_amounts)
     -  [Function `pending_distribution_counts`](#@Specification_1_pending_distribution_counts)
+    -  [Function `pending_distribution_amount`](#@Specification_1_pending_distribution_amount)
     -  [Function `staking_contract_exists`](#@Specification_1_staking_contract_exists)
     -  [Function `beneficiary_for_operator`](#@Specification_1_beneficiary_for_operator)
     -  [Function `get_expected_stake_pool_address`](#@Specification_1_get_expected_stake_pool_address)
@@ -1601,6 +1603,46 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
+<a id="0x1_staking_contract_pending_distribution_amount"></a>
+
+## Function `pending_distribution_amount`
+
+Return the pending distribution for a shareholder (e.g. commission, withdrawals from stakers).
+
+If the operator is given, this will return the pending commission amount for the operator.
+
+This errors out the staking contract with the provided staker and operator doesn't exist.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_amount">pending_distribution_amount</a>(staker: <b>address</b>, operator: <b>address</b>, shareholder: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_amount">pending_distribution_amount</a>(staker: <b>address</b>, operator: <b>address</b>, shareholder: <b>address</b>): u64 <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+    <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
+    <b>let</b> distribution_pool = &staking_contracts.borrow(&operator).distribution_pool;
+
+    // Return 0 <b>if</b> the shareholder is not in the distribution pool.
+    <b>if</b> (distribution_pool.contains(shareholder)) {
+        <b>let</b> shares = distribution_pool.shares(shareholder);
+        distribution_pool.shares_to_amount(shares)
+    } <b>else</b> {
+        0
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_staking_contract_staking_contract_exists"></a>
 
 ## Function `staking_contract_exists`
@@ -3008,6 +3050,35 @@ Staking_contract exists the stacker/operator pair.
 <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
 <b>let</b> shareholders_count = len(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.distribution_pool.shareholders);
 <b>ensures</b> result == shareholders_count;
+</code></pre>
+
+
+
+<a id="@Specification_1_pending_distribution_amount"></a>
+
+### Function `pending_distribution_amount`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_amount">pending_distribution_amount</a>(staker: <b>address</b>, operator: <b>address</b>, shareholder: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>;
+<b>let</b> staking_contracts = <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
+<b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
+<b>let</b> distribution_pool = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.distribution_pool;
+<b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares">pool_u64::spec_shares</a>(distribution_pool, shareholder);
+<b>aborts_if</b> distribution_pool.total_coins &gt; 0 && distribution_pool.total_shares &gt; 0
+    && (shares * distribution_pool.total_coins) / distribution_pool.total_shares &gt; MAX_U64;
+<b>let</b> val = <b>if</b> (<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_contains">pool_u64::spec_contains</a>(distribution_pool, shareholder)) {
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">pool_u64::spec_shares_to_amount_with_total_coins</a>(distribution_pool, shares, distribution_pool.total_coins)
+} <b>else</b> {
+    0
+};
+<b>ensures</b> result == val;
 </code></pre>
 
 
