@@ -89,7 +89,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_RUNNER_DURATION_SECS: 1800
       FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
       SEND_RESULTS_TO_TRUNK: true
