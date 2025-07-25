@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use aptos_crypto::x25519;
+use anyhow::Result;
 use clap::Parser;
 use l1_migration::extract_genesis_and_waypoint;
 use std::path::PathBuf;

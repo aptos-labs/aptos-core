@@ -13,6 +13,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
+    ledger_info::get_waypoint_version,
     on_chain_config::{
         ConfigurationResource, OnChainConfig, OnChainConfigPayload, OnChainConfigProvider,
     },
@@ -283,11 +284,25 @@ impl EventSubscriptionService {
         &self,
         version: Version,
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
-        let db_state_view = &self
-            .storage
-            .read()
-            .reader
-            .state_view_at_version(Some(version))
+        // Check if the requested version is below the minimum available version (waypoint)
+        let reader = self.storage.read().reader.clone();
+        let min_available_version = reader
+            .get_first_txn_version()
+            .map_err(|e| {
+                Error::UnexpectedErrorEncountered(format!(
+                    "Failed to get first transaction version: {:?}",
+                    e
+                ))
+            })?
+            .unwrap_or(0);
+        let effective_version = if version < min_available_version {
+            min_available_version
+        } else {
+            version
+        };
+
+        let db_state_view = &reader
+            .state_view_at_version(Some(effective_version))
             .map_err(|error| {
                 Error::UnexpectedErrorEncountered(format!(
                     "Failed to create account state view {:?}",
@@ -295,29 +310,25 @@ impl EventSubscriptionService {
                 ))
             })?;
 
-        let mut epoch = ConfigurationResource::fetch_config(&db_state_view)
+        let mut epoch = ConfigurationResource::fetch_config(db_state_view)
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
             })?
             .epoch();
 
-        let db_epoch_state = self
-            .storage
-            .read()
-            .reader
-            .get_latest_epoch_state()
-            .map_err(|_e| {
-                Error::UnexpectedErrorEncountered("Cannot read epoch state from DB".into())
-            })?;
+        let db_epoch_state = reader.get_latest_epoch_state().map_err(|_e| {
+            Error::UnexpectedErrorEncountered("Cannot read epoch state from DB".into())
+        })?;
         // TODO(l1-migration): update once config fixed
         if epoch < db_epoch_state.epoch {
             epoch = db_epoch_state.epoch;
         }
 
         // Return the new on-chain config payload (containing all found configs at this version).
+        // Use the effective version for the DbBackedOnChainConfig
         Ok(OnChainConfigPayload::new(
             epoch,
-            DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version),
+            DbBackedOnChainConfig::new(reader, effective_version),
         ))
     }
 }
@@ -404,7 +415,11 @@ pub struct DbBackedOnChainConfig {
 }
 
 impl DbBackedOnChainConfig {
-    pub fn new(reader: Arc<dyn DbReader>, version: Version) -> Self {
+    pub fn new(reader: Arc<dyn DbReader>, mut version: Version) -> Self {
+        let waypoint_version = get_waypoint_version().expect("Waypoint version is missing");
+        if version < waypoint_version {
+            version = waypoint_version as Version;
+        }
         Self { reader, version }
     }
 }

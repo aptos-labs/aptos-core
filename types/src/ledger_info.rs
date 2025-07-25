@@ -28,9 +28,22 @@ use std::{
     ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, OnceLock,
     },
 };
+
+/// Global waypoint version storage for bypassing verification of historical data
+static WAYPOINT_VERSION: OnceLock<Version> = OnceLock::new();
+
+/// Initialize the waypoint version (should be called once during node startup)
+pub fn set_waypoint_version(version: Version) {
+    let _ = WAYPOINT_VERSION.set(version);
+}
+
+/// Get the waypoint version if it has been set
+pub fn get_waypoint_version() -> Option<Version> {
+    WAYPOINT_VERSION.get().copied()
+}
 
 /// This structure serves a dual purpose.
 ///
@@ -305,6 +318,13 @@ impl LedgerInfoWithV0 {
         &self,
         validator: &ValidatorVerifier,
     ) -> ::std::result::Result<(), VerifyError> {
+        // Check if this LedgerInfo is before the waypoint version
+        if let Some(waypoint_version) = get_waypoint_version() {
+            if self.ledger_info().version() <= waypoint_version {
+                return Ok(());
+            }
+        }
+
         validator.verify_multi_signatures(self.ledger_info(), &self.signatures)
     }
 

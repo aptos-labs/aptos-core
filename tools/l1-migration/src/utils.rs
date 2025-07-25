@@ -1,21 +1,9 @@
 use anyhow::Result;
-use aptos_config::config::{
-    Peer, PeerRole, PeerSet, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
-};
-use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
-use aptos_types::{
-    account_address::from_identity_public_key, network_address::NetworkAddress,
-    transaction::Transaction, waypoint::Waypoint, PeerId,
-};
-use serde_yaml;
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    path::Path,
-    str::FromStr,
-};
+use aptos_types::{transaction::Transaction, waypoint::Waypoint};
+use std::{fs, path::Path};
 
 /// Extract genesis transaction and waypoint from an Aptos database
 pub fn extract_genesis_and_waypoint(db_path: &str, output_dir: &str) -> Result<()> {
@@ -51,11 +39,15 @@ pub fn extract_genesis_and_waypoint(db_path: &str, output_dir: &str) -> Result<(
     // Extract genesis transaction
     extract_genesis_transaction(&db, latest_ver, output_dir)?;
 
+    // Extract genesis waypoint
+    extract_genesis_waypoint(&db, latest_ver, output_dir)?;
+
     // Extract waypoint
     extract_waypoint(&db, output_dir)?;
 
     println!("✓ Genesis extraction completed successfully!");
     println!("  - genesis.blob: Contains the BCS-serialized genesis transaction");
+    println!("  - genesis_waypoint.txt: Contains the genesis waypoint for bootstrapping");
     println!("  - waypoint.txt: Contains the initial waypoint for bootstrapping");
 
     Ok(())
@@ -78,6 +70,30 @@ fn extract_genesis_transaction(db: &AptosDB, latest_ver: u64, output_dir: &str) 
 
     // Print information about the genesis transaction
     print_genesis_transaction_info(&genesis_transaction);
+
+    Ok(())
+}
+
+/// Extract the genesis waypoint from the database at version 0
+fn extract_genesis_waypoint(db: &AptosDB, _latest_ver: u64, output_dir: &str) -> Result<()> {
+    println!("Extracting genesis waypoint (version 0)...");
+
+    // Get the epoch ending ledger info for version 0 (genesis)
+    // This should always exist for a properly initialized database
+    let genesis_ledger_info_with_sigs = db
+        .get_epoch_ending_ledger_info(0)
+        .expect("genesis waypoint should exist");
+
+    let genesis_ledger_info = genesis_ledger_info_with_sigs.ledger_info();
+
+    // Generate genesis waypoint using the genesis ledger info
+    let genesis_waypoint = Waypoint::new_any(genesis_ledger_info);
+
+    // Write genesis_waypoint.txt
+    let genesis_waypoint_path = format!("{}/genesis_waypoint.txt", output_dir);
+    fs::write(&genesis_waypoint_path, genesis_waypoint.to_string())?;
+    println!("Genesis waypoint written to: {}", genesis_waypoint_path);
+    println!("Genesis waypoint: {}", genesis_waypoint);
 
     Ok(())
 }
