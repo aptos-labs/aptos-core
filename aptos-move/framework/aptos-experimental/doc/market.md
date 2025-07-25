@@ -2237,6 +2237,8 @@ Remaining size of the order in the order book.
 
 ## Function `set_order_metadata`
 
+Returns the order metadata for an order by order id.
+It is up to the caller to perform necessary permissions checks
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata">set_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, metadata: M)
@@ -2293,6 +2295,8 @@ Remaining size of the order in the order book.
 
 ## Function `set_order_metadata_by_client_id`
 
+Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
+around ownership of the order.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M)

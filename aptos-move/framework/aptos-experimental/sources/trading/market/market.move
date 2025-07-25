@@ -1116,6 +1116,8 @@ module aptos_experimental::market {
         self.order_book.get_order_metadata(order_id)
     }
 
+    /// Returns the order metadata for an order by order id.
+    /// It is up to the caller to perform necessary permissions checks
     public fun set_order_metadata<M: store + copy + drop>(
         self: &mut Market<M>, order_id: OrderIdType, metadata: M
     ) {
@@ -1132,6 +1134,8 @@ module aptos_experimental::market {
         return self.get_order_metadata(order_id.destroy_some())
     }
 
+    /// Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
+    /// around ownership of the order.
     public fun set_order_metadata_by_client_id<M: store + copy + drop>(
         self: &mut Market<M>, user: address, client_order_id: u64, metadata: M
     ) {
