@@ -1120,6 +1120,7 @@ where
                 traversal_context,
                 &addr,
                 ty,
+                // This value will be overridden if lightweight resource existence feature is disabled
                 false,
             )?;
         }
