@@ -10,28 +10,26 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
-use once_cell::sync::Lazy;
-use std::{fmt, sync::Mutex};
+use once_cell::sync::{Lazy, OnceCell};
+use std::fmt;
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
 
-static STABLE_TEST_DISPLAY: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static STABLE_TEST_DISPLAY: OnceCell<bool> = OnceCell::new();
 
 /// Call this function if display of errors should be stable for baseline tests.
 /// Specifically, no stack traces should be generated, as they contain transitive
 /// file locations.
 pub fn set_stable_test_display() {
-    if let Ok(mut b) = STABLE_TEST_DISPLAY.lock() {
-        *b = true
-    }
+    STABLE_TEST_DISPLAY.set(true).unwrap_or(())
 }
 
 /// Check whether stable test display is enabled. This can be used by other components
 /// to adjust their output.
 pub fn is_stable_test_display() -> bool {
-    STABLE_TEST_DISPLAY.lock().map(|m| *m).unwrap_or(false)
+    STABLE_TEST_DISPLAY.get().copied().unwrap_or(false)
 }
 
 /// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.

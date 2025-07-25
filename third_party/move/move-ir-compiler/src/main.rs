@@ -10,7 +10,10 @@ use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript},
 };
-use move_bytecode_verifier::{dependencies, verify_module, verify_script, VerifierConfig};
+use move_bytecode_verifier::{
+    dependencies, verify_module, verify_module_with_config, verify_script_with_config,
+    VerifierConfig,
+};
 use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_IR_EXTENSION, SOURCE_MAP_EXTENSION,
 };
@@ -52,17 +55,17 @@ fn print_error_and_exit(verification_error: &VMError) -> ! {
 }
 
 fn do_verify_module(module: &CompiledModule, dependencies: &[CompiledModule]) {
-    verify_module(module).unwrap_or_else(|err| print_error_and_exit(&err));
-    if let Err(err) = dependencies::verify_module(&VerifierConfig::default(), module, dependencies)
-    {
+    let config = VerifierConfig::default();
+    verify_module_with_config(&config, module).unwrap_or_else(|err| print_error_and_exit(&err));
+    if let Err(err) = dependencies::verify_module(&config, module, dependencies) {
         print_error_and_exit(&err);
     }
 }
 
 fn do_verify_script(script: &CompiledScript, dependencies: &[CompiledModule]) {
-    verify_script(script).unwrap_or_else(|err| print_error_and_exit(&err));
-    if let Err(err) = dependencies::verify_script(&VerifierConfig::default(), script, dependencies)
-    {
+    let config = VerifierConfig::default();
+    verify_script_with_config(&config, script).unwrap_or_else(|err| print_error_and_exit(&err));
+    if let Err(err) = dependencies::verify_script(&config, script, dependencies) {
         print_error_and_exit(&err);
     }
 }
