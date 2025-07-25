@@ -117,6 +117,21 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] Function `m::test1` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:12:5
+   │
+12 │ ╭     public fun test1(x: u64) {
+13 │ │         if (foo(x) == true) { bar() };
+14 │ │         if (foo(x) == false) { bar() };
+15 │ │         if (foo(x) != true) { bar() };
+   · │
+25 │ │         let _z = foo(x) == TRUE;
+26 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:29:13
    │

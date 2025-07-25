@@ -6,6 +6,7 @@
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod cyclomatic_complexity;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -34,6 +35,7 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
+        Box::<cyclomatic_complexity::CyclomaticComplexity>::default(),
         Box::<while_true::WhileTrue>::default(),
     ]
 }
