@@ -53,8 +53,14 @@ pub trait BatchThresholdEncryption {
     /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
     /// the secret key according to the [`ThresholdConfig`] given as input. Eventually, this will
     /// need to be replaced by a DKG.
-    fn setup<R: RngCore + CryptoRng>(rng: &mut R, max_batch_size: usize, number_of_rounds: usize, tc: &ThresholdConfig) 
-        -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)>;
+    fn setup_for_testing(
+        seed: u64, 
+        max_batch_size: usize, 
+        number_of_rounds: usize, 
+        tc_happypath: &ThresholdConfig, 
+        tc_slowpath: &ThresholdConfig
+    ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)>;
+
 
     /// Encrypt a plaintext with respect to a specific round number.
     fn encrypt<R: CryptoRng + RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext) 

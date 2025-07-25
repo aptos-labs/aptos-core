@@ -710,6 +710,7 @@ dependencies = [
  "itertools 0.14.0",
  "lazy_static",
  "num-traits",
+ "rand 0.7.3",
  "rand_core 0.6.4",
  "rayon",
  "serde",

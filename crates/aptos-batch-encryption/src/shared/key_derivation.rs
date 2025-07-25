@@ -64,12 +64,11 @@ impl VerificationKey for BIBEVerificationKey {
     }
 }
 
-pub fn keygen<R: RngCore + CryptoRng>(
+pub fn gen_msk_shares<R: RngCore + CryptoRng>(
+    msk: Fr,
     rng: &mut R,
     threshold_config: &ThresholdConfig,
     ) -> (BIBEMasterPublicKey, Vec<BIBEVerificationKey>, Vec<BIBEMasterSecretKeyShare>) {
-
-    let msk = Fr::rand(rng);
 
     let mpk = BIBEMasterPublicKey((G2Affine::generator() * msk).into());
 
@@ -198,18 +197,21 @@ impl BIBEDecryptionKey {
 
 #[cfg(test)]
 mod tests {
+    use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};
 
     use crate::shared::{algebra::shamir::ThresholdConfig, digest::{Digest, DigestKey}};
+    use crate::group::Fr;
 
-    use super::{keygen, BIBEDecryptionKey, BIBEDecryptionKeyShare};
+    use super::{gen_msk_shares, BIBEDecryptionKey, BIBEDecryptionKeyShare};
 
     #[test]
     fn test_reconstruct_verify() {
         let mut rng = thread_rng();
         let n = 8; let t = 6;
         let tc = ThresholdConfig::new(n, t);
-        let (mpk, vks, msk_shares) = keygen(&mut rng, &tc);
+        let msk = Fr::rand(&mut rng);
+        let (mpk, vks, msk_shares) = gen_msk_shares(msk, &mut rng, &tc);
         let digest = Digest::new_for_testing(&mut rng);
 
         let mut dk_shares = vec![];
