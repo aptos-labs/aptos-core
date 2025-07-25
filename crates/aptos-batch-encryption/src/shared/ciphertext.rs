@@ -86,7 +86,7 @@ pub trait CTDecrypt<I: Id, P: Plaintext> {
     fn decrypt(
         &self,
         ct: &Ciphertext<I>,
-        eval_proofs: &EvalProofs<I::Set>,
+        eval_proofs: &EvalProofs<I::OssifiedSet>,
         ) -> Result<P>;
 }
 
@@ -189,7 +189,7 @@ impl<I: Id, P: Plaintext> CTDecrypt<I, P> for BIBEDecryptionKey {
     fn decrypt(
         &self,
         ct: &Ciphertext<I>,
-        eval_proofs: &EvalProofs<<I as Id>::Set>,
+        eval_proofs: &EvalProofs<<I as Id>::OssifiedSet>,
         ) -> Result<P> {
 
         let pf = eval_proofs
@@ -203,7 +203,7 @@ impl<I: Id, P: Plaintext> CTDecrypt<I, P> for BIBEDecryptionKey {
 #[cfg(test)]
 pub mod tests {
     use crate::{schemes::fptx::{self, EncryptionKey, FPTX}, shared::{algebra::shamir::ThresholdConfig, ciphertext::{CTDecrypt, CTEncrypt, Ciphertext}, digest::DigestKey, ids::{FreeRootId, FreeRootIdSet, IdSet as _}, key_derivation::BIBEDecryptionKey}, traits::{BatchThresholdEncryption as _, Plaintext}};
-    use ark_std::{rand::thread_rng, One, Zero};
+    use ark_std::{rand::{thread_rng, Rng}, One, Zero};
     use crate::group::*;
 
     use super::{BIBECTDecrypt, BIBECTEncrypt};
@@ -212,7 +212,7 @@ pub mod tests {
     fn test_bibe_ct_encrypt_decrypt() {
         let mut rng = thread_rng();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, 8, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), 8, 1, &tc, &tc).unwrap();
 
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
@@ -243,7 +243,7 @@ pub mod tests {
     fn test_ct_encrypt_decrypt() {
         let mut rng = thread_rng();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, 8, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), 8, 1, &tc, &tc).unwrap();
 
         let plaintext = String::from("hi");
         let ct : Ciphertext<FreeRootId> = ek.encrypt(&mut rng, &plaintext).unwrap();

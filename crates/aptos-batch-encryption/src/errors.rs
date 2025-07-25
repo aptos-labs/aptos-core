@@ -20,6 +20,8 @@ pub enum BatchEncryptionError {
     DecryptionKeyShareVerifyError,
     #[error("Tried to decrypt a ciphertext whose eval proof wasn't yet computed")]
     UncomputedEvalProofError,
+    #[error("Tried to compute eval proofs for an id set whose coefficients weren't computed yet")]
+    EvalProofsWithUncomputedCoefficients,
     #[error("Hash2Curve failed: couldn't find a quadratic residue")]
     Hash2CurveFailure,
 }

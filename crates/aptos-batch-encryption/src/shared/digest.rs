@@ -11,7 +11,7 @@ use num_traits::{Zero, One};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_ff::{Field as _, PrimeField as _};
 use serde::{Deserialize, Serialize};
-use super::ids::{Id, IdSet};
+use super::ids::{Id, IdSet, OssifiedIdSet};
 use anyhow::{Result, anyhow};
 use crate::shared::ark_serialize::*;
 
@@ -98,7 +98,7 @@ impl DigestKey {
     }
 
     
-    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: usize) -> Result<(Digest, EvalProofs<IS>)> {
+    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: usize) -> Result<(Digest, EvalProofs<IS::OssifiedSet>)> {
         if round >= self.tau_powers_g1.len() {
             Err(anyhow!("Tried to compute digest with round greater than setup length."))
         } else if ids.capacity() > self.tau_powers_g1[round].len() - 1 {
@@ -108,7 +108,7 @@ impl DigestKey {
             ))?
         } else {
 
-            ids.compute_poly_coeffs();
+            let ids = ids.compute_poly_coeffs();
             let mut coeffs = ids.poly_coeffs();
             coeffs.resize(self.tau_powers_g1[round].len(), Fr::zero());
 
@@ -124,19 +124,19 @@ impl DigestKey {
 
 
 #[derive(Clone)]
-pub struct EvalProofs<'a, IS: IdSet> {
+pub struct EvalProofs<'a, IS: OssifiedIdSet> {
     pub digest_key: &'a DigestKey,
     pub digest: Digest,
     pub ids: IS,
     pub computed_proofs: HashMap<IS::Id, G1Affine>,
 }
 
-impl<'a, IS: IdSet> EvalProofs<'a, IS> {
-    pub fn new(digest_key: &'a DigestKey, digest: Digest, ids: &IS) -> Self {
+impl<'a, IS: OssifiedIdSet> EvalProofs<'a, IS> {
+    pub fn new(digest_key: &'a DigestKey, digest: Digest, ids: IS) -> Self {
         Self {
             digest_key,
             digest,
-            ids: ids.clone(),
+            ids,
             computed_proofs: HashMap::new(),
         }
     }
@@ -169,8 +169,8 @@ impl<'a, IS: IdSet> EvalProofs<'a, IS> {
     }
 
     pub fn uncomputed_ids(&self) -> Vec<IS::Id> {
-        let ids : HashSet<<IS as IdSet>::Id> = HashSet::from_iter(self.ids.as_vec().into_iter());
-        let computed_ids : HashSet<<IS as IdSet>::Id> = HashSet::from_iter(self.computed_proofs.keys().cloned());
+        let ids : HashSet<<IS as OssifiedIdSet>::Id> = HashSet::from_iter(self.ids.as_vec().into_iter());
+        let computed_ids : HashSet<<IS as OssifiedIdSet>::Id> = HashSet::from_iter(self.computed_proofs.keys().cloned());
 
         ids.difference(&computed_ids).cloned().collect()
     }
@@ -201,11 +201,12 @@ pub(crate) mod tests {
     use ark_std::rand::thread_rng;
     use itertools::Itertools;
     use super::*;
+    use crate::shared::ids::free_roots::ComputedCoeffs;
     use crate::shared::ids::{FFTDomainIdSet, FreeRootId, FreeRootIdSet};
 
 
     pub(crate) fn digest_and_pfs_for_testing<'a>(dk: &'a DigestKey) 
-        -> (Digest, EvalProofs<'a, FreeRootIdSet>)
+        -> (Digest, EvalProofs<'a, FreeRootIdSet<ComputedCoeffs>>)
     {
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();

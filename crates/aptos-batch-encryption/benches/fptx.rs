@@ -6,6 +6,7 @@ use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
 use aptos_batch_encryption::shared::ids::*;
 use aptos_batch_encryption::shared::key_derivation::BIBEDecryptionKeyShare;
 use aptos_batch_encryption::traits::{BatchThresholdEncryption, DecryptionKeyShare, Plaintext};
+use ark_std::rand::Rng as _;
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use ark_std::{rand::thread_rng, UniformRand, Zero, One};
 use rayon::ThreadPoolBuilder;
@@ -20,7 +21,7 @@ pub fn digest(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -43,7 +44,7 @@ pub fn verify_ct(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -65,7 +66,7 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -92,7 +93,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);
-        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -119,7 +120,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, vks, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, vks, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -151,7 +152,7 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);
-        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 
@@ -184,7 +185,7 @@ pub fn decrypt(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares) = FPTX::setup(&mut rng, batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg : String = String::from("hi");
 

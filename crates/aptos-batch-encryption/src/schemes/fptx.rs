@@ -1,7 +1,9 @@
 use std::marker::PhantomData;
 use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
+use ark_std::rand::rngs::StdRng;
 use ed25519_dalek::SIGNATURE_LENGTH;
+use rand_core::OsRng;
 use rand_core::{CryptoRng, RngCore};
 use anyhow::Result;
 use anyhow::anyhow;
@@ -15,9 +17,13 @@ use crate::shared::ciphertext::CTDecrypt;
 use crate::shared::ciphertext::CTEncrypt;
 use crate::shared::ciphertext::{BIBEEncryptionKey, Ciphertext};
 use crate::shared::digest::{Digest, EvalProofs};
+use crate::shared::ids::free_roots::ComputedCoeffs;
+use crate::shared::ids::free_roots::UncomputedCoeffs;
 use crate::shared::ids::{FreeRootId, FreeRootIdSet};
 use crate::shared::key_derivation::{self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare, BIBEVerificationKey};
 use crate::{group::*, shared::{digest::DigestKey, ids::{Id, IdSet}}, traits::{BatchThresholdEncryption, Plaintext}};
+use rand_core::SeedableRng;
+
 
 pub struct FPTX {
 }
@@ -72,7 +78,7 @@ impl BatchThresholdEncryption for FPTX {
 
     type Digest = Digest;
 
-    type EvalProofs<'a> = EvalProofs<'a, FreeRootIdSet>;
+    type EvalProofs<'a> = EvalProofs<'a, FreeRootIdSet<ComputedCoeffs>>;
 
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
 
@@ -84,13 +90,22 @@ impl BatchThresholdEncryption for FPTX {
 
     type VerificationKey = BIBEVerificationKey;
 
-    fn setup<R: RngCore + CryptoRng>(rng: &mut R, max_batch_size: usize, number_of_rounds: usize, tc: &ThresholdConfig)
-        -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)> {
+    fn setup_for_testing(
+        seed: u64,
+        max_batch_size: usize, 
+        number_of_rounds: usize,
+        tc_happypath: &ThresholdConfig,
+        tc_slowpath: &ThresholdConfig
+    ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)> 
+    {
+        let mut rng = <StdRng as SeedableRng>::seed_from_u64(2);
 
-        let digest_key = DigestKey::new(rng, max_batch_size, number_of_rounds)
+        let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
-        let (mpk, vks, msk_shares) = key_derivation::keygen(rng, tc);
-        
+        let msk = Fr::rand(&mut rng);
+        let (mpk, vks_happypath, msk_shares_happypath) = key_derivation::gen_msk_shares(msk, &mut rng, tc_happypath);
+        let (_, vks_slowpath, msk_shares_slowpath) = key_derivation::gen_msk_shares(msk, &mut rng, tc_slowpath);
+
 
         let ek = EncryptionKey {
             sig_mpk_g2: mpk.0,
@@ -98,20 +113,20 @@ impl BatchThresholdEncryption for FPTX {
             id_set_capacity: max_batch_size,
         };
 
-        Ok((ek, digest_key, vks, msk_shares))
+        Ok((ek, digest_key, vks_happypath, msk_shares_happypath, vks_slowpath, msk_shares_slowpath))
     }
 
     fn encrypt<R: rand_core::CryptoRng + rand_core::RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext) 
-        -> anyhow::Result<Self::Ciphertext> {
+    -> anyhow::Result<Self::Ciphertext> {
         ek.encrypt(rng, msg)
     }
 
     fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
-        -> anyhow::Result<(Self::Digest, Self::EvalProofs<'a>)> 
+    -> anyhow::Result<(Self::Digest, Self::EvalProofs<'a>)> 
     {
-        let mut ids : FreeRootIdSet 
-            = FreeRootIdSet::from_slice(
-                &cts
+        let mut ids : FreeRootIdSet<UncomputedCoeffs>
+        = FreeRootIdSet::from_slice(
+            &cts
                 .into_iter()
                 .map(|ct| ct.id())
                 .collect::<Vec<FreeRootId>>())
@@ -137,7 +152,7 @@ impl BatchThresholdEncryption for FPTX {
     fn derive_decryption_key_share(
         msk_share: &Self::MasterSecretKeyShare, 
         digest: &Self::Digest, 
-        ) -> Result<Self::DecryptionKeyShare> {
+    ) -> Result<Self::DecryptionKeyShare> {
         msk_share.derive_decryption_key_share(digest)
     }
 
@@ -152,16 +167,17 @@ impl BatchThresholdEncryption for FPTX {
         cts: &[Self::Ciphertext], 
         proofs: &Self::EvalProofs<'a>, 
         pool: &rayon::ThreadPool
-        ) -> anyhow::Result<Vec<P>> {
+    ) -> anyhow::Result<Vec<P>> 
+    {
         pool.install(|| 
             cts.into_par_iter()
-            .map(|ct| 
-                {
-                    let plaintext: Result<P> = decryption_key.decrypt(ct, proofs);
-                    plaintext
-                }
-            )
-            .collect::<anyhow::Result<Vec<P>>>()
+                .map(|ct| 
+                    {
+                        let plaintext: Result<P> = decryption_key.decrypt(ct, proofs);
+                        plaintext
+                    }
+                )
+                .collect::<anyhow::Result<Vec<P>>>()
         )
     }
 

@@ -2,6 +2,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use crate::group::{Fr, G1Affine};
 use ed25519_dalek::VerifyingKey;
+use anyhow::Result;
 
 pub mod fft_domain;
 pub mod free_roots;
@@ -12,6 +13,7 @@ pub use free_roots::{FreeRootIdSet, FreeRootId};
 
 pub trait Id : Send + Sync + Eq + PartialEq + Clone + Copy + Hash {
     type Set : IdSet<Id = Self>;
+    type OssifiedSet : OssifiedIdSet<Id = Self>;
 
     fn x(&self) -> Fr;
     fn y(&self) -> Fr;
@@ -22,6 +24,7 @@ pub trait Id : Send + Sync + Eq + PartialEq + Clone + Copy + Hash {
 /// A set of IDs that can be committed to as a KZG polynomial commitment.
 pub trait IdSet : Clone + Send + Sync {
     type Id : Id<Set = Self>;
+    type OssifiedSet : OssifiedIdSet<Id = Self::Id>;
     fn with_capacity(capacity: usize) -> Option<Self>;
     /// Maximum number of IDs which can be added to this set. Each set is initialized with such
     /// a capacity that should mirror the KZG setup size.
@@ -37,7 +40,15 @@ pub trait IdSet : Clone + Send + Sync {
         }
         Some(result)
     }
-    fn compute_poly_coeffs(&mut self);
+    fn compute_poly_coeffs(&self) -> Self::OssifiedSet;
+
+
+    fn as_vec(&self) -> Vec<Self::Id>;
+} 
+
+pub trait OssifiedIdSet {
+    type Id : Id<OssifiedSet = Self>;
+    fn as_vec(&self) -> Vec<Self::Id>;
     /// The coefficients of the polynomial to be committed to which encodes this set. Must call
     /// [`IdSet::compute_poly_coeffs`] before calling this.
     fn poly_coeffs(&self) -> Vec<Fr>;
@@ -51,8 +62,4 @@ pub trait IdSet : Clone + Send + Sync {
     // multiple proofs, and 3) all proofs. Also think about how to make FK work well for
     // not-all-proofs.
     // Finally, think about changing to new variant w/ randomized setups. DONE
-
-
-    fn as_vec(&self) -> Vec<Self::Id>;
-} 
-
+}
