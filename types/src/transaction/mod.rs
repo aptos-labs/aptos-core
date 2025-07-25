@@ -17,7 +17,7 @@ use crate::{
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
-    write_set::WriteSet,
+    write_set::{HotStateOp, WriteSet},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -36,6 +36,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
+    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
@@ -1464,31 +1465,30 @@ pub enum TransactionStatus {
 impl TransactionStatus {
     pub fn status(&self) -> Result<ExecutionStatus, StatusCode> {
         match self {
-            TransactionStatus::Keep(status) => Ok(status.clone()),
-            TransactionStatus::Discard(code) => Err(*code),
-            TransactionStatus::Retry => Err(StatusCode::UNKNOWN_VALIDATION_STATUS),
+            Self::Keep(status) => Ok(status.clone()),
+            Self::Discard(code) => Err(*code),
+            Self::Retry => Err(StatusCode::UNKNOWN_VALIDATION_STATUS),
         }
     }
 
     pub fn is_discarded(&self) -> bool {
         match self {
-            TransactionStatus::Discard(_) => true,
-            TransactionStatus::Keep(_) => false,
-            TransactionStatus::Retry => true,
+            Self::Discard(_) | Self::Retry => true,
+            Self::Keep(_) => false,
         }
     }
 
+    pub fn is_kept(&self) -> bool {
+        !self.is_discarded()
+    }
+
     pub fn is_retry(&self) -> bool {
-        match self {
-            TransactionStatus::Discard(_) => false,
-            TransactionStatus::Keep(_) => false,
-            TransactionStatus::Retry => true,
-        }
+        matches!(self, Self::Retry)
     }
 
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
-            TransactionStatus::Keep(s) => Ok(s.clone()),
+            Self::Keep(s) => Ok(s.clone()),
             _ => Err(format_err!("Not Keep.")),
         }
     }
@@ -1500,17 +1500,17 @@ impl TransactionStatus {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
+                    Self::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
                 },
-                _ => TransactionStatus::Keep(recorded.into()),
+                _ => Self::Keep(recorded.into()),
             },
             Err(code) => {
                 if code.status_type() == StatusType::InvariantViolation
                     && features.is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)
                 {
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+                    Self::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
                 } else {
-                    TransactionStatus::Discard(code)
+                    Self::Discard(code)
                 }
             },
         }
@@ -1518,7 +1518,7 @@ impl TransactionStatus {
 
     pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
         if vm_status == VMStatus::Executed {
-            TransactionStatus::Keep(ExecutionStatus::Success)
+            Self::Keep(ExecutionStatus::Success)
         } else {
             panic!("Auto-conversion should not be called with non-executed status.")
         }
@@ -1527,7 +1527,7 @@ impl TransactionStatus {
 
 impl From<ExecutionStatus> for TransactionStatus {
     fn from(txn_execution_status: ExecutionStatus) -> Self {
-        TransactionStatus::Keep(txn_execution_status)
+        Self::Keep(txn_execution_status)
     }
 }
 
@@ -1811,6 +1811,10 @@ impl TransactionOutput {
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
+    }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        self.write_set.add_hotness(hotness);
     }
 }
 
