@@ -151,6 +151,7 @@ module aptos_experimental::market {
         status: OrderStatus,
         details: std::string::String,
         metadata_bytes: vector<u8>,
+        trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
     }
 
     enum OrderCancellationReason has drop, copy {
@@ -385,6 +386,7 @@ module aptos_experimental::market {
         status: OrderStatus,
         details: &String,
         metadata: M,
+        trigger_condition: Option<TriggerCondition>,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         // Final check whether event sending is enabled
@@ -405,7 +407,8 @@ module aptos_experimental::market {
                     is_taker,
                     status,
                     details: *details,
-                    metadata_bytes
+                    metadata_bytes,
+                    trigger_condition
                 }
             );
         };
@@ -461,6 +464,7 @@ module aptos_experimental::market {
                 market_types::order_status_open(),
                 &std::string::utf8(b""),
                 metadata,
+                trigger_condition,
                 callbacks
             );
         };
@@ -519,6 +523,7 @@ module aptos_experimental::market {
             market_types::order_status_cancelled(),
             &maker_cancellation_reason,
             metadata,
+            option::none(), // trigger_condition
             callbacks
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
@@ -559,6 +564,7 @@ module aptos_experimental::market {
             market_types::order_status_cancelled(),
             &cancel_details,
             metadata,
+            option::none(), // trigger_condition
             callbacks
         );
         callbacks.cleanup_order(
@@ -638,6 +644,7 @@ module aptos_experimental::market {
                 market_types::order_status_filled(),
                 &std::string::utf8(b""),
                 metadata,
+                option::none(), // trigger_condition
                 callbacks
             );
             // Event for maker fill
@@ -654,6 +661,7 @@ module aptos_experimental::market {
                 market_types::order_status_filled(),
                 &std::string::utf8(b""),
                 maker_order.get_metadata_from_order(),
+                option::none(),
                 callbacks
             );
         };
@@ -771,6 +779,7 @@ module aptos_experimental::market {
                 market_types::order_status_open(),
                 &std::string::utf8(b""),
                 metadata,
+                trigger_condition,
                 callbacks
             );
         };
@@ -1053,6 +1062,7 @@ module aptos_experimental::market {
             market_types::order_status_cancelled(),
             &std::string::utf8(b"Order cancelled"),
             metadata,
+            option::none(), // trigger_condition
             callbacks
         );
     }
@@ -1099,6 +1109,7 @@ module aptos_experimental::market {
             market_types::order_status_size_reduced(),
             &std::string::utf8(b"Order size reduced"),
             metadata,
+            option::none(), // trigger_condition
             callbacks
         );
     }
