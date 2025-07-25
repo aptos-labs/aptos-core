@@ -158,7 +158,7 @@ jobs:
               { TEST_NAME: 'realistic-network-tuned-for-throughput', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'realistic_network_tuned_for_throughput', FORGE_ENABLE_PERFORMANCE: true },
               { TEST_NAME: 'consensus-stress-test', FORGE_RUNNER_DURATION_SECS: 2400, FORGE_TEST_SUITE: 'consensus_stress_test' },
               { TEST_NAME: 'workload-mix-test', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'workload_mix' },
-              { TEST_NAME: 'single-vfn-perf', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'single_vfn_perf' },
+              { TEST_NAME: 'single-vfn-perf', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'single_vfn_perf' },
               { TEST_NAME: 'fullnode-reboot-stress-test', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'fullnode_reboot_stress_test' },
               { TEST_NAME: 'compat', FORGE_RUNNER_DURATION_SECS: 300, FORGE_TEST_SUITE: 'compat' },
               { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
