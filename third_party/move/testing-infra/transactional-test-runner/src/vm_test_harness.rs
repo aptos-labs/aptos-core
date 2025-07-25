@@ -15,6 +15,7 @@ use legacy_move_compiler::{
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
+    errors,
     errors::{Location, VMResult},
     file_format::CompiledScript,
     CompiledModule,
@@ -124,6 +125,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
+        // Set stable test display of VM Errors so we can use the --verbose flag in baseline tests
+        errors::set_stable_test_display();
+
         let additional_mapping = match task_opt.map(|t| t.command) {
             Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses).unwrap()
