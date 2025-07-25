@@ -1,0 +1,12 @@
+processed 2 tasks
+
+task 1 'run'. lines 43-66:
+Error: Script execution failed with VMError: {
+    message: Expected type |s#7|s#7 has copy, got |s#7|s#7 which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

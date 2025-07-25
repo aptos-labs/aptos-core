@@ -1,0 +1,23 @@
+processed 5 tasks
+
+task 2 'run'. lines 42-55:
+Error: Script execution failed with VMError: {
+    message: Expected type u64, got u32 which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+
+task 4 'run'. lines 72-85:
+Error: Script execution failed with VMError: {
+    message: Expected type u64, got u32 which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
