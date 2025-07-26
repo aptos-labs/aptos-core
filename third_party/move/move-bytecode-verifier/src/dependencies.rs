@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module contains verification of usage of dependencies for modules and scripts.
-use crate::{verifier::VerificationScope, VerifierConfig};
+use crate::VerifierConfig;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     binary_views::BinaryIndexedView,
@@ -175,7 +175,7 @@ pub fn verify_module<'a>(
     module: &CompiledModule,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     verify_module_impl(module, dependencies)
@@ -199,7 +199,7 @@ pub fn verify_script<'a>(
     script: &CompiledScript,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     verify_script_impl(script, dependencies).map_err(|e| e.finish(Location::Script))

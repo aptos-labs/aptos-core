@@ -231,7 +231,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let sender = *id.address();
         let verbose = extra_args.verbose;
 
-        let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+        let compat = if extra_args.skip_check_struct_and_pub_function_linking
+            || self.run_config.verifier_disabled()
+        {
             Compatibility::no_check()
         } else {
             Compatibility::new(
@@ -542,6 +544,12 @@ impl TestRunConfig {
     pub(crate) fn using_masm(&self) -> bool {
         match self {
             Self::CompilerV2 { use_masm, .. } => *use_masm,
+        }
+    }
+
+    pub(crate) fn verifier_disabled(&self) -> bool {
+        match self {
+            Self::CompilerV2 { vm_config, .. } => vm_config.verifier_config.verify_nothing(),
         }
     }
 }
