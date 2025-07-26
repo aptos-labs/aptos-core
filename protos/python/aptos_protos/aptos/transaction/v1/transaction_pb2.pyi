@@ -91,6 +91,7 @@ class Transaction(_message.Message):
         "user",
         "validator",
         "block_epilogue",
+        "scheduled",
         "size_info",
     ]
 
@@ -103,6 +104,7 @@ class Transaction(_message.Message):
         TRANSACTION_TYPE_USER: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_VALIDATOR: _ClassVar[Transaction.TransactionType]
         TRANSACTION_TYPE_BLOCK_EPILOGUE: _ClassVar[Transaction.TransactionType]
+        TRANSACTION_TYPE_SCHEDULED: _ClassVar[Transaction.TransactionType]
     TRANSACTION_TYPE_UNSPECIFIED: Transaction.TransactionType
     TRANSACTION_TYPE_GENESIS: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_METADATA: Transaction.TransactionType
@@ -110,6 +112,7 @@ class Transaction(_message.Message):
     TRANSACTION_TYPE_USER: Transaction.TransactionType
     TRANSACTION_TYPE_VALIDATOR: Transaction.TransactionType
     TRANSACTION_TYPE_BLOCK_EPILOGUE: Transaction.TransactionType
+    TRANSACTION_TYPE_SCHEDULED: Transaction.TransactionType
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
@@ -122,6 +125,7 @@ class Transaction(_message.Message):
     USER_FIELD_NUMBER: _ClassVar[int]
     VALIDATOR_FIELD_NUMBER: _ClassVar[int]
     BLOCK_EPILOGUE_FIELD_NUMBER: _ClassVar[int]
+    SCHEDULED_FIELD_NUMBER: _ClassVar[int]
     SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
@@ -135,6 +139,7 @@ class Transaction(_message.Message):
     user: UserTransaction
     validator: ValidatorTransaction
     block_epilogue: BlockEpilogueTransaction
+    scheduled: ScheduledTransactionInfo
     size_info: TransactionSizeInfo
     def __init__(
         self,
@@ -150,6 +155,7 @@ class Transaction(_message.Message):
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
         validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
         block_epilogue: _Optional[_Union[BlockEpilogueTransaction, _Mapping]] = ...,
+        scheduled: _Optional[_Union[ScheduledTransactionInfo, _Mapping]] = ...,
         size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
@@ -399,6 +405,37 @@ class BlockEndInfo(_message.Message):
         block_output_limit_reached: bool = ...,
         block_effective_block_gas_units: _Optional[int] = ...,
         block_approx_output_size: _Optional[int] = ...,
+    ) -> None: ...
+
+class ScheduledTransactionInfo(_message.Message):
+    __slots__ = [
+        "sender",
+        "max_gas_amount",
+        "max_gas_unit_price",
+        "gas_unit_price_charged",
+        "schedule_time",
+        "txn_id",
+    ]
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    MAX_GAS_UNIT_PRICE_FIELD_NUMBER: _ClassVar[int]
+    GAS_UNIT_PRICE_CHARGED_FIELD_NUMBER: _ClassVar[int]
+    SCHEDULE_TIME_FIELD_NUMBER: _ClassVar[int]
+    TXN_ID_FIELD_NUMBER: _ClassVar[int]
+    sender: str
+    max_gas_amount: int
+    max_gas_unit_price: int
+    gas_unit_price_charged: int
+    schedule_time: int
+    txn_id: bytes
+    def __init__(
+        self,
+        sender: _Optional[str] = ...,
+        max_gas_amount: _Optional[int] = ...,
+        max_gas_unit_price: _Optional[int] = ...,
+        gas_unit_price_charged: _Optional[int] = ...,
+        schedule_time: _Optional[int] = ...,
+        txn_id: _Optional[bytes] = ...,
     ) -> None: ...
 
 class UserTransaction(_message.Message):
