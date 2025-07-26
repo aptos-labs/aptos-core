@@ -215,8 +215,9 @@ where
             ready_sched_txns_limit: usize,
         ) -> u64 {
             info!(
-                "Running scheduled transactions: {} total scheduled transactions",
-                total_scheduled_txns
+                "Running scheduled transactions: {} total scheduled transactions; ready_sched_txns_limit: {}",
+                total_scheduled_txns,
+                ready_sched_txns_limit
             );
 
             let mut total_executed = 0;

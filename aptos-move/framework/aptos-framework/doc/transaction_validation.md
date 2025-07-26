@@ -36,7 +36,6 @@
 -  [Function `unified_prologue_fee_payer_v2`](#0x1_transaction_validation_unified_prologue_fee_payer_v2)
 -  [Function `unified_epilogue_v2`](#0x1_transaction_validation_unified_epilogue_v2)
 -  [Function `scheduled_txn_epilogue`](#0x1_transaction_validation_scheduled_txn_epilogue)
--  [Function `scheduled_txn_cleanup`](#0x1_transaction_validation_scheduled_txn_cleanup)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -1727,35 +1726,6 @@ If there is no fee_payer, fee_payer = sender
         <b>let</b> mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
         <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
     };
-
-    <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key, <a href="account.md#0x1_account">account</a>, <b>false</b>);
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_validation_scheduled_txn_cleanup"></a>
-
-## Function `scheduled_txn_cleanup`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, sender_addr: <b>address</b>, txn_failed: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_cleanup">scheduled_txn_cleanup</a>(txn_key: ScheduleMapKey, sender_addr: <b>address</b>, txn_failed: bool) {
-    <a href="scheduled_txns.md#0x1_scheduled_txns_finish_execution">scheduled_txns::finish_execution</a>(txn_key);
-    <b>if</b> (txn_failed) {
-        <a href="scheduled_txns.md#0x1_scheduled_txns_emit_transaction_failed_event">scheduled_txns::emit_transaction_failed_event</a>(txn_key, sender_addr);
-    }
 }
 </code></pre>
 

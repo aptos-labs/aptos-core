@@ -66,7 +66,6 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
             .unwrap(),
         unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
         scheduled_txn_epilogue_name: Identifier::new("scheduled_txn_epilogue").unwrap(),
-        scheduled_txn_cleanup_name: Identifier::new("scheduled_txn_cleanup").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -93,7 +92,6 @@ pub struct TransactionValidation {
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
     pub scheduled_txn_epilogue_name: Identifier,
-    pub scheduled_txn_cleanup_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -722,32 +720,5 @@ pub(crate) fn run_scheduled_txn_epilogue(
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)?;
     emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
-    Ok(())
-}
-
-pub(crate) fn run_scheduled_txn_cleanup(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    txn: &ScheduledTransactionInfoWithKey,
-    traversal_context: &mut TraversalContext,
-    module_storage: &impl ModuleStorage,
-) -> VMResult<()> {
-    // remove from the schedule queue and emit a failure event
-    let args = vec![
-        txn.key.as_move_value(),
-        MoveValue::Address(txn.sender_handle),
-        MoveValue::Bool(true),
-    ];
-    session
-        .execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.scheduled_txn_cleanup_name,
-            vec![],
-            serialize_values(&args),
-            &mut UnmeteredGasMeter,
-            traversal_context,
-            module_storage,
-        )
-        .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)?;
     Ok(())
 }

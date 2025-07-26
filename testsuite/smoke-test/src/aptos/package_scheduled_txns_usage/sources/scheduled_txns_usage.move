@@ -64,6 +64,6 @@ module 0xA550C18::scheduled_txns_usage {
     }
 
     public entry fun test_shutdown(aptos: &signer) {
-        scheduled_txns::shutdown(aptos);
+        scheduled_txns::start_shutdown(aptos);
     }
 }

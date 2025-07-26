@@ -52,23 +52,29 @@ pub static SCHEDULED_TRANSACTIONS_MODULE_INFO: Lazy<ScheduledTxnsModuleInfo> =
     Lazy::new(|| ScheduledTxnsModuleInfo {
         module_addr: CORE_CODE_ADDRESS,
         deposit_owner_addr: AccountAddress::from_hex_literal("0xb").unwrap(),
+        framework_address: AccountAddress::from_hex_literal("0x1").unwrap(),
         module_name: Identifier::new("scheduled_txns").unwrap(),
         get_ready_transactions_name: Identifier::new("get_ready_transactions").unwrap(),
         get_ready_transactions_with_limit_name: Identifier::new(
             "get_ready_transactions_with_limit",
         )
         .unwrap(),
+        mark_txn_to_remove_name: Identifier::new("mark_txn_to_remove").unwrap(),
         execute_user_function_wrapper_name: Identifier::new("execute_user_function_wrapper")
             .unwrap(),
+        pause_scheduled_txns_name: Identifier::new("pause_scheduled_txns").unwrap(),
     });
 
 pub struct ScheduledTxnsModuleInfo {
     pub module_addr: AccountAddress,
     pub deposit_owner_addr: AccountAddress,
+    pub framework_address: AccountAddress,
     pub module_name: Identifier,
     pub get_ready_transactions_name: Identifier,
     pub get_ready_transactions_with_limit_name: Identifier,
+    pub mark_txn_to_remove_name: Identifier,
     pub execute_user_function_wrapper_name: Identifier,
+    pub pause_scheduled_txns_name: Identifier,
 }
 
 impl ScheduledTxnsModuleInfo {

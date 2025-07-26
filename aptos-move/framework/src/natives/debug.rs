@@ -33,15 +33,15 @@ fn native_print(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    if cfg!(feature = "testing") {
-        let val = safely_pop_arg!(args, Struct);
-        let bytes = val.unpack()?.next().unwrap();
+    //if cfg!(feature = "testing") {
+    let val = safely_pop_arg!(args, Struct);
+    let bytes = val.unpack()?.next().unwrap();
 
-        println!(
-            "[debug] {}",
-            std::str::from_utf8(&bytes.value_as::<Vec<u8>>()?).unwrap()
-        );
-    }
+    println!(
+        "[debug] {}",
+        std::str::from_utf8(&bytes.value_as::<Vec<u8>>()?).unwrap()
+    );
+    // }
 
     Ok(smallvec![])
 }
@@ -97,11 +97,11 @@ fn native_old_print_stacktrace(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.is_empty());
 
-    if cfg!(feature = "testing") {
-        let mut s = String::new();
-        context.print_stack_trace(&mut s)?;
-        println!("{}", s);
-    }
+    // if cfg!(feature = "testing") {
+    let mut s = String::new();
+    context.print_stack_trace(&mut s)?;
+    println!("{}", s);
+    // }
     Ok(smallvec![])
 }
 

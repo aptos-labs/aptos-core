@@ -81,6 +81,15 @@ pub enum SessionId {
     ScheduledTxn {
         hash: HashValue,
     },
+    ScheduledTxnPrologue {
+        hash: HashValue,
+    },
+    ScheduledTxnEpilogue {
+        hash: HashValue,
+    },
+    ScheduledTxnAbort {
+        hash: HashValue,
+    },
     SystemTxn {
         // A generic session id for a system txn
         // This is current used in execute_system_function_no_gas_meter() call while getting
@@ -188,6 +197,18 @@ impl SessionId {
         Self::ScheduledTxn { hash }
     }
 
+    pub fn scheduled_txn_prologue(hash: HashValue) -> Self {
+        Self::ScheduledTxnPrologue { hash }
+    }
+
+    pub fn scheduled_txn_epilogue(hash: HashValue) -> Self {
+        Self::ScheduledTxnEpilogue { hash }
+    }
+
+    pub fn scheduled_txn_abort(hash: HashValue) -> Self {
+        Self::ScheduledTxnAbort { hash }
+    }
+
     pub fn system_txn(hash: HashValue) -> Self {
         Self::SystemTxn { hash }
     }
@@ -208,6 +229,9 @@ impl SessionId {
             | Self::OrderlessTxnEpilogue { script_hash, .. }
             | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash,
             Self::ScheduledTxn { hash: _ }
+            | Self::ScheduledTxnPrologue { hash: _ }
+            | Self::ScheduledTxnEpilogue { hash: _ }
+            | Self::ScheduledTxnAbort { hash: _ }
             | Self::SystemTxn { hash: _ }
             | Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }

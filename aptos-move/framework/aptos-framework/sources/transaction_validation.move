@@ -901,15 +901,6 @@ module aptos_framework::transaction_validation {
             let mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
             transaction_fee::mint_and_refund(account, mint_and_refund_amount);
         };
-
-        scheduled_txn_cleanup(txn_key, account, false);
-    }
-
-    fun scheduled_txn_cleanup(txn_key: ScheduleMapKey, sender_addr: address, txn_failed: bool) {
-        scheduled_txns::finish_execution(txn_key);
-        if (txn_failed) {
-            scheduled_txns::emit_transaction_failed_event(txn_key, sender_addr);
-        }
     }
 
     #[test_only]
