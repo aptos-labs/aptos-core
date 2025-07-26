@@ -503,8 +503,6 @@ fn compare_types(
         ) => {
             compare_cross_module_signatures(context, handle_args, def_args, def_module)?;
             compare_cross_module_signatures(context, handle_result, def_result, def_module)?;
-            // TODO(#15664): should we allow the definition to change to a weaker ability
-            //   requirement? Currently we do not allow `&mut` to be changed to `&` either.
             if handle_ab == def_ab {
                 Ok(())
             } else {

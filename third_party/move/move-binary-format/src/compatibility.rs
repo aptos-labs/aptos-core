@@ -411,6 +411,18 @@ fn signature_token_compatible(
     new_tok: &SignatureToken,
 ) -> bool {
     match (old_tok, new_tok) {
+        (SignatureToken::Bool, SignatureToken::Bool)
+        | (SignatureToken::U8, SignatureToken::U8)
+        | (SignatureToken::U16, SignatureToken::U16)
+        | (SignatureToken::U32, SignatureToken::U32)
+        | (SignatureToken::U64, SignatureToken::U64)
+        | (SignatureToken::U128, SignatureToken::U128)
+        | (SignatureToken::U256, SignatureToken::U256)
+        | (SignatureToken::Address, SignatureToken::Address)
+        | (SignatureToken::Signer, SignatureToken::Signer) => true,
+        (SignatureToken::TypeParameter(old_idx), SignatureToken::TypeParameter(new_idx)) => {
+            old_idx == new_idx
+        },
         (SignatureToken::Reference(old_elem), SignatureToken::Reference(new_elem)) => {
             signature_token_compatible(old_module, old_elem, new_module, new_elem)
         },
@@ -434,13 +446,36 @@ fn signature_token_compatible(
                     signature_token_compatible(old_module, &old_args[i], new_module, &new_args[i])
                 })
         },
-        _ => {
-            // Map to representation equality. Notice that after handling of the cases above,
-            // two signature tokens which have equal representation are also logically equal.
-            // This is _not_ the case if handles are involved: for instance, Struct(h1) and
-            // Struct(h2) can be different even if h1 == h2, but stem from different modules.
-            old_tok == new_tok
+        (
+            SignatureToken::Function(old_args, old_results, old_abilities),
+            SignatureToken::Function(new_args, new_results, new_abilities),
+        ) => {
+            let vec_ok = |old_tys: &[SignatureToken], new_tys: &[SignatureToken]| -> bool {
+                old_tys
+                    .iter()
+                    .zip(new_tys)
+                    .all(|(old, new)| signature_token_compatible(old_module, old, new_module, new))
+            };
+            vec_ok(old_args, new_args)
+                && vec_ok(old_results, new_results)
+                && old_abilities == new_abilities
         },
+        (SignatureToken::Bool, _)
+        | (SignatureToken::U8, _)
+        | (SignatureToken::U64, _)
+        | (SignatureToken::U128, _)
+        | (SignatureToken::Address, _)
+        | (SignatureToken::Signer, _)
+        | (SignatureToken::Vector(_), _)
+        | (SignatureToken::Function(..), _)
+        | (SignatureToken::Struct(_), _)
+        | (SignatureToken::StructInstantiation(_, _), _)
+        | (SignatureToken::Reference(_), _)
+        | (SignatureToken::MutableReference(_), _)
+        | (SignatureToken::TypeParameter(_), _)
+        | (SignatureToken::U16, _)
+        | (SignatureToken::U32, _)
+        | (SignatureToken::U256, _) => false,
     }
 }
 
