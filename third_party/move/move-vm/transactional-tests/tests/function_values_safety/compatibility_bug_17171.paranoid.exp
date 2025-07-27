@@ -1,0 +1,12 @@
+processed 5 tasks
+
+task 4 'run'. lines 52-52:
+Error: Function execution failed with VMError: {
+    message: Expected type |s#8|, got |s#7| has copy + drop which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
