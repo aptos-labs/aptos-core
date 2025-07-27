@@ -17,7 +17,7 @@ For development environment setup and first build, see [Building Aptos From Sour
 
 ### Code Style, Hints, and Testing
 
-Refer to our Coding Guidelines for the [Move](https://aptos.dev/move/book/coding-conventions/) and [Rust](./RUST_CODING_STYLE.md) programming languages for detailed guidance about how to contribute to the project.
+Refer to our Coding Guidelines for the [Move](https://aptos.dev/build/smart-contracts/book/coding-conventions) and [Rust](./RUST_CODING_STYLE.md) programming languages for detailed guidance about how to contribute to the project.
 
 Also, please ensure you follow our [Secure Coding Guidelines](./RUST_SECURE_CODING.md) to contribute to Aptos securely. 
 
