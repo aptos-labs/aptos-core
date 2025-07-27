@@ -12630,7 +12630,6 @@ dependencies = [
  "once_cell",
  "regex",
  "tempfile",
- "tera",
  "termcolor",
 ]
 

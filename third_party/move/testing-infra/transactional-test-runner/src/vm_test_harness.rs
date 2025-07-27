@@ -240,6 +240,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
                 false,
+                false,
             )
         };
         let staging_module_storage = StagingModuleStorage::create_with_compat_config(

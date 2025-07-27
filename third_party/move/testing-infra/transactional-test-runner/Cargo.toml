@@ -36,7 +36,6 @@ once_cell = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
-tera = { workspace = true }
 
 # Optional dependencies for fuzzing
 arbitrary = { workspace = true, optional = true }
