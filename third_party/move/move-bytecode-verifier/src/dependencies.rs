@@ -262,7 +262,8 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::StructHandle,
                         idx as TableIndex,
-                    ));
+                    )
+                    .with_message("imported struct mismatches expectation"));
                 }
             },
             None => {
@@ -303,7 +304,8 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::FunctionHandle,
                         idx as TableIndex,
-                    ));
+                    )
+                    .with_message("imported function mismatches expectation"));
                 }
                 // same parameters
                 let handle_params = context.resolver.signature_at(function_handle.parameters);
@@ -484,7 +486,7 @@ fn compare_types(
     def_type: &SignatureToken,
     def_module: &CompiledModule,
 ) -> PartialVMResult<()> {
-    match (handle_type, def_type) {
+    let result = match (handle_type, def_type) {
         (SignatureToken::Bool, SignatureToken::Bool)
         | (SignatureToken::U8, SignatureToken::U8)
         | (SignatureToken::U16, SignatureToken::U16)
@@ -546,7 +548,14 @@ fn compare_types(
         | (SignatureToken::U16, _)
         | (SignatureToken::U32, _)
         | (SignatureToken::U256, _) => Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)),
-    }
+    };
+    result.map_err(|err| {
+        if err.message().is_none() {
+            err.with_message("imported type mismatches expectation")
+        } else {
+            err
+        }
+    })
 }
 
 fn compare_structs(
