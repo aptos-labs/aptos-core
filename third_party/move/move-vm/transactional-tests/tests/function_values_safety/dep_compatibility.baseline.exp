@@ -1,0 +1,13 @@
+processed 5 tasks
+
+task 4 'run'. lines 77-77:
+Error: Function execution failed with VMError: {
+    message: Unexpected verifier/deserialization error! This likely means there is code stored on chain that is unverifiable!
+Error: VMError { major_status: TYPE_MISMATCH, sub_status: None, message: Some("imported type mismatches expectation"), exec_state: None, location: Module(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("app") }), indices: [(FunctionHandle, 2)], offsets: [] },
+    major_status: UNEXPECTED_VERIFIER_ERROR,
+    sub_status: None,
+    location: 0x66::app,
+    indices: [(FunctionHandle, 2)],
+    offsets: [],
+    exec_state: None,
+}
