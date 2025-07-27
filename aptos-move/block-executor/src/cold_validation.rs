@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(BlockSTMv2): remove once integrated.
-#![allow(dead_code)]
-
 use crate::{explicit_sync_wrapper::ExplicitSyncWrapper, scheduler_status::ExecutionStatuses};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -92,8 +89,8 @@ struct PendingRequirement<R: Clone + Ord> {
 /// a shared pointer to the other worker (instead of cloning BTreeSet under status lock).
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidationRequirement<'a, R: Clone + Ord> {
-    requirements: &'a BTreeSet<R>,
-    is_deferred: bool,
+    pub(crate) requirements: &'a BTreeSet<R>,
+    pub(crate) is_deferred: bool,
 }
 
 impl<'a, R: Clone + Ord> ValidationRequirement<'a, R> {
@@ -163,7 +160,7 @@ pub(crate) struct ColdValidationRequirements<R: Clone + Ord> {
     /// If dedicated worker is not yet assigned, the caller takes on the responsibility.
     /// Pending requirements are processsed by the dedicated worker and transformed into
     /// active requirements (but this is done later and off the commit sequential path).
-    pending_requirements: Mutex<Vec<PendingRequirement<R>>>,
+    pending_requirements: CachePadded<Mutex<Vec<PendingRequirement<R>>>>,
 
     /// No cache padding since these are accessed less frequently and by the designated
     /// worker. Note: It is important to make sure there are no dangling references.
@@ -181,7 +178,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             deferred_requirements_status: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicU32::new(0)))
                 .collect(),
-            pending_requirements: Mutex::new(Vec::new()),
+            pending_requirements: CachePadded::new(Mutex::new(Vec::new())),
             active_requirements: ExplicitSyncWrapper::new(ActiveRequirements {
                 requirements: BTreeSet::new(),
                 versions: BTreeMap::new(),
@@ -317,10 +314,9 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
     /// (the calls must be alternating).
     ///
     /// Note that processing validation requirement may mean (a) completing the actual
-    /// required validation (always it requirement was [ValidationRequirement::Active]),
-    /// or (b) scheduling it in [ValidationRequirement::Deferred] case to be performed
-    /// if the txn was observed to still be executing. validation_completed parameter
-    /// is true in case (a) and false in case (b).
+    /// required validation or observing it is no longer needed, or (b) deferring it if the
+    /// txn was observed to still be executing. validation_still_needed parameter
+    /// is false in case (a) and true in case (b).
     ///
     /// The return value indicates if this was the last requirement (i.e. there are no more
     /// cold validation requirements and the worker is no longer assigned to process them).
@@ -329,7 +325,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         worker_id: u32,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        validation_completed: bool,
+        validation_still_needed: bool,
     ) -> Result<bool, PanicError> {
         if !self.is_dedicated_worker(worker_id) {
             return Err(code_invariant_error(format!(
@@ -359,7 +355,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
                 required_incarnation, incarnation
             )));
         }
-        if !validation_completed {
+        if validation_still_needed {
             // min_idx_with_unscheduled_requirements may be increased below, after deferred
             // status is already updated. When checking if txn can be committed, the access
             // order is opposite, ensuring that if minimum index is higher, we will also
@@ -759,7 +755,7 @@ mod tests {
                 })
             );
             assert!(!requirements
-                .validation_requirement_processed(1, 4, 1, true)
+                .validation_requirement_processed(1, 4, 1, false)
                 .unwrap());
 
             assert!(requirements.is_dedicated_worker(1));
@@ -773,7 +769,7 @@ mod tests {
                 })
             );
             assert!(requirements
-                .validation_requirement_processed(1, 5, 2, true)
+                .validation_requirement_processed(1, 5, 2, false)
                 .unwrap());
 
             // Worker should be reset when no more requirements.
@@ -789,10 +785,10 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
             let txn_configs: BTreeMap<TxnIndex, (SchedulingStatus, Incarnation)> = [
-                (2, (SchedulingStatus::Executing, 3)),
+                (2, (SchedulingStatus::Executing(BTreeSet::new()), 3)),
                 (3, (SchedulingStatus::Executed, 1)),
                 (5, (SchedulingStatus::Executed, 2)),
-                (6, (SchedulingStatus::Executing, 1)),
+                (6, (SchedulingStatus::Executing(BTreeSet::new()), 1)),
                 (7, (SchedulingStatus::Executed, 2)),
             ]
             .into_iter()
@@ -839,7 +835,7 @@ mod tests {
                 assert!(requirements.is_commit_blocked(txn_idx, incarnation));
 
                 assert_ok_eq!(
-                    requirements.validation_requirement_processed(1, txn_idx, incarnation, true),
+                    requirements.validation_requirement_processed(1, txn_idx, incarnation, false),
                     txn_idx == 6
                 );
 
@@ -878,7 +874,7 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
             let statuses = create_execution_statuses_with_txns(
                 10,
-                [(4, (SchedulingStatus::Executing, 1))]
+                [(4, (SchedulingStatus::Executing(BTreeSet::new()), 1))]
                     .into_iter()
                     .collect(),
             );
@@ -888,7 +884,7 @@ mod tests {
             assert_ok!(requirements.activate_pending_requirements(&statuses));
 
             // Process as deferred (not completed) w.o. calling get (not needed for test).
-            assert_ok!(requirements.validation_requirement_processed(1, 4, 1, false));
+            assert_ok!(requirements.validation_requirement_processed(1, 4, 1, true));
 
             // Should still be blocked for commit
             assert!(requirements.is_commit_blocked(4, 1));
@@ -905,9 +901,9 @@ mod tests {
         fn test_validation_requirement_processed_error_conditions() {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
-            assert_err!(requirements.validation_requirement_processed(2, 4, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 6, 2, false));
-            assert_err!(requirements.validation_requirement_processed(1, 5, 1, true));
+            assert_err!(requirements.validation_requirement_processed(2, 4, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 6, 2, true));
+            assert_err!(requirements.validation_requirement_processed(1, 5, 1, false));
 
             let statuses = create_execution_statuses_with_txns(
                 10,
@@ -926,10 +922,10 @@ mod tests {
                 })
             );
             // Wrong worker ID, wrong txn indices, and wrong incarnations should fail.
-            assert_err!(requirements.validation_requirement_processed(2, 7, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 6, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 8, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 7, 2, false));
+            assert_err!(requirements.validation_requirement_processed(2, 7, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 6, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 8, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 7, 2, true));
         }
     }
 
@@ -996,7 +992,7 @@ mod tests {
                 15,
                 [
                     (6, (SchedulingStatus::Executed, 1)),
-                    (9, (SchedulingStatus::Executing, 2)),
+                    (9, (SchedulingStatus::Executing(BTreeSet::new()), 2)),
                 ]
                 .into_iter()
                 .collect(),
@@ -1018,7 +1014,7 @@ mod tests {
                     is_deferred: false
                 })
             );
-            assert_ok!(requirements.validation_requirement_processed(1, 6, 1, true));
+            assert_ok!(requirements.validation_requirement_processed(1, 6, 1, false));
 
             assert_some_eq!(
                 requirements
@@ -1029,7 +1025,7 @@ mod tests {
                     is_deferred: true
                 })
             );
-            assert_ok!(requirements.validation_requirement_processed(1, 9, 2, false));
+            assert_ok!(requirements.validation_requirement_processed(1, 9, 2, true));
             test_active_requirements_empty(&requirements);
         }
     }
