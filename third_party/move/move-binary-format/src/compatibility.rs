@@ -410,6 +410,13 @@ fn signature_token_compatible(
     new_module: &CompiledModule,
     new_tok: &SignatureToken,
 ) -> bool {
+    let vec_ok = |old_tys: &[SignatureToken], new_tys: &[SignatureToken]| -> bool {
+        old_tys.len() == new_tys.len()
+            && old_tys
+                .iter()
+                .zip(new_tys)
+                .all(|(old, new)| signature_token_compatible(old_module, old, new_module, new))
+    };
     match (old_tok, new_tok) {
         (SignatureToken::Bool, SignatureToken::Bool)
         | (SignatureToken::U8, SignatureToken::U8)
@@ -441,21 +448,12 @@ fn signature_token_compatible(
             SignatureToken::StructInstantiation(new_handle, new_args),
         ) => {
             struct_equal(old_module, *old_handle, new_module, *new_handle)
-                && old_args.len() == new_args.len()
-                && (0..old_args.len()).all(|i| {
-                    signature_token_compatible(old_module, &old_args[i], new_module, &new_args[i])
-                })
+                && vec_ok(old_args, new_args)
         },
         (
             SignatureToken::Function(old_args, old_results, old_abilities),
             SignatureToken::Function(new_args, new_results, new_abilities),
         ) => {
-            let vec_ok = |old_tys: &[SignatureToken], new_tys: &[SignatureToken]| -> bool {
-                old_tys
-                    .iter()
-                    .zip(new_tys)
-                    .all(|(old, new)| signature_token_compatible(old_module, old, new_module, new))
-            };
             vec_ok(old_args, new_args)
                 && vec_ok(old_results, new_results)
                 && old_abilities == new_abilities

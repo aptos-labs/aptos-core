@@ -75,6 +75,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             if command_text.is_empty() {
                 continue;
             }
+            let command_text = expand_template(command_text);
             cur_commands.push((line_number, command_text))
         } else if re_whitespace.is_match(&line) {
             in_command = false;
