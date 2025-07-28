@@ -1,6 +1,6 @@
 processed 16 tasks
-
-task 1 'publish'. lines 8-13:
+task 0 lines 3-6:  publish --verbose
+task 1 lines 8-13:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type`: changed layout of struct `A`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -10,8 +10,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 3 'publish'. lines 20-25:
+task 2 lines 15-18:  publish --verbose
+task 3 lines 20-25:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_ability'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_ability`: changed layout of struct `A`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -21,8 +21,10 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 7 'publish'. lines 39-41:
+task 4 lines 27-29:  publish --verbose
+task 5 lines 31-33:  publish --verbose
+task 6 lines 35-37:  publish --verbose
+task 7 lines 39-41:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_persistent'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_persistent`: changed parameter types of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -32,8 +34,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 9 'publish'. lines 47-49:
+task 8 lines 43-45:  publish --verbose
+task 9 lines 47-49:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_public'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_public`: changed parameter types of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -43,8 +45,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 11 'publish'. lines 55-59:
+task 10 lines 51-53:  publish --verbose
+task 11 lines 55-59:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_result_since_public'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_result_since_public`: changed return type of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -54,8 +56,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 13 'publish'. lines 65-67:
+task 12 lines 61-63:  publish --verbose
+task 13 lines 65-67:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_ability_since_public'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_ability_since_public`: changed return type of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -65,8 +67,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 15 'publish'. lines 73-75:
+task 14 lines 69-71:  publish --verbose
+task 15 lines 73-75:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_ability2_since_public'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_ability2_since_public`: changed return type of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,

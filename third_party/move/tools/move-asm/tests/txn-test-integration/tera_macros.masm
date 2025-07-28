@@ -1,0 +1,20 @@
+{% import "macros" as macros %}
+
+// Use `-` for the block inside macro to eliminate spaces
+{% macro return() -%}
+    ret
+{%- endmacro return %}
+
+{% for val in [1, 5, 10] %}
+
+//# publish --print-bytecode
+module 0x66::h_{{val}}
+
+public fun f()
+    ld_u64 {{val}}
+    {{ macros::expect(ty='u64', val=val) }}
+    {{ self::return() }}
+
+//# run --verbose 0x66::h_{{val}}::f
+
+{% endfor %}

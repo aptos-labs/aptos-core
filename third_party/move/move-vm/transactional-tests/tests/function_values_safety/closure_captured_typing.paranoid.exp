@@ -1,6 +1,7 @@
 processed 7 tasks
-
-task 2 'run'. lines 49-62:
+task 0 lines 1-32:  publish
+task 1 lines 34-47:  run --verbose
+task 2 lines 49-62:  run --verbose
 Error: Script execution failed with VMError: {
     message: Expected type u64, got u32 which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -10,8 +11,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 4)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 4 'run'. lines 79-92:
+task 3 lines 64-77:  run --verbose
+task 4 lines 79-92:  run --verbose
 Error: Script execution failed with VMError: {
     message: Expected type u64, got u32 which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -21,8 +22,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 4)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 5 'run'. lines 94-107:
+task 5 lines 94-107:  run --verbose
 Error: Script execution failed with VMError: {
     message: Captured argument type `&u64` cannot be a reference,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -32,8 +32,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 6 'run'. lines 109-122:
+task 6 lines 109-122:  run --verbose
 Error: Script execution failed with VMError: {
     message: Captured argument type `&mut u64` cannot be a reference,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

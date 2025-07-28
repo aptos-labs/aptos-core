@@ -1,62 +1,58 @@
-//# publish
-module 0x66::helpers
+{% import "macros" as macros %}
 
-public fun f_copy_drop_store(): |u64|u32 has copy+drop+store
+{% for ty1 in integer_types %}
+{% for ty2 in integer_types %}
+
+//# publish
+module 0x66::helpers_{{ty1}}_{{ty2}}
+
+public fun f_copy_drop_store(): |{{ty1}}|{{ty2}} has copy+drop+store
     pack_closure action, 0
     ret
 
-#[persistent] fun action(x: u64): u32
+#[persistent] fun action(x: {{ty1}}): {{ty2}}
     move_loc x
-    cast_u32
-    ld_u32 20
+    cast_{{ty2}}
+    ld_{{ty2}} 20
     add
     ret
 
-public fun assert_eq(x: u32, y:u32)
-    move_loc x
-    move_loc y
-    eq
-    br_true r
-    ld_u64 255
-    abort
- r: ret
-
-
 //# run --verbose
 script
-use 0x66::helpers
+use 0x66::helpers_{{ty1}}_{{ty2}} as h
 
 fun ok()
-    local f1: |u64|u32 has copy+drop+store
-    local f2: |u64|u32 has copy+drop
-    call helpers::f_copy_drop_store
+    local f1: |{{ty1}}|{{ty2}} has copy+drop+store
+    local f2: |{{ty1}}|{{ty2}} has copy+drop
+    call h::f_copy_drop_store
     st_loc f1
     move_loc f1
     st_loc f2 // valid type coercion
-    ld_u64 5
+    ld_{{ty1}} 5
     move_loc f2
-    call_closure<|u64|u32>
-    ld_u32 25
-    call helpers::assert_eq
+    call_closure<|{{ty1}}|{{ty2}}>
+    {{macros::expect(ty=ty2, val=25)}}
     ret
 
 //# run --verbose
 script
-use 0x66::helpers
+use 0x66::helpers_{{ty1}}_{{ty2}} as h
 
 fun not_assignable()
-    local f1: |u64|u32 has drop
-    local f2: |u64|u32 has copy+drop
-    call helpers::f_copy_drop_store
+    local f1: |{{ty1}}|{{ty2}} has drop
+    local f2: |{{ty1}}|{{ty2}} has copy+drop
+    call h::f_copy_drop_store
     st_loc f1
     move_loc f1
     st_loc f2  // ERROR: invalid type coercion
-    ld_u64 5
+    ld_{{ty1}} 5
     copy_loc f2
-    call_closure<|u64|u32>
-    cast_u64
+    call_closure<|{{ty1}}|{{ty2}}>
+    cast_{{ty1}}
     move_loc f2
-    call_closure<|u64|u32>
-    ld_u32 45
-    call helpers::assert_eq
+    call_closure<|{{ty1}}|{{ty2}}>
+    {{macros::expect(ty=ty2, val=45)}}
     ret
+
+{% endfor %}
+{% endfor %}

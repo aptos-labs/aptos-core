@@ -87,6 +87,11 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// "foo" will have a separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &["/function_values_safety/"];
 
+/// Test files which should echo their commands. For now we only do this with function
+/// values, as those use macros for clarity what is executed. Perhaps it should be done
+/// for all tests.
+const ECHO_COMMAND: &[&str] = &["/function_values_safety/"];
+
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
         .iter()
@@ -107,11 +112,12 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .iter()
         .map(|(s, v)| (s.to_string(), *v))
         .collect::<Vec<_>>();
-    let vm_test_config = TestRunConfig::CompilerV2 {
+    let vm_test_config = TestRunConfig {
         language_version: config.language_version,
         experiments,
         vm_config: config.vm_config,
         use_masm: true,
+        echo: ECHO_COMMAND.iter().any(|s| p.contains(s)),
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

@@ -35,6 +35,7 @@ move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
+tera = { workspace = true }
 termcolor = { workspace = true }
 
 # Optional dependencies for fuzzing

@@ -6,7 +6,7 @@ pub const TEST_DIR: &str = "tests";
 
 use itertools::Itertools;
 use libtest_mimic::{Arguments, Trial};
-use move_transactional_test_runner::vm_test_harness;
+use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
 use walkdir::WalkDir;
 
 fn main() {
@@ -21,8 +21,12 @@ fn main() {
         })
         .map(|p| {
             let prompt = format!("move-asm-txn::{}", p.display());
+            let mut config = TestRunConfig::default().with_masm();
+            if p.display().to_string().contains("tera_macros.masm") {
+                config = config.with_echo()
+            }
             Trial::test(prompt, move || {
-                vm_test_harness::run_test_print_bytecode_with_masm(&p)
+                vm_test_harness::run_test_with_config(config, &p)
                     .map_err(|err| format!("{:?}", err).into())
             })
         })
