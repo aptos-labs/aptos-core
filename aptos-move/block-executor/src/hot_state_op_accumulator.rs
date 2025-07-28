@@ -64,7 +64,7 @@ where
     pub fn add_transaction<'a>(
         &mut self,
         writes: impl Iterator<Item = &'a Key>,
-        read_only: impl Iterator<Item = &'a Key>,
+        reads: impl Iterator<Item = &'a Key>,
     ) where
         Key: 'a,
     {
@@ -75,7 +75,7 @@ where
             self.writes.get_or_insert_owned(key);
         }
 
-        for key in read_only {
+        for key in reads {
             if self.to_make_hot.len() >= self.max_promotions_per_block {
                 COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
