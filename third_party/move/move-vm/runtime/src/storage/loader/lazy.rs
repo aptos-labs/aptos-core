@@ -68,6 +68,11 @@ impl<'a, T> StructDefinitionLoader for LazyLoader<'a, T>
 where
     T: ModuleStorage,
 {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        debug_assert!(self.runtime_environment().vm_config().enable_lazy_loading);
+        true
+    }
+
     fn load_struct_definition(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
@@ -80,7 +85,7 @@ where
             .idx_to_struct_name_ref(*idx)?;
 
         self.charge_module(gas_meter, traversal_context, &struct_name.module)?;
-        self.module_storage.fetch_struct_ty(
+        self.module_storage.unmetered_get_struct_definition(
             struct_name.module.address(),
             struct_name.module.name(),
             struct_name.name.as_ident_str(),
