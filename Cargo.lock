@@ -12690,6 +12690,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
@@ -12727,6 +12728,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "test-case",
  "triomphe",
  "typed-arena",
 ]

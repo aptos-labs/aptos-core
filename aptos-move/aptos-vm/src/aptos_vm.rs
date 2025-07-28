@@ -39,6 +39,7 @@ use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
+    gas_feature_versions,
     gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27},
     AptosGasParameters, VMGasParameters,
 };
@@ -85,7 +86,10 @@ use aptos_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
+use aptos_vm_logging::{
+    alert, log_schema::AdapterLogSchema, prelude::CRITICAL_ERRORS, speculative_error,
+    speculative_log,
+};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{
@@ -535,6 +539,8 @@ impl AptosVM {
     fn inject_abort_info_if_available(
         &self,
         module_storage: &impl AptosModuleStorage,
+        traversal_context: &TraversalContext,
+        log_context: &AdapterLogSchema,
         status: ExecutionStatus,
     ) -> ExecutionStatus {
         if let ExecutionStatus::MoveAbort {
@@ -543,12 +549,30 @@ impl AptosVM {
             ..
         } = status
         {
+            // Note: in general, this module should have been charged for (because the location is
+            // set). This cannot be enforced though, so the best option is to perform unmetered
+            // access in any case to get a consistent error message. In case it was not metered,
+            // log an error.
+            if self.features().is_lazy_loading_enabled()
+                && traversal_context
+                    .check_is_special_or_visited(module_id.address(), module_id.name())
+                    .is_err()
+            {
+                alert!(
+                    *log_context,
+                    "Unmetered metadata access for {}::{} when injecting abort info",
+                    module_id.address(),
+                    module_id.name()
+                );
+            }
+
             let info = module_storage
-                .fetch_module_metadata(module_id.address(), module_id.name())
+                .unmetered_get_module_metadata(module_id.address(), module_id.name())
                 .ok()
                 .flatten()
                 .and_then(|metadata| get_metadata(&metadata))
                 .and_then(|m| m.extract_abort_info(code));
+
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module_id),
                 code,
@@ -671,14 +695,12 @@ impl AptosVM {
         );
 
         // Abort information is injected using the user defined error in the Move contract.
-        //
-        // DO NOT move abort info injection before we create an epilogue session, because if
-        // there is a code publishing transaction that fails, it will invalidate VM loader
-        // cache which is flushed ONLY WHEN THE NEXT SESSION IS CREATED!
-        // Also, do not move this after we run failure epilogue below, because this will load
-        // module, which alters abort info. We have a transaction at version 596888095 which
-        // relies on this specific behavior...
-        let status = self.inject_abort_info_if_available(module_storage, status);
+        let status = self.inject_abort_info_if_available(
+            module_storage,
+            traversal_context,
+            log_context,
+            status,
+        );
         epilogue_session.execute(|session| {
             transaction_validation::run_failure_epilogue(
                 session,
@@ -1447,11 +1469,14 @@ impl AptosVM {
         let check_friend_linking = !self
             .features()
             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
+        // TODO(#17171): remove this once 1.34 is in production.
+        let function_compat_bug = self.gas_feature_version() < gas_feature_versions::RELEASE_V1_34;
         let compatibility_checks = Compatibility::new(
             check_struct_layout,
             check_friend_linking,
             self.timed_features()
                 .is_enabled(TimedFeatureFlag::EntryCompatibility),
+            function_compat_bug,
         );
 
         session.finish_with_module_publishing_and_initialization(
@@ -2419,6 +2444,9 @@ impl AptosVM {
         let module_storage = state_view.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
+
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let execution_result = Self::execute_view_function_in_vm(
             &mut session,
             &vm,
@@ -2427,6 +2455,7 @@ impl AptosVM {
             type_args,
             arguments,
             &mut gas_meter,
+            &mut traversal_context,
             &module_storage,
         );
         let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
@@ -2454,8 +2483,12 @@ impl AptosVM {
                     TransactionStatus::Keep(status) => status,
                     _ => ExecutionStatus::MiscellaneousError(Some(vm_status.status_code())),
                 };
-                let status_with_abort_info =
-                    vm.inject_abort_info_if_available(&module_storage, execution_status);
+                let status_with_abort_info = vm.inject_abort_info_if_available(
+                    &module_storage,
+                    &traversal_context,
+                    &log_context,
+                    execution_status,
+                );
                 ViewFunctionOutput::new_move_abort_error(
                     status_with_abort_info,
                     Some(vm_status.status_code()),
@@ -2480,11 +2513,9 @@ impl AptosVM {
         ty_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<Vec<Vec<u8>>, VMError> {
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
-
         let func = module_storage.load_function(&module_id, &func_name, &ty_args)?;
         let metadata = get_metadata(&func.owner_as_module()?.metadata);
 
@@ -2503,7 +2534,7 @@ impl AptosVM {
             func,
             arguments,
             gas_meter,
-            &mut traversal_context,
+            traversal_context,
             module_storage,
         )?;
 
@@ -3102,8 +3133,14 @@ pub(crate) fn should_create_account_resource(
         && txn_data.replay_protector == ReplayProtector::SequenceNumber(0)
     {
         let account_tag = AccountResource::struct_tag();
+
+        // INVARIANT:
+        //   Account lives at a special address, so we should not be charging for it and unmetered
+        //   access is safe. There are tests that ensure that address is always special.
+        assert!(account_tag.address.is_special());
         let metadata = module_storage
-            .fetch_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+            .unmetered_get_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+
         let (maybe_bytes, _) = resolver
             .get_resource_bytes_with_metadata_and_layout(
                 &txn_data.sender(),

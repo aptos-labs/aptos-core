@@ -1,0 +1,45 @@
+processed 6 tasks
+
+task 2 'run'. lines 35-48:
+Error: Script execution failed with VMError: {
+    message: closure type mismatch,
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: None,
+}
+
+task 3 'run'. lines 50-63:
+Error: Script execution failed with VMError: {
+    message: closure type mismatch,
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: None,
+}
+
+task 4 'run'. lines 65-78:
+Error: Script execution failed with VMError: {
+    message: closure type mismatch,
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: None,
+}
+
+task 5 'run'. lines 80-93:
+Error: Script execution failed with VMError: {
+    message: closure type mismatch,
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: None,
+}

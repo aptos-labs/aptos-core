@@ -440,7 +440,7 @@ impl AsmParser {
             };
             self.expect_special("|")?;
             let res_tys = if self.is_type_tuple() {
-                self.type_tuple()?
+                self.result_type_tuple()?
             } else {
                 vec![]
             };
@@ -464,13 +464,13 @@ impl AsmParser {
         self.list(Self::type_, ",")
     }
 
-    fn type_tuple(&mut self) -> AsmResult<Vec<Type>> {
+    fn result_type_tuple(&mut self) -> AsmResult<Vec<Type>> {
         if self.is_special("(") {
             self.advance()?;
             let res = self.type_list()?;
             self.expect_special(")")?;
             Ok(res)
-        } else if self.is_type() {
+        } else if self.is_type() || self.is_special("|") {
             Ok(vec![self.type_()?])
         } else {
             Err(error(self.next_loc, "expected type or type tuple"))
@@ -785,7 +785,7 @@ impl AsmParser {
         self.expect_special(")")?;
         let result = if self.is_special(":") {
             self.advance()?;
-            self.type_tuple()?
+            self.result_type_tuple()?
         } else {
             vec![]
         };

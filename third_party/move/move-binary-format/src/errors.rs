@@ -10,12 +10,27 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use std::fmt;
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
+
+static STABLE_TEST_DISPLAY: OnceCell<bool> = OnceCell::new();
+
+/// Call this function if display of errors should be stable for baseline tests.
+/// Specifically, no stack traces should be generated, as they contain transitive
+/// file locations.
+pub fn set_stable_test_display() {
+    STABLE_TEST_DISPLAY.set(true).unwrap_or(())
+}
+
+/// Check whether stable test display is enabled. This can be used by other components
+/// to adjust their output.
+pub fn is_stable_test_display() -> bool {
+    STABLE_TEST_DISPLAY.get().copied().unwrap_or(false)
+}
 
 /// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.
 /// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
@@ -416,7 +431,9 @@ impl PartialVMError {
 
     pub fn new(major_status: StatusCode) -> Self {
         debug_assert!(major_status != StatusCode::EXECUTED);
-        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+            && !is_stable_test_display()
+        {
             let mut len = 5;
             let mut trace: String = "Unknown invariant violation generated:\n".to_string();
             backtrace::trace(|frame| {
@@ -476,8 +493,11 @@ impl PartialVMError {
         self
     }
 
-    pub fn with_message(mut self, mut message: String) -> Self {
+    pub fn with_message(mut self, message: impl ToString) -> Self {
+        let mut message = message.to_string();
         if self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            // If there is already something in the message, interpret as stack  trace
+            // and append at the end
             if let Some(stacktrace) = self.0.message.take() {
                 message = format!("{} @{}", message, stacktrace);
             }

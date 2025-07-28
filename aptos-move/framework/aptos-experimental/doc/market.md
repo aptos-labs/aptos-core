@@ -349,6 +349,12 @@ TimeBased(time): The order is triggered when the current time is greater than or
 <dd>
 
 </dd>
+<dt>
+<code>trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -1254,7 +1260,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, user: <b>address</b>, orig_size: u64, remaining_size: u64, size_delta: u64, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool, is_taker: bool, status: <a href="market_types.md#0x7_market_types_OrderStatus">market_types::OrderStatus</a>, details: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, user: <b>address</b>, orig_size: u64, remaining_size: u64, size_delta: u64, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool, is_taker: bool, status: <a href="market_types.md#0x7_market_types_OrderStatus">market_types::OrderStatus</a>, details: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1277,6 +1283,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     status: OrderStatus,
     details: &String,
     metadata: M,
+    trigger_condition: Option&lt;TriggerCondition&gt;,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
@@ -1297,7 +1304,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 is_taker,
                 status,
                 details: *details,
-                metadata_bytes
+                metadata_bytes,
+                trigger_condition
             }
         );
     };
@@ -1373,6 +1381,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <a href="market_types.md#0x7_market_types_order_status_open">market_types::order_status_open</a>(),
             &std::string::utf8(b""),
             metadata,
+            trigger_condition,
             callbacks
         );
     };
@@ -1451,6 +1460,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
         &maker_cancellation_reason,
         metadata,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         callbacks
     );
     // If the maker is invalid cancel the maker order and <b>continue</b> <b>to</b> the next maker order
@@ -1511,6 +1521,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
         &cancel_details,
         metadata,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         callbacks
     );
     callbacks.cleanup_order(
@@ -1610,6 +1621,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
             &std::string::utf8(b""),
             metadata,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             callbacks
         );
         // Event for maker fill
@@ -1626,6 +1638,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <a href="market_types.md#0x7_market_types_order_status_filled">market_types::order_status_filled</a>(),
             &std::string::utf8(b""),
             maker_order.get_metadata_from_order(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             callbacks
         );
     };
@@ -1763,6 +1776,7 @@ of fill limit violation  in the previous transaction and the order is just a con
             <a href="market_types.md#0x7_market_types_order_status_open">market_types::order_status_open</a>(),
             &std::string::utf8(b""),
             metadata,
+            trigger_condition,
             callbacks
         );
     };
@@ -2105,6 +2119,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
         <a href="market_types.md#0x7_market_types_order_status_cancelled">market_types::order_status_cancelled</a>(),
         &std::string::utf8(b"Order cancelled"),
         metadata,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         callbacks
     );
 }
@@ -2171,6 +2186,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
         <a href="market_types.md#0x7_market_types_order_status_size_reduced">market_types::order_status_size_reduced</a>(),
         &std::string::utf8(b"Order size reduced"),
         metadata,
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         callbacks
     );
 }
@@ -2237,6 +2253,8 @@ Remaining size of the order in the order book.
 
 ## Function `set_order_metadata`
 
+Returns the order metadata for an order by order id.
+It is up to the caller to perform necessary permissions checks
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata">set_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, metadata: M)
@@ -2293,6 +2311,8 @@ Remaining size of the order in the order book.
 
 ## Function `set_order_metadata_by_client_id`
 
+Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
+around ownership of the order.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market.md#0x7_market_set_order_metadata_by_client_id">set_order_metadata_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market.md#0x7_market_Market">market::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, metadata: M)

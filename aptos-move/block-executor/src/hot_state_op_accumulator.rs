@@ -134,8 +134,11 @@ where
 
     pub fn should_refresh(&self, hot_since_version: Version) -> bool {
         if hot_since_version >= self.first_version {
-            error!("Unexpected: hot_since_version > block first version");
+            error!(
+                "Unexpected: hot_since_version ({}) >= block first version {}",
+                hot_since_version, self.first_version
+            );
         }
-        hot_since_version + self.refresh_interval_versions as Version >= self.first_version
+        hot_since_version + self.refresh_interval_versions as Version <= self.first_version
     }
 }
