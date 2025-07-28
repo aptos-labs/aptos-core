@@ -433,14 +433,6 @@ impl Type {
         }
     }
 
-    /// Returns true if the type is variant and can be subject of the assignability rule.
-    /// Currently, this is only the case for function types and immutable references to
-    /// function types.
-    pub fn is_variant(&self) -> bool {
-        matches!(self, Type::Function { .. })
-            || matches!(self, Type::Reference(bt) if matches!(bt.as_ref(), Type::Function{..}))
-    }
-
     pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
         if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
             let msg = format!("{} `{}` cannot be a reference", msg, self);
