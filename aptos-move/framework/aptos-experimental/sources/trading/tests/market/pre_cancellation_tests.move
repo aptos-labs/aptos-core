@@ -14,7 +14,7 @@ module aptos_experimental::pre_cancellation_tests {
     use aptos_experimental::market_types::{
         good_till_cancelled,
     };
-    use aptos_experimental::market::{new_market, new_market_config, cancel_order_with_client_id};
+    use aptos_experimental::market::{new_market, new_market_config};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
 

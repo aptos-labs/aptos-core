@@ -25,6 +25,7 @@ module aptos_experimental::active_order_book {
     const EINTERNAL_INVARIANT_BROKEN: u64 = 2;
 
     friend aptos_experimental::order_book;
+    friend aptos_experimental::bulk_order_book;
 
     /// ========= Active OrderBook ===========
 
@@ -202,6 +203,25 @@ module aptos_experimental::active_order_book {
         value.size
     }
 
+    public(friend) fun cancel_if_active_order(
+        self: &mut ActiveOrderBook,
+        price: u64,
+        unique_priority_idx: UniqueIdxType,
+        is_bid: bool
+    ){
+        let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
+        let key = ActiveBidKey { price, tie_breaker };
+        if (is_bid) {
+           if (self.buys.contains(&key)) {
+                self.buys.remove(&key);
+            }
+        } else {
+            if (self.sells.contains(&key)) {
+                self.sells.remove(&key);
+            }
+        };
+    }
+
     public(friend) fun is_active_order(
         self: &ActiveOrderBook,
         price: u64,
@@ -223,6 +243,7 @@ module aptos_experimental::active_order_book {
     ): bool {
         if (is_bid) {
             let best_ask_price = self.best_ask_price();
+            // print(&best_ask_price);
             best_ask_price.is_some() && price >= best_ask_price.destroy_some()
         } else {
             let best_bid_price = self.best_bid_price();
