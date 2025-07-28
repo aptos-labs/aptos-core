@@ -12,22 +12,28 @@ use super::{
         state_sync_config_apply_transaction_outputs, state_sync_config_execute_transactions,
     },
 };
+use crate::{suites::realistic_environment::wrap_with_realistic_env, TestCommand};
 use anyhow::Result;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{ConsensusConfig, MempoolConfig, NodeConfig};
 use aptos_forge::{
     args::TransactionTypeArg,
     emitter::NumAccountsMode,
+    prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
-        LatencyType, MetricsThreshold, StateProgressThreshold, SuccessCriteria,
-        SystemMetricsThreshold,
+        LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
+        SuccessCriteria, SystemMetricsThreshold,
     },
     AdminContext, AdminTest, AptosContext, AptosTest, EmitJobMode, EmitJobRequest, ForgeConfig,
-    NetworkContext, NetworkContextSynchronizer, NetworkTest, Test, WorkflowProgress,
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeResourceOverride, Test,
+    WorkflowProgress,
 };
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+};
 use aptos_testcases::{
     self,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -46,6 +52,7 @@ use aptos_testcases::{
     reconfiguration_test::ReconfigurationTest,
     three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
     twin_validator_test::TwinValidatorTest,
+    two_traffics_test::TwoTrafficsTest,
     validator_join_leave_test::ValidatorJoinLeaveTest,
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
@@ -468,6 +475,127 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
                 .add_wait_for_catchup_s(60)
                 .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
         )
+}
+
+pub(crate) fn single_cluster_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_fullnodes: usize,
+) -> ForgeConfig {
+    // Check if HAProxy is enabled
+    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
+        k8s.enable_haproxy
+    } else {
+        false
+    };
+
+    // Determine if this is a long running test
+    let duration_secs = duration.as_secs();
+    let long_running = duration_secs >= 2400;
+
+    // resource override for long_running tests
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000), // long running tests need more storage
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default() // no overrides
+    };
+
+    let mut success_criteria = SuccessCriteria::new(85)
+        .add_system_metrics_threshold(SystemMetricsThreshold::new(
+            // Check that we don't use more than 18 CPU cores for 15% of the time.
+            MetricsThreshold::new(25.0, 15),
+            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
+            // Check that we don't use more than final expected memory for more than 20% of the time.
+            MetricsThreshold::new_gb(8.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
+        ))
+        .add_no_restarts()
+        .add_wait_for_catchup_s(
+            // Give at least 60s for catchup, give 10% of the run for longer durations.
+            (duration.as_secs() / 10).max(60),
+        )
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
+            max_non_epoch_round_gap: 4,
+            max_epoch_round_gap: 4,
+        });
+
+    // If the test is short lived, we should verify that there are no fullnode failures
+    if !long_running {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+
+    if !ha_proxy {
+        success_criteria = success_criteria.add_latency_breakdown_threshold(
+            LatencyBreakdownThreshold::new_with_breach_pct(
+                vec![
+                    // quorum store backpressure is relaxed, so queueing happens here
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
+                ],
+                5,
+            ),
+        )
+    }
+
+    // Create the test
+    let mempool_backlog = if ha_proxy { 300 } else { 300 };
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .add_network_test(TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(
+                if ha_proxy {
+                    100
+                } else if long_running {
+                    // This is for forge stable
+                    100
+                } else {
+                    // During land time we want to be less strict, otherwise we flaky fail
+                    100
+                },
+            ),
+        })
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            // Have single epoch change in land blocking, and a few on long-running
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 10 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+        )
+        .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
 }
 
 pub fn mixed_emit_job() -> EmitJobRequest {
