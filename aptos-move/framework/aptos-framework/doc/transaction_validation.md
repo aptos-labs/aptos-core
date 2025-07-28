@@ -35,6 +35,7 @@
 -  [Function `unified_prologue_v2`](#0x1_transaction_validation_unified_prologue_v2)
 -  [Function `unified_prologue_fee_payer_v2`](#0x1_transaction_validation_unified_prologue_fee_payer_v2)
 -  [Function `unified_epilogue_v2`](#0x1_transaction_validation_unified_epilogue_v2)
+-  [Function `scheduled_txn_epilogue`](#0x1_transaction_validation_scheduled_txn_epilogue)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -75,6 +76,7 @@
 <b>use</b> <a href="nonce_validation.md#0x1_nonce_validation">0x1::nonce_validation</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
+<b>use</b> <a href="scheduled_txns.md#0x1_scheduled_txns">0x1::scheduled_txns</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -1667,6 +1669,69 @@ If there is no fee_payer, fee_payer = sender
         <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
         <a href="account.md#0x1_account_increment_sequence_number">account::increment_sequence_number</a>(addr);
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_validation_scheduled_txn_epilogue"></a>
+
+## Function `scheduled_txn_epilogue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(
+    deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
+    txn_key: ScheduleMapKey,
+    storage_fee_refunded: u64,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    scheduling_deposit: u64,
+    gas_units_remaining: u64
+) {
+    <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+
+    <b>assert</b>!(
+        (txn_gas_price <b>as</b> u128) * (gas_used <b>as</b> u128) &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>)
+    );
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+
+    <b>assert</b>!(scheduling_deposit &gt;= transaction_fee_amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> deposit_store_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(deposit_store_owner);
+
+    <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
+        <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
+        <b>let</b> refund_from_scheduling_deposit = scheduling_deposit - burn_amount;
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
+            deposit_store_owner,
+            <a href="account.md#0x1_account">account</a>,
+            refund_from_scheduling_deposit
+        );
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(deposit_store_addr, burn_amount);
+    } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+        // <b>return</b> the full deposit and mint the remaining
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
+            deposit_store_owner,
+            <a href="account.md#0x1_account">account</a>,
+            scheduling_deposit
+        );
+        <b>let</b> mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
+        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+    };
 }
 </code></pre>
 
