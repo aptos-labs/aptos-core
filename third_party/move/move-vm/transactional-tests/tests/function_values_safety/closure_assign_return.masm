@@ -1,0 +1,51 @@
+//# publish
+module 0x66::helpers
+
+public fun f_copy_drop_store(): |u64|u32 has copy+drop+store
+    pack_closure action, 0
+    ret
+
+#[persistent] fun action(x: u64): u32
+    move_loc x
+    cast_u32
+    ld_u32 20
+    add
+    ret
+
+public fun assert_eq(x: u32, y:u32)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+ r: ret
+
+
+//# publish
+module 0x66::ok
+use 0x66::helpers
+
+fun assignable(): (|u64|u32, |u64|u32 has copy+drop)
+    local f: |u64|u32
+    call helpers::f_copy_drop_store
+    st_loc f
+    move_loc f
+    call helpers::f_copy_drop_store
+    ret
+
+//# run --verbose 0x66::ok::assignable
+
+//# publish
+module 0x66::not_ok
+use 0x66::helpers
+
+fun assignable(): (|u64|u32, |u64|u32 has copy+drop)
+    local f: |u64|u32
+    call helpers::f_copy_drop_store
+    call helpers::f_copy_drop_store
+    st_loc f
+    move_loc f
+    ret
+
+//# run --verbose 0x66::not_ok::assignable
