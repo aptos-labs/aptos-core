@@ -22,7 +22,7 @@ use crate::LoadedFunction;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 /// The reentrancy checker's state
 #[derive(Default)]
@@ -33,6 +33,12 @@ pub(crate) struct ReentrancyChecker {
     /// Whether we are in module lock mode. This happens if we enter a function via
     /// `NativeDynamicDispatch`.
     module_lock_count: usize,
+    /// SECURITY FIX: Track closure call depth to prevent deep recursion attacks
+    closure_call_depth: usize,
+    /// SECURITY FIX: Maximum allowed closure call depth
+    max_closure_depth: usize,
+    /// SECURITY FIX: Track modules that have been reentered via closures
+    closure_reentered_modules: BTreeSet<ModuleId>,
 }
 
 /// Ways how functions are called
@@ -47,12 +53,66 @@ pub(crate) enum CallType {
 }
 
 impl ReentrancyChecker {
+    /// SECURITY FIX: Create a new reentrancy checker with enhanced security
+    pub fn new(max_closure_depth: usize) -> Self {
+        Self {
+            active_modules: BTreeMap::new(),
+            module_lock_count: 0,
+            closure_call_depth: 0,
+            max_closure_depth,
+            closure_reentered_modules: BTreeSet::new(),
+        }
+    }
+
+    /// Default constructor with reasonable security limits
+    pub fn default() -> Self {
+        Self::new(100)
+    }
+
+    /// SECURITY FIX: Check if closure call depth is within limits
+    fn check_closure_depth(&self) -> PartialVMResult<()> {
+        if self.closure_call_depth >= self.max_closure_depth {
+            return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                .with_message(format!(
+                    "Closure call depth {} exceeds maximum allowed depth {}",
+                    self.closure_call_depth, self.max_closure_depth
+                )));
+        }
+        Ok(())
+    }
+
+    /// SECURITY FIX: Check for suspicious closure reentrancy patterns
+    fn check_closure_reentrancy(&mut self, callee_module: &ModuleId) -> PartialVMResult<()> {
+        if self.closure_reentered_modules.contains(callee_module) {
+            return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                .with_message(format!(
+                    "Suspicious closure reentrancy detected for module {}",
+                    callee_module
+                )));
+        }
+        Ok(())
+    }
+
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
         callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
+        // SECURITY FIX: Enhanced closure security checks
+        if call_type == CallType::ClosureDynamicDispatch {
+            self.closure_call_depth += 1;
+            self.check_closure_depth()?;
+            self.check_closure_reentrancy(&callee.module_or_script_id())?;
+            
+            // Track modules that have been reentered via closures
+            if let Some(caller_module) = caller_module {
+                if caller_module == &callee.module_or_script_id() {
+                    self.closure_reentered_modules.insert(callee.module_or_script_id());
+                }
+            }
+        }
+        
         if call_type == CallType::NativeDynamicDispatch
             || callee.function.has_module_reentrancy_lock
         {
@@ -103,6 +163,17 @@ impl ReentrancyChecker {
         callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
+        // SECURITY FIX: Decrement closure call depth on exit
+        if call_type == CallType::ClosureDynamicDispatch {
+            if self.closure_call_depth > 0 {
+                self.closure_call_depth -= 1;
+            } else {
+                return Err(PartialVMError::new_invariant_violation(
+                    "Unbalanced closure call depth counter",
+                ));
+            }
+        }
+        
         let callee_module = callee.module_or_script_id();
         if caller_module != callee_module || call_type == CallType::ClosureDynamicDispatch {
             // If this is an exit from cross-module call, or exit from closure dispatch,
