@@ -2071,6 +2071,17 @@ struct AssignTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
+impl AssignTransformer<'_> {
+    /// Check if an expression is safe to eliminate, assuming its result is never used.
+    /// [TODO]: refine the rules to consider other side-effect-carrying operations.
+    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
+        matches!(
+            exp.as_ref(),
+            ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..)
+        )
+    }
+}
+
 #[allow(unused)]
 struct FreeVariableBinder<'a> {
     /// Usage information about variables in the expression
@@ -2132,6 +2143,10 @@ impl AssignTransformer<'_> {
                         substitution.insert(
                             *var,
                             self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+
+                        if stm_usage.read_count(*var) == 0 && !self.safe_to_eliminate(rhs) {
+                            new_stms.push(self.builder.unfold(&substitution, rhs.clone()));
+                        }
                     },
                 // Check whether an assignment can be transformed into a let
                 // TODO: refine to the correct implementation, the below doesn't work
@@ -2148,6 +2163,8 @@ impl AssignTransformer<'_> {
                 }
                  */
                 _ => {
+                    // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
+                    // Extra checks are needed to ensure safety.
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
                 },

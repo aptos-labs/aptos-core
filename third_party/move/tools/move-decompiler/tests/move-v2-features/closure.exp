@@ -101,7 +101,7 @@ module 0x99::lambda_generics {
         self
     }
     fun inlined<T: drop>(f: |S<T>|(S<T>), s: S<T>) {
-        ()
+        f(s);
     }
     fun test_receiver_inference(s: S<u64>) {
         inlined<u64>(|arg0| id(arg0), s);
