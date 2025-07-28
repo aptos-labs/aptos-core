@@ -4,7 +4,6 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
-    check_dependencies_and_charge_gas,
     data_cache::{DataCacheEntry, TransactionDataCache},
     dispatch_loader,
     interpreter::InterpreterDebugInterface,
@@ -12,6 +11,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
+        loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
@@ -278,19 +278,6 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         )
     }
 
-    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> VMResult<()> {
-        let arena_id = self
-            .traversal_context
-            .referenced_module_ids
-            .alloc(module_id);
-        check_dependencies_and_charge_gas(
-            self.module_storage,
-            self.gas_meter,
-            self.traversal_context,
-            [(arena_id.address(), arena_id.name())],
-        )
-    }
-
     pub fn traversal_context(&self) -> &TraversalContext<'c> {
         self.traversal_context
     }
@@ -343,6 +330,17 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 },
             },
         )
+    }
+
+    /// Charges gas for module dependencies for native dynamic dispatch.
+    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> PartialVMResult<()> {
+        dispatch_loader!(&self.module_storage, loader, {
+            loader.charge_native_result_load_module(
+                &mut self.gas_meter,
+                self.traversal_context,
+                &module_id,
+            )
+        })
     }
 
     /// Returns function value extension that can be used for (de)serializing function values.

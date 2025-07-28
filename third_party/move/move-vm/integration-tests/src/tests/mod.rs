@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::compiler::{as_module, compile_units};
 use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{
     effects::ChangeSet,
@@ -34,6 +35,15 @@ mod regression_tests;
 mod return_value_tests;
 mod runtime_reentrancy_check_tests;
 mod vm_arguments_tests;
+
+/// Given code string, compiles it, serializes and adds to storage.
+fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
+    let mut units = compile_units(&code).unwrap();
+    let m = as_module(units.pop().unwrap());
+    let mut blob = vec![];
+    m.serialize(&mut blob).unwrap();
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+}
 
 /// Executes a Move script on top of the provided storage state, with the given arguments and type
 /// arguments.

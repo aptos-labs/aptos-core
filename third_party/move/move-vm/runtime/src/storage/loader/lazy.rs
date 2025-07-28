@@ -3,7 +3,7 @@
 
 use crate::{
     module_traversal::TraversalContext,
-    storage::loader::traits::{Loader, StructDefinitionLoader},
+    storage::loader::traits::{Loader, NativeModuleLoader, StructDefinitionLoader},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
@@ -90,6 +90,21 @@ where
             struct_name.module.name(),
             struct_name.name.as_ident_str(),
         )
+    }
+}
+
+impl<'a, T> NativeModuleLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn charge_native_result_load_module(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<()> {
+        self.charge_module(gas_meter, traversal_context, module_id)?;
+        Ok(())
     }
 }
 
