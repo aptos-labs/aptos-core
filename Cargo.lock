@@ -12726,6 +12726,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "test-case",
  "triomphe",
  "typed-arena",
 ]
