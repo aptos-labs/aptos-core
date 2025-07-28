@@ -1,4 +1,3 @@
-
 module 0x1::error {
     public fun aborted(r: u64): u64 {
         canonical(7, r)
@@ -40,3 +39,6 @@ module 0x1::error {
         canonical(13, r)
     }
 }
+
+
+============ recompilation succeeded ========
