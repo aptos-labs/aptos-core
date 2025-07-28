@@ -1135,6 +1135,7 @@ where
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+            self.loader,
             self.layout_converter,
             gas_meter,
             traversal_context,

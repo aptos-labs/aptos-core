@@ -3,11 +3,13 @@
 
 use crate::{
     module_traversal::TraversalContext,
-    storage::loader::traits::{Loader, NativeModuleLoader, StructDefinitionLoader},
+    storage::loader::traits::{
+        Loader, ModuleMetadataLoader, NativeModuleLoader, StructDefinitionLoader,
+    },
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{gas_algebra::NumBytes, language_storage::ModuleId};
+use move_core_types::{gas_algebra::NumBytes, language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
@@ -105,6 +107,23 @@ where
     ) -> PartialVMResult<()> {
         self.charge_module(gas_meter, traversal_context, module_id)?;
         Ok(())
+    }
+}
+
+impl<'a, T> ModuleMetadataLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_module_metadata(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        self.charge_module(gas_meter, traversal_context, module_id)?;
+        self.module_storage
+            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .map_err(|err| err.to_partial())
     }
 }
 
