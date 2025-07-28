@@ -43,7 +43,7 @@ pub fn crypto_group(c: &mut Criterion) {
     field_additions(1_000_000, &mut group);
     field_multiplications(1_000_000, &mut group);
 
-    for thresh in [333, 666, 3_333, 6_6666] {
+    for thresh in [333, 666, 3_333, 6_666] {
         batch_evaluation_domain_new(thresh, &mut group);
         fft_assign_bench(thresh, &mut group);
 
