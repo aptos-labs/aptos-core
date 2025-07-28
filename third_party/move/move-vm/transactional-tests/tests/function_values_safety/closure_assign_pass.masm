@@ -1,37 +1,11 @@
 //# publish
 module 0x66::helpers
 
-// Uses pseudo captured structure to force a constructed
-// closure to have abilities. Note that declaration of
-// types (like return type) do not matter for paranoid
-// mode, rather it uses the actual type of the values
-// on the stack.
-
-struct CopyDropStore has copy+drop+store
-    dummy: bool
-struct Drop has drop
-    dummy: bool
-
 public fun f_copy_drop_store(): |u64|u32 has copy+drop+store
-    ld_true
-    pack CopyDropStore
-    pack_closure action_CopyDropStore, 1
+    pack_closure action, 0
     ret
 
-public fun f(): |u64|u32 has drop
-    ld_true
-    pack Drop
-    pack_closure action_Drop, 1
-    ret
-
-#[persistent] fun action_CopyDropStore(_s: CopyDropStore, x: u64): u32
-    move_loc x
-    cast_u32
-    ld_u32 20
-    add
-    ret
-
-#[persistent] fun action_Drop(_s: Drop, x: u64): u32
+#[persistent] fun action(x: u64): u32
     move_loc x
     cast_u32
     ld_u32 20
@@ -78,7 +52,10 @@ script
 use 0x66::helpers as h
 
 fun error()
-    call h::f
+    local f: |u64|u32 has drop
+    call h::f_copy_drop_store
+    st_loc f
+    move_loc f
     ld_u64 5
     call h::exec_twice // f on stack has wrong type
     ld_u32 50

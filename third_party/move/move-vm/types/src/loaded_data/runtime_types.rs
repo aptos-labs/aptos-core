@@ -433,6 +433,14 @@ impl Type {
         }
     }
 
+    pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
+        if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
+            let msg = format!("{} `{}` cannot be a reference", msg, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Bool) {
             let msg = format!("Expected boolean type, got {}", self);
