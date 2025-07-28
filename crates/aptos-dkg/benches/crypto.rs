@@ -40,6 +40,9 @@ pub const LARGE_SIZES: [usize; 3] = [8192, 16_384, 32_768];
 pub fn crypto_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("crypto");
 
+    field_additions(1_000_000, &mut group);
+    field_multiplications(1_000_000, &mut group);
+
     for thresh in [333, 666, 3_333, 6_6666] {
         batch_evaluation_domain_new(thresh, &mut group);
         fft_assign_bench(thresh, &mut group);
@@ -441,6 +444,50 @@ fn parallel_multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>, nu
             )
         },
     );
+}
+
+fn field_additions<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("field_additions", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let a = random_scalars(n, &mut rng);
+                let b = random_scalars(n, &mut rng);
+
+                (a, b)
+            },
+            |(a, b)| {
+                for i in 0..a.len() {
+                    let _c = a[i] + b[i];
+                }
+            },
+        )
+    });
+}
+
+fn field_multiplications<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("field_multiplication", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let a = random_scalars(n, &mut rng);
+                let b = random_scalars(n, &mut rng);
+
+                (a, b)
+            },
+            |(a, b)| {
+                for i in 0..a.len() {
+                    let _c = a[i] * b[i];
+                }
+            },
+        )
+    });
 }
 
 fn g1_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
