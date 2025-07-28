@@ -44,6 +44,11 @@ impl<'a, T> StructDefinitionLoader for EagerLoader<'a, T>
 where
     T: ModuleStorage,
 {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        debug_assert!(!self.runtime_environment().vm_config().enable_lazy_loading);
+        false
+    }
+
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
@@ -55,7 +60,7 @@ where
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        self.module_storage.fetch_struct_ty(
+        self.module_storage.unmetered_get_struct_definition(
             struct_name.module.address(),
             struct_name.module.name(),
             struct_name.name.as_ident_str(),

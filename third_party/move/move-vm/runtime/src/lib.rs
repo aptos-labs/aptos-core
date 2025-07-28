@@ -45,7 +45,10 @@ pub use storage::{
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
     loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
-    module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
+    module_storage::{
+        ambassador_impl_ModuleStorage, AsFunctionValueExtension, FunctionValueExtensionAdapter,
+        ModuleStorage,
+    },
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
 };
 

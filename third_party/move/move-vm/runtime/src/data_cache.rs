@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    module_traversal::TraversalContext,
     storage::{
-        module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+        loader::traits::StructDefinitionLoader, module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::LayoutConverter,
     },
     ModuleStorage,
 };
@@ -20,6 +21,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    gas::DependencyGasMeter,
     loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -129,6 +131,9 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     pub(crate) fn create_data_cache_entry(
+        layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
@@ -142,9 +147,11 @@ impl TransactionDataCache {
             },
         };
 
-        // TODO(Gas): Shall we charge for this?
-        let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
-            .type_to_type_layout_with_identifier_mappings(ty)?;
+        let layout_with_delayed_fields = layout_converter.type_to_type_layout_with_delayed_fields(
+            gas_meter,
+            traversal_context,
+            ty,
+        )?;
 
         let (data, bytes_loaded) = {
             let metadata = module_storage
@@ -160,15 +167,12 @@ impl TransactionDataCache {
                 addr,
                 &struct_tag,
                 &metadata,
-                if contains_delayed_fields {
-                    Some(&layout)
-                } else {
-                    None
-                },
+                layout_with_delayed_fields.layout_when_contains_delayed_fields(),
             )?
         };
 
         let function_value_extension = FunctionValueExtensionAdapter { module_storage };
+        let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let value = match data {
             Some(blob) => {
                 let max_value_nest_depth = function_value_extension.max_value_nest_depth();
