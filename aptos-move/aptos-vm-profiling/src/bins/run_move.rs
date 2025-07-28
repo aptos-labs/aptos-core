@@ -200,7 +200,9 @@ fn main() -> Result<()> {
     let return_values = MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut TransactionDataCache::empty(
+            Features::default().is_lightweight_resource_existence_enabled(),
+        ),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut extensions,

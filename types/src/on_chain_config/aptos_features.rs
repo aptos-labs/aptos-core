@@ -143,6 +143,8 @@ pub enum FeatureFlag {
 
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
+
+    LIGHTWEIGHT_RESOURCE_EXISTENCE = 98,
 }
 
 impl FeatureFlag {
@@ -423,6 +425,10 @@ impl Features {
 
     pub fn is_distribute_transaction_fee_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    pub fn is_lightweight_resource_existence_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
