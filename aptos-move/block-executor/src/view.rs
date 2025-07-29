@@ -1997,6 +1997,7 @@ mod test {
         delta_math::DeltaHistory,
         types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
     };
+    use aptos_crypto::hash::HashValue;
     use aptos_mvhashmap::{
         types::{MVDelayedFieldsError, TxnIndex},
         unsync_map::UnsyncMap,
@@ -2006,7 +2007,7 @@ mod test {
     use aptos_types::{
         error::PanicOr,
         state_store::{state_value::StateValue, MockStateView},
-        transaction::BlockExecutableTransaction,
+        transaction::{BlockExecutableTransaction, FeeDistribution, BlockEndInfo},
         write_set::TransactionWrite,
     };
     use aptos_vm_types::resolver::TResourceView;
@@ -2085,6 +2086,22 @@ mod test {
 
         fn user_txn_bytes_len(&self) -> usize {
             0
+        }
+
+        fn into_txn(self) -> aptos_types::transaction::Transaction {
+            unreachable!("TestTransactionType does not support into_txn")
+        }
+
+        fn from_txn(_txn: aptos_types::transaction::Transaction) -> Self {
+            unreachable!("TestTransactionType does not support from_txn")
+        }
+
+        fn block_epilogue_v1(
+            _block_id: HashValue,
+            _block_end_info: BlockEndInfo,
+            _fee_distribution: FeeDistribution,
+        ) -> Self {
+            unreachable!("TestTransactionType does not support block_epilogue_v1")
         }
     }
 

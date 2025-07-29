@@ -238,8 +238,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 && !skips_rest
             {
                 // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                // check_execution_status_during_commit must be used for checks re:status.
-                // Hence, since the status is not SkipRest, it must be Success.
+                // Since skips_rest is true, the status must be Success.
                 if let ExecutionStatus::Success(output) = self.take_output(txn_idx)? {
                     must_create_epilogue_txn = !output.has_new_epoch_event()?;
                     self.outputs[txn_idx as usize]

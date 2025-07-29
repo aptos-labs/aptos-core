@@ -7,6 +7,7 @@ use aptos_aggregator::{
     types::{DelayedFieldValue, ReadPosition},
 };
 use aptos_types::error::{code_invariant_error, PanicError, PanicOr};
+use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -765,7 +766,7 @@ mod test {
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
     };
     use aptos_types::delayed_fields::SnapshotToStringFormula;
-    use claims::{assert_err_eq, assert_matches, assert_ok_eq, assert_some};
+    use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 

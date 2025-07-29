@@ -585,7 +585,7 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(
+                Ok(BlockOutput::from_txn(
                     output_vec,
                     block_epilogue_txn,
                     BTreeMap::new(),

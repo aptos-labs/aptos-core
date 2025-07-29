@@ -97,7 +97,7 @@ where
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
-    block_epilogue_txn: &'a ExplicitSyncWrapper<Option<Transaction>>,
+    block_epilogue_txn: &'a ExplicitSyncWrapper<Option<T>>,
     block_epilogue_mutex: &'a BlockEpilogueMutex,
 }
 
@@ -1191,7 +1191,7 @@ where
         shared_counter: &AtomicU32,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-        block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
+        block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         num_running_workers: &AtomicU32,
         num_workers: usize,
         block_epilogue_mutex: &BlockEpilogueMutex,
@@ -1210,8 +1210,7 @@ where
         let mut scheduler_task = SchedulerTask::Retry;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
-        let drain_commit_queue = || -> Result<bool, PanicError> {
-            let mut block_epilogue_executed = false;
+        let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
@@ -1227,7 +1226,7 @@ where
                     None,
                 )?;
             }
-            Ok(block_epilogue_executed)
+            Ok(())
         };
 
         let mut maybe_epilogue_txn_idx = None;
@@ -1281,11 +1280,6 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            let block_epilogue_executed = drain_commit_queue()?;
-            if block_epilogue_executed {
-                scheduler_task = SchedulerTask::Done;
-            }
-
             if let Some(epilogue_txn_idx) = maybe_epilogue_txn_idx {
                 if let Some(epilogue_txn) = self.generate_block_epilogue_if_needed(
                     epilogue_txn_idx,
@@ -1301,7 +1295,7 @@ where
                     let _needs_suffix_validation = Self::execute(
                         epilogue_txn_idx,
                         0, // placeholder incarnation.
-                        &T::from_txn(epilogue_txn.clone()),
+                        &epilogue_txn,
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1344,6 +1338,8 @@ where
                         final_results,
                         Some(num_txns as TxnIndex),
                     )?;
+
+                    scheduler_task = SchedulerTask::Done;
                 }
                 maybe_epilogue_txn_idx = None;
             }
@@ -1493,7 +1489,7 @@ where
                     Self::execute_v2(
                         epilogue_txn_idx,
                         0, // placeholder incarnation.
-                        &T::from_txn(epilogue_txn.clone()),
+                        &epilogue_txn,
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1609,7 +1605,7 @@ where
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
         block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
-        block_epilogue_txn: Option<Transaction>,
+        block_epilogue_txn: Option<T>,
         mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: impl Send + 'static,
         last_input_output: TxnLastInputOutput<T, E::Output, E::Error>,
@@ -1679,7 +1675,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None::<T>, BTreeMap::new()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
@@ -1790,7 +1786,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None::<T>, BTreeMap::new()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1879,7 +1875,7 @@ where
         fee_statements: impl Iterator<Item = (usize, FeeStatement)>,
         block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
-    ) -> Transaction {
+    ) -> T {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
         if !self
             .config
@@ -1887,10 +1883,13 @@ where
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
         {
-            return Transaction::StateCheckpoint(block_id);
+            return T::from_txn(Transaction::StateCheckpoint(block_id));
         }
         if !features.is_calculate_transaction_fee_for_distribution_enabled() {
-            return Transaction::block_epilogue_v0(block_id, block_end_info.to_persistent());
+            return T::from_txn(Transaction::block_epilogue_v0(
+                block_id,
+                block_end_info.to_persistent(),
+            ));
         }
 
         let mut amount = BTreeMap::new();
@@ -1934,7 +1933,7 @@ where
                 }
             }
         }
-        Transaction::block_epilogue_v1(
+        T::block_epilogue_v1(
             block_id,
             block_end_info.to_persistent(),
             FeeDistribution::new(amount),
@@ -2091,7 +2090,7 @@ where
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None::<T>, BTreeMap::new()));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -2115,16 +2114,17 @@ where
         );
 
         let mut block_epilogue_txn = None;
-        let mut block_epilogue_txn_to_execute;
         let mut idx = 0;
         while idx <= num_txns {
             let txn = if idx != num_txns {
                 signature_verified_block.get_txn(idx as TxnIndex)
-            } else if block_epilogue_txn.is_some() {
-                block_epilogue_txn_to_execute = T::from_txn(block_epilogue_txn.clone().unwrap());
-                &block_epilogue_txn_to_execute
             } else {
-                break;
+                match block_epilogue_txn.as_ref() {
+                    Some(txn) => txn,
+                    None => {
+                        break;
+                    },
+                }
             };
             let latest_view = LatestView::<T, S>::new(
                 base_view,
@@ -2550,7 +2550,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, None, BTreeMap::new()));
+            return Ok(BlockOutput::new(ret, None::<T>, BTreeMap::new()));
         }
 
         Err(sequential_error)
@@ -2569,9 +2569,9 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         environment: &AptosEnvironment,
-        block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
+        block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         block_epilogue_mutex: &BlockEpilogueMutex,
-    ) -> Option<Transaction> {
+    ) -> Option<T> {
         // We only do this for block (when the block_id is returned). For other cases
         // like state sync or replay, the BlockEpilogue txn should already in the input
         // and we don't need to add one here.

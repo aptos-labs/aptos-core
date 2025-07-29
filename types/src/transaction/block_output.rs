@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Transaction;
-use crate::state_store::state_slot::StateSlot;
+use crate::{state_store::state_slot::StateSlot, transaction::BlockExecutableTransaction};
 use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Debug)]
@@ -16,6 +16,18 @@ pub struct BlockOutput<Key, Output: Debug> {
 
 impl<Key, Output: Debug> BlockOutput<Key, Output> {
     pub fn new(
+        transaction_outputs: Vec<Output>,
+        block_epilogue_txn: Option<impl BlockExecutableTransaction>,
+        to_make_hot: BTreeMap<Key, StateSlot>,
+    ) -> Self {
+        Self {
+            transaction_outputs,
+            block_epilogue_txn: block_epilogue_txn.map(|txn| txn.into_txn()),
+            to_make_hot,
+        }
+    }
+
+    pub fn from_txn(
         transaction_outputs: Vec<Output>,
         block_epilogue_txn: Option<Transaction>,
         to_make_hot: BTreeMap<Key, StateSlot>,
