@@ -16,7 +16,7 @@ datatest_stable::harness!(test_runner, "tests", r".*\.move$");
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let compiler_options = move_compiler_v2::Options {
         sources: vec![path.display().to_string()],
-        dependencies: vec![path_from_crate_root("../framework/aptos-stdlib/sources")],
+        dependencies: vec![path_from_crate_root("../framework/aptos-stdlib/sources"), path_from_crate_root("../framework/move-stdlib/sources")],
         named_address_mapping: vec![
             "std=0x1".to_string(),
             "aptos_std=0x1".to_string(),
