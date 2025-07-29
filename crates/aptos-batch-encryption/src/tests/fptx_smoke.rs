@@ -20,8 +20,8 @@ fn smoke() {
     let ct = FPTX::encrypt(&ek, &mut rng, &plaintext).unwrap();
     FPTX::verify_ct(&ct).unwrap();
 
-    let (d, mut pfs) = FPTX::digest(&dk, &vec![ct.clone()], 0, &tp).unwrap();
-    FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+    let (d, pfs_promise) = FPTX::digest(&dk, &vec![ct.clone()], 0, &tp).unwrap();
+    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
 
     let [dk_happy, dk_slow] = [(tc_happy, vks_happy, msk_shares_happy), (tc_slow, vks_slow, msk_shares_slow)]
         .into_iter()

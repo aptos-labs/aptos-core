@@ -16,7 +16,7 @@ use crate::shared::ciphertext::BIBECTDecrypt;
 use crate::shared::ciphertext::CTDecrypt;
 use crate::shared::ciphertext::CTEncrypt;
 use crate::shared::ciphertext::{BIBEEncryptionKey, Ciphertext};
-use crate::shared::digest::{Digest, EvalProofs};
+use crate::shared::digest::{Digest, EvalProofs, EvalProofsPromise};
 use crate::shared::ids::free_roots::ComputedCoeffs;
 use crate::shared::ids::free_roots::UncomputedCoeffs;
 use crate::shared::ids::{FreeRootId, FreeRootIdSet};
@@ -78,7 +78,9 @@ impl BatchThresholdEncryption for FPTX {
 
     type Digest = Digest;
 
-    type EvalProofs<'a> = EvalProofs<'a, FreeRootIdSet<ComputedCoeffs>>;
+    type EvalProofsPromise<'a> = EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>;
+
+    type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
 
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
 
@@ -122,7 +124,7 @@ impl BatchThresholdEncryption for FPTX {
     }
 
     fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
-    -> anyhow::Result<(Self::Digest, Self::EvalProofs<'a>)> 
+    -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise<'a>)> 
     {
         let mut ids : FreeRootIdSet<UncomputedCoeffs>
         = FreeRootIdSet::from_slice(
@@ -143,7 +145,7 @@ impl BatchThresholdEncryption for FPTX {
         ct.id()
     }
 
-    fn eval_proofs_compute_all<'a>(proofs: &mut Self::EvalProofs<'a>, pool: &rayon::ThreadPool) {
+    fn eval_proofs_compute_all<'a>(proofs: &Self::EvalProofsPromise<'a>, pool: &rayon::ThreadPool) -> Self::EvalProofs {
         pool.install(|| proofs.compute_all())
     }
 
@@ -165,7 +167,7 @@ impl BatchThresholdEncryption for FPTX {
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         cts: &[Self::Ciphertext], 
-        proofs: &Self::EvalProofs<'a>, 
+        proofs: &Self::EvalProofs,
         pool: &rayon::ThreadPool
     ) -> anyhow::Result<Vec<P>> 
     {

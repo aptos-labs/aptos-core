@@ -193,9 +193,9 @@ pub fn decrypt(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
             .collect();
 
-        let (d, mut pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
+        let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
 
         let dk_shares : Vec<BIBEDecryptionKeyShare> = 
             vec![ FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap() ];

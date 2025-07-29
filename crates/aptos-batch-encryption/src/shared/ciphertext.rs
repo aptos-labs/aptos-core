@@ -16,7 +16,7 @@ use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use ed25519_dalek::Signature;
 use ed25519_dalek::Verifier;
 
-use super::{digest::EvalProofs, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}};
+use super::{digest::{EvalProofs, EvalProofsPromise}, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub struct BIBECiphertext<I: Id> {
@@ -223,8 +223,8 @@ pub mod tests {
         }
 
         ids.compute_poly_coeffs();
-        let (digest, mut pfs) = dk.digest(&mut ids, 0).unwrap();
-        pfs.compute_all();
+        let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
+        let pfs = pfs.compute_all();
 
         let plaintext = String::from("hi");
 
@@ -252,8 +252,8 @@ pub mod tests {
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
-        let (digest, mut pfs) = dk.digest(&mut ids, 0).unwrap();
-        pfs.compute_all();
+        let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
+        let pfs = pfs.compute_all();
 
         let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()], &tc).unwrap();
 
