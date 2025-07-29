@@ -458,8 +458,10 @@ mod dbtool_tests {
         let internal_indexer_db =
             InternalIndexerDBService::get_indexer_db_for_restore(new_db_dir.as_path()).unwrap();
 
-        let mut config = RocksdbConfigs::default();
-        config.enable_storage_sharding = true;
+        let config = RocksdbConfigs {
+            enable_storage_sharding: true,
+            ..Default::default()
+        };
 
         let aptos_db: Arc<dyn DbReader> = Arc::new(
             AptosDB::open(
