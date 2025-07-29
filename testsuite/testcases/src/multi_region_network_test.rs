@@ -179,7 +179,7 @@ impl Default for IntraRegionNetEmConfig {
     fn default() -> Self {
         Self {
             bandwidth_rate_mbps: 10 * 1000, // 10 Gbps
-            delay_latency_ms: 20,
+            delay_latency_ms: 2,
             delay_jitter_ms: 0,
             delay_correlation_percentage: 20,
             loss_percentage: 1,
