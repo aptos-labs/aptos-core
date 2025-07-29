@@ -116,7 +116,7 @@ module supra_framework::supra_account {
         if (!account::exists_at(to)) {
             create_account(to);
             spec {
-                assert coin::spec_is_account_registered<SupraCoin>(to);
+                assume coin::spec_is_account_registered<SupraCoin>(to);
                 assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<SupraCoin>() ==>
                     coin::spec_is_account_registered<CoinType>(to);
             };

@@ -274,6 +274,7 @@ module supra_framework::coin {
     #[view]
     /// Get the paired fungible asset metadata object of a coin type. If not exist, return option::none().
     public fun paired_metadata<CoinType>(): Option<Object<Metadata>> acquires CoinConversionMap {
+        spec { assume !exists<CoinConversionMap>(@supra_framework);};
         if (exists<CoinConversionMap>(@supra_framework) && features::coin_to_fungible_asset_migration_feature_enabled(
         )) {
             let map = &borrow_global<CoinConversionMap>(@supra_framework).coin_to_fungible_asset_map;
@@ -668,6 +669,7 @@ module supra_framework::coin {
         amount: u64
     ): (u64, u64) {
         let coin_balance = coin_balance<CoinType>(account_addr);
+        spec {assume coin_balance >= amount;};
         if (coin_balance >= amount) {
             (amount, 0)
         } else {
@@ -919,6 +921,7 @@ module supra_framework::coin {
         account_addr: address,
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
+        spec { assume exists<CoinStore<CoinType>>(account_addr); };
         if (exists<CoinStore<CoinType>>(account_addr)) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             assert!(

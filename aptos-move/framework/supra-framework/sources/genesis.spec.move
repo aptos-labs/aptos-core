@@ -1,4 +1,5 @@
 spec supra_framework::genesis {
+    use supra_framework::reconfiguration_state;
     /// <high-level-req>
     /// No.: 1
     /// Requirement: All the core resources and modules should be created during genesis and owned by the Supra framework
@@ -141,14 +142,21 @@ spec supra_framework::genesis {
 
     spec set_genesis_end {
         pragma delegate_invariants_to_caller;
+        // Without this pragma, the function will timeout (property proved)
+        pragma aborts_if_is_partial;
         // property 4: An initial set of validators should exist before the end of genesis.
         /// [high-level-req-4]
         requires len(global<stake::ValidatorSet>(@supra_framework).active_validators) >= 1;
         // property 5: The end of genesis should be marked on chain.
         /// [high-level-req-5]
+        include stake::ResourceRequirement;
+        include reconfiguration_state::StartTimeSecsRequirement;
+        include supra_coin::ExistsSupraCoin;
+        include staking_config::StakingRewardsConfigEnabledRequirement;
         let addr = std::signer::address_of(supra_framework);
         aborts_if addr != @supra_framework;
         aborts_if exists<chain_status::GenesisEndMarker>(@supra_framework);
+        aborts_if !exists<supra_coin::MintCapStore>(@supra_framework);
         ensures global<chain_status::GenesisEndMarker>(@supra_framework) == chain_status::GenesisEndMarker {};
     }
 

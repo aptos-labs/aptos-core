@@ -163,6 +163,17 @@ spec supra_framework::transaction_validation {
         };
     }
 
+    spec automated_transaction_prologue(
+        sender: signer,
+        task_index: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        pragma verify = false;
+    }
+
     /// Aborts if length of public key hashed vector
     /// not equal the number of singers.
     spec multi_agent_script_prologue (
@@ -236,6 +247,26 @@ spec supra_framework::transaction_validation {
         // TODO(fa_migration)
         pragma verify = false;
         include EpilogueGasPayerAbortsIf { gas_payer: signer::address_of(account) };
+    }
+
+    spec automated_transaction_epilogue(
+        account: signer,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64
+    ) {
+        pragma verify = false;
+    }
+
+    spec epilogue_gas_payer_only(
+        gas_payer: address,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64
+    ) {
+        pragma verify = false;
     }
 
     /// Abort according to the conditions.

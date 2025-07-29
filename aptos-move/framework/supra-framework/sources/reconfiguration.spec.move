@@ -113,8 +113,8 @@ spec supra_framework::reconfiguration {
     /// Should equal to 0
     spec emit_genesis_reconfiguration_event {
         use supra_framework::reconfiguration::{Configuration};
-
         aborts_if !exists<Configuration>(@supra_framework);
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@supra_framework);
         let config_ref = global<Configuration>(@supra_framework);
         aborts_if !(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0);
         ensures global<Configuration>(@supra_framework).epoch == 1;

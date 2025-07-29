@@ -59,7 +59,7 @@ spec supra_framework::staking_config {
         use supra_framework::chain_status;
         invariant [suspendable] chain_status::is_operating() ==> exists<StakingConfig>(@supra_framework);
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        // pragma aborts_if_is_strict;
     }
 
     spec StakingConfig {

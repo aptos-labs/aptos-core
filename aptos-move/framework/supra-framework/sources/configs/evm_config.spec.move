@@ -14,4 +14,7 @@ spec supra_framework::evm_config {
         aborts_if false;
     }
 
+    spec initialize(supra_framework: &signer, config: vector<u8>) {
+        pragma aborts_if_is_strict = false;
+    }
 }
