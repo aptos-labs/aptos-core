@@ -52,7 +52,8 @@ module aptos_framework::system_addresses {
             addr == @0x7 ||
             addr == @0x8 ||
             addr == @0x9 ||
-            addr == @0xa
+            addr == @0xa ||
+            addr == @0xb
     }
 
     /// Return true if `addr` is 0x1.
