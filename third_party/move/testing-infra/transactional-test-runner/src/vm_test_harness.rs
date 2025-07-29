@@ -15,6 +15,7 @@ use legacy_move_compiler::{
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
+    errors,
     errors::{Location, VMResult},
     file_format::CompiledScript,
     CompiledModule,
@@ -124,6 +125,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
+        // Set stable test display of VM Errors so we can use the --verbose flag in baseline tests
+        errors::set_stable_test_display();
+
         let additional_mapping = match task_opt.map(|t| t.command) {
             Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses).unwrap()
@@ -227,12 +231,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let sender = *id.address();
         let verbose = extra_args.verbose;
 
-        let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+        let compat = if extra_args.skip_check_struct_and_pub_function_linking
+            || self.run_config.verifier_disabled()
+        {
             Compatibility::no_check()
         } else {
             Compatibility::new(
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
+                false,
                 false,
             )
         };
@@ -538,6 +545,12 @@ impl TestRunConfig {
     pub(crate) fn using_masm(&self) -> bool {
         match self {
             Self::CompilerV2 { use_masm, .. } => *use_masm,
+        }
+    }
+
+    pub(crate) fn verifier_disabled(&self) -> bool {
+        match self {
+            Self::CompilerV2 { vm_config, .. } => vm_config.verifier_config.verify_nothing(),
         }
     }
 }

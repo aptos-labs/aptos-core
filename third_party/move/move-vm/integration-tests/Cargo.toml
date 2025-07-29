@@ -28,6 +28,7 @@ move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = []

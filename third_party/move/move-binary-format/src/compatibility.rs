@@ -35,6 +35,9 @@ pub struct Compatibility {
     pub(crate) check_friend_linking: bool,
     /// if false, entry function will be treated as regular function.
     pub(crate) treat_entry_as_public: bool,
+    /// A temporary flag to preserve compatibility.
+    /// TODO(#17171): remove this once 1.34 rolled out
+    function_type_compat_bug: bool,
 }
 
 impl Default for Compatibility {
@@ -44,6 +47,7 @@ impl Default for Compatibility {
             check_struct_layout: true,
             check_friend_linking: true,
             treat_entry_as_public: true,
+            function_type_compat_bug: false,
         }
     }
 }
@@ -59,6 +63,7 @@ impl Compatibility {
             check_struct_layout: false,
             check_friend_linking: false,
             treat_entry_as_public: false,
+            function_type_compat_bug: false,
         }
     }
 
@@ -66,12 +71,15 @@ impl Compatibility {
         check_struct_layout: bool,
         check_friend_linking: bool,
         treat_entry_as_public: bool,
+        // TODO: remove this once 1.34 is released
+        function_type_compat_bug: bool,
     ) -> Self {
         Self {
             check_struct_and_pub_function_linking: true,
             check_struct_layout,
             check_friend_linking,
             treat_entry_as_public,
+            function_type_compat_bug,
         }
     }
 
@@ -117,14 +125,14 @@ impl Compatibility {
                 },
             };
 
-            if !struct_abilities_compatible(old_struct.abilities(), new_struct.abilities()) {
+            if !self.struct_abilities_compatible(old_struct.abilities(), new_struct.abilities()) {
                 errors.push(format!(
                     "removed abilities `{}` from struct `{}`",
                     old_struct.abilities().setminus(new_struct.abilities()),
                     old_struct.name()
                 ));
             }
-            if !struct_type_parameters_compatible(
+            if !self.struct_type_parameters_compatible(
                 old_struct.type_parameters(),
                 new_struct.type_parameters(),
             ) {
@@ -134,7 +142,7 @@ impl Compatibility {
                 ));
             }
             // Layout of old and new struct need to be compatible
-            if self.check_struct_layout && !struct_layout_compatible(&old_struct, new_struct) {
+            if self.check_struct_layout && !self.struct_layout_compatible(&old_struct, new_struct) {
                 errors.push(format!("changed layout of struct `{}`", old_struct.name()));
             }
         }
@@ -227,21 +235,21 @@ impl Compatibility {
                 Some("removed `entry` modifier")
             } else if !is_attribute_compatible {
                 Some("removed required attributes")
-            } else if !signature_compatible(
+            } else if !self.signature_compatible(
                 old_module,
                 old_func.parameters(),
                 new_module,
                 new_func.parameters(),
             ) {
                 Some("changed parameter types")
-            } else if !signature_compatible(
+            } else if !self.signature_compatible(
                 old_module,
                 old_func.return_type(),
                 new_module,
                 new_func.return_type(),
             ) {
                 Some("changed return type")
-            } else if !fun_type_parameters_compatible(
+            } else if !self.fun_type_parameters_compatible(
                 old_func.type_parameters(),
                 new_func.type_parameters(),
             ) {
@@ -291,186 +299,240 @@ impl Compatibility {
             Ok(())
         }
     }
-}
 
-// When upgrading, the new abilities must be a superset of the old abilities.
-// Adding an ability is fine, but removing an ability could cause existing usages to fail.
-fn struct_abilities_compatible(old_abilities: AbilitySet, new_abilities: AbilitySet) -> bool {
-    old_abilities.is_subset(new_abilities)
-}
+    // When upgrading, the new abilities must be a superset of the old abilities.
+    // Adding an ability is fine, but removing an ability could cause existing usages to fail.
+    fn struct_abilities_compatible(
+        &self,
+        old_abilities: AbilitySet,
+        new_abilities: AbilitySet,
+    ) -> bool {
+        old_abilities.is_subset(new_abilities)
+    }
 
-// When upgrading, the new type parameters must be the same length, and the new type parameter
-// constraints must be compatible
-fn fun_type_parameters_compatible(
-    old_type_parameters: &[AbilitySet],
-    new_type_parameters: &[AbilitySet],
-) -> bool {
-    old_type_parameters.len() == new_type_parameters.len()
-        && old_type_parameters.iter().zip(new_type_parameters).all(
-            |(old_type_parameter_constraint, new_type_parameter_constraint)| {
-                type_parameter_constraints_compatible(
-                    *old_type_parameter_constraint,
-                    *new_type_parameter_constraint,
-                )
-            },
-        )
-}
+    // When upgrading, the new type parameters must be the same length, and the new type parameter
+    // constraints must be compatible
+    fn fun_type_parameters_compatible(
+        &self,
+        old_type_parameters: &[AbilitySet],
+        new_type_parameters: &[AbilitySet],
+    ) -> bool {
+        old_type_parameters.len() == new_type_parameters.len()
+            && old_type_parameters.iter().zip(new_type_parameters).all(
+                |(old_type_parameter_constraint, new_type_parameter_constraint)| {
+                    self.type_parameter_constraints_compatible(
+                        *old_type_parameter_constraint,
+                        *new_type_parameter_constraint,
+                    )
+                },
+            )
+    }
 
-fn struct_type_parameters_compatible(
-    old_type_parameters: &[StructTypeParameter],
-    new_type_parameters: &[StructTypeParameter],
-) -> bool {
-    old_type_parameters.len() == new_type_parameters.len()
-        && old_type_parameters.iter().zip(new_type_parameters).all(
-            |(old_type_parameter, new_type_parameter)| {
-                type_parameter_phantom_decl_compatible(old_type_parameter, new_type_parameter)
-                    && type_parameter_constraints_compatible(
+    fn struct_type_parameters_compatible(
+        &self,
+        old_type_parameters: &[StructTypeParameter],
+        new_type_parameters: &[StructTypeParameter],
+    ) -> bool {
+        old_type_parameters.len() == new_type_parameters.len()
+            && old_type_parameters.iter().zip(new_type_parameters).all(
+                |(old_type_parameter, new_type_parameter)| {
+                    self.type_parameter_phantom_decl_compatible(
+                        old_type_parameter,
+                        new_type_parameter,
+                    ) && self.type_parameter_constraints_compatible(
                         old_type_parameter.constraints,
                         new_type_parameter.constraints,
                     )
-            },
-        )
-}
-
-fn struct_layout_compatible(
-    old_struct: &StructDefinitionView<CompiledModule>,
-    new_struct: &StructDefinitionView<CompiledModule>,
-) -> bool {
-    if old_struct.variant_count() == 0 {
-        // Old is regular struct, new needs to be as well (i.e. have zero variants) and compatible
-        // fields.
-        new_struct.variant_count() == 0
-            && fields_compatible(
-                old_struct.fields_optional_variant(None),
-                new_struct.fields_optional_variant(None),
+                },
             )
-    } else {
-        // Enum: the prefix of variants in the old definition must be the same as in the new one.
-        // (a) the variant names need to match
-        // (b) the variant fields need to be compatible
-        old_struct.variant_count() <= new_struct.variant_count()
-            && (0..old_struct.variant_count()).all(|i| {
-                let v_idx = i as VariantIndex;
-                old_struct.variant_name(v_idx) == new_struct.variant_name(v_idx)
-                    && fields_compatible(
-                        old_struct.fields_optional_variant(Some(v_idx)),
-                        new_struct.fields_optional_variant(Some(v_idx)),
-                    )
-            })
     }
-}
 
-fn fields_compatible<'a, 'b>(
-    mut old_fields: impl Iterator<Item = FieldDefinitionView<'a, CompiledModule>>,
-    mut new_fields: impl Iterator<Item = FieldDefinitionView<'b, CompiledModule>>,
-) -> bool {
-    loop {
-        match (old_fields.next(), new_fields.next()) {
-            (Some(old_field), Some(new_field)) => {
-                // Require names and types to be equal. Notice this is a stricter definition
-                // than required. We could in principle choose that changing the name
-                // (but not position or type) of a field is compatible. The VM does not care about
-                // the name of a field but clients presumably do.
-                if old_field.name() != new_field.name()
-                    || !signature_token_compatible(
-                        old_field.module(),
-                        old_field.signature_token(),
-                        new_field.module(),
-                        new_field.signature_token(),
-                    )
-                {
-                    return false;
-                }
-            },
-            (None, None) => return true,
-            _ => return false,
+    fn struct_layout_compatible(
+        &self,
+        old_struct: &StructDefinitionView<CompiledModule>,
+        new_struct: &StructDefinitionView<CompiledModule>,
+    ) -> bool {
+        if old_struct.variant_count() == 0 {
+            // Old is regular struct, new needs to be as well (i.e. have zero variants) and compatible
+            // fields.
+            new_struct.variant_count() == 0
+                && self.fields_compatible(
+                    old_struct.fields_optional_variant(None),
+                    new_struct.fields_optional_variant(None),
+                )
+        } else {
+            // Enum: the prefix of variants in the old definition must be the same as in the new one.
+            // (a) the variant names need to match
+            // (b) the variant fields need to be compatible
+            old_struct.variant_count() <= new_struct.variant_count()
+                && (0..old_struct.variant_count()).all(|i| {
+                    let v_idx = i as VariantIndex;
+                    old_struct.variant_name(v_idx) == new_struct.variant_name(v_idx)
+                        && self.fields_compatible(
+                            old_struct.fields_optional_variant(Some(v_idx)),
+                            new_struct.fields_optional_variant(Some(v_idx)),
+                        )
+                })
         }
     }
-}
 
-fn signature_compatible(
-    old_module: &CompiledModule,
-    old_sig: &Signature,
-    new_module: &CompiledModule,
-    new_sig: &Signature,
-) -> bool {
-    old_sig.0.len() == new_sig.0.len()
-        && old_sig
-            .0
-            .iter()
-            .zip(new_sig.0.iter())
-            .all(|(old_tok, new_tok)| {
-                signature_token_compatible(old_module, old_tok, new_module, new_tok)
-            })
-}
-
-fn signature_token_compatible(
-    old_module: &CompiledModule,
-    old_tok: &SignatureToken,
-    new_module: &CompiledModule,
-    new_tok: &SignatureToken,
-) -> bool {
-    match (old_tok, new_tok) {
-        (SignatureToken::Reference(old_elem), SignatureToken::Reference(new_elem)) => {
-            signature_token_compatible(old_module, old_elem, new_module, new_elem)
-        },
-        (
-            SignatureToken::MutableReference(old_elem),
-            SignatureToken::MutableReference(new_elem),
-        ) => signature_token_compatible(old_module, old_elem, new_module, new_elem),
-        (SignatureToken::Vector(old_elem), SignatureToken::Vector(new_elem)) => {
-            signature_token_compatible(old_module, old_elem, new_module, new_elem)
-        },
-        (SignatureToken::Struct(old_handle), SignatureToken::Struct(new_handle)) => {
-            struct_equal(old_module, *old_handle, new_module, *new_handle)
-        },
-        (
-            SignatureToken::StructInstantiation(old_handle, old_args),
-            SignatureToken::StructInstantiation(new_handle, new_args),
-        ) => {
-            struct_equal(old_module, *old_handle, new_module, *new_handle)
-                && old_args.len() == new_args.len()
-                && (0..old_args.len()).all(|i| {
-                    signature_token_compatible(old_module, &old_args[i], new_module, &new_args[i])
-                })
-        },
-        _ => {
-            // Map to representation equality. Notice that after handling of the cases above,
-            // two signature tokens which have equal representation are also logically equal.
-            // This is _not_ the case if handles are involved: for instance, Struct(h1) and
-            // Struct(h2) can be different even if h1 == h2, but stem from different modules.
-            old_tok == new_tok
-        },
+    fn fields_compatible<'a, 'b>(
+        &self,
+        mut old_fields: impl Iterator<Item = FieldDefinitionView<'a, CompiledModule>>,
+        mut new_fields: impl Iterator<Item = FieldDefinitionView<'b, CompiledModule>>,
+    ) -> bool {
+        loop {
+            match (old_fields.next(), new_fields.next()) {
+                (Some(old_field), Some(new_field)) => {
+                    // Require names and types to be equal. Notice this is a stricter definition
+                    // than required. We could in principle choose that changing the name
+                    // (but not position or type) of a field is compatible. The VM does not care about
+                    // the name of a field but clients presumably do.
+                    if old_field.name() != new_field.name()
+                        || !self.signature_token_compatible(
+                            old_field.module(),
+                            old_field.signature_token(),
+                            new_field.module(),
+                            new_field.signature_token(),
+                        )
+                    {
+                        return false;
+                    }
+                },
+                (None, None) => return true,
+                _ => return false,
+            }
+        }
     }
-}
 
-fn struct_equal(
-    old_module: &CompiledModule,
-    old_handle: StructHandleIndex,
-    new_module: &CompiledModule,
-    new_handle: StructHandleIndex,
-) -> bool {
-    let old_struct = StructHandleView::new(old_module, old_module.struct_handle_at(old_handle));
-    let new_struct = StructHandleView::new(new_module, new_module.struct_handle_at(new_handle));
-    old_struct.name() == new_struct.name() && old_struct.module_id() == new_struct.module_id()
-}
+    fn signature_compatible(
+        &self,
+        old_module: &CompiledModule,
+        old_sig: &Signature,
+        new_module: &CompiledModule,
+        new_sig: &Signature,
+    ) -> bool {
+        old_sig.0.len() == new_sig.0.len()
+            && old_sig
+                .0
+                .iter()
+                .zip(new_sig.0.iter())
+                .all(|(old_tok, new_tok)| {
+                    self.signature_token_compatible(old_module, old_tok, new_module, new_tok)
+                })
+    }
 
-// When upgrading, the new constraints must be a subset of (or equal to) the old constraints.
-// Removing an ability is fine, but adding an ability could cause existing callsites to fail
-fn type_parameter_constraints_compatible(
-    old_type_constraints: AbilitySet,
-    new_type_constraints: AbilitySet,
-) -> bool {
-    new_type_constraints.is_subset(old_type_constraints)
-}
+    fn signature_token_compatible(
+        &self,
+        old_module: &CompiledModule,
+        old_tok: &SignatureToken,
+        new_module: &CompiledModule,
+        new_tok: &SignatureToken,
+    ) -> bool {
+        let vec_ok = |old_tys: &[SignatureToken], new_tys: &[SignatureToken]| -> bool {
+            old_tys.len() == new_tys.len()
+                && old_tys.iter().zip(new_tys).all(|(old, new)| {
+                    self.signature_token_compatible(old_module, old, new_module, new)
+                })
+        };
+        match (old_tok, new_tok) {
+            (SignatureToken::Bool, SignatureToken::Bool)
+            | (SignatureToken::U8, SignatureToken::U8)
+            | (SignatureToken::U16, SignatureToken::U16)
+            | (SignatureToken::U32, SignatureToken::U32)
+            | (SignatureToken::U64, SignatureToken::U64)
+            | (SignatureToken::U128, SignatureToken::U128)
+            | (SignatureToken::U256, SignatureToken::U256)
+            | (SignatureToken::Address, SignatureToken::Address)
+            | (SignatureToken::Signer, SignatureToken::Signer) => true,
+            (SignatureToken::TypeParameter(old_idx), SignatureToken::TypeParameter(new_idx)) => {
+                old_idx == new_idx
+            },
+            (SignatureToken::Reference(old_elem), SignatureToken::Reference(new_elem)) => {
+                self.signature_token_compatible(old_module, old_elem, new_module, new_elem)
+            },
+            (
+                SignatureToken::MutableReference(old_elem),
+                SignatureToken::MutableReference(new_elem),
+            ) => self.signature_token_compatible(old_module, old_elem, new_module, new_elem),
+            (SignatureToken::Vector(old_elem), SignatureToken::Vector(new_elem)) => {
+                self.signature_token_compatible(old_module, old_elem, new_module, new_elem)
+            },
+            (SignatureToken::Struct(old_handle), SignatureToken::Struct(new_handle)) => {
+                self.struct_equal(old_module, *old_handle, new_module, *new_handle)
+            },
+            (
+                SignatureToken::StructInstantiation(old_handle, old_args),
+                SignatureToken::StructInstantiation(new_handle, new_args),
+            ) => {
+                self.struct_equal(old_module, *old_handle, new_module, *new_handle)
+                    && vec_ok(old_args, new_args)
+            },
+            (
+                SignatureToken::Function(old_args, old_results, old_abilities),
+                SignatureToken::Function(new_args, new_results, new_abilities),
+            ) => {
+                // Before bug #17171 was fixed, function types where compared with representation
+                // equality. Simulate this behavior if requested.
+                // TODO(#17171): remove this once fix rolled out
+                if self.function_type_compat_bug {
+                    old_tok == new_tok
+                } else {
+                    vec_ok(old_args, new_args)
+                        && vec_ok(old_results, new_results)
+                        && old_abilities == new_abilities
+                }
+            },
+            (SignatureToken::Bool, _)
+            | (SignatureToken::U8, _)
+            | (SignatureToken::U64, _)
+            | (SignatureToken::U128, _)
+            | (SignatureToken::Address, _)
+            | (SignatureToken::Signer, _)
+            | (SignatureToken::Vector(_), _)
+            | (SignatureToken::Function(..), _)
+            | (SignatureToken::Struct(_), _)
+            | (SignatureToken::StructInstantiation(_, _), _)
+            | (SignatureToken::Reference(_), _)
+            | (SignatureToken::MutableReference(_), _)
+            | (SignatureToken::TypeParameter(_), _)
+            | (SignatureToken::U16, _)
+            | (SignatureToken::U32, _)
+            | (SignatureToken::U256, _) => false,
+        }
+    }
 
-// Adding a phantom annotation to a parameter won't break clients because that can only increase the
-// the set of abilities in struct instantiations. Put it differently, adding phantom declarations
-// relaxes the requirements for clients.
-fn type_parameter_phantom_decl_compatible(
-    old_type_parameter: &StructTypeParameter,
-    new_type_parameter: &StructTypeParameter,
-) -> bool {
-    // old_type_paramter.is_phantom => new_type_parameter.is_phantom
-    !old_type_parameter.is_phantom || new_type_parameter.is_phantom
+    fn struct_equal(
+        &self,
+        old_module: &CompiledModule,
+        old_handle: StructHandleIndex,
+        new_module: &CompiledModule,
+        new_handle: StructHandleIndex,
+    ) -> bool {
+        let old_struct = StructHandleView::new(old_module, old_module.struct_handle_at(old_handle));
+        let new_struct = StructHandleView::new(new_module, new_module.struct_handle_at(new_handle));
+        old_struct.name() == new_struct.name() && old_struct.module_id() == new_struct.module_id()
+    }
+
+    // When upgrading, the new constraints must be a subset of (or equal to) the old constraints.
+    // Removing an ability is fine, but adding an ability could cause existing callsites to fail
+    fn type_parameter_constraints_compatible(
+        &self,
+        old_type_constraints: AbilitySet,
+        new_type_constraints: AbilitySet,
+    ) -> bool {
+        new_type_constraints.is_subset(old_type_constraints)
+    }
+
+    // Adding a phantom annotation to a parameter won't break clients because that can only increase the
+    // the set of abilities in struct instantiations. Put it differently, adding phantom declarations
+    // relaxes the requirements for clients.
+    fn type_parameter_phantom_decl_compatible(
+        &self,
+        old_type_parameter: &StructTypeParameter,
+        new_type_parameter: &StructTypeParameter,
+    ) -> bool {
+        // old_type_paramter.is_phantom => new_type_parameter.is_phantom
+        !old_type_parameter.is_phantom || new_type_parameter.is_phantom
+    }
 }

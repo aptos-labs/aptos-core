@@ -1,0 +1,52 @@
+//# publish --verbose
+module 0x66::m
+struct A has drop     // StructHandleIndex = 0
+    x: u64
+struct B has drop     // StructHandleIndex = 1
+    x: u64
+
+// First publish with function |A|
+public fun can_upgrade_wrong_type(f: |A|)
+    ld_u64 32
+    pack A
+    move_loc f
+    call_closure <|A|>
+    ret
+
+//# publish
+module 0x66::test
+use 0x66::m
+
+public fun call_it()
+    // Call the function using a closure of type |A|
+    pack_closure action, 0
+    call m::can_upgrade_wrong_type
+    ret
+
+fun action(x: m::A)
+    ret
+
+// Run it the function
+//# run 0x66::test::call_it
+
+//# publish --verbose
+module 0x66::m
+// We are swapping the order of A and B, such they get different struct handle
+// indices assigned.
+struct B has drop    // StructHandleIndex = 0
+    x: u64
+struct A has drop    // StructHandleIndex = 1
+    x: u64
+
+// Second publish with wrong type. This worked before #17171 was fixed,
+// allowing to pass a `B` to `0x66::test::action`. This was only
+// recognized during actual execution by paranoid mode.
+public fun can_upgrade_wrong_type(f: |B|)
+    ld_u64 32
+    pack B
+    move_loc f
+    call_closure <|B|>
+    ret
+
+// Run it again, this time passing `B`. Should never reach this point.
+//# run --verbose 0x66::test::call_it

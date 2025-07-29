@@ -1,0 +1,25 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-21:
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::helpers'. Got VMError: {
+    major_status: PACK_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x66::helpers,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+
+task 1 'run'. lines 23-33:
+Error: error: unknown module `0000000000000000000000000000000000000000000000000000000000000066::helpers`
+   ┌─ test:28:5
+   │
+28 │     call h::f_store_drop
+   │     ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown module `0000000000000000000000000000000000000000000000000000000000000066::helpers`
+   ┌─ test:29:5
+   │
+29 │     call h::pack
+   │     ^^^^^^^^^^^^
+
+

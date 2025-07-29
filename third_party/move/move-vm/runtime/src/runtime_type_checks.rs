@@ -149,7 +149,7 @@ pub fn verify_pack_closure(
         AbilitySet::PRIVATE_FUNCTIONS
     };
     // Verify that captured arguments are assignable against types in the function
-    // signature.
+    // signature, and that they are no references.
     let expected_capture_tys = mask.extract(func.param_tys(), true);
 
     let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
@@ -157,6 +157,7 @@ pub fn verify_pack_closure(
         .into_iter()
         .zip(given_capture_tys.into_iter())
     {
+        expected.paranoid_check_is_no_ref("Captured argument type")?;
         with_instantiation(ty_builder, func, expected, |expected| {
             // Intersect the captured type with the accumulated abilities
             abilities = abilities.intersect(given.abilities()?);

@@ -1,0 +1,45 @@
+processed 6 tasks
+
+task 2 'run'. lines 35-48:
+Error: Script execution failed with VMError: {
+    message: Expected type |u64|u64, got |&u64|u64 has copy + drop + store which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 3 'run'. lines 50-63:
+Error: Script execution failed with VMError: {
+    message: Expected type |u64|&u64, got |&u64|u64 has copy + drop + store which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 4 'run'. lines 65-78:
+Error: Script execution failed with VMError: {
+    message: Expected type |&mut u64|u64, got |&u64|u64 has copy + drop + store which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+
+task 5 'run'. lines 80-93:
+Error: Script execution failed with VMError: {
+    message: Expected type |&bool|u64, got |&u64|u64 has copy + drop + store which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
