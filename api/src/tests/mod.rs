@@ -29,6 +29,7 @@ use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, 
 
 #[cfg(test)]
 fn new_test_context_with_config(test_name: String, mut node_config: NodeConfig) -> TestContext {
+    node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 10);
     let test_context = super_new_test_context(test_name, node_config, false, None);
     let _ = test_context
