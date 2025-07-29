@@ -18,6 +18,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use std::{sync::Arc, time::Duration};
+use aptos_types::decryption::DecConfig;
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<PipelinedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
@@ -73,6 +74,8 @@ pub trait StateComputer: Send + Sync {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        dec_config_slow_path: Option<DecConfig>,
+        dec_config_fast_path: Option<DecConfig>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

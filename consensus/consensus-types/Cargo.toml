@@ -14,10 +14,12 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-batch-encryption = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-short-hex-str = { workspace = true }

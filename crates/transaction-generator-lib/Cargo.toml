@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+ark-std = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -26,3 +27,5 @@ move-package = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+aptos-batch-encryption = { workspace = true }
+aptos-types = { workspace = true }

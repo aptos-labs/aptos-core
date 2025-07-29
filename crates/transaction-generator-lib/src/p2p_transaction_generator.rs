@@ -4,7 +4,7 @@ use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, decryption::{Id, Round}, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},
@@ -16,6 +16,9 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, shared::algebra::shamir::ThresholdConfig};
+use aptos_types::decryption::{EncryptionKey, PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH};
+use ark_std::rand::thread_rng;
 
 pub enum SamplingMode {
     /// See `BasicSampler`.
@@ -150,7 +153,7 @@ pub struct P2PTransactionGenerator {
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
-    encrypted: bool,
+    encryption_key: Option<EncryptionKey>,
 }
 
 impl P2PTransactionGenerator {
@@ -162,7 +165,7 @@ impl P2PTransactionGenerator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampler: Box<dyn Sampler<AccountAddress>>,
-        encrypted: bool,
+        encryption_key: Option<EncryptionKey>,
     ) -> Self {
         Self {
             rng,
@@ -172,7 +175,7 @@ impl P2PTransactionGenerator {
             sampler,
             invalid_transaction_ratio,
             use_fa_transfer,
-            encrypted,
+            encryption_key,
         }
     }
 
@@ -183,8 +186,8 @@ impl P2PTransactionGenerator {
         num_coins: u64,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        if self.encrypted {
-            self.gen_single_encrypted_txn(from, to, num_coins, txn_factory)
+        if let Some(encryption_key) = &self.encryption_key {
+            self.gen_single_encrypted_txn(from, to, num_coins, txn_factory, encryption_key)
         } else {
             self.gen_single_plain_txn(from, to, num_coins, txn_factory)
         }
@@ -214,6 +217,7 @@ impl P2PTransactionGenerator {
         to: &AccountAddress,
         num_coins: u64,
         txn_factory: &TransactionFactory,
+        encryption_key: &EncryptionKey,
     ) -> SignedTransaction {
         let payload = if self.use_fa_transfer {
             aptos_stdlib::aptos_account_fungible_transfer_only(
@@ -222,9 +226,8 @@ impl P2PTransactionGenerator {
         } else {
             aptos_stdlib::aptos_coin_transfer(*to, num_coins)
         };
-        let id = Id::random();
-        let round = Round::default();
-        let encrypted_payload = payload.clone().into_encrypted(id, round).unwrap();
+        let mut rng = thread_rng();
+        let encrypted_payload = payload.clone().encrypt(encryption_key, &mut rng).unwrap();
         let signed_encrypted_txn = from.sign_with_transaction_builder(txn_factory.payload(encrypted_payload));
         assert!(signed_encrypted_txn.is_encrypted());
         signed_encrypted_txn
@@ -384,6 +387,14 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
                 Box::new(BurnAndRecycleSampler::new(recycle_batch_size))
             },
         };
+        let encryption_key = if self.encrypted {
+            let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
+            let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
+            let (ek, _, _, _, _, _) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+            Some(ek)
+        } else {
+            None
+        };
         Box::new(P2PTransactionGenerator::new(
             rng,
             self.amount,
@@ -392,7 +403,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.invalid_transaction_ratio,
             self.use_fa_transfer,
             sampler,
-            self.encrypted,
+            encryption_key,
         ))
     }
 }

@@ -703,7 +703,7 @@ pub(crate) async fn process_config_update<V, P>(
         Ok(consensus_config) => {
             *broadcast_within_validator_network.write() =
                 // !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
-                // daniel todo: should only broadcast encrypted txns
+                // daniel todo: revisit if we inline encrypted txns or use QS
                 true
         },
         Err(e) => {

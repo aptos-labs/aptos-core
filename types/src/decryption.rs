@@ -9,100 +9,44 @@
 
 use aptos_crypto::hash::HashValue;
 use serde::{Deserialize, Serialize};
-use crate::{decryption_traits::{BatchThresholdEncryption, ThresholdConfig, Plaintext}, account_address::AccountAddress, validator_verifier::ValidatorVerifier};
-use rand::RngCore;
-use rayon::ThreadPool;
-use anyhow::Result;
-use aptos_dkg::{
-    pvss::{Player, WeightedConfig},
-};
+use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use std::sync::Arc;
+use aptos_batch_encryption::traits::BatchThresholdEncryption;
+use aptos_batch_encryption::schemes::fptx::FPTX;
+use aptos_batch_encryption::shared::algebra::shamir::ThresholdConfig;
+use once_cell::sync::Lazy;
 
-pub struct FernandoBTE;
-
-impl BatchThresholdEncryption for FernandoBTE {
-    type EncryptionKey = ();
-    type DigestKey = ();
-    type Ciphertext = Vec<u8>;
-    type RoundNumber = u64;
-    type RoundNumberRange = (u64, u64);
-    type Digest = HashValue;
-    type DecryptionAuxInfo = ();
-    type MasterSecretKeyShare = ();
-    type DecryptionKeyShare = ();
-    type DecryptionKey = ();
-    type Id = HashValue;
-
-    fn setup(rng: &mut impl RngCore, max_batch_size: usize, tc: &ThresholdConfig)
-        -> (Self::EncryptionKey, Self::DigestKey, Vec<Self::MasterSecretKeyShare>) {
-        unimplemented!()
-    }
-
-    fn encrypt(ek: &Self::EncryptionKey, msg: impl Plaintext, t: Self::RoundNumberRange)
-        -> Self::Ciphertext {
-        unimplemented!()
-    }
-
-    fn digest(&self, cts: &[Self::Ciphertext], pool: &ThreadPool)
-        -> Result<(Self::Digest, Self::DecryptionAuxInfo)> {
-        unimplemented!()
-    }
-
-    fn verify_ct(_unverified_ct: &Self::Ciphertext) -> Result<()> {
-        Ok(())
-    }
-
-    fn ct_round_number_range(ct: &Self::Ciphertext) -> Self::RoundNumberRange {
-        unimplemented!()
-    }
-
-    fn ct_id(ct: &Self::Ciphertext) -> Self::Id {
-        unimplemented!()
-    }
-
-    fn prepare_decryption_aux_info(aux: &mut Self::DecryptionAuxInfo, pool: &ThreadPool) {
-        unimplemented!()
-    }
-
-    fn derive_decryption_key_share(
-        msk_share: &Self::MasterSecretKeyShare,
-        config: &ThresholdConfig,
-        digest: &Self::Digest,
-        t: Self::RoundNumber
-        ) -> Self::DecryptionKeyShare {
-        unimplemented!()
-    }
-
-    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig)
-        -> Result<Self::DecryptionKey> {
-        unimplemented!()
-    }
-
-    fn decrypt(
-        cts: &[Self::Ciphertext],
-        aux_info: Self::DecryptionAuxInfo,
-        pool: ThreadPool
-        ) -> Result<Vec<impl Plaintext>> {
-        Ok(vec![MyPlaintext])
-    }
-}
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MyPlaintext;
-impl Plaintext for MyPlaintext {}
-
-pub type EncryptionKey = <FernandoBTE as BatchThresholdEncryption>::EncryptionKey;
-pub type DigestKey = <FernandoBTE as BatchThresholdEncryption>::DigestKey;
-pub type Ciphertext = <FernandoBTE as BatchThresholdEncryption>::Ciphertext;
-pub type Id = <FernandoBTE as BatchThresholdEncryption>::Id;
-pub type Round = <FernandoBTE as BatchThresholdEncryption>::RoundNumber;
-pub type RoundRange = <FernandoBTE as BatchThresholdEncryption>::RoundNumberRange;
-pub type Digest = <FernandoBTE as BatchThresholdEncryption>::Digest;
-pub type DecryptionAuxInfo = <FernandoBTE as BatchThresholdEncryption>::DecryptionAuxInfo;
-pub type MasterSecretKeyShare = <FernandoBTE as BatchThresholdEncryption>::MasterSecretKeyShare;
-pub type DecryptionKeyShare = <FernandoBTE as BatchThresholdEncryption>::DecryptionKeyShare;
-pub type DecryptionKey = <FernandoBTE as BatchThresholdEncryption>::DecryptionKey;
+pub type EncryptionKey = <FPTX as BatchThresholdEncryption>::EncryptionKey;
+pub type DigestKey = <FPTX as BatchThresholdEncryption>::DigestKey;
+pub type Ciphertext = <FPTX as BatchThresholdEncryption>::Ciphertext;
+pub type Id = <FPTX as BatchThresholdEncryption>::Id;
+pub type Round = <FPTX as BatchThresholdEncryption>::Round;
+pub type Digest = <FPTX as BatchThresholdEncryption>::Digest;
+pub type EvalProofsPromise<'a> = <FPTX as BatchThresholdEncryption>::EvalProofsPromise<'a>;
+pub type EvalProofs = <FPTX as BatchThresholdEncryption>::EvalProofs;
+pub type MasterSecretKeyShare = <FPTX as BatchThresholdEncryption>::MasterSecretKeyShare;
+pub type VerificationKey = <FPTX as BatchThresholdEncryption>::VerificationKey;
+pub type DecryptionKeyShare = <FPTX as BatchThresholdEncryption>::DecryptionKeyShare;
+pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
+pub const PROTOTYPE_SETUP_SEED: u64 = 233;
+pub const PROTOTYPE_BATCH_SIZE: usize = 128;
+pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 10000;
+pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 7;
+pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 6;
+pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 4;
+pub const PROTOTYPE_DECRYPTION_POOL_SIZE: usize = 8;
+
+pub static DECRYPTION_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(PROTOTYPE_DECRYPTION_POOL_SIZE) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("decryption-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum DecryptionMessage {
@@ -116,15 +60,16 @@ pub struct DecMetadata {
     pub round: Round,
     pub timestamp: u64,
     pub block_id: HashValue,
+    pub digest: Digest,
 }
 
 impl DecMetadata {
-    pub fn new(epoch: u64, round: Round, timestamp: u64, block_id: HashValue) -> Self {
-        Self { epoch, round, timestamp, block_id }
+    pub fn new(epoch: u64, round: Round, timestamp: u64, block_id: HashValue, digest: Digest) -> Self {
+        Self { epoch, round, timestamp, block_id, digest }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecShare {
     pub author: Author,
     pub metadata: DecMetadata,
@@ -132,25 +77,27 @@ pub struct DecShare {
 }
 
 impl DecShare {
-    pub fn new_for_testing(author: Author, metadata: DecMetadata) -> Self {
-        Self {
-            author,
-            metadata,
-            share: DecryptionKeyShare::default(),
-        }
+    pub fn new(author: Author, metadata: DecMetadata, share: DecryptionKeyShare) -> Self {
+        Self { author, metadata, share }
     }
 
     pub fn verify(&self, config: &DecConfig) -> anyhow::Result<()> {
+        let index = config.get_id(self.author());
+        let decryption_key_share = self.share().clone();
+        config.verification_keys[index].verify_decryption_key_share(&self.metadata.digest, &decryption_key_share)?;
         Ok(())
     }
 
     pub fn aggregate<'a>(
-        shares: impl Iterator<Item = &'a DecShare>,
+        dec_shares: impl Iterator<Item = &'a DecShare>,
         config: &DecConfig,
-        metadata: DecMetadata,
+        pool: &rayon::ThreadPool
     ) -> anyhow::Result<DecryptionKey> {
-        // TODO: implement aggregation
-        Ok(DecryptionKey::default())
+        let shares: Vec<DecryptionKeyShare> = dec_shares
+            .map(|dec_share| dec_share.share.clone())
+            .collect();
+        let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config, pool)?;
+        Ok(decryption_key)
     }
 
     pub fn author(&self) -> &Author {
@@ -174,7 +121,7 @@ impl DecShare {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FastDecShare {
     pub share: DecShare,
 }
@@ -182,10 +129,6 @@ pub struct FastDecShare {
 impl FastDecShare {
     pub fn new(share: DecShare) -> Self {
         Self { share }
-    }
-
-    pub fn new_for_testing(author: Author, metadata: DecMetadata) -> Self {
-        Self { share: DecShare::new_for_testing(author, metadata) }
     }
 
     pub fn share(&self) -> DecShare {
@@ -226,12 +169,16 @@ pub struct DecConfig {
     author: Author,
     epoch: u64,
     validator: Arc<ValidatorVerifier>,
-    wconfig: WeightedConfig,
+    // wconfig: WeightedConfig,
+    digest_key: DigestKey,
+    msk_share: MasterSecretKeyShare,
+    verification_keys: Vec<VerificationKey>,
+    config: ThresholdConfig,
 }
 
 impl DecConfig {
-    pub fn new(author: Author, epoch: u64, validator: Arc<ValidatorVerifier>, wconfig: WeightedConfig) -> Self {
-        Self { author, epoch, validator, wconfig }
+    pub fn new(author: Author, epoch: u64, validator: Arc<ValidatorVerifier>, digest_key: DigestKey, msk_share: MasterSecretKeyShare, verification_keys: Vec<VerificationKey>, config: ThresholdConfig) -> Self {
+        Self { author, epoch, validator, digest_key, msk_share, verification_keys, config }
     }
 
     pub fn get_id(&self, peer: &Author) -> usize {
@@ -242,14 +189,24 @@ impl DecConfig {
             .expect("Peer should be in the index!")
     }
 
-    pub fn get_peer_weight(&self, peer: &Author) -> u64 {
-        let player = Player {
-            id: self.get_id(peer),
-        };
-        self.wconfig.get_player_weight(&player) as u64
+    pub fn digest_key(&self) -> &DigestKey {
+        &self.digest_key
+    }
+
+    pub fn msk_share(&self) -> &MasterSecretKeyShare {
+        &self.msk_share
     }
 
     pub fn threshold(&self) -> u64 {
-        self.wconfig.get_threshold_weight() as u64
+        self.config.t as u64
+    }
+
+    pub fn number_of_validators(&self) -> u64 {
+        self.config.n as u64
+    }
+
+    pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
+        // daniel todo: use weighted config
+        1
     }
 }

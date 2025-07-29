@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use ark_ec::pairing::Pairing as _;
 use ark_ec::AffineRepr;
 use ark_ff::UniformRand;
@@ -15,7 +18,7 @@ use super::algebra::shamir::{ShamirGroupShare, ShamirShare, ThresholdConfig};
 use super::symmetric;
 use anyhow::Result;
 
-
+#[derive(Clone)]
 pub struct BIBEMasterSecretKeyShare {
     mpk_g2: G2Affine,
     shamir_share: ShamirShare,
@@ -32,7 +35,7 @@ pub struct BIBEDecryptionKeyShare {
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BIBEDecryptionKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub digest_g1: G1Affine,
@@ -74,16 +77,16 @@ pub fn gen_msk_shares<R: RngCore + CryptoRng>(
 
     let players = (0..threshold_config.n).map(|x| Player::new(x));
 
-    let (msk_shares, vk_shares) : 
+    let (msk_shares, vk_shares) :
         (
-            Vec<BIBEMasterSecretKeyShare>, 
+            Vec<BIBEMasterSecretKeyShare>,
             Vec<BIBEVerificationKey>,
         )
          = threshold_config
         .share(msk, rng)
         .into_iter()
         .zip(players.clone())
-        .map(|(shamir_share, player)| 
+        .map(|(shamir_share, player)|
             (
                 BIBEMasterSecretKeyShare { mpk_g2: mpk.0, shamir_share, player },
                 BIBEVerificationKey { mpk_g2: mpk.0, vk_g2: (G2Affine::generator() * shamir_share.y).into(), player },
@@ -117,7 +120,7 @@ fn verify_bls(
 ) -> Result<()> {
     let hashed_offset : G1Affine = symmetric::hash_g2_element(offset)?;
 
-    if PairingSetting::pairing( 
+    if PairingSetting::pairing(
         digest.as_g1() + hashed_offset,
         verification_key_g2,
     ) == PairingSetting::pairing(
@@ -133,14 +136,14 @@ fn verify_bls(
 
 impl BIBEVerificationKey {
     pub fn verify_decryption_key_share(
-        &self, 
-        digest: &Digest, 
+        &self,
+        digest: &Digest,
         decryption_key_share: &BIBEDecryptionKeyShare) -> Result<()> {
 
         verify_bls(
-            self.vk_g2, 
-            digest, 
-            self.mpk_g2, 
+            self.vk_g2,
+            digest,
+            self.mpk_g2,
             decryption_key_share.signature_share.g_y
         ).map_err(|_| BatchEncryptionError::DecryptionKeyShareVerifyError)?;
 
@@ -150,14 +153,14 @@ impl BIBEVerificationKey {
 
 impl BIBEMasterPublicKey {
     pub fn verify_decryption_key(
-        &self, 
-        digest: &Digest, 
+        &self,
+        digest: &Digest,
         decryption_key: &BIBEDecryptionKey) -> Result<()> {
 
         verify_bls(
-            self.0, 
-            digest, 
-            self.0, 
+            self.0,
+            digest,
+            self.0,
             decryption_key.signature_g1,
         ).map_err(|_| BatchEncryptionError::DecryptionKeyShareVerifyError)?;
 
@@ -167,7 +170,7 @@ impl BIBEMasterPublicKey {
 
 impl BIBEDecryptionKey {
     pub fn reconstruct(
-        shares: &[BIBEDecryptionKeyShare], 
+        shares: &[BIBEDecryptionKeyShare],
         threshold_config: &ThresholdConfig) -> Result<Self> {
 
         let signature_g1 = threshold_config

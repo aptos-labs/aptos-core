@@ -41,6 +41,7 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use futures::future::join_all;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -69,7 +70,7 @@ impl DecManager {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        signer: Arc<ValidatorSigner>,
+        _signer: Arc<ValidatorSigner>,
         config: DecConfig,
         fast_config: Option<DecConfig>,
         outgoing_blocks: Sender<OrderedBlocks>,
@@ -117,60 +118,92 @@ impl DecManager {
         }
     }
 
-    fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
+    async fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
-        let broadcast_handles: Vec<_> = blocks
+
+        // let broadcast_handles: Vec<DropGuard> = blocks
+        //     .ordered_blocks
+        //     .iter()
+        //     .filter(|block| block.num_encrypted_txns() > 0)
+        //     .map(|block| self.process_incoming_block(block).await)
+        //     .collect();
+
+        let mut broadcast_handles = Vec::new();
+        for block in blocks
             .ordered_blocks
             .iter()
             .filter(|block| block.num_encrypted_txns() > 0)
-            .map(|block| self.process_incoming_block(block))
-            .collect();
+        {
+            let handle = self.process_incoming_block(block).await;
+            broadcast_handles.push(handle);
+        }
+
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_block(&self, block: &PipelinedBlock) -> DropGuard {
-        let dec_share = self.derive_self_dec_share(block);
+    async fn process_incoming_block(&self, block: &PipelinedBlock) -> DropGuard {
+        let dec_share = self.derive_self_dec_share(block).await;
 
         info!(LogSchema::new(LogEvent::BroadcastDecShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
             .round(block.round()));
-        let mut dec_store = self.dec_store.lock();
-        dec_store.update_highest_known_round(block.round());
-        dec_store.add_share(dec_share.clone(), PathType::Slow)
-            .expect("Add self dec share should succeed");
 
-        if let Some(fast_config) = &self.fast_config {
-            let self_fast_share = self.derive_self_fast_dec_share(block);
-            dec_store
-                .add_share(self_fast_share.share(), PathType::Fast)
-                .expect("Add self fast dec share should succeed");
+        let maybe_fast_share = if self.fast_config.is_some() {
+            Some(self.derive_self_fast_dec_share(block).await)
+        } else {
+            None
+        };
+
+        // Now acquire lock and update store
+        {
+            let mut dec_store = self.dec_store.lock();
+            dec_store.update_highest_known_round(block.round());
+            dec_store.add_share(dec_share.clone(), PathType::Slow)
+                .expect("Add self dec share should succeed");
+
+            if let Some(fast_share) = maybe_fast_share {
+                dec_store
+                    .add_share(fast_share.share(), PathType::Fast)
+                    .expect("Add self fast dec share should succeed");
+            }
+
+            dec_store.add_dec_metadata(dec_share.metadata().clone());
         }
 
-        dec_store.add_dec_metadata(dec_share.metadata().clone());
         self.network_sender
             .broadcast_without_self(DecMessage::DecShare(dec_share.clone()).into_network_message());
         self.spawn_aggregate_shares_task(dec_share.metadata().clone())
     }
 
-    fn derive_self_dec_share(&self, block: &PipelinedBlock) -> DecShare {
-        // let digest = block.dec_digest().unwrap();
-        // daniel todo: handle the case where the digest is not set
-        // daniel todo: derive self share
-        let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id());
-        let dec_share = DecShare::new_for_testing(self.author, dec_metadata.clone());
+    async fn derive_self_dec_share(&self, block: &PipelinedBlock) -> DecShare {
+        let futures = block.pipeline_futs().unwrap();
+        let dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
+            let (share, _) = fut.clone().await.expect("Decryption share computation failed");
+            share
+        } else {
+            panic!(
+                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
+                block.block().id()
+            );
+        };
 
         dec_share
     }
 
-    fn derive_self_fast_dec_share(&self, block: &PipelinedBlock) -> FastDecShare {
-        // let digest = block.dec_digest().unwrap();
-        // daniel todo: handle the case where the digest is not set
-        // daniel todo: derive self fast share
-        let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id());
-        let fast_dec_share = FastDecShare::new_for_testing(self.author, dec_metadata.clone());
+    async fn derive_self_fast_dec_share(&self, block: &PipelinedBlock) -> FastDecShare {
+        let futures = block.pipeline_futs().unwrap();
+        let fast_dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
+            let (_, fast_share) = fut.clone().await.expect("Decryption share computation failed");
+            fast_share
+        } else {
+            panic!(
+                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
+                block.block().id()
+            );
+        };
 
         fast_dec_share
     }
@@ -275,11 +308,10 @@ impl DecManager {
             self.config.clone(),
         ));
         let epoch_state = self.epoch_state.clone();
-        let round = metadata.round;
         let dec_store = self.dec_store.clone();
         let task = async move {
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let maybe_existing_shares = dec_store.lock().get_all_shares_authors(round);
+            let maybe_existing_shares = dec_store.lock().get_all_shares_authors(metadata.digest.clone());
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;
                 let request = RequestDecShare::new(metadata.clone());
@@ -290,7 +322,7 @@ impl DecManager {
                     .collect::<Vec<_>>();
                 info!(
                     epoch = epoch,
-                    round = round,
+                    round = metadata.round,
                     "[DecManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
@@ -299,7 +331,7 @@ impl DecManager {
                     .expect("Broadcast cannot fail");
                 info!(
                     epoch = epoch,
-                    round = round,
+                    round = metadata.round,
                     "[DecManager] Finish broadcasting share request",
                 );
             }
@@ -322,9 +354,11 @@ impl DecManager {
         let epoch_state = self.epoch_state.clone();
         let dec_config = self.config.clone();
         let fast_dec_config = self.fast_config.clone();
-        self.dec_store
-            .lock()
-            .update_highest_known_round(highest_known_round);
+        {
+            self.dec_store
+                .lock()
+                .update_highest_known_round(highest_known_round);
+        }
         spawn_named!(
             "dec manager verification",
             Self::verification_task(
@@ -341,7 +375,7 @@ impl DecManager {
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.next() => {
-                    self.process_incoming_blocks(blocks);
+                    self.process_incoming_blocks(blocks).await;
                 }
                 Some(reset) = reset_rx.next() => {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
@@ -363,7 +397,7 @@ impl DecManager {
                                 Ok(maybe_share) => {
                                     // if the block is available
                                     if let Some(block) = self.block_queue.get_block_for_round(request.dec_metadata().round) {
-                                        let dec_share = self.derive_self_dec_share(block);
+                                        let dec_share = self.derive_self_dec_share(block).await;
                                         self.dec_store.lock().add_share(dec_share.clone(), PathType::Slow).expect("Add self dec share should succeed");
                                         self.process_response(protocol, response_sender, DecMessage::DecShare(dec_share));
                                     } else {

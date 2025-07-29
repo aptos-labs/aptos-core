@@ -114,6 +114,9 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, shared::algebra::shamir::ThresholdConfig};
+use aptos_types::decryption::{EncryptionKey, PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS};
+
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -1251,8 +1254,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             },
         };
 
-        let dec_config = rand_config.as_ref().map(|rand_config| DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), rand_config.wconfig().clone()));
-        let fast_dec_config = fast_rand_config.as_ref().map(|rand_config| DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), rand_config.wconfig().clone()));
+
+        let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
+        let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
+
+        let (_, digest_key, verification_keys_slow_path, msk_shares_slow_path, verification_keys_fast_path, msk_shares_fast_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+
+        let self_index = epoch_state.verifier.address_to_validator_index().get(&self.author).expect("self should be in the index");
+        let self_msk_share_slow_path = msk_shares_slow_path[*self_index].clone();
+        let self_msk_share_fast_path = msk_shares_fast_path[*self_index].clone();
+
+        let dec_config_slow_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key.clone(), self_msk_share_slow_path, verification_keys_slow_path, tc_slow_path));
+        let dec_config_fast_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key, self_msk_share_fast_path, verification_keys_fast_path, tc_fast_path));
 
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",
@@ -1297,8 +1310,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 dec_msg_rx,
-                dec_config,
-                fast_dec_config,
+                dec_config_slow_path,
+                dec_config_fast_path,
             )
             .await
         } else {
@@ -1316,8 +1329,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 dec_msg_rx,
-                dec_config,
-                fast_dec_config,
+                dec_config_slow_path,
+                dec_config_fast_path,
             )
             .await
         }

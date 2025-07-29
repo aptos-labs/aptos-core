@@ -3,13 +3,18 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_types::{decryption::{DecKey, Id}, transaction::SignedTransaction, PeerId};
+use aptos_types::{decryption::{Ciphertext, DecryptionKey, EvalProofs, Id}, transaction::SignedTransaction, PeerId};
+use bcs;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use rayon::prelude::*;
+use aptos_types::decryption::DECRYPTION_POOL;
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 
 pub type OptBatches = BatchPointer<BatchInfo>;
 
@@ -369,24 +374,94 @@ impl InlineEncryptedTxns {
         Ok(())
     }
 
-    pub fn verify_encrypted_txns(&self) -> anyhow::Result<()> {
-        // daniel todo
-        Ok(())
-    }
-
     pub fn verify(&self) -> anyhow::Result<()> {
-        // daniel todo
-        // self.verify_ids()?;
-        // self.verify_encrypted_txns()?;
-        Ok(())
+        // verify ciphertexts
+        DECRYPTION_POOL.install(|| {
+            <Vec<SignedTransaction> as AsRef<Vec<SignedTransaction>>>::as_ref(&self.encrypted_txns)
+            // self.encrypted_txns
+            //     .as_ref()
+                .clone()
+                .into_par_iter()
+                .with_min_len(optimal_min_len(self.encrypted_txns.len(), 32))
+                .try_for_each(|t| t.verify_ciphertext())
+        })
     }
 
-    pub fn decrypt(&self, decryption_key: &DecKey) -> anyhow::Result<Vec<SignedTransaction>> {
-        let mut decrypted_txns = Vec::new();
-        for txn in self.encrypted_txns.iter() {
-            let decrypted_txn = txn.decrypt(decryption_key)?;
-            decrypted_txns.push(decrypted_txn.clone());
+    pub fn ciphertexts(&self) -> Vec<Ciphertext> {
+        self.encrypted_txns.iter().filter_map(|txn| txn.ciphertext()).collect()
+    }
+
+    pub fn decrypt(self, decryption_key: &DecryptionKey, proofs: &EvalProofs, pool: &rayon::ThreadPool) -> anyhow::Result<Vec<SignedTransaction>> {
+        let ciphertexts = self.ciphertexts();
+
+        // Ensure we have the same number of ciphertexts as transactions
+        if ciphertexts.len() != self.encrypted_txns.len() {
+            return Err(anyhow::anyhow!(
+                "Mismatch between number of ciphertexts ({}) and transactions ({})",
+                ciphertexts.len(),
+                self.encrypted_txns.len()
+            ));
         }
+
+        // Decrypt the ciphertexts to get plaintexts
+        let plaintexts: Vec<String> = FPTX::decrypt(decryption_key, &ciphertexts, proofs, pool)?;
+
+        // Reconstruct SignedTransaction objects from the decrypted plaintexts
+        let mut decrypted_txns = Vec::new();
+
+        for (i, (mut original_txn, plaintext)) in self.encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
+            // Convert string plaintext to bytes
+            let plaintext_bytes = plaintext.as_bytes();
+
+            // Try to deserialize the plaintext as a TransactionExecutable
+            let decrypted_executable = match bcs::from_bytes::<aptos_types::transaction::TransactionExecutable>(plaintext_bytes) {
+                Ok(executable) => executable,
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Failed to deserialize decrypted executable at index {}: {}",
+                        i,
+                        e
+                    ));
+                }
+            };
+
+            // Create a new RawTransaction with the decrypted executable
+            let mut raw_txn = original_txn.clone().into_raw_transaction();
+            let mut payload = raw_txn.into_payload();
+
+            // Replace the payload's executable with the decrypted one
+            match payload {
+                aptos_types::transaction::TransactionPayload::Payload(inner) => {
+                    match inner {
+                        aptos_types::transaction::TransactionPayloadInner::V1 { executable, extra_config } => {
+                            let new_payload = aptos_types::transaction::TransactionPayload::Payload(
+                                aptos_types::transaction::TransactionPayloadInner::V1 {
+                                    executable: decrypted_executable,
+                                    extra_config: extra_config,
+                                }
+                            );
+                            payload = new_payload;
+                        }
+                        _ => {
+                            return Err(anyhow::anyhow!(
+                                "Unsupported payload type for decryption at index {}",
+                                i
+                            ));
+                        }
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Unsupported payload type for decryption at index {}",
+                        i
+                    ));
+                }
+            }
+
+            original_txn.update_payload(payload);
+            decrypted_txns.push(original_txn);
+        }
+
         Ok(decrypted_txns)
     }
 }

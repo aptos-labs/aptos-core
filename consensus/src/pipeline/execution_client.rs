@@ -439,8 +439,8 @@ impl TExecutionClient for ExecutionProxyClient {
         highest_committed_round: Round,
         new_pipeline_enabled: bool,
         dec_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingDecRequest>,
-        dec_config: Option<DecConfig>,
-        fast_dec_config: Option<DecConfig>,
+        dec_config_slow_path: Option<DecConfig>,
+        dec_config_fast_path: Option<DecConfig>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
@@ -456,8 +456,8 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_publisher.clone(),
             new_pipeline_enabled,
             dec_msg_rx,
-            dec_config,
-            fast_dec_config,
+            dec_config_slow_path.clone(),
+            dec_config_fast_path.clone(),
         );
 
         let transaction_shuffler =
@@ -476,6 +476,8 @@ impl TExecutionClient for ExecutionProxyClient {
             transaction_deduper,
             randomness_enabled,
             onchain_consensus_config.order_vote_enabled(),
+            dec_config_slow_path,
+            dec_config_fast_path,
         );
 
         maybe_rand_msg_tx

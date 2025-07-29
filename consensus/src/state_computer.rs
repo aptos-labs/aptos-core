@@ -44,6 +44,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex as AsyncMutex;
+use aptos_types::decryption::DecConfig;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
@@ -70,6 +71,8 @@ struct MutableState {
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
     order_vote_enabled: bool,
+    dec_config_slow_path: Option<DecConfig>,
+    dec_config_fast_path: Option<DecConfig>,
 }
 
 /// Basic communication with the Execution module;
@@ -197,6 +200,8 @@ impl ExecutionProxy {
             transaction_deduper,
             is_randomness_enabled,
             order_vote_enabled,
+            dec_config_slow_path,
+            dec_config_fast_path,
         } = self
             .state
             .read()
@@ -223,6 +228,8 @@ impl ExecutionProxy {
             self.enable_pre_commit,
             order_vote_enabled,
             network,
+            dec_config_slow_path,
+            dec_config_fast_path,
         )
     }
 }
@@ -494,6 +501,8 @@ impl StateComputer for ExecutionProxy {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        dec_config_slow_path: Option<DecConfig>,
+        dec_config_fast_path: Option<DecConfig>,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -507,6 +516,8 @@ impl StateComputer for ExecutionProxy {
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
             order_vote_enabled,
+            dec_config_slow_path,
+            dec_config_fast_path,
         });
     }
 

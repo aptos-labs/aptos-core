@@ -5,7 +5,7 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 use crate::{
-    account_address::AccountAddress, block_metadata::BlockMetadata, chain_id::ChainId, contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE}, decryption::{Ciphertext, DecKey, Id, Round, FernandoBTE}, decryption_traits::BatchThresholdEncryption, keyless::{KeylessPublicKey, KeylessSignature}, ledger_info::LedgerInfo, proof::{TransactionInfoListWithProof, TransactionInfoWithProof}, transaction::authenticator::{
+    account_address::AccountAddress, block_metadata::BlockMetadata, chain_id::ChainId, contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE}, decryption::{DecKey, Id, Round, Ciphertext, EncryptionKey}, keyless::{KeylessPublicKey, KeylessSignature}, ledger_info::LedgerInfo, proof::{TransactionInfoListWithProof, TransactionInfoWithProof}, transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     }, vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus}, write_set::WriteSet
@@ -20,6 +20,7 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use ark_std::rand::rngs::ThreadRng;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::Rng;
@@ -78,6 +79,8 @@ use std::{
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use rand::rngs::StdRng;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -565,6 +568,10 @@ impl RawTransaction {
 }
 
 impl RawTransaction {
+    pub fn update_payload(&mut self, payload: TransactionPayload) {
+        self.payload = payload;
+    }
+
     pub fn is_encrypted(&self) -> bool {
         self.payload.is_encrypted()
     }
@@ -573,22 +580,15 @@ impl RawTransaction {
         self.payload.ct_id()
     }
 
-    pub fn decrypt(&self, _decryption_key: &DecKey) -> anyhow::Result<RawTransaction> {
-        let decrypted_payload = self.payload.clone().from_encrypted();
-        if let Some(decrypted_payload) = decrypted_payload {
-            let raw_txn = RawTransaction::new(
-                self.sender,
-                self.sequence_number,
-                decrypted_payload,
-                self.max_gas_amount,
-                self.gas_unit_price,
-                self.expiration_timestamp_secs,
-                self.chain_id,
-            );
-            Ok(raw_txn)
-        } else {
-            Err(anyhow::anyhow!("Failed to decrypt payload"))
-        }
+    pub fn ciphertext(&self) -> Option<Ciphertext> {
+        self.executable_ref()
+            .ok()
+            .and_then(|executable| executable.ciphertext().cloned())
+    }
+
+    pub fn verify_ciphertext(&self) -> Result<()> {
+        self.executable_ref()
+            .and_then(|executable| executable.verify_ciphertext())
     }
 }
 
@@ -693,7 +693,7 @@ pub enum TransactionPayload {
 }
 
 impl TransactionPayload {
-    pub fn into_encrypted(self, id: Id, target_round: Round) -> Option<TransactionPayload> {
+    pub fn encrypt(self, encryption_key: &EncryptionKey, rng: &mut ThreadRng) -> Option<TransactionPayload> {
         let extra_config_default = TransactionExtraConfig::V1 { multisig_address: None, replay_protection_nonce: None };
         let (executable, extra_config) = match self {
             Self::Script(script) => (TransactionExecutable::Script(script), extra_config_default),
@@ -703,28 +703,10 @@ impl TransactionPayload {
             },
             _ => return None,
         };
-        let encrypted_payload = executable.into_encrypted(id, target_round).unwrap();
+
+        let encrypted_payload = executable.encrypt(encryption_key, rng).unwrap();
         let payload = TransactionPayload::Payload(TransactionPayloadInner::V1 { executable: encrypted_payload, extra_config });
         Some(payload)
-    }
-
-    pub fn from_encrypted(self) -> Option<TransactionPayload> {
-        match self {
-            Self::Payload(TransactionPayloadInner::V1 { executable, extra_config }) => {
-                let encrypted_executable = executable.from_encrypted()?;
-                let payload = match encrypted_executable {
-                    TransactionExecutable::Script(script) => {
-                        TransactionPayload::Script(script)
-                    },
-                    TransactionExecutable::EntryFunction(entry_function) => {
-                        TransactionPayload::EntryFunction(entry_function)
-                    },
-                    _ => return None,
-                };
-                Some(payload)
-            },
-            _ => None,
-        }
     }
 }
 
@@ -779,36 +761,16 @@ impl TransactionExecutable {
         }
     }
 
-    /// Converts a Script or EntryFunction into an encrypted version.
-    /// Returns None if the executable is already encrypted or empty.
-    pub fn into_encrypted(self, id: Id, target_round: Round) -> Option<TransactionExecutable> {
+    pub fn encrypt(self, encryption_key: &EncryptionKey, rng: &mut ThreadRng) -> Option<TransactionExecutable> {
         let bytes = match self {
             Self::Script(script) => bcs::to_bytes(&script).ok()?,
             Self::EntryFunction(entry_function) => bcs::to_bytes(&entry_function).ok()?,
             Self::Empty | Self::Encrypted(_) => return None,
         };
-        Some(TransactionExecutable::Encrypted(EncryptedPayload::new(bytes)))
-    }
+        let msg : String = String::from_utf8(bytes).unwrap();
+        let ct = FPTX::encrypt(encryption_key, rng, &msg).expect("Failed to encrypt");
 
-    /// Converts an encrypted payload back to its original Script or EntryFunction.
-    /// Returns None if the executable is not encrypted or if deserialization fails.
-    pub fn from_encrypted(self) -> Option<TransactionExecutable> {
-        match self {
-            Self::Encrypted(encrypted_payload) => {
-                let bytes = encrypted_payload.ciphertext();
-                // Try to deserialize as Script first
-                if let Ok(script) = bcs::from_bytes::<Script>(bytes) {
-                    return Some(TransactionExecutable::Script(script));
-                }
-                // Try to deserialize as EntryFunction
-                if let Ok(entry_function) = bcs::from_bytes::<EntryFunction>(bytes) {
-                    return Some(TransactionExecutable::EntryFunction(entry_function));
-                }
-                // If neither works, return None
-                None
-            },
-            _ => None,
-        }
+        Some(TransactionExecutable::Encrypted(EncryptedPayload::new(ct)))
     }
 }
 
@@ -843,6 +805,17 @@ impl TransactionExecutableRef<'_> {
             _ => None,
         }
     }
+
+    pub fn ciphertext(&self) -> Option<&Ciphertext> {
+        match self {
+            Self::Encrypted(encrypted) => Some(encrypted.ciphertext()),
+            _ => None,
+        }
+    }
+
+    pub fn verify_ciphertext(&self) -> Result<()> {
+        <FPTX as BatchThresholdEncryption>::verify_ct(self.ciphertext().ok_or(anyhow::anyhow!("Ciphertext not found"))?)
+    }
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -872,11 +845,11 @@ impl EncryptedPayload {
     }
 
     pub fn ct_id(&self) -> Id {
-        FernandoBTE::ct_id(self.ciphertext())
+        FPTX::ct_id(self.ciphertext())
     }
 
     pub fn verify(&self) -> Result<()> {
-        FernandoBTE::verify_ct(&self.ciphertext)
+        FPTX::verify_ct(&self.ciphertext)
     }
 }
 
@@ -1022,6 +995,12 @@ impl TransactionPayload {
         self.executable_ref()
             .map(|executable| executable.ct_id())
             .unwrap_or(None)
+    }
+
+    pub fn ciphertext(&self) -> Option<Ciphertext> {
+        self.executable_ref()
+            .ok()
+            .and_then(|executable| executable.ciphertext().cloned())
     }
 }
 
@@ -1383,6 +1362,10 @@ impl SignedTransaction {
 
 // encryption related functions
 impl SignedTransaction {
+    pub fn update_payload(&mut self, payload: TransactionPayload) {
+        self.raw_txn.update_payload(payload);
+    }
+
     pub fn is_encrypted(&self) -> bool {
         self.raw_txn.is_encrypted()
     }
@@ -1391,10 +1374,12 @@ impl SignedTransaction {
         self.raw_txn.ct_id()
     }
 
-    pub fn decrypt(&self, decryption_key: &DecKey) -> anyhow::Result<SignedTransaction> {
-        let decrypted_raw_txn = self.raw_txn.decrypt(decryption_key)?;
-        let decrypted_txn = SignedTransaction::new_signed_transaction(decrypted_raw_txn, self.authenticator.clone());
-        Ok(decrypted_txn)
+    pub fn ciphertext(&self) -> Option<Ciphertext> {
+        self.raw_txn.ciphertext()
+    }
+
+    pub fn verify_ciphertext(&self) -> Result<()> {
+        self.raw_txn.verify_ciphertext()
     }
 }
 

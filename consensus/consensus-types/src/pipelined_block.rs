@@ -22,7 +22,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    decryption::{DecKey, DecShare, FastDecShare, Digest},
+    decryption::{DecKey, DecShare, Digest, EvalProofs, EvalProofsPromise, FastDecShare},
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
     transaction::{
@@ -81,9 +81,9 @@ pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 
-pub type DigestResult = ();
+pub type DigestResult<'a> = (Digest, EvalProofsPromise<'a>);
 pub type DecryptionShareResult = (DecShare, FastDecShare);
-pub type DecryptionAuxInfoResult = ();
+pub type EvalProofsResult = EvalProofs;
 pub type BroadcastDecryptionShareResult = ();
 pub type DecryptionResult = Arc<Vec<SignedTransaction>>;
 

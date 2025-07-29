@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! This module deals with computing and generating opening proofs for "digests",
 //! which are KZG polynomial commitments which commit to a set of IDs.
 
@@ -65,7 +68,7 @@ impl DigestKey {
 
         let rs : Vec<Fr> = (0..num_rounds).map(|_| Fr::rand(rng)).collect();
 
-        let tau_powers_randomized_fr = rs.into_iter().map(|r| 
+        let tau_powers_randomized_fr = rs.into_iter().map(|r|
             tau_powers_fr.iter().map(|tau_power| r * tau_power).collect::<Vec<Fr>>()).collect::<Vec<Vec<Fr>>>();
 
         let tau_powers_g1 : Vec<Vec<G1Affine>> = tau_powers_randomized_fr.into_iter().map(|powers_for_r|
@@ -75,7 +78,7 @@ impl DigestKey {
 
 
         let tau_powers_g1_projective : Vec<Vec<G1Projective>> = tau_powers_g1.iter()
-            .map(|gs| 
+            .map(|gs|
                 gs.iter().map(|g|
                     G1Projective::from(*g)
                 ).collect()
@@ -98,14 +101,14 @@ impl DigestKey {
         self.tau_powers_g1[0].len() - 1
     }
 
-    
+
     pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: u64) -> Result<(Digest, EvalProofsPromise<IS::OssifiedSet>)> {
         let round : usize = round as usize;
         if round >= self.tau_powers_g1.len() {
             Err(anyhow!("Tried to compute digest with round greater than setup length."))
         } else if ids.capacity() > self.tau_powers_g1[round].len() - 1 {
-            Err(anyhow!("Tried to compute a batch digest with size {}, where setup supports up to size {}", 
-                ids.capacity(), 
+            Err(anyhow!("Tried to compute a batch digest with size {}, where setup supports up to size {}",
+                ids.capacity(),
                 self.tau_powers_g1[round].len() - 1
             ))?
         } else {
@@ -126,8 +129,8 @@ impl DigestKey {
         // TODO use multipairing here?
         Ok(
             (
-                PairingSetting::pairing(pf, self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())) 
-                == 
+                PairingSetting::pairing(pf, self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()))
+                ==
                 PairingSetting::pairing(digest.as_g1() - G1Affine::generator() * id.y(), G2Affine::generator())
             )
                 .then_some(())
@@ -172,13 +175,13 @@ impl<'a, IS: OssifiedIdSet> EvalProofsPromise<'a, IS> {
     }
 
     pub fn compute_all(&self) -> EvalProofs<IS> {
-        EvalProofs { 
+        EvalProofs {
             computed_proofs: self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round),
         }
     }
 }
 
-
+#[derive(Clone)]
 pub struct EvalProofs<IS: OssifiedIdSet> {
     pub computed_proofs: HashMap<IS::Id, G1Affine>,
 }
@@ -204,7 +207,7 @@ pub(crate) mod tests {
     use crate::shared::ids::{FFTDomainIdSet, FreeRootId, FreeRootIdSet};
 
 
-    pub(crate) fn digest_and_pfs_for_testing<'a>(dk: &'a DigestKey) 
+    pub(crate) fn digest_and_pfs_for_testing<'a>(dk: &'a DigestKey)
         -> (Digest, EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>)
     {
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();

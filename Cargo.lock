@@ -958,6 +958,7 @@ name = "aptos-consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-bounded-executor",
  "aptos-cached-packages",
@@ -1061,10 +1062,12 @@ name = "aptos-consensus-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-executor-types",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
  "aptos-short-hex-str",
@@ -4553,10 +4556,13 @@ name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-framework",
  "aptos-infallible",
  "aptos-logger",
  "aptos-sdk",
+ "aptos-types",
+ "ark-std 0.4.0",
  "async-trait",
  "clap 4.5.21",
  "log",
@@ -4647,6 +4653,7 @@ version = "0.0.3"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
+ "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
