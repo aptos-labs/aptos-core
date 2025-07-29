@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_batch_encryption::group::Fr;
 use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
 use aptos_batch_encryption::shared::ids::free_roots::UncomputedCoeffs;
@@ -115,9 +118,9 @@ pub fn compute_all_eval_proofs_arbitrary_x(c: &mut Criterion) {
         }
         let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
 
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &pfs, |b, pfs| {
-            b.iter(|| { 
-                pfs.clone().compute_all()
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, setup), |b, input| {
+            b.iter(|| {
+                input.0.clone().compute_all(&input.1)
             });
         });
     }

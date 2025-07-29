@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use aes_gcm::aes::cipher;
 use aptos_batch_encryption::group::Fr;
 use aptos_batch_encryption::schemes::fptx::FPTX;
@@ -76,8 +79,8 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
 
         let (_, pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, tp), |b, input| {
-            b.iter(|| FPTX::eval_proofs_compute_all(&mut input.0.clone(), &input.1));
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, dk, tp), |b, input| {
+            b.iter(|| FPTX::eval_proofs_compute_all(&input.0, &input.1, &input.2));
         });
     }
 }
@@ -128,9 +131,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
             .collect();
 
-        let (d, mut pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
-
-        FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
         let dk_share = FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap();
         let vk = &vks[0];
@@ -162,7 +163,7 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
 
         let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        let dk_shares : Vec<BIBEDecryptionKeyShare> = 
+        let dk_shares : Vec<BIBEDecryptionKeyShare> =
             msk_shares
             .iter()
             .map(|msk_share| FPTX::derive_decryption_key_share(msk_share, &d).unwrap())
@@ -195,9 +196,9 @@ pub fn decrypt(c: &mut Criterion) {
 
         let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
+        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
 
-        let dk_shares : Vec<BIBEDecryptionKeyShare> = 
+        let dk_shares : Vec<BIBEDecryptionKeyShare> =
             vec![ FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap() ];
 
         let dk = FPTX::reconstruct_decryption_key(&dk_shares, &tc, &tp).unwrap();

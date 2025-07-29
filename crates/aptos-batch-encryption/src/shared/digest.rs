@@ -120,7 +120,7 @@ impl DigestKey {
             let digest = Digest { digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs).unwrap().into(), round };
 
             Ok((digest.clone(),
-            EvalProofsPromise::new(&self, digest, ids)
+            EvalProofsPromise::new(digest, ids)
         ))
         }
     }
@@ -157,26 +157,24 @@ impl DigestKey {
 
 
 #[derive(Clone)]
-pub struct EvalProofsPromise<'a, IS: OssifiedIdSet> {
-    pub digest_key: &'a DigestKey,
+pub struct EvalProofsPromise<IS: OssifiedIdSet> {
     pub digest: Digest,
     pub ids: IS,
 }
 
 
 
-impl<'a, IS: OssifiedIdSet> EvalProofsPromise<'a, IS> {
-    pub fn new(digest_key: &'a DigestKey, digest: Digest, ids: IS) -> Self {
+impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
+    pub fn new(digest: Digest, ids: IS) -> Self {
         Self {
-            digest_key,
             digest,
             ids,
         }
     }
 
-    pub fn compute_all(&self) -> EvalProofs<IS> {
+    pub fn compute_all(&self, digest_key: &DigestKey) -> EvalProofs<IS> {
         EvalProofs {
-            computed_proofs: self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round),
+            computed_proofs: self.ids.compute_all_eval_proofs_with_setup(digest_key, self.digest.round),
         }
     }
 }
@@ -208,7 +206,7 @@ pub(crate) mod tests {
 
 
     pub(crate) fn digest_and_pfs_for_testing<'a>(dk: &'a DigestKey)
-        -> (Digest, EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>)
+        -> (Digest, EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>)
     {
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
@@ -245,7 +243,7 @@ pub(crate) mod tests {
 
             for round in 0..num_rounds {
                 let (d, pfs_promise) = setup.digest(&mut ids, round as u64).unwrap();
-                let pfs = pfs_promise.compute_all();
+                let pfs = pfs_promise.compute_all(&setup);
                 setup.verify_all(&d, &pfs).unwrap();
             }
         }

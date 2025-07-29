@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use std::marker::PhantomData;
 use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
@@ -77,7 +80,7 @@ impl BatchThresholdEncryption for FPTX {
 
     type Digest = Digest;
 
-    type EvalProofsPromise<'a> = EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>;
+    type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
 
     type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
 
@@ -93,11 +96,11 @@ impl BatchThresholdEncryption for FPTX {
 
     fn setup_for_testing(
         seed: u64,
-        max_batch_size: usize, 
+        max_batch_size: usize,
         number_of_rounds: usize,
         tc_happypath: &ThresholdConfig,
         tc_slowpath: &ThresholdConfig
-    ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)> 
+    ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)>
     {
         let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
@@ -117,13 +120,13 @@ impl BatchThresholdEncryption for FPTX {
         Ok((ek, digest_key, vks_happypath, msk_shares_happypath, vks_slowpath, msk_shares_slowpath))
     }
 
-    fn encrypt<R: rand_core::CryptoRng + rand_core::RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext) 
+    fn encrypt<R: rand_core::CryptoRng + rand_core::RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext)
     -> anyhow::Result<Self::Ciphertext> {
         ek.encrypt(rng, msg)
     }
 
-    fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
-    -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise<'a>)> 
+    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool)
+    -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)>
     {
         let mut ids : FreeRootIdSet<UncomputedCoeffs>
         = FreeRootIdSet::from_slice(
@@ -144,15 +147,15 @@ impl BatchThresholdEncryption for FPTX {
         ct.id()
     }
 
-    fn eval_proofs_compute_all<'a>(proofs: &Self::EvalProofsPromise<'a>, pool: &rayon::ThreadPool) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all())
+    fn eval_proofs_compute_all(proofs: &Self::EvalProofsPromise, digest_key: &DigestKey, pool: &rayon::ThreadPool) -> Self::EvalProofs {
+        pool.install(|| proofs.compute_all(digest_key))
     }
 
 
 
     fn derive_decryption_key_share(
-        msk_share: &Self::MasterSecretKeyShare, 
-        digest: &Self::Digest, 
+        msk_share: &Self::MasterSecretKeyShare,
+        digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare> {
         msk_share.derive_decryption_key_share(digest)
     }
@@ -165,14 +168,14 @@ impl BatchThresholdEncryption for FPTX {
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::Ciphertext], 
+        cts: &[Self::Ciphertext],
         proofs: &Self::EvalProofs,
         pool: &rayon::ThreadPool
-    ) -> anyhow::Result<Vec<P>> 
+    ) -> anyhow::Result<Vec<P>>
     {
-        pool.install(|| 
+        pool.install(||
             cts.into_par_iter()
-                .map(|ct| 
+                .map(|ct|
                     {
                         let plaintext: Result<P> = decryption_key.decrypt(ct, proofs);
                         plaintext

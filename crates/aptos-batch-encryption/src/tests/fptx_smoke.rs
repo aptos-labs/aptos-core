@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use ark_std::rand::{seq::{IteratorRandom, SliceRandom}, thread_rng, Rng as _};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
@@ -6,7 +9,7 @@ use anyhow::Result;
 
 
 
-#[test] 
+#[test]
 fn smoke() {
     let mut rng = thread_rng();
     let tc_happy = ThresholdConfig::new(8, 5);
@@ -21,7 +24,7 @@ fn smoke() {
     FPTX::verify_ct(&ct).unwrap();
 
     let (d, pfs_promise) = FPTX::digest(&dk, &vec![ct.clone()], 0, &tp).unwrap();
-    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
+    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
 
     let [dk_happy, dk_slow] = [(tc_happy, vks_happy, msk_shares_happy), (tc_slow, vks_slow, msk_shares_slow)]
         .into_iter()
@@ -47,13 +50,13 @@ fn smoke() {
         .unwrap();
 
 
-    let decrypted_plaintexts : Vec<String> = 
+    let decrypted_plaintexts : Vec<String> =
         FPTX::decrypt(&dk_happy, &vec![ct.clone()], &pfs, &tp).unwrap();
-    
+
     assert_eq!(decrypted_plaintexts[0], plaintext);
 
-    let decrypted_plaintexts : Vec<String> = 
+    let decrypted_plaintexts : Vec<String> =
         FPTX::decrypt(&dk_slow, &vec![ct.clone()], &pfs, &tp).unwrap();
-    
+
     assert_eq!(decrypted_plaintexts[0], plaintext);
 }

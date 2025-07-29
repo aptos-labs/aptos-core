@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{hash::Hash, marker::PhantomData};
 
 use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
@@ -54,8 +57,8 @@ pub trait BIBECTEncrypt<I: Id> {
 
 pub trait BIBECTDecrypt<I: Id, P: Plaintext> {
     fn bibe_decrypt(
-        &self, 
-        ct: &BIBECiphertext<I>, 
+        &self,
+        ct: &BIBECiphertext<I>,
         eval_proof: G1Affine
         ) -> Result<P>;
 }
@@ -81,7 +84,7 @@ pub trait CTEncrypt<I: Id> {
 }
 
 pub trait CTDecrypt<I: Id, P: Plaintext> {
-    /// convenience method; will look up ct's id in EvalProofs, and 
+    /// convenience method; will look up ct's id in EvalProofs, and
     /// will use it to decrypt the ct's underlying bibe_ct
     fn decrypt(
         &self,
@@ -140,14 +143,14 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
         ];
 
         let otp_source_gt : PairingOutput<PairingSetting> =  PairingSetting::pairing(
-            G1Affine::generator() * id.y(), 
-            G2Affine::generator()) * r[0] 
+            G1Affine::generator() * id.y(),
+            G2Affine::generator()) * r[0]
             - PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2()) * r[1];
 
         let mut otp_source_bytes = Vec::new();
         otp_source_gt.serialize_compressed(&mut otp_source_bytes)?;
         let otp = OneTimePad::from_source_bytes(otp_source_bytes);
-        
+
         let symmetric_key = SymmetricKey::new(rng);
         let padded_key = otp.pad_key(&symmetric_key);
 
@@ -165,8 +168,8 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
 
 impl<I: Id, P: Plaintext> BIBECTDecrypt<I, P> for BIBEDecryptionKey {
     fn bibe_decrypt(
-        &self, 
-        ct: &BIBECiphertext<I>, 
+        &self,
+        ct: &BIBECiphertext<I>,
         eval_proof: G1Affine
         ) -> Result<P> {
         let otp_source_ml = PairingSetting::multi_miller_loop(
@@ -224,7 +227,7 @@ pub mod tests {
 
         ids.compute_poly_coeffs();
         let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
-        let pfs = pfs.compute_all();
+        let pfs = pfs.compute_all(&dk);
 
         let plaintext = String::from("hi");
 
@@ -253,7 +256,7 @@ pub mod tests {
 
         ids.compute_poly_coeffs();
         let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
-        let pfs = pfs.compute_all();
+        let pfs = pfs.compute_all(&dk);
 
         let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()], &tc).unwrap();
 

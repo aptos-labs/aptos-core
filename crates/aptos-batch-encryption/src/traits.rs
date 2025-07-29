@@ -1,4 +1,7 @@
 
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{hash::Hash, sync::mpsc::RecvTimeoutError};
 
 use rand_core::{CryptoRng, RngCore};
@@ -34,7 +37,7 @@ pub trait BatchThresholdEncryption {
 
     /// Auxiliary information needed for decryption. In the scheme we will implement,
     /// this consists of the KZG eval proofs.
-    type EvalProofsPromise<'a>;
+    type EvalProofsPromise;
 
     type EvalProofs;
 
@@ -56,40 +59,40 @@ pub trait BatchThresholdEncryption {
     /// the secret key according to the [`ThresholdConfig`] given as input. Eventually, this will
     /// need to be replaced by a DKG.
     fn setup_for_testing(
-        seed: u64, 
-        max_batch_size: usize, 
-        number_of_rounds: usize, 
-        tc_happypath: &ThresholdConfig, 
+        seed: u64,
+        max_batch_size: usize,
+        number_of_rounds: usize,
+        tc_happypath: &ThresholdConfig,
         tc_slowpath: &ThresholdConfig
     ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)>;
 
 
     /// Encrypt a plaintext with respect to a specific round number.
-    fn encrypt<R: CryptoRng + RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext) 
+    fn encrypt<R: CryptoRng + RngCore>(ek: &Self::EncryptionKey, rng: &mut R, msg: &impl Plaintext)
         -> Result<Self::Ciphertext>;
 
 
-    /// Derive a digest from a [`DigestKey`] and a slice of ciphertexts. 
-    fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &ThreadPool) 
-        -> Result<(Self::Digest, Self::EvalProofsPromise<'a>)>;
+    /// Derive a digest from a [`DigestKey`] and a slice of ciphertexts.
+    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &ThreadPool)
+        -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
-    /// prevent malleability attacks. 
+    /// prevent malleability attacks.
     fn verify_ct(ct: &Self::Ciphertext) -> Result<()>;
 
-    /// Although I'd like to expose as little of the identities as possible, Daniel told me that 
+    /// Although I'd like to expose as little of the identities as possible, Daniel told me that
     /// knowing the ID of a ciphertext will potentially help with deduplication.
     fn ct_id(ct: &Self::Ciphertext) -> Self::Id;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme.
-    fn eval_proofs_compute_all<'a>(proofs: &Self::EvalProofsPromise<'a>, pool: &ThreadPool) -> Self::EvalProofs;
+    fn eval_proofs_compute_all(proofs: &Self::EvalProofsPromise, digest_key: &Self::DigestKey, pool: &ThreadPool) -> Self::EvalProofs;
 
     /// Derive a decryption key share given a [`SuccinctDigest`] and a round number, whose
     /// corresponding reconstructed decryption key will be able to decrypt any ciphertext encrypted
     /// to that round number and committed to by that digest.
     fn derive_decryption_key_share(
-        msk_share: &Self::MasterSecretKeyShare, 
-        digest: &Self::Digest, 
+        msk_share: &Self::MasterSecretKeyShare,
+        digest: &Self::Digest,
         ) -> Result<Self::DecryptionKeyShare>;
 
 
@@ -102,16 +105,16 @@ pub trait BatchThresholdEncryption {
 
     /// Reconstruct a decryption key from a set of [`DecryptionKeyShare`]s assuming the set of
     /// shares surpasses the threshold.
-    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig, pool: &ThreadPool) 
+    fn reconstruct_decryption_key(shares: &[Self::DecryptionKeyShare], config: &ThresholdConfig, pool: &ThreadPool)
         -> Result<Self::DecryptionKey>;
 
     // TODO: verify decryption key?
-    
+
     /// Decrypt a set of ciphertext using a decryption key and advice.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::Ciphertext], 
-        aux_info: &Self::EvalProofs, 
+        cts: &[Self::Ciphertext],
+        aux_info: &Self::EvalProofs,
         pool: &ThreadPool
         ) -> Result<Vec<P>>;
 }
@@ -119,7 +122,7 @@ pub trait BatchThresholdEncryption {
 
 /// An element of the plaintext space. Does not depend on the specific scheme; any struct that is
 /// serializeable should allow for being used as a plaintext.
-pub trait Plaintext: Serialize + DeserializeOwned + Send + Sync {} 
+pub trait Plaintext: Serialize + DeserializeOwned + Send + Sync {}
 
 impl Plaintext for String {}
 
@@ -141,10 +144,3 @@ pub trait VerificationKey: Serialize + DeserializeOwned {
 pub trait DecryptionKeyShare: Serialize + DeserializeOwned {
     fn player(&self) -> Player;
 }
-
-
-
-
-
-
-
