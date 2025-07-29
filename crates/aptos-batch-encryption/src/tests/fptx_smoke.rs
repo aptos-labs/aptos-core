@@ -21,7 +21,7 @@ fn smoke() {
     FPTX::verify_ct(&ct).unwrap();
 
     let (d, pfs_promise) = FPTX::digest(&dk, &vec![ct.clone()], 0, &tp).unwrap();
-    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
+    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
 
     let [dk_happy, dk_slow] = [(tc_happy, vks_happy, msk_shares_happy), (tc_slow, vks_slow, msk_shares_slow)]
         .into_iter()

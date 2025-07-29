@@ -76,8 +76,8 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
 
         let (_, pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, tp), |b, input| {
-            b.iter(|| FPTX::eval_proofs_compute_all(&mut input.0.clone(), &input.1));
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, dk, tp), |b, input| {
+            b.iter(|| FPTX::eval_proofs_compute_all(&input.0, &input.1, &input.2));
         });
     }
 }
@@ -128,9 +128,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
             .map(|_| FPTX::encrypt(&ek, &mut rng, &msg).unwrap())
             .collect();
 
-        let (d, mut pfs) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
-
-        FPTX::eval_proofs_compute_all(&mut pfs, &tp);
+        let (d, _) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
         let dk_share = FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap();
         let vk = &vks[0];
@@ -195,7 +193,7 @@ pub fn decrypt(c: &mut Criterion) {
 
         let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0, &tp).unwrap();
 
-        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &tp);
+        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
 
         let dk_shares : Vec<BIBEDecryptionKeyShare> = 
             vec![ FPTX::derive_decryption_key_share(&msk_shares[0], &d).unwrap() ];

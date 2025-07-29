@@ -224,7 +224,7 @@ pub mod tests {
 
         ids.compute_poly_coeffs();
         let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
-        let pfs = pfs.compute_all();
+        let pfs = pfs.compute_all(&dk);
 
         let plaintext = String::from("hi");
 
@@ -253,7 +253,7 @@ pub mod tests {
 
         ids.compute_poly_coeffs();
         let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
-        let pfs = pfs.compute_all();
+        let pfs = pfs.compute_all(&dk);
 
         let dk = BIBEDecryptionKey::reconstruct(&vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()], &tc).unwrap();
 

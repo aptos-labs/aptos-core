@@ -34,7 +34,7 @@ pub trait BatchThresholdEncryption {
 
     /// Auxiliary information needed for decryption. In the scheme we will implement,
     /// this consists of the KZG eval proofs.
-    type EvalProofsPromise<'a>;
+    type EvalProofsPromise;
 
     type EvalProofs;
 
@@ -70,8 +70,8 @@ pub trait BatchThresholdEncryption {
 
 
     /// Derive a digest from a [`DigestKey`] and a slice of ciphertexts. 
-    fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &ThreadPool) 
-        -> Result<(Self::Digest, Self::EvalProofsPromise<'a>)>;
+    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &ThreadPool) 
+        -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
     /// prevent malleability attacks. 
@@ -82,7 +82,7 @@ pub trait BatchThresholdEncryption {
     fn ct_id(ct: &Self::Ciphertext) -> Self::Id;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme.
-    fn eval_proofs_compute_all<'a>(proofs: &Self::EvalProofsPromise<'a>, pool: &ThreadPool) -> Self::EvalProofs;
+    fn eval_proofs_compute_all(proofs: &Self::EvalProofsPromise, digest_key: &Self::DigestKey, pool: &ThreadPool) -> Self::EvalProofs;
 
     /// Derive a decryption key share given a [`SuccinctDigest`] and a round number, whose
     /// corresponding reconstructed decryption key will be able to decrypt any ciphertext encrypted

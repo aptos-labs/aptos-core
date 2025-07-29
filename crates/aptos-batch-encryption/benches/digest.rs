@@ -115,9 +115,9 @@ pub fn compute_all_eval_proofs_arbitrary_x(c: &mut Criterion) {
         }
         let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
 
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &pfs, |b, pfs| {
+        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, setup), |b, input| {
             b.iter(|| { 
-                pfs.clone().compute_all()
+                input.0.clone().compute_all(&input.1)
             });
         });
     }

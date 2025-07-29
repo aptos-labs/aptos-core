@@ -77,7 +77,7 @@ impl BatchThresholdEncryption for FPTX {
 
     type Digest = Digest;
 
-    type EvalProofsPromise<'a> = EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>;
+    type EvalProofsPromise = EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>;
 
     type EvalProofs = EvalProofs<FreeRootIdSet<ComputedCoeffs>>;
 
@@ -122,8 +122,8 @@ impl BatchThresholdEncryption for FPTX {
         ek.encrypt(rng, msg)
     }
 
-    fn digest<'a>(digest_key: &'a Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
-    -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise<'a>)> 
+    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool) 
+    -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> 
     {
         let mut ids : FreeRootIdSet<UncomputedCoeffs>
         = FreeRootIdSet::from_slice(
@@ -144,8 +144,8 @@ impl BatchThresholdEncryption for FPTX {
         ct.id()
     }
 
-    fn eval_proofs_compute_all<'a>(proofs: &Self::EvalProofsPromise<'a>, pool: &rayon::ThreadPool) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all())
+    fn eval_proofs_compute_all(proofs: &Self::EvalProofsPromise, digest_key: &DigestKey, pool: &rayon::ThreadPool) -> Self::EvalProofs {
+        pool.install(|| proofs.compute_all(digest_key))
     }
 
 
