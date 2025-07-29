@@ -73,7 +73,7 @@ impl BatchThresholdEncryption for FPTX {
 
     type Ciphertext = Ciphertext<FreeRootId>;
 
-    type Round = usize;
+    type Round = u64;
 
     type Digest = Digest;
 

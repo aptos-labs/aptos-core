@@ -99,7 +99,8 @@ impl DigestKey {
     }
 
     
-    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: usize) -> Result<(Digest, EvalProofsPromise<IS::OssifiedSet>)> {
+    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: u64) -> Result<(Digest, EvalProofsPromise<IS::OssifiedSet>)> {
+        let round : usize = round as usize;
         if round >= self.tau_powers_g1.len() {
             Err(anyhow!("Tried to compute digest with round greater than setup length."))
         } else if ids.capacity() > self.tau_powers_g1[round].len() - 1 {
@@ -240,7 +241,7 @@ pub(crate) mod tests {
             ids.compute_poly_coeffs();
 
             for round in 0..num_rounds {
-                let (d, pfs_promise) = setup.digest(&mut ids, round).unwrap();
+                let (d, pfs_promise) = setup.digest(&mut ids, round as u64).unwrap();
                 let pfs = pfs_promise.compute_all();
                 setup.verify_all(&d, &pfs).unwrap();
             }
