@@ -66,7 +66,6 @@ impl BIBEEncryptionKey for EncryptionKey {
 }
 
 
-
 impl BatchThresholdEncryption for FPTX {
     type EncryptionKey = EncryptionKey;
 
@@ -100,7 +99,7 @@ impl BatchThresholdEncryption for FPTX {
         tc_slowpath: &ThresholdConfig
     ) -> Result<(Self::EncryptionKey, Self::DigestKey, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>, Vec<Self::VerificationKey>, Vec<Self::MasterSecretKeyShare>)> 
     {
-        let mut rng = <StdRng as SeedableRng>::seed_from_u64(2);
+        let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
 
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)
             .ok_or(anyhow!("Failed to create digest key"))?;
