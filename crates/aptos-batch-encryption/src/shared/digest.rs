@@ -3,7 +3,7 @@
 
 use std::{collections::{HashMap, HashSet}, num};
 
-use crate::{errors::BatchEncryptionError, group::{Fr, G1Affine, G1Projective, G2Affine, PairingSetting}};
+use crate::{errors::BatchEncryptionError, group::{Fr, G1Affine, G2Projective, G1Projective, G2Affine, PairingSetting}};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use rand_core::{CryptoRng, RngCore};
 use ark_std::UniformRand;
@@ -32,8 +32,9 @@ pub struct DigestKey {
 
 /// A succinct commitment to a set of IDs. Internally, a KZG commitment over a shifted
 /// powers-of-tau.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Digest {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     digest_g1: G1Affine,
     round: usize,
 }
@@ -98,7 +99,8 @@ impl DigestKey {
     }
 
     
-    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: usize) -> Result<(Digest, EvalProofs<IS::OssifiedSet>)> {
+    pub fn digest<IS: IdSet>(&self, ids: &mut IS, round: u64) -> Result<(Digest, EvalProofsPromise<IS::OssifiedSet>)> {
+        let round : usize = round as usize;
         if round >= self.tau_powers_g1.len() {
             Err(anyhow!("Tried to compute digest with round greater than setup length."))
         } else if ids.capacity() > self.tau_powers_g1[round].len() - 1 {
@@ -115,89 +117,86 @@ impl DigestKey {
             let digest = Digest { digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs).unwrap().into(), round };
 
             Ok((digest.clone(),
-            EvalProofs::new(&self, digest, ids)
+            EvalProofsPromise::new(&self, digest, ids)
         ))
         }
     }
+
+    fn verify_pf(&self, digest: &Digest, id: impl Id, pf: G1Affine) -> Result<()> {
+        // TODO use multipairing here?
+        Ok(
+            (
+                PairingSetting::pairing(pf, self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x())) 
+                == 
+                PairingSetting::pairing(digest.as_g1() - G1Affine::generator() * id.y(), G2Affine::generator())
+            )
+                .then_some(())
+                .ok_or(BatchEncryptionError::EvalProofVerifyError)?
+        )
+
+
+    }
+
+    pub fn verify<IS: OssifiedIdSet>(&self, digest: &Digest, pfs: &EvalProofs<IS>, id: IS::Id) -> Result<()> {
+        let pf = pfs.computed_proofs[&id];
+        self.verify_pf(digest, id, pf)
+    }
+
+    pub fn verify_all<IS: OssifiedIdSet>(&self, digest: &Digest, pfs: &EvalProofs<IS>) -> Result<()> {
+        pfs.computed_proofs
+            .iter()
+            .map(|(id, pf)| self.verify_pf(digest, *id, *pf))
+            .collect()
+    }
+
 
 }
 
 
 #[derive(Clone)]
-pub struct EvalProofs<'a, IS: OssifiedIdSet> {
+pub struct EvalProofsPromise<'a, IS: OssifiedIdSet> {
     pub digest_key: &'a DigestKey,
     pub digest: Digest,
     pub ids: IS,
-    pub computed_proofs: HashMap<IS::Id, G1Affine>,
 }
 
-impl<'a, IS: OssifiedIdSet> EvalProofs<'a, IS> {
+
+
+impl<'a, IS: OssifiedIdSet> EvalProofsPromise<'a, IS> {
     pub fn new(digest_key: &'a DigestKey, digest: Digest, ids: IS) -> Self {
         Self {
             digest_key,
             digest,
             ids,
-            computed_proofs: HashMap::new(),
         }
     }
 
+    pub fn compute_all(&self) -> EvalProofs<IS> {
+        EvalProofs { 
+            computed_proofs: self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round),
+        }
+    }
+}
+
+
+pub struct EvalProofs<IS: OssifiedIdSet> {
+    pub computed_proofs: HashMap<IS::Id, G1Affine>,
+}
+
+impl<IS: OssifiedIdSet> EvalProofs<IS> {
     pub fn get(&self, i: &IS::Id) -> Option<G1Affine> {
         self.computed_proofs.get(i)
             .map(|g1| *g1)
     }
 
-    pub fn compute_all(&mut self) {
-        self.computed_proofs = self.ids.compute_all_eval_proofs_with_setup(self.digest_key, self.digest.round);
-    }
 
-    pub fn compute(&mut self, ids: &[IS::Id]) {
-        self.computed_proofs = self.ids.compute_eval_proofs_with_setup(self.digest_key, ids, self.digest.round);
-    }
-
-    pub fn compute_single(&mut self, id : IS::Id) {
-        let pf = self.ids.compute_eval_proof_with_setup(self.digest_key, id, self.digest.round);
-        self.computed_proofs.insert(id, pf);
-    }
-
-    fn verify_pf(&self, id: IS::Id, pf: G1Affine) -> Result<()> {
-        // TODO use multipairing here?
-        Ok((PairingSetting::pairing(pf, self.digest_key.tau_g2 - G2Affine::generator() * id.x()) 
-            == 
-            PairingSetting::pairing(self.digest.as_g1() - G1Affine::generator() * id.y(), G2Affine::generator())).then_some(()).ok_or(BatchEncryptionError::EvalProofVerifyError)?)
-
-
-    }
-
-    pub fn uncomputed_ids(&self) -> Vec<IS::Id> {
-        let ids : HashSet<<IS as OssifiedIdSet>::Id> = HashSet::from_iter(self.ids.as_vec().into_iter());
-        let computed_ids : HashSet<<IS as OssifiedIdSet>::Id> = HashSet::from_iter(self.computed_proofs.keys().cloned());
-
-        ids.difference(&computed_ids).cloned().collect()
-    }
-
-    pub fn verify(&self, id: IS::Id) -> Result<()> {
-        let pf = self.computed_proofs[&id];
-        self.verify_pf(id, pf)
-    }
-
-    pub fn verify_all(&self) -> Result<()> {
-        self.computed_proofs
-            .iter()
-            .map(|(id, pf)| self.verify_pf(*id, *pf))
-            .collect()
-    }
-
-    pub fn merge(&mut self, other_pfs: &Self) {
-    }
 }
-
-
 
 
 #[cfg(test)]
 pub(crate) mod tests {
     use ark_poly::DenseUVPolynomial;
-    use ark_poly::{univariate::DensePolynomial, Polynomial};
+   use ark_poly::{univariate::DensePolynomial, Polynomial};
     use ark_std::rand::thread_rng;
     use itertools::Itertools;
     use super::*;
@@ -206,7 +205,7 @@ pub(crate) mod tests {
 
 
     pub(crate) fn digest_and_pfs_for_testing<'a>(dk: &'a DigestKey) 
-        -> (Digest, EvalProofs<'a, FreeRootIdSet<ComputedCoeffs>>)
+        -> (Digest, EvalProofsPromise<'a, FreeRootIdSet<ComputedCoeffs>>)
     {
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();
@@ -242,36 +241,13 @@ pub(crate) mod tests {
             ids.compute_poly_coeffs();
 
             for round in 0..num_rounds {
-                let (d, mut pfs) = setup.digest(&mut ids, round).unwrap();
-                pfs.compute_all();
-                pfs.verify_all().unwrap();
+                let (d, pfs_promise) = setup.digest(&mut ids, round as u64).unwrap();
+                let pfs = pfs_promise.compute_all();
+                setup.verify_all(&d, &pfs).unwrap();
             }
         }
     }
 
-
-    #[test]
-    fn compute_and_verify_individual_opening_proofs() {
-        let batch_size = 4;
-        let num_rounds = 4;
-        let mut rng = thread_rng();
-        let setup = DigestKey::new(&mut rng, batch_size, num_rounds).unwrap();
-        let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
-        let mut counter = Fr::zero();
-        for _x in 0..batch_size {
-            ids.add(&FreeRootId::new(counter));
-            counter += Fr::one();
-        }
-
-        for round in 0..num_rounds {
-            println!("{}", round);
-            let (d, mut pfs) = setup.digest(&mut ids, round).unwrap();
-            for id in ids.as_vec() {
-                pfs.compute_single(id);
-            }
-            pfs.verify_all().unwrap();
-        }
-    }
 
     #[test]
     fn test_digest_key_capacity() {

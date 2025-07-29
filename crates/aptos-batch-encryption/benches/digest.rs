@@ -123,57 +123,5 @@ pub fn compute_all_eval_proofs_arbitrary_x(c: &mut Criterion) {
     }
 }
 
-pub fn compute_n_eval_proofs_arbitrary_x(c: &mut Criterion) {
-    let mut group = c.benchmark_group("EvalProofs::compute/FreeRootId");
-
-    for batch_size in [128] {
-        for num_proofs in [10, 32, 64, 96, 128] {
-            let mut rng = thread_rng();
-            let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
-            let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
-
-            for _x in 0..batch_size  {
-                ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
-            }
-            let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
-            let first_n_ids = &ids.as_vec()[0..num_proofs];
-
-            let mut pfs_testing = pfs.clone();
-            pfs_testing.compute(&first_n_ids);
-            pfs_testing.verify_all().unwrap();
-
-
-
-            group.bench_with_input(BenchmarkId::from_parameter(format!("batch size = {}, num proofs = {}", batch_size, num_proofs)), &(pfs, first_n_ids), |b, input| {
-                b.iter(|| { 
-                    input.0.clone().compute(input.1)
-                });
-            });
-        }
-    }
-}
-
-
-pub fn compute_single_eval_proof_arbitrary_x(c: &mut Criterion) {
-    let mut group = c.benchmark_group("EvalProofs::compute_single/FreeRootId");
-
-    for batch_size in [8, 32, 128, 512 ] {
-        let mut rng = thread_rng();
-        let setup = DigestKey::new(&mut rng, batch_size, 1).unwrap();
-        let mut ids = FreeRootIdSet::with_capacity(batch_size).unwrap();
-
-        for _x in 0..batch_size  {
-            ids.add(&FreeRootId::new(Fr::rand(&mut rng)));
-        }
-        let (d, pfs) = setup.digest(&mut ids, 0).unwrap();
-
-        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &(pfs, ids.as_vec()[0]), |b, input| {
-            b.iter(|| { 
-                input.0.clone().compute_single(input.1);
-            });
-        });
-    }
-}
-
-criterion_group!(benches, compute, compute_arbitrary_x, compute_all_eval_proofs_arbitrary_x, compute_single_eval_proof_arbitrary_x, compute_n_eval_proofs_arbitrary_x);
+criterion_group!(benches, compute, compute_arbitrary_x, compute_all_eval_proofs_arbitrary_x);
 criterion_main!(benches);
