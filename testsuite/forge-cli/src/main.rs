@@ -526,7 +526,7 @@ fn get_test_suite(
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),
         boxed!(|| get_indexer_test(test_name)),
-        boxed!(|| get_ungrouped_test(test_name)),
+        boxed!(|| get_ungrouped_test(test_name, duration, test_cmd)),
     ];
 
     for named_suite in named_test_suites.iter() {
