@@ -1010,7 +1010,8 @@ where
         let mut scheduler_task = SchedulerTask::Retry;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
-        let drain_commit_queue = || -> Result<(), PanicError> {
+        let drain_commit_queue = || -> Result<bool, PanicError> {
+            let mut block_epilogue_executed = false;
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
@@ -1111,12 +1112,12 @@ where
                             ));
                         };
                         *block_epilogue_txn.acquire().dereference_mut() = Some(txn);
-
+                        block_epilogue_executed = true;
                         scheduler.add_to_commit_queue(num_txns as u32);
                     }
                 }
             }
-            Ok(())
+            Ok(block_epilogue_executed)
         };
 
         loop {
@@ -1165,7 +1166,10 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            drain_commit_queue()?;
+            let block_epilogue_executed = drain_commit_queue()?;
+            if block_epilogue_executed {
+                scheduler_task = SchedulerTask::Done;
+            }
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
