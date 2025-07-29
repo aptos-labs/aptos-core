@@ -85,6 +85,9 @@ module aptos_framework::scheduled_txns {
     /// Max size of a scheduled transaction; 1MB for now as we are bounded by the slot size
     const MAX_SCHED_TXN_SIZE: u64 = 1024 * 1024;
 
+    /// Framework owned address that stores the deposits for all scheduled txns
+    const DEPOSIT_STORE_OWNER_ADDR: address = @0xb;
+
     enum ScheduledFunction has copy, store, drop {
          V1(|Option<signer>| has copy + store + drop),
     }
@@ -97,8 +100,8 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         /// Maximum gas to spend for this transaction
         max_gas_amount: u64,
-        /// Charged @ lesser of {max_gas_unit_price, max_gas_unit_price other than this in the block executed}
-        max_gas_unit_price: u64,
+        /// Gas unit price that the user is willing to pay for this txn when it is scheduled
+        gas_unit_price: u64,
         /// Option to pass a signer to the function
         pass_signer: bool,
         /// Variables are captured in the closure; optionally a signer is passed; no return
@@ -109,9 +112,7 @@ module aptos_framework::scheduled_txns {
     struct ScheduledTransactionInfoWithKey has drop {
         sender_addr: address,
         max_gas_amount: u64,
-        max_gas_unit_price: u64,
-        /// To be determined during execution
-        gas_unit_price_charged: u64,
+        gas_unit_price: u64,
         key: ScheduleMapKey
     }
 
@@ -136,7 +137,7 @@ module aptos_framework::scheduled_txns {
         /// key_size = 48 bytes
         schedule_map: BigOrderedMap<ScheduleMapKey, Empty>,
         ///
-        txn_tbl: Table<ScheduleMapKey, ScheduledTransaction>
+        txn_tbl: Table<u256, ScheduledTransaction>
     }
 
     /// BigOrderedMap has MAX_NODE_BYTES = 409600 (400KB), MAX_DEGREE = 4096, DEFAULT_TARGET_NODE_SIZE = 4096;
@@ -159,7 +160,7 @@ module aptos_framework::scheduled_txns {
         // todo: check if this is secure
         gas_fee_deposit_store_signer_cap: account::SignerCapability,
         module_status: ScheduledTxnsModuleStatus,
-        /// If run within the expiry_delta (from the time txn is expected to run), we will abort the txn
+        /// If run outside the expiry_delta (from the time txn is expected to run), we will abort the txn
         expiry_delta: u64
     }
 
@@ -181,12 +182,12 @@ module aptos_framework::scheduled_txns {
 
     #[event]
     struct TransactionScheduledEvent has drop, store {
-        scheduled_txn_time: u64,
+        block_time_ms: u64,
         scheduled_txn_hash: u256,
         sender_addr: address,
         scheduled_time_ms: u64,
         max_gas_amount: u64,
-        max_gas_unit_price: u64
+        gas_unit_price: u64
     }
 
     #[event]
@@ -214,7 +215,7 @@ module aptos_framework::scheduled_txns {
         system_addresses::assert_aptos_framework(framework);
 
         // Create owner account for handling deposits
-        let owner_addr = @0xb;
+        let owner_addr = DEPOSIT_STORE_OWNER_ADDR;
         let (owner_signer, owner_cap) =
             account::create_framework_reserved_account(owner_addr);
 
@@ -239,7 +240,7 @@ module aptos_framework::scheduled_txns {
         // Initialize queue
         let queue = ScheduleQueue {
             schedule_map: big_ordered_map::new_with_reusable(),
-            txn_tbl: table::new<ScheduleMapKey, ScheduledTransaction>()
+            txn_tbl: table::new<u256, ScheduledTransaction>()
         };
         move_to(framework, queue);
 
@@ -256,9 +257,9 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Starts the shutdown process. Can only be called when module status is Active.
-    /// Note: This function should be run in the block before get_ready_transactions(); otherwise, we can have a race
-    ///       condition where a transaction is both executed and cancelled.
-    ///       todo: check if this is possible in practice.
+    /// We need a governance proposal to shutdown the module. Possible reasons to shutdown are:
+    ///      (a) the stakeholders decide the feature is no longer needed
+    ///      (b) there is an invariant violation detected, and the only way out is to shutdown and cancel all txns
     public fun start_shutdown(framework: &signer) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
         system_addresses::assert_aptos_framework(framework);
 
@@ -270,17 +271,19 @@ module aptos_framework::scheduled_txns {
         aux_data.module_status = ScheduledTxnsModuleStatus::ShutdownInProgress;
 
         // remove txns that have already been run
-        // todo: if start_shutdown() cannot be called before get_ready_transactions(), then perhaps we need to call this in continue_shutdown().
         remove_txns(timestamp::now_microseconds() / 1000);
 
         process_shutdown_batch();
     }
 
     /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
+    /// todo: should continue_shutdown() be called automatically by the system ???
     public fun continue_shutdown() acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
         process_shutdown_batch();
     }
 
+    /// Re-initialize the module after the shutdown is complete
+    /// We need a governance proposal to re-initialize the module.
     public fun re_initialize(framework: &signer) acquires AuxiliaryData {
         system_addresses::assert_aptos_framework(framework);
         let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
@@ -291,7 +294,7 @@ module aptos_framework::scheduled_txns {
         aux_data.module_status = ScheduledTxnsModuleStatus::Active;
     }
 
-    /// Stop, remove and refund all scheduled txns; can be called only by the framework
+    /// Stop, remove and refund all scheduled txns
     fun process_shutdown_batch() acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         assert!(
@@ -310,12 +313,12 @@ module aptos_framework::scheduled_txns {
             while ((!iter.iter_is_end(&queue.schedule_map))
                 && (cancel_count < SHUTDOWN_CANCEL_LIMIT)) {
                 let key = iter.iter_borrow_key();
-                if (!queue.txn_tbl.contains(*key)) {
+                if (!queue.txn_tbl.contains(key.txn_id)) {
                     // the scheduled txn is run in the same block, but before this 'shutdown txn'
                     continue;
                 };
-                let txn = queue.txn_tbl.borrow(*key);
-                let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+                let txn = queue.txn_tbl.borrow(key.txn_id);
+                let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
                 txns_to_cancel.push_back(
                     KeyAndTxnInfo { key: *key, account_addr: txn.sender_addr, deposit_amt }
                 );
@@ -367,8 +370,10 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Pause the scheduled transactions module
-    /// This is called internally by the system if any system level invariant of scheduled txns is violated.
-    /// We would need a governance proposal to unpause or to start the shutdown process
+    /// Internally called by the system if any system level invariant of scheduled txns is violated.
+    /// Next steps is to have a governance proposal to:
+    ///     (a) unpause the module or
+    ///     (b) start the shutdown process
     public fun pause_scheduled_txns(framework: &signer) acquires AuxiliaryData {
         system_addresses::assert_aptos_framework(framework);
         let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
@@ -379,7 +384,9 @@ module aptos_framework::scheduled_txns {
         aux_data.module_status = ScheduledTxnsModuleStatus::Paused;
     }
 
-    /// Unpause the scheduled transactions module; can be called only by the framework
+    /// Unpause the scheduled transactions module.
+    /// This can be called by a governace proposal. It is advised that this be called only after ensuring that the
+    /// system invariants won't be violated again.
     public fun unpause_scheduled_txns(framework: &signer) acquires AuxiliaryData {
         system_addresses::assert_aptos_framework(framework);
         let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
@@ -404,7 +411,7 @@ module aptos_framework::scheduled_txns {
         sender_addr: address,
         scheduled_time_ms: u64,
         max_gas_amount: u64,
-        max_gas_unit_price: u64,
+        gas_unit_price: u64,
         pass_signer: bool,
         f: |Option<signer>| has copy + store + drop
     ): ScheduledTransaction {
@@ -412,7 +419,7 @@ module aptos_framework::scheduled_txns {
             sender_addr,
             scheduled_time_ms,
             max_gas_amount,
-            max_gas_unit_price,
+            gas_unit_price,
             pass_signer,
             f: ScheduledFunction::V1(f)
         }
@@ -437,11 +444,11 @@ module aptos_framework::scheduled_txns {
 
         // Only schedule txns in the future
         let txn_time = txn.scheduled_time_ms;
-        let block_time = timestamp::now_microseconds() / 1000;
-        assert!(txn_time > block_time, error::invalid_argument(EINVALID_TIME));
+        let block_time_ms = timestamp::now_microseconds() / 1000;
+        assert!(txn_time > block_time_ms, error::invalid_argument(EINVALID_TIME));
 
         assert!(
-            txn.max_gas_unit_price >= 100,
+            txn.gas_unit_price >= 100,
             error::invalid_argument(ELOW_GAS_UNIT_PRICE)
         );
 
@@ -458,13 +465,13 @@ module aptos_framework::scheduled_txns {
         // Create schedule map key
         let key = ScheduleMapKey {
             time: txn_time,
-            gas_priority: U64_MAX - txn.max_gas_unit_price,
+            gas_priority: U64_MAX - txn.gas_unit_price,
             txn_id
         };
 
         let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
         queue.schedule_map.add(key, Empty {});
-        queue.txn_tbl.add(key, txn);
+        queue.txn_tbl.add(key.txn_id, txn);
 
         // Collect deposit
         // Get owner signer from capability
@@ -477,18 +484,18 @@ module aptos_framework::scheduled_txns {
         coin::transfer<AptosCoin>(
             sender,
             gas_deposit_store_addr,
-            txn.max_gas_amount * txn.max_gas_unit_price
+            txn.max_gas_amount * txn.gas_unit_price
         );
 
         // Emit event that txn has been scheduled; for now indexer wants to consume this
         event::emit(
             TransactionScheduledEvent {
-                scheduled_txn_time: txn_time,
+                block_time_ms,
                 scheduled_txn_hash: txn_id,
                 sender_addr: txn.sender_addr,
                 scheduled_time_ms: txn.scheduled_time_ms,
                 max_gas_amount: txn.max_gas_amount,
-                max_gas_unit_price: txn.max_gas_unit_price
+                gas_unit_price: txn.gas_unit_price
             }
         );
 
@@ -505,13 +512,13 @@ module aptos_framework::scheduled_txns {
         );
 
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-        if (!queue.schedule_map.contains(&key) || !queue.txn_tbl.contains(key)) {
+        if (!queue.schedule_map.contains(&key) || !queue.txn_tbl.contains(key.txn_id)) {
             // Second check if for the case: the scheduled txn is run in the same block, but before this 'cancel txn'
             return
         };
 
-        let txn = queue.txn_tbl.borrow(key);
-        let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+        let txn = queue.txn_tbl.borrow(key.txn_id);
+        let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
         // verify sender
         assert!(
@@ -545,7 +552,7 @@ module aptos_framework::scheduled_txns {
 
         // Remove the transaction from schedule_map and txn_tbl
         queue.schedule_map.remove(&key);
-        queue.txn_tbl.remove(key);
+        queue.txn_tbl.remove(key.txn_id);
 
         // Refund the deposit
         // Get owner signer from capability
@@ -587,19 +594,18 @@ module aptos_framework::scheduled_txns {
         let count = 0;
 
         let iter = queue.schedule_map.new_begin_iter();
-        while (!iter.iter_is_end(&queue.schedule_map) && count < limit) {
+        while ((count < limit) && !iter.iter_is_end(&queue.schedule_map)) {
             let key = iter.iter_borrow_key();
             if (key.time > block_timestamp_ms) {
                 break;
             };
-            let txn = queue.txn_tbl.borrow(*key);
+            let txn = queue.txn_tbl.borrow(key.txn_id);
 
             let scheduled_txn_info_with_key =
                 ScheduledTransactionInfoWithKey {
                     sender_addr: txn.sender_addr,
                     max_gas_amount: txn.max_gas_amount,
-                    max_gas_unit_price: txn.max_gas_unit_price,
-                    gas_unit_price_charged: txn.max_gas_unit_price,
+                    gas_unit_price: txn.gas_unit_price,
                     key: *key
                 };
 
@@ -646,8 +652,8 @@ module aptos_framework::scheduled_txns {
             };
 
             // Get transaction info before cancelling
-            let txn = queue.txn_tbl.borrow(*key);
-            let deposit_amt = txn.max_gas_amount * txn.max_gas_unit_price;
+            let txn = queue.txn_tbl.borrow(key.txn_id);
+            let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
             txns_to_expire.push_back(
                 KeyAndTxnInfo { key: *key, account_addr: txn.sender_addr, deposit_amt }
@@ -681,18 +687,16 @@ module aptos_framework::scheduled_txns {
             let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
             let tbl_idx: u16 = 0;
 
-            let num_removed: u64 = 0;
             while ((tbl_idx as u64) < TO_REMOVE_PARALLELISM) {
                 if (to_remove.remove_tbl.contains(tbl_idx)) {
                     let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
                     while (!keys.is_empty()) {
                         let key = keys.pop_back();
-                        num_removed = num_removed + 1;
                         if (queue.schedule_map.contains(&key)) {
                             // Remove transaction from schedule_map and txn_tbl
-                            if (queue.txn_tbl.contains(key)) {
-                                queue.txn_tbl.remove(key);
+                            if (queue.txn_tbl.contains(key.txn_id)) {
+                                queue.txn_tbl.remove(key.txn_id);
                             };
                             queue.schedule_map.remove(&key);
                         };
@@ -714,7 +718,7 @@ module aptos_framework::scheduled_txns {
             // It is possible that the scheduled transaction was cancelled before in the same block
             return false;
         };
-        let txn = queue.txn_tbl.borrow(txn_key);
+        let txn = queue.txn_tbl.borrow(txn_key.txn_id);
         let pass_signer = txn.pass_signer;
 
         match(txn.f) {
@@ -732,7 +736,7 @@ module aptos_framework::scheduled_txns {
         //    of all scheduled transactions in the current block
         // 2. From txn_tbl: Removed immediately after transaction execution in this function to enable
         //    proper refunding of storage gas fees to the user
-        queue.txn_tbl.remove(txn_key);
+        queue.txn_tbl.remove(txn_key.txn_id);
         true
     }
 
@@ -780,7 +784,7 @@ module aptos_framework::scheduled_txns {
     ): |Option<signer>| has copy acquires ScheduleQueue {
         let queue = borrow_global<ScheduleQueue>(@aptos_framework);
         assert!(queue.schedule_map.contains(&key), 0);
-        let txn = queue.txn_tbl.borrow(key);
+        let txn = queue.txn_tbl.borrow(key.txn_id);
         match(txn.f) {
             ScheduledFunction::V1(f) => { f }
         }
