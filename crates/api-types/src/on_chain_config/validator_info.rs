@@ -27,9 +27,9 @@ pub struct ValidatorInfo {
     // initial property.
     pub account_address: AccountAddress,
     // Voting power of this validator
-    consensus_voting_power: u64,
+    pub consensus_voting_power: u64,
     // Validator config
-    config: ValidatorConfig,
+    pub config: ValidatorConfig,
 }
 
 impl fmt::Display for ValidatorInfo {

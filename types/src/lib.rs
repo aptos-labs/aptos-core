@@ -57,6 +57,9 @@ pub mod vm_status;
 pub mod waypoint;
 pub mod write_set;
 
+// IDL (Interface Definition Language) modules for cross-language serialization
+pub mod idl;
+
 pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
 

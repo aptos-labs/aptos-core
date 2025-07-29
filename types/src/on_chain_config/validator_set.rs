@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
+use crate::{idl::construct_and_convert_validator_set, on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
 use move_core_types::account_address::AccountAddress;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -13,6 +13,7 @@ use std::{
     vec,
     vec::IntoIter,
 };
+use anyhow::{format_err, Result};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -98,6 +99,10 @@ impl OnChainConfig for ValidatorSet {
     // validator_set_address
     const MODULE_IDENTIFIER: &'static str = "stake";
     const TYPE_IDENTIFIER: &'static str = "ValidatorSet";
+
+    fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
+        Ok(construct_and_convert_validator_set(bytes)?)
+    }
 }
 
 impl IntoIterator for ValidatorSet {
