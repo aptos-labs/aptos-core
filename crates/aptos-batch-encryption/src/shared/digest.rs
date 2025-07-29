@@ -32,8 +32,9 @@ pub struct DigestKey {
 
 /// A succinct commitment to a set of IDs. Internally, a KZG commitment over a shifted
 /// powers-of-tau.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Digest {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     digest_g1: G1Affine,
     round: usize,
 }
