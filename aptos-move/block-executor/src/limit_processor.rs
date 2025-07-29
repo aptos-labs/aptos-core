@@ -42,6 +42,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        println!(
+            "BlockGasLimitProcessor::new. block_gas_limit_type: {:?}",
+            block_gas_limit_type
+        );
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
             .then(|| BlockHotStateOpAccumulator::new(base_view));
@@ -89,6 +93,8 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
             if let Some(x) = &mut self.hot_state_op_accumulator {
+                // TODO(wqfish): probably need to order these to eliminate randomness.
+                // (These are `HashSet` right now.)
                 x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
             }
             self.txn_read_write_summaries.push(rw_summary);
