@@ -6,7 +6,10 @@ use move_compiler_v2::{diagnostics::human::HumanEmitter, run_move_compiler, Expe
 use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_prover_test_utils::baseline_test;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 /// Extension for expected output files.
 pub const EXP_EXT: &str = "exp";
@@ -25,7 +28,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         language_version: Some(LanguageVersion::latest_stable()),
         compiler_version: Some(CompilerVersion::latest_stable()),
         experiments: vec![Experiment::LINT_CHECKS.to_string()],
-        external_checks: vec![MoveLintChecks::make()],
+        external_checks: vec![MoveLintChecks::make(BTreeMap::from([(
+            "checks".to_string(),
+            "experimental".to_string(),
+        )]))],
         ..Default::default()
     };
     let mut output = String::new();
