@@ -1,0 +1,13 @@
+processed 3 tasks
+task 0 lines 1-35:  publish
+task 1 lines 38-48:  run --verbose
+task 2 lines 51-59:  run --verbose
+Error: Script execution failed with VMError: {
+    message: None,
+    major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: None,
+}

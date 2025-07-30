@@ -245,6 +245,16 @@ module aptos_std::ordered_map {
                 if (ord.is_eq()) {
                     // we skip the entries one, and below put in the result one from other.
                     overwritten.push_back(self.entries.pop_back());
+
+                    if (cur_i == 0) {
+                        // make other_entries empty, and rest in entries.
+                        // TODO cannot use mem::swap until it is public/released
+                        // mem::swap(&mut self.entries, &mut other_entries);
+                        self.entries.append(other_entries);
+                        break;
+                    } else {
+                        cur_i -= 1;
+                    };
                 };
 
                 reverse_result.push_back(other_entries.pop_back());
@@ -1225,6 +1235,39 @@ module aptos_std::ordered_map {
     public fun test_iter_add_abort_4() {
         let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
         map.new_begin_iter().iter_next(&map).iter_add(&mut map, 3, 25);
+    }
+
+    #[test]
+	public fun test_ordered_map_append_2() {
+        let map = new_from(vector[1, 2], vector[10, 20]);
+        let other = new_from(vector[1, 2], vector[100, 200]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2], vector[100, 200]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_3() {
+        let map = new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+        let other = new_from(vector[2, 4], vector[200, 400]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 200, 30, 400, 50]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_4() {
+        let map = new_from(vector[3, 4, 5, 6, 7], vector[30, 40, 50, 60, 70]);
+        let other = new_from(vector[1, 2, 4, 6], vector[100, 200, 400, 600]);
+        map.append(other);
+        assert!(map == new_from(vector[1, 2, 3, 4, 5, 6, 7], vector[100, 200, 30, 400, 50, 600, 70]));
+    }
+
+    #[test]
+	public fun test_ordered_map_append_5() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        let other = new_from(vector[0, 2, 4, 6], vector[0, 200, 400, 600]);
+        map.append(other);
+        aptos_std::debug::print(&map);
+        assert!(map == new_from(vector[0, 1, 2, 3, 4, 5, 6], vector[0, 10, 200, 30, 400, 50, 600]));
     }
 
     #[test_only]

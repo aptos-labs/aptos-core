@@ -1,0 +1,30 @@
+processed 2 tasks
+task 0 lines 1-6:  publish --print-bytecode
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test1
+struct S
+  _1: u64
+  _2: u8
+
+
+== END Bytecode ==
+task 1 lines 8-19:  publish --print-bytecode
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test2
+use 0x66::test1
+struct T
+  _1: test1::S
+
+// Function definition at index 0
+fun get(l0: test2::T): test1::S
+    borrow_loc l0
+    borrow_field T, _1
+    read_ref
+    ret
+
+
+== END Bytecode ==

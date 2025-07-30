@@ -6,8 +6,8 @@ pub(crate) mod truncation_helper;
 
 use crate::schema::db_metadata::{DbMetadataKey, DbMetadataSchema};
 use aptos_schemadb::{batch::NativeBatch, DB};
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
-use aptos_types::transaction::Version;
+use aptos_storage_interface::Result;
+use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 
 pub(crate) type ShardedStateKvSchemaBatch<'db> = [NativeBatch<'db>; NUM_STATE_SHARDS];
 

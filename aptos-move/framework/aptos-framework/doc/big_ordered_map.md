@@ -110,6 +110,7 @@ allowing cleaner iterator APIs.
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `allocate_spare_slots`](#@Specification_1_allocate_spare_slots)
     -  [Function `is_empty`](#@Specification_1_is_empty)
+    -  [Function `compute_length`](#@Specification_1_compute_length)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `upsert`](#@Specification_1_upsert)
     -  [Function `remove`](#@Specification_1_remove)
@@ -1633,11 +1634,17 @@ to O(n).
 
 
 <pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&K, &V|) {
-    self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
-        node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
-            f(k, &v.value);
-        });
-    })
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>();
+    <b>while</b> (!iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        f(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(), iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self));
+        iter = iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>(self);
+    };
+
+    // self.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_leaf_node_ref">for_each_leaf_node_ref</a>(|node| {
+    //     node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_for_each_ref_friend">for_each_ref_friend</a>(|k: &K, v: &<a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;| {
+    //         f(k, &v.value);
+    //     });
+    // })
 }
 </code></pre>
 
@@ -3359,6 +3366,24 @@ Given a path to node (excluding the node itself), which is currently stored unde
 
 
 <pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_compute_length"></a>
+
+### Function `compute_length`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_compute_length">compute_length</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="big_ordered_map.md#0x1_big_ordered_map_spec_len">spec_len</a>(self);
 </code></pre>
 
 

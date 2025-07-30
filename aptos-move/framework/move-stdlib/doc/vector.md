@@ -728,7 +728,14 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
     <b>let</b> found_index = 0;
     <b>let</b> i = 0;
     <b>let</b> len = self.<a href="vector.md#0x1_vector_length">length</a>();
-    <b>while</b> (i &lt; len) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= len;
+            <b>invariant</b> <b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; i: !f(self[j]);
+            <b>invariant</b> find ==&gt; i &lt; len && f(self[i]);
+        };
+        i &lt; len
+        }) {
         // Cannot call <b>return</b> in an inline function so we need <b>to</b> resort <b>to</b> <b>break</b> here.
         <b>if</b> (f(self.<a href="vector.md#0x1_vector_borrow">borrow</a>(i))) {
             find = <b>true</b>;
@@ -736,6 +743,9 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
             <b>break</b>
         };
         i += 1;
+    };
+    <b>spec</b> {
+        <b>assert</b> !<a href="vector.md#0x1_vector_find">find</a> &lt;==&gt; (<b>forall</b> j: num <b>where</b> j &gt;= 0 && j &lt; len: !f(self[j]));
     };
     (find, found_index)
 }

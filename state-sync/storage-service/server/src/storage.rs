@@ -5,14 +5,18 @@ use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::debug;
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
-use aptos_storage_service_types::responses::{
-    CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
+use aptos_storage_service_types::{
+    requests::{GetTransactionDataWithProofRequest, TransactionDataRequestType},
+    responses::{
+        CompleteDataRange, DataResponse, DataSummary, TransactionDataResponseType,
+        TransactionDataWithProofResponse,
+    },
 };
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use serde::Serialize;
 use std::{cmp::min, sync::Arc};
@@ -34,7 +38,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_version: u64,
         end_version: u64,
         include_events: bool,
-    ) -> aptos_storage_service_types::Result<TransactionListWithProof, Error>;
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns a list of epoch ending ledger infos, starting at `start_epoch`
     /// and ending at the `expected_end_epoch` (inclusive). For example, if
@@ -58,7 +62,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         proof_version: u64,
         start_version: u64,
         end_version: u64,
-    ) -> aptos_storage_service_types::Result<TransactionOutputListWithProof, Error>;
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns a list of transaction or outputs with a proof relative to the
     /// `proof_version`. The data list is expected to start at `start_version`
@@ -73,7 +77,13 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         end_version: u64,
         include_events: bool,
         max_num_output_reductions: u64,
-    ) -> aptos_storage_service_types::Result<TransactionOrOutputListWithProof, Error>;
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
+
+    /// Returns transaction data with a proof for the given request
+    fn get_transaction_data_with_proof(
+        &self,
+        transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error>;
 
     /// Returns the number of states in the state tree at the specified version.
     fn get_number_of_states(&self, version: u64)
@@ -235,7 +245,7 @@ impl StorageReaderInterface for StorageReader {
         start_version: u64,
         end_version: u64,
         include_events: bool,
-    ) -> aptos_storage_service_types::Result<TransactionListWithProof, Error> {
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         // Calculate the number of transactions to fetch
         let expected_num_transactions = inclusive_range_len(start_version, end_version)?;
         let max_num_transactions = self.config.max_transaction_chunk_size;
@@ -252,24 +262,28 @@ impl StorageReaderInterface for StorageReader {
                     include_events,
                 )
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionData,
+                transaction_list_with_proof: Some(transaction_list_with_proof),
+                transaction_output_list_with_proof: None,
+            };
             if num_transactions_to_fetch == 1 {
-                return Ok(transaction_list_with_proof); // We cannot return less than a single item
+                return Ok(response); // We cannot return less than a single item
             }
 
             // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &transaction_list_with_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
             if !overflow_frame {
-                return Ok(transaction_list_with_proof);
+                return Ok(response);
             } else {
                 increment_network_frame_overflow(
-                    DataResponse::TransactionsWithProof(transaction_list_with_proof).get_label(),
+                    DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_transactions_to_fetch = num_transactions_to_fetch / 2;
-                debug!("The request for {:?} transactions was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_transactions_to_fetch, num_bytes, new_num_transactions_to_fetch);
+                debug!("The request for {:?} transactions was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_transactions_to_fetch, num_bytes, max_network_chunk_bytes, new_num_transactions_to_fetch);
                 num_transactions_to_fetch = new_num_transactions_to_fetch; // Try again with half the amount of data
             }
         }
@@ -310,10 +324,9 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &epoch_change_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&epoch_change_proof, max_network_chunk_bytes)?;
             if !overflow_frame {
                 return Ok(epoch_change_proof);
             } else {
@@ -321,8 +334,8 @@ impl StorageReaderInterface for StorageReader {
                     DataResponse::EpochEndingLedgerInfos(epoch_change_proof).get_label(),
                 );
                 let new_num_ledger_infos_to_fetch = num_ledger_infos_to_fetch / 2;
-                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_ledger_infos_to_fetch, num_bytes, new_num_ledger_infos_to_fetch);
+                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_ledger_infos_to_fetch, num_bytes, max_network_chunk_bytes, new_num_ledger_infos_to_fetch);
                 num_ledger_infos_to_fetch = new_num_ledger_infos_to_fetch; // Try again with half the amount of data
             }
         }
@@ -339,7 +352,7 @@ impl StorageReaderInterface for StorageReader {
         proof_version: u64,
         start_version: u64,
         end_version: u64,
-    ) -> aptos_storage_service_types::Result<TransactionOutputListWithProof, Error> {
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         // Calculate the number of transaction outputs to fetch
         let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
         let max_num_outputs = self.config.max_transaction_output_chunk_size;
@@ -351,24 +364,28 @@ impl StorageReaderInterface for StorageReader {
                 .storage
                 .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+                transaction_list_with_proof: None,
+                transaction_output_list_with_proof: Some(output_list_with_proof),
+            };
             if num_outputs_to_fetch == 1 {
-                return Ok(output_list_with_proof); // We cannot return less than a single item
+                return Ok(response); // We cannot return less than a single item
             }
 
             // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &output_list_with_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
             if !overflow_frame {
-                return Ok(output_list_with_proof);
+                return Ok(response);
             } else {
                 increment_network_frame_overflow(
-                    DataResponse::TransactionOutputsWithProof(output_list_with_proof).get_label(),
+                    DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_outputs_to_fetch, num_bytes, new_num_outputs_to_fetch);
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, new_num_outputs_to_fetch);
                 num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
             }
         }
@@ -387,7 +404,7 @@ impl StorageReaderInterface for StorageReader {
         end_version: u64,
         include_events: bool,
         max_num_output_reductions: u64,
-    ) -> aptos_storage_service_types::Result<TransactionOrOutputListWithProof, Error> {
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
         // Calculate the number of transaction outputs to fetch
         let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
         let max_num_outputs = self.config.max_transaction_output_chunk_size;
@@ -402,39 +419,81 @@ impl StorageReaderInterface for StorageReader {
                 .storage
                 .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
                 .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &output_list_with_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+                transaction_list_with_proof: None,
+                transaction_output_list_with_proof: Some(output_list_with_proof),
+            };
+
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
 
             if !overflow_frame {
-                return Ok((None, Some(output_list_with_proof)));
+                return Ok(response);
             } else if num_outputs_to_fetch == 1 {
                 break; // We cannot return less than a single item. Fallback to transactions
             } else {
                 increment_network_frame_overflow(
-                    DataResponse::TransactionsOrOutputsWithProof((
-                        None,
-                        Some(output_list_with_proof),
-                    ))
-                    .get_label(),
+                    DataResponse::TransactionDataWithProof(response).get_label(),
                 );
                 let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}). Current number of data reductions: {:?}",
-                    num_outputs_to_fetch, num_bytes, num_output_reductions);
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Current number of data reductions: {:?}",
+                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, num_output_reductions);
                 num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
                 num_output_reductions += 1;
             }
         }
 
         // Return transactions only
-        let transactions_with_proof = self.get_transactions_with_proof(
-            proof_version,
-            start_version,
-            end_version,
-            include_events,
-        )?;
-        Ok((Some(transactions_with_proof), None))
+        self.get_transactions_with_proof(proof_version, start_version, end_version, include_events)
+    }
+
+    // TODOs:
+    // 1. Make this function respect the `max_network_chunk_bytes` limit. It's
+    //    currently not respected because the auxiliary information is not
+    //    size checked. However, this is okay for now because the limit is not
+    //    a hard limit, and auxiliary information is still quite small (e.g., u32
+    //    per transaction). However, we should address this.
+    // 2. Make this function respect the `max_response_bytes` limit in each request.
+    //    It's currently not respected because we only consider the
+    //    `max_network_chunk_bytes` limit as defined by the storage service config.
+    //    We should also address this.
+    fn get_transaction_data_with_proof(
+        &self,
+        transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
+    ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
+        // Extract the data versions from the request
+        let proof_version = transaction_data_with_proof_request.proof_version;
+        let start_version = transaction_data_with_proof_request.start_version;
+        let end_version = transaction_data_with_proof_request.end_version;
+
+        // Fetch the transaction data based on the request type
+        match transaction_data_with_proof_request.transaction_data_request_type {
+            TransactionDataRequestType::TransactionData(request) => {
+                // Get the transaction list with proof
+                self.get_transactions_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    request.include_events,
+                )
+            },
+            TransactionDataRequestType::TransactionOutputData => {
+                // Get the transaction output list with proof
+                self.get_transaction_outputs_with_proof(proof_version, start_version, end_version)
+            },
+            TransactionDataRequestType::TransactionOrOutputData(request) => {
+                // Get the transaction or output list with proof
+                self.get_transactions_or_outputs_with_proof(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    request.include_events,
+                    0, // Fetch all outputs, or return transactions
+                )
+            },
+        }
     }
 
     fn get_number_of_states(
@@ -474,9 +533,10 @@ impl StorageReaderInterface for StorageReader {
             }
 
             // Attempt to divide up the request if it overflows the message size
+            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
             let (overflow_frame, num_bytes) = check_overflow_network_frame(
                 &state_value_chunk_with_proof,
-                self.config.max_network_chunk_bytes,
+                max_network_chunk_bytes,
             )?;
             if !overflow_frame {
                 return Ok(state_value_chunk_with_proof);
@@ -486,8 +546,8 @@ impl StorageReaderInterface for StorageReader {
                         .get_label(),
                 );
                 let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
-                debug!("The request for {:?} state values was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_state_values_to_fetch, num_bytes, new_num_state_values_to_fetch);
+                debug!("The request for {:?} state values was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_state_values_to_fetch, num_bytes, max_network_chunk_bytes, new_num_state_values_to_fetch);
                 num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
             }
         }
@@ -555,7 +615,7 @@ impl DbReader for TimedStorageReader {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> StorageResult<TransactionListWithProof>;
+        ) -> StorageResult<TransactionListWithProofV2>;
 
         fn get_epoch_ending_ledger_infos(
             &self,
@@ -568,7 +628,7 @@ impl DbReader for TimedStorageReader {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> StorageResult<TransactionOutputListWithProof>;
+        ) -> StorageResult<TransactionOutputListWithProofV2>;
 
         fn get_state_item_count(&self, version: Version) -> StorageResult<usize>;
 

@@ -62,9 +62,9 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, Transaction, TransactionAuxiliaryData,
-        TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };

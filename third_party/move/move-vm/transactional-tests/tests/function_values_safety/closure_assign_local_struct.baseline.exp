@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-39:  publish
+task 1 lines 43-66:  run --verbose
+Error: Script execution failed with VMError: {
+    message: None,
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: None,
+}

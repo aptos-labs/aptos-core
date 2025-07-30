@@ -34,8 +34,9 @@ use aptos_types::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         AuxiliaryInfo, BlockEndInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction,
-        Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProofV2, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -341,8 +342,12 @@ fn create_blocks_and_chunks(
     block_ranges: Vec<std::ops::RangeInclusive<Version>>,
     chunk_ranges: Vec<std::ops::RangeInclusive<Version>>,
 ) -> (
-    Vec<(Vec<Transaction>, LedgerInfoWithSignatures)>,
-    Vec<TransactionListWithProof>,
+    Vec<(
+        Vec<Transaction>,
+        Vec<AuxiliaryInfo>,
+        LedgerInfoWithSignatures,
+    )>,
+    Vec<TransactionListWithProofV2>,
 ) {
     assert_eq!(*block_ranges.first().unwrap().start(), 1);
     assert_eq!(*chunk_ranges.first().unwrap().start(), 1);
@@ -387,9 +392,24 @@ fn create_blocks_and_chunks(
             .map(|v| encode_mint_transaction(gen_address(v), 10))
             .collect();
         let block_id = gen_block_id(version);
+        let aux_info: Vec<_> = (0..num_txns)
+            .map(|i| {
+                AuxiliaryInfo::new(
+                    PersistedAuxiliaryInfo::V1 {
+                        transaction_index: i as u32,
+                    },
+                    None,
+                )
+            })
+            .collect();
         let output = block_executor
             .execute_block(
-                (block_id, into_signature_verified_block(txns.clone())).into(),
+                (
+                    block_id,
+                    into_signature_verified_block(txns.clone()),
+                    aux_info.clone(),
+                )
+                    .into(),
                 parent_block_id,
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -397,10 +417,10 @@ fn create_blocks_and_chunks(
         assert_eq!(output.expect_last_version(), version);
         block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
-        out_blocks.push((txns, ledger_info));
+        out_blocks.push((txns, aux_info, ledger_info));
         parent_block_id = block_id;
     }
-    let ledger_info = out_blocks.last().unwrap().1.clone();
+    let ledger_info = out_blocks.last().unwrap().2.clone();
     let ledger_version = ledger_info.ledger_info().version();
     block_executor.commit_ledger(ledger_info).unwrap();
 
@@ -423,13 +443,13 @@ fn create_blocks_and_chunks(
 
 fn create_transaction_chunks(
     chunks: Vec<std::ops::RangeInclusive<Version>>,
-) -> (Vec<TransactionListWithProof>, LedgerInfoWithSignatures) {
+) -> (Vec<TransactionListWithProofV2>, LedgerInfoWithSignatures) {
     let num_txns = *chunks.last().unwrap().end();
     // last txn is a block epilogue
     let all_txns = 1..=num_txns;
     let (mut blocks, chunks) = create_blocks_and_chunks(vec![all_txns], chunks);
 
-    (chunks, blocks.pop().unwrap().1)
+    (chunks, blocks.pop().unwrap().2)
 }
 
 fn create_test_transaction(sequence_number: u64) -> Transaction {
@@ -790,12 +810,12 @@ proptest! {
         // get txn_infos from db
         let db = executor.db.reader.clone();
         prop_assert_eq!(db.expect_synced_version(), ledger_version);
-        let txn_list = db.get_transactions(
+        let (txn_list, persisted_aux_info)= db.get_transactions(
             1, /* start version */
             ledger_version, /* version */
             ledger_version, /* ledger version */
             false /* fetch events */
-        ).unwrap();
+        ).unwrap().into_parts();
         prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns]);
         let txn_infos = txn_list.proof.transaction_infos;
         let write_sets = db.get_write_set_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
@@ -806,7 +826,7 @@ proptest! {
         let replayer = chunk_executor_tests::TestExecutor::new();
         let chunks_enqueued = replayer.executor.enqueue_chunks(
             txn_list.transactions,
-            txn_infos.iter().map(|_| PersistedAuxiliaryInfo::None).collect(),
+            persisted_aux_info,
             txn_infos,
             write_sets,
             event_vecs,

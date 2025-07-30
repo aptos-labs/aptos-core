@@ -23,7 +23,7 @@ use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{sync::Arc, time::Duration};
 
@@ -213,7 +213,7 @@ impl<
                     transaction_outputs_with_proof,
                 ) => {
                     let payload_start_version =
-                        transaction_outputs_with_proof.first_transaction_output_version;
+                        transaction_outputs_with_proof.get_first_output_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -232,7 +232,8 @@ impl<
                     ledger_info_with_sigs,
                     transactions_with_proof,
                 ) => {
-                    let payload_start_version = transactions_with_proof.first_transaction_version;
+                    let payload_start_version =
+                        transactions_with_proof.get_first_transaction_version();
                     let notification_metadata = NotificationMetadata::new(
                         data_notification.creation_time,
                         data_notification.notification_id,
@@ -277,8 +278,8 @@ impl<
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
         notification_metadata: NotificationMetadata,
         ledger_info_with_signatures: LedgerInfoWithSignatures,
-        transaction_list_with_proof: Option<TransactionListWithProof>,
-        transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
+        transaction_list_with_proof: Option<TransactionListWithProofV2>,
+        transaction_outputs_with_proof: Option<TransactionOutputListWithProofV2>,
         payload_start_version: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version

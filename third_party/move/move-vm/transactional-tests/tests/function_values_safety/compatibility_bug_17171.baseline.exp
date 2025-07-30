@@ -1,0 +1,15 @@
+processed 5 tasks
+task 0 lines 1-14:  publish --verbose
+task 1 lines 16-29:  publish
+task 2 lines 30-30:  run 0x66::test::call_it
+task 3 lines 32-51:  publish --verbose
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::m'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::m`: changed parameter types of function `can_upgrade_wrong_type`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 52-52:  run --verbose 0x66::test::call_it

@@ -33,6 +33,7 @@ pool.
 
 -  [Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
 -  [Struct `StakingContract`](#0x1_staking_contract_StakingContract)
+-  [Resource `Staker`](#0x1_staking_contract_Staker)
 -  [Resource `Store`](#0x1_staking_contract_Store)
 -  [Resource `BeneficiaryForOperator`](#0x1_staking_contract_BeneficiaryForOperator)
 -  [Struct `UpdateCommissionEvent`](#0x1_staking_contract_UpdateCommissionEvent)
@@ -59,6 +60,7 @@ pool.
 -  [Struct `DistributeEvent`](#0x1_staking_contract_DistributeEvent)
 -  [Constants](#@Constants_0)
 -  [Function `stake_pool_address`](#0x1_staking_contract_stake_pool_address)
+-  [Function `staker_address`](#0x1_staking_contract_staker_address)
 -  [Function `last_recorded_principal`](#0x1_staking_contract_last_recorded_principal)
 -  [Function `commission_percentage`](#0x1_staking_contract_commission_percentage)
 -  [Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
@@ -131,6 +133,7 @@ pool.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64">0x1::pool_u64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -217,6 +220,33 @@ pool.
 </dd>
 <dt>
 <code>signer_cap: <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_staking_contract_Staker"></a>
+
+## Resource `Staker`
+
+
+
+<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>staker: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1409,6 +1439,42 @@ This errors out the staking contract with the provided staker and operator doesn
 
 </details>
 
+<a id="0x1_staking_contract_staker_address"></a>
+
+## Function `staker_address`
+
+Return the staker address for the provided pool address.
+
+If the pool address doesn't exist,
+or it's not a stake pool account,
+or the pool is created by a staker other than this module,
+or the pool is created before this feature,
+return None.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staker_address">staker_address</a>(pool_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staker_address">staker_address</a>(pool_address: <b>address</b>): std::option::Option&lt;<b>address</b>&gt; <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>&gt;(pool_address)) {
+        <b>return</b> std::option::some(<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>&gt;(pool_address).staker)
+    } <b>else</b> {
+        std::option::none()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_staking_contract_last_recorded_principal"></a>
 
 ## Function `last_recorded_principal`
@@ -1718,6 +1784,11 @@ Staker can call this function to create a simple staking contract with a specifi
 
     // Add the <a href="stake.md#0x1_stake">stake</a> <b>to</b> the <a href="stake.md#0x1_stake">stake</a> pool.
     <a href="stake.md#0x1_stake_add_stake_with_cap">stake::add_stake_with_cap</a>(&owner_cap, coins);
+
+    // Create the staker record.
+    <b>move_to</b>(&stake_pool_signer, <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> {
+        staker: staker_address,
+    });
 
     // Create the contract record.
     <b>let</b> pool_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&stake_pool_signer);

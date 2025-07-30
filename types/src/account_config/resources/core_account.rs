@@ -97,3 +97,15 @@ impl MoveStructType for AccountResource {
 }
 
 impl MoveResource for AccountResource {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_account_resource_has_special_address() {
+        // Note: module loading gas charging logic depends on this assumption. This should never
+        // change, but a test should catch if address changes at any point.
+        assert!(AccountResource::struct_tag().address.is_special());
+    }
+}

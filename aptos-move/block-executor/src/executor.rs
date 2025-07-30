@@ -79,7 +79,7 @@ use std::{
     },
 };
 
-struct SharedSyncParams<'a, T, E, S>
+struct SharedSyncParams<'a, 'b, T, E, S>
 where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
@@ -93,7 +93,7 @@ where
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
     delayed_field_id_counter: &'a AtomicU32,
-    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'a, T, S>>,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
@@ -163,6 +163,100 @@ where
         }
     }
 
+    // V1 processing is embedded in the execute method, while execute_v2 method calls
+    // this method to process speculative resource group outputs.
+    fn process_resource_group_output_v2(
+        maybe_output: Option<&E::Output>,
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        abort_manager: &mut AbortManager,
+    ) -> Result<(), PanicError> {
+        // The order of applying new group writes versus clearing previous writes is reversed
+        // in BlockSTMv2 as opposed to V1, which avoids the necessity to clone group keys and
+        // previous tags.
+        // TODO(BlockSTMv2): consider similar flow for resources.
+
+        let mut resource_group_write_set =
+            maybe_output.map_or(HashMap::new(), |output| output.resource_group_write_set());
+
+        last_input_output.for_each_resource_group_key_and_tags(
+            idx_to_execute,
+            |group_key_ref, prev_tags| {
+                match resource_group_write_set.remove_entry(group_key_ref) {
+                    Some((group_key, (group_metadata_op, group_size, group_ops))) => {
+                        // Current incarnation overwrites the previous write to a group.
+                        // TODO(BlockSTMv2): After MVHashMap refactoring, expose a single API
+                        // for groups handling everything (inner resources, metadata & size).
+                        abort_manager.invalidate_dependencies(
+                            // Invalidate the readers of group metadata.
+                            versioned_cache.data().write_v2::<true>(
+                                group_key.clone(),
+                                idx_to_execute,
+                                incarnation,
+                                Arc::new(group_metadata_op),
+                                None,
+                            ),
+                        )?;
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache.group_data().write_v2(
+                                group_key,
+                                idx_to_execute,
+                                incarnation,
+                                group_ops.into_iter(),
+                                group_size,
+                                prev_tags,
+                            )?,
+                        )?;
+                    },
+                    None => {
+                        // Clean up the write from previous incarnation.
+                        abort_manager.invalidate_dependencies(
+                            // Invalidate the readers of group metadata.
+                            versioned_cache
+                                .data()
+                                .remove_v2::<_, true>(group_key_ref, idx_to_execute)?,
+                        )?;
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache.group_data().remove_v2(
+                                group_key_ref,
+                                idx_to_execute,
+                                prev_tags,
+                            )?,
+                        )?;
+                    },
+                }
+                Ok(())
+            },
+        )?;
+
+        // Handle any remaining entries in resource_group_write_set (new group writes)
+        for (group_key, (group_metadata_op, group_size, group_ops)) in resource_group_write_set {
+            // New group write that wasn't in previous incarnation
+            abort_manager.invalidate_dependencies(
+                // Invalidate the readers of group metadata.
+                versioned_cache.data().write_v2::<true>(
+                    group_key.clone(),
+                    idx_to_execute,
+                    incarnation,
+                    Arc::new(group_metadata_op),
+                    None,
+                ),
+            )?;
+            abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
+                group_key,
+                idx_to_execute,
+                incarnation,
+                group_ops.into_iter(),
+                group_size,
+                HashSet::new(), // No previous tags since this is a new group write
+            )?)?;
+        }
+
+        Ok(())
+    }
+
     fn execute_v2(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
@@ -209,8 +303,17 @@ where
         let maybe_output =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
+        Self::process_resource_group_output_v2(
+            maybe_output,
+            idx_to_execute,
+            incarnation,
+            last_input_output,
+            versioned_cache,
+            &mut abort_manager,
+        )?;
+
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
-        let mut resource_write_set = Vec::new();
+        let mut resource_write_set = vec![];
         if let Some(output) = maybe_output {
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
@@ -223,7 +326,7 @@ where
                     maybe_layout,
                 ))?;
             }
-            // TODO(BlockSTMv2): handle groups, delayed fields and aggregator v1.
+            // TODO(BlockSTMv2): delayed fields and aggregator v1.
         }
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -231,7 +334,7 @@ where
             abort_manager.invalidate_dependencies(
                 versioned_cache
                     .data()
-                    .remove_v2::<_, false>(&key, idx_to_execute),
+                    .remove_v2::<_, false>(&key, idx_to_execute)?,
             )?;
         }
 
@@ -240,8 +343,6 @@ where
             read_set,
             execution_result,
             resource_write_set,
-            // TODO(BlockSTMv2): handle groups.
-            vec![],
         );
 
         scheduler.finish_execution(abort_manager)?;
@@ -281,7 +382,7 @@ where
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
         let mut prev_modified_group_keys: HashMap<T::Key, HashSet<T::Tag>> = last_input_output
-            .modified_group_keys(idx_to_execute)
+            .modified_group_key_and_tags_cloned(idx_to_execute)
             .into_iter()
             .collect();
         let mut prev_modified_delayed_fields = last_input_output
@@ -304,20 +405,13 @@ where
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
-        let mut group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = vec![];
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
         > {
-            let group_output = output.resource_group_write_set();
-            group_keys_and_tags = group_output
-                .iter()
-                .map(|(key, _, _, ops)| {
-                    let tags = ops.iter().map(|(tag, _)| tag.clone()).collect();
-                    (key.clone(), tags)
-                })
-                .collect();
-            for (group_key, group_metadata_op, group_size, group_ops) in group_output.into_iter() {
+            for (group_key, (group_metadata_op, group_size, group_ops)) in
+                output.resource_group_write_set().into_iter()
+            {
                 let prev_tags = prev_modified_group_keys
                     .remove(&group_key)
                     .unwrap_or_else(|| {
@@ -452,7 +546,6 @@ where
             read_set,
             execution_result,
             resource_write_set,
-            group_keys_and_tags,
         );
         Ok(needs_suffix_validation)
     }
@@ -514,7 +607,14 @@ where
         // We are not marking metadata change as estimate, but after a transaction execution
         // changes metadata, suffix validation is guaranteed to be triggered. Estimation affecting
         // execution behavior is left to size, which uses a heuristic approach.
-        last_input_output.mark_estimate_group_keys_and_tags(versioned_cache, txn_idx);
+        last_input_output
+            .for_each_resource_group_key_and_tags(txn_idx, |key, tags| {
+                versioned_cache
+                    .group_data()
+                    .mark_estimate(key, txn_idx, tags);
+                Ok(())
+            })
+            .expect("Passed closure always returns Ok");
 
         if let Some(keys) = last_input_output.delayed_field_keys(txn_idx) {
             for k in keys {
@@ -591,6 +691,7 @@ where
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
     /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
+    /// TODO(BlockSTMv2): Change the signature to use shared_sync_params.
     #[allow(clippy::too_many_arguments)]
     fn prepare_and_queue_commit_ready_txn(
         &self,
@@ -925,6 +1026,9 @@ where
             base_view,
         );
 
+        // This call finalizes the output and may not be concurrent with any other
+        // accesses to the output (e.g. querying the write-set, events, etc), as
+        // these read accesses are not synchronized and assumed to have terminated.
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
@@ -1010,7 +1114,8 @@ where
         let mut scheduler_task = SchedulerTask::Retry;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
-        let drain_commit_queue = || -> Result<(), PanicError> {
+        let drain_commit_queue = || -> Result<bool, PanicError> {
+            let mut block_epilogue_executed = false;
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
@@ -1111,12 +1216,12 @@ where
                             ));
                         };
                         *block_epilogue_txn.acquire().dereference_mut() = Some(txn);
-
+                        block_epilogue_executed = true;
                         scheduler.add_to_commit_queue(num_txns as u32);
                     }
                 }
             }
-            Ok(())
+            Ok(block_epilogue_executed)
         };
 
         loop {
@@ -1165,7 +1270,10 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            drain_commit_queue()?;
+            let block_epilogue_executed = drain_commit_queue()?;
+            if block_epilogue_executed {
+                scheduler_task = SchedulerTask::Done;
+            }
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -1240,7 +1348,7 @@ where
         // TODO: use worker id.
         _worker_id: u32,
         num_workers: u32,
-        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
         start_delayed_field_id_counter: u32,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
@@ -1348,13 +1456,67 @@ where
         Ok(())
     }
 
+    /// Common finalization logic for both BlockSTM and BlockSTMv2 parallel execution.
+    /// Handles commit task validation, error checking, state updates, and cleanup.
+    fn finalize_parallel_execution(
+        &self,
+        shared_maybe_error: &AtomicBool,
+        has_remaining_commit_tasks: bool,
+        final_results: ExplicitSyncWrapper<Vec<E::Output>>,
+        block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        block_epilogue_txn: Option<Transaction>,
+        mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        scheduler: impl Send + 'static,
+        last_input_output: TxnLastInputOutput<T, E::Output, E::Error>,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
+        // Check for errors or remaining commit tasks before any side effects.
+        let mut has_error = shared_maybe_error.load(Ordering::SeqCst);
+        if !has_error && has_remaining_commit_tasks {
+            alert!("[BlockSTM]: commit tasks not drained after parallel execution");
+            shared_maybe_error.store(true, Ordering::Relaxed);
+            has_error = true;
+        }
+
+        if has_error {
+            // Does not hurt to asynchronously drop even in the error case.
+            DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+            return Err(());
+        }
+
+        // Update state counters & insert verified modules into cache (safe after error check).
+        counters::update_state_counters(versioned_cache.stats(), true);
+        module_cache_manager_guard
+            .module_cache_mut()
+            .insert_verified(versioned_cache.take_modules_iter())
+            .map_err(|err| {
+                alert!("[BlockSTM] Encountered panic error: {:?}", err);
+            })?;
+
+        // Explicit async drops
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+
+        let to_make_hot = block_epilogue_txn
+            .is_some()
+            .then(|| block_limit_processor.acquire().get_slots_to_make_hot())
+            .unwrap_or_default();
+
+        // Return final result
+        Ok(BlockOutput::new(
+            final_results.into_inner(),
+            block_epilogue_txn,
+            to_make_hot,
+        ))
+    }
+
     #[allow(dead_code)]
     pub(crate) fn execute_transactions_parallel_v2(
         &self,
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // BlockSTMv2 should have less restrictions on the number of workers but we
         // still sanity check that it is not instantiated w. concurrency level 1.
@@ -1366,8 +1528,9 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
+
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
         {
@@ -1388,10 +1551,10 @@ where
 
         let shared_maybe_error = AtomicBool::new(false);
         let last_input_output = TxnLastInputOutput::new(num_txns);
-        let mut versioned_cache = MVHashMap::new();
+        let versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
             base_view,
             scheduler: &scheduler,
             versioned_cache: &versioned_cache,
@@ -1433,32 +1596,17 @@ where
         });
         drop(timer);
 
-        if !shared_maybe_error.load(Ordering::SeqCst)
-            && !scheduler.post_commit_processing_queue_is_empty()
-        {
-            // No error is recorded, parallel execution workers are done, but there is still
-            // a post commit processing task remaining. Commit tasks must be drained before workers
-            // exit, hence we log an error and fallback to sequential execution.
-            alert!("[BlockSTMv2] error: commit tasks not drained after parallel execution");
-
-            shared_maybe_error.store(true, Ordering::Relaxed);
-        }
-
-        counters::update_state_counters(versioned_cache.stats(), true);
-        module_cache_manager_guard
-            .module_cache_mut()
-            .insert_verified(versioned_cache.take_modules_iter())
-            .map_err(|err| {
-                alert!("[BlockSTM] Encountered panic error: {:?}", err);
-            })?;
-
-        // Explicit async drops.
-        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-
-        // TODO(BlockSTMv2): handle block epilogue txn and add block_end_info.
-        (!shared_maybe_error.load(Ordering::SeqCst))
-            .then(|| BlockOutput::new(final_results.into_inner(), None))
-            .ok_or(())
+        self.finalize_parallel_execution(
+            &shared_maybe_error,
+            !scheduler.post_commit_processing_queue_is_empty(),
+            final_results,
+            block_limit_processor,
+            None, // BlockSTMv2 doesn't handle block epilogue yet.
+            versioned_cache,
+            scheduler,
+            last_input_output,
+            module_cache_manager_guard,
+        )
     }
 
     pub(crate) fn execute_transactions_parallel(
@@ -1467,7 +1615,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1478,17 +1626,16 @@ where
             "Must use sequential execution"
         );
 
-        let mut versioned_cache = MVHashMap::new();
+        let versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
-
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             base_view,
             self.config.onchain.block_gas_limit_type.clone(),
@@ -1557,34 +1704,17 @@ where
         });
         drop(timer);
 
-        if !shared_maybe_error.load(Ordering::SeqCst) && scheduler.pop_from_commit_queue().is_ok() {
-            // No error is recorded, parallel execution workers are done, but there is
-            // still a commit task remaining. Commit tasks must be drained before workers
-            // exit, hence we log an error and fallback to sequential execution.
-            alert!("[BlockSTM] error: commit tasks not drained after parallel execution");
-
-            shared_maybe_error.store(true, Ordering::Relaxed);
-        }
-
-        counters::update_state_counters(versioned_cache.stats(), true);
-        module_cache_manager_guard
-            .module_cache_mut()
-            .insert_verified(versioned_cache.take_modules_iter())
-            .map_err(|err| {
-                alert!("[BlockSTM] Encountered panic error: {:?}", err);
-            })?;
-
-        if shared_maybe_error.load(Ordering::SeqCst) {
-            return Err(());
-        }
-
-        // Explicit async drops.
-        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-
-        Ok(BlockOutput::new(
-            final_results.into_inner(),
+        self.finalize_parallel_execution(
+            &shared_maybe_error,
+            scheduler.pop_from_commit_queue().is_ok(),
+            final_results,
+            block_limit_processor,
             block_epilogue_txn.into_inner(),
-        ))
+            versioned_cache,
+            scheduler,
+            last_input_output,
+            module_cache_manager_guard,
+        )
     }
 
     fn gen_block_epilogue(
@@ -1735,7 +1865,7 @@ where
             unsync_map.write(key, write_op, layout);
         }
 
-        for (group_key, metadata_op, group_size, group_ops) in
+        for (group_key, (metadata_op, group_size, group_ops)) in
             output.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
@@ -1813,11 +1943,11 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -1932,7 +2062,7 @@ where
                         approx_output_size,
                     );
 
-                    output.materialize_agg_v1(&latest_view);
+                    output.legacy_sequential_materialize_agg_v1(&latest_view);
                     assert_eq!(
                         output.aggregator_v1_delta_set().len(),
                         0,
@@ -1985,7 +2115,7 @@ where
                                 }
                             })
                             || output.resource_group_write_set().into_iter().any(
-                                |(group_key, _, output_group_size, group_ops)| {
+                                |(group_key, (_, output_group_size, group_ops))| {
                                     fail_point!("fail-point-resource-group-serialization", |_| {
                                         true
                                     });
@@ -2147,7 +2277,11 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        Ok(BlockOutput::new(ret, block_epilogue_txn))
+        let to_make_hot = block_epilogue_txn
+            .is_some()
+            .then(|| block_limit_processor.get_slots_to_make_hot())
+            .unwrap_or_default();
+        Ok(BlockOutput::new(ret, block_epilogue_txn, to_make_hot))
     }
 
     pub fn execute_block(
@@ -2156,16 +2290,25 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<T::Key, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                signature_verified_block,
-                base_view,
-                transaction_slice_metadata,
-                module_cache_manager_guard,
-            );
+            let parallel_result = if self.config.local.blockstm_v2 {
+                unimplemented!("BlockSTMv2 is not fully implemented");
+                // self.execute_transactions_parallel_v2(
+                //     signature_verified_block,
+                //     base_view,
+                //     module_cache_manager_guard,
+                // )
+            } else {
+                self.execute_transactions_parallel(
+                    signature_verified_block,
+                    base_view,
+                    transaction_slice_metadata,
+                    module_cache_manager_guard,
+                )
+            };
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
@@ -2253,7 +2396,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, None));
+            return Ok(BlockOutput::new(ret, None, BTreeMap::new()));
         }
 
         Err(sequential_error)

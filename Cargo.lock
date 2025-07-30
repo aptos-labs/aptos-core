@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.6.0"
+version = "7.7.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2514,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2#188ba1a37597739a2e503165dec0c3fcc63c89ec"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
@@ -2599,10 +2599,10 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2#188ba1a37597739a2e503165dec0c3fcc63c89ec"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "aptos-transaction-filter 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=2dd9c73b27fdcbe78c7391fd43c9a5d00b93e686)",
  "chrono",
@@ -3110,7 +3110,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2#188ba1a37597739a2e503165dec0c3fcc63c89ec"
 dependencies = [
  "chrono",
 ]
@@ -4125,6 +4125,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -4134,6 +4135,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "derive_more 0.99.17",
  "itertools 0.13.0",
+ "lru",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",
@@ -4570,6 +4572,7 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -9256,6 +9259,7 @@ name = "fuzzer"
 version = "0.1.0"
 dependencies = [
  "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-types",
  "arbitrary",
  "base64 0.21.7",
@@ -9266,6 +9270,8 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-core-types",
+ "move-model",
+ "move-transactional-test-runner",
  "rayon",
  "sha2 0.9.9",
  "walkdir",
@@ -9287,10 +9293,12 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "fuzzer",
  "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "move-transactional-test-runner",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -10655,7 +10663,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2#188ba1a37597739a2e503165dec0c3fcc63c89ec"
 dependencies = [
  "delegate",
  "derive_builder",
@@ -11873,6 +11881,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-asm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.21",
+ "codespan",
+ "codespan-reporting",
+ "either",
+ "itertools 0.13.0",
+ "libtest-mimic",
+ "move-binary-format",
+ "move-core-types",
+ "move-transactional-test-runner",
+ "walkdir",
+]
+
+[[package]]
 name = "move-ast-generator-tests"
 version = "0.1.0"
 dependencies = [
@@ -11896,6 +11921,7 @@ dependencies = [
  "indexmap 2.7.0",
  "move-bytecode-spec",
  "move-core-types",
+ "once_cell",
  "proptest",
  "proptest-derive",
  "ref-cast",
@@ -12576,10 +12602,16 @@ name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
+ "arbitrary",
+ "bcs 0.1.4",
  "clap 4.5.21",
  "datatest-stable",
+ "dearbitrary",
  "difference",
+ "either",
  "legacy-move-compiler",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -12599,6 +12631,7 @@ dependencies = [
  "once_cell",
  "regex",
  "tempfile",
+ "tera",
  "termcolor",
 ]
 
@@ -12658,6 +12691,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
@@ -12695,6 +12729,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "test-case",
  "triomphe",
  "typed-arena",
 ]
@@ -13483,6 +13518,18 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "package-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-transaction-workloads-lib",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "move-package",
 ]
 
 [[package]]
@@ -14658,7 +14705,7 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?tag=aptos-indexer-processors-v2.1.4#768c3433275cc4a4d191b8e97442c78408642849"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors-v2.git?tag=aptos-indexer-processors-v2.1.5#a1a0cfeff7febc81dbe5a238ed5318f319aaef6c"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
@@ -16135,7 +16182,7 @@ dependencies = [
 [[package]]
 name = "sample"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.1#6eb78b8fdadae14551e886185105ad5fffa29f2d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?tag=aptos-indexer-processor-sdk-v2.1.2#188ba1a37597739a2e503165dec0c3fcc63c89ec"
 dependencies = [
  "tracing",
 ]
@@ -16949,6 +16996,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",

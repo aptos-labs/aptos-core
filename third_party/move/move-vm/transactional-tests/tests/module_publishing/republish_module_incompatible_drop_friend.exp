@@ -1,6 +1,8 @@
 processed 4 tasks
-
-task 3 'publish'. lines 28-35:
+task 0 lines 1-7:  publish
+task 1 lines 9-16:  publish
+task 2 lines 18-26:  publish
+task 3 lines 28-35:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::M`: removed friend declaration `0000000000000000000000000000000000000000000000000000000000000042::N`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,

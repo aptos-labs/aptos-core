@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-89:  publish
+task 1 lines 91-91:  run 0x42::m::mt --signers 0x1
+task 2 lines 93-93:  run 0x42::m::mf --args @0x1

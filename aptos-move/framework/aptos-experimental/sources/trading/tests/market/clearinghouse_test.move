@@ -3,6 +3,8 @@ module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
     use std::signer;
+    use std::string;
+    use std::vector;
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_experimental::order_book_types::OrderIdType;
@@ -18,10 +20,18 @@ module aptos_experimental::clearinghouse_test {
     const E_ORDER_NOT_FOUND: u64 = 3;
     const E_ORDER_NOT_CLEANED_UP: u64 = 4;
 
-    struct TestOrderMetadata has store, copy, drop {}
+    struct TestOrderMetadata has store, copy, drop {
+        id: u64
+    }
 
-    public fun new_test_order_metadata(): TestOrderMetadata {
-        TestOrderMetadata {}
+    public fun new_test_order_metadata(id: u64): TestOrderMetadata {
+        TestOrderMetadata { id}
+    }
+
+    public fun get_order_metadata_bytes(
+        _order_metadata: TestOrderMetadata
+    ): vector<u8> {
+        vector::empty<u8>()
     }
 
     struct Position has store, drop {
@@ -161,6 +171,9 @@ module aptos_experimental::clearinghouse_test {
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_bytes(order_metadata)
             }
         )
     }
@@ -183,6 +196,9 @@ module aptos_experimental::clearinghouse_test {
             },
             |_account, _order_id, _is_bid, _price, _size| {
                 // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_bytes(order_metadata)
             }
         )
     }

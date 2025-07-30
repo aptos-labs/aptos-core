@@ -55,7 +55,7 @@ where
         S::name()
     }
 
-    fn prune(&self, _batch_size: usize) -> Result<Version> {
+    fn prune(&self, batch_size: usize) -> Result<Version> {
         // TODO(grao): Consider separate pruner metrics, and have a label for pruner name.
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_merkle_pruner__prune"])
@@ -79,11 +79,12 @@ where
                 .metadata_pruner
                 .maybe_prune_single_version(progress, target_version)?
             {
-                self.prune_shards(progress, target_version_for_this_round)?;
+                self.prune_shards(progress, target_version_for_this_round, batch_size)?;
                 progress = target_version_for_this_round;
                 info!(name = S::name(), progress = progress);
                 self.record_progress(target_version_for_this_round);
             } else {
+                self.prune_shards(progress, target_version, batch_size)?;
                 self.record_progress(target_version);
                 break;
             }
@@ -165,13 +166,18 @@ where
         Ok(pruner)
     }
 
-    fn prune_shards(&self, current_progress: Version, target_version: Version) -> Result<()> {
+    fn prune_shards(
+        &self,
+        current_progress: Version,
+        target_version: Version,
+        batch_size: usize,
+    ) -> Result<()> {
         THREAD_MANAGER
             .get_background_pool()
             .install(|| {
                 self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
                     shard_pruner
-                        .prune(current_progress, target_version)
+                        .prune(current_progress, target_version, batch_size)
                         .map_err(|err| {
                             anyhow!(
                                 "Failed to prune state merkle shard {}: {err}",
@@ -187,6 +193,7 @@ where
         state_merkle_db_shard: &DB,
         start_version: Version,
         target_version: Version,
+        limit: usize,
     ) -> Result<(Vec<StaleNodeIndex>, Option<Version>)> {
         let mut indices = Vec::new();
         let mut iter = state_merkle_db_shard.iter::<S>()?;
@@ -196,7 +203,7 @@ where
         })?;
 
         let mut next_version = None;
-        loop {
+        while indices.len() < limit {
             if let Some((index, _)) = iter.next().transpose()? {
                 next_version = Some(index.stale_since_version);
                 if index.stale_since_version <= target_version {
