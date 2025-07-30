@@ -288,15 +288,31 @@ module aptos_experimental::order_book {
         if (!self.orders.contains(&order_req.order_id)) {
             return self.place_maker_order(order_req);
         };
-        let order_with_state = self.orders.remove(&order_req.order_id);
-        order_with_state.increase_remaining_size(order_req.remaining_size);
-        self.orders.add(order_req.order_id, order_with_state);
+
+        modify_order(&mut self.orders, &order_req.order_id, |order_with_state| {
+            order_with_state.increase_remaining_size(order_req.remaining_size);
+            true
+        });
         self.active_orders.increase_order_size(
             order_req.price,
             original_order.get_unique_priority_idx(),
             order_req.remaining_size,
             order_req.is_bid
         );
+    }
+
+    // TODO move to big_ordered_map.move after function values are enabled in mainnet
+    inline fun modify_order<M: store + copy + drop>(
+        orders: &mut BigOrderedMap<OrderIdType, OrderWithState<M>>, order_id: &OrderIdType, modify_fn: |&mut  OrderWithState<M>| bool
+    ): OrderWithState<M> {
+        let order = *orders.borrow(order_id);
+        let keep = modify_fn(&mut order);
+        if (keep) {
+            orders.upsert(*order_id, order);
+        } else {
+            orders.remove(order_id);
+        };
+        order
     }
 
     fun place_pending_maker_order<M: store + copy + drop>(
@@ -340,11 +356,12 @@ module aptos_experimental::order_book {
         let result = self.active_orders.get_single_match_result(price, size, is_bid);
         let (order_id, matched_size, remaining_size) =
             result.destroy_active_matched_order();
-        let order_with_state = self.orders.remove(&order_id);
-        order_with_state.set_remaining_size(remaining_size);
-        if (remaining_size > 0) {
-            self.orders.add(order_id, order_with_state);
-        };
+
+        let order_with_state = modify_order(&mut self.orders, &order_id, |order_with_state| {
+            order_with_state.set_remaining_size(remaining_size);
+            remaining_size > 0
+        });
+
         let (order, is_active) = order_with_state.destroy_order_from_state();
         if (remaining_size == 0 && order.get_client_order_id().is_some()) {
             self.client_order_ids.remove(
@@ -370,14 +387,21 @@ module aptos_experimental::order_book {
         size_delta: u64
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
-        let order_with_state = self.orders.remove(&order_id);
-        assert!(
-            order_creator == order_with_state.get_order_from_state().get_account(),
-            EORDER_CREATOR_MISMATCH
-        );
-        order_with_state.decrease_remaining_size(size_delta);
+
+        let order_with_state = modify_order(&mut self.orders, &order_id, |order_with_state| {
+            assert!(
+                order_creator == order_with_state.get_order_from_state().get_account(),
+                EORDER_CREATOR_MISMATCH
+            );
+            order_with_state.decrease_remaining_size(size_delta);
+
+            // TODO should we be asserting that remaining size is greater than 0?
+            true
+        });
+
         if (order_with_state.is_active_order()) {
-            let order = order_with_state.get_order_from_state();self
+            let order = order_with_state.get_order_from_state();
+            self
                 .active_orders
                 .decrease_order_size(
                 order.get_price(),
@@ -386,7 +410,6 @@ module aptos_experimental::order_book {
                 order.is_bid()
             );
         };
-        self.orders.add(order_id, order_with_state);
     }
 
     public fun get_order_id_by_client_id<M: store + copy + drop>(
@@ -413,9 +436,11 @@ module aptos_experimental::order_book {
         self: &mut OrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
-        let order_with_state = self.orders.remove(&order_id);
-        order_with_state.set_metadata_in_state(metadata);
-        self.orders.add(order_id, order_with_state);
+
+        modify_order(&mut self.orders, &order_id, |order_with_state| {
+            order_with_state.set_metadata_in_state(metadata);
+            true
+        });
     }
 
     public fun is_active_order<M: store + copy + drop>(
