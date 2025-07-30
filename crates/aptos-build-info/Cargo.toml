@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-shadow-rs = { workspace = true }
+shadow-rs = { workspace = true, features = ["metadata"] }
 
 [build-dependencies]
-shadow-rs = { workspace = true }
+shadow-rs = { workspace = true, features = ["metadata"] }
