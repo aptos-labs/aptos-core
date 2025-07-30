@@ -3,6 +3,7 @@ module 0xABCD::order_book_example {
     use std::error;
     use std::option;
     use std::vector;
+    use std::table::{Self, Table};
 
     use aptos_experimental::order_book::{Self, OrderBook};
     use aptos_experimental::order_book_types::{Self, OrderIdType};
@@ -14,7 +15,7 @@ module 0xABCD::order_book_example {
     struct Empty has store, copy, drop {}
 
     struct Dex has key {
-        order_book: OrderBook<Empty>,
+        order_books: Table<u32, OrderBook<Empty>>,
     }
 
     // Create the global `Dex`.
@@ -25,17 +26,34 @@ module 0xABCD::order_book_example {
             ENOT_AUTHORIZED,
         );
 
+        let order_books = table::new();
+        for (i in 0..10) {
+            order_books.add(i, order_book::new_order_book());
+        };
+
         move_to(
             publisher,
-            Dex { order_book: order_book::new_order_book() }
+            Dex { order_books }
         );
     }
 
-    public entry fun place_order(sender: address, order_id: u64, bid_price: u64, volume: u64, is_bid: bool) acquires Dex {
+
+    inline fun borrow_order_book_mut(market_id: u32): &mut OrderBook<Empty> acquires Dex {
         assert!(exists<Dex>(@publisher_address), error::invalid_argument(EDEX_RESOURCE_NOT_PRESENT));
         let dex = borrow_global_mut<Dex>(@publisher_address);
+
+        if (!dex.order_books.contains(market_id)) {
+            let order_book = order_book::new_order_book();
+            dex.order_books.add(market_id, order_book);
+        };
+
+        dex.order_books.borrow_mut(market_id)
+    }
+
+    public entry fun place_order(market_id: u32, sender: address, order_id: u64, bid_price: u64, volume: u64, is_bid: bool) acquires Dex {
+        let order_book = borrow_order_book_mut(market_id);
         place_order_and_get_matches(
-            &mut dex.order_book,
+            order_book,
             sender, // account
             order_book_types::new_order_id_type(order_id as u128),
             bid_price,
@@ -45,14 +63,13 @@ module 0xABCD::order_book_example {
         );
     }
 
-    public entry fun cancel_order(order_id: u64) acquires Dex {
-        assert!(exists<Dex>(@publisher_address), error::invalid_argument(EDEX_RESOURCE_NOT_PRESENT));
-        let order_book = borrow_global_mut<Dex>(@publisher_address);
-        order_book.order_book.cancel_order(@publisher_address, order_book_types::new_order_id_type(order_id as u128));
+    public entry fun cancel_order(market_id: u32, order_id: u64) acquires Dex {
+        let order_book = borrow_order_book_mut(market_id);
+        order_book.cancel_order(@publisher_address, order_book_types::new_order_id_type(order_id as u128));
     }
 
     // Copied from order_book, as it's test_only and not part of public API there.
-    public fun place_order_and_get_matches(
+    fun place_order_and_get_matches(
         order_book: &mut OrderBook<Empty>,
         account: address,
         order_id: OrderIdType,
