@@ -1,9 +1,9 @@
 processed 5 tasks
-
-task 2 'run'. lines 37-37:
+task 0 lines 1-22:  publish
+task 1 lines 25-35:  publish
+task 2 lines 37-37:  run --verbose 0x66::ok::assignable
 return values: 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..), 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..)
-
-task 3 'publish'. lines 39-49:
+task 3 lines 39-49:  publish
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::not_ok'. Got VMError: {
     major_status: RET_TYPE_MISMATCH_ERROR,
     sub_status: None,
@@ -11,8 +11,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 4)],
 }
-
-task 4 'run'. lines 51-51:
+task 4 lines 51-51:  run --verbose 0x66::not_ok::assignable
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000066::not_ok doesn't exist,
     major_status: LINKER_ERROR,

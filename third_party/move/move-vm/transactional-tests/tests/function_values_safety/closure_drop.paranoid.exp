@@ -1,6 +1,7 @@
 processed 3 tasks
-
-task 2 'run'. lines 51-59:
+task 0 lines 1-35:  publish
+task 1 lines 38-48:  run --verbose
+task 2 lines 51-59:  run --verbose
 Error: Script execution failed with VMError: {
     message: Type |u64|u32 does not have expected ability drop,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
