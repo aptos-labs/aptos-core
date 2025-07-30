@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-7:
+task 0 lines 1-7:  publish --print-bytecode
 Error: error: unknown local `z`
   ┌─ test:5:5
   │

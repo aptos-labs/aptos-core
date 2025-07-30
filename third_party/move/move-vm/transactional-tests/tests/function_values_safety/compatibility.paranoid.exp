@@ -1,1 +1,17 @@
 processed 16 tasks
+task 0 lines 3-6:  publish --verbose
+task 1 lines 8-13:  publish --verbose
+task 2 lines 15-18:  publish --verbose
+task 3 lines 20-25:  publish --verbose
+task 4 lines 27-29:  publish --verbose
+task 5 lines 31-33:  publish --verbose
+task 6 lines 35-37:  publish --verbose
+task 7 lines 39-41:  publish --verbose
+task 8 lines 43-45:  publish --verbose
+task 9 lines 47-49:  publish --verbose
+task 10 lines 51-53:  publish --verbose
+task 11 lines 55-59:  publish --verbose
+task 12 lines 61-63:  publish --verbose
+task 13 lines 65-67:  publish --verbose
+task 14 lines 69-71:  publish --verbose
+task 15 lines 73-75:  publish --verbose

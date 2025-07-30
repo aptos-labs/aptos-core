@@ -146,10 +146,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
 
-        let vm_config = match &run_config {
-            TestRunConfig::CompilerV2 { vm_config, .. } => vm_config.clone(),
-        };
-        let runtime_environment = create_runtime_environment(vm_config);
+        let vm_config = &run_config.vm_config;
+        let runtime_environment = create_runtime_environment(vm_config.clone());
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let max_binary_format_version = storage.max_binary_format_version();
 
@@ -504,26 +502,29 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestRunConfig {
-    CompilerV2 {
-        language_version: LanguageVersion,
-        /// List of experiments and whether to enable them or not.
-        experiments: Vec<(String, bool)>,
-        /// Configuration for the VM that runs tests.
-        vm_config: VMConfig,
-        /// Whether to use  Move Assembler (.masm) format when printing
-        /// bytecode.
-        use_masm: bool,
-    },
+pub struct TestRunConfig {
+    pub language_version: LanguageVersion,
+    /// List of experiments and whether to enable them or not.
+    pub experiments: Vec<(String, bool)>,
+    /// Configuration for the VM that runs tests.
+    pub vm_config: VMConfig,
+    /// Whether to use  Move Assembler (.masm) format when printing
+    /// bytecode.
+    pub use_masm: bool,
+    /// Whether to print each command executed to test output.
+    pub echo: bool,
+}
+
+impl Default for TestRunConfig {
+    fn default() -> Self {
+        TestRunConfig::new(LanguageVersion::latest(), vec![])
+    }
 }
 
 impl TestRunConfig {
     /// Returns compiler V2 config with default VM config.
-    pub fn compiler_v2(
-        language_version: LanguageVersion,
-        experiments: Vec<(String, bool)>,
-    ) -> Self {
-        Self::CompilerV2 {
+    pub fn new(language_version: LanguageVersion, experiments: Vec<(String, bool)>) -> Self {
+        Self {
             language_version,
             experiments,
             vm_config: VMConfig {
@@ -532,42 +533,32 @@ impl TestRunConfig {
                 ..VMConfig::default()
             },
             use_masm: false,
+            echo: false,
         }
     }
 
-    pub fn with_masm(mut self) -> TestRunConfig {
-        match &mut self {
-            Self::CompilerV2 { use_masm, .. } => *use_masm = true,
+    pub fn with_masm(self) -> Self {
+        Self {
+            use_masm: true,
+            ..self
         }
-        self
+    }
+
+    pub fn with_echo(self) -> Self {
+        Self { echo: true, ..self }
     }
 
     pub(crate) fn using_masm(&self) -> bool {
-        match self {
-            Self::CompilerV2 { use_masm, .. } => *use_masm,
-        }
+        self.use_masm
     }
 
     pub(crate) fn verifier_disabled(&self) -> bool {
-        match self {
-            Self::CompilerV2 { vm_config, .. } => vm_config.verifier_config.verify_nothing(),
-        }
+        self.vm_config.verifier_config.verify_nothing()
     }
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]),
-        path,
-    )
-}
-
-// Notice this will go away once we have removed legacy disassembler
-pub fn run_test_print_bytecode_with_masm(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]).with_masm(),
-        path,
-    )
+    run_test_with_config(TestRunConfig::new(LanguageVersion::default(), vec![]), path)
 }
 
 fn precompiled_v2_stdlib() -> &'static PrecompiledFilesModules {

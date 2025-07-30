@@ -175,7 +175,7 @@ pub mod cli {
         let mut tasks = parse_transactional_test(file_path)?;
 
         // Create a minimal test configuration
-        let run_config = TestRunConfig::compiler_v2(LanguageVersion::latest(), vec![]);
+        let run_config = TestRunConfig::new(LanguageVersion::latest(), vec![]);
 
         let first_task = tasks.pop_front().unwrap();
         let init_opt = match &first_task.command {
