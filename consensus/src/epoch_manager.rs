@@ -1258,7 +1258,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
         let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
 
+        info!("[daniel] start setup for testing");
         let (_, digest_key, verification_keys_slow_path, msk_shares_slow_path, verification_keys_fast_path, msk_shares_fast_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+        info!("[daniel] setup for testing done");
 
         let self_index = epoch_state.verifier.address_to_validator_index().get(&self.author).expect("self should be in the index");
         let self_msk_share_slow_path = msk_shares_slow_path[*self_index].clone();

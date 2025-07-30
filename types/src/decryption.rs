@@ -22,7 +22,7 @@ pub type Ciphertext = <FPTX as BatchThresholdEncryption>::Ciphertext;
 pub type Id = <FPTX as BatchThresholdEncryption>::Id;
 pub type Round = <FPTX as BatchThresholdEncryption>::Round;
 pub type Digest = <FPTX as BatchThresholdEncryption>::Digest;
-pub type EvalProofsPromise<'a> = <FPTX as BatchThresholdEncryption>::EvalProofsPromise<'a>;
+pub type EvalProofsPromise = <FPTX as BatchThresholdEncryption>::EvalProofsPromise;
 pub type EvalProofs = <FPTX as BatchThresholdEncryption>::EvalProofs;
 pub type MasterSecretKeyShare = <FPTX as BatchThresholdEncryption>::MasterSecretKeyShare;
 pub type VerificationKey = <FPTX as BatchThresholdEncryption>::VerificationKey;
@@ -31,11 +31,11 @@ pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
 pub const PROTOTYPE_SETUP_SEED: u64 = 233;
-pub const PROTOTYPE_BATCH_SIZE: usize = 128;
-pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 10000;
-pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 7;
-pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 6;
-pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 4;
+pub const PROTOTYPE_BATCH_SIZE: usize = 32;
+pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 100;
+pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 4;
+pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 3;
+pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 2;
 pub const PROTOTYPE_DECRYPTION_POOL_SIZE: usize = 8;
 
 pub static DECRYPTION_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {

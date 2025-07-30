@@ -43,6 +43,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_types::decryption::PROTOTYPE_BATCH_SIZE;
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -608,7 +609,7 @@ impl ProposalGenerator {
                         block_timestamp: timestamp,
                         // for inline encrypted txns
                         // daniel todo: move to configs
-                        max_inline_encrypted_txns: PayloadTxnsSize::new(128, 128 * 10 * 1024),
+                        max_inline_encrypted_txns: PayloadTxnsSize::new(PROTOTYPE_BATCH_SIZE as u64, (PROTOTYPE_BATCH_SIZE as u64) * 10 * 1024),
                     },
                     validator_txn_filter,
                     wait_callback,

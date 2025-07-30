@@ -35,7 +35,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{DecConfig, DecKey, DecMetadata, DecShare, DigestKey, FastDecShare, DECRYPTION_POOL}, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
+    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{DecConfig, DecKey, DecMetadata, DecShare, DigestKey, FastDecShare, DECRYPTION_POOL, MasterSecretKeyShare}, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         SignedTransaction, Transaction,
     }, validator_signer::ValidatorSigner
@@ -49,7 +49,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{schemes::fptx::FPTX, shared::digest, traits::BatchThresholdEncryption};
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -221,7 +221,7 @@ impl Drop for Tracker {
     }
 }
 
-impl<'a> PipelineBuilder {
+impl PipelineBuilder {
     pub fn new(
         block_preparer: Arc<BlockPreparer>,
         executor: Arc<dyn BlockExecutorTrait>,
@@ -408,31 +408,21 @@ impl<'a> PipelineBuilder {
         let (maybe_compute_decryption_share_fut, maybe_compute_decryption_fut) = if pipelined_block.block().encrypted_payload().is_some() && !pipelined_block.dec_txns_is_set() {
             assert!(self.dec_config.is_some());
             assert!(self.fast_dec_config.is_some());
-            let dec_config = self.dec_config.as_ref().unwrap().clone();
-            let fast_dec_config = self.fast_dec_config.as_ref().unwrap().clone();
             let author = self.signer.author();
+            let digest_key: DigestKey = self.dec_config.as_ref().unwrap().digest_key().clone();
+            let msk_share: MasterSecretKeyShare = self.dec_config.as_ref().unwrap().msk_share().clone();
+            let fast_msk_share: MasterSecretKeyShare = self.fast_dec_config.as_ref().unwrap().msk_share().clone();
 
             let compute_digest_fut = spawn_shared_fut(
-                {
-                    let dec_config = dec_config.clone();
-                    async move { Self::compute_digest(block.clone(), &dec_config).await }
-                },
+                Self::compute_digest(block.clone(), digest_key.clone()),
                 Some(&mut abort_handles),
             );
             let compute_decryption_share_fut = spawn_shared_fut(
-                {
-                    let dec_config = dec_config.clone();
-                    let fast_dec_config = fast_dec_config.clone();
-                    let author = author;
-                    async move { Self::compute_decryption_share(compute_digest_fut.clone(), block.clone(), author, &dec_config, &fast_dec_config).await }
-                },
+                Self::compute_decryption_share(compute_digest_fut.clone(), block.clone(), author, msk_share, fast_msk_share),
                 Some(&mut abort_handles),
             );
             let compute_eval_proofs_fut = spawn_shared_fut(
-                {
-                    let compute_digest_fut = compute_digest_fut.clone();
-                    async move { Self::compute_eval_proofs(compute_digest_fut, block.clone()).await }
-                },
+                Self::compute_eval_proofs(compute_digest_fut, digest_key, block.clone()),
                 Some(&mut abort_handles),
             );
             let _ = spawn_shared_fut(
@@ -661,32 +651,31 @@ impl<'a> PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the digest of the encrypted payload
-    async fn compute_digest(block: Arc<Block>, dec_config: &DecConfig) -> TaskResult<DigestResult> {
+    async fn compute_digest(block: Arc<Block>, digest_key: DigestKey) -> TaskResult<DigestResult> {
         Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_digest", &block);
         tracker.start_working();
 
-        let digest_key = dec_config.digest_key();
         let encrypted_payload = block.encrypted_payload().unwrap();
         let ciphertexts = encrypted_payload.ciphertexts();
         let round = block.round();
 
-        let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(digest_key, &ciphertexts, round, &DECRYPTION_POOL)?;
+        let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ciphertexts, round, &DECRYPTION_POOL)?;
 
         Ok((digest, proofs_promise))
     }
 
     /// Precondition: compute_digest finishes
     /// What it does: Compute the decryption share for the block
-    async fn compute_decryption_share(digest_fut: TaskFuture<DigestResult<'a>>, block: Arc<Block>, author: Author, dec_config: &DecConfig, fast_dec_config: &DecConfig) -> TaskResult<DecryptionShareResult> {
+    async fn compute_decryption_share(digest_fut: TaskFuture<DigestResult>, block: Arc<Block>, author: Author, msk_share: MasterSecretKeyShare, fast_msk_share: MasterSecretKeyShare) -> TaskResult<DecryptionShareResult> {
         Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_decryption_share", &block);
         let (digest, proofs_promise) = digest_fut.await?;
         tracker.start_working();
         let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id(), digest.clone());
 
-        let share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(dec_config.msk_share(), &digest)?;
-        let fast_share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(fast_dec_config.msk_share(), &digest)?;
+        let share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest)?;
+        let fast_share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&fast_msk_share, &digest)?;
 
         let dec_share = DecShare::new(author, dec_metadata.clone(), share);
         let fast_dec_share = FastDecShare::new(DecShare::new(author, dec_metadata, fast_share));
@@ -696,13 +685,13 @@ impl<'a> PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the decryption aux info for the block
-    async fn compute_eval_proofs(digest_fut: TaskFuture<DigestResult<'a>>, block: Arc<Block>) -> TaskResult<EvalProofsResult> {
+    async fn compute_eval_proofs(digest_fut: TaskFuture<DigestResult>, digest_key: DigestKey, block: Arc<Block>) -> TaskResult<EvalProofsResult> {
         Self::check_block_encrypted(block.clone())?;
-        let (digest, proofs_promise) = digest_fut.await?;
+        let (_digest, proofs_promise) = digest_fut.await?;
         let mut tracker = Tracker::start_waiting("compute_eval_proofs", &block);
         tracker.start_working();
 
-        let proofs = <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &DECRYPTION_POOL);
+        let proofs = <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key, &DECRYPTION_POOL);
 
         Ok(proofs)
     }

@@ -127,7 +127,7 @@ pub trait Plaintext: Serialize + DeserializeOwned + Send + Sync {}
 impl Plaintext for String {}
 
 
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
 pub struct Player {
     id: usize,
 }

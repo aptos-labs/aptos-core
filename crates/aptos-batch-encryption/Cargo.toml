@@ -35,6 +35,7 @@ thiserror = "2.0.12"
 generic-array = { version = "0.14.7", features = ["serde"] }
 lazy_static = "1.5.0"
 rand.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 criterion = "0.5"

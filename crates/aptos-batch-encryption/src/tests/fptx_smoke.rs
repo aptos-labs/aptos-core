@@ -60,3 +60,41 @@ fn smoke() {
 
     assert_eq!(decrypted_plaintexts[0], plaintext);
 }
+
+#[test]
+fn fptx_serialize_deserialize_setup() {
+    let mut rng = thread_rng();
+    let tc_happy = ThresholdConfig::new(8, 5);
+    let tc_slow = ThresholdConfig::new(8, 3);
+    let tp = ThreadPoolBuilder::new().build().unwrap();
+
+        let setup = FPTX::setup_for_testing(rng.gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
+
+    let bytes = bcs::to_bytes(&setup).unwrap();
+    let setup2 :
+    (
+        <FPTX as BatchThresholdEncryption>::EncryptionKey,
+        <FPTX as BatchThresholdEncryption>::DigestKey,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>
+    )
+    = bcs::from_bytes(&bytes).unwrap();
+
+    assert_eq!(setup, setup2);
+
+    let json = serde_json::to_string(&setup).unwrap();
+    let setup2 :
+    (
+        <FPTX as BatchThresholdEncryption>::EncryptionKey,
+        <FPTX as BatchThresholdEncryption>::DigestKey,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>
+    )
+    = serde_json::from_str(&json).unwrap();
+    assert_eq!(setup, setup2);
+
+}

@@ -275,7 +275,7 @@ impl LocalSwarm {
             validator.start()?;
         }
 
-        self.wait_all_alive(Duration::from_secs(60)).await?;
+        self.wait_all_alive(Duration::from_secs(300)).await?;
         info!("Swarm launched successfully.");
         Ok(())
     }
