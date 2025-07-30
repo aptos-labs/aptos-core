@@ -1,6 +1,6 @@
 #[test_only]
-module aptos_std::i128_tests {
-    use aptos_std::i128;
+module aptos_experimental::i128_tests {
+    use aptos_experimental::i128;
 
     #[test]
     fun test_from() {

@@ -1,6 +1,6 @@
 #[test_only]
-module aptos_std::i64_tests {
-    use aptos_std::i64;
+module aptos_experimental::i64_tests {
+    use aptos_experimental::i64;
 
     #[test]
     fun test_from() {

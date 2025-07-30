@@ -1,4 +1,4 @@
-module aptos_std::i128 {
+module aptos_experimental::i128 {
     /// Arithmetic operation resulted in overflow (value outside the range [-2^127, 2^127 - 1])
     const EOVERFLOW: u64 = 1;
     /// Division by Zero is not allowed

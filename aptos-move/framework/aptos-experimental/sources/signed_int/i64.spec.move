@@ -1,50 +1,47 @@
-spec aptos_std::i128 {
+spec aptos_experimental::i64 {
     spec module {
         pragma aborts_if_is_strict;
     }
 
-    /// Interprets the I128 `bits` field as a signed integer.
-    spec fun to_num(self: I128): num {
-        if (self.bits >= BITS_MIN_I128) (self.bits as num) - TWO_POW_128
+    /// Interprets the I64 `bits` field as a signed integer.
+    spec fun to_num(self: I64): num {
+        if (self.bits >= BITS_MIN_I64) (self.bits as num) - TWO_POW_64
         else (self.bits as num)
     }
 
     spec from {
-        aborts_if v > BITS_MAX_I128 with EOVERFLOW;
-
-        ensures to_num(result) == v;
+        aborts_if v > BITS_MAX_I64 with EOVERFLOW;
     }
 
     spec neg_from {
-        aborts_if v > BITS_MIN_I128 with EOVERFLOW;
+        aborts_if v > BITS_MIN_I64 with EOVERFLOW;
 
-        // v + (-v) == 0
-        ensures is_zero(add(result, from(v)));
-
-        ensures to_num(result) + v == 0;
+        // from(v) + neg_from(v) == 0
+        ensures result.add(from(v)).is_zero();
     }
 
     spec neg {
         // Abort if neg_from would overflow
-        aborts_if !self.is_neg() && self.bits > BITS_MIN_I128 with EOVERFLOW;
+        aborts_if !self.is_neg() && self.bits > BITS_MIN_I64 with EOVERFLOW;
 
-        // Abort if abs(self) would overflow (MIN_I128 cannot be negated)
-        aborts_if self.is_neg() && self.bits == BITS_MIN_I128 with EOVERFLOW;
+        // Abort if abs(self) would overflow (MIN_I164 cannot be negated)
+        aborts_if self.is_neg() && self.bits == BITS_MIN_I64 with EOVERFLOW;
 
-        // -v = v * -1
+        // Mathematical behavior
         ensures result.eq(self.mul(neg_from(1)));
 
-        // -(-v) = v
+        // Involution: neg(neg(v)) == v (if both directions do not abort)
         ensures result.neg().eq(self);
     }
 
     spec wrapping_add {
-        ensures result.bits == (self.bits + num2.bits) % TWO_POW_128;
+        ensures result.bits == (self.bits + num2.bits) % TWO_POW_64;
     }
 
     spec add {
         pragma opaque;
 
+        // Abort conditions
         // Overflow when: two positives yield negative, or two negatives yield positive
         aborts_if !self.is_neg() && !num2.is_neg() && self.wrapping_add(num2).is_neg() with EOVERFLOW;
         aborts_if self.is_neg() && num2.is_neg() && !self.wrapping_add(num2).is_neg() with EOVERFLOW;
@@ -71,7 +68,7 @@ spec aptos_std::i128 {
     }
 
     spec wrapping_sub {
-        ensures result.bits == (self.bits + twos_complement(num2.bits)) % TWO_POW_128;
+        ensures result.bits == (self.bits + twos_complement(num2.bits)) % TWO_POW_64;
     }
 
     spec sub {
@@ -104,14 +101,14 @@ spec aptos_std::i128 {
 
     spec mul {
         // Abort conditions
-        // If result should be negative (opposite signs), must not exceed abs(MIN_I128)
+        // If result should be negative (opposite signs), must not exceed abs(MIN_I64)
         aborts_if self.sign() != num2.sign() &&
-            (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MIN_I128 as u256)
+            (self.abs_u64() as u128) * (num2.abs_u64() as u128) > (BITS_MIN_I64 as u128)
             with EOVERFLOW;
 
-        // If result should be positive (same signs), must not exceed MAX_I128
+        // If result should be positive (same signs), must not exceed MAX_I64
         aborts_if self.sign() == num2.sign() &&
-            (self.abs_u128() as u256) * (num2.abs_u128() as u256) > (BITS_MAX_I128 as u256)
+            (self.abs_u64() as u128) * (num2.abs_u64() as u128) > (BITS_MAX_I64 as u128)
             with EOVERFLOW;
 
         // result is positive, sign(self) == sign(num2)
@@ -133,9 +130,9 @@ spec aptos_std::i128 {
         // Abort conditions
         aborts_if num2.is_zero() with EDIVISION_BY_ZERO;
 
-        // MIN_I128 / -1 = MAX_I128 + 1, which is too big to fit in an I128
-        aborts_if self.sign() == num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MAX_I128 with EOVERFLOW;
-        aborts_if self.sign() != num2.sign() && self.abs_u128() / num2.abs_u128() > BITS_MIN_I128 with EOVERFLOW;
+        // MIN_I64 / -1 = MAX_I64 + 1, which is too big to fit in an I64
+        aborts_if self.sign() == num2.sign() && self.abs_u64() / num2.abs_u64() > BITS_MAX_I64 with EOVERFLOW;
+        aborts_if self.sign() != num2.sign() && self.abs_u64() / num2.abs_u64() > BITS_MIN_I64 with EOVERFLOW;
 
         // Behavior guarantees
         // Division result always rounds toward zero.
@@ -173,7 +170,7 @@ spec aptos_std::i128 {
     }
 
     spec abs {
-        aborts_if self.is_neg() && self.bits <= BITS_MIN_I128 with EOVERFLOW;
+        aborts_if self.is_neg() && self.bits <= BITS_MIN_I64 with EOVERFLOW;
 
         // by definition
         ensures self.is_neg() ==> self.abs().bits == twos_complement(self.bits);
@@ -188,8 +185,8 @@ spec aptos_std::i128 {
         ensures !self.is_neg() ==> to_num(result) == to_num(self);
     }
 
-    spec abs_u128 {
-        aborts_if self.is_neg() && self.bits < BITS_MIN_I128 with EOVERFLOW;
+    spec abs_u64 {
+        aborts_if self.is_neg() && self.bits < BITS_MIN_I64 with EOVERFLOW;
 
         // by definition
         ensures self.is_neg() ==> result == twos_complement(self.bits);
@@ -224,7 +221,7 @@ spec aptos_std::i128 {
         ensures result == spec_pow(self, exponent);
     }
 
-    spec fun spec_pow(self: I128, e: u128): I128 {
+    spec fun spec_pow(self: I64, e: u64): I64 {
         if (e == 0) {
             from(1)
         }
@@ -290,10 +287,10 @@ spec aptos_std::i128 {
         ensures result == (self.sign() == 1);
 
         // If result is true, the number is negative in two's complement
-        ensures result ==> self.bits >= BITS_MIN_I128;
+        ensures result ==> self.bits >= BITS_MIN_I64;
 
         // If result is false, the number is non-negative
-        ensures !result ==> self.bits < BITS_MIN_I128;
+        ensures !result ==> self.bits < BITS_MIN_I64;
     }
 
     spec cmp {
@@ -341,7 +338,7 @@ spec aptos_std::i128 {
     }
 
     spec gte {
-        // Only returns true if num1 is equal to or greater than num2
+        // Only returns true if self is equal to or greater than num2
         ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == GT);
 
         // Never returns true if self < num2
@@ -355,7 +352,7 @@ spec aptos_std::i128 {
     }
 
     spec lt {
-        // Only returns true if num1 is strictly less than num2
+        // Only returns true if self is strictly less than num2
         ensures result == (self.cmp(num2) == LT);
 
         // Never returns true if self >= num2
@@ -369,7 +366,7 @@ spec aptos_std::i128 {
     }
 
     spec lte {
-        // Only returns true if num1 is equal to or less than num2
+        // Only returns true if self is equal to or less than num2
         ensures result == (self.cmp(num2) == EQ || self.cmp(num2) == LT);
 
         // Never returns true if self > num2
