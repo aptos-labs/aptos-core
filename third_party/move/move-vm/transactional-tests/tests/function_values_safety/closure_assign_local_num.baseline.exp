@@ -1,0 +1,12 @@
+processed 3 tasks
+
+task 2 'run'. lines 66-82:
+Error: Script execution failed with VMError: {
+    message: None,
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: None,
+}
