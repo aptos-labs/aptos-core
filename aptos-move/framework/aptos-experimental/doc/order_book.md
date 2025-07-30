@@ -532,12 +532,12 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _bid_price,
             _orig_size,
             _size,
-            is_bid,
+            _is_bid,
             trigger_condition,
             _
         ) = order.destroy_order();
         self.pending_orders.cancel_pending_order(
-            trigger_condition.destroy_some(), unique_priority_idx, is_bid
+            trigger_condition.destroy_some(), unique_priority_idx
         );
         <b>if</b> (client_order_id.is_some()) {
             self.client_order_ids.remove(
@@ -820,7 +820,6 @@ it is added to the order book, if it exists, it's size is updated.
         order_id,
         order_req.trigger_condition.destroy_some(),
         ascending_idx,
-        order_req.is_bid
     );
 }
 </code></pre>

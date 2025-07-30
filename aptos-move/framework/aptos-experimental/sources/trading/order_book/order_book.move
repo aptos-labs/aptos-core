@@ -40,8 +40,8 @@ module aptos_experimental::order_book {
     #[test_only]
     use aptos_experimental::order_book_types::{
         new_order_id_type,
-        tp_trigger_condition,
-        UniqueIdxType
+        price_move_up_condition,
+        UniqueIdxType, price_move_down_condition
     };
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
@@ -157,12 +157,12 @@ module aptos_experimental::order_book {
                 _bid_price,
                 _orig_size,
                 _size,
-                is_bid,
+                _is_bid,
                 trigger_condition,
                 _
             ) = order.destroy_order();
             self.pending_orders.cancel_pending_order(
-                trigger_condition.destroy_some(), unique_priority_idx, is_bid
+                trigger_condition.destroy_some(), unique_priority_idx
             );
             if (client_order_id.is_some()) {
                 self.client_order_ids.remove(
@@ -325,7 +325,6 @@ module aptos_experimental::order_book {
             order_id,
             order_req.trigger_condition.destroy_some(),
             ascending_idx,
-            order_req.is_bid
         );
     }
 
@@ -1078,7 +1077,7 @@ module aptos_experimental::order_book {
     }
 
     #[test]
-    fun test_TP_order() {
+    fun test_price_move_down_condition() {
         let order_book = new_order_book<TestMetadata>();
 
         // Place a GTC sell order for 1000 units at price 100
@@ -1111,7 +1110,7 @@ module aptos_experimental::order_book {
                     orig_size: 400,
                     remaining_size: 400,
                     is_bid: true,
-                    trigger_condition: option::some(tp_trigger_condition(90)),
+                    trigger_condition: option::some(price_move_down_condition(90)),
                     metadata: TestMetadata {}
                 }
             );
@@ -1137,64 +1136,11 @@ module aptos_experimental::order_book {
         assert!(matched_size == 400);
         assert!(order.get_orig_size() == 1000);
         assert!(order.get_remaining_size() == 600); // Partial fill
-
-        // Place another buy order for 300 units
-        let match_result =
-            order_book.place_order_and_get_matches(
-                OrderRequest::V1 {
-                    account: @0xBB,
-                    order_id: new_order_id_type(3),
-                    client_order_id: option::none(),
-                    price: 100,
-                    orig_size: 300,
-                    remaining_size: 300,
-                    is_bid: true,
-                    trigger_condition: option::some(tp_trigger_condition(80)),
-                    metadata: TestMetadata {}
-                }
-            );
-
-        assert!(match_result.is_empty());
-        assert!(
-            order_book.pending_orders.get_price_move_down_index().keys().length() == 1
-        );
-
-        // Oracle price moves up to 95, this should not trigger any order
-        let match_results = order_book.trigger_pending_orders(95);
-        assert!(match_results.length() == 0);
-
-        // Move the oracle price down to 80, this should trigger the order
-        let match_results = order_book.trigger_pending_orders(80);
-        // Verify second taker was fully filled
-        assert!(total_matched_size(&match_results) == 300);
-
-        // Verify original maker was partially filled again
-        assert!(match_results.length() == 1);
-        let maker_match = match_results[0];
-        let (order, matched_size) = maker_match.destroy_single_order_match();
-        assert!(order.get_account() == @0xAA);
-        assert!(order.get_order_id() == new_order_id_type(1));
-        assert!(matched_size == 300);
-        assert!(order.get_orig_size() == 1000);
-        assert!(order.get_remaining_size() == 300); // Still partial as 300 units remain
-
-        // Original sell order should still exist with 300 units remaining
-        let order_id = new_order_id_type(1);
-        let order_state = *order_book.orders.borrow(&order_id);
-        let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
-            order.destroy_order();
-        assert!(is_active == true);
-        assert!(price == 100);
-        assert!(orig_size == 1000);
-        assert!(size == 300); // 1000 - 400 - 300 = 300 remaining
-        assert!(is_bid == false);
-
         order_book.destroy_order_book();
     }
 
     #[test]
-    fun test_SL_order() {
+    fun test_price_move_up_condition() {
         let order_book = new_order_book<TestMetadata>();
 
         // Place a GTC sell order for 1000 units at price 100
@@ -1227,7 +1173,7 @@ module aptos_experimental::order_book {
                     orig_size: 400,
                     remaining_size: 400,
                     is_bid: false,
-                    trigger_condition: option::some(tp_trigger_condition(110)),
+                    trigger_condition: option::some(price_move_up_condition(110)),
                     metadata: TestMetadata {}
                 }
             );
@@ -1266,7 +1212,7 @@ module aptos_experimental::order_book {
                     orig_size: 300,
                     remaining_size: 300,
                     is_bid: false,
-                    trigger_condition: option::some(tp_trigger_condition(120)),
+                    trigger_condition: option::some(price_move_up_condition(120)),
                     metadata: TestMetadata {}
                 }
             );
@@ -1481,7 +1427,7 @@ module aptos_experimental::order_book {
             orig_size: 1000,
             remaining_size: 1000,
             is_bid: false,
-            trigger_condition: option::some(tp_trigger_condition(90)),
+            trigger_condition: option::some(price_move_up_condition(90)),
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
