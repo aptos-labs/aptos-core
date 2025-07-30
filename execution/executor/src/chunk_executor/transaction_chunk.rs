@@ -76,6 +76,12 @@ impl TransactionChunk for ChunkToExecute {
             first_version: _,
         } = self;
 
+        assert_eq!(
+            transactions.len(),
+            persisted_aux_info.len(),
+            "transactions and persisted_aux_info must have the same length"
+        );
+
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
         // as only transactions with verified signatures are committed to the storage.
         let sig_verified_txns = {

@@ -19,6 +19,7 @@ use aptos_types::{
     },
     contract_event::TransactionEvent,
     state_store::MockStateView,
+    transaction::AuxiliaryInfo,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -42,7 +43,7 @@ pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord + Send + Sync + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 > {
-    txns_provider: DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
+    txns_provider: DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
     baseline_output: BaselineOutput<KeyType<K>>,
 }
 
@@ -110,7 +111,8 @@ where
             .into_iter()
             .map(|txn_gen| txn_gen.materialize(&key_universe))
             .collect();
-        let txns_provider = DefaultTxnProvider::new_without_info(transactions.clone());
+        let txns_provider: DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo> =
+            DefaultTxnProvider::new_without_info(transactions.clone());
 
         let baseline_output = BaselineOutput::generate(txns_provider.get_txns(), None);
 
@@ -138,7 +140,8 @@ where
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
-            DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
+            DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
+            AuxiliaryInfo,
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel(
             &self.txns_provider,

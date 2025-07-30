@@ -732,6 +732,15 @@ module std::features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
+    /// Whether the monotonically increasing counter native function is enabled.
+    const MONOTONICALLY_INCREASING_COUNTER: u64 = 98;
+
+    public fun get_monotonically_increasing_counter_feature(): u64 { MONOTONICALLY_INCREASING_COUNTER }
+
+    public fun is_monotonically_increasing_counter_enabled(): bool acquires Features {
+        is_enabled(MONOTONICALLY_INCREASING_COUNTER)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -35,7 +35,7 @@ use aptos_types::{
     contract_event::TransactionEvent,
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, MockStateView},
-    transaction::AuxiliaryInfo,
+    transaction::{AuxiliaryInfo, AuxiliaryInfoTrait},
     write_set::WriteOpKind,
 };
 use claims::{assert_matches, assert_ok};
@@ -68,7 +68,8 @@ fn test_block_epilogue_happy_path() {
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -135,7 +136,8 @@ fn test_block_epilogue_block_gas_limit_reached() {
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(1)),
         executor_thread_pool,
@@ -226,7 +228,8 @@ fn test_resource_group_deletion() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -304,7 +307,8 @@ fn resource_group_bcs_fallback() {
         MockTask<KeyType<u32>, MockEvent>,
         NonEmptyGroupDataView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -419,7 +423,8 @@ fn interrupt_requested() {
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -465,7 +470,8 @@ fn block_output_err_precedence() {
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
         executor_thread_pool,
@@ -508,7 +514,8 @@ fn skip_rest_gas_limit() {
         MockTask<KeyType<u32>, MockEvent>,
         MockStateView<KeyType<u32>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
-        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>, AuxiliaryInfo>,
+        AuxiliaryInfo,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
         executor_thread_pool,
@@ -552,6 +559,7 @@ where
             DeltaDataView<K>,
             NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
             _,
+            AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool,
@@ -571,6 +579,7 @@ where
             MockStateView<K>,
             NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
             _,
+            AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool,

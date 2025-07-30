@@ -15,6 +15,7 @@ use crate::{
     task::ExecutorTask,
     txn_provider::default::DefaultTxnProvider,
 };
+use aptos_types::transaction::AuxiliaryInfo;
 use proptest::test_runner::TestRunner;
 use std::marker::PhantomData;
 use test_case::test_case;
@@ -60,7 +61,10 @@ fn run_transactions_deltas(
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     DeltaDataView<KeyType<[u8; 32]>>,
-                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                    DefaultTxnProvider<
+                        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                        AuxiliaryInfo,
+                    >,
                 >(
                     executor_thread_pool.clone(),
                     maybe_block_gas_limit,
