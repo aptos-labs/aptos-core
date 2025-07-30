@@ -30,7 +30,7 @@ use crate::shared::ark_serialize::*;
 pub struct FPTX {
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EncryptionKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     sig_mpk_g2: G2Affine,

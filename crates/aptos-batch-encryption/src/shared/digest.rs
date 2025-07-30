@@ -21,7 +21,7 @@ use crate::{shared::algebra::fk_algorithm::FKDomain, shared::algebra::interpolat
 
 
 /// The digest public parameters.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DigestKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub tau_g2: G2Affine,

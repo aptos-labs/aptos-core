@@ -16,7 +16,7 @@ use super::symmetric;
 use anyhow::Result;
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEMasterSecretKeyShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     mpk_g2: G2Affine,
@@ -25,7 +25,7 @@ pub struct BIBEMasterSecretKeyShare {
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEDecryptionKeyShare {
     signature_share: ShamirGroupShare,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -34,7 +34,7 @@ pub struct BIBEDecryptionKeyShare {
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEDecryptionKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub digest_g1: G1Affine,
@@ -51,7 +51,7 @@ impl DecryptionKeyShare for BIBEDecryptionKeyShare {
 
 pub struct BIBEMasterPublicKey(pub(crate) G2Affine);
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEVerificationKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     mpk_g2: G2Affine,

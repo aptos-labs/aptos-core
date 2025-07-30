@@ -136,7 +136,7 @@ impl ThresholdConfig {
 }
 
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShamirShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub x: Fr,
@@ -144,7 +144,7 @@ pub struct ShamirShare {
     pub y: Fr
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShamirGroupShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub x: Fr,
