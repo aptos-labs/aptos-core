@@ -81,4 +81,17 @@ fn fptx_serialize_deserialize_setup() {
 
     assert_eq!(setup, setup2);
 
+    let json = serde_json::to_string(&setup).unwrap();
+    let setup2 : 
+    (
+        <FPTX as BatchThresholdEncryption>::EncryptionKey,
+        <FPTX as BatchThresholdEncryption>::DigestKey,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>
+    )
+    = serde_json::from_str(&json).unwrap();
+    assert_eq!(setup, setup2);
+
 }

@@ -582,6 +582,11 @@ mod tests {
 
             assert_eq!(fk_domain, fk_domain2);
 
+            let json = serde_json::to_string(&fk_domain).unwrap();
+
+            let fk_domain2 : FKDomain<Fr, G1Projective> = serde_json::from_str(&json).unwrap();
+
+            assert_eq!(fk_domain, fk_domain2);
         }
     }
 
