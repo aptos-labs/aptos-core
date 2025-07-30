@@ -1,6 +1,9 @@
 processed 5 tasks
-
-task 4 'run'. lines 77-77:
+task 0 lines 2-24:  publish --verbose
+task 1 lines 25-47:  publish --verbose
+task 2 lines 49-51:  run --verbose 0x66::app::run
+task 3 lines 52-75:  publish --skip-check-struct-and-pub-function-linking
+task 4 lines 77-77:  run --verbose 0x66::app::run
 Error: Function execution failed with VMError: {
     message: Expected type |u32|u32 has copy, got |u64|u32 has copy + drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

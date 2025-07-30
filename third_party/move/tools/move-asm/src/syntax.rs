@@ -281,6 +281,10 @@ impl AsmParser {
         !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline)
     }
 
+    fn lookahead_indent(&self) -> bool {
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Indent(_))
+    }
+
     #[allow(unused)]
     fn lookahead_soft_kw(&self, kw: &str) -> bool {
         !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
@@ -626,6 +630,13 @@ impl AsmParser {
         let label = if self.is_special(":") {
             self.advance()?;
             let label = Some(name);
+            if self.is_tok(&Token::Newline) && self.lookahead_indent() {
+                // Allow
+                //  l:
+                //    inst
+                self.advance()?;
+                self.advance()?;
+            }
             loc = self.next_loc;
             name = self.ident()?;
             label
