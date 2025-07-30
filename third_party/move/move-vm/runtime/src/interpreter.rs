@@ -21,7 +21,7 @@ use crate::{
     },
     storage::{
         dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
-        ty_depth_checker::TypeDepthChecker,
+        ty_depth_checker::TypeDepthChecker, ty_layout_converter::LayoutConverter,
     },
     trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
 };
@@ -38,7 +38,9 @@ use move_core_types::{
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
     language_storage::TypeTag,
-    vm_status::{StatusCode, StatusType},
+    vm_status::{
+        sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
+    },
 };
 use move_vm_types::{
     debug_write, debug_writeln,
@@ -97,8 +99,13 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     access_control: AccessControlState,
     /// Reentrancy checker.
     reentrancy_checker: ReentrancyChecker,
+    /// Loader to resolve functions and modules from remote storage. Ensures all module accesses
+    /// are metered.
+    loader: &'ctx LoaderImpl,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
+    /// Converts runtime types ([Type]) to layouts for (de)serialization.
+    layout_converter: &'ctx LayoutConverter<'ctx, LoaderImpl>,
 }
 
 struct TypeWithRuntimeEnvironment<'a, 'b> {
@@ -115,23 +122,30 @@ impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
 impl Interpreter {
     /// Entrypoint into the interpreter. All external calls need to be routed through this
     /// function.
-    pub(crate) fn entrypoint(
+    pub(crate) fn entrypoint<LoaderImpl>(
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
-        ty_depth_checker: &TypeDepthChecker<impl Loader>,
+        loader: &LoaderImpl,
+        ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
+        layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-    ) -> VMResult<Vec<Value>> {
+    ) -> VMResult<Vec<Value>>
+    where
+        LoaderImpl: Loader,
+    {
         InterpreterImpl::entrypoint(
             function,
             args,
             data_cache,
             module_storage,
+            loader,
             ty_depth_checker,
+            layout_converter,
             resource_resolver,
             gas_meter,
             traversal_context,
@@ -151,7 +165,9 @@ where
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
         module_storage: &impl ModuleStorage,
+        loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
+        layout_converter: &LayoutConverter<LoaderImpl>,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -163,7 +179,9 @@ where
             vm_config: module_storage.runtime_environment().vm_config(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
+            loader,
             ty_depth_checker,
+            layout_converter,
         };
 
         let function = Rc::new(function);
@@ -332,14 +350,18 @@ where
                         .map(|(_idx, val)| val)
                         .collect::<Vec<_>>();
 
-                    // TODO: Check if the error location is set correctly.
                     gas_meter
                         .charge_drop_frame(non_ref_vals.iter())
-                        .map_err(|e| self.set_location(e))?;
+                        .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    if RTTCheck::should_perform_checks() {
+                        self.check_return_tys(&mut current_frame)
+                            .map_err(|e| set_err_info!(current_frame, e))?;
+                    }
 
                     self.access_control
                         .exit_function(&current_frame.function)
-                        .map_err(|e| self.set_location(e))?;
+                        .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
                         self.reentrancy_checker
@@ -348,7 +370,7 @@ where
                                 &current_frame.function,
                                 current_frame.call_type(),
                             )
-                            .map_err(|e| self.set_location(e))?;
+                            .map_err(|e| set_err_info!(current_frame, e))?;
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -680,6 +702,38 @@ where
                 },
             }
         }
+    }
+
+    // Check whether the values on the operand stack have the expected return types.
+    fn check_return_tys(&self, current_frame: &mut Frame) -> PartialVMResult<()> {
+        let expected_ret_tys = current_frame.function.return_tys();
+        if self.call_stack.0.is_empty() && self.operand_stack.types.len() != expected_ret_tys.len()
+        {
+            // This is the outermost call on the stack, the type stack must contain exactly
+            // the expected number of returns.
+            return Err(PartialVMError::new_invariant_violation(
+                "unbalanced stack at end of execution",
+            )
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        if expected_ret_tys.is_empty() {
+            return Ok(());
+        }
+        let given_ret_tys = self.operand_stack.last_n_tys(expected_ret_tys.len())?;
+        for (expected, given) in expected_ret_tys.iter().zip(given_ret_tys) {
+            let ty_args = current_frame.function.ty_args();
+            if ty_args.is_empty() {
+                given.paranoid_check_assignable(expected)?;
+            } else {
+                let expected_inst = self
+                    .vm_config
+                    .ty_builder
+                    .create_ty_with_subst(expected, current_frame.function.ty_args())?;
+                given.paranoid_check_assignable(&expected_inst)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
@@ -1019,20 +1073,11 @@ where
                 .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
-                let arena_id = traversal_context
-                    .referenced_module_ids
-                    .alloc(module_name.clone());
-                check_dependencies_and_charge_gas(
-                        module_storage,
-                        gas_meter,
-                        traversal_context,
-                        [(arena_id.address(), arena_id.name())],
-                    )
-                    .map_err(|err| err
-                        .to_partial()
-                        .append_message_with_separator('.',
-                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
-                        ))?;
+                self.loader.charge_native_result_load_module(
+                    gas_meter,
+                    traversal_context,
+                    &module_name,
+                )?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
@@ -1085,11 +1130,15 @@ where
         resource_resolver: &impl ResourceResolver,
         module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
-        _traversal_context: &mut TraversalContext,
+        traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+            self.loader,
+            self.layout_converter,
+            gas_meter,
+            traversal_context,
             module_storage,
             resource_resolver,
             &addr,
@@ -1662,6 +1711,15 @@ impl Stack {
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))?;
         let args = self.types.split_off(remaining_stack_size);
         Ok(args)
+    }
+
+    fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
+        if self.types.len() < n {
+            return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
+                .with_message("Failed to get last n arguments on the argument stack".to_string()));
+        }
+        let len = self.types.len();
+        Ok(&self.types[(len - n)..])
     }
 
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
@@ -2280,19 +2338,6 @@ impl Frame {
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
-
-                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        let lazy_function = LazyLoadedFunction::new_resolved(
-                            module_storage,
-                            gas_meter,
-                            traversal_context,
-                            function.clone(),
-                            *mask,
-                        )?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?;
-
                         if RTTCheck::should_perform_checks() {
                             verify_pack_closure(
                                 self.ty_builder(),
@@ -2301,6 +2346,17 @@ impl Frame {
                                 *mask,
                             )?;
                         }
+                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        let lazy_function = LazyLoadedFunction::new_resolved(
+                            interpreter.layout_converter,
+                            gas_meter,
+                            traversal_context,
+                            function.clone(),
+                            *mask,
+                        )?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2323,7 +2379,7 @@ impl Frame {
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
-                            module_storage,
+                            interpreter.layout_converter,
                             gas_meter,
                             traversal_context,
                             function.clone(),

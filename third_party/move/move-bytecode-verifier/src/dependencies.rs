@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module contains verification of usage of dependencies for modules and scripts.
-use crate::{verifier::VerificationScope, VerifierConfig};
+use crate::VerifierConfig;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     binary_views::BinaryIndexedView,
@@ -175,7 +175,7 @@ pub fn verify_module<'a>(
     module: &CompiledModule,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     verify_module_impl(module, dependencies)
@@ -199,7 +199,7 @@ pub fn verify_script<'a>(
     script: &CompiledScript,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     verify_script_impl(script, dependencies).map_err(|e| e.finish(Location::Script))
@@ -262,7 +262,8 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::StructHandle,
                         idx as TableIndex,
-                    ));
+                    )
+                    .with_message("imported struct mismatches expectation"));
                 }
             },
             None => {
@@ -303,7 +304,8 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                         StatusCode::TYPE_MISMATCH,
                         IndexKind::FunctionHandle,
                         idx as TableIndex,
-                    ));
+                    )
+                    .with_message("imported function mismatches expectation"));
                 }
                 // same parameters
                 let handle_params = context.resolver.signature_at(function_handle.parameters);
@@ -484,7 +486,7 @@ fn compare_types(
     def_type: &SignatureToken,
     def_module: &CompiledModule,
 ) -> PartialVMResult<()> {
-    match (handle_type, def_type) {
+    let result = match (handle_type, def_type) {
         (SignatureToken::Bool, SignatureToken::Bool)
         | (SignatureToken::U8, SignatureToken::U8)
         | (SignatureToken::U16, SignatureToken::U16)
@@ -503,8 +505,6 @@ fn compare_types(
         ) => {
             compare_cross_module_signatures(context, handle_args, def_args, def_module)?;
             compare_cross_module_signatures(context, handle_result, def_result, def_module)?;
-            // TODO(#15664): should we allow the definition to change to a weaker ability
-            //   requirement? Currently we do not allow `&mut` to be changed to `&` either.
             if handle_ab == def_ab {
                 Ok(())
             } else {
@@ -548,7 +548,14 @@ fn compare_types(
         | (SignatureToken::U16, _)
         | (SignatureToken::U32, _)
         | (SignatureToken::U256, _) => Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)),
-    }
+    };
+    result.map_err(|err| {
+        if err.message().is_none() {
+            err.with_message("imported type mismatches expectation")
+        } else {
+            err
+        }
+    })
 }
 
 fn compare_structs(

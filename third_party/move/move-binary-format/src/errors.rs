@@ -493,8 +493,11 @@ impl PartialVMError {
         self
     }
 
-    pub fn with_message(mut self, mut message: String) -> Self {
+    pub fn with_message(mut self, message: impl ToString) -> Self {
+        let mut message = message.to_string();
         if self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            // If there is already something in the message, interpret as stack  trace
+            // and append at the end
             if let Some(stacktrace) = self.0.message.take() {
                 message = format!("{} @{}", message, stacktrace);
             }

@@ -243,7 +243,7 @@ impl StructType {
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex::new(0),
@@ -431,6 +431,14 @@ impl Type {
             | MutableReference(_)
             | TyParam(_) => false,
         }
+    }
+
+    pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
+        if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
+            let msg = format!("{} `{}` cannot be a reference", msg, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
     }
 
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {

@@ -68,6 +68,28 @@ impl TransactionFilter {
     pub fn is_empty(&self) -> bool {
         self.transaction_rules.is_empty()
     }
+
+    /// Adds an all matcher to the filter (matching all transactions)
+    pub fn add_all_filter(self, allow: bool) -> Self {
+        let transaction_matcher = TransactionMatcher::All;
+        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
+    }
+
+    /// Adds a filter rule containing multiple matchers
+    pub fn add_multiple_matchers_filter(
+        mut self,
+        allow: bool,
+        transaction_matchers: Vec<TransactionMatcher>,
+    ) -> Self {
+        let transaction_rule = if allow {
+            TransactionRule::Allow(transaction_matchers)
+        } else {
+            TransactionRule::Deny(transaction_matchers)
+        };
+        self.transaction_rules.push(transaction_rule);
+
+        self
+    }
 }
 
 // These are useful test-only methods for creating and testing filters
@@ -76,12 +98,6 @@ impl TransactionFilter {
     /// Adds an account address matcher to the filter
     pub fn add_account_address_filter(self, allow: bool, account_address: AccountAddress) -> Self {
         let transaction_matcher = TransactionMatcher::AccountAddress(account_address);
-        self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
-    }
-
-    /// Adds an all matcher to the filter (matching all transactions)
-    pub fn add_all_filter(self, allow: bool) -> Self {
-        let transaction_matcher = TransactionMatcher::All;
         self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
     }
 
@@ -101,22 +117,6 @@ impl TransactionFilter {
     pub fn add_module_address_filter(self, allow: bool, address: AccountAddress) -> Self {
         let transaction_matcher = TransactionMatcher::ModuleAddress(address);
         self.add_multiple_matchers_filter(allow, vec![transaction_matcher])
-    }
-
-    /// Adds a filter rule containing multiple matchers
-    pub fn add_multiple_matchers_filter(
-        mut self,
-        allow: bool,
-        transaction_matchers: Vec<TransactionMatcher>,
-    ) -> Self {
-        let transaction_rule = if allow {
-            TransactionRule::Allow(transaction_matchers)
-        } else {
-            TransactionRule::Deny(transaction_matchers)
-        };
-        self.transaction_rules.push(transaction_rule);
-
-        self
     }
 
     /// Adds a public key matcher to the filter

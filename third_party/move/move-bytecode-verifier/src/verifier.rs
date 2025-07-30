@@ -116,7 +116,7 @@ pub fn verify_module_with_config_for_test_with_version(
 }
 
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
@@ -178,7 +178,7 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    if matches!(config.scope, VerificationScope::Nothing) {
+    if config.verify_nothing() {
         return Ok(());
     }
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
@@ -317,5 +317,10 @@ impl VerifierConfig {
     /// Set verification scope
     pub fn set_scope(self, scope: VerificationScope) -> Self {
         Self { scope, ..self }
+    }
+
+    /// Returns true if verification is disabled.
+    pub fn verify_nothing(&self) -> bool {
+        matches!(self.scope, VerificationScope::Nothing)
     }
 }

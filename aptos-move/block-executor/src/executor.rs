@@ -79,7 +79,7 @@ use std::{
     },
 };
 
-struct SharedSyncParams<'a, T, E, S>
+struct SharedSyncParams<'a, 'b, T, E, S>
 where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T>,
@@ -93,7 +93,7 @@ where
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
     delayed_field_id_counter: &'a AtomicU32,
-    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'a, T, S>>,
+    block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<'b, T, S>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
@@ -1114,7 +1114,8 @@ where
         let mut scheduler_task = SchedulerTask::Retry;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
-        let drain_commit_queue = || -> Result<(), PanicError> {
+        let drain_commit_queue = || -> Result<bool, PanicError> {
+            let mut block_epilogue_executed = false;
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
@@ -1215,12 +1216,12 @@ where
                             ));
                         };
                         *block_epilogue_txn.acquire().dereference_mut() = Some(txn);
-
+                        block_epilogue_executed = true;
                         scheduler.add_to_commit_queue(num_txns as u32);
                     }
                 }
             }
-            Ok(())
+            Ok(block_epilogue_executed)
         };
 
         loop {
@@ -1269,7 +1270,10 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            drain_commit_queue()?;
+            let block_epilogue_executed = drain_commit_queue()?;
+            if block_epilogue_executed {
+                scheduler_task = SchedulerTask::Done;
+            }
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -1344,7 +1348,7 @@ where
         // TODO: use worker id.
         _worker_id: u32,
         num_workers: u32,
-        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
         start_delayed_field_id_counter: u32,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
@@ -1459,12 +1463,13 @@ where
         shared_maybe_error: &AtomicBool,
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
+        block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         block_epilogue_txn: Option<Transaction>,
         mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: impl Send + 'static,
         last_input_output: TxnLastInputOutput<T, E::Output, E::Error>,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
         // Check for errors or remaining commit tasks before any side effects.
         let mut has_error = shared_maybe_error.load(Ordering::SeqCst);
         if !has_error && has_remaining_commit_tasks {
@@ -1492,10 +1497,16 @@ where
         // Explicit async drops
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
+        let to_make_hot = block_epilogue_txn
+            .is_some()
+            .then(|| block_limit_processor.acquire().get_slots_to_make_hot())
+            .unwrap_or_default();
+
         // Return final result
         Ok(BlockOutput::new(
             final_results.into_inner(),
             block_epilogue_txn,
+            to_make_hot,
         ))
     }
 
@@ -1505,7 +1516,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // BlockSTMv2 should have less restrictions on the number of workers but we
         // still sanity check that it is not instantiated w. concurrency level 1.
@@ -1517,7 +1528,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
@@ -1543,7 +1554,7 @@ where
         let versioned_cache = MVHashMap::new();
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
             base_view,
             scheduler: &scheduler,
             versioned_cache: &versioned_cache,
@@ -1589,6 +1600,7 @@ where
             &shared_maybe_error,
             !scheduler.post_commit_processing_queue_is_empty(),
             final_results,
+            block_limit_processor,
             None, // BlockSTMv2 doesn't handle block epilogue yet.
             versioned_cache,
             scheduler,
@@ -1603,7 +1615,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<E::Output>, ()> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1620,7 +1632,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1696,6 +1708,7 @@ where
             &shared_maybe_error,
             scheduler.pop_from_commit_queue().is_ok(),
             final_results,
+            block_limit_processor,
             block_epilogue_txn.into_inner(),
             versioned_cache,
             scheduler,
@@ -1930,11 +1943,11 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T::Key, E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -2264,7 +2277,11 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        Ok(BlockOutput::new(ret, block_epilogue_txn))
+        let to_make_hot = block_epilogue_txn
+            .is_some()
+            .then(|| block_limit_processor.get_slots_to_make_hot())
+            .unwrap_or_default();
+        Ok(BlockOutput::new(ret, block_epilogue_txn, to_make_hot))
     }
 
     pub fn execute_block(
@@ -2273,7 +2290,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<T::Key, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -2379,7 +2396,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, None));
+            return Ok(BlockOutput::new(ret, None, BTreeMap::new()));
         }
 
         Err(sequential_error)
