@@ -46,8 +46,8 @@ use aptos_types::{
     on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
-        block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, FeeDistribution,
-        Transaction,
+        block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
+        BlockOutput, FeeDistribution, Transaction,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -97,22 +97,23 @@ where
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
 }
 
-pub struct BlockExecutor<T, E, S, L, TP> {
+pub struct BlockExecutor<T, E, S, L, TP, A> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<fn() -> (T, E, S, L, TP)>,
+    phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
 
-impl<T, E, S, L, TP> BlockExecutor<T, E, S, L, TP>
+impl<T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
 where
     T: BlockExecutableTransaction,
-    E: ExecutorTask<Txn = T>,
+    E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
-    TP: TxnProvider<T> + Sync,
+    TP: TxnProvider<T, A> + Sync,
+    A: AuxiliaryInfoTrait,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -279,6 +280,7 @@ where
 
         // TODO(BlockSTMv2): proper integration w. execution pooling for performance.
         let txn = signature_verified_block.get_txn(idx_to_execute);
+        let auxiliary_info = signature_verified_block.get_auxiliary_info(idx_to_execute);
 
         let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
         let sync_view = LatestView::new(
@@ -288,7 +290,8 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execution_result =
+            executor.execute_transaction(&sync_view, txn, &auxiliary_info, idx_to_execute);
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
@@ -353,6 +356,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         txn: &T,
+        auxiliary_info: &A,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
@@ -376,7 +380,8 @@ where
             ViewState::Sync(parallel_state),
             idx_to_execute,
         );
-        let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+        let execution_result =
+            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
 
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
@@ -741,6 +746,7 @@ where
                 txn_idx,
                 incarnation + 1,
                 block.get_txn(txn_idx),
+                &block.get_auxiliary_info(txn_idx),
                 last_input_output,
                 versioned_cache,
                 executor,
@@ -1185,6 +1191,7 @@ where
                             num_txns as u32,
                             0,
                             &T::from_txn(txn.clone()),
+                            &A::auxiliary_info_at_txn_index(num_txns as u32),
                             last_input_output,
                             versioned_cache,
                             &executor,
@@ -1303,6 +1310,7 @@ where
                         txn_idx,
                         incarnation,
                         block.get_txn(txn_idx),
+                        &block.get_auxiliary_info(txn_idx),
                         last_input_output,
                         versioned_cache,
                         &executor,
@@ -1764,9 +1772,9 @@ where
             let txn = signature_verified_block.get_txn(i as TxnIndex);
             if let Some(user_txn) = txn.try_as_signed_user_txn() {
                 let auxiliary_info = signature_verified_block.get_auxiliary_info(i as TxnIndex);
-                if let Some(ephemeral_info) = auxiliary_info.ephemeral_info() {
+                let proposer_index = auxiliary_info.proposer_index();
+                if let Some(proposer_index) = proposer_index {
                     let gas_price = user_txn.gas_unit_price();
-                    let proposer_index = ephemeral_info.proposer_index;
                     let fee_statement = output.fee_statement();
                     let total_gas_unit = fee_statement.gas_used();
                     // Total gas unit here includes the storage fee (deposit), which is not
@@ -1979,6 +1987,7 @@ where
             } else {
                 break;
             };
+            let auxiliary_info = signature_verified_block.get_auxiliary_info(idx as TxnIndex);
             let latest_view = LatestView::<T, S>::new(
                 base_view,
                 module_cache_manager_guard.module_cache(),
@@ -1986,7 +1995,8 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
+            let res =
+                executor.execute_transaction(&latest_view, txn, &auxiliary_info, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Abort(err) => {
