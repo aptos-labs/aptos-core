@@ -16,7 +16,9 @@ use super::symmetric;
 use anyhow::Result;
 
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BIBEMasterSecretKeyShare {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     mpk_g2: G2Affine,
     shamir_share: ShamirShare,
     player: Player,

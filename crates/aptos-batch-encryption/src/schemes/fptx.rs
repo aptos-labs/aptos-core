@@ -9,6 +9,7 @@ use anyhow::Result;
 use anyhow::anyhow;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator as _;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::BatchEncryptionError;
 use crate::shared::algebra::shamir::{ShamirGroupShare, ShamirShare, ThresholdConfig};
@@ -23,13 +24,17 @@ use crate::shared::ids::{FreeRootId, FreeRootIdSet};
 use crate::shared::key_derivation::{self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare, BIBEVerificationKey};
 use crate::{group::*, shared::{digest::DigestKey, ids::{Id, IdSet}}, traits::{BatchThresholdEncryption, Plaintext}};
 use rand_core::SeedableRng;
+use crate::shared::ark_serialize::*;
 
 
 pub struct FPTX {
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncryptionKey {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     sig_mpk_g2: G2Affine,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     tau_g2: G2Affine,
     id_set_capacity: usize,
 }

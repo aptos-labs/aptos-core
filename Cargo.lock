@@ -714,6 +714,7 @@ dependencies = [
  "rand_core 0.6.4",
  "rayon",
  "serde",
+ "serde_json",
  "sha2 0.10.8",
  "thiserror 2.0.12",
 ]

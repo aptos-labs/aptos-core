@@ -13,10 +13,11 @@ use crate::shared::ark_serialize::*;
 
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ThresholdConfig {
     pub n: usize,
     pub t: usize,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub domain: Radix2EvaluationDomain<Fr>,
 }
 

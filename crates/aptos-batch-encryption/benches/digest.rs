@@ -1,7 +1,12 @@
-use aptos_batch_encryption::group::Fr;
+use std::thread;
+
+use aptos_batch_encryption::group::*;
+use aptos_batch_encryption::shared::algebra::fk_algorithm::FKDomain;
 use aptos_batch_encryption::shared::digest::{Digest, DigestKey};
 use aptos_batch_encryption::shared::ids::free_roots::UncomputedCoeffs;
 use aptos_batch_encryption::shared::ids::*;
+use ark_ec::{AffineRepr as _, ScalarMul as _};
+use ark_poly::{EvaluationDomain as _, Radix2EvaluationDomain};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use ark_std::{rand::thread_rng, UniformRand, Zero, One};
 

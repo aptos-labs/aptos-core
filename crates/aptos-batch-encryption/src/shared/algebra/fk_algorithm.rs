@@ -1,10 +1,10 @@
-use std::{marker::PhantomData, ops::Mul};
+use std::{fmt, marker::PhantomData, ops::Mul};
 use crate::{group::{Fr, G1Affine, G1Projective}, shared::algebra::multi_point_eval::multi_point_eval_naive};
 
 use ark_ff::FftField;
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator as _};
-use serde::{de::Visitor, ser::{SerializeSeq as _, SerializeStruct as _}, Deserialize, Serialize};
+use serde::{de::{self, MapAccess, SeqAccess, Visitor}, ser::{SerializeSeq as _, SerializeStruct as _}, Deserialize, Serialize};
 use crate::shared::ark_serialize::*;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 
@@ -18,12 +18,13 @@ use super::multi_point_eval::multi_point_eval;
 /// a FFT-friendly subset of a field of size `n` is required. This struct
 /// represents that subset. Following the terminology in Arkworks, we call this
 /// subset a "domain".
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CirculantDomain<F: FftField> {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     fft_domain: Radix2EvaluationDomain<F>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedInput<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> {
     pub y: Vec<T>,
     _phantom: PhantomData<F>,
@@ -175,7 +176,7 @@ impl<F: FftField> CirculantDomain<F> {
 /// a FFT-friendly subset of a field of size `2 * n` is required. This struct
 /// represents that subset. Following the terminology in Arkworks, we call this
 /// subset a "domain".
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ToeplitzDomain<F: FftField + Sized> {
     pub circulant_domain: CirculantDomain<F>
 }
@@ -304,7 +305,7 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
 
 /// Encapsulates the [`ToeplitzDomain`] and a FFT evaluation domain required for running the FK
 /// algorithm.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FKDomain<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> {
     pub toeplitz_domain: ToeplitzDomain<F>,
     pub fft_domain: Radix2EvaluationDomain<F>,
@@ -321,6 +322,7 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T> + CanonicalSerialize + 
             tau_powers.into_iter().map(|tau_powers_for_round|
             Vec::from(tau_powers_for_round).into_iter().rev().collect()
             ).collect();
+        
         let prepared_toeplitz_inputs = 
             tau_powers_reversed.into_iter().map(|tau_powers_reversed_for_round|
                 toeplitz_domain.prepare_input(&tau_powers_reversed_for_round[1..])
@@ -412,12 +414,100 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
     }
 }
 
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum Field { ToeplitzDomainDimension, FftDomainSize, PreparedToeplitzInputs }
+
+struct FKDomainVisitor<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> {
+    _phantom: PhantomData<F>,
+    _phantom2: PhantomData<T>,
+}
+
+impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> Visitor<'de> for FKDomainVisitor<F, T> {
+    type Value = FKDomain<F, T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("struct FKDomain")
+    }
+
+    fn visit_seq<V>(self, mut seq: V) -> Result<FKDomain<F, T>, V::Error>
+where
+        V: SeqAccess<'de>,
+    {
+        let toeplitz_domain_dimension = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let fft_domain_size = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+        let prepared_toeplitz_inputs = seq.next_element()?
+            .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+        Ok(FKDomain {
+            toeplitz_domain: ToeplitzDomain::new(toeplitz_domain_dimension)
+            .ok_or(de::Error::custom("Toeplitz domain initialization failed"))?,
+            fft_domain: Radix2EvaluationDomain::new(fft_domain_size)
+            .ok_or(de::Error::custom("Radix2EvaluationDomain initialization failed"))?,
+            prepared_toeplitz_inputs,
+        })
+    }
+
+    fn visit_map<V>(self, mut map: V) -> Result<FKDomain<F, T>, V::Error>
+where
+        V: MapAccess<'de>,
+    {
+        let mut toeplitz_domain_dimension : Option<usize> = None;
+        let mut fft_domain_size : Option<usize> = None;
+        let mut prepared_toeplitz_inputs : Option<Vec<PreparedInput<F, T>>> = None;
+        while let Some(key) = map.next_key()? {
+            match key {
+                Field::ToeplitzDomainDimension => {
+                    if toeplitz_domain_dimension.is_some() {
+                        return Err(de::Error::duplicate_field("toeplitz_domain_dimension"));
+                    }
+                    toeplitz_domain_dimension = Some(map.next_value()?);
+                },
+                Field::FftDomainSize => {
+                    if fft_domain_size.is_some() {
+                        return Err(de::Error::duplicate_field("fft_domain_size"));
+                    }
+                    fft_domain_size = Some(map.next_value()?);
+                },
+                Field::PreparedToeplitzInputs => {
+                    if prepared_toeplitz_inputs.is_some() {
+                        return Err(de::Error::duplicate_field("prepared_toeplitz_inputs"));
+                    }
+                    prepared_toeplitz_inputs = Some(
+                        map.next_value()?
+                    );
+                }
+            }
+        }
+        let toeplitz_domain_dimension = toeplitz_domain_dimension.ok_or_else(|| de::Error::missing_field("toeplitz_domain_dimension"))?;
+        let fft_domain_size = fft_domain_size.ok_or_else(|| de::Error::missing_field("toeplitz_domain_dimension"))?;
+        let prepared_toeplitz_inputs = prepared_toeplitz_inputs
+        .ok_or_else(|| de::Error::missing_field("prepared_toeplitz_inputs"))?;
+        Ok(FKDomain {
+            toeplitz_domain: ToeplitzDomain::new(toeplitz_domain_dimension)
+            .ok_or(de::Error::custom("Toeplitz domain initialization failed"))?,
+            fft_domain: Radix2EvaluationDomain::new(fft_domain_size)
+            .ok_or(de::Error::custom("Radix2EvaluationDomain initialization failed"))?,
+            prepared_toeplitz_inputs,
+        })
+    }
+}
+
 impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> Deserialize<'de> for FKDomain<F, T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
+where
         D: serde::Deserializer<'de> {
-        todo!()
+
+
+        const FIELDS: &[&str] = &["toeplitz_domain_dimension", "fft_domain_size", "prepared_toeplitz_inputs"];
+        deserializer.deserialize_struct("Duration", FIELDS, FKDomainVisitor { 
+            _phantom: PhantomData,
+            _phantom2: PhantomData,
+        }
+        )
     }
+    
 }
 
 pub trait EPTest {
@@ -461,6 +551,39 @@ mod tests {
 
     use super::FKDomain;
 
+    #[test]
+    fn test_serialize_deserialize() {
+        for poly_degree_exp in 1..4 {
+            let poly_degree = 2usize.pow(poly_degree_exp);
+            let mut rng = thread_rng();
+
+            let tau = Fr::rand(&mut rng);
+
+            let mut tau_powers_fr = vec![Fr::one()];
+            let mut cur = tau.clone();
+            for _ in 0..poly_degree {
+                tau_powers_fr.push(cur);
+                cur *= &tau;
+            }
+
+            let poly : DensePolynomial<Fr> = DensePolynomial::from_coefficients_vec(
+                (0..(poly_degree + 1)).map(|_| Fr::rand(&mut rng)).collect()
+            );
+
+            let tau_powers_g1 = G1Projective::from(G1Affine::generator()).batch_mul(&tau_powers_fr);
+            let tau_powers_g1_projective : Vec<Vec<G1Projective>> = vec! [ tau_powers_g1.iter().map(|g| G1Projective::from(*g)).collect() ];
+            let tau_g2 : G2Affine = (G2Affine::generator() * tau).into();
+
+            let fk_domain : FKDomain<Fr, G1Projective> = FKDomain::new(poly_degree, poly_degree, tau_powers_g1_projective).unwrap();
+            
+            let bytes = bcs::to_bytes(&fk_domain).unwrap();
+
+            let fk_domain2 : FKDomain<Fr, G1Projective> = bcs::from_bytes(&bytes).unwrap();
+
+            assert_eq!(fk_domain, fk_domain2);
+
+        }
+    }
 
 
     #[test]
