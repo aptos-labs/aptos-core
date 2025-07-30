@@ -45,6 +45,7 @@ struct MutableState {
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
     order_vote_enabled: bool,
+    persisted_auxiliary_info_version: u8,
 }
 
 /// Basic communication with the Execution module;
@@ -87,6 +88,7 @@ impl ExecutionProxy {
             transaction_deduper,
             is_randomness_enabled,
             order_vote_enabled,
+            persisted_auxiliary_info_version,
         } = self
             .state
             .read()
@@ -112,6 +114,7 @@ impl ExecutionProxy {
             self.txn_notifier.clone(),
             self.enable_pre_commit,
             order_vote_enabled,
+            persisted_auxiliary_info_version,
         )
     }
 }
@@ -231,6 +234,7 @@ impl StateComputer for ExecutionProxy {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
         order_vote_enabled: bool,
+        persisted_auxiliary_info_version: u8,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -244,6 +248,7 @@ impl StateComputer for ExecutionProxy {
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
             order_vote_enabled,
+            persisted_auxiliary_info_version,
         });
     }
 

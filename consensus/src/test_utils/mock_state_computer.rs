@@ -60,6 +60,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionDeduper>,
         _: bool,
         _: bool,
+        _: u8,
     ) {
     }
 

@@ -26,7 +26,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
@@ -527,6 +527,7 @@ pub struct AptosBlockExecutorWrapper<
 impl<
         E: ExecutorTask<
             Txn = SignatureVerifiedTransaction,
+            AuxiliaryInfo = AuxiliaryInfo,
             Error = VMStatus,
             Output = AptosTransactionOutput,
         >,
@@ -535,7 +536,7 @@ impl<
     pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
+        TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &TP,
@@ -562,11 +563,12 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor = BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP>::new(
-            config,
-            executor_thread_pool,
-            transaction_commit_listener,
-        );
+        let executor =
+            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
+                config,
+                executor_thread_pool,
+                transaction_commit_listener,
+            );
 
         let ret = executor.execute_block(
             signature_verified_block,
@@ -608,7 +610,7 @@ impl<
     pub(crate) fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
+        TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         signature_verified_block: &TP,
         state_view: &S,
