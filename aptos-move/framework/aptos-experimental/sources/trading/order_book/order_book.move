@@ -291,7 +291,6 @@ module aptos_experimental::order_book {
 
         modify_order(&mut self.orders, &order_req.order_id, |order_with_state| {
             order_with_state.increase_remaining_size(order_req.remaining_size);
-            true
         });
         self.active_orders.increase_order_size(
             order_req.price,
@@ -303,17 +302,33 @@ module aptos_experimental::order_book {
 
     // TODO move to big_ordered_map.move after function values are enabled in mainnet
     inline fun modify_order<M: store + copy + drop>(
-        orders: &mut BigOrderedMap<OrderIdType, OrderWithState<M>>, order_id: &OrderIdType, modify_fn: |&mut  OrderWithState<M>| bool
+        orders: &mut BigOrderedMap<OrderIdType, OrderWithState<M>>, order_id: &OrderIdType, modify_fn: |&mut  OrderWithState<M>|
+    ) {
+        let order = *orders.borrow(order_id);
+        modify_fn(&mut order);
+        orders.upsert(*order_id, order);
+    }
+
+    inline fun modify_and_copy_order<M: store + copy + drop>(
+        orders: &mut BigOrderedMap<OrderIdType, OrderWithState<M>>, order_id: &OrderIdType, modify_fn: |&mut  OrderWithState<M>|
     ): OrderWithState<M> {
         let order = *orders.borrow(order_id);
+        modify_fn(&mut order);
+        orders.upsert(*order_id, order);
+        order
+    }
+
+    inline fun modify_or_remove_order<M: store + copy + drop>(
+        orders: &mut BigOrderedMap<OrderIdType, OrderWithState<M>>, order_id: &OrderIdType, modify_fn: |&mut  OrderWithState<M>| bool
+    ): OrderWithState<M> {
+        let order = orders.remove(order_id);
         let keep = modify_fn(&mut order);
         if (keep) {
-            orders.upsert(*order_id, order);
-        } else {
-            orders.remove(order_id);
+            orders.add(*order_id, order);
         };
         order
     }
+
 
     fun place_pending_maker_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: OrderRequest<M>
@@ -357,7 +372,7 @@ module aptos_experimental::order_book {
         let (order_id, matched_size, remaining_size) =
             result.destroy_active_matched_order();
 
-        let order_with_state = modify_order(&mut self.orders, &order_id, |order_with_state| {
+        let order_with_state = modify_or_remove_order(&mut self.orders, &order_id, |order_with_state| {
             order_with_state.set_remaining_size(remaining_size);
             remaining_size > 0
         });
@@ -388,7 +403,7 @@ module aptos_experimental::order_book {
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
 
-        let order_with_state = modify_order(&mut self.orders, &order_id, |order_with_state| {
+        let order_with_state = modify_and_copy_order(&mut self.orders, &order_id, |order_with_state| {
             assert!(
                 order_creator == order_with_state.get_order_from_state().get_account(),
                 EORDER_CREATOR_MISMATCH
@@ -396,7 +411,6 @@ module aptos_experimental::order_book {
             order_with_state.decrease_remaining_size(size_delta);
 
             // TODO should we be asserting that remaining size is greater than 0?
-            true
         });
 
         if (order_with_state.is_active_order()) {
@@ -439,7 +453,6 @@ module aptos_experimental::order_book {
 
         modify_order(&mut self.orders, &order_id, |order_with_state| {
             order_with_state.set_metadata_in_state(metadata);
-            true
         });
     }
 
