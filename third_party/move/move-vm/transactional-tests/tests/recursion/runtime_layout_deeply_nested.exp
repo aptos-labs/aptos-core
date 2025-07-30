@@ -1,6 +1,7 @@
 processed 4 tasks
-
-task 2 'run'. lines 79-86:
+task 0 lines 1-66:  publish
+task 1 lines 69-77:  run --signers 0x1
+task 2 lines 79-86:  run --signers 0x2
 Error: Script execution failed with VMError: {
     major_status: VM_MAX_VALUE_DEPTH_REACHED,
     sub_status: None,
@@ -8,8 +9,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 3 'run'. lines 89-96:
+task 3 lines 89-96:  run --signers 0x3
 Error: Script execution failed with VMError: {
     major_status: VM_MAX_VALUE_DEPTH_REACHED,
     sub_status: None,

@@ -8,7 +8,7 @@ To use tera templates n
 #}
 
 
-{% macro expect(ty, val) -%}
+{% macro expect_num(ty, val) -%}
     ld_{{ty}} {{val}}
     eq
     br_true r

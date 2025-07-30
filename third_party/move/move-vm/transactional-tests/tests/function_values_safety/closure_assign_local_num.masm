@@ -31,7 +31,7 @@ fun ok()
     ld_{{ty1}} 5
     move_loc f2
     call_closure<|{{ty1}}|{{ty2}}>
-    {{macros::expect(ty=ty2, val=25)}}
+    {{macros::expect_num(ty=ty2, val=25)}}
     ret
 
 //# run --verbose
@@ -51,7 +51,7 @@ fun not_assignable()
     cast_{{ty1}}
     move_loc f2
     call_closure<|{{ty1}}|{{ty2}}>
-    {{macros::expect(ty=ty2, val=45)}}
+    {{macros::expect_num(ty=ty2, val=45)}}
     ret
 
 {% endfor %}

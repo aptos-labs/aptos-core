@@ -211,8 +211,7 @@ pub enum PrintBytecodeInputChoice {
 #[derive(Debug, Parser)]
 pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
-    #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script
-    )]
+    #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
     /// Select Move source ("move"), MoveIR ("mvir"), or Move Assembler ("masm").  Is inferred
     /// from filename if absent.

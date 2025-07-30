@@ -21,10 +21,7 @@ fn main() {
         })
         .map(|p| {
             let prompt = format!("move-asm-txn::{}", p.display());
-            let mut config = TestRunConfig::default().with_masm();
-            if p.display().to_string().contains("tera_macros.masm") {
-                config = config.with_echo()
-            }
+            let config = TestRunConfig::default().with_masm().with_echo();
             Trial::test(prompt, move || {
                 vm_test_harness::run_test_with_config(config, &p)
                     .map_err(|err| format!("{:?}", err).into())

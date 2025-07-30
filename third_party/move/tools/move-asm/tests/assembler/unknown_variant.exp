@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-12:
+task 0 lines 1-12:  publish --print-bytecode
 Error: error: undeclared variant `V2`
   ┌─ test:8:5
   │

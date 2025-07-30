@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 20-24:
+task 0 lines 1-18:  publish
+task 1 lines 20-24:  run --type-args 0x1::Coin::Coin
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

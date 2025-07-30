@@ -12,7 +12,7 @@ module 0x66::h_{{val}}
 
 public fun f()
     ld_u64 {{val}}
-    {{ macros::expect(ty='u64', val=val) }}
+    {{ macros::expect_num(ty='u64', val=val) }}
     {{ self::return() }}
 
 //# run --verbose 0x66::h_{{val}}::f
