@@ -12,15 +12,19 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 #[derive(Debug, Clone)]
 pub enum TestResult {
-    Ok,
-    FailedWithMsg(String),
+    Successful,
+    SoftFailure(String),
+    HardFailure(String),
+    InfraFailure(String),
 }
 
 impl Display for TestResult {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            TestResult::Ok => write!(f, "Test Ok"),
-            TestResult::FailedWithMsg(msg) => write!(f, "Test Failed: {}", msg),
+            TestResult::Successful => write!(f, "Test Ok"),
+            TestResult::SoftFailure(msg) => write!(f, "Test Metrics Violation: {}", msg),
+            TestResult::HardFailure(msg) => write!(f, "Test Failed: {}", msg),
+            TestResult::InfraFailure(msg) => write!(f, "Failed due to infrastructure: {}", msg),
         }
     }
 }
@@ -59,11 +63,13 @@ impl TestSummary {
     pub fn handle_result(&mut self, details: TestDetails, result: TestResult) -> Result<()> {
         write!(self.stdout, "test {} ... ", details.name())?;
         match result.clone() {
-            TestResult::Ok => {
+            TestResult::Successful => {
                 self.passed += 1;
                 self.write_ok()?;
             },
-            TestResult::FailedWithMsg(msg) => {
+            TestResult::HardFailure(msg)
+            | TestResult::InfraFailure(msg)
+            | TestResult::SoftFailure(msg) => {
                 self.failed.push(details.name());
                 self.write_failed()?;
                 writeln!(self.stdout)?;
