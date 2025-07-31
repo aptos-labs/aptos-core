@@ -17,6 +17,7 @@ members = [
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-memory-usage-tracker",
+    "aptos-move/aptos-move-linter",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
@@ -396,6 +397,7 @@ aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
+aptos-move-linter = { path = "aptos-move/aptos-move-linter" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
