@@ -984,6 +984,7 @@ where
             txn_idx,
         );
 
+        // AA
         let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
             .map(|((group_key, metadata_op), is_read_needing_exchange)| {
                 let (finalized_group, group_size) = versioned_cache
