@@ -1,0 +1,77 @@
+/// `lib` provides function exec
+//# publish --verbose
+
+module 0x66::lib
+
+public fun exec(f: |u64|u32 has copy, x: u64): u32
+    move_loc x
+    copy_loc f
+    call_closure<|u64|u32>
+    cast_u64
+    move_loc f
+    call_closure<|u64|u32>
+    ret
+
+public fun assert_eq(x: u32, y:u32)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+ r: ret
+
+/// `app` calls this function
+//# publish --verbose
+
+module 0x66::app
+use 0x66::lib
+
+
+public fun run()
+    local f: |u64|u32 has copy+drop
+    pack_closure add_one, 0
+    st_loc f
+    move_loc f
+    ld_u64 5
+    call lib::exec
+    ld_u32 7
+    call lib::assert_eq
+    ret
+
+fun add_one(x: u64): u32
+    move_loc x
+    cast_u32
+    ld_u32 1
+    add
+    ret
+
+//# run --verbose 0x66::app::run
+
+/// `lib` is republished with change of parameter type (compat turned off)
+//# publish --skip-check-struct-and-pub-function-linking
+
+module 0x66::lib
+
+public fun exec(f: |u32|u32 has copy, x: u64): u32
+    move_loc x
+    cast_u32
+    copy_loc f
+    call_closure<|u32|u32>
+    move_loc f
+    call_closure<|u32|u32>
+    ret
+
+public fun assert_eq(x: u32, y:u32)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+ r: ret
+
+/// Execute again should cause dependency linking error, since `app` was deployed using
+/// different parameter type. In paranoid mode, type expectation should be violated.
+
+//# run --verbose 0x66::app::run

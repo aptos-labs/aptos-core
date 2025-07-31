@@ -18,10 +18,12 @@ mod unnecessary_numerical_extreme_comparison;
 mod while_true;
 
 use move_compiler_v2::external_checks::ExpChecker;
+use std::collections::BTreeMap;
 
 /// Returns a default pipeline of "expression linters" to run.
-pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
-    vec![
+pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box<dyn ExpChecker>> {
+    // Start with the default set of checks.
+    let checks: Vec<Box<dyn ExpChecker>> = vec![
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
@@ -35,5 +37,13 @@ pub fn get_default_linter_pipeline() -> Vec<Box<dyn ExpChecker>> {
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),
-    ]
+    ];
+    let checks_category = config.get("checks").map_or("default", |s| s.as_str());
+    if checks_category == "strict" || checks_category == "experimental" {
+        // Push strict checks to `checks`.
+    }
+    if checks_category == "experimental" {
+        // Push experimental checks to `checks`.
+    }
+    checks
 }

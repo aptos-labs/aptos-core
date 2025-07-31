@@ -1,0 +1,93 @@
+//# publish
+module 0x66::helpers
+
+public fun f(captured: u64, delayed: &u64): u64
+    move_loc captured
+    move_loc delayed
+    read_ref
+    add
+    ret
+
+public fun assert3(x: u64)
+    move_loc x
+    ld_u64 3
+    eq
+    br_true l
+    ld_u64 255
+    abort
+ l: ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun ok()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|&u64|u64>
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_call_ty_1()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|u64|u64> // ERROR
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_call_ty_2()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|u64|&u64> // ERROR
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_call_ty_3()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|&mut u64|u64> // ERROR
+    call helpers::assert3
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers
+
+fun wrong_call_ty_4()
+    local delayed: u64
+    ld_u64 1
+    st_loc delayed
+    borrow_loc delayed
+    ld_u64 2
+    pack_closure helpers::f, 1
+    call_closure<|&bool|u64> // ERROR
+    call helpers::assert3
+    ret

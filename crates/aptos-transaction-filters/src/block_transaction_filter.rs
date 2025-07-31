@@ -116,17 +116,33 @@ impl BlockTransactionFilter {
     pub fn is_empty(&self) -> bool {
         self.block_transaction_rules.is_empty()
     }
-}
 
-// These are useful test-only methods for creating and testing filters
-#[cfg(any(test, feature = "fuzzing"))]
-impl BlockTransactionFilter {
     /// Adds a filter that matches all block transactions
     pub fn add_all_filter(self, allow: bool) -> Self {
         let block_matcher = BlockTransactionMatcher::Block(BlockMatcher::All);
         self.add_multiple_matchers_filter(allow, vec![block_matcher])
     }
 
+    /// Adds a filter rule containing multiple matchers
+    pub fn add_multiple_matchers_filter(
+        mut self,
+        allow: bool,
+        block_transaction_matchers: Vec<BlockTransactionMatcher>,
+    ) -> Self {
+        let transaction_rule = if allow {
+            BlockTransactionRule::Allow(block_transaction_matchers)
+        } else {
+            BlockTransactionRule::Deny(block_transaction_matchers)
+        };
+        self.block_transaction_rules.push(transaction_rule);
+
+        self
+    }
+}
+
+// These are useful test-only methods for creating and testing filters
+#[cfg(any(test, feature = "fuzzing"))]
+impl BlockTransactionFilter {
     /// Adds a block author matcher to the filter
     pub fn add_block_author_filter(self, allow: bool, block_author: AccountAddress) -> Self {
         let block_matcher = BlockTransactionMatcher::Block(BlockMatcher::Author(block_author));
@@ -164,22 +180,6 @@ impl BlockTransactionFilter {
         let block_matcher =
             BlockTransactionMatcher::Block(BlockMatcher::BlockTimeStampLessThan(timestamp));
         self.add_multiple_matchers_filter(allow, vec![block_matcher])
-    }
-
-    /// Adds a filter rule containing multiple matchers
-    pub fn add_multiple_matchers_filter(
-        mut self,
-        allow: bool,
-        block_transaction_matchers: Vec<BlockTransactionMatcher>,
-    ) -> Self {
-        let transaction_rule = if allow {
-            BlockTransactionRule::Allow(block_transaction_matchers)
-        } else {
-            BlockTransactionRule::Deny(block_transaction_matchers)
-        };
-        self.block_transaction_rules.push(transaction_rule);
-
-        self
     }
 }
 

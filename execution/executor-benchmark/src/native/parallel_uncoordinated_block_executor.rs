@@ -84,7 +84,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         let block_epilogue_txn = Transaction::block_epilogue_v0(
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
@@ -122,6 +122,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         Ok(BlockOutput::new(
             transaction_outputs,
             Some(block_epilogue_txn),
+            BTreeMap::new(),
         ))
     }
 }

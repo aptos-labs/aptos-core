@@ -1730,7 +1730,7 @@ pub fn test_mainnet_end_to_end() {
         panic!("Invalid WriteSetPayload");
     };
 
-    let writeset = changeset.write_set().expect_v0();
+    let writeset = changeset.write_set().as_v0();
 
     let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset

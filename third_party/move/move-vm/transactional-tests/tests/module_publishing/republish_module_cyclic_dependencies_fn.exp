@@ -1,6 +1,9 @@
 processed 5 tasks
-
-task 4 'publish'. lines 39-46:
+task 0 lines 1-7:  publish
+task 1 lines 9-16:  publish
+task 2 lines 18-25:  publish
+task 3 lines 27-36:  run
+task 4 lines 39-46:  publish
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::A'. Got VMError: {
     major_status: CYCLIC_MODULE_DEPENDENCY,
     sub_status: None,

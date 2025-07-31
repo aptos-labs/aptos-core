@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test
+
+enum E has drop
+  V1
+    x: u64
+
+fun select(x: E): u64
+    borrow_loc x
+    borrow_variant_field E, V2::y
+    read_ref
+    ret

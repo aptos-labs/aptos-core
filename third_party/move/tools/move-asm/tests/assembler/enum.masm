@@ -1,0 +1,30 @@
+//# publish --print-bytecode
+module 0x66::test
+
+enum E has drop
+  V1
+    _1: u64
+    _2: u8
+  V2
+    _1: u64
+    _2: u32
+
+fun pack_and_select(): u64
+    ld_u64 1
+    ld_u8 2
+    pack_variant E, V1
+    call select
+    ret
+
+fun select(x: E): u64
+    borrow_loc x
+    borrow_variant_field E, V1::_1, V2::_1
+    read_ref
+    ret
+
+fun pack_and_unpack(): (u64, u32)
+    ld_u64 1
+    ld_u8 2
+    pack_variant E, V1
+    unpack_variant E, V2
+    ret

@@ -340,6 +340,7 @@ fn main() {
         }),
         (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::OrderBook {
             state: OrderBookState::new(),
+            num_markets: 1,
             overlap_ratio: 0.0, // Since we run a single txn, no matches will happen irrespectively
             buy_frequency: 0.5,
             max_sell_size: 1,

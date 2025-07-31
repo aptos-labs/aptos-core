@@ -32,6 +32,11 @@ pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 /// Transaction commit failed (will not be retried) because it expired
 pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
+/// Transaction commit failed (will not be retried) because the nonce is already used in a previous transaction
+pub const TXN_COMMIT_FAILED_NONCE_ALREADY_USED_LABEL: &str = "failed_nonce_already_used";
+/// Transaction commit failed (will not be retried) because the transaction expiration time is too far in the future
+pub const TXN_COMMIT_FAILED_TXN_EXPIRATION_TOO_FAR_IN_FUTURE_LABEL: &str =
+    "failed_txn_expiration_too_far_in_future";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -1329,6 +1334,10 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
                     TXN_COMMIT_FAILED_DUPLICATE_LABEL
                 } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
                     TXN_COMMIT_FAILED_EXPIRED_LABEL
+                } else if *reason == DiscardedVMStatus::NONCE_ALREADY_USED {
+                    TXN_COMMIT_FAILED_NONCE_ALREADY_USED_LABEL
+                } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE {
+                    TXN_COMMIT_FAILED_TXN_EXPIRATION_TOO_FAR_IN_FUTURE_LABEL
                 } else {
                     TXN_COMMIT_FAILED_LABEL
                 }

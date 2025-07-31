@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    check_dependencies_and_charge_gas,
     module_traversal::TraversalContext,
-    storage::loader::traits::{Loader, StructDefinitionLoader},
+    storage::loader::traits::{
+        Loader, ModuleMetadataLoader, NativeModuleLoader, StructDefinitionLoader,
+    },
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_vm_types::{
     gas::DependencyGasMeter,
     loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
@@ -44,6 +48,11 @@ impl<'a, T> StructDefinitionLoader for EagerLoader<'a, T>
 where
     T: ModuleStorage,
 {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        debug_assert!(!self.runtime_environment().vm_config().enable_lazy_loading);
+        false
+    }
+
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
@@ -55,11 +64,59 @@ where
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        self.module_storage.fetch_struct_ty(
+        self.module_storage.unmetered_get_struct_definition(
             struct_name.module.address(),
             struct_name.module.name(),
             struct_name.name.as_ident_str(),
         )
+    }
+}
+
+impl<'a, T> NativeModuleLoader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn charge_native_result_load_module(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<()> {
+        let arena_id = traversal_context
+            .referenced_module_ids
+            .alloc(module_id.clone());
+        check_dependencies_and_charge_gas(self.module_storage, gas_meter, traversal_context, [(
+            arena_id.address(),
+            arena_id.name(),
+        )])
+        .map_err(|err| {
+            err.to_partial().append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to charge transitive dependency for {}. Does this module exist?",
+                    module_id
+                ),
+            )
+        })?;
+        Ok(())
+    }
+}
+
+impl<'a, T> ModuleMetadataLoader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_module_metadata(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<Vec<Metadata>> {
+        // Note:
+        //   For backwards compatibility, metadata accesses were never metered.
+        self.module_storage
+            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .map_err(|err| err.to_partial())
     }
 }
 

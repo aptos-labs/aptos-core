@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
-use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, Epoch};
+use aptos_storage_service_types::{responses::TransactionOrOutputListWithProofV2, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ pub trait AptosDataClientInterface {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -53,7 +53,7 @@ pub trait AptosDataClientInterface {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction or output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -65,7 +65,7 @@ pub trait AptosDataClientInterface {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Fetches the number of states at the specified version.
     async fn get_number_of_states(
@@ -98,7 +98,7 @@ pub trait AptosDataClientInterface {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOutputListWithProofV2>>;
 
     /// Fetches a transaction list with proof, with transactions from
     /// start to end versions (inclusive). The proof is relative to the
@@ -113,7 +113,7 @@ pub trait AptosDataClientInterface {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionListWithProof>>;
+    ) -> error::Result<Response<TransactionListWithProofV2>>;
 
     /// Fetches a transaction or output list with proof, with data from
     /// start to end versions (inclusive). The proof is relative to the
@@ -128,7 +128,7 @@ pub trait AptosDataClientInterface {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOrOutputListWithProofV2>>;
 
     /// Subscribes to new transaction output lists with proofs. Subscriptions
     /// start at `known_version + 1` and `known_epoch` (inclusive), as
@@ -139,7 +139,7 @@ pub trait AptosDataClientInterface {
         &self,
         subscription_request_metadata: SubscriptionRequestMetadata,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Subscribes to new transaction lists with proofs. Subscriptions start
     /// at `known_version + 1` and `known_epoch` (inclusive), as specified
@@ -152,7 +152,7 @@ pub trait AptosDataClientInterface {
         subscription_request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>>;
 
     /// Subscribes to new transaction or output lists with proofs. Subscriptions
     /// start at `known_version + 1` and `known_epoch` (inclusive), as
@@ -165,7 +165,7 @@ pub trait AptosDataClientInterface {
         subscription_request_metadata: SubscriptionRequestMetadata,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 }
 
 /// Subscription stream metadata associated with each subscription request
@@ -264,12 +264,12 @@ impl<T> Response<T> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
-    NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
-    NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionOutputsWithProof((TransactionOutputListWithProofV2, LedgerInfoWithSignatures)),
+    NewTransactionsWithProof((TransactionListWithProofV2, LedgerInfoWithSignatures)),
     NumberOfStates(u64),
     StateValuesWithProof(StateValueChunkWithProof),
-    TransactionOutputsWithProof(TransactionOutputListWithProof),
-    TransactionsWithProof(TransactionListWithProof),
+    TransactionOutputsWithProof(TransactionOutputListWithProofV2),
+    TransactionsWithProof(TransactionListWithProofV2),
 }
 
 impl ResponsePayload {
@@ -295,10 +295,10 @@ impl ResponsePayload {
                 epoch_ending_ledger_infos.len()
             },
             Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::NewTransactionsWithProof((transactions_with_proof, _)) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             Self::NumberOfStates(_) => {
                 1 // The number of states is a single u64
@@ -307,10 +307,10 @@ impl ResponsePayload {
                 state_values_with_proof.raw_values.len()
             },
             Self::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             Self::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
         }
     }
@@ -328,23 +328,23 @@ impl From<Vec<LedgerInfoWithSignatures>> for ResponsePayload {
     }
 }
 
-impl From<(TransactionOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
-    fn from(inner: (TransactionOutputListWithProof, LedgerInfoWithSignatures)) -> Self {
+impl From<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionOutputListWithProofV2, LedgerInfoWithSignatures)) -> Self {
         Self::NewTransactionOutputsWithProof(inner)
     }
 }
 
-impl From<(TransactionListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
-    fn from(inner: (TransactionListWithProof, LedgerInfoWithSignatures)) -> Self {
+impl From<(TransactionListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionListWithProofV2, LedgerInfoWithSignatures)) -> Self {
         Self::NewTransactionsWithProof(inner)
     }
 }
 
-impl TryFrom<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+impl TryFrom<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)> for ResponsePayload {
     type Error = Error;
 
     fn try_from(
-        inner: (TransactionOrOutputListWithProof, LedgerInfoWithSignatures),
+        inner: (TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures),
     ) -> error::Result<Self, Error> {
         let ((transaction_list, output_list), ledger_info) = inner;
         if let Some(transaction_list) = transaction_list {
@@ -371,22 +371,22 @@ impl From<u64> for ResponsePayload {
     }
 }
 
-impl From<TransactionOutputListWithProof> for ResponsePayload {
-    fn from(inner: TransactionOutputListWithProof) -> Self {
+impl From<TransactionOutputListWithProofV2> for ResponsePayload {
+    fn from(inner: TransactionOutputListWithProofV2) -> Self {
         Self::TransactionOutputsWithProof(inner)
     }
 }
 
-impl From<TransactionListWithProof> for ResponsePayload {
-    fn from(inner: TransactionListWithProof) -> Self {
+impl From<TransactionListWithProofV2> for ResponsePayload {
+    fn from(inner: TransactionListWithProofV2) -> Self {
         Self::TransactionsWithProof(inner)
     }
 }
 
-impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
+impl TryFrom<TransactionOrOutputListWithProofV2> for ResponsePayload {
     type Error = Error;
 
-    fn try_from(inner: TransactionOrOutputListWithProof) -> error::Result<Self, Error> {
+    fn try_from(inner: TransactionOrOutputListWithProofV2) -> error::Result<Self, Error> {
         let (transaction_list, output_list) = inner;
         if let Some(transaction_list) = transaction_list {
             Ok(Self::TransactionsWithProof(transaction_list))

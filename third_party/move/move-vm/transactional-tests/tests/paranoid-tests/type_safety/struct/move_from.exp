@@ -1,6 +1,8 @@
 processed 4 tasks
-
-task 3 'run'. lines 41-47:
+task 0 lines 1-20:  publish
+task 1 lines 22-28:  run --signers 0x1 
+task 2 lines 30-39:  run --signers 0x1 
+task 3 lines 41-47:  run --signers 0x1 
 Error: Script execution failed with VMError: {
     major_status: INTERNAL_TYPE_ERROR,
     sub_status: None,

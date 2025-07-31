@@ -16,11 +16,9 @@ use aptos_config::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, SubscribeTransactionDataWithProofRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        SubscriptionStreamMetadata, TransactionData, TransactionDataRequestType,
-        TransactionOrOutputData,
+        SubscriptionStreamMetadata,
     },
     responses::StorageServerSummary,
     StorageServiceError,
@@ -739,16 +737,12 @@ async fn test_subscription_max_pending_requests() {
             .map(|i| {
                 let start_version = peer_version + (i * max_transaction_output_chunk_size) + 1;
                 let end_version = start_version + max_transaction_output_chunk_size - 1;
-                utils::create_output_list_with_proof(start_version, end_version, highest_version)
-            })
-            .collect();
-
-        // Create the persisted auxiliary infos
-        let persisted_auxiliary_infos: Vec<_> = (0..num_stream_requests)
-            .map(|i| {
-                let start_version = peer_version + (i * max_transaction_output_chunk_size) + 1;
-                let end_version = start_version + max_transaction_output_chunk_size - 1;
-                utils::create_persisted_auxiliary_infos(start_version, end_version, use_request_v2)
+                utils::create_output_list_with_proof(
+                    start_version,
+                    end_version,
+                    highest_version,
+                    use_request_v2,
+                )
             })
             .collect();
 
@@ -762,8 +756,6 @@ async fn test_subscription_max_pending_requests() {
                 max_transaction_output_chunk_size,
                 highest_version,
                 output_lists_with_proofs[stream_request_index as usize].clone(),
-                use_request_v2,
-                persisted_auxiliary_infos[stream_request_index as usize].clone(),
             );
         }
 
@@ -841,7 +833,6 @@ async fn test_subscription_max_pending_requests() {
             // Verify that the correct response is received
             utils::verify_output_subscription_response(
                 output_lists_with_proofs.clone(),
-                persisted_auxiliary_infos.clone(),
                 highest_ledger_info.clone(),
                 &mut mock_client,
                 &mut response_receivers,
@@ -923,16 +914,13 @@ async fn test_subscription_overwrite_streams() {
             peer_version + 1,
             highest_version,
             highest_version,
+            use_request_v2,
         );
         let transaction_list_with_proof = utils::create_transaction_list_with_proof(
             peer_version + 1,
             highest_version,
             highest_version,
             false,
-        );
-        let persisted_auxiliary_infos = utils::create_persisted_auxiliary_infos(
-            peer_version + 1,
-            highest_version,
             use_request_v2,
         );
 
@@ -945,8 +933,6 @@ async fn test_subscription_overwrite_streams() {
             highest_version - peer_version,
             highest_version,
             output_list_with_proof.clone(),
-            use_request_v2,
-            persisted_auxiliary_infos.clone(),
         );
         utils::expect_get_transactions(
             &mut db_reader,
@@ -955,8 +941,6 @@ async fn test_subscription_overwrite_streams() {
             highest_version,
             false,
             transaction_list_with_proof.clone(),
-            use_request_v2,
-            persisted_auxiliary_infos.clone(),
         );
 
         // Create a storage service config
@@ -1008,7 +992,6 @@ async fn test_subscription_overwrite_streams() {
         // Verify that the correct response is received (when it comes through)
         utils::verify_output_subscription_response(
             vec![output_list_with_proof.clone()],
-            vec![persisted_auxiliary_infos.clone()],
             highest_ledger_info.clone(),
             &mut mock_client,
             &mut response_receivers,
@@ -1059,7 +1042,6 @@ async fn test_subscription_overwrite_streams() {
             use_request_v2,
             transaction_list_with_proof,
             highest_ledger_info,
-            persisted_auxiliary_infos,
         )
         .await;
     }
@@ -1103,17 +1085,11 @@ fn create_subscription_data_request(
     match random_number % 3 {
         0 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionData(TransactionData {
-                        include_events: true,
-                    });
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    true,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
@@ -1125,15 +1101,10 @@ fn create_subscription_data_request(
         },
         1 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOutputData;
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_output_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionOutputsWithProof(
@@ -1146,17 +1117,11 @@ fn create_subscription_data_request(
         },
         2 => {
             if use_request_v2 {
-                let transaction_data_request_type =
-                    TransactionDataRequestType::TransactionOrOutputData(TransactionOrOutputData {
-                        include_events: true,
-                    });
-                DataRequest::SubscribeTransactionDataWithProof(
-                    SubscribeTransactionDataWithProofRequest {
-                        transaction_data_request_type,
-                        subscription_stream_metadata,
-                        subscription_stream_index,
-                        max_response_bytes: 0,
-                    },
+                DataRequest::subscribe_transaction_or_output_data_with_proof(
+                    subscription_stream_metadata,
+                    subscription_stream_index,
+                    true,
+                    0,
                 )
             } else {
                 DataRequest::SubscribeTransactionsOrOutputsWithProof(

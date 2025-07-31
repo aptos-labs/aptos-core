@@ -1,11 +1,12 @@
 processed 5 tasks
-
-task 2 'view'. lines 31-31:
+task 0 lines 1-20:  publish
+task 1 lines 22-29:  run --signers 0x1
+task 2 lines 31-31:  view --address 0x1 --resource 0x1::M::R
 key 0x1::M::R {
     x: false
 }
-
-task 4 'view'. lines 42-42:
+task 3 lines 33-40:  run --signers 0x1
+task 4 lines 42-42:  view --address 0x1 --resource 0x1::M::R
 key 0x1::M::R {
     x: false
 }

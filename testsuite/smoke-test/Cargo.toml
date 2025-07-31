@@ -42,6 +42,7 @@ aptos-schemadb = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
+aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }

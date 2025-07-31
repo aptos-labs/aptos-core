@@ -23,7 +23,7 @@ use aptos_storage_service_types::{
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
-    responses::{CompleteDataRange, TransactionOrOutputListWithProof},
+    responses::{CompleteDataRange, TransactionOrOutputListWithProofV2},
     Epoch,
 };
 use aptos_types::{
@@ -40,8 +40,9 @@ use aptos_types::{
     },
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionPayload,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -56,7 +57,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-
 // TODO(joshlind): provide a better way to mock the data client.
 // Especially around verifying timeouts!
 
@@ -369,7 +369,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         known_epoch: Epoch,
         request_timeout_ms: u64,
     ) -> Result<
-        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>,
         aptos_data_client::error::Error,
     > {
         // Verify the request timeout
@@ -423,7 +423,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> Result<
-        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>,
         aptos_data_client::error::Error,
     > {
         // Verify the request timeout
@@ -479,7 +479,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
-        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>,
     > {
         // Verify the request timeout
         let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
@@ -548,7 +548,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::error::Error> {
+    ) -> Result<Response<TransactionOutputListWithProofV2>, aptos_data_client::error::Error> {
         // Verify the request timeout
         let data_request =
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
@@ -578,7 +578,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::error::Error> {
+    ) -> Result<Response<TransactionListWithProofV2>, aptos_data_client::error::Error> {
         // Verify the request timeout
         let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
             proof_version,
@@ -609,7 +609,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> aptos_data_client::error::Result<Response<TransactionOrOutputListWithProof>> {
+    ) -> aptos_data_client::error::Result<Response<TransactionOrOutputListWithProofV2>> {
         // Verify the request timeout
         let data_request =
             DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
@@ -660,7 +660,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         subscription_request_metadata: SubscriptionRequestMetadata,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
-        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionOutputListWithProofV2, LedgerInfoWithSignatures)>,
     > {
         // Extract the known version, known epoch and the subscription stream index
         let known_version_at_stream_start =
@@ -727,7 +727,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
-        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionListWithProofV2, LedgerInfoWithSignatures)>,
     > {
         // Extract the known version, known epoch and the subscription stream index
         let known_version_at_stream_start =
@@ -795,7 +795,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
-        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>,
     > {
         // Extract the known version, known epoch and the subscription stream index
         let known_version_at_stream_start =
@@ -1069,7 +1069,7 @@ pub fn create_transaction_list_with_proof(
     start_version: u64,
     end_version: u64,
     include_events: bool,
-) -> TransactionListWithProof {
+) -> TransactionListWithProofV2 {
     // Include events if required
     let events = if include_events { Some(vec![]) } else { None };
 
@@ -1085,27 +1085,35 @@ pub fn create_transaction_list_with_proof(
     transaction_list_with_proof.events = events;
     transaction_list_with_proof.transactions = transactions;
 
-    transaction_list_with_proof
+    TransactionListWithProofV2::new_from_v1(transaction_list_with_proof)
 }
 
 /// Creates an output list with proof for testing
 pub fn create_output_list_with_proof(
     start_version: u64,
     end_version: u64,
-) -> TransactionOutputListWithProof {
+) -> TransactionOutputListWithProofV2 {
+    // Create a transaction list with proof
     let transaction_list_with_proof =
         create_transaction_list_with_proof(start_version, end_version, false);
+
+    // Create a transaction output list with proof
     let transactions_and_outputs = transaction_list_with_proof
+        .get_transaction_list_with_proof()
         .transactions
         .iter()
         .map(|txn| (txn.clone(), create_transaction_output()))
         .collect();
-
-    TransactionOutputListWithProof::new(
+    let output_list_with_proof = TransactionOutputListWithProof::new(
         transactions_and_outputs,
         Some(start_version),
-        transaction_list_with_proof.proof,
-    )
+        transaction_list_with_proof
+            .get_transaction_list_with_proof()
+            .proof
+            .clone(),
+    );
+
+    TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof)
 }
 
 /// Returns true iff the server should return transactions

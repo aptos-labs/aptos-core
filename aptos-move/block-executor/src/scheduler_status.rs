@@ -654,6 +654,7 @@ impl ExecutionStatuses {
     /// This can be called during an ongoing execution to determine if the
     /// execution has been concurrently aborted. This allows the executor
     /// to return early and to discard the results.
+    #[inline]
     pub(crate) fn already_started_abort(
         &self,
         txn_idx: TxnIndex,

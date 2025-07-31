@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.6.0"
+version = "7.7.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -4141,6 +4141,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -4587,6 +4588,7 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -9273,6 +9275,7 @@ name = "fuzzer"
 version = "0.1.0"
 dependencies = [
  "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-types",
  "arbitrary",
  "base64 0.21.7",
@@ -9283,6 +9286,8 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-core-types",
+ "move-model",
+ "move-transactional-test-runner",
  "rayon",
  "sha2 0.9.9",
  "walkdir",
@@ -9304,10 +9309,12 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "fuzzer",
  "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "move-transactional-test-runner",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -11930,6 +11937,7 @@ dependencies = [
  "indexmap 2.7.0",
  "move-bytecode-spec",
  "move-core-types",
+ "once_cell",
  "proptest",
  "proptest-derive",
  "ref-cast",
@@ -12379,6 +12387,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-package-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-rest-client",
+ "fs2",
+ "futures",
+ "git2 0.16.1",
+ "hex",
+ "move-core-types",
+ "percent-encoding",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "move-package-manifest"
 version = "0.1.0"
 dependencies = [
@@ -12610,8 +12636,12 @@ name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
+ "arbitrary",
+ "bcs 0.1.4",
  "clap 4.5.21",
  "datatest-stable",
+ "dearbitrary",
  "difference",
  "either",
  "legacy-move-compiler",
@@ -12635,6 +12665,7 @@ dependencies = [
  "once_cell",
  "regex",
  "tempfile",
+ "tera",
  "termcolor",
 ]
 
@@ -12694,6 +12725,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
@@ -12731,6 +12763,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "test-case",
  "triomphe",
  "typed-arena",
 ]
@@ -13519,6 +13552,18 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "package-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-transaction-workloads-lib",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "move-package",
 ]
 
 [[package]]
@@ -16985,6 +17030,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",

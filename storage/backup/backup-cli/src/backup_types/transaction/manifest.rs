@@ -7,6 +7,14 @@ use anyhow::{ensure, Result};
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub enum TransactionChunkFormat {
+    // (Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)
+    V0,
+    // (Transaction, PersistedAuxiliaryInfo, TransactionInfo, Vec<ContractEvent>, WriteSet)
+    V1,
+}
+
 /// A chunk of a transaction backup manifest to represent the
 /// [`first_version`, `last_version`] range (right side inclusive).
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -22,6 +30,12 @@ pub struct TransactionChunk {
     /// signatures it carries, against the validator set in the epoch. (Hence proper
     /// `EpochEndingBackup` is needed for verification.)
     pub proof: FileHandle,
+    #[serde(default = "default_to_v0")]
+    pub format: TransactionChunkFormat,
+}
+
+fn default_to_v0() -> TransactionChunkFormat {
+    TransactionChunkFormat::V0
 }
 
 /// Transaction backup manifest, representing transactions in the

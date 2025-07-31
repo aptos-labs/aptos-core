@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 31-38:
+task 0 lines 1-29:  publish
+task 1 lines 31-38:  run --verbose
 Error: Script execution failed with VMError: {
     message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000001111111111111110,
     major_status: MISSING_DATA,

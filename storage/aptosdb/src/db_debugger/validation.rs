@@ -16,7 +16,7 @@ use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
-    transaction::{Transaction::UserTransaction, TransactionListWithProof},
+    transaction::{Transaction::UserTransaction, TransactionListWithProofV2},
 };
 use rayon::{
     iter::{IntoParallelIterator, ParallelIterator},
@@ -105,7 +105,7 @@ pub fn validate_db_data(
             .unwrap();
         verify_batch_txn_events(&txns, &internal_db, start)
             .unwrap_or_else(|_| panic!("{}, {} failed to verify", start, end));
-        assert_eq!(txns.transactions.len() as u64, num_of_txns);
+        assert_eq!(txns.get_num_transactions() as u64, num_of_txns);
     });
 
     Ok(())
@@ -145,7 +145,7 @@ pub fn verify_state_kvs(
 }
 
 pub fn verify_batch_txn_events(
-    txns: &TransactionListWithProof,
+    txns: &TransactionListWithProofV2,
     internal_db: &DB,
     start_version: u64,
 ) -> Result<()> {
@@ -190,11 +190,16 @@ fn verify_state_kv(
 }
 
 fn verify_transactions(
-    transaction_list: &TransactionListWithProof,
+    transaction_list: &TransactionListWithProofV2,
     internal_indexer_db: &DB,
     start_version: u64,
 ) -> Result<()> {
-    for (idx, txn) in transaction_list.transactions.iter().enumerate() {
+    for (idx, txn) in transaction_list
+        .get_transaction_list_with_proof()
+        .transactions
+        .iter()
+        .enumerate()
+    {
         match txn {
             UserTransaction(signed_transaction) => {
                 let key = (
@@ -268,12 +273,12 @@ fn verify_event_by_version(
 }
 
 fn verify_events(
-    transaction_list: &TransactionListWithProof,
+    transaction_list: &TransactionListWithProofV2,
     internal_indexer_db: &DB,
     start_version: u64,
 ) -> Result<()> {
     let mut version = start_version;
-    match &transaction_list.events {
+    match &transaction_list.get_transaction_list_with_proof().events {
         None => {
             return Ok(());
         },

@@ -17,7 +17,7 @@ from typing import Tuple, List, Optional, Any
 
 # Constants
 DISK_COPIES = 1
-STORAGE_CLASS = "ssd-data-xfs-immediate"
+STORAGE_CLASS = "pd-balanced-xfs-immediate"
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)

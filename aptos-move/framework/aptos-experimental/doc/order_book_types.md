@@ -7,6 +7,7 @@
 
 
 -  [Struct `OrderIdType`](#0x7_order_book_types_OrderIdType)
+-  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
@@ -19,6 +20,7 @@
 -  [Function `get_slippage_pct_precision`](#0x7_order_book_types_get_slippage_pct_precision)
 -  [Function `new_time_based_trigger_condition`](#0x7_order_book_types_new_time_based_trigger_condition)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
+-  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
 -  [Function `new_ascending_id_generator`](#0x7_order_book_types_new_ascending_id_generator)
 -  [Function `next_ascending_id`](#0x7_order_book_types_next_ascending_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
@@ -35,6 +37,7 @@
 -  [Function `index`](#0x7_order_book_types_index)
 -  [Function `get_order_from_state`](#0x7_order_book_types_get_order_from_state)
 -  [Function `get_metadata_from_state`](#0x7_order_book_types_get_metadata_from_state)
+-  [Function `set_metadata_in_state`](#0x7_order_book_types_set_metadata_in_state)
 -  [Function `get_order_id`](#0x7_order_book_types_get_order_id)
 -  [Function `get_account`](#0x7_order_book_types_get_account)
 -  [Function `get_unique_priority_idx`](#0x7_order_book_types_get_unique_priority_idx)
@@ -82,6 +85,39 @@
 <dl>
 <dt>
 <code>order_id: u128</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x7_order_book_types_AccountClientOrderId"></a>
+
+## Struct `AccountClientOrderId`
+
+
+
+<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>client_order_id: u64</code>
 </dt>
 <dd>
 
@@ -639,6 +675,32 @@
 
 </details>
 
+<a id="0x7_order_book_types_new_account_client_order_id"></a>
+
+## Function `new_account_client_order_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: u64
+): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
+    <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_new_ascending_id_generator"></a>
 
 ## Function `new_ascending_id_generator`
@@ -1072,6 +1134,32 @@
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): M {
     self.order.metadata
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_set_metadata_in_state"></a>
+
+## Function `set_metadata_in_state`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;, metadata: M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">OrderWithState</a>&lt;M&gt;, metadata: M
+) {
+    self.order.metadata = metadata;
 }
 </code></pre>
 

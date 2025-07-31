@@ -1,7 +1,8 @@
 processed 5 tasks
-
-task 3 'run'. lines 32-32:
+task 0 lines 1-17:  publish
+task 1 lines 19-24:  run --args 0 0 0
+task 2 lines 26-30:  run --type-args 0x42::M::S --args 0 0 0
+task 3 lines 32-32:  run 0x42::M::foo --args 0 0 0
 mutable inputs after call: local#2: { 0 }
-
-task 4 'run'. lines 34-34:
+task 4 lines 34-34:  run 0x42::M::foo_gen --type-args 0x42::M::S --args 0 0 0
 mutable inputs after call: local#2: { 0 }

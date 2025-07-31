@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 17-27:
+task 0 lines 1-15:  publish
+task 1 lines 17-27:  run --signers 0x1
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),

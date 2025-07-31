@@ -543,7 +543,7 @@ mod tests {
         ]);
         loader.add_enum("E", vec![("V0", vec![(
             "ds",
-            Type::Vector(triomphe::Arc::new(struct_ty(d))),
+            Type::Vector(triomphe::Arc::new(generic_struct_ty(d, vec![Type::U8]))),
         )])]);
 
         let checker = TypeDepthChecker::new(&loader);
@@ -605,6 +605,12 @@ mod tests {
         loader.add_struct("C", vec![("x", Type::TyParam(0))]);
         loader.add_struct("D", vec![("xs", a_c_a_u8_ty)]);
 
+        // struct E {
+        //   x: C<u8>,
+        // }
+        let e = loader.get_struct_identifier("E");
+        loader.add_struct("E", vec![("x", generic_struct_ty(c, vec![Type::U8]))]);
+
         let checker = TypeDepthChecker::new(&loader);
         let mut currently_visiting = HashSet::new();
 
@@ -618,7 +624,15 @@ mod tests {
             assert!(currently_visiting.is_empty());
         }
 
-        assert_eq!(checker.formula_cache.borrow().len(), 4);
+        // C<E> does not create a cycle: E contains C<u8>.
+        assert_ok!(checker.calculate_type_depth_formula(
+            &mut gas_meter,
+            &mut traversal_context,
+            &mut currently_visiting,
+            &generic_struct_ty(c, vec![struct_ty(e)]),
+        ));
+
+        assert_eq!(checker.formula_cache.borrow().len(), 5);
     }
 
     #[test]

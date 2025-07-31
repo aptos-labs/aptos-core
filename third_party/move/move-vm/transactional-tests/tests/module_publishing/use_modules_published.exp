@@ -1,10 +1,10 @@
 processed 6 tasks
-
-task 2 'publish'. lines 17-31:
+task 0 lines 1-7:  publish
+task 1 lines 9-15:  publish
+task 2 lines 17-31:  publish
 Error: Unbound function 0000000000000000000000000000000000000000000000000000000000000043.M.foo
-
-task 3 'run'. lines 33-40:
+task 3 lines 33-40:  run
 Error: Unbound function 0000000000000000000000000000000000000000000000000000000000000042.M.run
-
-task 5 'run'. lines 50-65:
+task 4 lines 42-48:  publish
+task 5 lines 50-65:  run
 Error: Dependency not provided for 0000000000000000000000000000000000000000000000000000000000000044.M

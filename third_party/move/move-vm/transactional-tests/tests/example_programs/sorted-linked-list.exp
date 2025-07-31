@@ -1,6 +1,7 @@
 processed 26 tasks
-
-task 2 'run'. lines 246-254:
+task 0 lines 1-234:  publish
+task 1 lines 237-244:  run --signers 0xA
+task 2 lines 246-254:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(1),
@@ -8,8 +9,8 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(3), 9)],
 }
-
-task 4 'run'. lines 265-273:
+task 3 lines 256-263:  run --signers 0xB
+task 4 lines 265-273:  run --signers 0xB
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(3),
@@ -17,8 +18,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 9)],
 }
-
-task 5 'run'. lines 275-283:
+task 5 lines 275-283:  run --signers 0xC
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(7),
@@ -26,8 +26,8 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 61)],
 }
-
-task 7 'run'. lines 294-302:
+task 6 lines 285-292:  run --signers 0xC
+task 7 lines 294-302:  run --signers 0xD
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(6),
@@ -35,8 +35,8 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 52)],
 }
-
-task 9 'run'. lines 313-321:
+task 8 lines 304-311:  run --signers 0xD
+task 9 lines 313-321:  run --signers 0xF
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(5),
@@ -44,8 +44,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 15)],
 }
-
-task 10 'run'. lines 323-331:
+task 10 lines 323-331:  run --signers 0xE
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(6),
@@ -53,8 +52,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 52)],
 }
-
-task 11 'run'. lines 333-341:
+task 11 lines 333-341:  run --signers 0xC
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(3),
@@ -62,8 +60,9 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(4), 9)],
 }
-
-task 14 'run'. lines 361-369:
+task 12 lines 343-350:  run --signers 0xE
+task 13 lines 352-359:  run --signers 0xC
+task 14 lines 361-369:  run --signers 0xC
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(11),
@@ -71,8 +70,9 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(6), 8)],
 }
-
-task 17 'run'. lines 389-397:
+task 15 lines 371-378:  run --signers 0xC
+task 16 lines 380-387:  run --signers 0xA
+task 17 lines 389-397:  run --signers 0xB
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(11),
@@ -80,8 +80,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(6), 8)],
 }
-
-task 18 'run'. lines 399-407:
+task 18 lines 399-407:  run --signers 0xB
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(15),
@@ -89,8 +88,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(7), 27)],
 }
-
-task 19 'run'. lines 409-417:
+task 19 lines 409-417:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(14),
@@ -98,8 +96,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(7), 12)],
 }
-
-task 20 'run'. lines 419-427:
+task 20 lines 419-427:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(12),
@@ -107,8 +104,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(6), 15)],
 }
-
-task 21 'run'. lines 429-437:
+task 21 lines 429-437:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(9),
@@ -116,8 +112,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(5), 32)],
 }
-
-task 22 'run'. lines 439-450:
+task 22 lines 439-450:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(14),
@@ -125,8 +120,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(7), 12)],
 }
-
-task 23 'run'. lines 452-463:
+task 23 lines 452-463:  run --signers 0xA
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(12),
@@ -134,3 +128,5 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(6), 15)],
 }
+task 24 lines 465-475:  run --signers 0xA
+task 25 lines 477-484:  run --signers 0xB

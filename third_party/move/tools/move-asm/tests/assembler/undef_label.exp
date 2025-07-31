@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-6:
+task 0 lines 1-6:  publish --print-bytecode
 Error: error: unbound branch label `l3`
   ┌─ test:4:5
   │

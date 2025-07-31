@@ -50,7 +50,7 @@ where
             "Catching up {} shard {shard_id}.",
             S::name(),
         );
-        myself.prune(progress, metadata_progress)?;
+        myself.prune(progress, metadata_progress, usize::MAX)?;
 
         Ok(myself)
     }
@@ -59,6 +59,7 @@ where
         &self,
         current_progress: Version,
         target_version: Version,
+        max_nodes_to_prune: usize,
     ) -> Result<()> {
         loop {
             let mut batch = SchemaBatch::new();
@@ -66,6 +67,7 @@ where
                 &self.db_shard,
                 current_progress,
                 target_version,
+                max_nodes_to_prune,
             )?;
 
             indices.into_iter().try_for_each(|index| {

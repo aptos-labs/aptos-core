@@ -1,4 +1,3 @@
 processed 1 task
-
-task 0 'publish'. lines 1-5:
+task 0 lines 1-5:  publish --print-bytecode
 Error: expected a module but found a script

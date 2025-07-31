@@ -1,6 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 12-21:
+task 0 lines 1-10:  run --signers 0x1
+task 1 lines 12-21:  run --signers 0x1
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -8,8 +8,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 5)],
 }
-
-task 2 'run'. lines 23-32:
+task 2 lines 23-32:  run --signers 0x1
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,

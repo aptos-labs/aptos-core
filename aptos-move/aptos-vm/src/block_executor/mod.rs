@@ -30,7 +30,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
     },
-    write_set::WriteOp,
+    write_set::{HotStateOp, WriteOp},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
@@ -45,7 +45,7 @@ use move_core_types::{
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
 };
@@ -115,16 +115,21 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
+    // This can be accomplished either by providing callbacks or by providing AsRef access to
+    // a guard, which for different resources write types would require changing the
+    // data-structures in the VMOutput / ChangeSet.
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn resource_group_write_set(
         &self,
-    ) -> Vec<(
+    ) -> HashMap<
         StateKey,
-        WriteOp,
-        ResourceGroupSize,
-        BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-    )> {
+        (
+            WriteOp,
+            ResourceGroupSize,
+            BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        ),
+    > {
         self.vm_output
             .lock()
             .as_ref()
@@ -135,23 +140,50 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
                     Some((
                         key.clone(),
-                        group_write.metadata_op().clone(),
-                        group_write
-                            .maybe_group_op_size()
-                            .unwrap_or(ResourceGroupSize::zero_combined()),
-                        group_write
-                            .inner_ops()
-                            .iter()
-                            .map(|(tag, (op, maybe_layout))| {
-                                (tag.clone(), (op.clone(), maybe_layout.clone()))
-                            })
-                            .collect(),
+                        (
+                            group_write.metadata_op().clone(),
+                            group_write
+                                .maybe_group_op_size()
+                                .unwrap_or(ResourceGroupSize::zero_combined()),
+                            group_write
+                                .inner_ops()
+                                .iter()
+                                .map(|(tag, (op, maybe_layout))| {
+                                    (tag.clone(), (op.clone(), maybe_layout.clone()))
+                                })
+                                .collect(),
+                        ),
                     ))
                 } else {
                     None
                 }
             })
             .collect()
+    }
+
+    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
+    where
+        F: FnMut(&StateKey, HashSet<&StructTag>) -> Result<(), PanicError>,
+    {
+        for (key, tags) in self
+            .vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to get resource group writes")
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((key, group_write.inner_ops().keys().collect()))
+                } else {
+                    None
+                }
+            })
+        {
+            callback(key, tags)?;
+        }
+
+        Ok(())
     }
 
     /// More efficient implementation to avoid unnecessarily cloning inner_ops.
@@ -165,6 +197,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .flat_map(|(key, write)| {
                 if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
                     Some((key.clone(), group_write.metadata_op().clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn resource_group_tags(&self) -> Vec<(StateKey, HashSet<StructTag>)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output must be set to get metadata ops")
+            .resource_write_set()
+            .iter()
+            .flat_map(|(key, write)| {
+                if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write {
+                    Some((
+                        key.clone(),
+                        group_write.inner_ops().keys().cloned().collect(),
+                    ))
                 } else {
                     None
                 }
@@ -286,7 +338,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .to_vec()
     }
 
-    fn materialize_agg_v1(&self, view: &impl TAggregatorV1View<Identifier = StateKey>) {
+    fn legacy_sequential_materialize_agg_v1(
+        &self,
+        view: &impl TAggregatorV1View<Identifier = StateKey>,
+    ) {
         self.vm_output
             .lock()
             .as_mut()
@@ -468,7 +523,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<S::Key, TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -500,11 +555,28 @@ impl<
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
-                let output_vec: Vec<_> = transaction_outputs
+                let (transaction_outputs, block_epilogue_txn, to_make_hot) =
+                    block_output.into_inner();
+                let mut output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect();
+                if block_epilogue_txn.is_some() {
+                    // Attach the hotness changes to block epilogue's output.
+                    let epilogue_output = output_vec
+                        .last_mut()
+                        .expect("transaction_outputs must be non-empty when epilogue exists");
+                    assert!(
+                        epilogue_output.status().is_kept(),
+                        "Block epilogue must be kept."
+                    );
+                    epilogue_output.add_hotness(
+                        to_make_hot
+                            .into_iter()
+                            .map(|(key, slot)| (key, HotStateOp::make_hot(slot)))
+                            .collect(),
+                    );
+                }
 
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
@@ -515,7 +587,11 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
+                Ok(BlockOutput::new(
+                    output_vec,
+                    block_epilogue_txn,
+                    BTreeMap::new(),
+                ))
             },
             Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
                 err_msg,
@@ -540,7 +616,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<S::Key, TransactionOutput>, VMStatus> {
         Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,

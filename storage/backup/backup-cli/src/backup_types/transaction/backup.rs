@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backup_types::transaction::manifest::{TransactionBackup, TransactionChunk},
+    backup_types::transaction::manifest::{
+        TransactionBackup, TransactionChunk, TransactionChunkFormat,
+    },
     metadata::Metadata,
     storage::{BackupHandleRef, BackupStorage, FileHandle, ShellSafeName},
     utils::{
@@ -181,6 +183,7 @@ impl TransactionBackupController {
             last_version,
             transactions: chunk_handle,
             proof: proof_handle,
+            format: TransactionChunkFormat::V1,
         })
     }
 

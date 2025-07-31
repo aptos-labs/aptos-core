@@ -12,7 +12,7 @@ spec:
   resources:
     requests:
       storage: 12Ti
-  storageClassName: ssd-data-xfs-immediate
+  storageClassName: pd-balanced-xfs-immediate
   volumeMode: Filesystem
   dataSourceRef:
     name: testnet-archive

@@ -3,7 +3,7 @@ Copyright (c) The Diem Core Contributors
 SPDX-License-Identifier: Apache-2.0
 
 This files contains a Tera Rust template for the prover's Boogie prelude.
-(See https://tera.netlify.app/docs).
+(See https://docs.rs/tera/latest/tera/).
 
 The following variables and filters are bound in the template context:
 
@@ -676,7 +676,7 @@ procedure {:inline 1} $CastBv{{instance}}to{{impl.base}}(src: bv{{instance}}) re
 function $castBv{{instance}}to{{impl.base}}(src: bv{{instance}}) returns (bv{{impl.base}})
 {
     {%- if base_diff < 0 %}
-    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then 
+    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then
         $Arbitrary_value_of'bv{{impl.base}}'()
     {%- endif %}
     {%- if base_diff < 0 %}

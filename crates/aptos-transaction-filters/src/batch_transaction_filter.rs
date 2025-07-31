@@ -82,17 +82,33 @@ impl BatchTransactionFilter {
     pub fn is_empty(&self) -> bool {
         self.batch_transaction_rules.is_empty()
     }
-}
 
-// These are useful test-only methods for creating and testing filters
-#[cfg(any(test, feature = "fuzzing"))]
-impl BatchTransactionFilter {
     /// Adds a filter that matches all batch transactions
     pub fn add_all_filter(self, allow: bool) -> Self {
         let batch_matcher = BatchTransactionMatcher::Batch(BatchMatcher::All);
         self.add_multiple_matchers_filter(allow, vec![batch_matcher])
     }
 
+    /// Adds a filter rule containing multiple matchers
+    pub fn add_multiple_matchers_filter(
+        mut self,
+        allow: bool,
+        batch_transaction_matchers: Vec<BatchTransactionMatcher>,
+    ) -> Self {
+        let transaction_rule = if allow {
+            BatchTransactionRule::Allow(batch_transaction_matchers)
+        } else {
+            BatchTransactionRule::Deny(batch_transaction_matchers)
+        };
+        self.batch_transaction_rules.push(transaction_rule);
+
+        self
+    }
+}
+
+// These are useful test-only methods for creating and testing filters
+#[cfg(any(test, feature = "fuzzing"))]
+impl BatchTransactionFilter {
     /// Adds a filter rule that matches a specific batch ID
     pub fn add_batch_id_filter(self, allow: bool, batch_id: BatchId) -> Self {
         let batch_matcher = BatchTransactionMatcher::Batch(BatchMatcher::BatchId(batch_id));
@@ -117,22 +133,6 @@ impl BatchTransactionFilter {
         self.add_multiple_matchers_filter(allow, vec![BatchTransactionMatcher::Transaction(
             transaction_matcher,
         )])
-    }
-
-    /// Adds a filter rule containing multiple matchers
-    pub fn add_multiple_matchers_filter(
-        mut self,
-        allow: bool,
-        batch_transaction_matchers: Vec<BatchTransactionMatcher>,
-    ) -> Self {
-        let transaction_rule = if allow {
-            BatchTransactionRule::Allow(batch_transaction_matchers)
-        } else {
-            BatchTransactionRule::Deny(batch_transaction_matchers)
-        };
-        self.batch_transaction_rules.push(transaction_rule);
-
-        self
     }
 }
 

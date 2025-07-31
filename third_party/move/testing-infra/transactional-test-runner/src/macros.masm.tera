@@ -1,0 +1,18 @@
+{#
+Copyright © Aptos Foundation
+SPDX-License-Identifier: Apache-2.0
+
+Tera templates for supporting Move ASM transactional tests.
+
+To use tera templates n
+#}
+
+
+{% macro expect_num(ty, val) -%}
+    ld_{{ty}} {{val}}
+    eq
+    br_true r
+    ld_u64 255
+    abort
+  r:
+{%- endmacro expect %}

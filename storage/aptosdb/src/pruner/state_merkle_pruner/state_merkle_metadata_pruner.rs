@@ -54,6 +54,7 @@ where
             &self.metadata_db,
             current_progress,
             target_version_for_this_round,
+            usize::MAX,
         )?;
 
         let mut batch = SchemaBatch::new();

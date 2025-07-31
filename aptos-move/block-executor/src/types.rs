@@ -58,7 +58,7 @@ impl<T: Transaction> ReadWriteSummary<T> {
     }
 
     pub fn keys_read(&self) -> impl Iterator<Item = &T::Key> {
-        Self::keys_except_delayed_fields(self.writes.iter())
+        Self::keys_except_delayed_fields(self.reads.iter())
     }
 
     fn keys_except_delayed_fields<'a>(

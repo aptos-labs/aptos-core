@@ -57,6 +57,8 @@ mod test_smoke_tests;
 #[cfg(test)]
 mod transaction;
 #[cfg(test)]
+mod transaction_filter;
+#[cfg(test)]
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;

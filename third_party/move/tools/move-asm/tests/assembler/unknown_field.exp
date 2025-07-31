@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-11:  publish --print-bytecode
+Error: error: undeclared field `bad`
+  ┌─ test:7:5
+  │
+7 │     borrow_field S, bad
+  │     ^^^^^^^^^^^^^^^^^^^
+
+

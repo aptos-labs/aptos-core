@@ -18,8 +18,8 @@ struct FuzzData {
 fn is_valid_type_tag(type_tag: &TypeTag) -> bool {
     match type_tag {
         TypeTag::Struct(struct_tag) => {
-            Identifier::is_valid(&struct_tag.module.to_string())
-                && Identifier::is_valid(&struct_tag.name.to_string())
+            Identifier::is_valid(struct_tag.module.to_string())
+                && Identifier::is_valid(struct_tag.name.to_string())
                 && struct_tag.type_args.iter().all(is_valid_type_tag)
         },
         TypeTag::Vector(inner_type_tag) => is_valid_type_tag(inner_type_tag),

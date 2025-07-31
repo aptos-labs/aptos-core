@@ -17,7 +17,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,15 @@ impl BackupHandler {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<
-        impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
+        impl Iterator<
+                Item = Result<(
+                    Transaction,
+                    PersistedAuxiliaryInfo,
+                    TransactionInfo,
+                    Vec<ContractEvent>,
+                    WriteSet,
+                )>,
+            > + '_,
     > {
         let txn_iter = self
             .ledger_db
@@ -62,6 +70,10 @@ impl BackupHandler {
             .ledger_db
             .write_set_db()
             .get_write_set_iter(start_version, num_transactions)?;
+        let mut persisted_aux_info_iter = self
+            .ledger_db
+            .persisted_auxiliary_info_db()
+            .get_persisted_auxiliary_info_iter(start_version, num_transactions)?;
 
         let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
@@ -85,8 +97,14 @@ impl BackupHandler {
                     version
                 ))
             })??;
+            let persisted_aux_info = persisted_aux_info_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "PersistedAuxiliaryInfo not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
             BACKUP_TXN_VERSION.set(version as i64);
-            Ok((txn, txn_info, event_vec, write_set))
+            Ok((txn, persisted_aux_info, txn_info, event_vec, write_set))
         });
         Ok(zipped)
     }

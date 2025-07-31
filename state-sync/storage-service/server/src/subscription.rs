@@ -473,21 +473,21 @@ impl SubscriptionStreamRequests {
                 transaction_output_list,
                 target_ledger_info,
             )) => (
-                transaction_output_list.transactions_and_outputs.len(),
+                transaction_output_list.get_num_outputs(),
                 target_ledger_info,
             ),
             DataResponse::NewTransactionsWithProof((transaction_list, target_ledger_info)) => {
-                (transaction_list.transactions.len(), target_ledger_info)
+                (transaction_list.get_num_transactions(), target_ledger_info)
             },
             DataResponse::NewTransactionsOrOutputsWithProof((
                 (transaction_list, transaction_output_list),
                 target_ledger_info,
             )) => {
                 if let Some(transaction_list) = transaction_list {
-                    (transaction_list.transactions.len(), target_ledger_info)
+                    (transaction_list.get_num_transactions(), target_ledger_info)
                 } else if let Some(transaction_output_list) = transaction_output_list {
                     (
-                        transaction_output_list.transactions_and_outputs.len(),
+                        transaction_output_list.get_num_outputs(),
                         target_ledger_info,
                     )
                 } else {
@@ -505,8 +505,7 @@ impl SubscriptionStreamRequests {
                         {
                             transaction_list_with_proof_v2
                                 .get_transaction_list_with_proof()
-                                .transactions
-                                .len()
+                                .get_num_transactions()
                         } else {
                             return Err(Error::UnexpectedErrorEncountered(format!(
                                 "Transaction data response is missing transaction list: {:?}",
@@ -520,8 +519,7 @@ impl SubscriptionStreamRequests {
                         {
                             output_list_with_proof_v2
                                 .get_output_list_with_proof()
-                                .transactions_and_outputs
-                                .len()
+                                .get_num_outputs()
                         } else {
                             return Err(Error::UnexpectedErrorEncountered(format!(
                                 "Transaction output data response is missing output list: {:?}",

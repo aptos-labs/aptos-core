@@ -14,7 +14,9 @@ use std::{
 #[derive(Debug)]
 enum DebugCommand {
     PrintStack,
-    Step,
+    Step(usize),
+    StepOver(usize),
+    StepOut,
     Continue,
     Breakpoint(String),
     DeleteBreakpoint(String),
@@ -25,7 +27,9 @@ impl DebugCommand {
     pub fn debug_string(&self) -> &str {
         match self {
             Self::PrintStack => "stack",
-            Self::Step => "step",
+            Self::Step(_) => "step",
+            Self::StepOver(_) => "step_over",
+            Self::StepOut => "step_out",
             Self::Continue => "continue",
             Self::Breakpoint(_) => "breakpoint ",
             Self::DeleteBreakpoint(_) => "delete ",
@@ -36,13 +40,26 @@ impl DebugCommand {
     pub fn commands() -> Vec<DebugCommand> {
         vec![
             Self::PrintStack,
-            Self::Step,
+            Self::Step(0),
+            Self::StepOver(0),
+            Self::StepOut,
             Self::Continue,
             Self::Breakpoint("".to_string()),
             Self::DeleteBreakpoint("".to_string()),
             Self::PrintBreakpoints,
         ]
     }
+}
+
+fn parse_number(s: &str) -> Result<usize, String> {
+    if s.trim_start().is_empty() {
+        return Ok(1);
+    }
+    let n = s.trim_start().parse::<usize>();
+    if n.is_err() {
+        return Err("Step count must be a number".to_string());
+    }
+    Ok(n.unwrap())
 }
 
 impl FromStr for DebugCommand {
@@ -54,9 +71,19 @@ impl FromStr for DebugCommand {
         if s.starts_with(PrintStack.debug_string()) {
             return Ok(PrintStack);
         }
-        if s.starts_with(Step.debug_string()) {
-            return Ok(Step);
+
+        if s.starts_with(StepOut.debug_string()) {
+            return Ok(StepOut);
         }
+
+        if let Some(n) = s.strip_prefix(StepOver(0).debug_string()) {
+            return Ok(StepOver(parse_number(n)?));
+        }
+
+        if let Some(n) = s.strip_prefix(Step(0).debug_string()) {
+            return Ok(Step(parse_number(n)?));
+        }
+
         if s.starts_with(Continue.debug_string()) {
             return Ok(Continue);
         }
@@ -84,14 +111,28 @@ impl FromStr for DebugCommand {
 #[derive(Debug)]
 pub(crate) struct DebugContext {
     breakpoints: BTreeSet<String>,
-    should_take_input: bool,
+    input_checker: InputChecker,
+}
+
+#[derive(Debug)]
+enum InputChecker {
+    StepRemaining(usize),
+    StepOverRemaining {
+        function_string: String,
+        stack_depth: usize,
+        remaining: usize,
+    },
+    StepOut {
+        target_stack_depth: usize,
+    },
+    Continue,
 }
 
 impl DebugContext {
     pub(crate) fn new() -> Self {
         Self {
             breakpoints: BTreeSet::new(),
-            should_take_input: true,
+            input_checker: InputChecker::StepRemaining(1),
         }
     }
 
@@ -106,21 +147,61 @@ impl DebugContext {
     ) {
         let instr_string = format!("{:?}", instr);
         let function_string = function.name_as_pretty_string();
-        let breakpoint_hit = self.breakpoints.contains(&function_string)
-            || self
-                .breakpoints
-                .iter()
-                .any(|bp| instr_string[..].starts_with(bp.as_str()));
+        let breakpoint_hit = self
+            .breakpoints
+            .iter()
+            .any(|bp| instr_string[..].starts_with(bp.as_str()) || function_string.contains(bp));
 
-        if self.should_take_input || breakpoint_hit {
-            self.should_take_input = true;
+        let should_take_input = match &mut self.input_checker {
+            InputChecker::StepRemaining(n) => {
+                if *n == 1 {
+                    self.input_checker = InputChecker::Continue;
+                    true
+                } else {
+                    *n -= 1;
+                    false
+                }
+            },
+            InputChecker::StepOverRemaining {
+                function_string: target_function_string,
+                stack_depth,
+                remaining,
+            } => {
+                if &function_string == target_function_string
+                    && *stack_depth == interpreter.get_stack_frames(usize::MAX).stack_trace().len()
+                {
+                    if *remaining == 1 {
+                        self.input_checker = InputChecker::Continue;
+                        true
+                    } else {
+                        *remaining -= 1;
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            InputChecker::StepOut { target_stack_depth } => {
+                if *target_stack_depth
+                    == interpreter.get_stack_frames(usize::MAX).stack_trace().len()
+                {
+                    self.input_checker = InputChecker::Continue;
+                    true
+                } else {
+                    false
+                }
+            },
+            InputChecker::Continue => false,
+        };
+
+        if should_take_input || breakpoint_hit {
             if breakpoint_hit {
                 let bp_match = self
                     .breakpoints
                     .iter()
                     .find(|bp| instr_string.starts_with(bp.as_str()))
-                    .unwrap()
-                    .clone();
+                    .cloned()
+                    .unwrap_or(function_string.clone());
                 println!(
                     "Breakpoint {} hit with instruction {}",
                     bp_match, instr_string
@@ -138,12 +219,23 @@ impl DebugContext {
                     Ok(_) => match input.parse::<DebugCommand>() {
                         Err(err) => println!("{}", err),
                         Ok(command) => match command {
-                            DebugCommand::Step => {
-                                self.should_take_input = true;
+                            DebugCommand::Step(n) => {
+                                self.input_checker = InputChecker::StepRemaining(n);
+                                break;
+                            },
+                            DebugCommand::StepOver(n) => {
+                                self.input_checker = InputChecker::StepOverRemaining {
+                                    function_string: function_string.clone(),
+                                    stack_depth: interpreter
+                                        .get_stack_frames(usize::MAX)
+                                        .stack_trace()
+                                        .len(),
+                                    remaining: n,
+                                };
                                 break;
                             },
                             DebugCommand::Continue => {
-                                self.should_take_input = false;
+                                self.input_checker = InputChecker::Continue;
                                 break;
                             },
                             DebugCommand::Breakpoint(breakpoint) => {
@@ -151,6 +243,18 @@ impl DebugContext {
                             },
                             DebugCommand::DeleteBreakpoint(breakpoint) => {
                                 self.breakpoints.remove(&breakpoint);
+                            },
+                            DebugCommand::StepOut => {
+                                let stack_depth =
+                                    interpreter.get_stack_frames(usize::MAX).stack_trace().len();
+                                if stack_depth == 0 {
+                                    println!("No stack frames to step out of");
+                                } else {
+                                    self.input_checker = InputChecker::StepOut {
+                                        target_stack_depth: stack_depth - 1,
+                                    };
+                                    break;
+                                }
                             },
                             DebugCommand::PrintBreakpoints => self
                                 .breakpoints

@@ -1,8 +1,8 @@
 Ok(
     [
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -11,7 +11,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
@@ -30,8 +31,8 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -41,7 +42,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
@@ -56,8 +58,8 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -66,7 +68,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
@@ -81,8 +84,8 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -92,7 +95,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000020000000000000000000000000000000000000000000000" },
             ],
@@ -103,8 +107,8 @@ Ok(
             auxiliary_data: None,
         },
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -113,7 +117,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
@@ -132,8 +137,8 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: Value(
-                V0(
+            write_set: WriteSet {
+                value: V0(
                     WriteSetV0(
                         WriteSetMut {
                             write_set: {
@@ -142,7 +147,8 @@ Ok(
                         },
                     ),
                 ),
-            ),
+                hotness: {},
+            },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],

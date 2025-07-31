@@ -283,6 +283,14 @@ impl PipelineBuilder {
             },
             Some(abort_handles),
         );
+        let rand_fut = spawn_shared_fut(
+            async move {
+                rand_rx
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("randomness tx cancelled")))
+            },
+            Some(abort_handles),
+        );
         (
             PipelineInputTx {
                 qc_tx: Some(qc_tx),
@@ -293,7 +301,7 @@ impl PipelineBuilder {
             },
             PipelineInputRx {
                 qc_rx,
-                rand_rx,
+                rand_fut,
                 order_vote_rx,
                 order_proof_fut,
                 commit_proof_fut,
@@ -365,7 +373,7 @@ impl PipelineBuilder {
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             qc_rx,
-            rand_rx,
+            rand_fut,
             order_vote_rx,
             order_proof_fut,
             commit_proof_fut,
@@ -379,14 +387,14 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
-                rand_rx,
+                rand_fut,
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let ledger_update_fut = spawn_shared_fut(
             Self::ledger_update(
@@ -395,7 +403,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let commit_vote_fut = spawn_shared_fut(
             Self::sign_commit_vote(
@@ -419,7 +427,7 @@ impl PipelineBuilder {
                 block.clone(),
                 self.pre_commit_status(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let commit_ledger_fut = spawn_shared_fut(
             Self::commit_ledger(
@@ -429,7 +437,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
 
         let post_ledger_update_fut = spawn_shared_fut(
@@ -537,7 +545,7 @@ impl PipelineBuilder {
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
-        randomness_rx: oneshot::Receiver<Option<Randomness>>,
+        randomness_rx: TaskFuture<Option<Randomness>>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,

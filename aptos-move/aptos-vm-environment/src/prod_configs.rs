@@ -14,7 +14,7 @@ use aptos_types::{
     state_store::StateView,
 };
 use move_binary_format::deserializer::DeserializerConfig;
-use move_bytecode_verifier::VerifierConfig;
+use move_bytecode_verifier::{verifier::VerificationScope, VerifierConfig};
 use move_vm_runtime::config::VMConfig;
 use move_vm_types::{
     loaded_data::runtime_types::TypeBuilder, values::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
@@ -85,6 +85,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
     // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 
     VerifierConfig {
+        scope: VerificationScope::Everything,
         max_loop_depth: Some(5),
         max_generic_instantiation_length: Some(32),
         max_function_parameters: Some(128),

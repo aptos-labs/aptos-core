@@ -20,38 +20,38 @@ use std::{
 /**
 ================================ BlockSTMv2 Scheduler (SchedulerV2) ================================
 
-This module implements `SchedulerV2`, the core component of the BlockSTMv2 execution engine.
-`SchedulerV2` orchestrates the parallel execution of transactions within a block, managing
+This module implements [SchedulerV2], the core component of the BlockSTMv2 execution engine.
+[SchedulerV2] orchestrates the parallel execution of transactions within a block, managing
 their lifecycle from initial scheduling through execution, potential aborts and re-executions,
 and eventual commit and post-commit processing.
 
 Key Responsibilities:
 ---------------------
-1.  **Task Management**: `SchedulerV2` provides tasks to worker threads. These tasks can be
+1.  **Task Management**: [SchedulerV2] provides tasks to worker threads. These tasks can be
     to execute a transaction, or to perform post-commit processing for a committed transaction.
-    It uses a `TaskKind` enum to represent these different types of tasks.
+    It uses a [TaskKind] enum to represent these different types of tasks.
 
 2.  **Transaction Lifecycle Coordination**: It interacts closely with `ExecutionStatuses` (from
     `scheduler_status.rs`) to track and update the state of each transaction (e.g.,
     `PendingScheduling`, `Executing`, `Executed`, `Aborted`).
 
 3.  **Concurrency Control & Dependency Management**:
-    -   **Abort Handling**: It utilizes an `AbortManager` to handle invalidations. When a
+    -   **Abort Handling**: It utilizes an [AbortManager] to handle invalidations. When a
         transaction's execution output might affect other transactions that read its prior
         state, those dependent transactions are aborted and rescheduled.
-    -   **Stall Propagation**: It manages `AbortedDependencies` to track which transactions
+    -   **Stall Propagation**: It manages [AbortedDependencies] to track which transactions
         have been previously aborted due to changes in a dependency. This information is
         used to implement a "stall" mechanism. If a transaction T_i is stalled (e.g.,
         because a lower-indexed transaction T_j it depends on was aborted and T_j might
         abort T_i again), T_i's re-execution might be deferred. Stalls propagate through
         the dependency graph that the scheduler automatically builds and maintains.
 
-4.  **Commit Sequencing**: `SchedulerV2` ensures that transactions are committed in their
+4.  **Commit Sequencing**: [SchedulerV2] ensures that transactions are committed in their
     original sequence (by transaction index). It manages a `next_to_commit_idx` and uses
     `CommitMarkerFlag`s to track the commit state of each transaction (NotCommitted,
     CommitStarted, Committed). A lock (`queueing_commits_lock`) is used to serialize
     the dispatching of sequential commit hooks. Once the lock is acquired,
-    `[SchedulerV2::start_commit]` and `[SchedulerV2::end_commit]` are called to
+    [SchedulerV2::start_commit] and [SchedulerV2::end_commit] are called to
     start and end the commit process for a transaction (which includes the caller
     specified sequential commit hooks / logic).
 
@@ -61,7 +61,12 @@ Key Responsibilities:
         defer the first re-execution of a transaction until all preceding transactions
         have produced their initial speculative writes.
     -   **`min_not_scheduled_idx`**: An optimization that tracks the minimum transaction
-        index that has not yet been scheduled, helping to quickly identify available work.
+        index that has not yet been scheduled. This is currently used to identify maximum
+        range of the interval that may require a traversal for module read validation
+        (after a committed txn that publishes a module), but can be generally useful for
+        tracking the evolution of the "active" interval of the scheduler.
+        TODO(BlockSTMv2): consider constraining the interval to have a maximum size, for
+        optimizing performance as well as for integration w. execution pooling, etc.
 
 6.  **Halt and Completion**: Provides mechanisms to halt ongoing execution prematurely and
     to determine when all transactions in the block are fully processed and committed.
@@ -69,26 +74,26 @@ Key Responsibilities:
 Interaction with Other Components:
 ---------------------------------
 -   **`ExecutionStatuses`**: The source of truth for the status (scheduling state, incarnation,
-    stall count) of individual transactions. `SchedulerV2` queries and updates these statuses.
--   **`ExecutionQueueManager`**: Embedded within `ExecutionStatuses`, it manages the actual
-    queue of transactions ready for execution. `SchedulerV2` interacts with it to pop
+    stall count) of individual transactions. [SchedulerV2] queries and updates these statuses.
+-   **[ExecutionQueueManager]**: Embedded within `ExecutionStatuses`, it manages the actual
+    queue of transactions ready for execution. [SchedulerV2] interacts with it to pop
     transactions for execution and to add transactions back (e.g., upon re-scheduling).
--   **`AbortManager`**: Used by worker threads during `[SchedulerV2::finish_execution]`. When a worker
-    completes a transaction, it uses the `AbortManager` to identify and initiate aborts for
-    dependent transactions that read its (now potentially changed) output. `SchedulerV2`
-    consumes the `AbortManager` to finalize these aborts and update dependencies.
--   **Worker Threads**: Continuously request tasks from `SchedulerV2` via `[SchedulerV2::next_task]`.
-    They execute these tasks and report results (e.g., via `[SchedulerV2::finish_execution]`,
-    `[SchedulerV2::end_commit]`).
+-   **[AbortManager]**: Used by worker threads during `[SchedulerV2::finish_execution]`. When a worker
+    completes a transaction, it uses the [AbortManager] to identify and initiate aborts for
+    dependent transactions that read its (now potentially changed) output. [SchedulerV2]
+    consumes the [AbortManager] to finalize these aborts and update dependencies.
+-   **Worker Threads**: Continuously request tasks from [SchedulerV2] via [SchedulerV2::next_task].
+    They execute these tasks and report results (e.g., via [SchedulerV2::finish_execution],
+    [SchedulerV2::end_commit]).
 
 Conceptual Execution Model:
 --------------------------
-Workers request tasks. `SchedulerV2` prioritizes:
+Workers request tasks. [SchedulerV2] prioritizes:
 1.  **Post-Commit Processing Tasks**: If there are transactions that have been committed and
     are awaiting their parallel post-commit logic, these are dispatched first. This provides
     more parallelism and ensures that committed work is finalized promptly.
-2.  **Execution Tasks**: If no post-commit tasks are pending, `SchedulerV2` attempts to pop
-    a transaction from the `ExecutionQueueManager`. If successful, it transitions the
+2.  **Execution Tasks**: If no post-commit tasks are pending, [SchedulerV2] attempts to pop
+    a transaction from the [ExecutionQueueManager]. If successful, it transitions the
     transaction's state to `Executing` and returns an `Execute` task to the worker.
 3.  **Control Tasks**: If no work is immediately available, `NextTask` is returned, signaling
     the worker to try again. If all work is done or the scheduler is halted, `Done` is returned.
@@ -100,19 +105,19 @@ heuristic to reduce wasted work from cascading aborts.
 
 /// Manages push-invalidations caused by a transaction's output and handles aborting dependent transactions.
 ///
-/// `AbortManager` is a non-Sync struct designed for a worker executing a particular transaction
+/// [AbortManager] is a non-Sync struct designed for a worker executing a particular transaction
 /// (the "owner transaction", identified by `owner_txn_idx` and `owner_incarnation`).
 /// When the owner transaction finishes execution, its writes might necessitate the re-execution
-/// of other transactions that read the same data locations. `AbortManager` is used by the
+/// of other transactions that read the same data locations. [AbortManager] is used by the
 /// worker thread responsible for the owner transaction to:
 ///
 /// 1.  Identify such dependent transactions.
-/// 2.  Attempt to initiate their abort by calling `[SchedulerV2::start_abort]` on the scheduler.
+/// 2.  Attempt to initiate their abort by calling [SchedulerV2::start_abort] on the scheduler.
 /// 3.  Track the outcome of these abort attempts within its `invalidations` map.
 ///
-/// After a transaction's execution attempt is processed by the scheduler, the `AbortManager` instance
-/// is transferred by value (moving ownership) to the `SchedulerV2::finish_execution` function.
-/// This transfer enforces a clear ownership model and ensures that the `AbortManager`'s state
+/// After a transaction's execution attempt is processed by the scheduler, the [AbortManager] instance
+/// is transferred by value (moving ownership) to the [SchedulerV2::finish_execution] function.
+/// This transfer enforces a clear ownership model and ensures that the [AbortManager]'s state
 /// is correctly consumed and finalized.
 pub(crate) struct AbortManager<'a> {
     owner_txn_idx: TxnIndex,
@@ -221,9 +226,9 @@ impl<'a> AbortManager<'a> {
     /// Attempts to initiate an abort for the given transaction and incarnation via the scheduler.
     ///
     /// Returns:
-    /// - `Ok(Some(incarnation))` if `[SchedulerV2::start_abort]` was successful for the given `incarnation`.
-    /// - `Ok(None)` if `[SchedulerV2::start_abort]` returned false (e.g., already aborted).
-    /// - `Err(PanicError)` if `[SchedulerV2::start_abort]` itself returns an error.
+    /// - `Ok(Some(incarnation))` if [SchedulerV2::start_abort] was successful for `incarnation`.
+    /// - `Ok(None)` if [SchedulerV2::start_abort] returned false (e.g., already aborted).
+    /// - `Err(PanicError)` if [SchedulerV2::start_abort] itself returns an error.
     fn start_abort(
         &self,
         txn_idx: TxnIndex,
@@ -260,17 +265,17 @@ impl<'a> AbortManager<'a> {
 /// other transactions (T_dep) that read T_owner's output to be aborted. This struct,
 /// associated with T_owner, keeps a record of such T_dep transactions.
 ///
-/// It also tracks which of these dependencies it has actively propagated stalls to (for later removal)
-/// since such dependencies might be detected concurrently to stalls being added/removed elsewhere.
-/// The primary purpose is to manage these "stalls". If T_owner itself is aborted or stalled,
-/// it's likely that its previously aborted dependencies (T_dep) will also need to be
-/// re-aborted if they re-execute. To prevent wasted work, a stall can be propagated from
-/// T_owner to these T_dep transactions.
+/// It also tracks which of these dependencies it has actively propagated stalls to (for later
+/// removal) since such dependencies might be detected concurrently to stalls being added/removed
+/// elsewhere. The primary purpose is to manage these "stalls". If T_owner itself is aborted or
+/// stalled, it's likely that its previously aborted dependencies (T_dep) will also need to be
+/// re-aborted if they re-execute. To prevent wasted work, a stall can be propagated from T_owner
+/// to these T_dep transactions.
 ///
 /// This struct distinguishes between dependencies for which a stall has been actively
 /// propagated (`stalled_deps`) and those for which it has not (`not_stalled_deps`).
 /// The `is_stalled` flag indicates whether the owner transaction itself is considered stalled
-/// from the perspective of this `AbortedDependencies` instance, which then dictates whether
+/// from the perspective of this [AbortedDependencies] instance, which then dictates whether
 /// to propagate `add_stall` or `remove_stall` to its dependencies.
 ///
 /// An invariant is maintained: `stalled_deps` and `not_stalled_deps` must always be disjoint.
@@ -433,10 +438,10 @@ impl ExecutionQueueManager {
     }
 }
 
-/// Represents the different kinds of tasks that a worker thread can receive from `SchedulerV2`.
+/// Represents the different kinds of tasks that a worker thread can receive from [SchedulerV2].
 ///
-/// This enum defines the instructions passed from `[SchedulerV2::next_task]` to an executor (worker thread)
-/// to direct its activity.
+/// This enum defines the instructions passed from [SchedulerV2::next_task] to an executor
+/// (worker thread) to direct its activity.
 #[derive(PartialEq, Debug)]
 pub(crate) enum TaskKind {
     /// Instructs the worker to execute a specific `(TxnIndex, Incarnation)` of a transaction.
@@ -449,17 +454,17 @@ pub(crate) enum TaskKind {
     /// itself is assumed to be parallelizable and typically involves finalization or cleanup steps.
     PostCommitProcessing(TxnIndex),
     /// Signals that no specific task (like `Execute` or `PostCommitProcessing`) is immediately
-    /// available from the scheduler. The worker should typically call `next_task()` again soon,
-    /// possibly after a brief pause or yielding, to check for new work.
+    /// available from the scheduler. The worker should typically call [SchedulerV2::next_task]
+    /// again soon, possibly after a brief pause or yielding, to check for new work.
     NextTask,
     /// Signals that all transactions have been processed and committed, and the scheduler
     /// has no more work. The worker thread receiving this task can terminate.
     Done,
 }
 
-/// Flags representing the commit status of a transaction, used by `SchedulerV2`.
+/// Flags representing the commit status of a transaction, used by [SchedulerV2].
 ///
-/// These constant flag values are stored in `SchedulerV2::committed_marker` for each transaction
+/// These constant flag values are stored in [SchedulerV2::committed_marker] for each txn
 /// to track its progress through the final stages of the commit process.
 ///
 /// The typical lifecycle is: `NotCommitted` -> `CommitStarted` -> `Committed`.
@@ -470,11 +475,11 @@ enum CommitMarkerFlag {
     /// sequential commit hook been dispatched.
     NotCommitted = 0,
     /// The transaction has been identified as the next to commit, and its sequential
-    /// commit hook has been dispatched (obtained via `[SchedulerV2::start_commit]`).
-    /// The system is now waiting for `[SchedulerV2::end_commit]` to be called for this transaction.
+    /// commit hook has been dispatched (obtained via [SchedulerV2::start_commit]).
+    /// The system is now waiting for [SchedulerV2::end_commit] to be called for this transaction.
     CommitStarted = 1,
     /// The transaction's sequential commit hook has been successfully performed (indicated
-    /// by a call to `[SchedulerV2::end_commit]`), and it is now fully committed from the
+    /// by a call to [SchedulerV2::end_commit]), and it is now fully committed from the
     /// scheduler's perspective. Its `PostCommitProcessing` task can now be scheduled.
     Committed = 2,
 }
@@ -487,14 +492,14 @@ pub(crate) struct SchedulerV2 {
 
     /// Manages the `ExecutionStatus` for each transaction, which includes its current
     /// scheduling state, incarnation number, stall count, and dependency shortcut flag.
-    /// Also embeds the `ExecutionQueueManager` for queuing transactions.
+    /// Also embeds the [ExecutionQueueManager] for queuing transactions.
     txn_statuses: ExecutionStatuses,
 
     /// For each transaction `i`, `aborted_dependencies[i]` stores a list of transactions
     /// `j > i` that were previously aborted by `i` (due to `i`'s writes).
     /// This information is used to propagate stalls: if `i` is stalled or aborted,
     /// a stall signal is propagated to these dependent transactions `j`.
-    /// Each `AbortedDependencies` instance is protected by a `Mutex`.
+    /// Each [AbortedDependencies] instance is protected by a `Mutex`.
     aborted_dependencies: Vec<CachePadded<Mutex<AbortedDependencies>>>,
 
     /// The index of the next transaction that is eligible to have its sequential commit hook
@@ -508,19 +513,19 @@ pub(crate) struct SchedulerV2 {
     is_halted: CachePadded<AtomicBool>,
 
     /// An armed lock used to serialize access to the critical section where sequential commit
-    /// hooks are dispatched (`[SchedulerV2::start_commit]`). It helps manage
+    /// hooks are dispatched ([SchedulerV2::start_commit]). It helps manage
     /// contention with the arming mechanism.
     queueing_commits_lock: CachePadded<ArmedLock>,
     /// A concurrent queue holding the indices of transactions that have been committed and
     /// are ready for their parallel post-commit processing phase.
     post_commit_processing_queue: CachePadded<ConcurrentQueue<TxnIndex>>,
-    /// For each transaction `i`, `committed_marker[i]` stores its `CommitMarkerFlag`,
-    /// indicating its current stage in the commit process (NotCommitted, CommitStarted, Committed).
+    /// For each txn `i`, `committed_marker[i]` stores its [CommitMarkerFlag], indicating
+    /// its current stage in the commit process (NotCommitted, CommitStarted, Committed).
     committed_marker: Vec<CachePadded<AtomicU8>>,
 }
 
 impl SchedulerV2 {
-    /// Creates a new `SchedulerV2` instance.
+    /// Creates a new [SchedulerV2] instance.
     ///
     /// Initializes all internal structures based on the total number of transactions
     /// (`num_txns`) in the block and the number of worker threads (`num_workers`).
@@ -554,8 +559,8 @@ impl SchedulerV2 {
     ///
     /// Workers should call this to gain exclusive access to the critical section for
     /// dispatching sequential commit hooks. If the lock is acquired (`true`), the worker
-    /// should proceed to call `[SchedulerV2::start_commit]` repeatedly, and then ensure
-    /// `[SchedulerV2::commit_hooks_unlock]` is called.
+    /// should proceed to call [SchedulerV2::start_commit] repeatedly, and then ensure
+    /// [SchedulerV2::commit_hooks_unlock] is called.
     ///
     /// Returns `true` if the lock was acquired, `false` otherwise.
     pub(crate) fn commit_hooks_try_lock(&self) -> bool {
@@ -573,7 +578,7 @@ impl SchedulerV2 {
     /// 1. The scheduler is not halted.
     /// 2. `next_to_commit_idx` is less than `num_txns` (i.e., there are transactions remaining).
     /// 3. The transaction at `next_to_commit_idx` has its status as `Executed` (verified by
-    ///    `[ExecutionStatuses::is_executed]`).
+    ///    [ExecutionStatuses::is_executed]).
     ///
     /// If all conditions are met:
     /// - The `committed_marker` for `next_to_commit_idx` is updated from `NotCommitted` to
@@ -657,12 +662,12 @@ impl SchedulerV2 {
     /// 1. Updates the `committed_marker` for `txn_idx` from `CommitStarted` to `Committed`.
     ///    Panics if the previous marker was not `CommitStarted`.
     /// 2. Pushes `txn_idx` to the `post_commit_processing_queue`, making it available for
-    ///    a `PostCommitProcessing` task to be dispatched by `[SchedulerV2::next_task]`.
+    ///    a `PostCommitProcessing` task to be dispatched by [SchedulerV2::next_task].
     ///    Panics if the queue push fails (e.g., if the queue is full, which shouldn't happen
     ///    given it's bounded by `num_txns`).
     ///
     /// It is crucial that `txn_idx` was previously obtained from a successful call to
-    /// `[SchedulerV2::start_commit]`, and that the `queueing_commits_lock` was held
+    /// [SchedulerV2::start_commit], and that the `queueing_commits_lock` was held
     /// by the worker during the execution of the commit hook and this call.
     pub(crate) fn end_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let prev_marker = self.committed_marker[txn_idx as usize].load(Ordering::Relaxed);
@@ -693,7 +698,7 @@ impl SchedulerV2 {
     ///
     /// This method must be called by a worker after it has finished attempting to acquire
     /// and process sequential commit hooks (i.e., after its loop calling
-    /// `[SchedulerV2::start_commit]` and `[SchedulerV2::end_commit]` is done.
+    /// [SchedulerV2::start_commit] and [SchedulerV2::end_commit] is done.
     ///
     /// If the next transaction to commit (`next_to_commit_idx`) is ready (i.e., executed
     /// and not halted), this method will "arm" the lock, signifying that new commit work
@@ -712,20 +717,22 @@ impl SchedulerV2 {
 
     /// Checks if the `post_commit_processing_queue` is empty.
     ///
-    /// Returns `true` if there are no transactions awaiting post-commit processing, `false` otherwise.
+    /// Returns `true` if there are no transactions awaiting post-commit processing,
+    /// `false` otherwise.
     pub(crate) fn post_commit_processing_queue_is_empty(&self) -> bool {
         self.post_commit_processing_queue.is_empty()
     }
 
-    /// Returns the minimum transaction index that has not yet been scheduled (i.e., popped
-    /// from the `execution_queue` by `[ExecutionQueueManager::pop_next]`).
+    /// Returns the minimum transaction index that has not yet been scheduled (i.e.,
+    /// popped from the `execution_queue` by [ExecutionQueueManager::pop_next]).
     ///
     /// This provides an indication of how far along the scheduler is in dispatching
     /// initial execution tasks.
     ///
-    /// The value is retrieved from `[ExecutionQueueManager::min_not_scheduled_idx]`.
+    /// The value is retrieved from [ExecutionQueueManager::min_not_scheduled_idx].
     ///
-    /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater than `num_txns`).
+    /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater
+    /// than `num_txns`).
     pub(crate) fn min_not_scheduled_idx(&self) -> Result<TxnIndex, PanicError> {
         let ret = self
             .txn_statuses
@@ -759,18 +766,18 @@ impl SchedulerV2 {
     ///
     /// This is the primary method workers call to get work from the scheduler.
     /// The scheduler prioritizes tasks as follows:
-    /// 1.  **`Done`**: If `[SchedulerV2::is_done]` is true, it returns `TaskKind::Done` immediately.
+    /// 1.  **`Done`**: If [SchedulerV2::is_done] is true, it returns `TaskKind::Done`.
     /// 2.  **`PostCommitProcessing`**: Attempts to pop a `txn_idx` from the
     ///     `post_commit_processing_queue`. If successful, returns
     ///     `TaskKind::PostCommitProcessing(txn_idx)`. If this was the last transaction
     ///     (`num_txns - 1`), it also sets `is_done` to true.
     /// 3.  **`Done` (if halted)**: If the `post_commit_processing_queue` is empty and
-    ///     `[SchedulerV2::is_halted]` is true, returns `TaskKind::Done`.
+    ///     [SchedulerV2::is_halted] is true, returns `TaskKind::Done`.
     /// 4.  **`Execute`**: Attempts to pop a `txn_idx` from the main `execution_queue` via
-    ///     `[ExecutionQueueManager::pop_next]` (accessed through `txn_statuses`). If successful, it then
-    ///     calls `[SchedulerV2::start_executing]` to mark the transaction as `Executing`
-    ///     and get its current incarnation. If `[SchedulerV2::start_executing]` returns `Some(incarnation)`,
-    ///     it returns `TaskKind::Execute(txn_idx, incarnation)`.
+    ///     `[ExecutionQueueManager::pop_next]` (accessed through `txn_statuses`). If successful,
+    ///     it then calls [SchedulerV2::start_executing] to mark the transaction as `Executing`
+    ///     and get its current incarnation. If [SchedulerV2::start_executing] returns
+    ///     `Some(incarnation)`, it returns `TaskKind::Execute(txn_idx, incarnation)`.
     /// 5.  **`NextTask`**: If none of the above yield a task (e.g., queues are empty, no work
     ///     to start), it returns `TaskKind::NextTask`, indicating the worker should try again.
     ///
@@ -817,10 +824,10 @@ impl SchedulerV2 {
     ///     dependencies of `txn_idx`. This is skipped for incarnation 0 as the initial writes
     ///     might cause invalidations very different from the subsequent re-executions.
     /// 3.  **Finish Aborts**: For each transaction in `invalidated_set` for which `start_abort`
-    ///     was successful (i.e., `Some(incarnation)` was stored by `AbortManager`), calls
-    ///     `[ExecutionStatuses::finish_abort]` to complete the abort process. These transactions
+    ///     was successful (i.e., `Some(incarnation)` was stored by [AbortManager]), calls
+    ///     [ExecutionStatuses::finish_abort] to complete the abort process. These transactions
     ///     are added to a `stall_propagation_queue`.
-    /// 4.  **Finish Own Execution**: Calls `[ExecutionStatuses::finish_execution]`
+    /// 4.  **Finish Own Execution**: Calls [ExecutionStatuses::finish_execution]
     ///     to update the status of the just-executed transaction (e.g., to `Executed` or to
     ///     `PendingScheduling` if it was aborted concurrently). If this call indicates the
     ///     transaction is now `Executed` (returns true), `txn_idx` is also added to the
@@ -829,8 +836,8 @@ impl SchedulerV2 {
     ///     or the preceding transaction (`txn_idx - 1`) is no longer `NotCommitted`, it arms
     ///     the `queueing_commits_lock`, implying that `txn_idx` might be ready for commit.
     /// 6.  **Update `executed_once_max_idx`**: If `incarnation == 0`, calls
-    ///     `[SchedulerV2::try_increase_executed_once_max_idx]`.
-    /// 7.  **Propagate Stalls/Unstalls**: Calls `[SchedulerV2::propagate]` to recursively
+    ///     [SchedulerV2::try_increase_executed_once_max_idx].
+    /// 7.  **Propagate Stalls/Unstalls**: Calls [SchedulerV2::propagate] to recursively
     ///     process stall/unstall signals based on the status changes of transactions in the
     ///     `stall_propagation_queue`.
     ///
@@ -886,8 +893,8 @@ impl SchedulerV2 {
 
     /// Sets the scheduler to a halted state.
     ///
-    /// This is an atomic operation. Once halted, `[SchedulerV2::is_halted]` will return `true`,
-    /// and `[SchedulerV2::next_task]` will start returning `TaskKind::Done` once the
+    /// This is an atomic operation. Once halted, [SchedulerV2::is_halted] will return `true`,
+    /// and [SchedulerV2::next_task] will start returning `TaskKind::Done` once the
     /// `post_commit_processing_queue` is empty.
     /// This is typically used to signal an abnormal termination or a need to stop processing
     /// transactions beyond a certain index.
@@ -905,11 +912,11 @@ impl SchedulerV2 {
     /// This is used by workers during transaction execution to determine if they should
     /// stop processing early.
     ///
-    /// - Returns `true` if `[SchedulerV2::is_halted]` is true.
+    /// - Returns `true` if [SchedulerV2::is_halted] is true.
     /// - If not globally halted and `incarnation == 0`, returns `false` (0-th incarnation
     ///   is never aborted early to ensure its speculative writes are produced).
     /// - Otherwise (not halted, `incarnation > 0`), returns the result of
-    ///   `[ExecutionStatuses::already_started_abort]`.
+    ///   [ExecutionStatuses::already_started_abort].
     #[inline]
     pub(crate) fn is_halted_or_aborted(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         if self.is_halted() {
@@ -984,19 +991,20 @@ impl SchedulerV2 {
 impl SchedulerV2 {
     /// Propagates stall or unstall signals recursively through the dependency graph.
     ///
-    /// This method processes a `stall_propagation_queue` containing transaction indices whose
-    /// states might have changed (e.g., executed, aborted, stalled, unstalled).
+    /// This method processes a `stall_propagation_queue` containing transaction indices
+    /// whose states might have changed (e.g., executed, aborted, stalled, unstalled).
     /// For each `task_idx` popped from the queue:
     /// 1. It acquires a lock on `self.aborted_dependencies[task_idx]`.
     /// 2. It checks the current status of `task_idx` using `txn_statuses`:
-    ///    - If `task_idx` is `[ExecutionStatuses::shortcut_executed_and_not_stalled]` (meaning it's executed
-    ///      and not currently considered stalled by `ExecutionStatuses`), it calls
-    ///      `[AbortedDependencies::remove_stall]` on its `AbortedDependencies`. This, in turn, might add
-    ///      more indices (dependencies of `task_idx` that were unstalled) to the
+    ///    - If `task_idx` is [ExecutionStatuses::shortcut_executed_and_not_stalled]
+    ///      (meaning executed and not currently considered stalled by `ExecutionStatuses`),
+    ///      it calls [AbortedDependencies::remove_stall] on its [AbortedDependencies].
+    ///      This, in turn, might add more indices (dependencies of `task_idx` that
+    ///      were unstalled) to the `stall_propagation_queue`.
+    ///    - Otherwise (if `task_idx` is not executed or is stalled), it calls
+    ///      [AbortedDependencies::add_stall] on its [AbortedDependencies]. This might
+    ///      add more indices (dependencies of `task_idx` that were stalled) to the
     ///      `stall_propagation_queue`.
-    ///    - Otherwise (if `task_idx` is not executed or is stalled), it calls `[AbortedDependencies::add_stall]`
-    ///      on its `AbortedDependencies`. This might add more indices (dependencies of
-    ///      `task_idx` that were stalled) to the `stall_propagation_queue`.
     ///
     /// The process continues until the `stall_propagation_queue` is empty.
     /// This mechanism ensures that stall states are consistently propagated based on the
@@ -1030,13 +1038,13 @@ impl SchedulerV2 {
 
     /// Initiates the abort process for a specific transaction incarnation via `ExecutionStatuses`.
     ///
-    /// This is a wrapper around `[ExecutionStatuses::start_abort]`.
-    /// If the abort is successfully initiated (i.e., `[ExecutionStatuses::start_abort]` returns `Ok(true)`):
+    /// This is a wrapper around [ExecutionStatuses::start_abort]. If the abort is successfully
+    /// initiated (i.e., [ExecutionStatuses::start_abort] returns `Ok(true)`):
     /// - Increments the `SPECULATIVE_ABORT_COUNT` counter.
     /// - Clears any speculative transaction logs for the `txn_idx` (as its current execution
     ///   attempt is being aborted).
     ///
-    /// Returns the result of `[ExecutionStatuses::start_abort]`.
+    /// Returns the result of [ExecutionStatuses::start_abort].
     fn start_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> Result<bool, PanicError> {
         let ret = self.txn_statuses.start_abort(txn_idx, incarnation)?;
         if ret {
@@ -1050,8 +1058,8 @@ impl SchedulerV2 {
 
     /// Initiates the execution of a transaction via `ExecutionStatuses`.
     ///
-    /// This is a direct wrapper around `[ExecutionStatuses::start_executing]`.
-    /// It attempts to transition the transaction at `txn_idx` to the `Executing` state.
+    /// This is a direct wrapper around [ExecutionStatuses::start_executing]. It attempts to
+    /// transition the transaction at `txn_idx` to the `Executing` state.
     ///
     /// Returns `Ok(Some(incarnation))` if successful, `Ok(None)` if the transaction
     /// was not in a state to start execution (e.g., not `PendingScheduling`), or
@@ -1071,10 +1079,10 @@ impl SchedulerV2 {
     /// The method then iterates from `txn_idx` upwards, checking `[ExecutionStatuses::ever_executed]`
     /// for each subsequent transaction `idx`. For each `idx` that has been executed at least once:
     /// - `executed_once_max_idx` is updated to `idx + 1`.
-    /// - If `idx` is found to be `[ExecutionStatuses::pending_scheduling_and_not_stalled]`, it is re-added to the
-    ///   `execution_queue`. This handles cases where a transaction `idx` might have been
-    ///   scheduled for re-execution (e.g., its first re-execution) but was deferred because
-    ///   `executed_once_max_idx` was less than `idx`. Now that the watermark is advancing
+    /// - If `idx` is found to be [ExecutionStatuses::pending_scheduling_and_not_stalled], it is
+    ///   re-added to the `execution_queue`. This handles cases where a transaction `idx` might
+    ///   have been scheduled for re-execution (e.g., its first re-execution) but was deferred
+    ///   because `executed_once_max_idx` was less than `idx`. Now that the watermark is advancing
     ///   past `idx`, it can be truly scheduled.
     /// The iteration stops when an `idx` is encountered that has not `ever_executed` or when
     /// `num_txns` is reached.

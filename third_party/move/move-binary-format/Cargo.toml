@@ -17,6 +17,7 @@ dearbitrary = { workspace = true, optional = true, features = ["derive"] }
 indexmap = { workspace = true }
 move-bytecode-spec = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 ref-cast = { workspace = true }

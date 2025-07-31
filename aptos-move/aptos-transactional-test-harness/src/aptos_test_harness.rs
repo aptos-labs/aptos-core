@@ -1100,7 +1100,7 @@ fn precompiled_v2_framework_with_experimental() -> &'static PrecompiledFilesModu
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_aptos_test_with_config(
         path,
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![(
+        TestRunConfig::new(LanguageVersion::default(), vec![(
             "attach-compiled-module".to_owned(),
             true,
         )]),
@@ -1112,17 +1112,13 @@ pub fn run_aptos_test_with_config(
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let suffix = Some(EXP_EXT.to_owned());
-    let v2_lib = match &config {
-        // only latest language version can use experimental framework
-        TestRunConfig::CompilerV2 {
-            language_version, ..
-        } => {
-            if language_version == &LanguageVersion::latest() {
-                precompiled_v2_framework_with_experimental()
-            } else {
-                precompiled_v2_framework()
-            }
-        },
+    let v2_lib = {
+        let language_version = &config.language_version;
+        if language_version == &LanguageVersion::latest() {
+            precompiled_v2_framework_with_experimental()
+        } else {
+            precompiled_v2_framework()
+        }
     };
     set_paranoid_type_checks(true);
     run_test_impl::<AptosTestAdapter>(config, path, v2_lib, &suffix)

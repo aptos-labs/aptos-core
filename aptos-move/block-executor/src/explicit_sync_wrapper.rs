@@ -49,6 +49,14 @@ impl<T> ExplicitSyncWrapper<T> {
         unsafe { &*self.value.get() }
     }
 
+    // This performs the acquire fence so temporal reasoning on the result
+    // of the dereference is valid, and then returns a reference with the
+    // same lifetime as the wrapper (unlike acquire which returns a guard).
+    pub fn fence_and_dereference(&self) -> &T {
+        atomic::fence(atomic::Ordering::Acquire);
+        self.dereference()
+    }
+
     pub fn dereference_mut<'a>(&self) -> &'a mut T {
         unsafe { &mut *self.value.get() }
     }

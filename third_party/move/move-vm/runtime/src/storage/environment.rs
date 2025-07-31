@@ -122,6 +122,7 @@ impl RuntimeEnvironment {
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Script> {
         dependencies::verify_script(
+            &self.vm_config.verifier_config,
             locally_verified_script.0.as_ref(),
             immediate_dependencies
                 .iter()
@@ -168,6 +169,7 @@ impl RuntimeEnvironment {
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Module> {
         dependencies::verify_module(
+            &self.vm_config.verifier_config,
             locally_verified_module.0.as_ref(),
             immediate_dependencies
                 .iter()

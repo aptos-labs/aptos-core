@@ -1,1 +1,5 @@
 processed 4 tasks
+task 0 lines 1-23:  publish
+task 1 lines 25-32:  run --signers 0x1
+task 2 lines 34-42:  run --signers 0x1
+task 3 lines 44-52:  run --signers 0x1

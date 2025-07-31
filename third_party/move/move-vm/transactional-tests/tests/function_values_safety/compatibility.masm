@@ -1,0 +1,75 @@
+// ========= Field Type
+
+//# publish --verbose
+module 0x66::incompatible_field_type
+struct A has drop
+    x: |u64|u32 has drop
+
+//# publish --verbose
+module 0x66::incompatible_field_type
+struct A has drop
+    x: |u32|u64 has drop
+
+// ========= Field Ability
+
+//# publish --verbose
+module 0x66::incompatible_field_ability
+struct A has drop
+    x: |u64|u32 has drop
+
+//# publish --verbose
+module 0x66::incompatible_field_ability
+struct A has drop
+    x: |u64|u32 has drop+copy
+
+// ========= Function Type
+
+//# publish --verbose
+module 0x66::compatible_function_since_private
+fun foo(x: |u64|u32)
+
+//# publish --verbose
+module 0x66::compatible_function_since_private
+fun foo(x: |bool|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_persistent
+#[persistent] fun foo(x: |u64|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_persistent
+#[persistent] fun foo(x: |bool|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_public
+public fun foo(x: |u64|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_public
+public fun foo(x: |bool|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_result_since_public
+public fun foo(): |u64|u32
+
+//# publish --verbose
+module 0x66::incompatible_function_result_since_public
+public fun foo(): |bool|u32
+
+// ========= Function Ability
+
+//# publish --verbose
+module 0x66::incompatible_function_ability_since_public
+public fun foo(): |u64|u32 has store
+
+//# publish --verbose
+module 0x66::incompatible_function_ability_since_public
+public fun foo(): |bool|u32 has copy+store
+
+//# publish --verbose
+module 0x66::incompatible_function_ability2_since_public
+public fun foo(): |u64|u32 has store+copy
+
+//# publish --verbose
+module 0x66::incompatible_function_ability2_since_public
+public fun foo(): |bool|u32 has copy

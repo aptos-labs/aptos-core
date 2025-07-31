@@ -22,6 +22,7 @@ use std::time::Instant;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VerifierConfig {
+    pub scope: VerificationScope,
     pub max_loop_depth: Option<usize>,
     pub max_function_parameters: Option<usize>,
     pub max_generic_instantiation_length: Option<usize>,
@@ -47,6 +48,15 @@ pub struct VerifierConfig {
     pub max_function_return_values: Option<usize>,
     /// Maximum depth of a type node.
     pub max_type_depth: Option<usize>,
+}
+
+/// Scope of verification.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+pub enum VerificationScope {
+    /// Do all verification
+    Everything,
+    /// The remaining variants are for testing and should never be used in production
+    Nothing,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -106,8 +116,9 @@ pub fn verify_module_with_config_for_test_with_version(
 }
 
 pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
-    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
-
+    if config.verify_nothing() {
+        return Ok(());
+    }
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         // Always needs to run bound checker first as subsequent passes depend on it
@@ -167,8 +178,9 @@ pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
 }
 
 pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
-    fail::fail_point!("skip-verification-for-paranoid-tests", |_| { Ok(()) });
-
+    if config.verify_nothing() {
+        return Ok(());
+    }
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         // Always needs to run bound checker first as subsequent passes depend on it
@@ -207,6 +219,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
 impl Default for VerifierConfig {
     fn default() -> Self {
         Self {
+            scope: VerificationScope::Everything,
             max_loop_depth: None,
             max_function_parameters: None,
             max_generic_instantiation_length: None,
@@ -266,6 +279,7 @@ impl VerifierConfig {
     /// An approximation of what config is used in production.
     pub fn production() -> Self {
         Self {
+            scope: VerificationScope::Everything,
             max_loop_depth: Some(5),
             max_generic_instantiation_length: Some(32),
             max_function_parameters: Some(128),
@@ -298,5 +312,15 @@ impl VerifierConfig {
             max_function_return_values: Some(128),
             max_type_depth: Some(20),
         }
+    }
+
+    /// Set verification scope
+    pub fn set_scope(self, scope: VerificationScope) -> Self {
+        Self { scope, ..self }
+    }
+
+    /// Returns true if verification is disabled.
+    pub fn verify_nothing(&self) -> bool {
+        matches!(self.scope, VerificationScope::Nothing)
     }
 }

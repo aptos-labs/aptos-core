@@ -17,8 +17,8 @@ use aptos_storage_interface::{
 use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
-        Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
     },
     write_set::WriteSet,
 };
@@ -228,6 +228,7 @@ impl Verifier {
             .backup_handler
             .get_transaction_iter(start, limit as usize)?;
         let mut cur_txns = Vec::new();
+        let mut cur_persisted_aux_info = Vec::new();
         let mut expected_events = Vec::new();
         let mut expected_writesets = Vec::new();
         let mut expected_txn_infos = Vec::new();
@@ -245,9 +246,16 @@ impl Verifier {
                 }
             }
 
-            let (input_txn, expected_txn_info, expected_event, expected_writeset) = item?;
+            let (
+                input_txn,
+                persisted_aux_info,
+                expected_txn_info,
+                expected_event,
+                expected_writeset,
+            ) = item?;
             let is_epoch_ending = expected_event.iter().any(ContractEvent::is_new_epoch_event);
             cur_txns.push(input_txn);
+            cur_persisted_aux_info.push(persisted_aux_info);
             expected_txn_infos.push(expected_txn_info);
             expected_events.push(expected_event);
             expected_writesets.push(expected_writeset);
@@ -258,6 +266,7 @@ impl Verifier {
                     let failed_txn_opt = self.execute_and_verify(
                         &mut chunk_start_version,
                         &mut cur_txns,
+                        &mut cur_persisted_aux_info,
                         &mut expected_txn_infos,
                         &mut expected_events,
                         &mut expected_writesets,
@@ -273,6 +282,7 @@ impl Verifier {
         let fail_txns = self.execute_and_verify(
             &mut chunk_start_version,
             &mut cur_txns,
+            &mut cur_persisted_aux_info,
             &mut expected_txn_infos,
             &mut expected_events,
             &mut expected_writesets,
@@ -319,6 +329,7 @@ impl Verifier {
         &self,
         current_version: &mut Version,
         cur_txns: &mut Vec<Transaction>,
+        cur_persisted_aux_info: &mut Vec<PersistedAuxiliaryInfo>,
         expected_txn_infos: &mut Vec<TransactionInfo>,
         expected_events: &mut Vec<Vec<ContractEvent>>,
         expected_writesets: &mut Vec<WriteSet>,
@@ -330,8 +341,13 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
-        // TODO(grao): Pass in persisted info.
-        let txns_provider = DefaultTxnProvider::new_without_info(txns);
+        let txns_provider = DefaultTxnProvider::new(
+            txns,
+            cur_persisted_aux_info
+                .iter()
+                .map(|info| AuxiliaryInfo::new(*info, None))
+                .collect(),
+        );
         let executed_outputs = AptosVMBlockExecutor::new().execute_block_no_limit(
             &txns_provider,
             &self
@@ -351,6 +367,7 @@ impl Verifier {
                 Some(&expected_events[idx]),
             ) {
                 cur_txns.drain(0..idx + 1);
+                cur_persisted_aux_info.drain(0..idx + 1);
                 expected_txn_infos.drain(0..idx + 1);
                 expected_events.drain(0..idx + 1);
                 expected_writesets.drain(0..idx + 1);
@@ -360,6 +377,7 @@ impl Verifier {
         }
 
         cur_txns.clear();
+        cur_persisted_aux_info.clear();
         expected_txn_infos.clear();
         expected_events.clear();
         expected_writesets.clear();

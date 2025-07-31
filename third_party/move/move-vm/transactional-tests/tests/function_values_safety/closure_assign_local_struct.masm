@@ -1,0 +1,66 @@
+//# publish
+module 0x66::helpers
+
+struct Fungible
+    x: u64
+
+public fun pack(x: u64): Fungible
+    move_loc x
+    pack Fungible
+    ret
+
+public fun unpack(x: Fungible): u64
+    move_loc x
+    unpack Fungible
+    ret
+
+public fun capture(f: Fungible): |Fungible|Fungible
+    move_loc f
+    pack_closure action, 1
+    ret
+
+public fun action(f1: Fungible, f2: Fungible): Fungible
+    // Sum the inputs up
+    move_loc f1
+    call unpack
+    move_loc f2
+    call unpack
+    add
+    pack Fungible
+    ret
+
+public fun assert_eq(x: u64, y: u64)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+ r: ret
+
+
+
+//# run --verbose
+script
+use 0x66::helpers as h
+
+fun expect_error()
+    local f: |h::Fungible|h::Fungible has copy
+    ld_u64 22
+    call h::pack
+    call h::capture
+    st_loc f
+    ld_u64 2
+    call h::pack
+    copy_loc f                                  // error: Copying a value capturing a non-copyable
+    call_closure<|h::Fungible|h::Fungible>
+    // Now have one fungible with value 22
+    ld_u64 2
+    call h::pack
+    move_loc f
+    call_closure<|h::Fungible|h::Fungible>      // Now have another fungible with value 22
+    call h::action
+    call h::unpack
+    ld_u64 44
+    call h::assert_eq
+    ret

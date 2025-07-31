@@ -1,19 +1,15 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-6:
+task 0 lines 1-6:  publish --print-bytecode
 
 == BEGIN Bytecode ==
-// Move bytecode v7
-module 66.m {
+// Bytecode version v7
+module 0x66::m
+// Function definition at index 0
+public fun f(l0: u64): u64
+    move_loc l0
+    ret
 
 
-public f(Arg0: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: Ret
-}
-}
 == END Bytecode ==
-
-task 1 'run'. lines 8-8:
+task 1 lines 8-8:  run 0x66::m::f --args 1 --verbose
 return values: 1

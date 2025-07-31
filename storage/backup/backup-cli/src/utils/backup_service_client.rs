@@ -152,7 +152,7 @@ impl BackupServiceClient {
     ) -> Result<impl AsyncRead> {
         self.get(
             "transactions",
-            &format!("{}/{}", start_version, num_transactions,),
+            &format!("{}/{}", start_version, num_transactions),
         )
         .await
     }

@@ -189,7 +189,7 @@ jobs:
         with:
           formula-name: aptos
           tag-name: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
-          base-branch: master
+          base-branch: main
           create-pullrequest: true
           commit-message: |
             {{formulaName}} {{version}}

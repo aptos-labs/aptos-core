@@ -342,6 +342,11 @@ where
 {
     type Key = StateKey;
 
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        let value_opt = self.get_state_value(state_key)?.map(|value| (0, value));
+        Ok(StateSlot::from_db_get(value_opt))
+    }
+
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         if let Some(res) = self.states.read().get(state_key) {
             return Ok(res.clone());

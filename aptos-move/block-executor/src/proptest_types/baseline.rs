@@ -637,7 +637,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         self.insert_or_verify_delayed_field_id(baseline_key.clone(), id);
     }
 
-    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
+    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<K, MockOutput<K, E>>) {
         let mut group_world = HashMap::new();
         let mut group_metadata: HashMap<K, Option<StateValueMetadata>> = HashMap::new();
 
@@ -1030,7 +1030,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutionResult<BlockOutput<MockOutput<K, E>>, usize>,
+        results: &BlockExecutionResult<BlockOutput<K, MockOutput<K, E>>, usize>,
     ) {
         match results {
             Ok(block_output) => {
@@ -1049,7 +1049,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
     pub(crate) fn assert_parallel_output<E: Debug>(
         &self,
-        results: &Result<BlockOutput<MockOutput<K, E>>, ()>,
+        results: &Result<BlockOutput<K, MockOutput<K, E>>, ()>,
     ) {
         match results {
             Ok(block_output) => {
