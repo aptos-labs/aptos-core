@@ -107,11 +107,12 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .iter()
         .map(|(s, v)| (s.to_string(), *v))
         .collect::<Vec<_>>();
-    let vm_test_config = TestRunConfig::CompilerV2 {
+    let vm_test_config = TestRunConfig {
         language_version: config.language_version,
         experiments,
         vm_config: config.vm_config,
         use_masm: true,
+        echo: true,
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

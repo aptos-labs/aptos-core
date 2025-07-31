@@ -1,6 +1,6 @@
 processed 6 tasks
-
-task 1 'publish'. lines 11-17:
+task 0 lines 3-9:  publish
+task 1 lines 11-17:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Priv'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::Priv`: removed `entry` modifier of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -10,8 +10,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 3 'publish'. lines 27-33:
+task 2 lines 19-25:  publish --verbose
+task 3 lines 27-33:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Pub'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::Pub`: removed `entry` modifier of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
@@ -21,8 +21,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     offsets: [],
     exec_state: None,
 }
-
-task 5 'publish'. lines 43-49:
+task 4 lines 35-41:  publish --verbose
+task 5 lines 43-49:  publish --verbose
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Fr'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::Fr`: removed `entry` modifier of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
