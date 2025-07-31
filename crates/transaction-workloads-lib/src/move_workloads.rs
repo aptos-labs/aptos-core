@@ -255,6 +255,8 @@ pub enum EntryPoints {
 
     OrderBook {
         state: Arc<OrderBookState>,
+        /// Number of markets to use.
+        num_markets: u32,
         /// Buy and sell price is picked randomly from their respective ranges.
         ///  `overlap_ratio` defines what portion of the range they overlap on.
         overlap_ratio: f64,
@@ -836,6 +838,7 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::OrderBook {
                 state,
+                num_markets,
                 overlap_ratio,
                 buy_frequency,
                 max_buy_size,
@@ -843,6 +846,7 @@ impl EntryPointTrait for EntryPoints {
             } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
 
+                let market_id = rng.gen_range(0, *num_markets);
                 let price_range = 1000000;
                 let is_bid = rng.gen_bool(*buy_frequency);
                 let size = rng.gen_range(1, 1 + if is_bid { max_buy_size } else { max_sell_size });
@@ -854,6 +858,7 @@ impl EntryPointTrait for EntryPoints {
 
                 // (account_order_id: u64, bid_price: u64, volume: u64, is_bid: bool)
                 get_payload(module_id, ident_str!("place_order").to_owned(), vec![
+                    bcs::to_bytes(&market_id).unwrap(),
                     bcs::to_bytes(&AccountAddress::random()).unwrap(),
                     bcs::to_bytes(
                         &state
