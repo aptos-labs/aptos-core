@@ -13,7 +13,7 @@ use crate::{
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     transaction::authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
@@ -587,8 +587,10 @@ fn gen_auth(
             AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
         },
         Auth::Abstraction(function_info, sign_function) => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::abstraction(
                 function_info.clone(),
                 digest.clone(),
@@ -600,8 +602,10 @@ fn gen_auth(
             account_identity,
             sign_function,
         } => {
-            let digest =
-                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            let digest = AASigningData::signing_message_digest(
+                signing_message(user_signed_message)?,
+                function_info.clone(),
+            )?;
             AccountAuthenticator::derivable_abstraction(
                 function_info.clone(),
                 digest.clone(),

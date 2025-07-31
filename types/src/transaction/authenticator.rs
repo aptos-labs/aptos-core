@@ -22,7 +22,7 @@ use aptos_crypto::{
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
@@ -553,7 +553,7 @@ pub enum AbstractionAuthData {
         #[serde(with = "serde_bytes")]
         signing_message_digest: Vec<u8>,
         #[serde(with = "serde_bytes")]
-        authenticator: Vec<u8>,
+        abstract_signature: Vec<u8>,
     },
     DerivableV1 {
         #[serde(with = "serde_bytes")]
@@ -577,6 +577,39 @@ impl AbstractionAuthData {
                 ..
             } => signing_message_digest,
         }
+    }
+}
+
+#[derive(
+    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+)]
+pub enum AASigningData {
+    V1 {
+        original_signing_message: Vec<u8>,
+        function_info: FunctionInfo,
+    },
+}
+
+impl AASigningData {
+    pub fn new(original_signing_message: Vec<u8>, function_info: FunctionInfo) -> Self {
+        Self::V1 {
+            original_signing_message,
+            function_info,
+        }
+    }
+
+    pub fn signing_message_digest(
+        original_signing_message: Vec<u8>,
+        function_info: FunctionInfo,
+    ) -> Result<Vec<u8>> {
+        Ok(HashValue::sha3_256_of(
+            signing_message(&AASigningData::V1 {
+                original_signing_message,
+                function_info,
+            })?
+            .as_slice(),
+        )
+        .to_vec())
     }
 }
 
@@ -626,13 +659,13 @@ impl AccountAuthenticator {
     pub fn abstraction(
         function_info: FunctionInfo,
         signing_message_digest: Vec<u8>,
-        authenticator: Vec<u8>,
+        abstract_signature: Vec<u8>,
     ) -> Self {
         Self::Abstraction {
             function_info,
             auth_data: AbstractionAuthData::V1 {
                 signing_message_digest,
-                authenticator,
+                abstract_signature,
             },
         }
     }
@@ -673,8 +706,12 @@ impl AccountAuthenticator {
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
             // Abstraction delayed the authentication after prologue.
-            Self::Abstraction { auth_data, .. } => {
-                ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
+            Self::Abstraction {
+                auth_data,
+                function_info,
+            } => {
+                let original_signing_message = signing_message(message)?;
+                ensure!(auth_data.signing_message_digest() == &AASigningData::signing_message_digest(original_signing_message, function_info.clone())?, "The signing message digest provided in Abstraction Authenticator is not expected");
                 Ok(())
             },
         }
