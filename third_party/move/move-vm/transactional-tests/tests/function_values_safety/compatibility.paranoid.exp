@@ -1,17 +1,43 @@
-processed 16 tasks
-task 0 lines 3-6:  publish --verbose
-task 1 lines 8-13:  publish --verbose
-task 2 lines 15-18:  publish --verbose
-task 3 lines 20-25:  publish --verbose
-task 4 lines 27-29:  publish --verbose
-task 5 lines 31-33:  publish --verbose
-task 6 lines 35-37:  publish --verbose
-task 7 lines 39-41:  publish --verbose
-task 8 lines 43-45:  publish --verbose
-task 9 lines 47-49:  publish --verbose
-task 10 lines 51-53:  publish --verbose
-task 11 lines 55-59:  publish --verbose
-task 12 lines 61-63:  publish --verbose
-task 13 lines 65-67:  publish --verbose
-task 14 lines 69-71:  publish --verbose
-task 15 lines 73-75:  publish --verbose
+processed 42 tasks
+task 0 lines 7-10:  publish [module 0x66::incompatible_field_type_u64]
+task 1 lines 17-20:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 2 lines 23-26:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 3 lines 33-36:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 4 lines 39-42:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 5 lines 49-52:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 6 lines 55-58:  publish --verbose [module 0x66::incompatible_field_type_u64]
+task 7 lines 66-69:  publish [module 0x66::incompatible_field_type_R_u8]
+task 8 lines 76-79:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 9 lines 82-85:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 10 lines 92-95:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 11 lines 98-101:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 12 lines 108-111:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 13 lines 114-124:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+task 14 lines 130-133:  publish [module 0x66::incompatible_field_ability_has_drop]
+task 15 lines 140-143:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 16 lines 150-153:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 17 lines 160-163:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 18 lines 171-174:  publish [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 19 lines 181-184:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 20 lines 191-194:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 21 lines 201-204:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 22 lines 212-215:  publish [module 0x66::incompatible_field_ability_]
+task 23 lines 222-225:  publish --verbose [module 0x66::incompatible_field_ability_]
+task 24 lines 232-244:  publish --verbose [module 0x66::incompatible_field_ability_]
+task 25 lines 246-248:  publish [module 0x66::compatible_function_since_private]
+task 26 lines 250-252:  publish [module 0x66::compatible_function_since_private]
+task 27 lines 254-256:  publish [module 0x66::incompatible_function_since_persistent]
+task 28 lines 258-260:  publish --verbose [module 0x66::incompatible_function_since_persistent]
+task 29 lines 262-264:  publish [module 0x66::incompatible_function_since_public]
+task 30 lines 266-268:  publish --verbose [module 0x66::incompatible_function_since_public]
+task 31 lines 270-272:  publish [module 0x66::incompatible_function_result_since_public]
+task 32 lines 274-278:  publish --verbose [module 0x66::incompatible_function_result_since_public]
+task 33 lines 280-282:  publish [module 0x66::incompatible_function_ability_since_public]
+task 34 lines 284-286:  publish --verbose [module 0x66::incompatible_function_ability_since_public]
+task 35 lines 288-290:  publish --verbose [module 0x66::incompatible_function_ability2_since_public]
+task 36 lines 292-296:  publish --verbose [module 0x66::incompatible_function_ability2_since_public]
+task 37 lines 298-300:  publish [module 0x66::incompatible_generic_function]
+task 38 lines 302-304:  publish --verbose [module 0x66::incompatible_generic_function]
+task 39 lines 306-308:  publish --verbose [module 0x66::incompatible_generic_function]
+task 40 lines 310-314:  publish [module 0x66::incompatible_generic_structure]
+task 41 lines 316-320:  publish --verbose [module 0x66::incompatible_generic_structure]

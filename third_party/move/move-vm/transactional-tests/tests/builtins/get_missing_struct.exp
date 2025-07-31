@@ -1,6 +1,6 @@
 processed 2 tasks
-task 0 lines 1-29:  publish
-task 1 lines 31-38:  run --verbose
+task 0 lines 1-29:  publish [module 0x1.Token {]
+task 1 lines 31-38:  run --verbose [import 0x1.Token;]
 Error: Script execution failed with VMError: {
     message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000001111111111111110,
     major_status: MISSING_DATA,

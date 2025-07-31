@@ -1,4 +1,4 @@
 processed 3 tasks
-task 0 lines 1-20:  publish
+task 0 lines 1-20:  publish [module 0x42.Tests {]
 task 1 lines 22-22:  run 0x42::Tests::test --type-args u64 --args 0
 task 2 lines 24-24:  run 0x42::Tests::test --type-args vector<u8> --args b"hello"

@@ -1,38 +1,71 @@
 // ========= Field Type
 
-//# publish --verbose
-module 0x66::incompatible_field_type
+{% for ty1 in ["u64", "&u8"] %}
+
+{% set suffix = mangle(repr=ty1) %}
+
+//# publish
+module 0x66::incompatible_field_type_{{suffix}}
 struct A has drop
-    x: |u64|u32 has drop
+    x: |{{ty1}}|u32 has drop
+
+
+{% for ty2 in ["u16", "address", "&mut u8"] %}
+
+{% if ty1 != ty2 %}
 
 //# publish --verbose
-module 0x66::incompatible_field_type
+module 0x66::incompatible_field_type_{{suffix}}
 struct A has drop
-    x: |u32|u64 has drop
+    x: |{{ty2}}|u32 has drop
+
+
+//# publish --verbose
+module 0x66::incompatible_field_type_{{suffix}}
+struct A has drop
+    x: |{{ty1}}|{{ty2}} has drop
+
+{% endif %}
+{% endfor %}
+{% endfor %}
+
 
 // ========= Field Ability
 
-//# publish --verbose
-module 0x66::incompatible_field_ability
-struct A has drop
-    x: |u64|u32 has drop
+{% for abi_old in [ "has drop", "has copy+drop", ""] %}
+
+{% set suffix = mangle(repr=abi_old) %}
+
+//# publish
+module 0x66::incompatible_field_ability_{{suffix}}
+struct A
+    x: |u64|u32 {{abi_old}}
+
+
+{% for abi_new in [ "has copy", "has copy+store", ""] %}
+
+{% if abi_new != abi_old %}
 
 //# publish --verbose
-module 0x66::incompatible_field_ability
-struct A has drop
-    x: |u64|u32 has drop+copy
+module 0x66::incompatible_field_ability_{{suffix}}
+struct A
+    x: |u64|u32 {{abi_new}}
+
+{% endif %}
+{% endfor %}
+{% endfor %}
 
 // ========= Function Type
 
-//# publish --verbose
+//# publish
 module 0x66::compatible_function_since_private
 fun foo(x: |u64|u32)
 
-//# publish --verbose
+//# publish
 module 0x66::compatible_function_since_private
 fun foo(x: |bool|u32)
 
-//# publish --verbose
+//# publish
 module 0x66::incompatible_function_since_persistent
 #[persistent] fun foo(x: |u64|u32)
 
@@ -40,7 +73,7 @@ module 0x66::incompatible_function_since_persistent
 module 0x66::incompatible_function_since_persistent
 #[persistent] fun foo(x: |bool|u32)
 
-//# publish --verbose
+//# publish
 module 0x66::incompatible_function_since_public
 public fun foo(x: |u64|u32)
 
@@ -48,7 +81,7 @@ public fun foo(x: |u64|u32)
 module 0x66::incompatible_function_since_public
 public fun foo(x: |bool|u32)
 
-//# publish --verbose
+//# publish
 module 0x66::incompatible_function_result_since_public
 public fun foo(): |u64|u32
 
@@ -58,7 +91,7 @@ public fun foo(): |bool|u32
 
 // ========= Function Ability
 
-//# publish --verbose
+//# publish
 module 0x66::incompatible_function_ability_since_public
 public fun foo(): |u64|u32 has store
 
@@ -73,3 +106,29 @@ public fun foo(): |u64|u32 has store+copy
 //# publish --verbose
 module 0x66::incompatible_function_ability2_since_public
 public fun foo(): |bool|u32 has copy
+
+// ======= Generics
+
+//# publish
+module 0x66::incompatible_generic_function
+public fun foo<A>(): |A|A
+
+//# publish --verbose
+module 0x66::incompatible_generic_function
+public fun foo<A>(): |A|u32
+
+//# publish --verbose
+module 0x66::incompatible_generic_function
+public fun foo<A, B>(): |A|B
+
+//# publish
+module 0x66::incompatible_generic_structure
+struct S<A>
+    x: A
+public fun foo<A>(): |S<A>|A
+
+//# publish --verbose
+module 0x66::incompatible_generic_structure
+struct S<A>
+    x: A
+public fun foo<A, B>(): |S<B>|A

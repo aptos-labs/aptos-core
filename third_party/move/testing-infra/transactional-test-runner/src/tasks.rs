@@ -34,8 +34,8 @@ pub struct TaskInput<Command> {
 pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput<Command>>> {
     use regex::Regex;
     use std::io::Write;
-    // checks whether there is a macro header so we use Tera to expand file content
-    let re_is_tera = Regex::new(r"(?m)\s*\{%").unwrap();
+    // checks whether there is a tera statement or comment header
+    let re_is_tera = Regex::new(r"(?m)\s*\{(%|#)").unwrap();
     // checks for lines that are entirely whitespace
     let re_whitespace = Regex::new(r"^\s*$").unwrap();
     // checks for lines that start with // comments
@@ -107,6 +107,12 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             command_source = format!("{} {}", command_source, text);
         }
         let command_text = format!("task {}", command_source);
+        if let Some((_, line)) = text.get(0) {
+            // Append first text line for better context
+            if !line.is_empty() {
+                command_source = format!("{} [{}]", command_source, line)
+            }
+        }
         let command_split = command_text.split_ascii_whitespace().collect::<Vec<_>>();
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
         let command = match Command::try_parse_from(command_split) {
