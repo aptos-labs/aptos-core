@@ -553,7 +553,7 @@ pub enum AbstractionAuthData {
         #[serde(with = "serde_bytes")]
         signing_message_digest: Vec<u8>,
         #[serde(with = "serde_bytes")]
-        authenticator: Vec<u8>,
+        abstract_signature: Vec<u8>,
     },
     DerivableV1 {
         #[serde(with = "serde_bytes")]
@@ -578,6 +578,14 @@ impl AbstractionAuthData {
             } => signing_message_digest,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, CryptoHash)]
+pub enum AASigningMessage<'a, T: Serialize + CryptoHash> {
+    V1 {
+        txn_message: &'a T,
+        function_info: FunctionInfo,
+    },
 }
 
 impl AccountAuthenticator {
@@ -626,13 +634,13 @@ impl AccountAuthenticator {
     pub fn abstraction(
         function_info: FunctionInfo,
         signing_message_digest: Vec<u8>,
-        authenticator: Vec<u8>,
+        abstract_signature: Vec<u8>,
     ) -> Self {
         Self::Abstraction {
             function_info,
             auth_data: AbstractionAuthData::V1 {
                 signing_message_digest,
-                authenticator,
+                abstract_signature,
             },
         }
     }
@@ -673,8 +681,16 @@ impl AccountAuthenticator {
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
             // Abstraction delayed the authentication after prologue.
-            Self::Abstraction { auth_data, .. } => {
-                ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
+            Self::Abstraction {
+                auth_data,
+                function_info,
+            } => {
+                ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(
+                    &AASigningMessage::V1 {
+                        txn_message: message,
+                        function_info,
+                    }
+                )?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
                 Ok(())
             },
         }
