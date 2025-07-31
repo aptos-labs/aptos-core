@@ -8,7 +8,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Transaction, Version,
+        AuxiliaryInfo, Transaction, Version,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// start and end versions of these transactions.
 pub(crate) struct Workload {
     /// Stores a non-empty block of  signature verified transactions ready for execution.
-    pub(crate) txn_provider: DefaultTxnProvider<SignatureVerifiedTransaction>,
+    pub(crate) txn_provider: DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
     /// Stores metadata for the version range of a block, corresponding to [begin, end) versions.
     /// It is always set to [TransactionSliceMetadata::Chunk].
     pub(crate) transaction_slice_metadata: TransactionSliceMetadata,
