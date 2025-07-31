@@ -7,7 +7,7 @@ AbstractionAuthData:
       V1:
         STRUCT:
           - signing_message_digest: BYTES
-          - authenticator: BYTES
+          - abstract_signature: BYTES
     1:
       DerivableV1:
         STRUCT:
@@ -307,6 +307,12 @@ FeeDistribution:
               MAP:
                 KEY: U64
                 VALUE: U64
+FunctionInfo:
+  STRUCT:
+    - module_address:
+        TYPENAME: AccountAddress
+    - module_name: STR
+    - function_name: STR
 FunctionParamOrReturnTag:
   ENUM:
     0:
@@ -321,12 +327,6 @@ FunctionParamOrReturnTag:
       Value:
         NEWTYPE:
           TYPENAME: TypeTag
-FunctionInfo:
-  STRUCT:
-    - module_address:
-        TYPENAME: AccountAddress
-    - module_name: STR
-    - function_name: STR
 FunctionTag:
   STRUCT:
     - args:
