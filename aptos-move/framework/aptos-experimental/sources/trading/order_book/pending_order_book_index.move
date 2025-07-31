@@ -41,10 +41,9 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_bid: bool
     ) {
         let (price_move_up_index, price_move_down_index, time_based_index) =
-            trigger_condition.index(is_bid);
+            trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(
                 &PendingOrderKey {
@@ -71,12 +70,10 @@ module aptos_experimental::pending_order_book_index {
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_bid: bool
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =
-            trigger_condition.index(is_bid);
-
+            trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.add(
                 PendingOrderKey {
