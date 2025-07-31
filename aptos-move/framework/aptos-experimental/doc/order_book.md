@@ -30,6 +30,9 @@ types of pending orders are supported.
 -  [Function `is_taker_order`](#0x7_order_book_is_taker_order)
 -  [Function `place_maker_order`](#0x7_order_book_place_maker_order)
 -  [Function `reinsert_maker_order`](#0x7_order_book_reinsert_maker_order)
+-  [Function `modify_order`](#0x7_order_book_modify_order)
+-  [Function `modify_and_copy_order`](#0x7_order_book_modify_and_copy_order)
+-  [Function `modify_or_remove_order`](#0x7_order_book_modify_or_remove_order)
 -  [Function `place_pending_maker_order`](#0x7_order_book_place_pending_maker_order)
 -  [Function `get_single_match_for_taker`](#0x7_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_order_book_decrease_order_size)
@@ -763,15 +766,104 @@ it is added to the order book, if it exists, it's size is updated.
     <b>if</b> (!self.orders.contains(&order_req.order_id)) {
         <b>return</b> self.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(order_req);
     };
-    <b>let</b> order_with_state = self.orders.remove(&order_req.order_id);
-    order_with_state.increase_remaining_size(order_req.remaining_size);
-    self.orders.add(order_req.order_id, order_with_state);
+
+    <a href="order_book.md#0x7_order_book_modify_order">modify_order</a>(&<b>mut</b> self.orders, &order_req.order_id, |order_with_state| {
+        order_with_state.increase_remaining_size(order_req.remaining_size);
+    });
     self.active_orders.increase_order_size(
         order_req.price,
         original_order.get_unique_priority_idx(),
         order_req.remaining_size,
         order_req.is_bid
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_modify_order"></a>
+
+## Function `modify_order`
+
+
+
+<pre><code><b>fun</b> <a href="order_book.md#0x7_order_book_modify_order">modify_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;|)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="order_book.md#0x7_order_book_modify_order">modify_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;|
+) {
+    <b>let</b> order = *orders.borrow(order_id);
+    modify_fn(&<b>mut</b> order);
+    orders.upsert(*order_id, order);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_modify_and_copy_order"></a>
+
+## Function `modify_and_copy_order`
+
+
+
+<pre><code><b>fun</b> <a href="order_book.md#0x7_order_book_modify_and_copy_order">modify_and_copy_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;|): <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="order_book.md#0x7_order_book_modify_and_copy_order">modify_and_copy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;|
+): OrderWithState&lt;M&gt; {
+    <b>let</b> order = *orders.borrow(order_id);
+    modify_fn(&<b>mut</b> order);
+    orders.upsert(*order_id, order);
+    order
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_modify_or_remove_order"></a>
+
+## Function `modify_or_remove_order`
+
+
+
+<pre><code><b>fun</b> <a href="order_book.md#0x7_order_book_modify_or_remove_order">modify_or_remove_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;|bool): <a href="order_book_types.md#0x7_order_book_types_OrderWithState">order_book_types::OrderWithState</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="order_book.md#0x7_order_book_modify_or_remove_order">modify_or_remove_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;| bool
+): OrderWithState&lt;M&gt; {
+    <b>let</b> order = orders.remove(order_id);
+    <b>let</b> keep = modify_fn(&<b>mut</b> order);
+    <b>if</b> (keep) {
+        orders.add(*order_id, order);
+    };
+    order
 }
 </code></pre>
 
@@ -855,11 +947,12 @@ API to ensure that the order is a taker order before calling this API, otherwise
     <b>let</b> result = self.active_orders.get_single_match_result(price, size, is_bid);
     <b>let</b> (order_id, matched_size, remaining_size) =
         result.destroy_active_matched_order();
-    <b>let</b> order_with_state = self.orders.remove(&order_id);
-    order_with_state.set_remaining_size(remaining_size);
-    <b>if</b> (remaining_size &gt; 0) {
-        self.orders.add(order_id, order_with_state);
-    };
+
+    <b>let</b> order_with_state = <a href="order_book.md#0x7_order_book_modify_or_remove_order">modify_or_remove_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
+        order_with_state.set_remaining_size(remaining_size);
+        remaining_size &gt; 0
+    });
+
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
     <b>if</b> (remaining_size == 0 && order.get_client_order_id().is_some()) {
         self.client_order_ids.remove(
@@ -905,14 +998,20 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
     size_delta: u64
 ) {
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-    <b>let</b> order_with_state = self.orders.remove(&order_id);
-    <b>assert</b>!(
-        order_creator == order_with_state.get_order_from_state().get_account(),
-        <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>
-    );
-    order_with_state.decrease_remaining_size(size_delta);
+
+    <b>let</b> order_with_state = <a href="order_book.md#0x7_order_book_modify_and_copy_order">modify_and_copy_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
+        <b>assert</b>!(
+            order_creator == order_with_state.get_order_from_state().get_account(),
+            <a href="order_book.md#0x7_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>
+        );
+        order_with_state.decrease_remaining_size(size_delta);
+
+        // TODO should we be asserting that remaining size is greater than 0?
+    });
+
     <b>if</b> (order_with_state.<a href="order_book.md#0x7_order_book_is_active_order">is_active_order</a>()) {
-        <b>let</b> order = order_with_state.get_order_from_state();self
+        <b>let</b> order = order_with_state.get_order_from_state();
+        self
             .active_orders
             .<a href="order_book.md#0x7_order_book_decrease_order_size">decrease_order_size</a>(
             order.get_price(),
@@ -921,7 +1020,6 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
             order.is_bid()
         );
     };
-    self.orders.add(order_id, order_with_state);
 }
 </code></pre>
 
@@ -1008,9 +1106,10 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
 ) {
     <b>assert</b>!(self.orders.contains(&order_id), <a href="order_book.md#0x7_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-    <b>let</b> order_with_state = self.orders.remove(&order_id);
-    order_with_state.set_metadata_in_state(metadata);
-    self.orders.add(order_id, order_with_state);
+
+    <a href="order_book.md#0x7_order_book_modify_order">modify_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
+        order_with_state.set_metadata_in_state(metadata);
+    });
 }
 </code></pre>
 
