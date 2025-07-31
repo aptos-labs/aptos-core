@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30},
+    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34},
     AptosGasParameters,
 };
 use aptos_types::{
@@ -74,10 +75,11 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
 }
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
-pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
+pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features) -> VerifierConfig {
     let use_signature_checker_v2 = features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2);
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
+    let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     let enable_resource_access_control =
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
@@ -108,6 +110,7 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
         max_per_mod_meter_units: Some(1000 * 80000),
         use_signature_checker_v2,
         sig_checker_v2_fix_script_ty_param_count,
+        sig_checker_v2_fix_function_signatures,
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,
@@ -137,7 +140,7 @@ pub fn aptos_prod_vm_config(
     let paranoid_type_checks = get_paranoid_type_checks();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
-    let verifier_config = aptos_prod_verifier_config(features);
+    let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
 
     let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
         512
