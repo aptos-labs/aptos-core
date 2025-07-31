@@ -1,6 +1,5 @@
 processed 3 tasks
-
-task 0 'run'. lines 1-6:
+task 0 lines 1-6:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -8,8 +7,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 1 'run'. lines 8-13:
+task 1 lines 8-13:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -17,8 +15,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 15-20:
+task 2 lines 15-20:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,

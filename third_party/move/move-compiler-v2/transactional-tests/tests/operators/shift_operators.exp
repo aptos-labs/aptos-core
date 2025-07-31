@@ -1,6 +1,5 @@
 processed 8 tasks
-
-task 0 'run'. lines 1-8:
+task 0 lines 1-8:  run [// Number of bits shifted >= total number of bits in the number.]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -8,8 +7,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-
-task 1 'run'. lines 10-18:
+task 1 lines 10-18:  run [script {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -17,3 +15,9 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
+task 2 lines 19-27:  run [script {]
+task 3 lines 28-48:  run [script {]
+task 4 lines 49-70:  run [script {]
+task 5 lines 71-85:  run [script {]
+task 6 lines 86-100:  run [script {]
+task 7 lines 101-131:  run [script {]

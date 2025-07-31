@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 12-12:
+task 0 lines 1-10:  publish [module 0xc0ffee::m {]
+task 1 lines 12-12:  run 0xc0ffee::m::test
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),

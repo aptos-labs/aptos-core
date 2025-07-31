@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'publish'. lines 8-14:
+task 0 lines 1-6:  publish [module 0xc0ffee::m {]
+task 1 lines 8-14:  publish [module 0xc0ffee::n {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::n'. Got VMError: {
     major_status: LOOKUP_FAILED,
     sub_status: None,
