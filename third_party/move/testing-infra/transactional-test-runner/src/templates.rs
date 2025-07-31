@@ -27,13 +27,11 @@ impl Default for TemplateContext {
                     return Err(tera::Error::msg("expected string"));
                 };
                 Ok(Value::String(
-                    arg.replace('|', "~")
-                        .replace('<', "$")
-                        .replace('>', "$")
+                    arg.replace('|', "_F_")
+                        .replace(['<', '>'], "$")
                         .replace('&', "R_")
                         .replace('+', "_A_")
-                        .replace(':', "_")
-                        .replace(' ', "_"),
+                        .replace([':', ' '], "_"),
                 ))
             },
         );

@@ -35,7 +35,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
     use regex::Regex;
     use std::io::Write;
     // checks whether there is a tera statement or comment header
-    let re_is_tera = Regex::new(r"(?m)\s*\{(%|#)").unwrap();
+    let re_is_tera = Regex::new(r"(?m)^\s*\{(%|#)").unwrap();
     // checks for lines that are entirely whitespace
     let re_whitespace = Regex::new(r"^\s*$").unwrap();
     // checks for lines that start with // comments
@@ -107,7 +107,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             command_source = format!("{} {}", command_source, text);
         }
         let command_text = format!("task {}", command_source);
-        if let Some((_, line)) = text.get(0) {
+        if let Some((_, line)) = text.first() {
             // Append first text line for better context
             if !line.is_empty() {
                 command_source = format!("{} [{}]", command_source, line)
