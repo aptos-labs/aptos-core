@@ -329,6 +329,7 @@ dependencies = [
  "aptos-localnet",
  "aptos-logger",
  "aptos-move-debugger",
+ "aptos-move-linter",
  "aptos-network-checker",
  "aptos-node",
  "aptos-rest-client",
@@ -3088,6 +3089,21 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-move-linter"
+version = "0.1.0"
+dependencies = [
+ "codespan-reporting",
+ "datatest-stable",
+ "legacy-move-compiler",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "num 0.4.1",
 ]
 
 [[package]]
