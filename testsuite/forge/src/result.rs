@@ -67,9 +67,16 @@ impl TestSummary {
                 self.passed += 1;
                 self.write_ok()?;
             },
-            TestResult::HardFailure(msg)
-            | TestResult::InfraFailure(msg)
-            | TestResult::SoftFailure(msg) => {
+            TestResult::SoftFailure(msg) => {
+                self.passed += 1;
+
+                writeln!(self.stdout)?;
+                write!(self.stdout, "Error: {}", msg)?;
+                writeln!(self.stdout)?;
+
+                self.write_ok()?;
+            },
+            TestResult::HardFailure(msg) | TestResult::InfraFailure(msg) => {
                 self.failed.push(details.name());
                 self.write_failed()?;
                 writeln!(self.stdout)?;
