@@ -1,0 +1,676 @@
+
+Diagnostics:
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:29:13
+   │
+29 │         if (!!a) ();
+   │             ^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:36:13
+   │
+36 │         if (!!a) ();
+   │             ^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:37:13
+   │
+37 │         if (!(!b)) ();
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:43:13
+   │
+43 │         if (!!flags.a) ();
+   │             ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:44:13
+   │
+44 │         if (!(!flags.b)) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:53:13
+   │
+53 │         if (!!nested.flags.a) ();
+   │             ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:54:13
+   │
+54 │         if (!(!nested.enabled)) ();
+   │             ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:62:13
+   │
+62 │         if (a && b || a) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:63:13
+   │
+63 │         if (a || a && b) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:70:13
+   │
+70 │         if (x && y || x) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:71:13
+   │
+71 │         if (x || x && y) ();
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:13
+   │
+75 │         if (TRUE_CONST && FALSE_CONST || TRUE_CONST) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The right-hand side of `||` evaluates to `true`. Recall that the expression `bexpr || true` is logically equivalent to `true`. Consider simplifying.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:13
+   │
+75 │         if (TRUE_CONST && FALSE_CONST || TRUE_CONST) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:13
+   │
+75 │         if (TRUE_CONST && FALSE_CONST || TRUE_CONST) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `false`. Recall that the expression `false && bexpr` is logically equivalent to `false`. Consider simplifying.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:76:28
+   │
+76 │         if (FALSE_CONST || FALSE_CONST && TRUE_CONST) ();
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:76:13
+   │
+76 │         if (FALSE_CONST || FALSE_CONST && TRUE_CONST) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:76:13
+   │
+76 │         if (FALSE_CONST || FALSE_CONST && TRUE_CONST) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:82:13
+   │
+82 │         if (flags.a && flags.b || flags.a) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:83:13
+   │
+83 │         if (flags.a || flags.a && flags.b) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:92:13
+   │
+92 │         if (nested.flags.a && nested.enabled || nested.flags.a) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:93:13
+   │
+93 │         if (nested.flags.a || nested.flags.a && nested.enabled) ();
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:110:13
+    │
+110 │         if (!!a && !a) ();
+    │             ^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:110:13
+    │
+110 │         if (!!a && !a) ();
+    │             ^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:111:13
+    │
+111 │         if (a && a) ();
+    │             ^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:112:13
+    │
+112 │         if (a || a) ();
+    │             ^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:118:13
+    │
+118 │         if (flag && flag) ();
+    │             ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:119:13
+    │
+119 │         if (flag || flag) ();
+    │             ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:124:13
+    │
+124 │         if (TRUE_CONST && TRUE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:125:13
+    │
+125 │         if (FALSE_CONST || FALSE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:131:13
+    │
+131 │         if (flags.a && flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:132:13
+    │
+132 │         if (flags.b || flags.b) ();
+    │             ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:141:13
+    │
+141 │         if (nested.flags.a && nested.flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:142:13
+    │
+142 │         if (nested.flags.b || nested.flags.b) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:160:13
+    │
+160 │         if (a && !a) ();
+    │             ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:161:13
+    │
+161 │         if (!a && a) ();
+    │             ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:162:13
+    │
+162 │         if (a || !a) ();
+    │             ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:163:13
+    │
+163 │         if (!a || a) ();
+    │             ^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:169:13
+    │
+169 │         if (condition && !condition) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:170:13
+    │
+170 │         if (!condition && condition) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:171:13
+    │
+171 │         if (condition || !condition) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:172:13
+    │
+172 │         if (!condition || condition) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:177:27
+    │
+177 │         if (TRUE_CONST && !TRUE_CONST) ();
+    │                           ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:177:13
+    │
+177 │         if (TRUE_CONST && !TRUE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:178:13
+    │
+178 │         if (!TRUE_CONST && TRUE_CONST) ();
+    │             ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:178:13
+    │
+178 │         if (!TRUE_CONST && TRUE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:179:28
+    │
+179 │         if (FALSE_CONST || !FALSE_CONST) ();
+    │                            ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:179:13
+    │
+179 │         if (FALSE_CONST || !FALSE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:180:13
+    │
+180 │         if (!FALSE_CONST || FALSE_CONST) ();
+    │             ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that the expression `bexpr || false` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:180:13
+    │
+180 │         if (!FALSE_CONST || FALSE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:186:13
+    │
+186 │         if (flags.a && !flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:187:13
+    │
+187 │         if (!flags.a && flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:188:13
+    │
+188 │         if (flags.a || !flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:189:13
+    │
+189 │         if (!flags.a || flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:198:13
+    │
+198 │         if (nested.flags.a && !nested.flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:199:13
+    │
+199 │         if (!nested.flags.a && nested.flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:200:13
+    │
+200 │         if (nested.flags.a || !nested.flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:201:13
+    │
+201 │         if (!nested.flags.a || nested.flags.a) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:219:13
+    │
+219 │         if ((a && b) || (a && c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:220:13
+    │
+220 │         if ((a || b) && (a || c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:228:13
+    │
+228 │         if ((a && b) || (a && c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:229:13
+    │
+229 │         if ((a || b) && (a || c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:13
+    │
+233 │         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:44
+    │
+233 │         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
+    │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:13
+    │
+233 │         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:234:13
+    │
+234 │         if ((FALSE_CONST || FALSE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:234:45
+    │
+234 │         if ((FALSE_CONST || FALSE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
+    │                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:234:13
+    │
+234 │         if ((FALSE_CONST || FALSE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:241:13
+    │
+241 │         if ((flags.a && other.a) || (flags.a && other.c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:242:13
+    │
+242 │         if ((flags.a || other.a) && (flags.a || other.c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:251:13
+    │
+251 │         if ((nested.flags.a && nested.enabled) || (nested.flags.a && nested.flags.c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:252:13
+    │
+252 │         if ((nested.flags.a || nested.enabled) && (nested.flags.a || nested.flags.c)) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:259:13
+    │
+259 │         if ((helper_function() && TRUE_CONST) || (helper_function() && (y > 10))) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that the expression `bexpr || false` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:260:13
+    │
+260 │         if ((helper_function() || FALSE_CONST) && (helper_function() || (y > 10))) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:292:13
+    │
+292 │         if (TRUE_CONST && FALSE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:293:13
+    │
+293 │         if (FALSE_CONST || TRUE_CONST) ();
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
