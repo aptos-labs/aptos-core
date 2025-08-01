@@ -26,7 +26,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -164,17 +164,17 @@ where
 {
     fn charge_dependency(
         &mut self,
-        is_new: bool,
+        kind: DependencyKind,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
     ) -> PartialVMResult<()> {
         let (cost, res) =
-            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
+            self.delegate_charge(|base| base.charge_dependency(kind, addr, name, size));
 
         if !cost.is_zero() {
             self.dependencies.push(Dependency {
-                is_new,
+                kind,
                 id: ModuleId::new(*addr, name.to_owned()),
                 size,
                 cost,
