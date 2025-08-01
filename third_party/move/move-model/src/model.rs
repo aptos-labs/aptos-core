@@ -52,7 +52,6 @@ pub use move_binary_format::file_format::Visibility;
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     file_format::{
         Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
         FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
@@ -61,7 +60,7 @@ use move_binary_format::{
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
-use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
@@ -72,7 +71,6 @@ use move_core_types::{
     language_storage,
     value::MoveValue,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -3516,20 +3514,10 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = self.data.source_map.as_ref().expect("source map").clone();
-        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
-            only_externally_visible: false,
-            print_code: true,
-            print_basic_blocks: true,
-            print_locals: true,
-            print_bytecode_stats: false,
-        });
+        let module = self.get_verified_module()?;
         Some(
-            disas
-                .disassemble()
-                // Failure here is fatal and should not happen
-                .expect("Failed to disassemble a verified module"),
+            move_asm::disassembler::disassemble_module(String::new(), module)
+                .expect("disassemble succeeds"),
         )
     }
 
