@@ -25,6 +25,8 @@ pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     max_promotions_per_block: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
     /// evicted.
+    /// TODO(HotState): remove `dead_code` annotation.
+    #[allow(dead_code)]
     refresh_interval_versions: usize,
 }
 
@@ -139,6 +141,8 @@ where
                 hot_since_version, self.first_version
             );
         }
-        hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        // TODO(HotState): understand perf impact. For now, we always refresh.
+        // hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        true
     }
 }
