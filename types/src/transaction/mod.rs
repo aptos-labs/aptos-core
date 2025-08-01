@@ -54,7 +54,9 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
+pub use self::block_epilogue::{
+    BlockEndInfo, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
+};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -2980,7 +2982,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         None
     }
 
-    fn from_txn(_txn: Transaction) -> Self {
+    fn gen_state_checkpoint() -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v0() -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v1(block_end_info: TBlockEndInfoExt<Self::Key>) -> Self {
         unimplemented!()
     }
 }
