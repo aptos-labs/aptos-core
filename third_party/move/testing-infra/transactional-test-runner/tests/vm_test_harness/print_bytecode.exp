@@ -1,23 +1,17 @@
 processed 2 tasks
-
-task 0 'print-bytecode'. lines 1-5:
-// Move bytecode v7
-script {
-
-
-main<Ty0, Ty1>() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 7-13:
-// Move bytecode v7
-module 42.M {
+task 0 lines 1-5:  print-bytecode [main<T, U>() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main<T0, T1>()
+    ret
 
 
-f<Ty0, Ty1>() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
+task 1 lines 7-13:  print-bytecode --input=module [module 0x42.M {]
+// Bytecode version v7
+module 0x42::M
+// Function definition at index 0
+fun f<T0, T1>()
+    ret
+
+

@@ -1,5 +1,5 @@
 processed 6 tasks
-task 0 lines 6-17:  publish --print-bytecode
+task 0 lines 6-17:  publish --print-bytecode [module 0x66::h_1]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -18,7 +18,7 @@ l0: ret
 
 == END Bytecode ==
 task 1 lines 19-19:  run --verbose 0x66::h_1::f
-task 2 lines 23-34:  publish --print-bytecode
+task 2 lines 23-34:  publish --print-bytecode [module 0x66::h_5]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -37,7 +37,7 @@ l0: ret
 
 == END Bytecode ==
 task 3 lines 36-36:  run --verbose 0x66::h_5::f
-task 4 lines 40-51:  publish --print-bytecode
+task 4 lines 40-51:  publish --print-bytecode [module 0x66::h_10]
 
 == BEGIN Bytecode ==
 // Bytecode version v7

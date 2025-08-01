@@ -1,6 +1,6 @@
 processed 17 tasks
-task 0 lines 1-15:  run --verbose
-task 1 lines 17-22:  run --verbose
+task 0 lines 1-15:  run --verbose [main() {]
+task 1 lines 17-22:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Addition overflow,
     major_status: ARITHMETIC_ERROR,
@@ -10,7 +10,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 2 lines 24-29:  run --verbose
+task 2 lines 24-29:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Addition overflow,
     major_status: ARITHMETIC_ERROR,
@@ -20,8 +20,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 3 lines 33-46:  run --verbose
-task 4 lines 48-53:  run --verbose
+task 3 lines 33-46:  run --verbose [main() {]
+task 4 lines 48-53:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Subtraction overflow,
     major_status: ARITHMETIC_ERROR,
@@ -31,7 +31,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 5 lines 55-60:  run --verbose
+task 5 lines 55-60:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Subtraction overflow,
     major_status: ARITHMETIC_ERROR,
@@ -41,8 +41,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 6 lines 63-75:  run --verbose
-task 7 lines 77-82:  run --verbose
+task 6 lines 63-75:  run --verbose [main() {]
+task 7 lines 77-82:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Multiplication overflow,
     major_status: ARITHMETIC_ERROR,
@@ -52,7 +52,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 8 lines 84-89:  run --verbose
+task 8 lines 84-89:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Multiplication overflow,
     major_status: ARITHMETIC_ERROR,
@@ -62,8 +62,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 9 lines 93-106:  run --verbose
-task 10 lines 108-113:  run --verbose
+task 9 lines 93-106:  run --verbose [main() {]
+task 10 lines 108-113:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Division by zero,
     major_status: ARITHMETIC_ERROR,
@@ -73,7 +73,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 11 lines 115-120:  run --verbose
+task 11 lines 115-120:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Division by zero,
     major_status: ARITHMETIC_ERROR,
@@ -83,7 +83,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 12 lines 122-127:  run --verbose
+task 12 lines 122-127:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Division by zero,
     major_status: ARITHMETIC_ERROR,
@@ -93,8 +93,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 13 lines 131-144:  run --verbose
-task 14 lines 146-151:  run --verbose
+task 13 lines 131-144:  run --verbose [main() {]
+task 14 lines 146-151:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,
     major_status: ARITHMETIC_ERROR,
@@ -104,7 +104,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 15 lines 153-158:  run --verbose
+task 15 lines 153-158:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,
     major_status: ARITHMETIC_ERROR,
@@ -114,7 +114,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 16 lines 160-165:  run --verbose
+task 16 lines 160-165:  run --verbose [main() {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,
     major_status: ARITHMETIC_ERROR,

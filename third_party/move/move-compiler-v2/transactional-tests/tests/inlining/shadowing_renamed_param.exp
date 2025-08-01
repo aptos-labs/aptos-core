@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-46:
+task 0 lines 1-46:  publish [module 0x42::Test {]
 warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
    ┌─ TEMPFILE:10:31
    │
@@ -14,3 +13,4 @@ warning: This assignment/binding to the left-hand-side variable `x` is unused. C
    │                 ^
 
 
+task 1 lines 48-48:  run 0x42::Test::test_shadowing_entry

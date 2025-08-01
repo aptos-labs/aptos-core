@@ -1,28 +1,23 @@
 processed 4 tasks
+task 0 lines 1-14:  print-bytecode --input=module [// Borrowing a global of a type defined as part of the same module is valid.]
+// Bytecode version v7
+module 0x1d6::M
+use 0x1::signer
+struct T
+  b: bool
 
-task 0 'print-bytecode'. lines 1-14:
-// Move bytecode v7
-module 1d6.M {
-use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+// Function definition at index 0
+fun f(l0: signer)
+    local l1: &mut M::T
+    borrow_loc l0
+    call signer::address_of
+    mut_borrow_global T
+    st_loc l1
+    ret
 
 
-struct T has key {
-	b: bool
-}
-
-f(Arg0: signer) /* def_idx: 0 */ {
-L1:	loc0: &mut T
-B0:
-	0: ImmBorrowLoc[0](Arg0: signer)
-	1: Call signer::address_of(&signer): address
-	2: MutBorrowGlobal[0](T)
-	3: StLoc[1](loc0: &mut T)
-	4: Ret
-}
-}
-
-task 2 'print-bytecode'. lines 21-33:
+task 1 lines 16-19:  publish [module 0x2d6.M {]
+task 2 lines 21-33:  print-bytecode --input=module [// Borrowing a global of a type defined in a different module is invalid.]
 Error: Missing struct definition for T
-
-task 3 'print-bytecode'. lines 35-46:
+task 3 lines 35-46:  print-bytecode [// Borrowing a global of a struct type within a script (which cannot define its own struct types)]
 Error: Missing struct definition for T

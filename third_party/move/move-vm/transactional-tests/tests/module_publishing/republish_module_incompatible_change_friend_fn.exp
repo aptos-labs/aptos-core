@@ -1,8 +1,8 @@
 processed 4 tasks
-task 0 lines 1-7:  publish
-task 1 lines 9-16:  publish
-task 2 lines 18-26:  publish
-task 3 lines 28-36:  publish --verbose
+task 0 lines 1-7:  publish [module 0x42.N {]
+task 1 lines 9-16:  publish [module 0x42.M {]
+task 2 lines 18-26:  publish [module 0x42.N {]
+task 3 lines 28-36:  publish --verbose [module 0x42.M {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::M`: changed return type of function `foo`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,

@@ -1,6 +1,5 @@
 processed 5 tasks
-
-task 0 'publish'. lines 1-12:
+task 0 lines 1-12:  publish [// ensure that generic structs instantiated with struct types behave like resources]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M1'. Got VMError: {
     major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,
     sub_status: None,
@@ -8,8 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-
-task 1 'publish'. lines 14-25:
+task 1 lines 14-25:  publish [module 0x1.M2 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
     sub_status: None,
@@ -17,8 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 2 'publish'. lines 27-37:
+task 2 lines 27-37:  publish [module 0x1.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: READREF_WITHOUT_COPY_ABILITY,
     sub_status: None,
@@ -26,8 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 3 'publish'. lines 39-50:
+task 3 lines 39-50:  publish [module 0x1.M4 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M4'. Got VMError: {
     major_status: WRITEREF_WITHOUT_DROP_ABILITY,
     sub_status: None,
@@ -35,8 +31,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-
-task 4 'publish'. lines 52-62:
+task 4 lines 52-62:  publish [module 0x1.M5 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M5'. Got VMError: {
     major_status: COPYLOC_WITHOUT_COPY_ABILITY,
     sub_status: None,
