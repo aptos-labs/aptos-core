@@ -332,7 +332,7 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
 
     fn with_module_writes(
         &mut self,
-        module_writes: &[ModuleWrite<ValueType>],
+        module_writes: impl Iterator<Item = ModuleWrite<ValueType>>,
         txn_idx: TxnIndex,
     ) -> &mut Self {
         for module_write in module_writes {
@@ -505,7 +505,10 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
             .with_group_deltas(group_deltas)
             .with_resource_writes(&behavior.resource_writes, delta_test_kind, txn_idx)
             .with_resource_deltas(resource_deltas, delta_test_kind)
-            .with_module_writes(&behavior.module_writes, txn_idx as TxnIndex);
+            .with_module_writes(
+                behavior.module_writes.values().cloned(),
+                txn_idx as TxnIndex,
+            );
 
         // Apply gas
         *accumulated_gas += behavior.gas;
