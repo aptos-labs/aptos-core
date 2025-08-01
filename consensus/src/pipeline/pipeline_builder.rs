@@ -658,9 +658,11 @@ impl PipelineBuilder {
 
         let encrypted_payload = block.encrypted_payload().unwrap();
         let ciphertexts = encrypted_payload.ciphertexts();
-        let round = block.round();
+        // let encryption_round = encrypted_payload.encryption_round();
+        // daniel todo: hack before having a large setup
+        let encryption_round = 0;
 
-        let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ciphertexts, round, &DECRYPTION_POOL)?;
+        let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ciphertexts, encryption_round, &DECRYPTION_POOL)?;
 
         Ok((digest, proofs_promise))
     }

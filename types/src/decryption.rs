@@ -16,6 +16,7 @@ use aptos_batch_encryption::schemes::fptx::FPTX;
 use aptos_batch_encryption::shared::algebra::shamir::ThresholdConfig;
 use once_cell::sync::Lazy;
 
+
 pub type EncryptionKey = <FPTX as BatchThresholdEncryption>::EncryptionKey;
 pub type DigestKey = <FPTX as BatchThresholdEncryption>::DigestKey;
 pub type Ciphertext = <FPTX as BatchThresholdEncryption>::Ciphertext;
@@ -30,9 +31,10 @@ pub type DecryptionKeyShare = <FPTX as BatchThresholdEncryption>::DecryptionKeyS
 pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
+
 pub const PROTOTYPE_SETUP_SEED: u64 = 233;
-pub const PROTOTYPE_BATCH_SIZE: usize = 32;
-pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 100;
+pub const PROTOTYPE_BATCH_SIZE: usize = 128;
+pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 1;
 pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 4;
 pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 3;
 pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 2;

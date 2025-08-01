@@ -126,6 +126,8 @@ pub trait Plaintext: Serialize + DeserializeOwned + Send + Sync {}
 
 impl Plaintext for String {}
 
+impl Plaintext for Vec<u8> {}
+
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
 pub struct Player {

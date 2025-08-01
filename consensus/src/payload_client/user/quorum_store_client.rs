@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 use std::{collections::BTreeMap, sync::Arc};
 use aptos_types::transaction::SignedTransaction;
+use aptos_types::decryption::Round;
 
 const NO_TXN_DELAY: u64 = 30;
 
@@ -71,6 +72,7 @@ impl QuorumStoreClient {
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
         max_inline_encrypted_txns: PayloadTxnsSize,
+        encryption_round: Round,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
@@ -121,7 +123,7 @@ impl QuorumStoreClient {
                             }
                         }
                     }
-                    payload.add_encrypted_txns(encrypted_txns_to_add);
+                    payload.add_encrypted_txns(encrypted_txns_to_add, encryption_round);
                     Ok(payload)
                 },
             },
@@ -164,6 +166,7 @@ impl UserPayloadClient for QuorumStoreClient {
                     params.user_txn_filter.clone(),
                     params.block_timestamp,
                     params.max_inline_encrypted_txns,
+                    params.encryption_round,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {

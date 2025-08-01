@@ -131,6 +131,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     } else {
         TimelineState::NotReady
     };
+    let is_encrypted = transaction.is_encrypted();
     let statuses: Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))> =
         process_incoming_transactions(
             &smp,

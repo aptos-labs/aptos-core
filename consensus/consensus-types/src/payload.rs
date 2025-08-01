@@ -3,7 +3,7 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_types::{decryption::{Ciphertext, DecryptionKey, EvalProofs, Id}, transaction::SignedTransaction, PeerId};
+use aptos_types::{decryption::{Ciphertext, DecryptionKey, EvalProofs, Id, Round}, transaction::SignedTransaction, PeerId};
 use bcs;
 use core::fmt;
 use serde::{Deserialize, Serialize};
@@ -330,17 +330,20 @@ impl OptQuorumStorePayloadV1 {
 
 static DEFAULT_INLINE_ENCRYPTED_TXNS: InlineEncryptedTxns = InlineEncryptedTxns {
     encrypted_txns: Vec::new(),
+    encryption_round: 0,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InlineEncryptedTxns{
     encrypted_txns: Vec<SignedTransaction>,
+    encryption_round: Round,
 }
 
 impl InlineEncryptedTxns {
-    pub fn new(txns: Vec<SignedTransaction>) -> Self {
+    pub fn new(txns: Vec<SignedTransaction>, encryption_round: Round) -> Self {
         Self {
             encrypted_txns: txns,
+            encryption_round,
         }
     }
 
@@ -350,6 +353,10 @@ impl InlineEncryptedTxns {
 
     pub fn num_txns(&self) -> usize {
         self.encrypted_txns.len()
+    }
+
+    pub fn encryption_round(&self) -> Round {
+        self.encryption_round
     }
 
     pub fn is_empty(&self) -> bool {
@@ -404,17 +411,14 @@ impl InlineEncryptedTxns {
         }
 
         // Decrypt the ciphertexts to get plaintexts
-        let plaintexts: Vec<String> = FPTX::decrypt(decryption_key, &ciphertexts, proofs, pool)?;
+        let plaintexts: Vec<Vec<u8>> = FPTX::decrypt(decryption_key, &ciphertexts, proofs, pool)?;
 
         // Reconstruct SignedTransaction objects from the decrypted plaintexts
         let mut decrypted_txns = Vec::new();
 
-        for (i, (mut original_txn, plaintext)) in self.encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
-            // Convert string plaintext to bytes
-            let plaintext_bytes = plaintext.as_bytes();
-
+        for (i, (mut original_txn, plaintext_bytes)) in self.encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
             // Try to deserialize the plaintext as a TransactionExecutable
-            let decrypted_executable = match bcs::from_bytes::<aptos_types::transaction::TransactionExecutable>(plaintext_bytes) {
+            let decrypted_executable = match bcs::from_bytes::<aptos_types::transaction::TransactionExecutable>(&plaintext_bytes) {
                 Ok(executable) => executable,
                 Err(e) => {
                     return Err(anyhow::anyhow!(
@@ -541,14 +545,14 @@ impl OptQuorumStorePayload {
         }
     }
 
-    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>) {
+    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>, encryption_round: Round) {
         if encrypted_txns.is_empty() {
             return;
         }
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => {
                 // change to v2
-                *self = OptQuorumStorePayload::V2(opt_qs_payload.clone(), InlineEncryptedTxns::new(encrypted_txns));
+                *self = OptQuorumStorePayload::V2(opt_qs_payload.clone(), InlineEncryptedTxns::new(encrypted_txns, encryption_round));
             }
             OptQuorumStorePayload::V2(_, ref mut inline_encrypted_txns) => {
                 inline_encrypted_txns.add(encrypted_txns);

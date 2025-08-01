@@ -274,6 +274,7 @@ impl DagDriver {
                     recent_max_fill_fraction: 0.0,
                     block_timestamp: self.time_service.now_unix_time(),
                     max_inline_encrypted_txns: PayloadTxnsSize::new(0, 0),
+                    encryption_round: 0,
                 },
                 sys_payload_filter,
                 Box::pin(async {}),

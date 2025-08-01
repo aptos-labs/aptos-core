@@ -401,6 +401,9 @@ pub struct ProposalGenerator {
 
     // Last round that a proposal was generated
     last_round_generated: Mutex<Round>,
+
+    next_encryption_round: Arc<Mutex<Round>>,
+
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
 
@@ -428,6 +431,7 @@ impl ProposalGenerator {
         vtxn_config: ValidatorTxnConfig,
         allow_batches_without_pos_in_proposal: bool,
         opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
+        next_encryption_round: Arc<Mutex<Round>>,
     ) -> Self {
         Self {
             author,
@@ -444,6 +448,7 @@ impl ProposalGenerator {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             last_round_generated: Mutex::new(0),
+            next_encryption_round,
             quorum_store_enabled,
             vtxn_config,
             allow_batches_without_pos_in_proposal,
@@ -590,6 +595,7 @@ impl ProposalGenerator {
                 .collect();
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+            let encryption_round = *self.next_encryption_round.lock();
 
             let (validator_txns, mut payload) = self
                 .payload_client
@@ -610,6 +616,7 @@ impl ProposalGenerator {
                         // for inline encrypted txns
                         // daniel todo: move to configs
                         max_inline_encrypted_txns: PayloadTxnsSize::new(PROTOTYPE_BATCH_SIZE as u64, (PROTOTYPE_BATCH_SIZE as u64) * 10 * 1024),
+                        encryption_round,
                     },
                     validator_txn_filter,
                     wait_callback,
@@ -638,6 +645,11 @@ impl ProposalGenerator {
             false,
             proposer_election,
         );
+
+        if payload.encrypted_txns().is_some() {
+            let mut next_encryption_round = self.next_encryption_round.lock();
+            *next_encryption_round += 1;
+        }
 
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(

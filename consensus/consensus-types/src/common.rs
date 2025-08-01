@@ -487,13 +487,13 @@ impl Payload {
         !matches!(self, Payload::DirectMempool(_))
     }
 
-    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>) {
+    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>, encryption_round: Round) {
         if encrypted_txns.is_empty() {
             return;
         }
         match self {
             Payload::OptQuorumStore(opt_qs_payload) => {
-                opt_qs_payload.add_encrypted_txns(encrypted_txns);
+                opt_qs_payload.add_encrypted_txns(encrypted_txns, encryption_round);
             }
             _ => {}
         }

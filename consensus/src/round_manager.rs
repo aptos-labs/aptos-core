@@ -270,6 +270,7 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+    next_encryption_round: Arc<Mutex<Round>>,
 }
 
 impl RoundManager {
@@ -290,6 +291,7 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+        next_encryption_round: Arc<Mutex<Round>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -321,6 +323,7 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
+            next_encryption_round,
         }
     }
 
@@ -1019,6 +1022,11 @@ impl RoundManager {
             .insert_block(proposal.clone())
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
+
+        if let Some(last_round) = proposal.encrypted_payload().map(|payload| payload.encryption_round()) {
+            let mut next_encryption_round = self.next_encryption_round.lock();
+            *next_encryption_round = last_round + 1;
+        }
 
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {

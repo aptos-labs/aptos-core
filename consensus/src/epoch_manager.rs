@@ -918,6 +918,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             failures_tracker.clone(),
         ));
 
+        let next_encryption_round = Arc::new(Mutex::new(0));
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
@@ -951,6 +952,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
+            next_encryption_round.clone(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
@@ -985,6 +987,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             failures_tracker,
+            next_encryption_round,
         );
 
         round_manager.init(last_vote).await;

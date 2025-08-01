@@ -767,8 +767,8 @@ impl TransactionExecutable {
             Self::EntryFunction(entry_function) => bcs::to_bytes(&entry_function).ok()?,
             Self::Empty | Self::Encrypted(_) => return None,
         };
-        let msg : String = String::from_utf8(bytes).unwrap();
-        let ct = FPTX::encrypt(encryption_key, rng, &msg).expect("Failed to encrypt");
+        // Use the bytes directly instead of converting to UTF-8 string
+        let ct = FPTX::encrypt(encryption_key, rng, &bytes).expect("Failed to encrypt");
 
         Some(TransactionExecutable::Encrypted(EncryptedPayload::new(ct)))
     }
