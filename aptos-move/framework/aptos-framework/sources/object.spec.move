@@ -394,6 +394,11 @@ spec aptos_framework::object {
         ensures !exists<ObjectCore>(ref.self);
     }
 
+    spec generate_signer_for_extending {
+        pragma opaque;
+        ensures result == spec_generate_signer_for_extending(ref);
+    }
+
     spec set_untransferable(ref: &ConstructorRef) {
         aborts_if !exists<ObjectCore>(ref.self);
         aborts_if exists<Untransferable>(ref.self);
@@ -569,4 +574,8 @@ spec aptos_framework::object {
     spec fun spec_create_user_derived_object_address(source: address, derive_from: address): address;
 
     spec fun spec_create_guid_object_address(source: address, creation_num: u64): address;
+
+    spec fun spec_generate_signer_for_extending(ref: &ExtendRef): signer {
+        aptos_framework::create_signer::spec_create_signer(ref.self)
+    }
 }
