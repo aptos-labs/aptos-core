@@ -1,22 +1,18 @@
 processed 3 tasks
+task 0 lines 1-9:  print-bytecode --input=module [module 0x2d20.M {]
+// Bytecode version v7
+module 0x2d20::M
+struct T
+  u: u64
 
-task 0 'print-bytecode'. lines 1-9:
-// Move bytecode v7
-module 2d20.M {
-struct T {
-	u: u64
-}
+// Function definition at index 0
+fun f(): M::T
+    ld_u64 0
+    pack T
+    ret
 
-f(): T /* def_idx: 0 */ {
-B0:
-	0: LdU64(0)
-	1: Pack[0](T)
-	2: Ret
-}
-}
 
-task 1 'print-bytecode'. lines 11-20:
+task 1 lines 11-20:  print-bytecode --input=module [module 0x3d20.M {]
 Error: Unbound field x
-
-task 2 'print-bytecode'. lines 22-31:
+task 2 lines 22-31:  print-bytecode --input=module [module 0x4d20.M {]
 Error: Field y defined out of order for struct T

@@ -1,9 +1,9 @@
 processed 5 tasks
-task 0 lines 1-22:  publish
-task 1 lines 25-35:  publish
+task 0 lines 1-22:  publish [module 0x66::helpers]
+task 1 lines 25-35:  publish [module 0x66::ok]
 task 2 lines 37-37:  run --verbose 0x66::ok::assignable
 return values: 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..), 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..)
-task 3 lines 39-49:  publish
+task 3 lines 39-49:  publish [module 0x66::not_ok]
 task 4 lines 51-51:  run --verbose 0x66::not_ok::assignable
 Error: Function execution failed with VMError: {
     message: Expected type |u64|u32 has copy + drop, got |u64|u32 which is not assignable ,

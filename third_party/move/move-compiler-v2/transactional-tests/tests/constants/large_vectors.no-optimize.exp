@@ -1,6 +1,5 @@
 processed 3 tasks
-
-task 0 'publish'. lines 1-15:
+task 0 lines 1-15:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  bug: bytecode verification failed with unexpected status code `VALUE_STACK_OVERFLOW`:
 Error message: none
@@ -12,8 +11,7 @@ Error message: none
   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 
-
-task 1 'run'. lines 17-17:
+task 1 lines 17-17:  run 0xc0ffee::m::large_vec_1
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -21,8 +19,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 19-19:
+task 2 lines 19-19:  run 0xc0ffee::m::large_vec_2
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

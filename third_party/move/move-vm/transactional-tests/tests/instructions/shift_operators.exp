@@ -1,5 +1,5 @@
 processed 16 tasks
-task 0 lines 1-7:  run
+task 0 lines 1-7:  run [// Number of bits shifted >= total number of bits in the number.]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 1 lines 9-14:  run
+task 1 lines 9-14:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 2 lines 16-21:  run
+task 2 lines 16-21:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -23,7 +23,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 3 lines 23-28:  run
+task 3 lines 23-28:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -31,7 +31,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 4 lines 30-35:  run
+task 4 lines 30-35:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -39,7 +39,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 5 lines 37-42:  run
+task 5 lines 37-42:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -47,7 +47,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 6 lines 44-49:  run
+task 6 lines 44-49:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -55,7 +55,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 7 lines 51-56:  run
+task 7 lines 51-56:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -63,7 +63,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 8 lines 58-63:  run
+task 8 lines 58-63:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -71,7 +71,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 9 lines 65-73:  run
+task 9 lines 65-73:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -79,9 +79,9 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
-task 10 lines 74-95:  run
-task 11 lines 96-117:  run
-task 12 lines 118-139:  run
-task 13 lines 140-154:  run
-task 14 lines 155-169:  run
-task 15 lines 170-200:  run
+task 10 lines 74-95:  run [main() {]
+task 11 lines 96-117:  run [main() {]
+task 12 lines 118-139:  run [main() {]
+task 13 lines 140-154:  run [main() {]
+task 14 lines 155-169:  run [main() {]
+task 15 lines 170-200:  run [main() {]
