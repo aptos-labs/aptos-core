@@ -178,10 +178,16 @@ impl PersistedStateValue {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Eq, PartialEq)]
 pub struct StateValue {
     data: Bytes,
     metadata: StateValueMetadata,
+}
+
+impl std::fmt::Debug for StateValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "omitted")
+    }
 }
 
 pub const ARB_STATE_VALUE_MAX_SIZE: usize = 100;
