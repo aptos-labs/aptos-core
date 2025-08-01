@@ -8,7 +8,9 @@ use move_vm_types::{
 };
 use serde::Serialize;
 
-/// Dynamic config options for the Move VM.
+/// Dynamic config options for the Move VM. Always add new fields to the end, as we rely on the
+/// hash or serialized bytes of config to detect if it has changed (e.g., new feature flag was
+/// enabled). Also, do not delete existing fields, or change the type of existing field.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VMConfig {
     pub verifier_config: VerifierConfig,
