@@ -54,7 +54,9 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
+pub use self::block_epilogue::{
+    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution,
+};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -2862,7 +2864,7 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: TBlockEndInfoExt<K>,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
