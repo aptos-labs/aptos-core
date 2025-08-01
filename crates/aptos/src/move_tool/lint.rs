@@ -7,11 +7,11 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_move_linter::SecurityChecks;
 use async_trait::async_trait;
 use clap::Parser;
 use move_compiler_v2::Experiment;
 use move_linter::MoveLintChecks;
-use aptos_move_linter::SecurityChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use move_package::source_package::std_lib::StdVersion;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
@@ -86,6 +86,10 @@ pub struct LintPackage {
     ///   Also runs the strict and default checks.
     #[clap(long, verbatim_doc_comment, value_parser = clap::value_parser!(LintOptions))]
     pub checks: Option<LintOptions>,
+
+    /// Enables execution of security checks
+    #[clap(long)]
+    pub security_checks: bool,
 }
 
 impl LintPackage {
@@ -185,18 +189,13 @@ impl CliCommand<&'static str> for LintPackage {
         let build_config = BuiltPackage::create_build_config(&build_options)?;
         let resolved_graph =
             BuiltPackage::prepare_resolution_graph(package_path, build_config.clone())?;
-        let mut external_checks = vec![MoveLintChecks::make()];
-        if self.security_checks{
+        let mut external_checks = vec![MoveLintChecks::make(
+            self.checks.unwrap_or_default().to_config(),
+        )];
+        if self.security_checks {
             external_checks.push(SecurityChecks::make());
         }
-        BuiltPackage::build_with_external_checks(
-            resolved_graph,
-            build_options,
-            build_config,
-            vec![MoveLintChecks::make(
-                self.checks.unwrap_or_default().to_config(),
-            )],
-        )?;
+        BuiltPackage::build_with_external_checks(resolved_graph, build_options, build_config)?;
 
         Ok("succeeded")
     }
