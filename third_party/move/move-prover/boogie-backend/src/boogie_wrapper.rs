@@ -7,6 +7,7 @@
 // DEBUG
 // use backtrace::Backtrace;
 use crate::{
+    boogie_helpers,
     boogie_helpers::{boogie_inst_suffix, boogie_struct_name},
     options::{BoogieOptions, VectorTheory},
     prover_task_runner::{ProverTaskRunner, RunBoogieWithSeeds},
@@ -1507,6 +1508,11 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
+        let struct_name = &boogie_struct_name(struct_env, inst);
+        let mut ctor_name = struct_env
+            .get_name()
+            .display(struct_env.symbol_pool())
+            .to_string();
         let entries = if struct_env.is_intrinsic() {
             let mut rep = self.extract_literal()?.to_string();
             if rep.starts_with("T@") {
@@ -1516,14 +1522,33 @@ impl ModelValue {
             }
             vec![PrettyDoc::text(rep)]
         } else {
-            let struct_name = &boogie_struct_name(struct_env, inst);
-            let values = self
-                .extract_list(struct_name)
-                // It appears sometimes keys are represented witout, sometimes with enclosing
-                // bars?
-                .or_else(|| self.extract_list(&format!("|{}|", struct_name)))?;
+            let mut variant = None;
+            let mut values: &[ModelValue] = &[];
+            if struct_env.has_variants() {
+                // Probe which of the variants we are looking at
+                for vari in struct_env.get_variants() {
+                    let variant_name =
+                        boogie_helpers::boogie_struct_variant_name(struct_env, inst, vari);
+                    if let Some(vals) = self
+                        .extract_list(&variant_name)
+                        // It appears sometimes keys are represented without, sometimes with enclosing
+                        // bars?
+                        .or_else(|| self.extract_list(&format!("|{}|", variant_name)))
+                    {
+                        variant = Some(vari);
+                        values = vals;
+                        ctor_name =
+                            format!("{}::{}", ctor_name, vari.display(struct_env.symbol_pool()));
+                        break;
+                    }
+                }
+            } else {
+                values = self
+                    .extract_list(struct_name)
+                    .or_else(|| self.extract_list(&format!("|{}|", struct_name)))?;
+            }
             struct_env
-                .get_fields()
+                .get_fields_optional_variant(variant)
                 .enumerate()
                 .map(|(i, f)| {
                     let ty = f.get_type().instantiate(inst);
@@ -1543,13 +1568,13 @@ impl ModelValue {
         };
         Some(
             PrettyDoc::text(format!(
-                "{}.{}",
+                "{}::{}",
                 struct_env
                     .module_env
                     .get_name()
                     .name()
                     .display(struct_env.symbol_pool()),
-                struct_env.get_name().display(struct_env.symbol_pool())
+                ctor_name
             ))
             .append(Self::pretty_vec_or_struct_body(entries)),
         )

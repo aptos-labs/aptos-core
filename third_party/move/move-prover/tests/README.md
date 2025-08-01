@@ -14,7 +14,7 @@ prover's integration into the Move CLI and configured outside this tree.
 > `.exp`. To update those files, use `UPBL=1 cargo test`. To update or test a single file, you can
 > also provide a fragment of the Move source path.
 
-## Running the Prover on Sources in this Tree
+## Running the Prover for Debugging on Sources in this Tree
 
 > NOTE: in contrast to older versions, the prover does not longer automatically pick a configuration file via the MOVE_PROVER_CONFIG variable.
 
@@ -29,12 +29,21 @@ The file at the path to `<my_config.toml>` should contain (at least) the followi
 
 ```toml
 move_deps = [
-    "<your-path-to>/diem/language/move-stdlib/sources"
+  "/Users/<you>/aptos-core/third_party/move/move-stdlib/sources"
 ]
 move_named_address_values = [
-    "Std=0x1",
+  "std=0x1",
+  "extensions=0x2",
 ]
 ```
+
+The prover dumps debug information to the `debug!` channel of the `log` crate. In order to see it and save it to a file, use e.g.
+
+```shell
+mvp --verbose debug --dump-bytecode enum_invariants.move 2>&1 1>prover.log
+```
+
+This will dump the stackless bytecode of the steps in the transformation pipeline to `prover.log`.
 
 ## Running Tests: Quick Guide
 
