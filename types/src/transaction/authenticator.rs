@@ -45,10 +45,7 @@ pub enum AuthenticationError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthenticationProof {
     Key(Vec<u8>),
-    Abstraction {
-        function_info: FunctionInfo,
-        auth_data: AbstractionAuthData,
-    },
+    Abstraction(AbstractAuthenticator),
     None,
 }
 
@@ -541,23 +538,35 @@ pub enum AccountAuthenticator {
         authenticator: MultiKeyAuthenticator,
     },
     NoAccountAuthenticator,
-    Abstraction {
-        function_info: FunctionInfo,
-        auth_data: AbstractionAuthData,
+    Abstract {
+        authenticator: AbstractAuthenticator,
     }, // ... add more schemes here
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub enum AbstractionAuthData {
+pub enum AbstractAuthenticator {
+    /// An abstract `authenticator` should be verifiable by the function in `function_info` over the signing_message_digest = sha3_256(RawTransactionWithData(raw_txn, function_info))
+    /// For example, consider the following authentication function:
+    ///
+    ///   fun verify(owner: signer, authenticator: vector<u8>, signing_message_digest: vector<u8>) -> signer
+    ///
+    /// It might operate by, for example:
+    ///  1. Looking up the public key of `owner` in some table
+    ///  2. Parsing the `authenticator` as an RSA signature
+    ///  2. Verifying this RSA signature over the `signing_message_digest` under this public key
+    ///
+    /// Note: Abstract authenticators don't exactly follow the `AccountAuthenticator` paradigm, where an "authenticator" typically consists of a public key and a signature.
     V1 {
         #[serde(with = "serde_bytes")]
-        signing_message_digest: Vec<u8>,
+        authentication_function: FunctionInfo,
         #[serde(with = "serde_bytes")]
-        authenticator: Vec<u8>,
+        authenticator: Vec<u8>, // TODO: Should this be called authentication_proof? Or what is that?
     },
+    /// An derivable abstract `authenticator` should be verifiable by the function in `function_info` over the signing_message_digest = sha3_256(RawTransactionWithData(raw_txn, function_info))
+    /// against the given abstract_signature and abstract_public_key
     DerivableV1 {
         #[serde(with = "serde_bytes")]
-        signing_message_digest: Vec<u8>,
+        authentication_function: FunctionInfo,
         #[serde(with = "serde_bytes")]
         abstract_signature: Vec<u8>,
         #[serde(with = "serde_bytes")]
@@ -565,19 +574,23 @@ pub enum AbstractionAuthData {
     },
 }
 
-impl AbstractionAuthData {
-    pub fn signing_message_digest(&self) -> &Vec<u8> {
-        match self {
-            Self::V1 {
-                signing_message_digest,
-                ..
-            }
-            | Self::DerivableV1 {
-                signing_message_digest,
-                ..
-            } => signing_message_digest,
-        }
-    }
+// exists to match the move resource that is passed in the native call
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub enum MoveResourceAbstractionAuthData {
+     V1 {
+        #[serde(with = "serde_bytes")]
+        signing_message_digest: Vec<u8>,
+        #[serde(with = "serde_bytes")]
+        authenticator: Vec<u8>,
+     },
+     DerivableV1 {
+        #[serde(with = "serde_bytes")]
+        signing_message_digest: Vec<u8>,
+        #[serde(with = "serde_bytes")]
+        abstract_signature: Vec<u8>,
+        #[serde(with = "serde_bytes")]
+        abstract_public_key: Vec<u8>,
+     },
 }
 
 impl AccountAuthenticator {
@@ -672,9 +685,8 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.verify(message),
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
-            // Abstraction delayed the authentication after prologue.
-            Self::Abstraction { auth_data, .. } => {
-                ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
+            // Abstract authenticator delays the authentication to after prologue.
+            Self::Abstract { .. } => {
                 Ok(())
             },
         }
