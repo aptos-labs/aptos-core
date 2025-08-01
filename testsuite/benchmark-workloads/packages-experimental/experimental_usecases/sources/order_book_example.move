@@ -81,7 +81,7 @@ module 0xABCD::order_book_example {
         let trigger_condition = option::none();
         let match_results = vector::empty();
         while (remaining_size > 0) {
-            if (!order_book.is_taker_order(option::some(price), is_bid, trigger_condition)) {
+            if (!order_book.is_taker_order(price, is_bid, trigger_condition)) {
                 order_book.place_maker_order(
                     order_book::new_order_request(
                         account,
@@ -99,7 +99,7 @@ module 0xABCD::order_book_example {
             };
             let match_result =
                 order_book.get_single_match_for_taker(
-                    option::some(price), remaining_size, is_bid
+                    price, remaining_size, is_bid
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
