@@ -55,6 +55,15 @@ impl EncryptionKey {
             id_set_capacity,
         }
     }
+
+    pub fn verify_decryption_key(
+        &self,
+        digest: &Digest,
+        decryption_key: &BIBEDecryptionKey) -> Result<()> 
+    {
+        BIBEMasterPublicKey(self.sig_mpk_g2).verify_decryption_key(digest, decryption_key)
+    }
+
 }
 
 
