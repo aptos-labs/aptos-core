@@ -72,7 +72,7 @@ impl AnalyzedTransaction {
             .chain(write_hints.iter())
             .any(|hint| !matches!(hint, StorageLocation::Specific(_)));
         let hash = transaction.hash();
-        AnalyzedTransaction {
+        Self {
             transaction,
             read_hints,
             write_hints,
@@ -141,7 +141,7 @@ impl Hash for AnalyzedTransaction {
 
 impl From<SignatureVerifiedTransaction> for AnalyzedTransaction {
     fn from(txn: SignatureVerifiedTransaction) -> Self {
-        AnalyzedTransaction::new(txn)
+        Self::new(txn)
     }
 }
 
@@ -153,7 +153,7 @@ impl From<AnalyzedTransaction> for SignatureVerifiedTransaction {
 
 impl From<Transaction> for AnalyzedTransaction {
     fn from(txn: Transaction) -> Self {
-        AnalyzedTransaction::new(txn.into())
+        Self::new(txn.into())
     }
 }
 
