@@ -6,6 +6,7 @@
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod cyclomatic_complexity;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -23,7 +24,7 @@ use std::collections::BTreeMap;
 /// Returns a default pipeline of "expression linters" to run.
 pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box<dyn ExpChecker>> {
     // Start with the default set of checks.
-    let checks: Vec<Box<dyn ExpChecker>> = vec![
+    let mut checks: Vec<Box<dyn ExpChecker>> = vec![
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
@@ -44,6 +45,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
     }
     if checks_category == "experimental" {
         // Push experimental checks to `checks`.
+        checks.push(Box::<cyclomatic_complexity::CyclomaticComplexity>::default());
     }
     checks
 }
