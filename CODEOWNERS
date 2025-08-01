@@ -1,5 +1,7 @@
 # **Please** keep this file ordered alphabetically by directory paths.
 
+/CODEOWNERS @aptos-labs/security
+
 # Owners for the `.github` directory and all its subdirectories.
 /.github/ @aptos-labs/prod-eng
 
@@ -16,13 +18,13 @@
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
 /aptos-move/framework/aptos-framework/sources/jwks.move @zjma
 /aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
-/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
-/aptos-move/framework/**/*.spec.move @junkil-park
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma 
+/aptos-move/framework/**/*.spec.move @rahxephon89
 /aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
 
 # Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
-/aptos-move/framework/aptos-token @areshand
-/aptos-move/framework/src/natives/cryptography/ @alinush @zjma @mstraka100
+/aptos-move/framework/aptos-token @gregnazario
+/aptos-move/framework/src/natives/cryptography/ @alinush @zjma 
 /aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
 /aptos-move/sharded_block-executor/ @sitalkedia
@@ -31,6 +33,9 @@
 
 # Owner for aptos node (to prevent things from becoming out of hand :D)
 /aptos-node/ @joshlind
+
+# Owner for the /buildtools directory
+/buildtools/ @aptos-labs/internal-ops-deployment-approvers
 
 # Owner for the node configs (to prevent things from becoming out of hand :D)
 /config/ @joshlind @gregnazario
@@ -48,8 +53,8 @@
 /crates/aptos @gregnazario @banool
 
 # Owners for the `/crates/aptos-crypto*` directories.
-/crates/aptos-crypto-derive/ @alinush @zjma @mstraka100 @rex1fernando
-/crates/aptos-crypto/ @alinush @zjma @mstraka100 @rex1fernando
+/crates/aptos-crypto-derive/ @alinush @zjma  @rex1fernando
+/crates/aptos-crypto/ @alinush @zjma  @rex1fernando
 
 # Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
 /crates/aptos-faucet @banool @gregnazario
@@ -61,7 +66,7 @@
 /crates/aptos-open-api @banool @gregnazario
 
 # Owners for the aptos-protos crate
-/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso  @aptos-labs/ecosystem-infra
+/crates/aptos-protos @banool @bowenyang007 @jillxuu @rtso  @aptos-labs/ecosystem-infra
 
 /crates/aptos-rest-client @banool @gregnazario
 
@@ -73,8 +78,8 @@
 /crates/aptos-speculative-state-helper @gelash
 
 # Owners for the `telemetry` related crates.
-/crates/aptos-telemetry @ibalajiarun @geekflyer
-/crates/aptos-telemetry-service @ibalajiarun @geekflyer
+/crates/aptos-telemetry @ibalajiarun
+/crates/aptos-telemetry-service @ibalajiarun
 
 # Owners for the inspection-service crate
 /crates/inspection-service/ @joshlind
@@ -83,11 +88,11 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/docker` directory and all its subdirectories.
-/docker/ @aptos-labs/prod-eng
+/docker/ @aptos-labs/internal-ops-deployment-approvers
 /docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for execution and storage.
-/execution/ @msmouse @lightmark @grao1991
+/execution/ @lightmark @grao1991
 
 # Owners for mempool.
 /mempool/ @bchocho
@@ -99,18 +104,19 @@
 /scripts/ @aptos-labs/prod-eng
 /scripts/authenticator_regenerate.sh @alinush @hariria @heliuchuan
 /scripts/algebra-gas/ @zjma
+/scripts/dev_setup.sh @aptos-labs/internal-ops-deployment-approvers
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind
 
 # Owners for execution and storage.
-/storage/ @msmouse @lightmark @grao1991
+/storage/ @lightmark @grao1991
 
 # Owners for the `/terraform` directory and all its subdirectories.
-/terraform/ @aptos-labs/prod-eng
+/terraform/ @aptos-labs/internal-ops-deployment-approvers
 
 # Owners for the `aptos-dkg` crate.
 /crates/aptos-dkg @alinush @rex1fernando
 
 /types/src/keyless/ @alinush @heliuchuan
-/types/src/transaction/authenticator.rs @alinush @mstraka100
+/types/src/transaction/authenticator.rs @alinush
