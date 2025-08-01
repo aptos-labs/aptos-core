@@ -17,7 +17,7 @@ use crate::{
     utils,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
 use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
@@ -114,6 +114,10 @@ impl<T: StorageReaderInterface> Handler<T> {
                 )))
                 .peer_network_id(&peer_network_id));
             return;
+        }
+
+        if request.data_request.is_transaction_data_v2_request() {
+            info!("Got a v2 data request: {:?}", request.get_label());
         }
 
         // Handle any optimistic fetch requests
