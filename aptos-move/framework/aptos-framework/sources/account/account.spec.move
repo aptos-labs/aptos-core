@@ -752,7 +752,7 @@ spec aptos_framework::account {
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
     }
 
-    spec set_originating_address(account: &signer) {
-        pragma verify=false;
+    spec set_originating_address(_account: &signer) {
+        aborts_with ESET_ORIGINATING_ADDRESS_DISABLED;
     }
 }

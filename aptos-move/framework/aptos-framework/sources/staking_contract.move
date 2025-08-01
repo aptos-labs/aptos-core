@@ -334,6 +334,26 @@ module aptos_framework::staking_contract {
     }
 
     #[view]
+    /// Return the pending distribution for a shareholder (e.g. commission, withdrawals from stakers).
+    ///
+    /// If the operator is given, this will return the pending commission amount for the operator.
+    ///
+    /// This errors out the staking contract with the provided staker and operator doesn't exist.
+    public fun pending_distribution_amount(staker: address, operator: address, shareholder: address): u64 acquires Store {
+        assert_staking_contract_exists(staker, operator);
+        let staking_contracts = &Store[staker].staking_contracts;
+        let distribution_pool = &staking_contracts.borrow(&operator).distribution_pool;
+
+        // Return 0 if the shareholder is not in the distribution pool.
+        if (distribution_pool.contains(shareholder)) {
+            let shares = distribution_pool.shares(shareholder);
+            distribution_pool.shares_to_amount(shares)
+        } else {
+            0
+        }
+    }
+
+    #[view]
     /// Return true if the staking contract between the provided staker and operator exists.
     public fun staking_contract_exists(staker: address, operator: address): bool acquires Store {
         if (!exists<Store>(staker)) {

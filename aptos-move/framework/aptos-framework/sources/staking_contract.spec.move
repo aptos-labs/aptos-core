@@ -130,6 +130,25 @@ spec aptos_framework::staking_contract {
         ensures result == shareholders_count;
     }
 
+    spec pending_distribution_amount(staker: address, operator: address, shareholder: address): u64 {
+        include ContractExistsAbortsIf;
+
+        let staking_contracts = Store[staker].staking_contracts;
+        let staking_contract = simple_map::spec_get(staking_contracts, operator);
+        let distribution_pool = staking_contract.distribution_pool;
+        let shares = pool_u64::spec_shares(distribution_pool, shareholder);
+        aborts_if distribution_pool.total_coins > 0 && distribution_pool.total_shares > 0
+            && (shares * distribution_pool.total_coins) / distribution_pool.total_shares > MAX_U64;
+
+        let val = if (pool_u64::spec_contains(distribution_pool, shareholder)) {
+            pool_u64::spec_shares_to_amount_with_total_coins(distribution_pool, shares, distribution_pool.total_coins)
+        } else {
+            0
+        };
+
+        ensures result == val;
+    }
+
     spec staking_contract_exists(staker: address, operator: address): bool {
         aborts_if false;
         ensures result == spec_staking_contract_exists(staker, operator);
