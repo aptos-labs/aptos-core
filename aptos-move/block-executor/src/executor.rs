@@ -1501,6 +1501,7 @@ where
             .is_some()
             .then(|| block_limit_processor.acquire().get_slots_to_make_hot())
             .unwrap_or_default();
+        info!("num slots to make hot: {}", to_make_hot.len());
 
         // Return final result
         Ok(BlockOutput::new(
@@ -2281,6 +2282,7 @@ where
             .is_some()
             .then(|| block_limit_processor.get_slots_to_make_hot())
             .unwrap_or_default();
+        info!("num slots to make hot: {}", to_make_hot.len());
         Ok(BlockOutput::new(ret, block_epilogue_txn, to_make_hot))
     }
 
