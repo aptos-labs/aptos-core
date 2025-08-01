@@ -64,7 +64,7 @@ where
     pub fn add_transaction<'a>(
         &mut self,
         writes: impl Iterator<Item = &'a Key>,
-        reads: impl Iterator<Item = &'a Key>,
+        read_only: impl Iterator<Item = &'a Key>,
     ) where
         Key: 'a,
     {
@@ -75,7 +75,7 @@ where
             self.writes.get_or_insert_owned(key);
         }
 
-        for key in reads {
+        for key in read_only {
             if self.to_make_hot.len() >= self.max_promotions_per_block {
                 COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
@@ -134,11 +134,8 @@ where
 
     pub fn should_refresh(&self, hot_since_version: Version) -> bool {
         if hot_since_version >= self.first_version {
-            error!(
-                "Unexpected: hot_since_version {} >= block first version {}",
-                hot_since_version, self.first_version
-            );
+            error!("Unexpected: hot_since_version > block first version");
         }
-        hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        hot_since_version + self.refresh_interval_versions as Version >= self.first_version
     }
 }
