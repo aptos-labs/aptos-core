@@ -21,13 +21,8 @@ pub enum SignatureVerifiedTransaction {
 impl PartialEq for SignatureVerifiedTransaction {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (
-                SignatureVerifiedTransaction::Invalid(a),
-                SignatureVerifiedTransaction::Invalid(b),
-            ) => a.eq(b),
-            (SignatureVerifiedTransaction::Valid(a), SignatureVerifiedTransaction::Valid(b)) => {
-                a.eq(b)
-            },
+            (Self::Invalid(a), Self::Invalid(b)) => a.eq(b),
+            (Self::Valid(a), Self::Valid(b)) => a.eq(b),
             _ => {
                 panic!("Unexpected equality check on {:?} and {:?}", self, other)
             },
@@ -40,46 +35,46 @@ impl Eq for SignatureVerifiedTransaction {}
 impl SignatureVerifiedTransaction {
     pub fn into_inner(self) -> Transaction {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn,
-            SignatureVerifiedTransaction::Invalid(txn) => txn,
+            Self::Valid(txn) => txn,
+            Self::Invalid(txn) => txn,
         }
     }
 
     pub fn borrow_into_inner(&self) -> &Transaction {
         match self {
-            SignatureVerifiedTransaction::Valid(ref txn) => txn,
-            SignatureVerifiedTransaction::Invalid(ref txn) => txn,
+            Self::Valid(ref txn) => txn,
+            Self::Invalid(ref txn) => txn,
         }
     }
 
     pub fn is_valid(&self) -> bool {
         match self {
-            SignatureVerifiedTransaction::Valid(_) => true,
-            SignatureVerifiedTransaction::Invalid(_) => false,
+            Self::Valid(_) => true,
+            Self::Invalid(_) => false,
         }
     }
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => match txn {
+            Self::Valid(txn) => match txn {
                 Transaction::UserTransaction(txn) => Some(txn.sender()),
                 _ => None,
             },
-            SignatureVerifiedTransaction::Invalid(_) => None,
+            Self::Invalid(_) => None,
         }
     }
 
     pub fn hash(&self) -> HashValue {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
-            SignatureVerifiedTransaction::Invalid(txn) => txn.hash(),
+            Self::Valid(txn) => txn.hash(),
+            Self::Invalid(txn) => txn.hash(),
         }
     }
 
     pub fn expect_valid(&self) -> &Transaction {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn,
-            SignatureVerifiedTransaction::Invalid(_) => panic!("Expected valid transaction"),
+            Self::Valid(txn) => txn,
+            Self::Invalid(_) => panic!("Expected valid transaction"),
         }
     }
 }
@@ -92,16 +87,14 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
     fn user_txn_bytes_len(&self) -> usize {
         match self {
-            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
-                txn.txn_bytes_len()
-            },
+            Self::Valid(Transaction::UserTransaction(txn)) => txn.txn_bytes_len(),
             _ => 0,
         }
     }
 
     fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
-            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => Some(txn),
+            Self::Valid(Transaction::UserTransaction(txn)) => Some(txn),
             _ => None,
         }
     }
@@ -115,10 +108,10 @@ impl From<Transaction> for SignatureVerifiedTransaction {
     fn from(txn: Transaction) -> Self {
         match txn {
             Transaction::UserTransaction(txn) => match txn.verify_signature() {
-                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+                Ok(_) => Self::Valid(Transaction::UserTransaction(txn)),
+                Err(_) => Self::Invalid(Transaction::UserTransaction(txn)),
             },
-            _ => SignatureVerifiedTransaction::Valid(txn),
+            _ => Self::Valid(txn),
         }
     }
 }
