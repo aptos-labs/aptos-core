@@ -20,6 +20,11 @@ use move_core_types::{state::VMState, vm_status::StatusCode};
 use serde::Serialize;
 use std::time::Instant;
 
+/// Configuration for the bytecode verifier.
+///
+/// Always add new fields to the end, as we rely on the hash or serialized bytes of config to
+/// detect if it has changed (e.g., new feature flag was enabled). Also, do not delete existing
+/// fields, or change the type of existing field.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VerifierConfig {
     pub scope: VerificationScope,

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use once_cell::sync::Lazy;
-use prometheus::{register_histogram_vec, HistogramTimer, HistogramVec};
+use prometheus::{
+    register_histogram_vec, register_int_gauge, HistogramTimer, HistogramVec, IntGauge,
+};
 
 /// Helper trait to encapsulate [HistogramVec] functionality. Users can use this trait to time
 /// different VM parts collecting metrics for different labels. Use wisely as timers do introduce
@@ -43,4 +45,12 @@ pub static VM_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         buckets,
     )
     .expect("Registering the histogram should always succeed")
+});
+
+pub static VERIFIED_MODULE_CACHE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "verified_module_cache_size",
+        "Number of modules stored in verified module cache"
+    )
+    .expect("Registering the counter should always succeed")
 });
