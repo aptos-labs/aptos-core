@@ -2,14 +2,15 @@ Move prover returns: exiting with verification errors
 error: data invariant does not hold
    ┌─ tests/sources/functional/enum_invariants.move:12:9
    │
-12 │         invariant self.bar >= 0;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+12 │         invariant self.bar > 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/enum_invariants.move:24: add_one_if_first
+   =     at tests/sources/functional/enum_invariants.move:31: sub_one_if_second_fail
    =         self = <redacted>
-   =     at tests/sources/functional/enum_invariants.move:26: add_one_if_first
-   =         foo = <redacted>
+   =     at tests/sources/functional/enum_invariants.move:33: sub_one_if_second_fail
+   =     at tests/sources/functional/enum_invariants.move:34: sub_one_if_second_fail
+   =         bar = <redacted>
    =         self = <redacted>
-   =     at tests/sources/functional/enum_invariants.move:25: add_one_if_first
+   =     at tests/sources/functional/enum_invariants.move:32: sub_one_if_second_fail
    =         self = <redacted>
    =     at tests/sources/functional/enum_invariants.move:12
