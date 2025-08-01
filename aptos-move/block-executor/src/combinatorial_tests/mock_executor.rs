@@ -3,11 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    proptest_types::types::{
-        deserialize_to_delayed_field_id, serialize_from_delayed_field_id, DeltaTestKind,
-        GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType, RESERVED_TAG,
+    combinatorial_tests::types::{
+        DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
+        RESERVED_TAG,
     },
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    types::delayed_field_mock_serialization::{
+        deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
+    },
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
@@ -694,7 +697,7 @@ where
         self.aggregator_v1_writes.clone().into_iter().collect()
     }
 
-    fn aggregator_v1_delta_set(&self) -> Vec<(K, DeltaOp)> {
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
         if !self.deltas.is_empty() && self.deltas[0].2.is_none() {
             // When testing with delayed fields the Option is Some(id, success).
             self.deltas
@@ -702,7 +705,7 @@ where
                 .map(|(k, delta, _)| (k.clone(), *delta))
                 .collect()
         } else {
-            vec![]
+            BTreeMap::new()
         }
     }
 
