@@ -1,19 +1,16 @@
 processed 1 task
+task 0 lines 1-14:  print-bytecode --input=module [module 0xcafe.Nop {]
+// Bytecode version v7
+module 0xcafe::Nop
+// Function definition at index 0
+fun nop_valid()
+    nop
+    ret
 
-task 0 'print-bytecode'. lines 1-14:
-// Move bytecode v7
-module cafe.Nop {
+// Function definition at index 1
+fun nop_invalid()
+    nop
+    pop
+    ret
 
 
-nop_valid() /* def_idx: 0 */ {
-B0:
-	0: Nop
-	1: Ret
-}
-nop_invalid() /* def_idx: 1 */ {
-B0:
-	0: Nop
-	1: Pop
-	2: Ret
-}
-}

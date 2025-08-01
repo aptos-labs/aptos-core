@@ -1,8 +1,8 @@
 processed 5 tasks
-task 0 lines 2-24:  publish --verbose
-task 1 lines 25-47:  publish --verbose
-task 2 lines 49-51:  run --verbose 0x66::app::run
-task 3 lines 52-75:  publish --skip-check-struct-and-pub-function-linking
+task 0 lines 2-24:  publish --verbose [module 0x66::lib]
+task 1 lines 25-47:  publish --verbose [module 0x66::app]
+task 2 lines 49-51:  run --verbose 0x66::app::run [/// `lib` is republished with change of parameter type (compat turned off)]
+task 3 lines 52-75:  publish --skip-check-struct-and-pub-function-linking [module 0x66::lib]
 task 4 lines 77-77:  run --verbose 0x66::app::run
 Error: Function execution failed with VMError: {
     message: Unexpected verifier/deserialization error! This likely means there is code stored on chain that is unverifiable!

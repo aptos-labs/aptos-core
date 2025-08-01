@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-5:  run --signers 0x1
+task 0 lines 1-5:  run --signers 0x1 [// DEPRECATED now will fail. signer args same as other args]
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_ARGUMENTS_MISMATCH,
     sub_status: None,

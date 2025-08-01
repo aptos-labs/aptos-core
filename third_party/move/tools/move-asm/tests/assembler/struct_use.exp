@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 1-6:  publish --print-bytecode
+task 0 lines 1-6:  publish --print-bytecode [module 0x66::test1]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -10,7 +10,7 @@ struct S
 
 
 == END Bytecode ==
-task 1 lines 8-19:  publish --print-bytecode
+task 1 lines 8-19:  publish --print-bytecode [module 0x66::test2]
 
 == BEGIN Bytecode ==
 // Bytecode version v7

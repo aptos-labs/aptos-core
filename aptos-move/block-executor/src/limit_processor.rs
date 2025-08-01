@@ -292,10 +292,11 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        TBlockEndInfoExt::new(inner)
+        let to_make_hot = self.get_slots_to_make_hot();
+        TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    pub(crate) fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }
@@ -311,7 +312,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
 mod test {
     use super::*;
     use crate::{
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{KeyType, MockTransaction},
         },

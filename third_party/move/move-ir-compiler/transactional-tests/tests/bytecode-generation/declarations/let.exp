@@ -1,16 +1,12 @@
 processed 2 tasks
+task 0 lines 1-7:  print-bytecode [// `let` generates a local with the given type.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ret
 
-task 0 'print-bytecode'. lines 1-7:
-// Move bytecode v7
-script {
 
-
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 9-16:
+task 1 lines 9-16:  print-bytecode [// Two `let` cannot use the same name for a local.]
 Error: variable redefinition x

@@ -113,15 +113,15 @@ module aptos_experimental::market_test_utils {
         is_bid: bool,
         time_in_force: TimeInForce,
         event_store: &mut EventStore,
-        max_fills: Option<u64>,
+        max_matches: Option<u32>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): (OrderIdType, OrderMatchResult) {
         let taker_addr = signer::address_of(taker);
-        let max_fills =
-            if (max_fills.is_none()) { 1000 }
+        let max_matches =
+            if (max_matches.is_none()) { 1000 }
             else {
-                max_fills.destroy_some()
+                max_matches.destroy_some()
             };
         // Taker order will be immediately match in the same transaction
         let result =
@@ -135,7 +135,7 @@ module aptos_experimental::market_test_utils {
                     option::none(), // trigger_condition
                     metadata,
                     client_order_id,
-                    max_fills,
+                    max_matches,
                     true,
                     callbacks
                 )
@@ -146,7 +146,7 @@ module aptos_experimental::market_test_utils {
                     is_bid, // is_bid
                     metadata,
                     client_order_id,
-                    max_fills,
+                    max_matches,
                     true,
                     callbacks
                 )
@@ -188,7 +188,7 @@ module aptos_experimental::market_test_utils {
         maker_remaining_sizes: vector<u64>,
         event_store: &mut EventStore,
         is_cancelled: bool,
-        max_fills: Option<u64>,
+        max_matches: Option<u32>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): (OrderIdType, OrderMatchResult) {
@@ -202,7 +202,7 @@ module aptos_experimental::market_test_utils {
                 is_bid,
                 time_in_force,
                 event_store,
-                max_fills,
+                max_matches,
                 metadata,
                 callbacks
             );

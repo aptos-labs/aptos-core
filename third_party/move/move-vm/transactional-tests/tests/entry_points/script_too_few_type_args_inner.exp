@@ -1,6 +1,6 @@
 processed 2 tasks
-task 0 lines 1-4:  publish
-task 1 lines 6-10:  run --type-args 0x1::M::Ex
+task 0 lines 1-4:  publish [module 0x1.M {]
+task 1 lines 6-10:  run --type-args 0x1::M::Ex [main<T>() { // too few type args for inner type]
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
     sub_status: None,
