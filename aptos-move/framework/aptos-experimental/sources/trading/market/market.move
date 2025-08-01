@@ -1184,17 +1184,17 @@ module aptos_experimental::market {
     /// Returns all the pending order ready to be executed based on the oracle price. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>, oracle_price: u64
+        self: &mut Market<M>, oracle_price: u64, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_price_based_orders(oracle_price)
+        self.order_book.take_ready_price_based_orders(oracle_price, order_limit)
     }
 
     /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>
+        self: &mut Market<M>, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_time_based_orders()
+        self.order_book.take_ready_time_based_orders(order_limit)
     }
 
     // ============================= test_only APIs ====================================
