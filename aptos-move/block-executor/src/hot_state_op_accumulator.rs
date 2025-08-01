@@ -139,6 +139,8 @@ where
                 hot_since_version, self.first_version
             );
         }
-        hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        // TODO(HotState): understand perf impact. For now, we always refresh.
+        // hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        true
     }
 }
