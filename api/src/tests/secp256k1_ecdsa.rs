@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::new_test_context;
+use super::new_test_context_with_orderless_flags;
 use aptos_api_test_context::current_function_name;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, secp256k1_ecdsa, SigningKey};
 use aptos_sdk::types::{
@@ -16,11 +16,29 @@ use aptos_sdk::types::{
     LocalAccount,
 };
 use rand::{rngs::StdRng, SeedableRng};
+use rstest::rstest;
 use std::convert::TryInto;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_multi_secp256k1_ecdsa() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_multi_secp256k1_ecdsa(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
     let other = context.create_account().await;
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
@@ -44,6 +62,7 @@ async fn test_multi_secp256k1_ecdsa() {
     let txn2 = context.create_user_account(&other).await;
     context.commit_block(&vec![txn2]).await;
 
+    let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let ed22519_txn = context.account_transfer(&mut account, &other, 5);
     let raw_txn = ed22519_txn.into_raw_transaction();
 
@@ -67,13 +86,36 @@ async fn test_multi_secp256k1_ecdsa() {
         balance_start + 5,
         context.get_apt_balance(other.address()).await
     );
-    let txns = context.get("/transactions?start=14&limit=1").await;
+
+    let txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=1",
+            current_ledger_version + 2
+        ))
+        .await;
     context.check_golden_output(txns[0]["signature"].clone());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_secp256k1_ecdsa() {
-    let mut context = new_test_context(current_function_name!());
+#[rstest(
+    case_name,
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case("", false, false),
+    case("_payload_v2", true, false),
+    case("_orderless", true, true)
+)]
+async fn test_secp256k1_ecdsa(
+    case_name: &str,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!() + case_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
     let other = context.create_account().await;
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
@@ -95,6 +137,7 @@ async fn test_secp256k1_ecdsa() {
     let txn2 = context.create_user_account(&other).await;
     context.commit_block(&vec![txn2]).await;
 
+    let current_ledger_version = u64::from(context.get_latest_ledger_info().ledger_version);
     let ed22519_txn = context.account_transfer(&mut account, &other, 5);
     let secp256k1_ecdsa_txn = ed22519_txn
         .into_raw_transaction()
@@ -111,6 +154,12 @@ async fn test_secp256k1_ecdsa() {
         balance_start + 5,
         context.get_apt_balance(other.address()).await
     );
-    let txns = context.get("/transactions?start=14&limit=1").await;
+
+    let txns = context
+        .get(&format!(
+            "/transactions?start={}&limit=1",
+            current_ledger_version + 2
+        ))
+        .await;
     context.check_golden_output(txns[0]["signature"].clone());
 }

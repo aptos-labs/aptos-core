@@ -67,6 +67,7 @@ use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
+use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -78,7 +79,6 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
-
 pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
@@ -2177,7 +2177,8 @@ impl CliCommand<TransactionSummary> for Simulate {
         if self.local {
             self.txn_options.simulate_locally(payload).await
         } else {
-            self.txn_options.simulate_remotely(payload).await
+            let mut rng = rand::rngs::StdRng::from_entropy();
+            self.txn_options.simulate_remotely(&mut rng, payload).await
         }
     }
 }
