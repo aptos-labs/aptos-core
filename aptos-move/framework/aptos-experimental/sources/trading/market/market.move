@@ -169,19 +169,25 @@ module aptos_experimental::market {
         order_id: OrderIdType,
         remaining_size: u64,
         cancel_reason: Option<OrderCancellationReason>,
-        fill_sizes: vector<u64>
+        fill_sizes: vector<u64>,
+        match_count: u32, // includes fills and cancels
     }
 
     public fun destroy_order_match_result(
         self: OrderMatchResult
-    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<u64>) {
-        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes } =
+    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<u64>, u32) {
+        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes, match_count } =
             self;
-        (order_id, remaining_size, cancel_reason, fill_sizes)
+        (order_id, remaining_size, cancel_reason, fill_sizes, match_count)
     }
 
     public fun number_of_fills(self: &OrderMatchResult): u64 {
         self.fill_sizes.length()
+    }
+
+    /// Includes fills and cancels
+    public fun number_of_matches(self: &OrderMatchResult): u32 {
+        self.match_count
     }
 
     public fun total_fill_size(self: &OrderMatchResult): u64 {
@@ -310,7 +316,7 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         client_order_id: Option<u64>,
-        max_match_limit: u64,
+        max_match_limit: u32,
         cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
@@ -340,7 +346,7 @@ module aptos_experimental::market {
         is_bid: bool,
         metadata: M,
         client_order_id: Option<u64>,
-        max_match_limit: u64,
+        max_match_limit: u32,
         cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
@@ -421,6 +427,7 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         fill_sizes: vector<u64>,
+        match_count: u32,
         is_bid: bool,
         time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
@@ -441,6 +448,7 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 fill_sizes,
+                match_count,
                 is_bid,
                 false, // is_taker
                 OrderCancellationReason::IOCViolation,
@@ -494,7 +502,8 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
     }
 
@@ -544,6 +553,7 @@ module aptos_experimental::market {
         orig_size: u64,
         size_delta: u64,
         fill_sizes: vector<u64>,
+        match_count: u32,
         is_bid: bool,
         is_taker: bool,
         cancel_reason: OrderCancellationReason,
@@ -574,7 +584,8 @@ module aptos_experimental::market {
             order_id,
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
     }
 
@@ -678,6 +689,7 @@ module aptos_experimental::market {
                 orig_size,
                 *remaining_size,
                 *fill_sizes,
+                0, // match_count - doesn't matter as we don't use the result.
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::ClearinghouseSettleViolation,
@@ -745,7 +757,7 @@ module aptos_experimental::market {
         metadata: M,
         order_id: Option<OrderIdType>,
         client_order_id: Option<u64>,
-        max_match_limit: u64,
+        max_match_limit: u32,
         cancel_on_match_limit: bool,
         emit_taker_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
@@ -802,6 +814,7 @@ module aptos_experimental::market {
                 orig_size,
                 0, // 0 because order was never placed
                 vector[],
+                0, // match_count
                 is_bid,
                 is_taker_order, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
@@ -822,6 +835,7 @@ module aptos_experimental::market {
                     orig_size,
                     remaining_size,
                     vector[],
+                    0, // match_count
                     is_bid,
                     is_taker_order, // is_taker
                     OrderCancellationReason::DuplicateClientOrderIdViolation,
@@ -844,6 +858,7 @@ module aptos_experimental::market {
                     orig_size,
                     remaining_size,
                     vector[],
+                    0, // match_count
                     is_bid,
                     is_taker_order, // is_taker
                     OrderCancellationReason::OrderPreCancelled,
@@ -861,6 +876,7 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 vector[],
+                0, // match_count
                 is_bid,
                 time_in_force,
                 trigger_condition,
@@ -883,6 +899,7 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 vector[],
+                0, // match_count
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::PostOnlyViolation,
@@ -894,6 +911,7 @@ module aptos_experimental::market {
         let fill_sizes = vector::empty();
         let match_count = 0;
         loop {
+            match_count += 1;
             let taker_cancellation_reason =
                 self.settle_single_trade(
                     user_addr,
@@ -905,15 +923,15 @@ module aptos_experimental::market {
                     order_id,
                     client_order_id,
                     callbacks,
-                    &mut fill_sizes
+                    &mut fill_sizes,
                 );
-            match_count += 1;
             if (taker_cancellation_reason.is_some()) {
                 return OrderMatchResult {
                     order_id,
                     remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
-                    fill_sizes
+                    fill_sizes,
+                    match_count
                 }
             };
             if (remaining_size == 0) {
@@ -936,6 +954,7 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::IOCViolation,
@@ -951,6 +970,7 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         time_in_force,
                         trigger_condition,
@@ -973,6 +993,7 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::MaxFillLimitViolation,
@@ -987,7 +1008,8 @@ module aptos_experimental::market {
                         cancel_reason: option::some(
                             OrderCancellationReason::MaxFillLimitViolation
                         ),
-                        fill_sizes
+                        fill_sizes,
+                        match_count
                     }
                 };
             };
@@ -996,7 +1018,8 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
     }
 
