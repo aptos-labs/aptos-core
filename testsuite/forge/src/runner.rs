@@ -248,7 +248,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         .expect("There has to be at least 1 version")
     }
 
-    pub fn run(&self) -> Result<TestReport> {
+    pub fn run(&self) -> Result<TestSummary> {
         let test_count = self.filter_tests(&self.tests.all_tests()).count();
         let filtered_out = test_count.saturating_sub(self.tests.all_tests().len());
         let retain_debug_logs = self.options.retain_debug_logs || self.tests.retain_debug_logs;
@@ -353,11 +353,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
         summary.write_summary()?;
 
-        if summary.success() {
-            Ok(report)
-        } else {
-            bail!("Tests Failed")
-        }
+        Ok(summary)
     }
 
     fn filter_tests<'a, T: Test + ?Sized>(

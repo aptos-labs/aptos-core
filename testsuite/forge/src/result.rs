@@ -40,6 +40,7 @@ pub struct TestSummary {
     total: usize,
     filtered_out: usize,
     passed: usize,
+    soft_failure: Vec<String>,
     failed: Vec<String>,
     observers: Vec<Box<dyn TestObserver>>,
 }
@@ -51,6 +52,7 @@ impl TestSummary {
             total,
             filtered_out,
             passed: 0,
+            soft_failure: Vec::new(),
             failed: Vec::new(),
             observers: Vec::new(),
         }
@@ -62,13 +64,13 @@ impl TestSummary {
 
     pub fn handle_result(&mut self, details: TestDetails, result: TestResult) -> Result<()> {
         write!(self.stdout, "test {} ... ", details.name())?;
-        match result.clone() {
+        match &result {
             TestResult::Successful => {
                 self.passed += 1;
                 self.write_ok()?;
             },
             TestResult::SoftFailure(msg) => {
-                self.passed += 1;
+                self.soft_failure.push(details.name());
 
                 writeln!(self.stdout)?;
                 write!(self.stdout, "Error: {}", msg)?;
@@ -157,8 +159,9 @@ impl TestSummary {
         }
         writeln!(
             self.stdout,
-            ". {} passed; {} failed; {} filtered out",
+            ". {} passed; {} soft failed; {} hard failed; {} filtered out",
             self.passed,
+            self.soft_failure.len(),
             self.failed.len(),
             self.filtered_out
         )?;
@@ -167,6 +170,10 @@ impl TestSummary {
     }
 
     pub fn success(&self) -> bool {
-        self.failed.is_empty()
+        self.failed.is_empty() && self.soft_failure.is_empty()
+    }
+    
+    pub fn is_soft_failure(&self) -> bool {
+        !self.soft_failure.is_empty() && self.failed.is_empty()
     }
 }
