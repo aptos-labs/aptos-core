@@ -1227,6 +1227,18 @@ impl ExpData {
     /// but `branches_to(loop { break }, 0..10)` will return true.
     /// count as exit.
     pub fn branches_to(&self, nest_range: Range<usize>) -> bool {
+        let branch_cond = |loop_nest: usize, nest: usize, _: bool| {
+            nest >= loop_nest && nest_range.contains(&(nest - loop_nest))
+        };
+        self.customizable_branches_to(branch_cond)
+    }
+
+    /// A customizable version of `branches_to`, allowing to
+    /// specify how a `continue` or `break` refers to which loop(s).
+    pub fn customizable_branches_to<F>(&self, condition: F) -> bool
+    where
+        F: Fn(usize, usize, bool) -> bool,
+    {
         let mut loop_nest = 0;
         let mut branches = false;
         let mut visitor = |post: bool, e: &ExpData| {
@@ -1238,9 +1250,7 @@ impl ExpData {
                         loop_nest += 1
                     }
                 },
-                ExpData::LoopCont(_, nest, _)
-                    if *nest >= loop_nest && nest_range.contains(&(*nest - loop_nest)) =>
-                {
+                ExpData::LoopCont(_, nest, cond) if condition(loop_nest, *nest, *cond) => {
                     branches = true;
                     return false; // found a reference, exit visit early
                 },
