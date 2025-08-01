@@ -22,6 +22,13 @@ pub(crate) enum SchedulerWrapper<'a> {
 }
 
 impl SchedulerWrapper<'_> {
+    pub(crate) fn as_v2(&self) -> Option<&SchedulerV2> {
+        match self {
+            SchedulerWrapper::V1(_, _) => None,
+            SchedulerWrapper::V2(scheduler) => Some(scheduler),
+        }
+    }
+
     pub(crate) fn is_v2(&self) -> bool {
         matches!(self, SchedulerWrapper::V2(_))
     }

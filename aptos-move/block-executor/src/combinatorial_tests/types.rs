@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::delayed_field_mock_serialization::serialize_delayed_field_tuple;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
 use aptos_types::{
     account_address::AccountAddress,
@@ -25,7 +26,6 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::Module;
-use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
@@ -969,43 +969,11 @@ pub(crate) fn key_to_mock_module_id<K: Clone + Hash + Debug + Ord>(
     ModuleId::new(AccountAddress::new(addr), Identifier::new("test").unwrap())
 }
 
-// ID is just the unique index as u128.
-pub(crate) fn serialize_from_delayed_field_u128(value_or_id: u128, version: u32) -> Bytes {
-    let tuple = (value_or_id, version);
-    serialize_delayed_field_tuple(&tuple)
-}
-
-pub(crate) fn serialize_from_delayed_field_id(
-    delayed_field_id: DelayedFieldID,
-    version: u32,
-) -> Bytes {
-    let tuple = (delayed_field_id.extract_unique_index() as u128, version);
-    serialize_delayed_field_tuple(&tuple)
-}
-
-fn serialize_delayed_field_tuple(value: &(u128, u32)) -> Bytes {
-    bcs::to_bytes(value)
-        .expect("Failed to serialize (u128, u32) tuple")
-        .into()
-}
-
-/// The width of the delayed field is not used in the tests, and fixed as 8 for
-/// all delayed field constructions. However, only the real ID is actually
-/// serialized and deserialized (together with the version).
-pub(crate) fn deserialize_to_delayed_field_u128(bytes: &[u8]) -> Result<(u128, u32), bcs::Error> {
-    bcs::from_bytes::<(u128, u32)>(bytes)
-}
-
-pub(crate) fn deserialize_to_delayed_field_id(
-    bytes: &[u8],
-) -> Result<(DelayedFieldID, u32), bcs::Error> {
-    let (id, version) = bcs::from_bytes::<(u128, u32)>(bytes)?;
-    Ok((DelayedFieldID::from((id as u32, 8)), version))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::types::delayed_field_mock_serialization::{
+        deserialize_to_delayed_field_u128, serialize_delayed_field_tuple,
+    };
     use test_case::test_case;
 
     #[test_case((0u128, 0u32) ; "zero values")]
