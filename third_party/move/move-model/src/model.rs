@@ -1843,6 +1843,8 @@ impl GlobalEnv {
             variants: None,
             spec: RefCell::new(Spec::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 
@@ -2025,6 +2027,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2091,6 +2094,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 
@@ -3128,6 +3132,26 @@ impl<'env> ModuleEnv<'env> {
                     deps.insert(used_mod_id);
                 }
             }
+            // Obtain used structs and enums for package visibility of structs/enums
+            if self
+                .env
+                .language_version()
+                .is_at_least(LanguageVersion::V2_4)
+            {
+                for used_struct in fun_env.get_used_structs_with_transitive_inline() {
+                    let used_mod_id = used_struct.module_id;
+                    if self.get_id() == used_struct.module_id {
+                        continue;
+                    }
+                    let used_mod_env = self.env.get_module(used_mod_id);
+                    let used_struct_env = used_mod_env.get_struct(used_struct.id);
+                    if used_struct_env.has_package_visibility()
+                        && self.can_call_package_fun_in(&used_mod_env)
+                    {
+                        deps.insert(used_mod_id);
+                    }
+                }
+            }
         }
         deps
     }
@@ -3622,6 +3646,13 @@ pub struct StructData {
 
     /// Whether this struct is native
     pub is_native: bool,
+
+    /// Visibility of this struct
+    pub visibility: Visibility,
+
+    /// Whether this struct has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
 }
 
 impl StructData {
@@ -3638,6 +3669,8 @@ impl StructData {
             variants: None,
             spec: RefCell::new(Default::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 }
@@ -3989,6 +4022,14 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 }
 
@@ -4374,6 +4415,9 @@ pub struct FunctionData {
 
     /// A cache for used functions including ones obtained by transitively traversing used inline functions.
     pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used structs.
+    pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
 }
 
 impl FunctionData {
@@ -4402,6 +4446,7 @@ impl FunctionData {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 }
@@ -4441,6 +4486,21 @@ impl<'env> FunctionEnv<'env> {
             self.module_env.get_name().display(self.module_env.env),
             self.get_name_str()
         )
+    }
+
+    /// Split function name by spliter. If spliter does not exist in the string, return None.
+    pub fn get_and_split_fun_name(&self, spliter: char) -> Option<Vec<String>> {
+        let full_name = self.get_name_str();
+        if full_name.contains(spliter) {
+            Some(
+                full_name
+                    .split(spliter)
+                    .map(|s| s.to_string())
+                    .collect_vec(),
+            )
+        } else {
+            None
+        }
     }
 
     /// Gets full name with module address as string.
@@ -5104,6 +5164,31 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used structs/enums including ones obtained by transitively traversing used inline functions
+    pub fn get_used_structs_with_transitive_inline(&self) -> BTreeSet<QualifiedId<StructId>> {
+        if let Some(used_structs) = &*self.data.used_structs.borrow() {
+            return used_structs.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            if let Some(def) = fnc.get_def() {
+                def.struct_usage(self.module_env.env, &mut set);
+            }
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                if f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_structs.borrow_mut() = Some(set.clone());
         set
     }
 

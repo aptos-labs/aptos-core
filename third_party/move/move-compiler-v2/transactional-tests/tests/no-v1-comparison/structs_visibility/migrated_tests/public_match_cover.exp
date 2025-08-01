@@ -1,0 +1,23 @@
+processed 8 tasks
+
+task 7 'publish'. lines 195-230:
+Error: compilation errors:
+ error: unreachable pattern
+    ┌─ TEMPFILE7:204:13
+    │
+204 │             E::V1 {..} => {}
+    │             ^^^^^^^^^^
+
+error: unreachable pattern
+    ┌─ TEMPFILE7:214:13
+    │
+214 │             E::V1 {b: G::G2{ a: H::H2 {b: _}}, a: F::F1} => {},
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unreachable pattern
+    ┌─ TEMPFILE7:223:13
+    │
+223 │             E::V1 {..} => {}
+    │             ^^^^^^^^^^
+
+

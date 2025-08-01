@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking-lang-v2.4/illegal_dollar_ident.move:7:20
+  │
+7 │     public fun make$Wrapper(x: u64): Wrapper {
+  │                    ^ Invalid character: `$`

@@ -135,6 +135,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/assert_one.move",
     "no-v1-comparison/closures/reentrancy",
     "no-v1-comparison/closures/reentrancy",
+    "no-v1-comparison/structs_visibility/migrated_tests/public_enum_field_select.move",
     "control_flow/for_loop_non_terminating.move",
     "control_flow/for_loop_nested_break.move",
     "evaluation_order/lazy_assert.move",

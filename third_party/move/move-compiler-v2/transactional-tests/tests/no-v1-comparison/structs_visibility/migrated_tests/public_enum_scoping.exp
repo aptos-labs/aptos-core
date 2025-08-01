@@ -1,0 +1,25 @@
+processed 3 tasks
+
+task 1 'publish'. lines 21-50:
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ TEMPFILE1:30:21
+   │
+30 │             let x = 4;
+   │                     ^
+
+warning: This assignment/binding to the left-hand-side variable `b` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_b`), or renaming to `_`
+   ┌─ TEMPFILE1:45:13
+   │
+45 │             Two{i, b} => 3,
+   │             ^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `i` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_i`), or renaming to `_`
+   ┌─ TEMPFILE1:45:13
+   │
+45 │             Two{i, b} => 3,
+   │             ^^^^^^^^^
+
+
+
+task 2 'run'. lines 52-52:
+return values: 3

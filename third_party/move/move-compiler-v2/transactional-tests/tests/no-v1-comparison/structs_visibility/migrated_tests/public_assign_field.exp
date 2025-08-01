@@ -1,0 +1,22 @@
+processed 9 tasks
+
+task 2 'run'. lines 132-132:
+return values: { 42, true }
+
+task 3 'run'. lines 134-134:
+return values: { 42, true }
+
+task 4 'run'. lines 136-136:
+return values: { 0, false }
+
+task 5 'run'. lines 138-138:
+return values: 4
+
+task 6 'run'. lines 140-140:
+return values: { { { 0 }, 42 }, { 1 }, { { 2 }, 42 } }
+
+task 7 'run'. lines 142-142:
+return values: true
+
+task 8 'run'. lines 144-144:
+return values: true
