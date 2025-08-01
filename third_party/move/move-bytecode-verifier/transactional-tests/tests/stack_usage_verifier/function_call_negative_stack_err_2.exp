@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 24-35:
+task 0 lines 1-22:  publish [module 0x1.A {]
+task 1 lines 24-35:  run [import 0x1.A;]
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,

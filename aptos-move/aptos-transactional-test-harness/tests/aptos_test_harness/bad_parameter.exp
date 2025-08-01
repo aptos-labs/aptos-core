@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 1 'publish'. lines 4-10:
+task 1 lines 4-10:  publish --private-key Alice [module Alice::M {]
 Error: extended checks failed:
 
 error: `init_module` function can only take a single parameter of type `signer` or `&signer`

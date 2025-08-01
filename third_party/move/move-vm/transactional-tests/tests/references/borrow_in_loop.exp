@@ -1,5 +1,5 @@
 processed 3 tasks
-task 0 lines 1-23:  publish
+task 0 lines 1-23:  publish [module 0x42.m {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::m'. Got VMError: {
     major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 2 lines 27-41:  run --gas-budget 100000
+task 2 lines 27-41:  run --gas-budget 100000 [main() {]
 Error: Script execution failed with VMError: {
     major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
     sub_status: None,
