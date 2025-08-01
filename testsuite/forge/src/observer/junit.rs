@@ -48,8 +48,10 @@ impl TestObserver for JunitTestObserver {
         let mut suite = TestSuite::new(self.name.clone());
         for (test_name, result) in self.results.lock().unwrap().iter() {
             let status = match result {
-                TestResult::Ok => quick_junit::TestCaseStatus::success(),
-                TestResult::FailedWithMsg(msg) => {
+                TestResult::Successful => quick_junit::TestCaseStatus::success(),
+                TestResult::HardFailure(msg)
+                | TestResult::InfraFailure(msg)
+                | TestResult::SoftFailure(msg) => {
                     // Not 100% sure what the difference between failure and error is.
                     let mut status =
                         quick_junit::TestCaseStatus::non_success(NonSuccessKind::Failure);
