@@ -54,6 +54,7 @@ mod remote_state;
 mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
+mod shelby_audit_sim;
 mod simple_defi;
 mod smart_data_structures;
 mod stake;
