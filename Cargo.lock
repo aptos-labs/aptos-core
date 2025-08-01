@@ -4574,7 +4574,6 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -11849,15 +11848,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module-publish"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
-]
-
-[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13549,11 +13539,8 @@ name = "package-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
- "aptos-transaction-workloads-lib",
- "bcs 0.1.4",
+ "aptos-transaction-generator-lib",
  "clap 4.5.21",
- "move-package",
 ]
 
 [[package]]
