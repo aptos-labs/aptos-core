@@ -14,7 +14,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, StateView},
+    state_store::StateView,
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
@@ -82,7 +82,7 @@ impl VMBlockExecutor for FakeVM {
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         Ok(BlockOutput::new(vec![], None, BTreeMap::new()))
     }
 }
