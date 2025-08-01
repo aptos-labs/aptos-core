@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/enum_invariants.move:12:9
+   │
+12 │         invariant self.bar >= 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/enum_invariants.move:24: add_one_if_first
+   =         self = <redacted>
+   =     at tests/sources/functional/enum_invariants.move:26: add_one_if_first
+   =         foo = <redacted>
+   =         self = <redacted>
+   =     at tests/sources/functional/enum_invariants.move:25: add_one_if_first
+   =         self = <redacted>
+   =     at tests/sources/functional/enum_invariants.move:12
