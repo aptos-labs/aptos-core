@@ -3,14 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::{BlockExecutionError, BlockExecutionResult},
-    proptest_types::{
+    combinatorial_tests::{
         mock_executor::MockOutput,
         types::{
-            default_group_map, deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128,
-            raw_metadata, serialize_from_delayed_field_u128, DeltaTestKind, GroupSizeOrMetadata,
-            MockIncarnation, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
+            default_group_map, raw_metadata, DeltaTestKind, GroupSizeOrMetadata, MockIncarnation,
+            MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
         },
+    },
+    errors::{BlockExecutionError, BlockExecutionResult},
+    types::delayed_field_mock_serialization::{
+        deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128,
+        serialize_from_delayed_field_u128,
     },
 };
 use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
