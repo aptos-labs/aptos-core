@@ -25,7 +25,7 @@ pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     max_promotions_per_block: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
     /// evicted.
-    refresh_interval_versions: usize,
+    _refresh_interval_versions: usize,
 }
 
 impl<'base_view, Key, BaseView> BlockHotStateOpAccumulator<'base_view, Key, BaseView>
@@ -57,7 +57,7 @@ where
             to_make_hot: BTreeMap::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
-            refresh_interval_versions,
+            _refresh_interval_versions: refresh_interval_versions,
         }
     }
 
@@ -139,6 +139,8 @@ where
                 hot_since_version, self.first_version
             );
         }
-        hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        // TODO(HotState): understand perf impact. For now, we always refresh.
+        // hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        true
     }
 }
