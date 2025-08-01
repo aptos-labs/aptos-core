@@ -38,6 +38,7 @@ use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -411,16 +412,18 @@ impl SimpleVMTestAdapter<'_> {
         let mut extensions = NativeContextExtensions::default();
 
         let mut data_cache = TransactionDataCache::empty();
-        let return_values = MoveVM::execute_loaded_function(
-            function,
-            args,
-            &mut data_cache,
-            &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
-            &mut extensions,
-            module_storage,
-            &self.storage,
-        )?;
+        let return_values = dispatch_loader!(module_storage, loader, {
+            MoveVM::execute_loaded_function(
+                function,
+                args,
+                &mut data_cache,
+                &mut gas_status,
+                &mut TraversalContext::new(&traversal_storage),
+                &mut extensions,
+                &loader,
+                &self.storage,
+            )
+        })?;
 
         let change_set = data_cache
             .into_effects(module_storage)
