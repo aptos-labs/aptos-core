@@ -134,6 +134,7 @@ HELM_CHARTS = ["aptos-node", "aptos-genesis"]
 class ForgeState(Enum):
     RUNNING = "RUNNING"
     PASS = "PASS"
+    SOFT_FAIL = "SOFT_FAIL"
     FAIL = "FAIL"
     SKIP = "SKIP"
     EMPTY = "EMPTY"
@@ -202,7 +203,7 @@ class ForgeResult:
                 )
             )
         result._end_time = context.time.now()
-        if result.state not in (ForgeState.PASS, ForgeState.FAIL, ForgeState.SKIP):
+        if result.state not in (ForgeState.PASS, ForgeState.SOFT_FAIL, ForgeState.FAIL, ForgeState.SKIP):
             raise Exception("Forge result never entered terminal state")
         if result.output is None:
             raise Exception("Forge result didnt record output")
@@ -236,7 +237,7 @@ class ForgeResult:
         return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
-        return self.state == ForgeState.PASS
+        return self.state == ForgeState.PASS || self.state == ForgeState.SOFT_FAIL
 
 
 @dataclass
@@ -343,7 +344,7 @@ def format_report(context: ForgeContext, result: ForgeResult) -> str:
             debugging_appendix
         )
     else:
-        if result.state == ForgeState.FAIL:
+        if result.state == ForgeState.FAIL || result.state == ForgeState.SOFT_FAIL:
             return "{}\n{}".format(report_text, debugging_appendix)
         return report_text
 
@@ -663,8 +664,10 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
 
     if result.state == ForgeState.PASS:
         forge_comment_header = f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
+    elif result.state == ForgeState.SOFT_FAIL:
+        forge_comment_header = f"### :heavy_exclamation_mark: Forge suite `{context.forge_test_suite}` soft failure on {get_testsuite_images(context)}"
     elif result.state == ForgeState.FAIL:
-        forge_comment_header = f"### :x: Forge suite `{context.forge_test_suite}` failure on {get_testsuite_images(context)}"
+        forge_comment_header = f"### :x: Forge suite `{context.forge_test_suite}` hard failure on {get_testsuite_images(context)}"
     elif result.state == ForgeState.SKIP:
         forge_comment_header = f"### :thought_balloon: Forge suite `{context.forge_test_suite}` preempted on {get_testsuite_images(context)}"
     else:
@@ -966,7 +969,26 @@ class K8sForgeRunner(ForgeRunner):
                         )
                     )
                 else:
-                    state = ForgeState.FAIL
+                    exit_code = (
+                        context.shell.run(
+                        [
+                            "kubectl",
+                            "--kubeconfig",
+                            context.forge_cluster.kubeconf,
+                            "get",
+                            "pod",
+                            "-n",
+                            "default",
+                            forge_pod_name,
+                            "-o",
+                            "jsonpath='{.status.containerStatuses[*].state.terminated.exitCode}'",
+                        ]
+                    )
+                    .output.decode()
+                    if exit_code == "51":
+                        state = ForgeState.SOFT_FAIL
+                    else:
+                        state = ForgeState.FAIL
 
                 attempts -= 1
                 if attempts <= 0:
