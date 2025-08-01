@@ -130,7 +130,7 @@ fn native_destroy(
 
     // Actually remove the aggregator.
     let id = AggregatorID::new(handle, key);
-    aggregator_data.remove_aggregator(id);
+    aggregator_data.remove_aggregator(id)?;
 
     Ok(smallvec![])
 }

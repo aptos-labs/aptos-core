@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{AptosMoveResolver, SessionExt},
+    v2::AptosSession,
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
-use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
+use aptos_types::vm::module_metadata::{get_metadata, RuntimeModuleMetadataV1};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::LoadedFunction;
+use std::sync::Arc;
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -30,16 +30,20 @@ pub fn determine_is_view(
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
 pub(crate) fn validate_view_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
+    session: &mut impl AptosSession,
     args: Vec<Vec<u8>>,
-    fun_name: &IdentStr,
     func: &LoadedFunction,
-    module_metadata: Option<&RuntimeModuleMetadataV1>,
     struct_constructors_feature: bool,
 ) -> PartialVMResult<Vec<Vec<u8>>> {
+    let metadata = get_metadata(
+        &func
+            .owner_as_module()
+            .map_err(|err| err.to_partial())?
+            .metadata,
+    );
+
     // Must be marked as view function.
-    let is_view = determine_is_view(module_metadata, fun_name);
+    let is_view = determine_is_view(metadata.as_ref().map(Arc::as_ref), func.name_id());
     if !is_view {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -58,7 +62,6 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        module_storage,
         func.param_tys(),
         args,
         func.ty_args(),

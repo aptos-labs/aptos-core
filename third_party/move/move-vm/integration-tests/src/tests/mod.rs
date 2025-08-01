@@ -10,7 +10,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -98,18 +98,18 @@ fn execute_function_for_test(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
+    let mut data_cache = TransactionDataCache::empty();
     let traversal_storage = TraversalStorage::new();
 
     let func = module_storage.load_function(module_id, function_name, ty_args)?;
     MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut MoveVmDataCacheAdapter::new(&mut data_cache, data_storage, module_storage),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut NativeContextExtensions::default(),
         module_storage,
-        data_storage,
     )
 }
 
@@ -128,12 +128,11 @@ fn execute_script_impl(
     MoveVM::execute_loaded_function(
         function,
         args,
-        &mut data_cache,
+        &mut MoveVmDataCacheAdapter::new(&mut data_cache, storage, &code_storage),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut NativeContextExtensions::default(),
         &code_storage,
-        storage,
     )?;
     let change_set = data_cache
         .into_effects(&code_storage)

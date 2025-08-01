@@ -307,7 +307,7 @@ fn native_read(
     let aggregator_value_ty = &ty_args[0];
     let aggregator = safely_pop_arg!(args, StructRef);
 
-    let value = if let Some((resolver, delayed_field_data)) = get_context_data(context) {
+    let value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
         delayed_field_data.read_aggregator(id, resolver)?
     } else {
