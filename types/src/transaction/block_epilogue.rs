@@ -26,8 +26,8 @@ pub enum BlockEpiloguePayload {
 impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
-            BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
-            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
+            Self::V0 { block_end_info, .. } => Some(block_end_info),
+            Self::V1 { block_end_info, .. } => Some(block_end_info),
         }
     }
 }
@@ -73,7 +73,7 @@ impl BlockEndInfo {
 
     pub fn limit_reached(&self) -> bool {
         match self {
-            BlockEndInfo::V0 {
+            Self::V0 {
                 block_gas_limit_reached,
                 block_output_limit_reached,
                 ..
@@ -83,7 +83,7 @@ impl BlockEndInfo {
 
     pub fn block_effective_gas_units(&self) -> u64 {
         match self {
-            BlockEndInfo::V0 {
+            Self::V0 {
                 block_effective_block_gas_units,
                 ..
             } => *block_effective_block_gas_units,
