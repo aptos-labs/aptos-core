@@ -14,6 +14,7 @@ edition = "2021"
 ambassador = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 claims = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }

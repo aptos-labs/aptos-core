@@ -8,6 +8,7 @@ use crate::{
         STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorModuleCacheLocalConfig,
@@ -28,7 +29,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::VMStatus,
 };
-use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
@@ -105,6 +106,17 @@ where
         // different, we reset it to the new one, and flush the module cache.
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
+            if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
+                let flush_verifier_cache = self.environment.as_ref().map_or(true, |e| {
+                    e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
+                });
+                if flush_verifier_cache {
+                    // Additionally, if the verifier config changes, we flush static verifier cache
+                    // as well.
+                    RuntimeEnvironment::flush_verified_module_cache();
+                }
+            }
+
             self.environment = Some(storage_environment);
             self.module_cache.flush();
         }
