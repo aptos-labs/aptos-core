@@ -18,7 +18,10 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
-    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
+    transaction::{
+        scheduled_txn::{ScheduledTransactionInfoWithKey, SCHEDULED_TRANSACTIONS_MODULE_INFO},
+        MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef,
+    },
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -62,6 +65,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_fee_payer_v2_name: Identifier::new("unified_prologue_fee_payer_v2")
             .unwrap(),
         unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
+        scheduled_txn_epilogue_name: Identifier::new("scheduled_txn_epilogue").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -87,6 +91,7 @@ pub struct TransactionValidation {
     pub unified_prologue_v2_name: Identifier,
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
+    pub scheduled_txn_epilogue_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -682,4 +687,38 @@ pub(crate) fn run_failure_epilogue(
             log_context,
         )
     })
+}
+
+pub(crate) fn run_scheduled_txn_epilogue(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    txn: &ScheduledTransactionInfoWithKey,
+    gas_remaining: Gas,
+    fee_statement: FeeStatement,
+    traversal_context: &mut TraversalContext,
+    module_storage: &impl ModuleStorage,
+) -> VMResult<()> {
+    let args = vec![
+        MoveValue::Signer(SCHEDULED_TRANSACTIONS_MODULE_INFO.deposit_owner_addr),
+        MoveValue::Address(txn.sender_handle),
+        txn.key.as_move_value(),
+        MoveValue::U64(fee_statement.storage_fee_refund()),
+        MoveValue::U64(txn.gas_unit_price),
+        MoveValue::U64(txn.max_gas_amount),
+        MoveValue::U64(txn.max_gas_amount * txn.gas_unit_price),
+        MoveValue::U64(gas_remaining.into()),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.scheduled_txn_epilogue_name,
+            vec![],
+            serialize_values(&args),
+            &mut UnmeteredGasMeter,
+            traversal_context,
+            module_storage,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)?;
+    emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+    Ok(())
 }
