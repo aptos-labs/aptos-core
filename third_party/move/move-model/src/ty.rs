@@ -3552,6 +3552,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
+    /// Whether to display module addresses in types, to accommodate special cases
+    pub display_module_addr: bool,
     /// Var types that are recursive and should appear as `..` in display
     pub recursive_vars: Option<BTreeSet<u32>>,
 }
@@ -3567,6 +3569,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }
@@ -3591,6 +3594,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }
@@ -3667,7 +3671,14 @@ impl fmt::Display for TypeDisplay<'_> {
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 if !a.is_unit() {
-                    write!(f, "{}", a.display(self.context))?;
+                    let mut arg_str = a.display(self.context).to_string();
+                    // Function value args cannot be displayed as a tuple
+                    arg_str = arg_str
+                        .strip_prefix('(')
+                        .and_then(|s| s.strip_suffix(')'))
+                        .unwrap_or(&arg_str)
+                        .to_string();
+                    write!(f, "{}", arg_str)?;
                 }
                 f.write_str("|")?;
                 if !t.is_unit() {
@@ -3762,9 +3773,10 @@ impl TypeDisplay<'_> {
         } else {
             let struct_env = env.get_module(mid).into_struct(sid);
             let module_name = struct_env.module_env.get_name();
-            let module_str = if self.context.use_module_qualification
-                || self.context.used_modules.contains(&mid)
-                || Some(module_name) == self.context.module_name.as_ref()
+            let module_str = if !self.context.display_module_addr
+                && (self.context.use_module_qualification
+                    || self.context.used_modules.contains(&mid)
+                    || Some(module_name) == self.context.module_name.as_ref())
             {
                 module_name.display(env).to_string()
             } else {
@@ -3776,7 +3788,7 @@ impl TypeDisplay<'_> {
                 struct_env.get_name().display(env.symbol_pool())
             )
         };
-        if !self.context.use_module_qualification {
+        if !self.context.display_module_addr && !self.context.use_module_qualification {
             if let Some(mname) = &self.context.module_name {
                 let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
                 if let Some(shortcut) = str.strip_prefix(&s) {

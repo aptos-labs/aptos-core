@@ -32,6 +32,6 @@ module 0xcafe::m {
         y + (c as u8)
     }
     fun __lambda__2__nested(c: u64, y: u64): u64 {
-        map2(y - c as u8, |arg0| __lambda__1__nested(c, arg0)) as u64
+        map2((y - c) as u8, |arg0| __lambda__1__nested(c, arg0)) as u64
     }
 }

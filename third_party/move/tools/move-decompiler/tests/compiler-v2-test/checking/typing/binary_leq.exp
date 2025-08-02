@@ -3,17 +3,12 @@ module 0x8675309::M {
         f: u64,
     }
     fun t0(x: u64, r: R) {
-        x <= x;
-        *&(&r).f <= *&(&r).f;
-        if (1 <= *&(&r).f) *&(&r).f <= 0;
+        let _t21;
+        let _t4 = x <= x;
+        let _t11 = *&(&r).f <= *&(&r).f;
+        if (1 <= *&(&r).f) _t21 = *&(&r).f <= 0;
         let R{f: _t23} = r;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: expected expression with no value but found `bool`
-  ┌─ binary_leq.move:8:9
-  │
-8 │         if (1 <= *&(&r).f) *&(&r).f <= 0;
-  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+============ recompilation succeeded ========

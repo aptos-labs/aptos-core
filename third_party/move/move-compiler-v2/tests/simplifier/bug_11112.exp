@@ -47,10 +47,10 @@ module 0xcafe::vectors {
                 {
                     let (e) = (0x1::vector::borrow_mut<u64>(v, i));
                     *e = s;
-                    s = s + 1
+                    s = s + 1;
                 };
-                i = i + 1
-            }
+                i = i + 1;
+            };
         };
         if (v == vector[2, 3, 4]) () else abort 0;
     }

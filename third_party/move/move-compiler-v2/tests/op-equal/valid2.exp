@@ -37,7 +37,7 @@ module 0xc0ffee::m {
         {
             let $t2 = 1;
             let $t1 = &mut self.x;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
         1
     }
@@ -46,7 +46,7 @@ module 0xc0ffee::m {
         {
             let $t2 = foo(&mut s);
             let $t1 = &mut s.x;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
         s.x
     }

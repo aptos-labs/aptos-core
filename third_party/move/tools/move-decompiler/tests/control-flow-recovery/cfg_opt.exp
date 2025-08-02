@@ -3,7 +3,7 @@ module 0x99::cfg_opt_simple {
         loop {
             if (!(x > 1)) {
                 if (!(y > 2)) break};
-            y = y + 1
+            y = y + 1;
         };
         x + 1 + y
     }
@@ -11,7 +11,7 @@ module 0x99::cfg_opt_simple {
         loop {
             if (!(x > 1)) {
                 if (!(y > 2)) break};
-            y = y + 1
+            y = y + 1;
         };
         x + y
     }

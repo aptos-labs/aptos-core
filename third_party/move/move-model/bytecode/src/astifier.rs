@@ -90,6 +90,7 @@ use move_model::{
     model::{GlobalEnv, Loc, NodeId, QualifiedInstId, StructId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known::{BORROW_MUT_NAME, BORROW_NAME},
 };
 use std::{
     cmp::Ordering,
@@ -1076,14 +1077,17 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, None, rhs);
             },
-            MoveTo(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveTo, srcs);
+            MoveTo(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveTo, srcs);
             },
-            MoveFrom(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveFrom, srcs);
+            MoveFrom(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveFrom, srcs);
             },
-            Exists(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::Exists(None), srcs);
+            Exists(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::Exists(None), srcs);
             },
             TestVariant(mid, sid, variant, inst) => {
                 self.gen_call_stm(
@@ -1108,13 +1112,16 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, Some(*variant), rhs);
             },
-            BorrowGlobal(_, _, inst) => self.gen_call_stm(
-                ctx,
-                Some(inst),
-                dests,
-                Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
-                srcs,
-            ),
+            BorrowGlobal(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(
+                    ctx,
+                    Some(&vec![ty]),
+                    dests,
+                    Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
+                    srcs,
+                );
+            },
             BorrowLoc => self.gen_call_stm(
                 ctx,
                 None,
@@ -2138,12 +2145,10 @@ impl AssignTransformer<'_> {
         let mut blocks = vec![];
         let mut new_stms = vec![];
         let mut substitution: BTreeMap<Symbol, Exp> = BTreeMap::new();
-        for stm in stms {
+        for (idx, stm) in stms.iter().enumerate() {
             let stm_usage = self.usage[&stm.node_id()].clone();
             match stm.as_ref() {
-                // Check whether an assignment can be eliminated because it is used only once.
-                // This is often the case with stackless bytecode generated
-                // from stack code.
+                // Check whether an assignment can be eliminated
                 ExpData::Assign(id, Pattern::Var(_, var), rhs)
                 if
                 // Cannot be read outside this block
@@ -2154,7 +2159,8 @@ impl AssignTransformer<'_> {
                     // happens if we are in a loop).
                     stm_usage.is_single_assignment(*var, id) &&
                     // Must not be borrowed after this statement
-                    !stm_usage.is_borrowed(*var)
+                    !stm_usage.is_borrowed(*var) &&
+                    self.safe_to_simplify(var, rhs, stms.get(idx+1..).unwrap_or(&[]), &substitution)
                 =>
                     {
                         substitution.insert(
@@ -2168,8 +2174,6 @@ impl AssignTransformer<'_> {
                         }
                     },
                 _ => {
-                    // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
-                    // Extra checks are needed to ensure safety.
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
                 },
@@ -2185,6 +2189,168 @@ impl AssignTransformer<'_> {
             new_stms.push(block)
         }
         new_stms
+    }
+
+    /// Check if the following pattern
+    /// ```move
+    ///  let _t = rhs; // _t is only used once and never written to again
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(_t)
+    /// ```
+    ///  can be safely simplified to
+    /// ```move
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(rhs)
+    /// ```
+    ///
+    fn safe_to_simplify(
+        &self,
+        target_var: &Symbol,
+        rhs: &Exp,
+        stmts: &[Exp],
+        substitution: &BTreeMap<Symbol, Exp>,
+    ) -> bool {
+        // If the target var is used immediately after its assignment, we can safely simplify it.
+        // See the function doc for definition of "immediate" usage.
+        if Self::use_immediately(target_var, stmts) {
+            return true;
+        }
+        // If the RHS has side effects that are location-sensitive (e.g., moving an `Abort` to a later location will incur undesired computation).
+        // See the function doc for definition of location-sensitivity.
+        if Self::loc_sensitive(rhs) {
+            return false;
+        }
+
+        // Check if moving the RHS to a later location might incur different results
+        // Algorithm:
+        // - Gather all the variables used by the RHS and their types
+        // - Check every statement in the sequence before usage of the target variable:
+        //   - If any of the RHS free var is redefined or mutably borrowed, we cannot move the RHS around
+        //   - If the RHS free var is a mutable reference, and it is read again, we cannot move the RHS around
+        //     - This is to avoid creating conflicting references.
+        //     - This rule is a bit strict, but necessary for safety
+        //   - If any statement introduces uncertain side effects to the analysis above, we give up.
+
+        // Step 1: gather all free vars used by the RHS
+        let rhs = self.builder.unfold(substitution, rhs.clone());
+        let mut rhs_free_vars = BTreeSet::new();
+        rhs.visit_free_local_vars(|node_id, var| {
+            rhs_free_vars.insert((node_id, var));
+        });
+
+        // Analyze all the follow-up statements
+        for stmt in stmts {
+            // Step 2: Give up if a statement has uncertain side effects
+            if self.uncertain_side_effects(stmt) {
+                return false;
+            }
+
+            // Step 3: Get all the free vars usage by a statement
+            let stmt = self.builder.unfold(substitution, stmt.clone());
+            let mut stmt_usage = UsageInfo::default();
+            let mut visitor = |e: &ExpData| {
+                fetch_usage(&mut stmt_usage, e);
+                true
+            };
+            stmt.visit_pre_order(&mut visitor);
+
+            // Step 4: Give up if any of the free vars used by the RHS is written to/mutably borrowed in the statement,
+            // or if any of the free vars of mutable reference type is read in the statement.
+            if rhs_free_vars.iter().any(|(node_id, var)| {
+                stmt_usage.writes.contains_key(var)
+                    || (self
+                        .builder
+                        .env()
+                        .get_node_type(*node_id)
+                        .is_mutable_reference()
+                        && stmt_usage.reads.contains_key(var))
+            }) {
+                return false;
+            }
+
+            // Step 5: If the target var has been reached, we are good to go!
+            let mut stmt_free_vars = BTreeSet::new();
+            stmt.visit_free_local_vars(|_, var| {
+                stmt_free_vars.insert(var);
+            });
+            if stmt_free_vars.contains(target_var) {
+                return true;
+            }
+        }
+        true
+    }
+
+    /// Check if the target variable is used immediately in the first exp of the sequence.
+    /// We are now using a set of very strict rules to determine "immediate" usage:
+    /// - The first exp is a `if-else` expression, and the target variable is used in the condition.
+    /// - The first exp is an `assign` expression, which assins the target variable to another
+    /// [TODO]: refine the rules to include more cases.
+    fn use_immediately(target_var: &Symbol, stmts: &[Exp]) -> bool {
+        match stmts.first().map(|exp| exp.as_ref()) {
+            None => true,
+            Some(ExpData::IfElse(_, cond, _, _)) => {
+                let mut free_vars = BTreeSet::new();
+                cond.visit_free_local_vars(|_, var| {
+                    free_vars.insert(var);
+                });
+                free_vars.contains(target_var)
+            },
+            Some(ExpData::Assign(_, _, exp)) => {
+                matches!(exp.as_ref(), ExpData::LocalVar(_, var) if *var == *target_var)
+            },
+            _ => false,
+        }
+    }
+
+    /// Check if an expression is location-sensitive, meaning it has side effects depending on its location.
+    /// We are now using a set of umbrella heuristics to determine location sensitivity
+    /// /// [TODO]: refine the heuristics to narrow down the cases.
+    /// - Abort
+    /// - User defined functions
+    /// - `MoveFrom`
+    /// - `MoveTo`
+    fn loc_sensitive(exp: &Exp) -> bool {
+        matches!(
+            exp.as_ref(),
+            ExpData::Call(
+                _,
+                Operation::Abort
+                    | Operation::MoveFunction(..)
+                    | Operation::Exists(..)
+                    | Operation::MoveFrom
+                    | Operation::MoveTo,
+                _
+            )
+        )
+    }
+
+    /// Check if an expression has uncertain side effects to our analysis inside `safe_to_simplify`.
+    /// Currently we include all cases where we cannot reason the references
+    /// - `BorrowGlobal`
+    /// - `Vector::Borrow` and `Vector::BorrowMut`
+    fn uncertain_side_effects(&self, exp: &Exp) -> bool {
+        match exp.as_ref() {
+            ExpData::Assign(_, _, rhs) => match rhs.as_ref() {
+                ExpData::Call(_, Operation::BorrowGlobal(..), _) => true,
+                ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
+                    let mod_env = self.builder.env().get_module(*mid);
+                    if mod_env.is_std_vector() {
+                        let name = mod_env.get_function(*fid).get_name_str();
+                        name == BORROW_NAME || name == BORROW_MUT_NAME
+                    } else {
+                        false
+                    }
+                },
+                _ => false,
+            },
+            _ => false,
+        }
     }
 }
 

@@ -141,18 +141,18 @@ module 0x42::freeze_mut_ref {
         let x = 0;
         let f = &mut {
             x = x + 1;
-            s
+            s;
         }.f;
         let g = &mut {
             x = x + 1;
-            s
+            s;
         }.f;
         let y = &mut 2;
         let z;
         *{
             *f = 0;
             z = /*freeze*/y;
-            g
+            g;
         } = 2;
     }
     fun t6(cond: bool, s: &mut S, other: &S) {

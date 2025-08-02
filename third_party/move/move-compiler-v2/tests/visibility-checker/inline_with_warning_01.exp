@@ -66,10 +66,10 @@ module 0xc0ffee::m {
     public inline fun outer(): u64 {
         {
             let ();
-            secret() + secret()
+            secret() + secret();
         } + {
             let ();
-            secret() + secret()
+            secret() + secret();
         } + some_what_inner()
     }
     fun secret(): u64 {
@@ -83,11 +83,11 @@ module 0xc0ffee::m {
             let ();
             {
                 let ();
-                secret() + secret()
+                secret() + secret();
             } + {
                 let ();
-                secret() + secret()
-            } + some_what_inner()
+                secret() + secret();
+            } + some_what_inner();
         } == 168) () else abort 14566554180833181696;
     }
 }

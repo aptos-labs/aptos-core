@@ -167,7 +167,7 @@ module 0x42::m {
         {
             let $t2 = s.x;
             let $t1 = &mut self.x;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun unwrap<T: copy>(self: &Wrapper<T>): T {

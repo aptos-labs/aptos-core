@@ -1,13 +1,12 @@
 module 0x42::create_signer {
+    friend 0x42::object;
     friend native fun create_signer(addr: address): signer;
 }
-
 module 0x42::error {
     public fun permission_denied(i: u64): u64 {
         i
     }
 }
-
 module 0x42::event {
     struct EventHandle<phantom T: drop + store> has store {
         counter: u64,
@@ -20,14 +19,13 @@ module 0x42::event {
         ()
     }
 }
-
 module 0x42::signer {
     public fun address_of(s: &signer): address {
-        *borrow_address(s)
+        let _t2 = borrow_address(s);
+        *_t2
     }
     public native fun borrow_address(s: &signer): &address;
 }
-
 module 0x42::object {
     use 0x42::create_signer;
     use 0x42::event;
@@ -54,30 +52,32 @@ module 0x42::object {
         to: address,
     }
     public fun owner<T: key>(object: Object<T>): address {
-        if (!exists(*&(&object).inner)) abort 5;
-        *&borrow_global(*&(&object).inner).owner
+        let _t4 = exists<ObjectCore>(*&(&object).inner);
+        if (!_t4) abort 5;
+        let _t7 = *&(&object).inner;
+        *&borrow_global<ObjectCore>(_t7).owner
     }
     public entry fun burn<T: key>(owner: &signer, object: Object<T>, a1: bool) {
         let _t3 = signer::address_of(owner);
-        if (!is_owner<T>(object, _t3)) abort 4;
+        let _t12 = is_owner<T>(object, _t3);
+        if (!_t12) abort 4;
         let _t4 = *&(&object).inner;
-        move_to(TombStone{original_owner: _t3}, &create_signer::create_signer(_t4));
-        let _t7 = borrow_global_mut(_t4);
-        if (*&_t7.owner != 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff) {
-            if (a1) event::emit<Transfer>(Transfer{object: _t4,from: *&_t7.owner,to: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
-            event::emit_event<TransferEvent>(&mut _t7.transfer_events, TransferEvent{object: _t4,from: *&_t7.owner,to: 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
-            &mut _t7.owner = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        move_to<TombStone>(&create_signer::create_signer(_t4), TombStone{original_owner: _t3});
+        let _t6 = a1;
+        let _t22 = _t4;
+        let _t7 = borrow_global_mut<ObjectCore>(_t22);
+        let _t28 = *&_t7.owner != @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        if (_t28) {
+            if (_t6) event::emit<Transfer>(Transfer{object: _t4,from: *&_t7.owner,to: @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            let _t37 = &mut _t7.transfer_events;
+            event::emit_event<TransferEvent>(_t37, TransferEvent{object: _t4,from: *&_t7.owner,to: @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            *&mut _t7.owner = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
         };
     }
     public fun is_owner<T: key>(object: Object<T>, owner: address): bool {
-        owner<T>(object) == owner
+        let _t3 = owner<T>(object);
+        _t3 == owner
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ bug-13880.move:69:13
-   │
-69 │             &mut _t7.owner = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-   │             ^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

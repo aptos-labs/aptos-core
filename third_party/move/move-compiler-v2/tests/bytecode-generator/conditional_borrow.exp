@@ -126,14 +126,14 @@ module 0x8675::M {
         let a = z;
         let tref4 = &mut {
             let _q = 1;
-            a
+            a;
         };
         *tref4 = *tref4 + 4;
         let tref5 = &mut a;
         *tref5 = *tref5 + 8;
         let tref6 = &mut {
             3;
-            a
+            a;
         };
         *tref6 = *tref6 + 16;
         a
@@ -151,14 +151,14 @@ module 0x8675::M {
         let a = z;
         let tref4 = &mut {
             let _q = 1;
-            a.f
+            a.f;
         };
         *tref4 = *tref4 + 1;
         let tref5 = &mut a.f;
         *tref5 = *tref5 + 8;
         let tref6 = &mut {
             3;
-            a.f
+            a.f;
         };
         *tref6 = *tref6 + 16;
         a.f

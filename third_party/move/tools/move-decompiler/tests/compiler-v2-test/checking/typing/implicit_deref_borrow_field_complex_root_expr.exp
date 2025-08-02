@@ -8,21 +8,15 @@ module 0x8675309::M {
         let _t4;
         let _t3;
         if (cond) _t3 = s else _t3 = s;
-        *&_t3.f;
-        if (cond) _t4 = /*freeze*/s_mut else _t4 = s;
-        *&_t4.f;
-        if (cond) _t5 = s else _t5 = /*freeze*/s_mut;
-        *&_t5.f;
+        let _t12 = *&_t3.f;
+        if (cond) _t4 = freeze(s_mut) else _t4 = s;
+        let _t18 = *&_t4.f;
+        if (cond) _t5 = s else _t5 = freeze(s_mut);
+        let _t23 = *&_t5.f;
         if (cond) _t6 = s_mut else _t6 = s_mut;
-        *&_t6.f;
-        *&(&S{f: 0}).f;
+        let _t28 = *&_t6.f;
+        let _t33 = *&(&S{f: 0}).f;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot assign `&S` to left-hand side of type `&mut S` (mutability mismatch)
-   ┌─ implicit_deref_borrow_field_complex_root_expr.move:12:46
-   │
-12 │         if (cond) _t4 = /*freeze*/s_mut else _t4 = s;
-   │                                              ^^^
+============ recompilation succeeded ========

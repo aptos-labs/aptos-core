@@ -3,7 +3,8 @@ module 0x8675309::M {
         f: u64,
     }
     fun acq(addr: address): R {
-        move_from(addr)
+        let _t2 = move_from<R>(addr);
+        _t2
     }
     fun t0(addr: address) {
         let R{f: _t3} = acq(addr);
@@ -11,26 +12,25 @@ module 0x8675309::M {
     }
     fun t1(addr: address) {
         let R{f: _t4} = acq(addr);
-        borrow_global_mut(addr);
+        let _t5 = addr;
+        let _t6 = borrow_global_mut<R>(_t5);
     }
     fun t2(addr: address) {
         let R{f: _t4} = acq(addr);
-        borrow_global(addr);
+        let _t5 = addr;
+        let _t6 = borrow_global<R>(_t5);
     }
     fun t3(cond: bool, addr: address) {
         let _t3;
         let _t2 = R{f: 0};
         let R{f: _t8} = acq(addr);
-        if (cond) _t3 = borrow_global_mut(addr) else _t3 = &mut _t2;
-        &mut _t3.f = 0;
+        if (cond) {
+            let _t10 = addr;
+            _t3 = borrow_global_mut<R>(_t10);
+        } else _t3 = &mut _t2;
+        *&mut _t3.f = 0;
         let R{f: _t16} = _t2;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ call_acquires.move:25:9
-   │
-25 │         &mut _t3.f = 0;
-   │         ^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========
