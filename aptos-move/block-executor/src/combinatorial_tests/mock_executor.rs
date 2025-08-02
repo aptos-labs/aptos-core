@@ -633,6 +633,29 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
 }
 
 impl<K, E> MockOutput<K, E> {
+    fn empty_success_output() -> Self {
+        Self {
+            writes: vec![],
+            aggregator_v1_writes: vec![],
+            group_writes: vec![],
+            module_writes: vec![],
+            deltas: vec![],
+            events: vec![],
+            read_results: vec![],
+            delayed_field_reads: vec![],
+            module_read_results: vec![],
+            read_group_size_or_metadata: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            patched_resource_write_set: OnceCell::new(),
+            total_gas: 0,
+            called_write_summary: OnceCell::new(),
+            skipped: false,
+            maybe_error_msg: None,
+            reads_needing_exchange: HashMap::new(),
+            group_reads_needing_exchange: HashMap::new(),
+        }
+    }
+
     // Helper method to create an empty MockOutput with common settings
     pub(crate) fn skipped_output(error_msg: Option<String>) -> Self {
         Self {
@@ -982,6 +1005,9 @@ where
             MockTransaction::InterruptRequested => {
                 while !view.interrupt_requested() {}
                 ExecutionStatus::SkipRest(MockOutput::skip_output())
+            },
+            MockTransaction::StateCheckpoint => {
+                ExecutionStatus::Success(MockOutput::empty_success_output())
             },
         }
     }
