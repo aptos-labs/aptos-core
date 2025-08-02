@@ -2,7 +2,7 @@
 
 //# print-bytecode
 script {
-    entry fun main() {
+    fun main() {
         ()
     }
 }

@@ -6,7 +6,11 @@
 //! scripts (`CompiledScript`) to the global env.
 
 use crate::{
-    ast::{Address, ModuleName},
+    ast::{
+        AccessSpecifier as ASTAccessSpecifier, AccessSpecifierKind as ASTAccessSpecifierKind,
+        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, ModuleName,
+        ResourceSpecifier as ASTResourceSpecifier,
+    },
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
         ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant, TypeParameter,
@@ -14,12 +18,16 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use itertools::Itertools;
 use move_binary_format::{
+    access::ModuleAccess,
     file_format::{
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureToken,
-        StructDefinitionIndex, StructHandleIndex, TableIndex, VariantIndex, Visibility,
+        AccessKind as FFAccessKind, AddressSpecifier as FFAddressSpecifier, FunctionAttribute,
+        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount,
+        ResourceSpecifier as FFResourceSpecifier, SignatureToken, StructDefinitionIndex,
+        StructHandleIndex, TableIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
     views::{
@@ -29,7 +37,9 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier, language_storage,
+};
 use std::collections::BTreeMap;
 
 impl GlobalEnv {
@@ -65,6 +75,7 @@ impl GlobalEnv {
         loader.load();
         let BinaryModuleLoader { module_id, .. } = loader;
         self.attach_compiled_module(module_id, module, source_map);
+        self.update_loaded_modules();
         module_id
     }
 }
@@ -401,8 +412,10 @@ impl<'a> BinaryModuleLoader<'a> {
 
         let result_type = Type::tuple(handle_view.return_().0.iter().map(|s| self.ty(s)).collect());
 
-        // TODO: access specifiers
-        let access_specifiers = None;
+        // Convert access specifiers from file format to AST format
+        // [Optional TODO] fetch `acquires` from the definition view, if available
+        let access_specifiers = self.access_specifiers(&handle_view, &module_id, &params);
+
         let (visibility, is_native, kind) = if let Some((_, def_view)) = def_view {
             (
                 def_view.visibility(),
@@ -418,6 +431,32 @@ impl<'a> BinaryModuleLoader<'a> {
             // defaults
             (Visibility::Public, false, FunctionKind::Regular)
         };
+
+        // add attributes to the function
+        let mut attributes = vec![];
+        for attr in handle_view.attributes() {
+            match attr {
+                FunctionAttribute::Persistent => {
+                    if !visibility.is_public() {
+                        let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                        let sym = self
+                            .env
+                            .symbol_pool()
+                            .make(well_known::PERSISTENT_ATTRIBUTE);
+                        attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    }
+                },
+                FunctionAttribute::ModuleLock => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self
+                        .env
+                        .symbol_pool()
+                        .make(well_known::MODULE_LOCK_ATTRIBUTE);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+            }
+        }
+
         let mut new = false;
         let fun_data = self.env.module_data[module_id.to_usize()]
             .function_data
@@ -428,6 +467,7 @@ impl<'a> BinaryModuleLoader<'a> {
                     visibility,
                     is_native,
                     kind,
+                    attributes,
                     ..FunctionData::new(fun_id.symbol(), loc)
                 }
             });
@@ -455,6 +495,130 @@ impl<'a> BinaryModuleLoader<'a> {
                 fun_id.symbol().display(self.env.symbol_pool())
             ))
         }
+    }
+
+    fn access_specifiers(
+        &self,
+        handle_view: &FunctionHandleView<CompiledModule>,
+        module_id: &ModuleId,
+        params: &[Parameter],
+    ) -> Option<Vec<ASTAccessSpecifier>> {
+        let ff_access_specifiers = handle_view.access_specifiers()?;
+        let mut access_specifiers = Vec::new();
+        let ff_module = handle_view.module();
+        for ff_acc_spec in ff_access_specifiers {
+            let spec_kind = match ff_acc_spec.kind {
+                FFAccessKind::Reads => ASTAccessSpecifierKind::Reads,
+                FFAccessKind::Writes => ASTAccessSpecifierKind::Writes,
+            };
+            let spec_negated = ff_acc_spec.negated;
+            let resource_spec = match ff_acc_spec.resource {
+                FFResourceSpecifier::Any => ASTResourceSpecifier::Any,
+                FFResourceSpecifier::DeclaredAtAddress(addr_idx) => {
+                    let acct_addr = ff_module.address_identifier_at(addr_idx);
+                    ASTResourceSpecifier::DeclaredAtAddress(Address::Numerical(*acct_addr))
+                },
+                FFResourceSpecifier::DeclaredInModule(mhid) => {
+                    let mhandle = ff_module.module_handle_at(mhid);
+                    let ff_mid = ff_module.module_id_for_handle(mhandle);
+                    // The module may not have been loaded. If so, we have to skip this.
+                    let mname = self.env.to_module_name(&ff_mid);
+                    if let Some(module_env) = self.env.find_module(&mname) {
+                        ASTResourceSpecifier::DeclaredInModule(module_env.get_id())
+                    } else {
+                        continue;
+                    }
+                },
+                FFResourceSpecifier::Resource(shid) => {
+                    let shandle = ff_module.struct_handle_at(shid);
+                    let mhandle = ff_module.module_handle_at(shandle.module);
+                    let ff_mid = ff_module.module_id_for_handle(mhandle);
+                    let sname = ff_module.identifier_at(shandle.name);
+                    let stag = language_storage::StructTag {
+                        address: ff_mid.address,
+                        module: ff_mid.name,
+                        name: Identifier::new_unchecked(sname.as_str()),
+                        type_args: vec![],
+                    };
+                    // The struct may not have been loaded. If so, we have to skip this.
+                    if let Some(sid) = self.env.find_struct_by_tag(&stag) {
+                        ASTResourceSpecifier::Resource(module_id.qualified_inst(sid.id, vec![]))
+                    } else {
+                        continue;
+                    }
+                },
+                FFResourceSpecifier::ResourceInstantiation(shid, sig_idx) => {
+                    let shandle = ff_module.struct_handle_at(shid);
+                    let mhandle = ff_module.module_handle_at(shandle.module);
+                    let ff_mid = ff_module.module_id_for_handle(mhandle);
+                    let sname = ff_module.identifier_at(shandle.name);
+                    let sig = ff_module.signature_at(sig_idx);
+                    let type_args: Vec<_> = sig.0.iter().map(|arg| self.ty(arg)).collect();
+                    let type_tags = type_args
+                        .iter()
+                        .map(|t| t.clone().into_type_tag(self.env))
+                        .collect::<Option<Vec<_>>>()
+                        .unwrap_or_else(|| {
+                            self.error(format!(
+                                "invalid type arguments for resource instantiation `{}`",
+                                sname
+                            ));
+                            vec![]
+                        });
+                    let stag = language_storage::StructTag {
+                        address: ff_mid.address,
+                        module: ff_mid.name,
+                        name: Identifier::new_unchecked(sname.as_str()),
+                        type_args: type_tags,
+                    };
+                    // The struct may not have been loaded. If so, we have to skip this.
+                    if let Some(sid) = self.env.find_struct_by_tag(&stag) {
+                        ASTResourceSpecifier::Resource(module_id.qualified_inst(sid.id, type_args))
+                    } else {
+                        continue;
+                    }
+                },
+            };
+            let addr_spec = match ff_acc_spec.address {
+                FFAddressSpecifier::Any => ASTAddressSpecifier::Any,
+                FFAddressSpecifier::Literal(addr_idx) => {
+                    let addr = Address::Numerical(*ff_module.address_identifier_at(addr_idx));
+                    ASTAddressSpecifier::Address(addr)
+                },
+                FFAddressSpecifier::Parameter(param_idx, func_inst_inx) => {
+                    if let Some(func_inst_idx) = func_inst_inx {
+                        let func_inst = ff_module.function_instantiation_at(func_inst_idx);
+                        let func_handle = ff_module.function_handle_at(func_inst.handle);
+                        let mhandle = ff_module.module_handle_at(func_handle.module);
+                        let ff_mid = ff_module.module_id_for_handle(mhandle);
+                        let func_name = ff_module.identifier_at(func_handle.name);
+                        let func = self
+                            .env
+                            .find_function_by_language_storage_id_name(&ff_mid, func_name);
+                        if let Some(func) = func {
+                            ASTAddressSpecifier::Call(
+                                module_id.qualified_inst(func.get_id(), func.get_parameter_types()),
+                                params[param_idx as usize].0,
+                            )
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        ASTAddressSpecifier::Parameter(params[param_idx as usize].0)
+                    }
+                },
+            };
+            let loc = Loc::default();
+            let ast_access_specifier: ASTAccessSpecifier = ASTAccessSpecifier {
+                kind: spec_kind,
+                negated: spec_negated,
+                resource: (loc.clone(), resource_spec),
+                address: (loc.clone(), addr_spec),
+                loc,
+            };
+            access_specifiers.push(ast_access_specifier);
+        }
+        Some(access_specifiers)
     }
 
     fn ty(&self, sign: &SignatureToken) -> Type {

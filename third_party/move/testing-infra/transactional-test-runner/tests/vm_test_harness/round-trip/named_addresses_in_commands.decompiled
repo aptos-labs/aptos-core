@@ -5,8 +5,8 @@
 //# run --signers A
 script {
     use 0x1::signer;
-    entry fun main(p0: signer) {
-        if (!(signer::address_of(&p0) == 0x2a)) abort 1000;
+    fun main(p0: signer) {
+        if (!(signer::address_of(&p0) == @0x2a)) abort 1000;
     }
 }
 
@@ -17,7 +17,8 @@ module 0x2a::M {
         x: u64,
     }
     public fun publish_foo(p0: &signer) {
-        move_to(Foo{x: 500}, p0);
+        let _t3 = Foo{x: 500};
+        move_to<Foo>(p0, _t3);
     }
 }
 
@@ -25,7 +26,7 @@ module 0x2a::M {
 //# run --signers A
 script {
     use 0x2a::M;
-    entry fun main(p0: signer) {
+    fun main(p0: signer) {
         M::publish_foo(&p0);
     }
 }

@@ -253,11 +253,14 @@ fn run_compile_decompile_test_workflow(path: &Path, config: &TestConfig) -> anyh
 
     // Step 2: decompile the compiled modules
     let mut decompiler = Decompiler::new(config.decompiler_options.clone());
+    let mut modules = vec![];
+    let mut source_maps = vec![];
     for module_env in env.get_modules() {
         if !module_env.is_primary_target() {
             continue;
         }
         if let Some(compiled_module) = module_env.get_verified_module() {
+            modules.push(compiled_module.clone());
             let source_map = module_env.get_source_map().cloned().unwrap_or_else(|| {
                 let mut bytes = vec![];
                 compiled_module
@@ -265,10 +268,13 @@ fn run_compile_decompile_test_workflow(path: &Path, config: &TestConfig) -> anyh
                     .expect("expected serialization success");
                 decompiler.empty_source_map(&module_env.get_full_name_str(), &bytes)
             });
-            output += &decompiler.decompile_module(compiled_module.clone(), source_map);
-            output += "\n";
+            source_maps.push(source_map);
         }
     }
+
+    output += &decompiler.decompile_package(modules, source_maps);
+    output += "\n";
+
     if decompiler
         .env()
         .check_diag(&mut error_writer, Severity::Warning, "decompilation")

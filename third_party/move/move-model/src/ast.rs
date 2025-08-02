@@ -3067,19 +3067,18 @@ impl ModuleName {
     }
 
     /// Return the pseudo module name used for scripts, incorporating the `index`.
-    /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
+    /// Our compiler infrastructure uses `SCRIPT_MODULE_ID` for pseudo modules created from scripts.
     pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
         let name = pool.make(Self::pseudo_script_name_builder(SCRIPT_MODULE_NAME, index).as_str());
-        ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
+        ModuleName(
+            Address::Numerical(*pseudo_script_module_id().address()),
+            name,
+        )
     }
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
-        // TODO: remove all usages of MAX_ADDRESS for script addresses; for now
-        // identify MAX_ADDRESS and the one in `language_storage::pseudo_script_module`
-        // as script.
-        self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
-            || self.0 == Address::Numerical(pseudo_script_module_id().address)
+        self.0 == Address::Numerical(*pseudo_script_module_id().address())
     }
 }
 
