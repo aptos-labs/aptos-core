@@ -8136,6 +8136,7 @@ dependencies = [
  "bcs 0.1.4",
  "claims",
  "hex",
+ "log",
  "move-binary-format",
  "move-core-types",
  "move-model",

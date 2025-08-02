@@ -203,7 +203,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     use aptos_table_natives::NativeTableContext;
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
-    exts.add(NativeCodeContext::new());
+    exts.add(NativeCodeContext::new(false));
     exts.add(NativeTransactionContext::new(
         vec![1],
         vec![1],

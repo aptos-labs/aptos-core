@@ -350,13 +350,14 @@ pub fn update_counters_for_processed_chunk<T>(
         };
 
         let kind = match txn.get_transaction() {
-            Some(Transaction::UserTransaction(_)) => "user_transaction",
-            Some(Transaction::GenesisTransaction(_)) => "genesis",
-            Some(Transaction::BlockMetadata(_)) => "block_metadata",
-            Some(Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
-            Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
-            Some(Transaction::BlockEpilogue(_)) => "block_epilogue",
-            Some(Transaction::ValidatorTransaction(_)) => "validator_transaction",
+            Some(&Transaction::UserTransaction(_)) => "user_transaction",
+            Some(&Transaction::GenesisTransaction(_)) => "genesis",
+            Some(&Transaction::BlockMetadata(_)) => "block_metadata",
+            Some(&Transaction::BlockMetadataExt(_)) => "block_metadata_ext",
+            Some(&Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            Some(&Transaction::BlockEpilogue(_)) => "block_epilogue",
+            Some(&Transaction::ValidatorTransaction(_)) => "validator_transaction",
+            Some(&Transaction::ScheduledTransaction(_)) => "scheduled_transaction",
             None => "unknown",
         };
 

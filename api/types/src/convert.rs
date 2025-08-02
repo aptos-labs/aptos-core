@@ -181,8 +181,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::{
-            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            BlockEpilogue, BlockMetadata, BlockMetadataExt, GenesisTransaction,
+            ScheduledTransaction, StateCheckpoint, UserTransaction,
         };
         let aux_data = self
             .db
@@ -211,6 +211,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 BlockMetadataTransaction::from_internal_ext(txn, info, events),
             ),
             StateCheckpoint(_) => {
+                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                })
+            },
+            ScheduledTransaction(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),

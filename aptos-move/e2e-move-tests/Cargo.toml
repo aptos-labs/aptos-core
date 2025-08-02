@@ -32,6 +32,7 @@ aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 hex = { workspace = true }
+log = "0.4.27"
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
