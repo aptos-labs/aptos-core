@@ -122,7 +122,6 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         Ok(BlockOutput::new(
             transaction_outputs,
             Some(block_epilogue_txn.into()),
-            BTreeMap::new(),
         ))
     }
 }
