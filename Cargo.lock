@@ -4657,7 +4657,6 @@ dependencies = [
  "criterion",
  "dashmap 7.0.0-rc2",
  "derivative",
- "derive_more 0.99.17",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
