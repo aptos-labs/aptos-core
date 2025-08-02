@@ -137,6 +137,10 @@ impl TransactionsToKeep {
         self.borrow_state_update_refs()
     }
 
+    pub fn transactions_with_output(&self) -> &TransactionsWithOutput {
+        self.borrow_transactions_with_output()
+    }
+
     pub fn ends_with_sole_checkpoint(&self) -> bool {
         let _timer = TIMER.timer_with(&["ends_with_sole_checkpoint"]);
 
