@@ -6,7 +6,7 @@ error: constraint `integer` incompatible with `||_ has ..`
 3 │         5();
   │         ^^^
 
-error: constraint `integer` incompatible with `|(integer, integer)|_ has ..`
+error: constraint `integer` incompatible with `|integer, integer|_ has ..`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value2.move:4:9
   │
 4 │         5(0, 1);

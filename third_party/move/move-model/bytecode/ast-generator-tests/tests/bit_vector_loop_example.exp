@@ -60,19 +60,29 @@ _t11: bool = Deref(_t10);
 return _t11
 
 --- Assign-Transformed Generated AST
+_t6: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
 loop {
-  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  if (_t6) break;
   Abort(131072)
 };
-return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+_t8: &vector<bool> = select m::BitVector.bit_field(self);
+return Deref(vector::borrow<bool>(_t8, bit_index))
 
 --- If-Transformed Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+_t6: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+if (Not(_t6)) Abort(131072);
+_t8: &vector<bool> = select m::BitVector.bit_field(self);
+return Deref(vector::borrow<bool>(_t8, bit_index))
 
 --- Var-Bound Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+{
+  let _t6: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+  if (Not(_t6)) Abort(131072);
+  {
+    let _t8: &vector<bool> = select m::BitVector.bit_field(self);
+    return Deref(vector::borrow<bool>(_t8, bit_index))
+  }
+}
 
 
 === Processing m::set =====================================================
@@ -146,22 +156,37 @@ _t14 = _t13;
 return Tuple()
 
 --- Assign-Transformed Generated AST
+_t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
 loop {
-  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  if (_t8) break;
   Abort(131072)
 };
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
+_t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+_t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+_t3 = true;
 return Tuple()
 
 --- If-Transformed Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
+_t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+if (Not(_t8)) Abort(131072);
+_t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+_t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+_t3 = true;
 return Tuple()
 
 --- Var-Bound Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
-return Tuple()
+{
+  let _t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+  if (Not(_t8)) Abort(131072);
+  {
+    let _t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+    {
+      let _t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+      _t3 = true;
+      return Tuple()
+    }
+  }
+}
 
 
 === Processing m::shift_left =====================================================
@@ -476,11 +501,12 @@ loop {
 return Tuple()
 
 --- Assign-Transformed Generated AST
+_t10: bool = Ge(amount, Deref(select m::BitVector.length(self)));
 loop {
   loop {
     loop {
       loop {
-        if (Not(Ge(amount, Deref(select m::BitVector.length(self))))) break;
+        if (Not(_t10)) break;
         _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
         _t3: u64 = 0;
         break[1]
@@ -491,7 +517,8 @@ loop {
     loop {
       loop {
         if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break[1];
-        vector::borrow_mut<bool>(_t2, _t3) = false;
+        _t5: &mut bool = vector::borrow_mut<bool>(_t2, _t3);
+        _t5 = false;
         _t3: u64 = Add(_t3, 1);
         continue
       };
@@ -502,13 +529,17 @@ loop {
   loop {
     loop {
       if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break[1];
+      _t35: &BitVector = Freeze(true)(self);
+      _t37: bool = m::is_index_set(_t35, _t3);
       loop {
         loop {
-          if (Not(m::is_index_set(Freeze(true)(self), _t3))) break;
-          m::set(self, Sub(_t3, amount));
+          if (Not(_t37)) break;
+          _t41: u64 = Sub(_t3, amount);
+          m::set(self, _t41);
           break[1]
         };
-        m::unset(self, Sub(_t3, amount));
+        _t48: u64 = Sub(_t3, amount);
+        m::unset(self, _t48);
         break
       };
       _t3: u64 = Add(_t3, 1);
@@ -516,7 +547,8 @@ loop {
     };
     break
   };
-  _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+  _t51: u64 = Deref(select m::BitVector.length(self));
+  _t3: u64 = Sub(_t51, amount);
   loop {
     loop {
       if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break[1];
@@ -531,12 +563,14 @@ loop {
 return Tuple()
 
 --- If-Transformed Generated AST
-if Ge(amount, Deref(select m::BitVector.length(self))) {
+_t10: bool = Ge(amount, Deref(select m::BitVector.length(self)));
+if _t10 {
   _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
   _t3: u64 = 0;
   loop {
     if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
-    vector::borrow_mut<bool>(_t2, _t3) = false;
+    _t5: &mut bool = vector::borrow_mut<bool>(_t2, _t3);
+    _t5 = false;
     _t3: u64 = Add(_t3, 1);
     continue
   }
@@ -544,15 +578,20 @@ if Ge(amount, Deref(select m::BitVector.length(self))) {
   _t3: u64 = amount;
   loop {
     if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
-    if m::is_index_set(Freeze(true)(self), _t3) {
-      m::set(self, Sub(_t3, amount))
+    _t35: &BitVector = Freeze(true)(self);
+    _t37: bool = m::is_index_set(_t35, _t3);
+    if _t37 {
+      _t41: u64 = Sub(_t3, amount);
+      m::set(self, _t41)
     } else {
-      m::unset(self, Sub(_t3, amount))
+      _t48: u64 = Sub(_t3, amount);
+      m::unset(self, _t48)
     };
     _t3: u64 = Add(_t3, 1);
     continue
   };
-  _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+  _t51: u64 = Deref(select m::BitVector.length(self));
+  _t3: u64 = Sub(_t51, amount);
   loop {
     if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
     m::unset(self, _t3);
@@ -565,38 +604,59 @@ return Tuple()
 --- Var-Bound Generated AST
 {
   let _t3: u64;
-  if Ge(amount, Deref(select m::BitVector.length(self))) {
-    {
-      let _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
-      _t3: u64 = 0;
-      loop {
-        if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
-        vector::borrow_mut<bool>(_t2, _t3) = false;
-        _t3: u64 = Add(_t3, 1);
-        continue
+  {
+    let _t10: bool = Ge(amount, Deref(select m::BitVector.length(self)));
+    if _t10 {
+      {
+        let _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
+        _t3: u64 = 0;
+        loop {
+          if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
+          {
+            let _t5: &mut bool = vector::borrow_mut<bool>(_t2, _t3);
+            _t5 = false;
+            _t3: u64 = Add(_t3, 1);
+            continue
+          }
+        }
       }
-    }
-  } else {
-    _t3: u64 = amount;
-    loop {
-      if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
-      if m::is_index_set(Freeze(true)(self), _t3) {
-        m::set(self, Sub(_t3, amount))
-      } else {
-        m::unset(self, Sub(_t3, amount))
+    } else {
+      _t3: u64 = amount;
+      loop {
+        if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+        {
+          let _t35: &BitVector = Freeze(true)(self);
+          {
+            let _t37: bool = m::is_index_set(_t35, _t3);
+            if _t37 {
+              {
+                let _t41: u64 = Sub(_t3, amount);
+                m::set(self, _t41)
+              }
+            } else {
+              {
+                let _t48: u64 = Sub(_t3, amount);
+                m::unset(self, _t48)
+              }
+            };
+            _t3: u64 = Add(_t3, 1);
+            continue
+          }
+        }
       };
-      _t3: u64 = Add(_t3, 1);
-      continue
+      {
+        let _t51: u64 = Deref(select m::BitVector.length(self));
+        _t3: u64 = Sub(_t51, amount);
+        loop {
+          if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+          m::unset(self, _t3);
+          _t3: u64 = Add(_t3, 1);
+          continue
+        }
+      }
     };
-    _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
-    loop {
-      if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
-      m::unset(self, _t3);
-      _t3: u64 = Add(_t3, 1);
-      continue
-    }
-  };
-  return Tuple()
+    return Tuple()
+  }
 }
 
 
@@ -671,22 +731,37 @@ _t14 = _t13;
 return Tuple()
 
 --- Assign-Transformed Generated AST
+_t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
 loop {
-  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  if (_t8) break;
   Abort(131072)
 };
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
+_t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+_t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+_t3 = false;
 return Tuple()
 
 --- If-Transformed Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
+_t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+if (Not(_t8)) Abort(131072);
+_t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+_t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+_t3 = false;
 return Tuple()
 
 --- Var-Bound Generated AST
-if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
-vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
-return Tuple()
+{
+  let _t8: bool = Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)));
+  if (Not(_t8)) Abort(131072);
+  {
+    let _t10: &mut vector<bool> = select m::BitVector.bit_field(self);
+    {
+      let _t3: &mut bool = vector::borrow_mut<bool>(_t10, bit_index);
+      _t3 = false;
+      return Tuple()
+    }
+  }
+}
 
 === Sourcified Output ============================================
 module 0x1::m {
@@ -695,29 +770,47 @@ module 0x1::m {
         bit_field: vector<bool>,
     }
     public fun is_index_set(self: &BitVector, bit_index: u64): bool {
-        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
-        *0x1::vector::borrow<bool>(&self.bit_field, bit_index)
+        let _t6 = bit_index < 0x1::vector::length<bool>(&self.bit_field);
+        if (!_t6) abort 131072;
+        let _t8 = &self.bit_field;
+        *0x1::vector::borrow<bool>(_t8, bit_index)
     }
     public fun set(self: &mut BitVector, bit_index: u64) {
-        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
-        *0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index) = true;
+        let _t8 = bit_index < 0x1::vector::length<bool>(&self.bit_field);
+        if (!_t8) abort 131072;
+        let _t10 = &mut self.bit_field;
+        let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
+        *_t3 = true;
     }
     public fun shift_left(self: &mut BitVector, amount: u64) {
         let _t3;
-        if (amount >= *&self.length) {
+        let _t10 = amount >= *&self.length;
+        if (_t10) {
             let _t2 = &mut self.bit_field;
             _t3 = 0;
-            while (_t3 < 0x1::vector::length<bool>(/*freeze*/_t2)) {
-                *0x1::vector::borrow_mut<bool>(_t2, _t3) = false;
-                _t3 = _t3 + 1
+            while (_t3 < 0x1::vector::length<bool>(freeze(_t2))) {
+                let _t5 = 0x1::vector::borrow_mut<bool>(_t2, _t3);
+                *_t5 = false;
+                _t3 = _t3 + 1;
+                continue
             }
         } else {
             _t3 = amount;
             while (_t3 < *&self.length) {
-                if (is_index_set(/*freeze*/self, _t3)) set(self, _t3 - amount) else unset(self, _t3 - amount);
-                _t3 = _t3 + 1
+                let _t35 = freeze(self);
+                let _t37 = is_index_set(_t35, _t3);
+                if (_t37) {
+                    let _t41 = _t3 - amount;
+                    set(self, _t41)
+                } else {
+                    let _t48 = _t3 - amount;
+                    unset(self, _t48)
+                };
+                _t3 = _t3 + 1;
+                continue
             };
-            _t3 = *&self.length - amount;
+            let _t51 = *&self.length;
+            _t3 = _t51 - amount;
             while (_t3 < *&self.length) {
                 unset(self, _t3);
                 _t3 = _t3 + 1
@@ -725,7 +818,10 @@ module 0x1::m {
         };
     }
     public fun unset(self: &mut BitVector, bit_index: u64) {
-        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
-        *0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index) = false;
+        let _t8 = bit_index < 0x1::vector::length<bool>(&self.bit_field);
+        if (!_t8) abort 131072;
+        let _t10 = &mut self.bit_field;
+        let _t3 = 0x1::vector::borrow_mut<bool>(_t10, bit_index);
+        *_t3 = false;
     }
 }

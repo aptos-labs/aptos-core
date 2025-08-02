@@ -79,69 +79,69 @@ module 0xc0ffee::m {
 module 0xc0ffee::m {
     fun mod1(r: &mut u64) {
         {
-            let $t2 = 2;
-            let $t1 = r;
-            *$t1 = *$t1 + $t2
+            let _t2 = 2;
+            let _t1 = r;
+            *_t1 = *_t1 + _t2
         };
     }
     fun mod2(r: &mut u64): u64 {
         {
-            let $t2 = 2;
-            let $t1 = r;
-            *$t1 = *$t1 + $t2
+            let _t2 = 2;
+            let _t1 = r;
+            *_t1 = *_t1 + _t2
         };
         *r
     }
     public fun test0(): u64 {
         let v = 1;
         {
-            let $t = {
+            let _t = {
                 {
-                    let $t = {
+                    let _t = {
                         {
-                            let $t = 2;
-                            v = v + $t
+                            let _t = 2;
+                            v = v + _t
                         };
                         v
                     };
-                    v = v + $t
+                    v = v + _t
                 };
                 v
             };
-            v = v + $t
+            v = v + _t
         };
         v
     }
     public fun test1(): u64 {
         let v = 1;
         {
-            let $t = {
+            let _t = {
                 {
-                    let $t = 2;
-                    v = v + $t
+                    let _t = 2;
+                    v = v + _t
                 };
                 v
             };
-            v = v + $t
+            v = v + _t
         };
         v
     }
     public fun test2(): u64 {
         let v = 1;
         {
-            let $t = {
+            let _t = {
                 mod1(&mut v);
                 v
             };
-            v = v + $t
+            v = v + _t
         };
         v
     }
     public fun test3(): u64 {
         let v = 1;
         {
-            let $t = mod2(&mut v);
-            v = v + $t
+            let _t = mod2(&mut v);
+            v = v + _t
         };
         v
     }

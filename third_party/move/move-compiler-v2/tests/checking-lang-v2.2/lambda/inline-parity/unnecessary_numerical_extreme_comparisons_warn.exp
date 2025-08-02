@@ -169,13 +169,14 @@ module 0xc0ffee::m {
 
     }
     public fun test5(x: u8): bool {
-        apply(|arg0| __lambda__1__test5(arg0), x)
+        apply(|arg0| lambda__1__test5(arg0), x)
     }
-    fun __lambda__1__test5(x: u8): bool {
+    fun lambda__1__test5(x: u8): bool {
         x > 255u8
     }
 }
 module 0xc0ffee::no_warn {
+    #[lint::skip]
     public fun test(x: u8) {
         if (x < 0u8) abort 1;
     }
