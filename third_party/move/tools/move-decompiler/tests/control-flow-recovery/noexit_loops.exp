@@ -23,7 +23,7 @@ module 0x99::noexit_loops {
     fun f13(cond: bool) {
         let _t2;
         if (cond) _t2 = 0 else _t2 = 1;
-        1 + (_t2 + 2);
+        let _t12 = 1 + (_t2 + 2);
         loop continue
     }
     fun f14(p: bool, q: bool) {
@@ -32,7 +32,7 @@ module 0x99::noexit_loops {
     }
     fun f15() {
         let _t0 = 0;
-        _t0 + 1;
+        _t0 = _t0 + 1;
     }
     fun f16() {
         loop continue

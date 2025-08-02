@@ -11,14 +11,14 @@ use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::files::FileHash;
 use move_model::{
     metadata::LanguageVersion,
-    model::{GlobalEnv, Loc},
+    model::{GlobalEnv, Loc, ModuleId},
     sourcifier::Sourcifier,
 };
 use move_stackless_bytecode::{
     astifier,
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
 };
-use std::{collections::BTreeMap, fs, io::Write, mem, path::Path, rc::Rc};
+use std::{collections::BTreeMap, fs, io::Write, mem, path::Path, rc::Rc, vec};
 
 #[derive(Parser, Clone, Debug, Default)]
 #[clap(author, version, about)]
@@ -80,7 +80,7 @@ impl Options {
     }
 }
 
-/// Represent an instance of a decompiler. The decompiler can be run end-to-end operating
+/// Represents an instance of a decompiler. The decompiler can be run end-to-end operating
 /// on files, or incrementally without already deserialized modules and scripts.
 pub struct Decompiler {
     options: Options,
@@ -145,32 +145,88 @@ impl Decompiler {
         }
     }
 
+    /// Decompile a package of modules together with their source maps.
+    /// It loads all the modules into the environment first, and then decompile them one by one.
+    pub fn decompile_package(
+        &mut self,
+        modules: Vec<CompiledModule>,
+        source_maps: Vec<SourceMap>,
+    ) -> String {
+        let mut result = String::new();
+        let mut module_ids = vec![];
+        for (module, source_map) in modules.iter().zip(source_maps.iter()) {
+            if let Some(module_id) = self.load_module(module.clone(), source_map.clone()) {
+                module_ids.push(module_id);
+            }
+        }
+        module_ids.iter().for_each(|&module_id| {
+            result.push_str(&self.decompile_loaded_module(module_id));
+        });
+        result
+    }
+
     /// Decompiles the given binary module. A source map must be provided for error
     /// reporting; use `self.empty_source_map` to create one if none is available.
     pub fn decompile_module(&mut self, module: CompiledModule, source_map: SourceMap) -> String {
-        // Verify the module
-        if let Err(e) = move_bytecode_verifier::verify_module(&module) {
-            self.env.error(
-                &self.env.to_loc(&source_map.definition_location),
-                &format!("bytecode verification failed: {:#?}", e),
-            );
-            return String::default();
+        let module_id = match self.load_module(module, source_map) {
+            Some(id) => id,
+            None => return String::default(),
+        };
+        self.decompile_loaded_module(module_id)
+    }
+
+    pub fn load_module(
+        &mut self,
+        module: CompiledModule,
+        source_map: SourceMap,
+    ) -> Option<ModuleId> {
+        if !self.validate_module(&module, &source_map) {
+            return None;
         }
-        // Load module into environment, creating stubs for any missing dependencies
         let module_id = self
             .env
             .load_compiled_module(/*with_dep_closure*/ true, module, source_map);
         if self.env.has_errors() {
-            return String::default();
+            return None;
         }
+        Some(module_id)
+    }
 
+    pub fn decompile_loaded_module(&mut self, module_id: ModuleId) -> String {
+        // Lift file format bytecode to stackless bytecode.
+        let mut targets = FunctionTargetsHolder::default();
+        self.lift_to_stackless_bytecode(module_id, &mut targets);
+        // Lift stackless bytecode to AST.
+        self.lift_to_ast(&targets);
+        // Sourcify the ast.
+        self.sourcify_ast(module_id)
+    }
+
+    pub fn validate_module(&self, module: &CompiledModule, source_map: &SourceMap) -> bool {
+        // Run bytecode verification on the module.
+        if let Err(e) = move_bytecode_verifier::verify_module(module) {
+            self.env.error(
+                &self.env.to_loc(&source_map.definition_location),
+                &format!("bytecode verification failed: {:#?}", e),
+            );
+            return false;
+        }
+        true
+    }
+
+    pub fn lift_to_stackless_bytecode(
+        &mut self,
+        module_id: ModuleId,
+        targets: &mut FunctionTargetsHolder,
+    ) {
         // Create FunctionTargetsHolder with stackless bytecode for all functions in the module,
         let module_env = self.env.get_module(module_id);
-        let mut targets = FunctionTargetsHolder::default();
         for func_env in module_env.get_functions() {
             targets.add_target(&func_env)
         }
+    }
 
+    pub fn lift_to_ast(&mut self, targets: &FunctionTargetsHolder) {
         // Generate AST for all function targets.
         for fun_id in targets.get_funs() {
             let fun_env = self.env.get_function(fun_id);
@@ -179,24 +235,35 @@ impl Decompiler {
                 continue;
             }
             if let Some(def) = astifier::generate_ast_raw(&target) {
-                let def = if self.options.no_expressions {
-                    def
-                } else {
-                    astifier::transform_assigns(&target, def)
-                };
-                let def = if self.options.no_conditionals {
-                    def
-                } else {
-                    astifier::transform_conditionals(&target, def)
-                };
+                let mut def = def.clone();
+                // Run the AST transformation pipeline until a fixed point is reached.
+                // Why doing this: one transformation can create new optimization opportunities for other transformations.
+                //
+                // Every transformation reduces the AST in a successful iteration, guaranteeing termination of the loop.
+                // New transformations should follow the same principle.
+                loop {
+                    let mut new_def = def.clone();
+                    if !self.options.no_expressions {
+                        new_def = astifier::transform_assigns(&target, new_def);
+                    }
+                    if !self.options.no_conditionals {
+                        new_def = astifier::transform_conditionals(&target, new_def);
+                    }
+                    if new_def == def {
+                        break;
+                    }
+                    def = new_def;
+                }
                 // The next step must always happen to create valid Move
                 let def = astifier::bind_free_vars(&target, def);
                 self.env.set_function_def(fun_env.get_qualified_id(), def)
             }
         }
+    }
 
+    pub fn sourcify_ast(&self, module_id: ModuleId) -> String {
         // Render the module as source
-        let sourcifier = Sourcifier::new(&self.env);
+        let sourcifier = Sourcifier::new(&self.env, true);
         sourcifier.print_module(module_id);
         sourcifier.result()
     }
