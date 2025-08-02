@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::BlockExecutableTransaction;
-use crate::state_store::state_slot::StateSlot;
-use std::{collections::BTreeMap, fmt::Debug};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct BlockOutput<T, Output>
@@ -15,7 +14,6 @@ where
     // A BlockEpilogueTxn might be appended to the block.
     // This field will be None iff the input is not a block, or an epoch change is triggered.
     block_epilogue_txn: Option<T>,
-    to_make_hot: BTreeMap<T::Key, StateSlot>,
 }
 
 impl<T, Output> BlockOutput<T, Output>
@@ -23,15 +21,10 @@ where
     T: BlockExecutableTransaction,
     Output: Debug,
 {
-    pub fn new(
-        transaction_outputs: Vec<Output>,
-        block_epilogue_txn: Option<T>,
-        to_make_hot: BTreeMap<T::Key, StateSlot>,
-    ) -> Self {
+    pub fn new(transaction_outputs: Vec<Output>, block_epilogue_txn: Option<T>) -> Self {
         Self {
             transaction_outputs,
             block_epilogue_txn,
-            to_make_hot,
         }
     }
 
@@ -39,12 +32,8 @@ where
         self.transaction_outputs
     }
 
-    pub fn into_inner(self) -> (Vec<Output>, Option<T>, BTreeMap<T::Key, StateSlot>) {
-        (
-            self.transaction_outputs,
-            self.block_epilogue_txn,
-            self.to_make_hot,
-        )
+    pub fn into_inner(self) -> (Vec<Output>, Option<T>) {
+        (self.transaction_outputs, self.block_epilogue_txn)
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
