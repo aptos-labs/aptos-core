@@ -10,12 +10,17 @@ use crate::{
     gas::{check_gas, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
-        session::user_transaction_sessions::{
-            abort_hook::AbortHookSession,
-            epilogue::EpilogueSession,
-            prologue::PrologueSession,
-            session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
-            user::UserSession,
+        session::{
+            respawned_session::RespawnedSession,
+            scheduled_txn_epilogue_session::ScheduledTxnEpilogueSession,
+            scheduled_txn_session::ScheduledTxnSession,
+            user_transaction_sessions::{
+                abort_hook::AbortHookSession,
+                epilogue::EpilogueSession,
+                prologue::PrologueSession,
+                session_change_sets::{SystemSessionChangeSet, UserSessionChangeSet},
+                user::UserSession,
+            },
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
@@ -23,6 +28,7 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
+    transaction_validation::run_scheduled_txn_epilogue,
     verifier::{
         event_validation, native_validation, resource_groups, transaction_arg_validation,
         view_function,
@@ -34,9 +40,9 @@ use aptos_block_executor::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_framework::natives::code::PublishRequest;
-use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
+use aptos_gas_algebra::{FeePerGasUnit, Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
     gas_feature_versions,
@@ -72,6 +78,9 @@ use aptos_types::{
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
+        scheduled_txn::{
+            ScheduleMapKey, ScheduledTransactionInfoWithKey, SCHEDULED_TRANSACTIONS_MODULE_INFO,
+        },
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
@@ -490,11 +499,11 @@ impl AptosVM {
     }
 
     fn fee_statement_from_gas_meter(
-        txn_data: &TransactionMetadata,
+        max_gas_units: Gas,
         gas_meter: &impl AptosGasMeter,
         storage_fee_refund: u64,
     ) -> FeeStatement {
-        let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
+        let gas_used = Self::gas_used(max_gas_units, gas_meter);
         FeeStatement::new(
             gas_used,
             u64::from(gas_meter.execution_gas_used()),
@@ -678,7 +687,8 @@ impl AptosVM {
             if let Err(err) = self.charge_change_set(
                 &mut abort_hook_session_change_set,
                 gas_meter,
-                txn_data,
+                txn_data.transaction_size,
+                txn_data.gas_unit_price,
                 resolver,
                 module_storage,
             ) {
@@ -688,8 +698,11 @@ impl AptosVM {
                 );
             };
 
-            let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+            let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                txn_data.max_gas_amount(),
+                gas_meter,
+                ZERO_STORAGE_REFUND,
+            );
 
             // Verify we charged sufficiently for creating an account slot
             let gas_params = self.gas_params(log_context)?;
@@ -720,8 +733,11 @@ impl AptosVM {
             }
             (abort_hook_session_change_set, fee_statement)
         } else {
-            let fee_statement =
-                AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
+            let fee_statement = AptosVM::fee_statement_from_gas_meter(
+                txn_data.max_gas_amount(),
+                gas_meter,
+                ZERO_STORAGE_REFUND,
+            );
             (prologue_session_change_set, fee_statement)
         };
 
@@ -783,7 +799,7 @@ impl AptosVM {
         }
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
-            txn_data,
+            txn_data.max_gas_amount(),
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
         );
@@ -1032,11 +1048,12 @@ impl AptosVM {
         &self,
         change_set: &mut impl ChangeSetInterface,
         gas_meter: &mut impl AptosGasMeter,
-        txn_data: &TransactionMetadata,
+        transaction_size: NumBytes,
+        gas_unit_price: FeePerGasUnit,
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
-        gas_meter.charge_io_gas_for_transaction(txn_data.transaction_size())?;
+        gas_meter.charge_io_gas_for_transaction(transaction_size)?;
         for event in change_set.events_iter() {
             gas_meter.charge_io_gas_for_event(event)?;
         }
@@ -1046,8 +1063,8 @@ impl AptosVM {
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
             change_set,
-            txn_data.transaction_size,
-            txn_data.gas_unit_price,
+            transaction_size,
+            gas_unit_price,
             resolver.as_executor_view(),
             module_storage,
         )?;
@@ -1069,7 +1086,8 @@ impl AptosVM {
         let storage_refund = self.charge_change_set(
             &mut user_session_change_set,
             gas_meter,
-            txn_data,
+            txn_data.transaction_size,
+            txn_data.gas_unit_price,
             resolver,
             module_storage,
         )?;
@@ -2490,6 +2508,45 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    pub fn execute_system_function_no_gas_meter(
+        state_view: &impl StateView,
+        module_id: &ModuleId,
+        function_name: &Identifier,
+        type_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+        block_id: HashValue,
+    ) -> Result<Vec<Vec<u8>>, VMStatus> {
+        // Create VM instance with environment
+        let env = AptosEnvironment::new(state_view);
+        let vm = AptosVM::new(&env, state_view);
+
+        // Create a new session
+        let resolver = state_view.as_move_resolver();
+        let mut session = vm.new_session(&resolver, SessionId::system_txn(block_id), None);
+
+        // Set up gas meter and traversal context
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+        // Get code storage adapter and ensure it's properly referenced
+        let code_storage = state_view.as_aptos_code_storage(&env);
+        let code_storage_ref = &code_storage;
+
+        // Execute the function
+        let result = session.execute_function_bypass_visibility(
+            module_id,
+            function_name,
+            type_args,
+            args,
+            &mut gas_meter,
+            &mut traversal_context,
+            code_storage_ref,
+        )?;
+
+        Ok(result.return_values.into_iter().map(|v| v.0).collect())
+    }
+
     pub fn execute_view_function(
         state_view: &impl StateView,
         module_id: ModuleId,
@@ -2869,7 +2926,250 @@ impl AptosVM {
                 )?;
                 (vm_status, output)
             },
+            Transaction::ScheduledTransaction(txn) => {
+                let traversal_storage = TraversalStorage::new();
+                let mut traversal_context = TraversalContext::new(&traversal_storage);
+                let (vm_status, output) = self.process_scheduled_transaction(
+                    resolver,
+                    txn,
+                    &mut traversal_context,
+                    code_storage,
+                    log_context,
+                )?;
+                (vm_status, output)
+            },
         })
+    }
+
+    pub(crate) fn process_scheduled_transaction(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: &ScheduledTransactionInfoWithKey,
+        traversal_context: &mut TraversalContext,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let balance = txn.max_gas_amount - SCHEDULED_TRANSACTIONS_MODULE_INFO.base_gas_amount;
+        let storage_gas = self.storage_gas_params(log_context)?;
+        let mut gas_meter = make_prod_gas_meter(
+            self.gas_feature_version(),
+            self.gas_params(log_context)?.vm.clone(),
+            storage_gas.clone(),
+            false,
+            balance.into(),
+            code_storage,
+        );
+
+        let mut prologue_session = RespawnedSession::spawn(
+            self,
+            SessionId::scheduled_txn_prologue(txn.key.hash()),
+            resolver,
+            VMChangeSet::empty(),
+            Some(UserTransactionContext::new(
+                txn.sender_handle,
+                [].to_vec(),
+                txn.sender_handle,
+                txn.max_gas_amount,
+                txn.gas_unit_price,
+                self.chain_id().id(),
+                None,
+                None,
+                true, // is_prologue
+            )),
+        );
+
+        match prologue_session.execute(|session| {
+            session.execute_function_bypass_visibility(
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.mark_txn_to_remove_name,
+                vec![],
+                serialize_values(&[txn.key.as_move_value()]),
+                &mut gas_meter,
+                traversal_context,
+                code_storage,
+            )
+        }) {
+            Err(err) => {
+                error!(
+                    *log_context,
+                    "Scheduled transaction prologue failed: {:?}, txn: {:?}", err, txn
+                );
+                // Attempt to pause scheduled transactions
+                self.pause_scheduled_txns_module(&txn.key, resolver, code_storage)?;
+                return Err(err.into_vm_status());
+            },
+            Ok(_) => (), // Continue with rest of function if prologue succeeds
+        }
+        let prologue_change_set = prologue_session.finish_with_squashed_change_set(
+            &storage_gas.change_set_configs,
+            code_storage,
+            false,
+        )?;
+
+        // no need of scheduled txn prologue for now.
+        let args = vec![
+            MoveValue::Signer(txn.sender_handle),
+            txn.key.as_move_value(),
+        ];
+
+        let mut session = ScheduledTxnSession::spawn(
+            self,
+            txn,
+            self.chain_id().id(),
+            resolver,
+            prologue_change_set,
+        );
+
+        let user_func_status = session.session.execute(|session| {
+            // Run the user function for the scheduled transaction.
+            // The user function is expected to be defined in the scheduled transactions module.
+            session.execute_function_bypass_visibility(
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.execute_user_function_wrapper_name,
+                vec![],
+                serialize_values(&args),
+                &mut gas_meter,
+                traversal_context,
+                code_storage,
+            )
+        });
+        let txn_status = match user_func_status {
+            Ok(success_status) => {
+                let user_func_executed =
+                    bcs::from_bytes::<bool>(&success_status.return_values[0].0).unwrap();
+                if !user_func_executed {
+                    // User function was not executed, which means the scheduled transaction was
+                    // cancelled in this block. In this we must not run the txn epilogue or cleanup
+                    // or charge/refund gas. The cancellation flow will take care of that.
+                    info!(
+                        "[Scheduled Transaction] txn id {:?} was not run, it was likely cancelled",
+                        txn.key.txn_id
+                    );
+                    let vm_status = VMStatus::error(
+                        StatusCode::TRANSACTION_EXPIRED, // todo: check if this error code is good or we should create a new one
+                        None,
+                    );
+                    return Ok((vm_status, discarded_output(StatusCode::TRANSACTION_EXPIRED)));
+                }
+                TransactionStatus::Keep(ExecutionStatus::Success)
+            },
+            Err(err) => {
+                // If the user function execution fails, we return the error status and an empty output.
+                let error_vm_status = err.into_vm_status();
+                let txn_status =
+                    TransactionStatus::from_vm_status(error_vm_status.clone(), self.features());
+                match txn_status {
+                    TransactionStatus::Keep(_) => {
+                        // In this case we will run the epilogue and charge the gas used.
+                        warn!(
+                            "[Scheduled Transaction] txn id: {}; execution failed with status {:?}; we will run the epilogue and charge the gas used",
+                            txn.key.txn_id,
+                            error_vm_status
+                        );
+                    },
+                    TransactionStatus::Discard(_) | TransactionStatus::Retry => {
+                        error!(
+                            "[Scheduled Transaction] Discarding txn {}; execution failed with status: {:?}",
+                            txn.key.txn_id,
+                            error_vm_status
+                        );
+                        self.pause_scheduled_txns_module(&txn.key, resolver, code_storage)?;
+                        return Err(error_vm_status);
+                    },
+                }
+                txn_status
+            },
+        };
+
+        let mut session_change_set = session.finish(
+            &self.storage_gas_params(log_context)?.change_set_configs,
+            code_storage,
+        )?;
+
+        let storage_refund = self.charge_change_set(
+            &mut session_change_set,
+            &mut gas_meter,
+            0.into(),
+            txn.gas_unit_price.into(),
+            resolver,
+            code_storage,
+        )?;
+        let fee_statement = Self::fee_statement_from_gas_meter(
+            txn.max_gas_amount.into(),
+            &gas_meter,
+            u64::from(storage_refund),
+        );
+
+        let mut epilogue_session = ScheduledTxnEpilogueSession::spawn(
+            self,
+            txn,
+            self.chain_id().id(),
+            resolver,
+            session_change_set,
+            &self.storage_gas_params(log_context)?.change_set_configs,
+            fee_statement,
+            txn_status,
+        );
+
+        // Run epilogue but store result instead of propagating error
+        match epilogue_session.session.execute(|session| {
+            run_scheduled_txn_epilogue(
+                session,
+                txn,
+                gas_meter.balance(),
+                fee_statement,
+                traversal_context,
+                code_storage,
+            )
+        }) {
+            Ok(()) => {},
+            Err(err) => {
+                error!(
+                    "[Scheduled Transaction] txn_id {}; txn epilogue failed with status: {:?}",
+                    txn.key.txn_id, err
+                );
+                self.pause_scheduled_txns_module(&txn.key, resolver, code_storage)?;
+                return Err(err.into_vm_status());
+            },
+        };
+
+        let output = epilogue_session.finish(code_storage)?;
+        Ok((VMStatus::Executed, output))
+    }
+
+    fn pause_scheduled_txns_module(
+        &self,
+        txn_key: &ScheduleMapKey,
+        resolver: &impl AptosMoveResolver,
+        code_storage: &impl AptosModuleStorage,
+    ) -> VMResult<()> {
+        error!("[Scheduled Transaction] System invariant violation while executing txn id {:?}: Pausing scheduled txns module", txn_key.txn_id);
+        // Create a new session
+        let mut session = self.new_session(
+            resolver,
+            SessionId::scheduled_txn_abort(txn_key.hash()),
+            None,
+        );
+        let mut gas_meter = UnmeteredGasMeter;
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        let args = vec![MoveValue::Signer(
+            SCHEDULED_TRANSACTIONS_MODULE_INFO.framework_address,
+        )];
+        session
+            .execute_function_bypass_visibility(
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+                &SCHEDULED_TRANSACTIONS_MODULE_INFO.pause_scheduled_txns_name,
+                vec![],
+                serialize_values(&args),
+                &mut gas_meter,
+                &mut traversal_context,
+                code_storage,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)?;
+        error!("[Scheduled Transaction] Scheduled txns module paused successfully");
+        Ok(())
     }
 }
 
