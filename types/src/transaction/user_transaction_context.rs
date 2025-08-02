@@ -13,6 +13,7 @@ pub struct UserTransactionContext {
     chain_id: u8,
     entry_function_payload: Option<EntryFunctionPayload>,
     multisig_payload: Option<MultisigPayload>,
+    disallow_module_publishing: bool,
 }
 
 impl UserTransactionContext {
@@ -25,6 +26,7 @@ impl UserTransactionContext {
         chain_id: u8,
         entry_function_payload: Option<EntryFunctionPayload>,
         multisig_payload: Option<MultisigPayload>,
+        disallow_module_publishing: bool,
     ) -> Self {
         Self {
             sender,
@@ -35,6 +37,7 @@ impl UserTransactionContext {
             chain_id,
             entry_function_payload,
             multisig_payload,
+            disallow_module_publishing,
         }
     }
 
@@ -68,6 +71,10 @@ impl UserTransactionContext {
 
     pub fn multisig_payload(&self) -> Option<MultisigPayload> {
         self.multisig_payload.clone()
+    }
+
+    pub fn disallow_module_publishing(&self) -> bool {
+        self.disallow_module_publishing
     }
 }
 

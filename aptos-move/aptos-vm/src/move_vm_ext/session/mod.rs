@@ -48,6 +48,8 @@ use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
+pub mod scheduled_txn_epilogue_session;
+pub mod scheduled_txn_session;
 pub mod session_id;
 pub(crate) mod user_transaction_sessions;
 pub mod view_with_change_set;
@@ -88,6 +90,10 @@ where
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
+        let disallow_module_publish = maybe_user_transaction_context
+            .as_ref()
+            .map_or(false, |ctx| ctx.disallow_module_publishing());
+
         extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
@@ -104,7 +110,7 @@ where
             chain_id.id(),
             maybe_user_transaction_context,
         ));
-        extensions.add(NativeCodeContext::new());
+        extensions.add(NativeCodeContext::new(disallow_module_publish));
         extensions.add(NativeStateStorageContext::new(resolver));
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
