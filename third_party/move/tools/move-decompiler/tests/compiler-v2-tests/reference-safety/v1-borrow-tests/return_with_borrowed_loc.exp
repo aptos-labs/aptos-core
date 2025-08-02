@@ -1,0 +1,18 @@
+module 0x8675309::M {
+    struct X has copy, drop {
+        y: Y,
+    }
+    struct Y has copy, drop {
+        u: u64,
+    }
+    fun t1() {
+        let _t1 = &0;
+    }
+    fun t2() {
+        let _t1 = &X{y: Y{u: 0}};
+        let _t2 = &_t1.y;
+        let _t3 = &_t2.u;
+    }
+}
+
+============ recompilation succeeded ========

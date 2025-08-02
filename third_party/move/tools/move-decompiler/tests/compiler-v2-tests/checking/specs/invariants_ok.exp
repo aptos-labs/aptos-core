@@ -1,0 +1,11 @@
+module 0x42::M {
+    struct R {
+        s: S,
+    }
+    struct S {
+        x: u64,
+        y: bool,
+    }
+}
+
+============ recompilation succeeded ========

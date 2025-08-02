@@ -1,0 +1,18 @@
+module 0x8675::M {
+    public fun test(): u64 {
+        let _t1 = test1(10);
+        _t1
+    }
+    fun test1(r: u64): u64 {
+        let _t2 = 0;
+        loop {
+            r = r - 1;
+            _t2 = _t2 + r;
+            if (r > 0) continue;
+            break;
+        };
+        r + r + _t2
+    }
+}
+
+============ recompilation succeeded ========

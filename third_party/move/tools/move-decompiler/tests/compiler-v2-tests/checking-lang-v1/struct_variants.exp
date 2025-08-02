@@ -1,0 +1,15 @@
+module 0x42::m {
+    enum S {
+        None,
+        Some {
+            x: u64,
+        }
+    }
+    fun f(s: S) {
+        let _t10;
+        let _t1 = &s;
+        if (_t1 is None) S::None{} = s else if (_t1 is Some) S::Some{x: _t10} = s else abort 14566554180833181697;
+    }
+}
+
+============ recompilation succeeded ========

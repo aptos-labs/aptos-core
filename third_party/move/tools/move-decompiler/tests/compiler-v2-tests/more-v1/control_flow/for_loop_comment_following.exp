@@ -1,0 +1,38 @@
+script {
+    fun main_0() {
+        let _t0 = 0;
+        let _t1 = false;
+        loop {
+            let _t10 = _t1;
+            if (_t10) _t0 = _t0 + 1 else _t1 = true;
+            if (_t0 < 10) continue;
+            break;
+        };
+        let _t2 = 0;
+        let _t3 = false;
+        loop {
+            let _t19 = _t3;
+            if (_t19) _t2 = _t2 + 1 else _t3 = true;
+            if (_t2 < 10) continue;
+            break;
+        };
+        let _t4 = 0;
+        let _t5 = false;
+        loop {
+            let _t28 = _t5;
+            if (_t28) _t4 = _t4 + 1 else _t5 = true;
+            if (_t4 < 10) continue;
+            break;
+        };
+        let _t6 = 0;
+        let _t7 = false;
+        loop {
+            let _t37 = _t7;
+            if (_t37) _t6 = _t6 + 1 else _t7 = true;
+            if (_t6 < 10) continue;
+            break;
+        };
+    }
+}
+
+============ recompilation succeeded ========

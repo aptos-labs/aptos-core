@@ -1,0 +1,17 @@
+module 0x8675309::M {
+    fun t0(cond: bool) {
+        while (cond) continue;
+    }
+    fun t1() {
+        let _t3 = &mut 0;
+    }
+    fun t2(cond: bool) {
+        while (!cond) continue;
+    }
+    fun t4(cond: bool) {
+        let _t2 = &cond;
+        while (*_t2) continue;
+    }
+}
+
+============ recompilation succeeded ========

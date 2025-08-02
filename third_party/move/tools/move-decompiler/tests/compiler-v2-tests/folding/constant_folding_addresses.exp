@@ -1,0 +1,10 @@
+module 0x8675309::M {
+    fun const_addr(): address {
+        @0x1234
+    }
+    fun const_addr_let(): address {
+        @0x1234
+    }
+}
+
+============ recompilation succeeded ========

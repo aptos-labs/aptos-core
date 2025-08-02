@@ -1,0 +1,7 @@
+module 0x1::A {
+    fun foo() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

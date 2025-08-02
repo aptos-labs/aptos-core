@@ -1,0 +1,57 @@
+script {
+    fun main_0() {
+        loop continue
+    }
+}
+script {
+    fun main_1() {
+        loop continue
+    }
+}
+script {
+    fun main_2(cond: bool) {
+        if (!cond) abort 0;
+    }
+}
+script {
+    fun main_3() {
+        loop continue
+    }
+}
+script {
+    fun main_4() {
+        ()
+    }
+}
+script {
+    fun main_5() {
+        ()
+    }
+}
+script {
+    fun main_6(cond: bool) {
+        while (!cond) continue;
+    }
+}
+script {
+    fun main_7(cond: bool) {
+        while (cond) continue;
+    }
+}
+script {
+    fun main_8(cond: bool) {
+        if (cond) abort 0;
+    }
+}
+script {
+    fun main_9(cond: bool) {
+        while (!cond) continue;
+    }
+}
+script {
+    fun main_10(cond: bool) {
+        while (!cond) continue;
+    }
+}
+
+============ recompilation succeeded ========

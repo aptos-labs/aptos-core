@@ -1,0 +1,7 @@
+module 0x8675309::M {
+    public fun f<T>(x: T) {
+        f<T>(x);
+    }
+}
+
+============ recompilation succeeded ========

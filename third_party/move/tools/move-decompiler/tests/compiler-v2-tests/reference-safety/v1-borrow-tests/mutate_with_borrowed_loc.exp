@@ -1,0 +1,8 @@
+module 0x8675309::M {
+    fun t1() {
+        let _t5 = &0;
+        let _t7 = &0;
+    }
+}
+
+============ recompilation succeeded ========

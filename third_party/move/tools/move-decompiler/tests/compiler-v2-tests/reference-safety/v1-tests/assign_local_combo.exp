@@ -1,0 +1,48 @@
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+        g: u64,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0(cond: bool) {
+        let _t2;
+        let _t1 = S{f: 0,g: 0};
+        if (cond) _t2 = &(&_t1).f else _t2 = &(&_t1).g;
+        let _t10 = *_t2;
+        let _t13 = S{f: 0,g: 0};
+    }
+    fun t1(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) _t3 = &mut (&mut S{f: 0,g: 0}).f else _t3 = &mut other.f;
+        let _t12 = *_t3;
+        let _t15 = S{f: 0,g: 0};
+    }
+    fun t2(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) _t3 = &mut S{f: 0,g: 0} else _t3 = other;
+        let _t11 = *_t3;
+        let _t14 = S{f: 0,g: 0};
+    }
+    fun t3(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) {
+            let _t10 = id_mut<S>(&mut S{f: 0,g: 0});
+            _t3 = _t10;
+        } else _t3 = other;
+        let _t12 = *_t3;
+        let _t15 = S{f: 0,g: 0};
+    }
+    fun t4(cond: bool) {
+        let _t12;
+        let _t14;
+        let _t2 = &(&S{f: 0,g: 0}).f;
+        if (cond) _t12 = S{f: 0,g: 0} else _t14 = *_t2;
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,44 @@
+module 0x42::Test {
+    struct X has drop {
+    }
+    fun many() {
+        let _t4 = 0x1::vector::empty<X>();
+        let _t5 = &mut _t4;
+        0x1::vector::push_back<X>(_t5, X{});
+        0x1::vector::push_back<X>(_t5, X{});
+        let _t6 = 0x1::vector::empty<address>();
+        let _t7 = 0x1::vector::empty<address>();
+        let _t8 = 0x1::vector::empty<vector<address>>();
+        let _t9 = &mut _t8;
+        0x1::vector::push_back<vector<address>>(_t9, _t6);
+        0x1::vector::push_back<vector<address>>(_t9, _t7);
+        let _t10 = 0x1::vector::empty<address>();
+        let _t11 = 0x1::vector::empty<address>();
+        let _t12 = 0x1::vector::empty<vector<address>>();
+        let _t13 = &mut _t12;
+        0x1::vector::push_back<vector<address>>(_t13, _t10);
+        0x1::vector::push_back<vector<address>>(_t13, _t11);
+        let _t14 = 0x1::vector::empty<vector<address>>();
+        let _t15 = 0x1::vector::empty<vector<vector<address>>>();
+        let _t16 = &mut _t15;
+        0x1::vector::push_back<vector<vector<address>>>(_t16, _t12);
+        0x1::vector::push_back<vector<vector<address>>>(_t16, _t14);
+    }
+    fun none() {
+        let _t0 = 0x1::vector::empty<bool>();
+    }
+    fun one() {
+        let _t2 = 0x1::vector::empty<X>();
+        0x1::vector::push_back<X>(&mut _t2, X{});
+        let _t4 = 0x1::vector::empty<address>();
+        let _t5 = 0x1::vector::empty<vector<address>>();
+        0x1::vector::push_back<vector<address>>(&mut _t5, _t4);
+        let _t7 = 0x1::vector::empty<address>();
+        let _t8 = 0x1::vector::empty<vector<address>>();
+        0x1::vector::push_back<vector<address>>(&mut _t8, _t7);
+        let _t10 = 0x1::vector::empty<vector<vector<address>>>();
+        0x1::vector::push_back<vector<vector<address>>>(&mut _t10, _t8);
+    }
+}
+
+============ recompilation succeeded ========

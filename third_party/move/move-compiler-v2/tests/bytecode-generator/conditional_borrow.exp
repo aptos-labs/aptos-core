@@ -126,14 +126,14 @@ module 0x8675::M {
         let a = z;
         let tref4 = &mut {
             let _q = 1;
-            a
+            a;
         };
         *tref4 = *tref4 + 4;
         let tref5 = &mut a;
         *tref5 = *tref5 + 8;
         let tref6 = &mut {
             3;
-            a
+            a;
         };
         *tref6 = *tref6 + 16;
         a
@@ -141,24 +141,24 @@ module 0x8675::M {
     fun test1b(r: S): u64 {
         let x = S{f: 3};
         let tref = &mut (if (r.f < 4) r else x);
-        (*tref).f = 10;
+        *tref.f = 10;
         let y = r;
         let tref2 = &mut y;
-        (*tref2).f = (*tref2).f + 1;
+        *tref2.f = *tref2.f + 1;
         let z = y;
         let tref3 = &mut z.f;
         *tref3 = *tref3 + 1;
         let a = z;
         let tref4 = &mut {
             let _q = 1;
-            a.f
+            a.f;
         };
         *tref4 = *tref4 + 1;
         let tref5 = &mut a.f;
         *tref5 = *tref5 + 8;
         let tref6 = &mut {
             3;
-            a.f
+            a.f;
         };
         *tref6 = *tref6 + 16;
         a.f

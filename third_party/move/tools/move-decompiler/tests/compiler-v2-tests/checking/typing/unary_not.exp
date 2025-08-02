@@ -1,0 +1,14 @@
+module 0x8675309::M {
+    struct R {
+        f: bool,
+    }
+    fun t0(x: bool, r: R) {
+        let _t3 = !x;
+        let _t5 = !x;
+        let _t7 = !x;
+        let _t11 = !*&(&r).f;
+        let R{f: _t13} = r;
+    }
+}
+
+============ recompilation succeeded ========

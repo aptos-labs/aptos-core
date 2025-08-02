@@ -1,0 +1,12 @@
+module 0xcafe::Module0 {
+    struct S {
+        x: bool,
+    }
+    public fun f(): S {
+        let _t0 = S{x: false};
+        *&mut (*&(&_t0).x) = true;
+        _t0
+    }
+}
+
+============ recompilation succeeded ========

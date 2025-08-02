@@ -1,0 +1,10 @@
+module 0x8675309::Tester {
+    struct T has copy, drop {
+        f: u64,
+    }
+    fun t() {
+        let _t0 = T{f: 0};
+    }
+}
+
+============ recompilation succeeded ========

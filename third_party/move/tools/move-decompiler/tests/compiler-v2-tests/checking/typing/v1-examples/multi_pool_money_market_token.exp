@@ -1,0 +1,201 @@
+module 0x2::Map {
+    struct T<K, V> has copy, drop, store {
+    }
+    public native fun empty<K, V>(): T<K, V>;
+    public native fun insert<K, V>(m: &T<K, V>, k: K, v: V);
+    public native fun remove<K, V>(m: &T<K, V>, k: &K): V;
+    public native fun contains_key<K, V>(m: &T<K, V>, k: &K): bool;
+    public native fun get<K, V>(m: &T<K, V>, k: &K): &V;
+    public native fun get_mut<K, V>(m: &mut T<K, V>, k: &K): &mut V;
+}
+module 0x2::Token {
+    struct Coin<AssetType: copy + drop> has store {
+        type: AssetType,
+        value: u64,
+    }
+    public fun value<ATy: copy + drop>(coin: &Coin<ATy>): u64 {
+        *&coin.value
+    }
+    public fun create<ATy: copy + drop>(type: ATy, value: u64): Coin<ATy> {
+        Coin<ATy>{type: type,value: value}
+    }
+    public fun deposit<ATy: copy + drop>(coin: &mut Coin<ATy>, check: Coin<ATy>) {
+        let Coin<ATy>{type: _t5,value: _t6} = check;
+        if (!(&coin.type == &_t5)) abort 42;
+        *&mut coin.value = *&coin.value + _t6;
+    }
+    public fun destroy_zero<ATy: copy + drop>(coin: Coin<ATy>) {
+        let Coin<ATy>{type: _t3,value: _t4} = coin;
+        if (!(_t4 == 0)) abort 11;
+    }
+    public fun join<ATy: copy + drop>(xus: Coin<ATy>, coin2: Coin<ATy>): Coin<ATy> {
+        deposit<ATy>(&mut xus, coin2);
+        xus
+    }
+    public fun split<ATy: copy + drop>(coin: Coin<ATy>, amount: u64): (Coin<ATy>, Coin<ATy>) {
+        let _t6 = withdraw<ATy>(&mut coin, amount);
+        (coin, _t6)
+    }
+    public fun withdraw<ATy: copy + drop>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
+        if (!(*&coin.value >= amount)) abort 10;
+        *&mut coin.value = *&coin.value - amount;
+        Coin<ATy>{type: *&coin.type,value: amount}
+    }
+}
+module 0x3::OneToOneMarket {
+    use 0x2::Map;
+    use 0x2::Token;
+    use 0x1::signer;
+    struct BorrowRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        record: Map::T<address, u64>,
+    }
+    struct DepositRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        record: Map::T<address, u64>,
+    }
+    struct Pool<AssetType: copy + drop> has key {
+        coin: Token::Coin<AssetType>,
+    }
+    struct Price<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        price: u64,
+    }
+    public fun borrow<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, amount: u64): Token::Coin<Out> {
+        let _t6 = max_borrow_amount<In,Out>(account, pool_owner);
+        if (!(amount <= _t6)) abort 1025;
+        update_borrow_record<In,Out>(account, pool_owner, amount);
+        let _t12 = borrow_global_mut<Pool<Out>>(pool_owner);
+        let _t15 = Token::withdraw<Out>(&mut _t12.coin, amount);
+        _t15
+    }
+    public fun deposit<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, coin: Token::Coin<In>) {
+        let _t5 = Token::value<In>(&coin);
+        update_deposit_record<In,Out>(account, pool_owner, _t5);
+        let _t10 = borrow_global_mut<Pool<In>>(pool_owner);
+        Token::deposit<In>(&mut _t10.coin, coin);
+    }
+    fun max_borrow_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address): u64 {
+        let _t6;
+        let _t4;
+        let _t9 = deposited_amount<In,Out>(account, pool_owner);
+        let _t12 = borrowed_amount<In,Out>(account, pool_owner);
+        let _t2 = _t12;
+        let _t14 = borrow_global<Price<In, Out>>(pool_owner);
+        let _t3 = _t9 * *&_t14.price;
+        if (_t3 < _t2) _t4 = 0 else _t4 = _t3 - _t2;
+        let _t23 = borrow_global<Pool<Out>>(pool_owner);
+        let _t25 = Token::value<Out>(&_t23.coin);
+        let _t5 = _t25;
+        if (_t4 < _t5) _t6 = _t4 else _t6 = _t5;
+        _t6
+    }
+    fun update_borrow_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, amount: u64) {
+        let _t7 = signer::address_of(account);
+        let _t3 = _t7;
+        if (!exists<BorrowRecord<In, Out>>(_t3)) {
+            let _t11 = Map::empty<address,u64>();
+            move_to<BorrowRecord<In, Out>>(account, BorrowRecord<In,Out>{record: _t11});
+        };
+        let _t14 = borrow_global_mut<BorrowRecord<In, Out>>(_t3);
+        let _t4 = &mut _t14.record;
+        let _t19 = Map::contains_key<address,u64>(freeze(_t4), &pool_owner);
+        if (_t19) {
+            let _t23 = Map::remove<address,u64>(freeze(_t4), &pool_owner);
+            amount = amount + _t23;
+        };
+        Map::insert<address,u64>(freeze(_t4), pool_owner, amount);
+    }
+    fun update_deposit_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, amount: u64) {
+        let _t7 = signer::address_of(account);
+        let _t3 = _t7;
+        if (!exists<DepositRecord<In, Out>>(_t3)) {
+            let _t11 = Map::empty<address,u64>();
+            move_to<DepositRecord<In, Out>>(account, DepositRecord<In,Out>{record: _t11});
+        };
+        let _t14 = borrow_global_mut<DepositRecord<In, Out>>(_t3);
+        let _t4 = &mut _t14.record;
+        let _t19 = Map::contains_key<address,u64>(freeze(_t4), &pool_owner);
+        if (_t19) {
+            let _t23 = Map::remove<address,u64>(freeze(_t4), &pool_owner);
+            amount = amount + _t23;
+        };
+        Map::insert<address,u64>(freeze(_t4), pool_owner, amount);
+    }
+    fun accept<AssetType: copy + drop + store>(account: &signer, init: Token::Coin<AssetType>) {
+        let _t3 = signer::address_of(account);
+        if (exists<Pool<AssetType>>(_t3)) abort 42;
+        move_to<Pool<AssetType>>(account, Pool<AssetType>{coin: init});
+    }
+    fun borrowed_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address): u64 {
+        let _t4;
+        let _t6 = signer::address_of(account);
+        let _t2 = _t6;
+        loop {
+            if (exists<BorrowRecord<In, Out>>(_t2)) {
+                let _t11 = borrow_global<BorrowRecord<In, Out>>(_t2);
+                let _t3 = &_t11.record;
+                let _t15 = Map::contains_key<address,u64>(_t3, &pool_owner);
+                if (_t15) {
+                    let _t18 = Map::get<address,u64>(_t3, &pool_owner);
+                    _t4 = *_t18;
+                    break;
+                };
+                _t4 = 0;
+                break;
+            };
+            return 0;
+        };
+        _t4
+    }
+    fun deposited_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address): u64 {
+        let _t4;
+        let _t6 = signer::address_of(account);
+        let _t2 = _t6;
+        loop {
+            if (exists<DepositRecord<In, Out>>(_t2)) {
+                let _t11 = borrow_global<DepositRecord<In, Out>>(_t2);
+                let _t3 = &_t11.record;
+                let _t15 = Map::contains_key<address,u64>(_t3, &pool_owner);
+                if (_t15) {
+                    let _t18 = Map::get<address,u64>(_t3, &pool_owner);
+                    _t4 = *_t18;
+                    break;
+                };
+                _t4 = 0;
+                break;
+            };
+            return 0;
+        };
+        _t4
+    }
+    public fun register_price<In: copy + drop + store, Out: copy + drop + store>(account: &signer, initial_in: Token::Coin<In>, initial_out: Token::Coin<Out>, price: u64) {
+        accept<In>(account, initial_in);
+        accept<Out>(account, initial_out);
+        move_to<Price<In, Out>>(account, Price<In,Out>{price: price});
+    }
+}
+module 0x70dd::ToddNickels {
+    use 0x2::Token;
+    use 0x1::signer;
+    struct T has copy, drop, store {
+    }
+    struct Wallet has key {
+        nickels: Token::Coin<T>,
+    }
+    public fun init(account: &signer) {
+        let _t2 = signer::address_of(account);
+        if (!(_t2 == @0x70dd)) abort 42;
+        let _t9 = Token::create<T>(T{}, 0);
+        move_to<Wallet>(account, Wallet{nickels: _t9});
+    }
+    public fun destroy(c: Token::Coin<T>) {
+        let _t2 = borrow_global_mut<Wallet>(@0x70dd);
+        Token::deposit<T>(&mut _t2.nickels, c);
+    }
+    public fun mint(account: &signer): Token::Coin<T> {
+        let _t2 = signer::address_of(account);
+        if (!(_t2 == @0x70dd)) abort 42;
+        let _t8 = Token::create<T>(T{}, 5);
+        _t8
+    }
+}
+
+============ recompilation succeeded ========

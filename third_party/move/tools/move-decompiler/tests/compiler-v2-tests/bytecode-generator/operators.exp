@@ -1,0 +1,36 @@
+module 0x42::operators {
+    fun arithm(x: u64, y: u64): u64 {
+        x + y / (x - y) * y % x
+    }
+    fun bits(x: u64, y: u8): u64 {
+        x << y & x
+    }
+    fun bools(x: bool, y: bool): bool {
+        let _t5;
+        let _t4;
+        let _t3;
+        let _t2;
+        if (x) _t2 = y else _t2 = false;
+        if (_t2) _t3 = true else if (x) _t3 = !y else _t3 = false;
+        if (_t3) _t4 = true else if (x) _t4 = false else _t4 = y;
+        if (_t4) _t5 = true else if (x) _t5 = false else _t5 = !y;
+        _t5
+    }
+    fun equality<T: drop>(x: T, y: T): bool {
+        x == y
+    }
+    fun inequality<T: drop>(x: T, y: T): bool {
+        x != y
+    }
+    fun order(x: u64, y: u64): bool {
+        let _t4;
+        let _t3;
+        let _t2;
+        if (x < y) _t2 = x <= y else _t2 = false;
+        if (_t2) _t3 = !(x > y) else _t3 = false;
+        if (_t3) _t4 = !(x >= y) else _t4 = false;
+        _t4
+    }
+}
+
+============ recompilation succeeded ========

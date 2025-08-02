@@ -1,0 +1,24 @@
+module 0x42::Test {
+    public fun other(a: u64, b: u64): u64 {
+        let _t2 = 0;
+        while (a < b) {
+            a = a + 1;
+            let _t3 = a;
+            let _t5 = 0;
+            while (_t3 < b) {
+                _t3 = _t3 + 1;
+                _t5 = _t5 + _t3;
+            };
+            _t2 = _t5 + _t2;
+            continue;
+        };
+        _t2
+    }
+    public fun test_shadowing() {
+        let _t3 = other(1, 4);
+        let _t0 = _t3;
+        if (!(_t0 == 10)) abort _t0;
+    }
+}
+
+============ recompilation succeeded ========

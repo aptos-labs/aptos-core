@@ -1,0 +1,11 @@
+module 0x42::bit_vector_infer {
+    public fun new(_length: u64) {
+        let _t8;
+        _length = 1;
+        if (_length > 0) _t8 = _length - 1;
+        let _t9 = 0x1::vector::empty<bool>();
+        0x1::vector::push_back<bool>(&mut _t9, false);
+    }
+}
+
+============ recompilation succeeded ========

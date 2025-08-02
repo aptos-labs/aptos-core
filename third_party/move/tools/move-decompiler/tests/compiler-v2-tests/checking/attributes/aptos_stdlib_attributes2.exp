@@ -1,0 +1,10 @@
+module 0x1::M {
+    fun bar() {
+        ()
+    }
+    fun foo() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

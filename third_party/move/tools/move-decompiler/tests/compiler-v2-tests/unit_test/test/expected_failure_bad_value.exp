@@ -1,0 +1,4 @@
+module 0x1::A {
+}
+
+============ recompilation succeeded ========

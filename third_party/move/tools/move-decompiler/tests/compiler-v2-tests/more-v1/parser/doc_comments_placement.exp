@@ -1,0 +1,11 @@
+module 0x42::M {
+    use 0x1::option;
+    struct T {
+        f: option::Option<u64>,
+    }
+    fun f() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

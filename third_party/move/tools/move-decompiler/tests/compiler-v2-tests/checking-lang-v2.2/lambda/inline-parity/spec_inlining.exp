@@ -1,0 +1,19 @@
+module 0x42::Test {
+    fun apply(v: u64, predicate: |u64|(bool)): bool {
+        predicate(v)
+    }
+    public fun test_apply(x: u64) {
+        let _t5 = apply(x, |arg0| lambda__1__test_apply(arg0));
+        if (!_t5) abort 1;
+        let _t9 = apply(x, |arg0| lambda__2__test_apply(arg0));
+        if (!_t9) abort 2;
+    }
+    fun lambda__1__test_apply(v: u64): bool {
+        v >= 0
+    }
+    fun lambda__2__test_apply(v: u64): bool {
+        v != 0
+    }
+}
+
+============ recompilation succeeded ========

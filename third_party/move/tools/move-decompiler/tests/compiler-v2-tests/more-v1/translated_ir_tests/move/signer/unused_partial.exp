@@ -1,0 +1,10 @@
+module 0x8675309::M {
+    fun t(cond: bool, s: signer) {
+        if (cond) consume(s);
+    }
+    fun consume(s: signer) {
+        consume(s);
+    }
+}
+
+============ recompilation succeeded ========

@@ -3,7 +3,7 @@ module 0xcafe::m {
     struct S<T> {
         x: T,
     }
-    private fun consume<T>(s: S<T>,x: T,f: |(S<T>, T)|T): T {
+    private fun consume<T>(s: S<T>,x: T,f: |S<T>, T|T): T {
         (f)(s, x)
     }
     private fun pattern(s: S<u64>,x: u64): u64 {
@@ -25,7 +25,7 @@ module 0xcafe::m {
     struct S<T> {
         x: T,
     }
-    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|T): T {
+    fun consume<T>(s: S<T>, x: T, f: |S<T>, T|T): T {
         f(s, x)
     }
     fun pattern(s: S<u64>, x: u64): u64 {

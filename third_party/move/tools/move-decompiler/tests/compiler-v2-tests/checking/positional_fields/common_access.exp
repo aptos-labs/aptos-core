@@ -1,0 +1,15 @@
+module 0x42::test {
+    enum Foo has drop {
+        A {
+            _0: u8,
+        }
+        B {
+            _0: u8,
+        }
+    }
+    fun common_access(x: Foo): u8 {
+        *&(&x)._0
+    }
+}
+
+============ recompilation succeeded ========

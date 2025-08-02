@@ -1,0 +1,39 @@
+module 0x8675309::Tester {
+    use 0x1::signer;
+    struct Box has key {
+        f: u64,
+    }
+    struct Data has key {
+        v1: u64,
+        v2: u64,
+    }
+    fun bump_and_pick(account: &signer, b1: &mut Box, b2: &mut Box): &u64 {
+        let _t4;
+        let _t6 = signer::address_of(account);
+        let _t7 = borrow_global_mut<Data>(_t6);
+        let _t3 = _t7;
+        *&mut b1.f = *&_t3.v1;
+        *&mut b2.f = *&_t3.v2;
+        if (*&b1.f > *&b2.f) _t4 = &b1.f else _t4 = &b2.f;
+        _t4
+    }
+    fun larger_field(account: &signer, drop: address, result: &mut u64) {
+        let _t7 = signer::address_of(account);
+        let _t8 = move_from<Box>(_t7);
+        let _t3 = _t8;
+        let _t10 = move_from<Box>(drop);
+        let _t4 = _t10;
+        if (!(*&(&_t3).f == 0)) abort 42;
+        if (!(*&(&_t4).f == 0)) abort 42;
+        let _t24 = bump_and_pick(account, &mut _t3, &mut _t4);
+        let _t5 = _t24;
+        if (!(*&(&_t3).f != 0)) abort 42;
+        if (!(*&(&_t4).f != 0)) abort 42;
+        if (!(_t5 == &(&_t3).f != (_t5 == &(&_t4).f))) abort 42;
+        *result = *_t5;
+        move_to<Box>(account, _t3);
+        let Box{f: _t50} = _t4;
+    }
+}
+
+============ recompilation succeeded ========

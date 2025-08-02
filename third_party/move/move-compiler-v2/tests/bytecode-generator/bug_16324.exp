@@ -61,8 +61,8 @@ module 0xc0ffee::m {
                     let _price = price(order);
                     let _size = size(order);
                 };
-                i = i + 1
-            }
+                i = i + 1;
+            };
         };
     }
 }

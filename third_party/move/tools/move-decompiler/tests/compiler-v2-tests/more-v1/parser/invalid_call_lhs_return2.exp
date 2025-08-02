@@ -1,0 +1,7 @@
+module 0x123::M {
+    fun foo() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

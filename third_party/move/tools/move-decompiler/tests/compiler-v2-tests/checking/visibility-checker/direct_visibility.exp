@@ -1,0 +1,26 @@
+module 0x815::a {
+    friend 0x815::c;
+    friend fun f() {
+        ()
+    }
+    friend fun g() {
+        ()
+    }
+}
+module 0x815::b {
+    friend 0x815::c;
+    friend fun f() {
+        ()
+    }
+}
+module 0x815::c {
+    use 0x815::a;
+    use 0x815::b;
+    public fun f() {
+        a::f();
+        a::g();
+        b::f();
+    }
+}
+
+============ recompilation succeeded ========

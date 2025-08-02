@@ -1,0 +1,17 @@
+module 0x42::move_function_in_spec {
+    struct TypeInfo has copy, drop, store, key {
+        account_address: address,
+    }
+    fun foo<T>() {
+        let _t2 = type_of<T>();
+    }
+    public fun type_of<T>(): TypeInfo {
+        abort 1
+    }
+    public fun no_change(target: address, new_addr: address): bool {
+        let _t3 = borrow_global<TypeInfo>(target);
+        *&_t3.account_address == new_addr
+    }
+}
+
+============ recompilation succeeded ========

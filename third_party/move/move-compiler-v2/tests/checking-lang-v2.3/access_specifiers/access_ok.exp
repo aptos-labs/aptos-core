@@ -142,6 +142,6 @@ module 0x42::m {
     {
     }
     fun make_up_address(_x: u64): address {
-        0x42
+        @0x42
     }
 }

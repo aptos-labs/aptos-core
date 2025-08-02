@@ -1,0 +1,13 @@
+module 0xcafe::Module0 {
+    struct Struct0 has copy, drop {
+        x: bool,
+    }
+    public fun function5(var21: bool, var23: bool) {
+        let _t3;
+        if (var21) _t3 = true else _t3 = var23;
+        let _t11 = &var21 != &_t3;
+        let _t13 = Struct0{x: var21};
+    }
+}
+
+============ recompilation succeeded ========

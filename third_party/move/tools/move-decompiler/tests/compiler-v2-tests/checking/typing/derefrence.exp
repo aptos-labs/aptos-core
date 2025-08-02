@@ -1,0 +1,24 @@
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+        x: X,
+    }
+    struct X has copy, drop {
+    }
+    fun t0(x: &u64, x_mut: &mut u64, s: &S, s_mut: &mut S) {
+        let _t5 = *x;
+        let _t7 = *x_mut;
+        let _t9 = *s;
+        let _t12 = *&s.f;
+        let _t15 = *&s.f;
+        let _t18 = *&s.x;
+        let _t20 = *s_mut;
+        let _t23 = *&s_mut.f;
+        let _t26 = *&s_mut.f;
+        let _t29 = *&s_mut.f;
+        let _t32 = *&s_mut.x;
+        let _t35 = *&s_mut.x;
+    }
+}
+
+============ recompilation succeeded ========

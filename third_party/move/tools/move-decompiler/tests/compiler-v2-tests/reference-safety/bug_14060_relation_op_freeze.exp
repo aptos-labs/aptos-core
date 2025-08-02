@@ -1,0 +1,8 @@
+module 0xcafe::Module0 {
+    public fun f() {
+        let _t2 = &mut 1u8;
+        let _t11 = freeze(&mut 0u8) != freeze(_t2);
+    }
+}
+
+============ recompilation succeeded ========

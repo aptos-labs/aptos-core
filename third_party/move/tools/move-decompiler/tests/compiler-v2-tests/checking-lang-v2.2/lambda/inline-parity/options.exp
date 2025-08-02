@@ -1,0 +1,31 @@
+module 0x42::map_opt {
+    use 0x1::option;
+    public fun map<Element: drop, OtherElement>(t: option::Option<Element>, f: |Element|(OtherElement) has drop): option::Option<OtherElement> {
+        let _t2;
+        let _t4 = option::is_some<Element>(&t);
+        if (_t4) {
+            let _t6 = option::extract<Element>(&mut t);
+            let _t9 = option::some<OtherElement>(f(_t6));
+            _t2 = _t9;
+        } else {
+            let _t11 = option::none<OtherElement>();
+            _t2 = _t11;
+        };
+        _t2
+    }
+}
+module 0x42::Test {
+    use 0x42::map_opt;
+    use 0x1::option;
+    public fun test(): u64 {
+        let _t2 = option::some<u64>(1);
+        let _t4 = map_opt::map<u64,u64>(_t2, |arg0| lambda__1__test(arg0));
+        let _t6 = option::extract<u64>(&mut _t4);
+        _t6
+    }
+    fun lambda__1__test(e: u64): u64 {
+        e + 1
+    }
+}
+
+============ recompilation succeeded ========

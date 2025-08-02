@@ -1,0 +1,7 @@
+module 0x815::test {
+    fun f1() {
+        loop continue
+    }
+}
+
+============ recompilation succeeded ========

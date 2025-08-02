@@ -1,0 +1,38 @@
+module 0x8675309::Tester {
+    use 0x1::signer;
+    struct Initializer has key {
+        x: u64,
+        y: u64,
+    }
+    struct Point has copy, drop {
+        x: u64,
+        y: u64,
+    }
+    fun bump_and_give(u: &mut u64): &u64 {
+        *u = *u + 1;
+        freeze(u)
+    }
+    fun larger_field(account: &signer, point_ref: &mut Point): &u64 {
+        let _t3;
+        if (!(*&point_ref.x == 0)) abort 42;
+        if (!(*&point_ref.y == 0)) abort 42;
+        let _t16 = set_and_pick(account, point_ref);
+        let _t17 = bump_and_give(_t16);
+        let _t2 = _t17;
+        if (*_t2 == *&point_ref.x) _t3 = *_t2 != *&point_ref.y else _t3 = false;
+        if (!_t3) abort 42;
+        _t2
+    }
+    fun set_and_pick(account: &signer, p: &mut Point): &mut u64 {
+        let _t3;
+        let _t5 = signer::address_of(account);
+        let _t6 = borrow_global_mut<Initializer>(_t5);
+        let _t2 = _t6;
+        *&mut p.x = *&_t2.x;
+        *&mut p.y = *&_t2.y;
+        if (*&p.x >= *&p.y) _t3 = &mut p.x else _t3 = &mut p.y;
+        _t3
+    }
+}
+
+============ recompilation succeeded ========

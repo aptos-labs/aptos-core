@@ -1,0 +1,13 @@
+module 0x42::reference_conversion {
+    fun deref(r: &u64): u64 {
+        *r
+    }
+    fun use_it(): u64 {
+        let _t1 = &mut 42;
+        *_t1 = 43;
+        let _t8 = deref(freeze(_t1));
+        _t8
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,12 @@
+script {
+    fun main_0(_u: u64, _s: signer) {
+        ()
+    }
+}
+script {
+    fun main_1(_u: u64, _s: signer, _u2: u64) {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

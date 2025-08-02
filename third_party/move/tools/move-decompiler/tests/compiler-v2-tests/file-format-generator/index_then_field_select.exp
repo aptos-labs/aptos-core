@@ -1,0 +1,32 @@
+module 0x42::test {
+    struct Coin has copy, drop {
+        _0: u256,
+    }
+    fun inc_vec_new(x: &mut vector<u256>, index: u64) {
+        let _t5 = 0x1::vector::borrow<u256>(freeze(x), index);
+        let _t11 = 0x1::vector::borrow_mut<u256>(x, index);
+        *_t11 = *_t5 + 1u256;
+    }
+    fun test0(x: &mut vector<Coin>, index: u64) {
+        let _t5 = 0x1::vector::borrow_mut<Coin>(x, index);
+    }
+    fun test1(x: vector<Coin>, index: u64) {
+        let _t5 = 0x1::vector::borrow_mut<Coin>(&mut x, index);
+    }
+    fun test3(x: &vector<Coin>, index: u64) {
+        let _t4 = 0x1::vector::borrow<Coin>(x, index);
+        let _t5 = *_t4;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with stackless-bytecode checks failed
+error: cannot transfer mutable value since it is borrowed
+  ┌─ index_then_field_select.move:7:20
+  │
+6 │         let _t5 = 0x1::vector::borrow<u256>(freeze(x), index);
+  │                   ------------------------------------------- previously borrowed here
+7 │         let _t11 = 0x1::vector::borrow_mut<u256>(x, index);
+  │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+8 │         *_t11 = *_t5 + 1u256;
+  │                 ---- conflicting reference `_t5` used here

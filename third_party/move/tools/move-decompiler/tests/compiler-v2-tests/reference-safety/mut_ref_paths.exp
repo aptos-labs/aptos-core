@@ -1,0 +1,38 @@
+module 0x42::m {
+    struct S {
+        x: u64,
+        y: u64,
+    }
+    fun f(s: &mut S): &mut u64 {
+        &mut s.x
+    }
+    fun g(s: &mut S): &mut S {
+        s
+    }
+    fun nested_rejoin(c: bool, s: &mut S): &mut u64 {
+        let _t3;
+        let _t2;
+        if (c) {
+            let _t6 = g(s);
+            _t2 = _t6;
+        } else {
+            let _t14 = g(s);
+            _t2 = _t14;
+        };
+        if (c) _t3 = &mut _t2.y else _t3 = &mut _t2.x;
+        _t3
+    }
+    fun simple_rejoin(c: bool, s: &mut S): &mut u64 {
+        let _t2;
+        if (c) {
+            let _t5 = f(s);
+            _t2 = _t5;
+        } else {
+            let _t8 = f(s);
+            _t2 = _t8;
+        };
+        _t2
+    }
+}
+
+============ recompilation succeeded ========

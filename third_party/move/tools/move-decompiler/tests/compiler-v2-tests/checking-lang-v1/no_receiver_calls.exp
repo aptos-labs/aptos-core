@@ -1,0 +1,13 @@
+module 0x42::m {
+    struct T has drop {
+    }
+    fun call_receiver(t: T) {
+        receiver(&t, 1);
+        receiver(&t, 1);
+    }
+    fun receiver(self: &T, _x: u64) {
+        abort 1
+    }
+}
+
+============ recompilation succeeded ========

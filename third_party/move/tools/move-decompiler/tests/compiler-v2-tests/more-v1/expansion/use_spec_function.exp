@@ -1,0 +1,9 @@
+module 0x2::X {
+}
+module 0x2::M {
+    fun t() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

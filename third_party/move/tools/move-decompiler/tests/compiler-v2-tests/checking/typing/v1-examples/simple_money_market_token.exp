@@ -1,0 +1,148 @@
+module 0x2::Token {
+    struct Coin<AssetType: copy + drop> has store {
+        type: AssetType,
+        value: u64,
+    }
+    public fun value<ATy: copy + drop + store>(coin: &Coin<ATy>): u64 {
+        *&coin.value
+    }
+    public fun create<ATy: copy + drop + store>(type: ATy, value: u64): Coin<ATy> {
+        Coin<ATy>{type: type,value: value}
+    }
+    public fun deposit<ATy: copy + drop + store>(coin: &mut Coin<ATy>, check: Coin<ATy>) {
+        let Coin<ATy>{type: _t5,value: _t6} = check;
+        if (!(&coin.type == &_t5)) abort 42;
+        *&mut coin.value = *&coin.value + _t6;
+    }
+    public fun destroy_zero<ATy: copy + drop + store>(coin: Coin<ATy>) {
+        let Coin<ATy>{type: _t3,value: _t4} = coin;
+        if (!(_t4 == 0)) abort 11;
+    }
+    public fun join<ATy: copy + drop + store>(xus: Coin<ATy>, coin2: Coin<ATy>): Coin<ATy> {
+        deposit<ATy>(&mut xus, coin2);
+        xus
+    }
+    public fun split<ATy: copy + drop + store>(coin: Coin<ATy>, amount: u64): (Coin<ATy>, Coin<ATy>) {
+        let _t6 = withdraw<ATy>(&mut coin, amount);
+        (coin, _t6)
+    }
+    public fun withdraw<ATy: copy + drop + store>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
+        if (!(*&coin.value >= amount)) abort 10;
+        *&mut coin.value = *&coin.value - amount;
+        Coin<ATy>{type: *&coin.type,value: amount}
+    }
+}
+module 0x70dd::ToddNickels {
+    use 0x2::Token;
+    use 0x1::signer;
+    struct T has copy, drop, store {
+    }
+    struct Wallet has key {
+        nickels: Token::Coin<T>,
+    }
+    public fun destroy(c: Token::Coin<T>) {
+        let _t2 = borrow_global_mut<Wallet>(@0x70dd);
+        Token::deposit<T>(&mut _t2.nickels, c);
+    }
+    public fun init(account: &signer) {
+        let _t2 = signer::address_of(account);
+        if (!(_t2 == @0x70dd)) abort 42;
+        let _t9 = Token::create<T>(T{}, 0);
+        move_to<Wallet>(account, Wallet{nickels: _t9});
+    }
+    public fun mint(account: &signer): Token::Coin<T> {
+        let _t2 = signer::address_of(account);
+        if (!(_t2 == @0x70dd)) abort 42;
+        let _t8 = Token::create<T>(T{}, 5);
+        _t8
+    }
+}
+module 0xb055::OneToOneMarket {
+    use 0x2::Token;
+    use 0x1::signer;
+    struct BorrowRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        record: u64,
+    }
+    struct DepositRecord<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        record: u64,
+    }
+    struct Pool<AssetType: copy + drop> has key {
+        coin: Token::Coin<AssetType>,
+    }
+    struct Price<phantom InputAsset: copy + drop, phantom OutputAsset: copy + drop> has key {
+        price: u64,
+    }
+    public fun borrow<In: copy + drop + store, Out: copy + drop + store>(account: &signer, amount: u64): Token::Coin<Out> {
+        let _t4 = max_borrow_amount<In,Out>(account);
+        if (!(amount <= _t4)) abort 1025;
+        update_borrow_record<In,Out>(account, amount);
+        let _t9 = borrow_global_mut<Pool<Out>>(@0xb055);
+        let _t12 = Token::withdraw<Out>(&mut _t9.coin, amount);
+        _t12
+    }
+    public fun deposit<In: copy + drop + store, Out: copy + drop + store>(account: &signer, coin: Token::Coin<In>) {
+        let _t4 = Token::value<In>(&coin);
+        update_deposit_record<In,Out>(account, _t4);
+        let _t8 = borrow_global_mut<Pool<In>>(@0xb055);
+        Token::deposit<In>(&mut _t8.coin, coin);
+    }
+    fun max_borrow_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer): u64 {
+        let _t5;
+        let _t3;
+        let _t7 = deposited_amount<In,Out>(account);
+        let _t9 = borrowed_amount<In,Out>(account);
+        let _t1 = _t9;
+        let _t11 = borrow_global<Price<In, Out>>(@0xb055);
+        let _t2 = _t7 * *&_t11.price;
+        if (_t2 < _t1) _t3 = 0 else _t3 = _t2 - _t1;
+        let _t20 = borrow_global<Pool<Out>>(@0xb055);
+        let _t22 = Token::value<Out>(&_t20.coin);
+        let _t4 = _t22;
+        if (_t3 < _t4) _t5 = _t3 else _t5 = _t4;
+        _t5
+    }
+    fun update_borrow_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, amount: u64) {
+        let _t5 = signer::address_of(account);
+        let _t2 = _t5;
+        if (!exists<BorrowRecord<In, Out>>(_t2)) move_to<BorrowRecord<In, Out>>(account, BorrowRecord<In,Out>{record: 0});
+        let _t12 = borrow_global_mut<BorrowRecord<In, Out>>(_t2);
+        let _t3 = &mut _t12.record;
+        *_t3 = *_t3 + amount;
+    }
+    fun update_deposit_record<In: copy + drop + store, Out: copy + drop + store>(account: &signer, amount: u64) {
+        let _t5 = signer::address_of(account);
+        let _t2 = _t5;
+        if (!exists<DepositRecord<In, Out>>(_t2)) move_to<DepositRecord<In, Out>>(account, DepositRecord<In,Out>{record: 0});
+        let _t12 = borrow_global_mut<DepositRecord<In, Out>>(_t2);
+        let _t3 = &mut _t12.record;
+        *_t3 = *_t3 + amount;
+    }
+    fun accept<AssetType: copy + drop + store>(account: &signer, init: Token::Coin<AssetType>) {
+        let _t3 = signer::address_of(account);
+        if (exists<Pool<AssetType>>(_t3)) abort 42;
+        move_to<Pool<AssetType>>(account, Pool<AssetType>{coin: init});
+    }
+    fun borrowed_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer): u64 {
+        let _t3 = signer::address_of(account);
+        let _t1 = _t3;
+        if (!exists<BorrowRecord<In, Out>>(_t1)) return 0;
+        let _t8 = borrow_global<BorrowRecord<In, Out>>(_t1);
+        *&_t8.record
+    }
+    fun deposited_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer): u64 {
+        let _t3 = signer::address_of(account);
+        let _t1 = _t3;
+        if (!exists<DepositRecord<In, Out>>(_t1)) return 0;
+        let _t8 = borrow_global<DepositRecord<In, Out>>(_t1);
+        *&_t8.record
+    }
+    public fun register_price<In: copy + drop + store, Out: copy + drop + store>(account: &signer, initial_in: Token::Coin<In>, initial_out: Token::Coin<Out>, price: u64) {
+        let _t5 = signer::address_of(account);
+        if (!(_t5 == @0xb055)) abort 42;
+        accept<In>(account, initial_in);
+        accept<Out>(account, initial_out);
+        move_to<Price<In, Out>>(account, Price<In,Out>{price: price});
+    }
+}
+
+============ recompilation succeeded ========

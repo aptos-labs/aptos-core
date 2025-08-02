@@ -1,0 +1,12 @@
+module 0x8675309::A {
+    use 0x1::signer;
+    struct T1 has key {
+        v: u64,
+    }
+    public fun test(account: &signer) {
+        let _t3 = signer::address_of(account);
+        let _t4 = borrow_global_mut<T1>(_t3);
+    }
+}
+
+============ recompilation succeeded ========

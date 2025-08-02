@@ -1,0 +1,11 @@
+module 0x8675309::M {
+    struct R {
+    }
+    fun t0() {
+        let _t5 = &0;
+        let _t7 = &mut 0;
+        let R{} = R{};
+    }
+}
+
+============ recompilation succeeded ========

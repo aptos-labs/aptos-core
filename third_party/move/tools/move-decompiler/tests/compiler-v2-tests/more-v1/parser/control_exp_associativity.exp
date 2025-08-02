@@ -1,0 +1,15 @@
+module 0x42::M {
+    fun t(cond: bool) {
+        let _t4;
+        let _t3;
+        let _t2;
+        if (cond) _t2 = 0 else _t2 = 20;
+        let _t11 = 1 + _t2;
+        if (cond) _t3 = 10 else _t3 = 10;
+        let _t16 = _t3 == 10;
+        if (cond) _t4 = 0 else _t4 = 10;
+        let _t21 = _t4 + 1;
+    }
+}
+
+============ recompilation succeeded ========

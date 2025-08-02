@@ -1,0 +1,10 @@
+module 0x8675309::M {
+    fun t1() {
+        let _t0 = 0;
+        let _t5 = &mut _t0;
+        *_t5 = 1;
+        *&mut _t0 = 2;
+    }
+}
+
+============ recompilation succeeded ========

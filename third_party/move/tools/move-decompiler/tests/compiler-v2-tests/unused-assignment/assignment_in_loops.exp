@@ -1,0 +1,16 @@
+module 0x42::test {
+    fun unused_assignment_in_loop() {
+        let _t0 = 1;
+        let _t1 = 0;
+        let _t2 = false;
+        loop {
+            let _t6 = _t2;
+            if (_t6) _t1 = _t1 + 1 else _t2 = true;
+            if (!(_t1 < 10)) break;
+            _t0 = _t0 + 1;
+            continue;
+        };
+    }
+}
+
+============ recompilation succeeded ========

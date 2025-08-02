@@ -1,0 +1,13 @@
+module 0x8675309::M {
+    friend fun f() {
+        ()
+    }
+    friend fun g() {
+        ()
+    }
+    friend fun h() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

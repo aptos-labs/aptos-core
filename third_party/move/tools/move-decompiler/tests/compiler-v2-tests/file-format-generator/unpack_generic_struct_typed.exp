@@ -1,0 +1,26 @@
+module 0x42::m {
+    use 0x1::vector;
+    struct E<Key> has copy, drop, store {
+        key: Key,
+    }
+    struct Option<Element> has copy, drop, store {
+        vec: vector<Element>,
+    }
+    public fun destroy_none<Element>(t: Option<Element>) {
+        let _t2 = is_none<Element>(&t);
+        if (!_t2) abort 262144;
+        let Option<Element>{vec: _t4} = t;
+        vector::destroy_empty<Element>(_t4);
+    }
+    public fun is_none<Element>(t: &Option<Element>): bool {
+        let _t3 = vector::is_empty<Element>(&t.vec);
+        _t3
+    }
+    public fun foo<Key: drop + store>(data: E<Key>, v: &mut Key) {
+        let E<Key>{key: _t3} = data;
+        let E<Key>{key: _t5} = E<Key>{key: _t3};
+        *v = _t5;
+    }
+}
+
+============ recompilation succeeded ========

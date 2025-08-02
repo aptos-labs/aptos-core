@@ -1,0 +1,13 @@
+module 0x2::M {
+    entry fun f1() {
+        ()
+    }
+    public entry fun f2() {
+        ()
+    }
+    friend entry fun f3() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

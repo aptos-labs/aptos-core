@@ -1,0 +1,25 @@
+module 0x7b::M {
+    struct S has copy, drop {
+    }
+    public fun s(): S {
+        S{}
+    }
+    public fun take(_s: S) {
+        ()
+    }
+}
+script {
+    use 0x7b::M;
+    fun main_0() {
+        let _t0 = M::s();
+        M::take(_t0);
+        let _t1 = M::s();
+        M::take(_t1);
+        let _t2 = M::s();
+        M::take(_t2);
+        let _t3 = M::s();
+        M::take(_t3);
+    }
+}
+
+============ recompilation succeeded ========

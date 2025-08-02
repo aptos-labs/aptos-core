@@ -38,26 +38,26 @@ module 0x8675309::M {
     fun t0() {
         {
             let x = 0;
-            x
+            x;
         };
         {
             let x = 0;
-            &x
+            &x;
         };
         {
             let y = 0;
-            &mut (y + 1)
+            &mut (y + 1);
         };
         R{} = {
             let r = {
                 let r = R{};
                 r
             };
-            r
+            r;
         };
         {
             let x = 0;
-            (x, false)
+            (x, false);
         };
     }
 }

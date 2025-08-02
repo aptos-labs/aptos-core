@@ -1,0 +1,16 @@
+module 0x42::m {
+    struct S<T> has drop {
+        x: T,
+    }
+    fun id<T>(self: S<T>): S<T> {
+        self
+    }
+    fun inlined<T: drop>(f: |S<T>|(S<T>), s: S<T>) {
+        let _t4 = f(s);
+    }
+    fun test_receiver_inference(s: S<u64>) {
+        inlined<u64>(|arg0| id(arg0), s);
+    }
+}
+
+============ recompilation succeeded ========

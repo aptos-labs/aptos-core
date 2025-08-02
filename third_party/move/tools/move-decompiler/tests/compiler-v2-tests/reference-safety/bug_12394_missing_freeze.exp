@@ -1,0 +1,25 @@
+module 0x815::m {
+    fun bar(x: &u64): &u64 {
+        x
+    }
+    fun foo(x: &mut u64): &u64 {
+        *x = 2;
+        freeze(x)
+    }
+    public fun foobar(x: u64): u64 {
+        let _t2 = foo(&mut x);
+        let _t3 = bar(_t2);
+        *_t3
+    }
+    fun t2(u1: &mut u64, u2: &mut u64): (&mut u64, &mut u64) {
+        (u1, u2)
+    }
+    fun test_4() {
+        let (_t8,_t9) = t2(&mut 3, &mut 4);
+    }
+    fun test_5() {
+        let (_t8,_t9) = t2(&mut 3, &mut 4);
+    }
+}
+
+============ recompilation succeeded ========

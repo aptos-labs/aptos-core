@@ -1,0 +1,20 @@
+module 0x7b::M {
+    struct S {
+    }
+    public fun bar(): S {
+        S{}
+    }
+    public fun nop() {
+        ()
+    }
+}
+module 0x7b::N {
+    use 0x7b::M;
+    fun foo(): M::S {
+        M::nop();
+        let _t0 = M::bar();
+        _t0
+    }
+}
+
+============ recompilation succeeded ========

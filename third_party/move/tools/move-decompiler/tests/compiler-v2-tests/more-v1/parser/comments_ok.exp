@@ -1,0 +1,16 @@
+module 0x8675309::M {
+    fun f() {
+        ()
+    }
+    fun g() {
+        ()
+    }
+    fun h() {
+        ()
+    }
+    fun str(): vector<u8> {
+        vector[104u8, 116u8, 116u8, 112u8, 58u8, 47u8, 47u8, 100u8, 105u8, 101u8, 109u8, 46u8, 99u8, 111u8, 109u8]
+    }
+}
+
+============ recompilation succeeded ========

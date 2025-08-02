@@ -1,0 +1,143 @@
+module 0x42::M {
+    struct Box<T> has copy, drop, store, key {
+        f: T,
+    }
+    struct Pair<T1, T2> has copy, drop, store, key {
+        f1: T1,
+        f2: T2,
+    }
+    struct R has store, key {
+    }
+    struct S has copy, drop, store, key {
+    }
+    struct Sc<phantom T: copy> {
+    }
+    struct Scds<phantom T: copy + drop + store> {
+    }
+    struct Sd<phantom T: drop> {
+    }
+    struct Sk<phantom T: key> {
+    }
+    struct Ss<phantom T: store> {
+    }
+    struct Ssk<phantom T: store + key> {
+    }
+    fun d<T: drop>() {
+        ()
+    }
+    fun c<T: copy>() {
+        ()
+    }
+    fun cds<T: copy + drop + store>() {
+        ()
+    }
+    fun k<T: key>() {
+        ()
+    }
+    fun s<T: store>() {
+        ()
+    }
+    fun sk<T: store + key>() {
+        ()
+    }
+    fun t1<Tc: copy, Td: drop, Ts: store, Tk: key, Tcd: copy + drop, Tcs: copy + store, Tds: drop + store, Tsk: store + key, Tcds: copy + drop + store>() {
+        c<u64>();
+        d<signer>();
+        s<bool>();
+        cds<address>();
+        c<vector<u64>>();
+        d<vector<signer>>();
+        s<vector<bool>>();
+        cds<vector<address>>();
+        let Sc<u64>{} = Sc<u64>{};
+        let Sd<signer>{} = Sd<signer>{};
+        let Ss<bool>{} = Ss<bool>{};
+        let Scds<address>{} = Scds<address>{};
+        let Sc<vector<u64>>{} = Sc<vector<u64>>{};
+        let Sd<vector<signer>>{} = Sd<vector<signer>>{};
+        let Ss<vector<bool>>{} = Ss<vector<bool>>{};
+        let Scds<vector<address>>{} = Scds<vector<address>>{};
+        c<Tc>();
+        c<Tcd>();
+        c<Tcs>();
+        c<Tcds>();
+        d<Td>();
+        d<Tcd>();
+        d<Tds>();
+        d<Tcds>();
+        s<Ts>();
+        s<Tcs>();
+        s<Tds>();
+        s<Tsk>();
+        s<Tcds>();
+        k<Tk>();
+        k<Tsk>();
+        sk<Tsk>();
+        cds<Tcds>();
+        let Sc<Tc>{} = Sc<Tc>{};
+        let Sc<Tcd>{} = Sc<Tcd>{};
+        let Sc<Tcs>{} = Sc<Tcs>{};
+        let Sc<Tcds>{} = Sc<Tcds>{};
+        let Sd<Td>{} = Sd<Td>{};
+        let Sd<Tcd>{} = Sd<Tcd>{};
+        let Sd<Tds>{} = Sd<Tds>{};
+        let Sd<Tcds>{} = Sd<Tcds>{};
+        let Ss<Ts>{} = Ss<Ts>{};
+        let Ss<Tcs>{} = Ss<Tcs>{};
+        let Ss<Tds>{} = Ss<Tds>{};
+        let Ss<Tsk>{} = Ss<Tsk>{};
+        let Ss<Tcds>{} = Ss<Tcds>{};
+        let Sk<Tk>{} = Sk<Tk>{};
+        let Sk<Tsk>{} = Sk<Tsk>{};
+        let Ssk<Tsk>{} = Ssk<Tsk>{};
+        let Scds<Tcds>{} = Scds<Tcds>{};
+        c<S>();
+        c<Box<S>>();
+        c<Pair<Box<S>, S>>();
+        d<S>();
+        d<Box<S>>();
+        d<Pair<Box<S>, S>>();
+        s<S>();
+        s<R>();
+        s<Box<S>>();
+        s<Box<R>>();
+        s<Pair<Box<S>, S>>();
+        s<Pair<R, Box<Pair<R, S>>>>();
+        k<R>();
+        k<Box<R>>();
+        k<Pair<R, Box<R>>>();
+        k<Pair<R, Box<Pair<R, S>>>>();
+        sk<R>();
+        sk<Box<R>>();
+        sk<Pair<R, Box<R>>>();
+        sk<Pair<R, Box<Pair<R, S>>>>();
+        cds<S>();
+        cds<Box<S>>();
+        cds<Pair<Box<S>, S>>();
+        let Sc<S>{} = Sc<S>{};
+        let Sc<Box<S>>{} = Sc<Box<S>>{};
+        let Sc<Pair<Box<S>, S>>{} = Sc<Pair<Box<S>, S>>{};
+        let Sd<S>{} = Sd<S>{};
+        let Sd<Box<S>>{} = Sd<Box<S>>{};
+        let Sd<Pair<Box<S>, S>>{} = Sd<Pair<Box<S>, S>>{};
+        let Ss<S>{} = Ss<S>{};
+        let Ss<R>{} = Ss<R>{};
+        let Ss<Box<S>>{} = Ss<Box<S>>{};
+        let Ss<Box<R>>{} = Ss<Box<R>>{};
+        let Ss<Pair<Box<S>, S>>{} = Ss<Pair<Box<S>, S>>{};
+        let Ss<Pair<R, Box<Pair<R, S>>>>{} = Ss<Pair<R, Box<Pair<R, S>>>>{};
+        let Sk<R>{} = Sk<R>{};
+        let Sk<Box<R>>{} = Sk<Box<R>>{};
+        let Sk<Pair<R, Box<R>>>{} = Sk<Pair<R, Box<R>>>{};
+        let Sk<Pair<R, Box<Pair<R, S>>>>{} = Sk<Pair<R, Box<Pair<R, S>>>>{};
+        let Ssk<R>{} = Ssk<R>{};
+        let Ssk<Box<R>>{} = Ssk<Box<R>>{};
+        let Ssk<Pair<R, Box<R>>>{} = Ssk<Pair<R, Box<R>>>{};
+        let Ssk<Pair<R, Box<Pair<R, S>>>>{} = Ssk<Pair<R, Box<Pair<R, S>>>>{};
+        let Scds<S>{} = Scds<S>{};
+        let Scds<Box<S>>{} = Scds<Box<S>>{};
+        let Scds<Pair<Box<S>, S>>{} = Scds<Pair<Box<S>, S>>{};
+    }
+}
+
+============ recompilation succeeded ========

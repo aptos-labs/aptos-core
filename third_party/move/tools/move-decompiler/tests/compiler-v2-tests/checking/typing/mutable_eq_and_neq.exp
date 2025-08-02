@@ -1,0 +1,39 @@
+module 0x8675309::M {
+    struct B {
+        f: bool,
+    }
+    struct P {
+        b1: B,
+        b2: B,
+    }
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun t(r1: &mut u64, r2: &mut u64, s: &mut S) {
+        let _t7 = freeze(r1) == freeze(r1);
+        let _t12 = freeze(r1) == freeze(r2);
+        let _t17 = freeze(r2) == freeze(r2);
+        let _t22 = freeze(r2) == freeze(r2);
+        let _t27 = freeze(r1) != freeze(r1);
+        let _t32 = freeze(r1) != freeze(r2);
+        let _t37 = freeze(r2) != freeze(r2);
+        let _t42 = freeze(r2) != freeze(r2);
+        let _t49 = freeze(&mut s.f) == freeze(&mut s.f);
+        let _t56 = freeze(&mut s.f) == freeze(&mut s.g);
+        let _t63 = freeze(&mut s.g) == freeze(&mut s.f);
+        let _t70 = freeze(&mut s.g) == freeze(&mut s.g);
+        let _t77 = freeze(&mut s.f) != freeze(&mut s.f);
+        let _t84 = freeze(&mut s.f) != freeze(&mut s.g);
+        let _t91 = freeze(&mut s.g) != freeze(&mut s.f);
+        let _t98 = freeze(&mut s.g) != freeze(&mut s.g);
+    }
+    fun t1(p: &mut P) {
+        *&mut (&mut p.b1).f = freeze(&mut p.b1) == freeze(&mut p.b2);
+    }
+    fun t2(p: &mut P) {
+        *&mut (&mut p.b1).f = freeze(&mut p.b1) != freeze(&mut p.b2);
+    }
+}
+
+============ recompilation succeeded ========

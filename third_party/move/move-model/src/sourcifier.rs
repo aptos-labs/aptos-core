@@ -29,15 +29,18 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Sourcifier<'a> {
     builder: ExpBuilder<'a>,
     writer: CodeWriter,
+    // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names)
+    amend: bool,
 }
 
 impl<'a> Sourcifier<'a> {
     /// Creates a new sourcifier.
-    pub fn new(env: &'a GlobalEnv) -> Self {
+    pub fn new(env: &'a GlobalEnv, amend: bool) -> Self {
         Self {
             builder: ExpBuilder::new(env),
             // Location not used, but required by the constructor
             writer: CodeWriter::new(env.unknown_loc()),
+            amend,
         }
     }
 
@@ -95,28 +98,38 @@ impl<'a> Sourcifier<'a> {
     /// as a parameter.
     pub fn print_fun(&self, fun_id: QualifiedId<FunId>, def: Option<&Exp>) {
         let fun_env = self.env().get_function(fun_id);
-        match fun_env.visibility() {
-            Visibility::Private => {},
-            Visibility::Public => {
-                emit!(self.writer, "public ")
-            },
-            Visibility::Friend => {
-                emit!(self.writer, "friend ")
-            },
+        if !fun_env.module_env.is_script_module() {
+            if !fun_env.get_attributes().is_empty() {
+                self.print_list("#[", ", ", "]", fun_env.get_attributes().iter(), |attr| {
+                    emit!(self.writer, "{}", self.sym(attr.name()))
+                });
+                emit!(self.writer, " ");
+            }
+
+            match fun_env.visibility() {
+                Visibility::Private => {},
+                Visibility::Public => {
+                    emit!(self.writer, "public ")
+                },
+                Visibility::Friend => {
+                    emit!(self.writer, "friend ")
+                },
+            }
+            if fun_env.is_entry() {
+                emit!(self.writer, "entry ")
+            }
+            if fun_env.is_native() {
+                emit!(self.writer, "native ")
+            }
+            if fun_env.is_inline() {
+                emit!(self.writer, "inline ")
+            }
         }
-        if fun_env.is_entry() {
-            emit!(self.writer, "entry ")
-        }
-        if fun_env.is_native() {
-            emit!(self.writer, "native ")
-        }
-        if fun_env.is_inline() {
-            emit!(self.writer, "inline ")
-        }
+
         emit!(
             self.writer,
             "fun {}{}",
-            self.sym(fun_env.get_name()),
+            Self::amend_fun_name(self.sym(fun_env.get_name()), self.amend),
             self.type_params(fun_env.get_type_parameters_ref())
         );
         let tctx = fun_env.get_type_display_ctx();
@@ -142,7 +155,7 @@ impl<'a> Sourcifier<'a> {
         if let Some(def) = def {
             // A sequence or block is already automatically printed in braces with indent
             let requires_braces = !Self::is_braced(def);
-            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, def);
+            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, def, self.amend);
             if requires_braces {
                 self.print_block(|| {
                     if !def.is_unit_exp() {
@@ -157,6 +170,21 @@ impl<'a> Sourcifier<'a> {
         } else {
             emitln!(self.writer, ";");
         }
+    }
+
+    /// Amend function name to be recompilable
+    fn amend_fun_name(mut fun: String, amend: bool) -> String {
+        // amend lambda function names
+        if amend {
+            if fun.starts_with("__lambda") {
+                fun = fun.replacen("__", "", 1);
+            }
+            // amend script entry function name
+            if fun.starts_with("<SELF>_") {
+                fun = fun.replacen("<SELF>_", "main_", 1);
+            }
+        }
+        fun
     }
 
     fn is_braced(exp: &Exp) -> bool {
@@ -237,7 +265,7 @@ impl<'a> Sourcifier<'a> {
 
     pub fn print_value(&self, value: &Value, ty: Option<&Type>) {
         match value {
-            Value::Address(address) => emit!(self.writer, "{}", self.env().display(address)),
+            Value::Address(address) => emit!(self.writer, "@{}", self.env().display(address)),
             Value::Number(int) => {
                 emit!(self.writer, "{}", int);
                 if let Some(Type::Primitive(prim)) = ty {
@@ -282,7 +310,7 @@ impl<'a> Sourcifier<'a> {
             },
             Value::AddressArray(addresses) => {
                 self.print_list("vector[", ", ", "]", addresses.iter(), |address| {
-                    emit!(self.writer, "{}", self.env().display(address))
+                    emit!(self.writer, "@{}", self.env().display(address))
                 })
             },
         }
@@ -356,10 +384,37 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn field(&self, tctx: &TypeDisplayContext, field: &FieldEnv) -> String {
+        let mut tctx = tctx.clone();
+        // If the field is a struct defined in a different module with name identical to the parent struct, e.g.,
+        //    ```Move
+        //    use 0x2::X;
+        //    struct X {
+        //        f: X::S,
+        //    }
+        //    ```
+        // we need to force to print out the module address (i.e., `f: X::S` -> `f: 0x2::X::S`).
+        if let Type::Struct(field_mid, _, _) = field.get_type() {
+            let sym_pool = self.env().symbol_pool();
+            // Get the module id defining the field struct
+            let field_mname = self
+                .env()
+                .get_module(field_mid)
+                .get_name()
+                .display(self.env())
+                .to_string();
+            // Get the module id of the parent struct
+            let parent_mid = field.struct_env.module_env.get_id();
+            // Get the name of the parent struct
+            let parent_sname = field.struct_env.get_name().display(sym_pool).to_string();
+            // Check if the conditions above are met
+            if parent_mid != field_mid && parent_sname == field_mname {
+                tctx.display_module_addr = true;
+            }
+        }
         format!(
             "{}: {}",
             self.sym(field.get_name()),
-            field.get_type().display(tctx)
+            field.get_type().display(&tctx).to_string()
         )
     }
 
@@ -392,7 +447,14 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn sym(&self, sym: Symbol) -> String {
-        sym.display(self.env().symbol_pool()).to_string()
+        let mut sym_str = sym.display(self.env().symbol_pool()).to_string();
+        // Replace the `invalid` characters so that the generated code is recompilable.
+        if self.amend {
+            for ch in ['$'] {
+                sym_str = sym_str.replace(ch, "_");
+            }
+        }
+        sym_str
     }
 
     fn print_block(&self, content_printer: impl Fn()) {
@@ -438,6 +500,7 @@ pub struct ExpSourcifier<'a> {
     loop_labels: BTreeMap<NodeId, Symbol>,
     // A mapping from node-id if `break` or `continue` to associated label, if one is needed.
     cont_labels: BTreeMap<NodeId, Symbol>,
+    amend: bool,
 }
 
 /// Helper type to split blocks and sequences into vector of items
@@ -475,12 +538,17 @@ mod Prio {
 
 impl<'a> ExpSourcifier<'a> {
     /// Creates a sourcifier for the given expression in the context of the function
-    pub fn for_fun(parent: &'a Sourcifier<'a>, fun_env: &'a FunctionEnv, exp: &Exp) -> Self {
+    pub fn for_fun(
+        parent: &'a Sourcifier<'a>,
+        fun_env: &'a FunctionEnv,
+        exp: &Exp,
+        amend: bool,
+    ) -> Self {
         let type_display_context = fun_env.get_type_display_ctx();
         let temp_names = (0..fun_env.get_parameter_count())
             .map(|i| (i, fun_env.get_local_name(i)))
             .collect();
-        Self::new(parent, type_display_context, temp_names, exp)
+        Self::new(parent, type_display_context, temp_names, exp, amend)
     }
 
     fn new(
@@ -488,6 +556,7 @@ impl<'a> ExpSourcifier<'a> {
         type_display_context: TypeDisplayContext<'a>,
         temp_names: BTreeMap<TempIndex, Symbol>,
         for_exp: &Exp,
+        amend: bool,
     ) -> Self {
         let (_, cont_to_loop) = for_exp.compute_loop_bindings();
         let mut loop_labels = BTreeMap::new();
@@ -518,6 +587,7 @@ impl<'a> ExpSourcifier<'a> {
             temp_names,
             loop_labels,
             cont_labels,
+            amend,
         }
     }
 
@@ -547,7 +617,7 @@ impl<'a> ExpSourcifier<'a> {
                         emit!(self.wr(), "{} ", capture_kind);
                     };
                     emit!(self.wr(), "|");
-                    self.print_pat(pat);
+                    self.print_pat(pat, self.amend);
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
                     if let Some(spec) = spec_opt {
@@ -586,18 +656,25 @@ impl<'a> ExpSourcifier<'a> {
                                         } else {
                                             self.print_exp(Prio::General, last && is_result, stm);
                                             if last {
+                                                // Do not forget the last semicolon if no result is expected
+                                                if !is_result {
+                                                    emit!(self.wr(), ";")
+                                                }
                                                 emitln!(self.wr())
                                             }
                                         }
                                     }
                                     LetOrStm::Let(pat, binding) => {
                                         emit!(self.wr(), "let ");
-                                        self.print_pat(pat);
+                                        self.print_pat(pat, false);
                                         if let Some(exp) = binding {
                                             emit!(self.wr(), " = ");
-                                            self.print_exp(Prio::General, is_result, exp);
+                                            self.print_exp(Prio::General, matches!(exp.as_ref(), Block(..) | Sequence(..)), exp);
                                         }
                                         if last {
+                                            if !is_result {
+                                                    emit!(self.wr(), ";")
+                                            }
                                             emitln!(self.wr())
                                         }
                                     }
@@ -635,7 +712,7 @@ impl<'a> ExpSourcifier<'a> {
                 emitln!(self.wr(), ") {");
                 self.wr().indent();
                 for arm in arms {
-                    self.print_pat(&arm.pattern);
+                    self.print_pat(&arm.pattern, false);
                     if let Some(exp) = &arm.condition {
                         emit!(self.wr(), " if ");
                         self.print_exp(Prio::General, false, exp);
@@ -747,16 +824,18 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, val)
             }),
             Assign(_, pat, val) => self.parenthesize(context_prio, Prio::General, || {
-                self.print_pat(pat);
+                self.print_pat(pat, false);
                 emit!(self.wr(), " = ");
-                self.print_exp(Prio::General, false, val)
+                self.print_exp(Prio::General, matches!(exp.as_ref(), Block(..) | Sequence(..)), val);
             }),
             Mutate(_, lhs, rhs) => self.parenthesize(context_prio, Prio::General, || {
-                if matches!(
-                    lhs.as_ref(),
-                    Call(_, Operation::Select(..) | Operation::SelectVariants(..), _)
-                ) {
-                    // No deref required
+                if let Call(inner_id, Operation::Select(..) | Operation::SelectVariants(..), _) =
+                    lhs.as_ref()
+                {
+                    let result_ty = self.env().get_node_type(*inner_id);
+                    if result_ty.is_mutable_reference() {
+                        emit!(self.wr(), "*");
+                    }
                     self.print_exp(Prio::General, false, lhs);
                     emit!(self.wr(), " = ");
                     self.print_exp(Prio::General, false, rhs)
@@ -785,6 +864,13 @@ impl<'a> ExpSourcifier<'a> {
         })
     }
 
+    fn print_rev_exp_list(&self, open: &str, close: &str, exps: &[Exp]) {
+        self.parent
+            .print_list(open, ", ", close, exps.iter().rev(), |e| {
+                self.print_exp(Prio::General, false, e)
+            })
+    }
+
     fn print_call(&self, context_prio: Priority, id: NodeId, oper: &Operation, args: &[Exp]) {
         match oper {
             Operation::MoveFunction(mid, fid) => {
@@ -794,10 +880,10 @@ impl<'a> ExpSourcifier<'a> {
                         self.wr(),
                         "{}{}",
                         self.module_qualifier(*mid),
-                        self.sym(fun_env.get_name())
+                        Sourcifier::amend_fun_name(self.sym(fun_env.get_name()), self.amend)
                     );
                     self.print_node_inst(id);
-                    self.print_exp_list("(", ")", args)
+                    self.print_exp_list("(", ")", args);
                 })
             },
             Operation::Closure(mid, fid, mask) => {
@@ -865,33 +951,49 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::Tuple => self.print_exp_list("(", ")", args),
             Operation::Select(mid, sid, fid) => {
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                    let field_env = struct_env.get_field(*fid);
-                    let result_ty = self.env().get_node_type(id);
+                let struct_env = self.env().get_module(*mid).into_struct(*sid);
+                let field_env = struct_env.get_field(*fid);
+                let result_ty = self.env().get_node_type(id);
+                let given_prio = if result_ty.is_reference() {
+                    Prio::Prefix
+                } else {
+                    Prio::Postfix
+                };
+                self.parenthesize(context_prio, given_prio, || {
+                    let mut context_prio = Prio::Prefix;
                     if result_ty.is_immutable_reference() {
-                        emit!(self.wr(), "&")
+                        emit!(self.wr(), "&");
+                        context_prio = Prio::Postfix;
                     } else if result_ty.is_mutable_reference() {
-                        emit!(self.wr(), "&mut ")
+                        emit!(self.wr(), "&mut ");
+                        context_prio = Prio::Postfix;
                     }
-                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    self.print_exp(context_prio, false, &args[0]);
                     emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
             Operation::SelectVariants(mid, sid, fids) => {
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                    // All field names are the same, so we can choose one representative
-                    // on source level.
-                    let fid = fids[0];
-                    let field_env = struct_env.get_field(fid);
-                    let result_ty = self.env().get_node_type(id);
+                let struct_env = self.env().get_module(*mid).into_struct(*sid);
+                // All field names are the same, so we can choose one representative
+                // on source level.
+                let fid = fids[0];
+                let field_env = struct_env.get_field(fid);
+                let result_ty = self.env().get_node_type(id);
+                let given_prio = if result_ty.is_reference() {
+                    Prio::Prefix
+                } else {
+                    Prio::Postfix
+                };
+                self.parenthesize(context_prio, given_prio, || {
+                    let mut context_prio = Prio::Prefix;
                     if result_ty.is_immutable_reference() {
-                        emit!(self.wr(), "&")
+                        emit!(self.wr(), "&");
+                        context_prio = Prio::Postfix;
                     } else if result_ty.is_mutable_reference() {
-                        emit!(self.wr(), "&mut ")
+                        emit!(self.wr(), "&mut ");
+                        context_prio = Prio::Postfix;
                     }
-                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    self.print_exp(context_prio, false, &args[0]);
                     emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
@@ -934,16 +1036,21 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), "abort ");
                 self.print_exp(Prio::General, false, &args[0])
             }),
-            Operation::Freeze(_) => {
-                emit!(self.wr(), "/*freeze*/");
-                self.print_exp(context_prio, false, &args[0])
+            Operation::Freeze(explicit) => {
+                if *explicit {
+                    self.print_exp_list("freeze(", ")", &args[0..1]);
+                } else {
+                    emit!(self.wr(), "/*freeze*/");
+                    self.print_exp(context_prio, false, &args[0]);
+                }
             },
             Operation::Not => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "!");
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
             Operation::Cast => self.parenthesize(context_prio, Prio::General, || {
-                self.print_exp(Prio::General, false, &args[0]);
+                // We take `as` as a postfix operator, to enforce a parenthesis around LHS as needed
+                self.print_exp(Prio::Postfix, false, &args[0]);
                 let ty = self.env().get_node_type(id);
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
@@ -964,7 +1071,7 @@ impl<'a> ExpSourcifier<'a> {
             Operation::MoveTo => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "move_to");
                 self.print_node_inst(id);
-                self.print_exp_list("(", ")", args)
+                self.print_rev_exp_list("(", ")", args)
             }),
             Operation::MoveFrom => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "move_from");
@@ -977,7 +1084,7 @@ impl<'a> ExpSourcifier<'a> {
                 } else {
                     emit!(self.wr(), "&")
                 }
-                self.print_exp(Prio::Prefix, false, &args[0])
+                self.print_exp(Prio::Postfix, false, &args[0])
             }),
             Operation::Deref => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "*");
@@ -1120,15 +1227,32 @@ impl<'a> ExpSourcifier<'a> {
         }
     }
 
-    fn print_pat(&self, pat: &Pattern) {
+    fn print_pat(&self, pat: &Pattern, no_parenthesize: bool) {
         match pat {
-            Pattern::Var(_, name) => emit!(self.wr(), "{}", self.sym(*name)),
+            Pattern::Var(node_id, name) => {
+                emit!(self.wr(), "{}", self.sym(*name));
+                let ty = self.env().get_node_type(*node_id);
+                if let Type::Fun(_, _, ability) = ty {
+                    if !ability.is_empty() {
+                        emit!(self.wr(), " : {}", self.ty(&ty));
+                    }
+                }
+            },
             Pattern::Wildcard(_) => emit!(self.wr(), "_"),
-            Pattern::Tuple(_, elems) => self
-                .parent
-                .print_list("(", ",", ")", elems.iter(), |p| self.print_pat(p)),
+            Pattern::Tuple(_, elems) => {
+                let (start, end) = if !no_parenthesize {
+                    ("(", ")")
+                } else {
+                    ("", "")
+                };
+                self.parent.print_list(start, ",", end, elems.iter(), |p| {
+                    self.print_pat(p, no_parenthesize)
+                })
+            },
             Pattern::Struct(_, qid, variant, elems) => {
-                self.print_constructor(qid, variant, elems.iter(), |p| self.print_pat(p))
+                self.print_constructor(qid, variant, elems.iter(), |p| {
+                    self.print_pat(p, no_parenthesize)
+                })
             },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),
         }

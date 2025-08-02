@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    struct Coin {
+    }
+    fun foo(c: Coin) {
+        let Coin{} = c;
+    }
+    fun t0() {
+        abort 0
+    }
+    fun t1() {
+        abort 0
+    }
+}
+
+============ recompilation succeeded ========

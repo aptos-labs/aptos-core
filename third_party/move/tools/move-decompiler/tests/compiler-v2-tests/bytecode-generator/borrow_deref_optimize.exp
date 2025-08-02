@@ -1,0 +1,23 @@
+module 0x42::test {
+    struct X has copy, drop, key {
+        value: bool,
+    }
+    fun no_optimize_resource(): bool {
+        let _t2 = borrow_global<X>(@0x1);
+        *&(&mut (*_t2)).value
+    }
+    fun no_optimize_vector() {
+        let _t6 = 0x1::vector::borrow<vector<u64>>(&vector[vector[1, 2]], 0);
+        let _t10 = 0x1::vector::borrow_mut<u64>(&mut (*_t6), 1);
+    }
+    fun optimize_resource(): bool {
+        let _t1 = borrow_global<X>(@0x1);
+        *&_t1.value
+    }
+    fun optimize_vector() {
+        let _t5 = 0x1::vector::borrow_mut<vector<u64>>(&mut vector[vector[1, 2]], 0);
+        let _t7 = 0x1::vector::borrow_mut<u64>(_t5, 1);
+    }
+}
+
+============ recompilation succeeded ========

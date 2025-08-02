@@ -1,0 +1,12 @@
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    fun t1(root: &mut S, cond: bool) {
+        let _t3;
+        if (cond) _t3 = &0 else _t3 = &root.f;
+        let _t9 = *_t3;
+    }
+}
+
+============ recompilation succeeded ========

@@ -86,8 +86,8 @@ module 0x12391283::M {
                     let (elem) = (e);
                     accu = {
                         let (sum,addend) = (accu, elem);
-                        sum + (addend as u64)
-                    }
+                        sum + (addend as u64);
+                    };
                 };
             };
         };
@@ -106,8 +106,8 @@ module 0x12391283::M {
                     let (elem) = (e);
                     accu = {
                         let (sum,addend) = (accu, elem);
-                        sum + (addend as u64)
-                    }
+                        sum + (addend as u64);
+                    };
                 };
             };
         };

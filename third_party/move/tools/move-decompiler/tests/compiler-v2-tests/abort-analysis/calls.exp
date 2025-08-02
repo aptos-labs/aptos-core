@@ -1,0 +1,10 @@
+module 0x42::test {
+    fun nothing() {
+        ()
+    }
+    fun test0() {
+        nothing();
+    }
+}
+
+============ recompilation succeeded ========

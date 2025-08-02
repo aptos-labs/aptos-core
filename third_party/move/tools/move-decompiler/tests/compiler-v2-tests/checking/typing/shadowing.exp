@@ -1,0 +1,17 @@
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        b: bool,
+    }
+    fun t0() {
+        ()
+    }
+    fun t1(cond: bool) {
+        if (!cond) ();
+    }
+    fun t2() {
+        let S{f: _t3,b: _t4} = S{f: 0,b: false};
+    }
+}
+
+============ recompilation succeeded ========

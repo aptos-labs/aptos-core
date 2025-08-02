@@ -1,0 +1,53 @@
+module 0x8675::M {
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0() {
+        let _t0 = 0;
+        let _t5 = &mut _t0;
+        let _t1 = &mut _t0;
+        let _t7 = *_t5;
+        let _t9 = *_t1;
+        if (_t0 == 0) _t0 = 3 else _t0 = 2;
+        let _t15 = id_mut<u64>(&mut _t0);
+        let _t17 = *_t15;
+        let _t19 = *&mut _t0;
+        let _t20 = &_t0;
+        let _t2 = &mut _t0;
+        let _t23 = *_t2;
+        let _t24 = *_t20;
+        let _t26 = *_t2;
+        let _t3 = &_t0;
+        let _t30 = *_t3;
+        let _t31 = *&_t0;
+        let _t33 = *_t3;
+        let _t35 = id<u64>(&_t0);
+        _t3 = _t35;
+        let _t38 = *_t3;
+        let _t39 = *&_t0;
+        let _t41 = *_t3;
+    }
+    fun test1(r: u64): u64 {
+        let _t2 = 0;
+        while (r > 0) {
+            r = r - 1;
+            _t2 = _t2 + r;
+        };
+        r + r + _t2
+    }
+    fun test1a(x: u64, r: &u64): u64 {
+        let _t2 = *r;
+        let _t3 = r;
+        while (x > 0) x = x - *_t3;
+        *r + _t2 + (x + 3 + x) + _t2
+    }
+}
+
+============ recompilation succeeded ========

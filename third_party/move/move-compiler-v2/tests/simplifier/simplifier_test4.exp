@@ -60,25 +60,25 @@ module 0x8675309::M {
             &mut {
                 x = x + 1;
                 z;
-                s
+                s;
             }.f
         };
         if (z == 1) {
             x = x + 1;
-            foo(/*freeze*/s, {
+            foo(freeze(s), {
                 *{
                     x = x + 1;
-                    f
+                    f;
                 } = 0;
-                1
-            })
+                1;
+            });
         } else x = x + 1;
         if (x == 4) () else abort 0;
     }
     fun t1(s: &mut S) {
         bar(&mut s.f, {
             s.f = 0;
-            1
+            1;
         })
     }
 }

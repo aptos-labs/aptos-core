@@ -1,0 +1,22 @@
+module 0x8675309::M {
+    fun t0() {
+        ()
+    }
+    fun t1() {
+        ()
+    }
+    fun t2(cond: bool) {
+        ()
+    }
+    fun t3(cond: bool) {
+        if (!cond) ();
+    }
+    fun t4(cond: bool) {
+        if (!cond) ();
+    }
+    fun t5(cond: bool) {
+        while (cond) if (cond) continue;
+    }
+}
+
+============ recompilation succeeded ========

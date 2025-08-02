@@ -29,9 +29,9 @@ module 0x815::test {
         'l0: loop {
             loop 'l1: loop if (true) loop {
                 if (false) continue 'l0 else break 'l1;
-                break
+                break;
             } else continue 'l0;
-            break
+            break;
         }
     }
 }

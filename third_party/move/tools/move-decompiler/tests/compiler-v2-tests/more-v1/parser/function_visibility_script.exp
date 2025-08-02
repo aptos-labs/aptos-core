@@ -1,0 +1,13 @@
+module 0x8675309::M {
+    public entry fun f() {
+        ()
+    }
+    public entry fun g() {
+        ()
+    }
+    public entry fun h() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

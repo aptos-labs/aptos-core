@@ -1,0 +1,10 @@
+module 0xdecafbad::m {
+    public fun one() {
+        ()
+    }
+    public fun two(x: u64): u64 {
+        x
+    }
+}
+
+============ recompilation succeeded ========

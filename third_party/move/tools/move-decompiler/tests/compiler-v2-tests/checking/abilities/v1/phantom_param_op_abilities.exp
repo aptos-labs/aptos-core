@@ -1,0 +1,46 @@
+module 0x42::M {
+    struct HasCopy<phantom T1, T2> has copy {
+        a: T2,
+    }
+    struct HasDrop<phantom T1, T2> has drop {
+        a: T2,
+    }
+    struct HasKey<phantom T1, T2> has key {
+        a: T2,
+    }
+    struct HasStore<phantom T1, T2> has store {
+        a: T2,
+    }
+    struct NoAbilities {
+    }
+    struct RequireStore<T: store> {
+        a: T,
+    }
+    fun f1(ref: &mut HasDrop<NoAbilities, u64>) {
+        *ref = HasDrop<NoAbilities,u64>{a: 1};
+    }
+    fun f2() {
+        let _t1 = HasDrop<NoAbilities,u64>{a: 1};
+    }
+    fun f3(_x: HasDrop<NoAbilities, u64>) {
+        ()
+    }
+    fun f4(x: HasCopy<NoAbilities, u64>): (HasCopy<NoAbilities, u64>, HasCopy<NoAbilities, u64>) {
+        (x, x)
+    }
+    fun f5(s: &signer, x: HasKey<NoAbilities, u64>) {
+        move_to<HasKey<NoAbilities, u64>>(s, x);
+    }
+    fun f6(): HasKey<NoAbilities, u64> {
+        let _t1 = move_from<HasKey<NoAbilities, u64>>(@0x0);
+        _t1
+    }
+    fun f7(): bool {
+        exists<HasKey<NoAbilities, u64>>(@0x0)
+    }
+    fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
+        RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities,u64>{a: 1}}
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,36 @@
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    fun bar(s: &mut S): &mut S {
+        s
+    }
+    fun baz(): S {
+        S{f: 0}
+    }
+    fun foo(x: &mut u64): &mut u64 {
+        x
+    }
+    fun t0() {
+        *&mut 0 = 1;
+        *&mut (&mut S{f: 0}).f = 1;
+        let _t18 = foo(&mut 0);
+        *_t18 = 1;
+        let _t23 = bar(&mut S{f: 0});
+        *&mut _t23.f = 1;
+        let _t29 = bar(&mut S{f: 0});
+        *&mut _t29.f = 1;
+        let _t32 = baz();
+        *&mut (&mut _t32).f = 1;
+        let _t36 = baz();
+        *&mut (&mut _t36).f = 1;
+    }
+    fun t1() {
+        let _t1 = &mut S{f: 0};
+        *_t1 = S{f: 1};
+        *&mut _t1.f = 1;
+        *&mut _t1.f = 1;
+    }
+}
+
+============ recompilation succeeded ========

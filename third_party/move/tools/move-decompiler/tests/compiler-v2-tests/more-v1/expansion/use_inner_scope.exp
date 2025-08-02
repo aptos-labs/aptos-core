@@ -1,0 +1,30 @@
+module 0x2::M {
+    struct S1 has drop {
+        b: bool,
+    }
+    struct S2 has drop {
+        u: u64,
+    }
+    fun t() {
+        let _t0 = check();
+        if (!_t0) ();
+        let _t1 = num();
+        let _t3 = _t1 + 1;
+        let _t5 = S2{u: 0};
+        let _t7 = S1{b: false};
+        let _t8 = check();
+        if (!_t8) ();
+        let _t9 = num();
+        let _t11 = _t9 + 1;
+        let _t13 = S2{u: 0};
+        let _t15 = S1{b: false};
+    }
+    fun check(): bool {
+        false
+    }
+    fun num(): u64 {
+        0
+    }
+}
+
+============ recompilation succeeded ========

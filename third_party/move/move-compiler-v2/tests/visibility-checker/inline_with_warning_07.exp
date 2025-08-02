@@ -133,6 +133,6 @@ module 0xc0ffee::o {
         f: u64,
     }
     public inline fun my_borrow(): &R {
-        borrow_global<R>(0xc0ffee)
+        borrow_global<R>(@0xc0ffee)
     }
 }

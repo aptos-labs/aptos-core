@@ -1,0 +1,11 @@
+module 0x42::mathtest {
+}
+module 0x42::mathtest2 {
+}
+module 0x42::test {
+    fun test_nested_fun1() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

@@ -71,7 +71,7 @@ module 0x8675309::M {
         loop {
             let y = &x;
             _ = move y;
-            x = 0
+            x = 0;
         }
     }
     fun tborrow2(cond: bool) {
@@ -80,7 +80,7 @@ module 0x8675309::M {
             let y = &x;
             _ = move y;
             if (cond) x = 0;
-            break
+            break;
         };
         x;
     }

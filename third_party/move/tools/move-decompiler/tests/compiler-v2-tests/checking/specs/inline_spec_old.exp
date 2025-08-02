@@ -1,0 +1,7 @@
+module 0x42::m {
+    public fun foo(vec: &mut vector<bool>) {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

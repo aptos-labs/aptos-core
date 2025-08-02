@@ -1,0 +1,32 @@
+module 0x42::m {
+    struct T has copy, drop, store {
+        issuer: vector<u8>,
+        version: u64,
+    }
+    struct J has copy, drop, store {
+        variant: u64,
+    }
+    struct S has copy, drop, store {
+        entries: vector<T>,
+    }
+    fun test(s: &mut S, issuer: vector<u8>) {
+        let _t12 = 0x1::vector::length<T>(&s.entries);
+        let _t3 = &s.entries;
+        let _t4 = false;
+        let _t5 = 0;
+        let _t6 = 0;
+        let _t19 = 0x1::vector::length<T>(_t3);
+        let _t21 = 0x1::vector::length<T>(_t3);
+        loop {
+            let _t9;
+            if (!(_t6 < _t21)) break;
+            let _t27 = 0x1::vector::borrow<T>(_t3, _t6);
+            if (*&_t27.issuer == issuer) _t9 = _t12 > 0 else _t9 = false;
+            if (_t9) break;
+            _t6 = _t6 + _t19;
+            continue;
+        };
+    }
+}
+
+============ recompilation succeeded ========

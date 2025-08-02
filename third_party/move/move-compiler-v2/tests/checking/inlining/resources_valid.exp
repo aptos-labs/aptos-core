@@ -47,7 +47,7 @@ module 0x42::token {
     {
         {
             let (ref) = (ref);
-            borrow_global<Token>(objects::get_addr<Token>(ref))
+            borrow_global<Token>(objects::get_addr<Token>(ref));
         }.val
     }
 }

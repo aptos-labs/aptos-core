@@ -1,0 +1,14 @@
+module 0x42::Test {
+    fun foo(g: |u64, u64, u64, u64|(u64), x: u64, y: u64, z: u64, q: u64): u64 {
+        g(x, y, z, q)
+    }
+    public fun test() {
+        let _t5 = foo(|arg0,arg1,arg2,arg3| lambda__1__test(arg0, arg1, arg2, arg3), 10, 100, 1000, 10000);
+        if (!(_t5 == 10100)) abort 0;
+    }
+    fun lambda__1__test(param_0: u64, y: u64, param_2: u64, q: u64): u64 {
+        y + q
+    }
+}
+
+============ recompilation succeeded ========

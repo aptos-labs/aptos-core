@@ -1,0 +1,26 @@
+module 0x815::m {
+    struct MyMap has key {
+        table: Table<address, ValueWrap>,
+    }
+    struct Table<T1, T2> has store {
+        x: T1,
+        y: T2,
+    }
+    struct ValueWrap has drop, store {
+        val: u64,
+    }
+    fun contains<T1: drop, T2: drop>(self: &Table<T1, T2>, _key: T1): bool {
+        true
+    }
+    fun add<T1: drop, T2: drop>(self: &mut Table<T1, T2>, _key: T1, _val: T2) {
+        ()
+    }
+    public fun add_when_missing(key: address, val: u64) {
+        let _t5 = borrow_global_mut<MyMap>(@0x815);
+        let _t2 = _t5;
+        let _t9 = contains<address,ValueWrap>(&_t2.table, key);
+        if (!_t9) add<address,ValueWrap>(&mut _t2.table, key, ValueWrap{val: val});
+    }
+}
+
+============ recompilation succeeded ========

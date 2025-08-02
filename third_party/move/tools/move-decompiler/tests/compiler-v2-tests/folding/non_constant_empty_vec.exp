@@ -1,0 +1,30 @@
+module 0x42::M {
+    struct S {
+    }
+    public fun empty_generic_vec<T>(): vector<T> {
+        let _t0 = 0x1::vector::empty<T>();
+        _t0
+    }
+    public fun empty_generic_vec_vec<T>(): vector<vector<T>> {
+        let _t0 = 0x1::vector::empty<vector<T>>();
+        _t0
+    }
+    public fun empty_signer_vec(): vector<signer> {
+        let _t0 = 0x1::vector::empty<signer>();
+        _t0
+    }
+    public fun empty_signer_vec_vec(): vector<vector<signer>> {
+        let _t0 = 0x1::vector::empty<vector<signer>>();
+        _t0
+    }
+    public fun empty_struct_vec(): vector<S> {
+        let _t0 = 0x1::vector::empty<S>();
+        _t0
+    }
+    public fun empty_struct_vec_vec(): vector<vector<S>> {
+        let _t0 = 0x1::vector::empty<vector<S>>();
+        _t0
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,20 @@
+module 0x42::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    fun t(cond: bool, s1: S, s2: S) {
+        let _t4;
+        let _t3;
+        let _t24;
+        let _t9;
+        let _t27;
+        if (!cond) _t27 = *&(&s2).f;
+        if (cond) _t9 = *&(&s1).f else _t24 = *&(&s2).f;
+        if (cond) _t3 = s1 else _t3 = s2;
+        let _t14 = *&(&_t3).f;
+        if (cond) _t4 = s1 else _t4 = s2;
+        let _t19 = *&(&_t4).f;
+    }
+}
+
+============ recompilation succeeded ========

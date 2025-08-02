@@ -176,7 +176,7 @@ module 0xc0ffee::m {
     }
 }
 module 0xc0ffee::no_warn {
-    public fun test(x: u8) {
+    #[lint::skip] public fun test(x: u8) {
         if (x < 0u8) abort 1;
     }
 }

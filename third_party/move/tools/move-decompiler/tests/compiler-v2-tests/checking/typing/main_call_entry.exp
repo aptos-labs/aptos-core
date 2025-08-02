@@ -1,0 +1,13 @@
+module 0x2::X {
+    public entry fun foo() {
+        ()
+    }
+}
+script {
+    use 0x2::X;
+    fun main_0() {
+        X::foo();
+    }
+}
+
+============ recompilation succeeded ========

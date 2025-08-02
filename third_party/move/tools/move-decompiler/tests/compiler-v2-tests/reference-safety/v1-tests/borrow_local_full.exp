@@ -1,0 +1,38 @@
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0() {
+        let _t0 = 0;
+        let _t5 = &mut _t0;
+        let _t1 = &mut _t0;
+        let _t7 = *_t5;
+        let _t9 = *_t1;
+        let _t11 = id_mut<u64>(&mut _t0);
+        let _t13 = *_t11;
+        let _t15 = *&mut _t0;
+        let _t16 = &_t0;
+        let _t2 = &mut _t0;
+        let _t19 = *_t2;
+        let _t20 = *_t16;
+        let _t22 = *_t2;
+        let _t3 = &_t0;
+        let _t26 = *_t3;
+        let _t27 = *&_t0;
+        let _t29 = *_t3;
+        let _t31 = id<u64>(&_t0);
+        _t3 = _t31;
+        let _t34 = *_t3;
+        let _t35 = *&_t0;
+        let _t37 = *_t3;
+    }
+}
+
+============ recompilation succeeded ========

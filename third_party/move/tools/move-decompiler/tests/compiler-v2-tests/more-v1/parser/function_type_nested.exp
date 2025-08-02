@@ -1,0 +1,16 @@
+module 0x8675309::M {
+    struct B<T> {
+        f: T,
+    }
+    struct R {
+    }
+    fun caller() {
+        fn<B<R>>();
+        fn<B<R>>();
+    }
+    fun fn<T>() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

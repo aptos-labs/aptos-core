@@ -1,0 +1,12 @@
+module 0x42::m {
+    struct Option<Element> has copy, drop, store {
+        vec: vector<Element>,
+    }
+    public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
+        let _t2 = 0x1::vector::length<Element>(&vec);
+        if (_t2 > 1) abort 1;
+        Option<Element>{vec: vec}
+    }
+}
+
+============ recompilation succeeded ========

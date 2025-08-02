@@ -1,0 +1,17 @@
+module 0x2::X {
+    struct R {
+    }
+    struct U {
+    }
+}
+module 0x2::M {
+    use 0x2::X;
+    fun f(u: X::U, r: X::R) {
+        g(u, r);
+    }
+    fun g(u: X::U, r: X::R) {
+        f(u, r);
+    }
+}
+
+============ recompilation succeeded ========

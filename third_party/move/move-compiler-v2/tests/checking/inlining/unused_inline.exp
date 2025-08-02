@@ -48,7 +48,7 @@ module 0xc0ffee::m {
             i = i + 1;
             if (i == 5) {
                 break;
-            }
+            };
         };
         i
     }
@@ -58,7 +58,7 @@ module 0xc0ffee::m {
             i = i + 1;
             if (i == 5) {
                 break;
-            }
+            };
         };
         i
     }

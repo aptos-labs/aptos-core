@@ -1,0 +1,22 @@
+module 0x8675309::M {
+    public fun byte_string(): vector<u8> {
+        vector[68u8, 105u8, 101u8, 109u8]
+    }
+    public fun byte_string_with_escaped_sequence(): vector<u8> {
+        vector[72u8, 101u8, 108u8, 108u8, 111u8, 10u8, 32u8, 100u8, 105u8, 101u8, 109u8, 46u8, 32u8, 10u8, 32u8, 78u8, 101u8, 119u8, 108u8, 105u8, 110u8, 101u8, 59u8, 32u8, 13u8, 32u8, 67u8, 97u8, 114u8, 114u8, 105u8, 97u8, 103u8, 101u8, 32u8, 114u8, 101u8, 116u8, 117u8, 114u8, 110u8, 59u8, 32u8, 9u8, 32u8, 84u8, 97u8, 98u8, 59u8, 32u8, 92u8, 32u8, 66u8, 97u8, 99u8, 107u8, 115u8, 108u8, 97u8, 115u8, 104u8, 59u8, 32u8, 0u8, 32u8, 78u8, 117u8, 108u8, 108u8]
+    }
+    public fun byte_string_with_hex(): vector<u8> {
+        vector[0u8, 1u8, 2u8]
+    }
+    public fun byte_string_with_quotes(): vector<u8> {
+        vector[34u8, 68u8, 105u8, 101u8, 109u8, 34u8]
+    }
+    public fun empty_byte_string(): vector<u8> {
+        vector[]
+    }
+    public fun escaped_backslash_before_quote(): vector<u8> {
+        vector[92u8]
+    }
+}
+
+============ recompilation succeeded ========

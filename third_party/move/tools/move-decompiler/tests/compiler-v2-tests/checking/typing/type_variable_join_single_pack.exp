@@ -1,0 +1,12 @@
+module 0x42::M {
+    struct Box<T> has copy, drop {
+        f1: T,
+        f2: T,
+    }
+    fun t0() {
+        let _t0 = Box<u64>{f1: 0,f2: 1};
+        let _t6 = Box<Box<u64>>{f1: _t0,f2: _t0};
+    }
+}
+
+============ recompilation succeeded ========

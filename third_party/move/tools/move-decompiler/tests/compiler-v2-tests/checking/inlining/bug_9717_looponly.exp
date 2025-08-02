@@ -1,0 +1,20 @@
+module 0xcafe::vectors {
+    public entry fun guess_flips_break2(flips: vector<u8>): u64 {
+        let _t1 = 0;
+        let _t2 = &flips;
+        loop {
+            let _t7 = 0x1::vector::length<u8>(_t2);
+            if (!(_t1 < _t7)) break;
+            let _t11 = 0x1::vector::borrow<u8>(_t2, _t1);
+            if (*_t11 != 0u8) break;
+            _t1 = _t1 + 1;
+            let _t22 = 0x1::vector::borrow<u8>(_t2, _t1);
+            if (!(*_t22 == 5u8)) continue;
+            break;
+        };
+        let _t16 = 0x1::vector::length<u8>(_t2);
+        _t16
+    }
+}
+
+============ recompilation succeeded ========

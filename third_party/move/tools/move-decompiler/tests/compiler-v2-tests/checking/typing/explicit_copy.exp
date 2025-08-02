@@ -1,0 +1,11 @@
+module 0x8675309::M {
+    struct R {
+    }
+    struct S has copy, drop {
+    }
+    fun t() {
+        let _t1 = S{};
+    }
+}
+
+============ recompilation succeeded ========

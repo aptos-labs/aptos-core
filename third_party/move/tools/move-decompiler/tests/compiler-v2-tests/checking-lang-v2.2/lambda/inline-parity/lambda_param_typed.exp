@@ -1,0 +1,42 @@
+module 0x42::LambdaParam {
+    public fun inline_apply(f: |u64|(u64) has drop, b: u64): u64 {
+        f(b)
+    }
+    public fun inline_apply2(f: |u64|(u64) has drop, b: u64): u64 {
+        let _t4 = inline_apply(f, b);
+        _t4
+    }
+    public fun inline_apply3(f: |u64|(u64) has drop, b: u64): u64 {
+        let _t4 = inline_apply4(f, b);
+        _t4
+    }
+    public fun inline_apply4(_f: |u64|(u64) has drop, b: u64): u64 {
+        b
+    }
+    fun test_lambda_symbol_param1() {
+        let _t2 = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param1(arg0), 3);
+        if (!(_t2 == 3)) abort 0;
+    }
+    fun lambda__1__test_lambda_symbol_param1(x: u64): u64 {
+        x
+    }
+    fun test_lambda_symbol_param2() {
+        let _t2 = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param2(arg0), 3);
+        if (!(_t2 == 3)) abort 0;
+        let _t7 = inline_apply(|arg0| lambda__2__test_lambda_symbol_param2(arg0), 3);
+        if (!(_t7 == 3)) abort 0;
+        let _t12 = inline_apply3(|arg0| lambda__3__test_lambda_symbol_param2(arg0), 3);
+        if (!(_t12 == 3)) abort 0;
+    }
+    fun lambda__1__test_lambda_symbol_param2(x: u64): u64 {
+        x
+    }
+    fun lambda__2__test_lambda_symbol_param2(x: u64): u64 {
+        x
+    }
+    fun lambda__3__test_lambda_symbol_param2(x: u64): u64 {
+        x
+    }
+}
+
+============ recompilation succeeded ========

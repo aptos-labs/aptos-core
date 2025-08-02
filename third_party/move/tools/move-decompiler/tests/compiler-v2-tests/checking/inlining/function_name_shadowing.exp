@@ -1,0 +1,22 @@
+module 0x42::OtherModule {
+    public fun g(a: u64, b: u64): u64 {
+        a + b
+    }
+    public fun h(a: u64, b: u64): u64 {
+        2 * a + b
+    }
+}
+module 0x42::Test {
+    use 0x42::OtherModule;
+    public fun f(a: u64, b: u64): u64 {
+        a * b
+    }
+    public fun test_shadowing(): u64 {
+        let _t2 = f(10, 2);
+        let _t5 = OtherModule::g(10, 2);
+        let _t9 = OtherModule::h(10, 2);
+        _t2 * _t5 * _t9
+    }
+}
+
+============ recompilation succeeded ========

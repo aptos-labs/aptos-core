@@ -1,0 +1,23 @@
+module 0x42::pack_unpack_ref {
+    struct G {
+        x1: u64,
+        x2: u64,
+        s: S,
+    }
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    fun unpack_mut_ref(s: &mut S): (u64, u64) {
+        (*&mut s.f, *&mut s.g)
+    }
+    fun unpack_ref(s: &S): (u64, u64) {
+        (*&s.f, *&s.g)
+    }
+    fun unpack_ref_G(g: &G): (u64, u64, u64, u64) {
+        let _t2 = &g.s;
+        (*&g.x1, *&g.x2, *&_t2.f, *&_t2.g)
+    }
+}
+
+============ recompilation succeeded ========

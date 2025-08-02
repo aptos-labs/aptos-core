@@ -1,0 +1,23 @@
+module 0x8675309::M {
+    struct R has key {
+    }
+    struct S has drop {
+        f: u64,
+    }
+    public fun bg(a: address) {
+        let _t4 = borrow_global_mut<R>(a);
+        let _t7 = borrow_global<R>(a);
+    }
+    public fun borrow_field(s: &mut S): u64 {
+        *freeze(&mut s.f) + *&s.f
+    }
+    public fun borrow_local(x: u64): u64 {
+        *freeze(&mut x) + x + x
+    }
+    public fun deref(x: u64): u64 {
+        let _t1 = &mut x;
+        *freeze(_t1) + *_t1 + x
+    }
+}
+
+============ recompilation succeeded ========

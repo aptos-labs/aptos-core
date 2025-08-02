@@ -1,0 +1,38 @@
+module 0x42::m {
+    use 0x1::vector;
+    public entry fun init() {
+        let _t16 = vector::borrow<vector<vector<u8>>>(&vector[vector[]], 0);
+        let _t18 = vector::empty<u64>();
+        let _t2 = *_t16;
+        vector::reverse<vector<u8>>(&mut _t2);
+        let _t3 = _t2;
+        let _t22 = vector::length<vector<u8>>(&_t3);
+        let _t4 = _t22;
+        while (_t4 > 0) {
+            let _t27 = vector::pop_back<vector<u8>>(&mut _t3);
+            let _t5 = &mut _t18;
+            let _t30 = vector::length<u8>(&_t27);
+            let _t8 = _t30 + 2;
+            vector::push_back<u64>(_t5, _t8);
+            _t4 = _t4 - 1;
+            continue;
+        };
+        vector::destroy_empty<vector<u8>>(_t3);
+        let _t42 = vector::borrow<vector<u64>>(&vector[vector[]], 0);
+        let _t44 = vector::empty<u64>();
+        let _t11 = *_t42;
+        vector::reverse<u64>(&mut _t11);
+        let _t12 = _t11;
+        let _t48 = vector::length<u64>(&_t12);
+        _t4 = _t48;
+        while (_t4 > 0) {
+            let _t53 = vector::pop_back<u64>(&mut _t12);
+            vector::push_back<u64>(&mut _t44, _t53 + 3);
+            _t4 = _t4 - 1;
+            continue;
+        };
+        vector::destroy_empty<u64>(_t12);
+    }
+}
+
+============ recompilation succeeded ========

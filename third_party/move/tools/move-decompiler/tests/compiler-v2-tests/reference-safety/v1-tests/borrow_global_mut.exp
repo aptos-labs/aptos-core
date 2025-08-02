@@ -1,0 +1,81 @@
+module 0x8675309::M {
+    struct R has key {
+        f: u64,
+    }
+    fun t0(addr: address) {
+        let _t2 = borrow_global_mut<R>(addr);
+        let _t6 = borrow_global_mut<R>(addr);
+        *&mut _t6.f = *&_t2.f;
+    }
+    fun t1(addr: address) {
+        let _t2 = borrow_global<R>(addr);
+        let _t6 = borrow_global_mut<R>(addr);
+        *&mut _t6.f = *&_t2.f;
+    }
+    fun t2(addr: address) {
+        let _t2 = borrow_global_mut<R>(addr);
+        let _t6 = borrow_global_mut<R>(addr);
+        *&mut _t6.f = *&_t2.f;
+    }
+    fun t3(addr: address) {
+        let _t2 = move_from<R>(addr);
+        let R{f: _t3} = _t2;
+        let _t5 = borrow_global_mut<R>(addr);
+        *&mut _t5.f = _t3;
+    }
+    fun t4(cond: bool, addr: address) {
+        let _t4;
+        let _t2 = R{f: 0};
+        let _t9 = borrow_global<R>(addr);
+        if (cond) {
+            let _t14 = borrow_global_mut<R>(addr);
+            _t4 = _t14;
+        } else _t4 = &mut _t2;
+        *&mut _t4.f = *&_t9.f;
+        let R{f: _t20} = _t2;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with stackless-bytecode checks failed
+error: cannot mutably borrow `M::R` since it is already borrowed
+  ┌─ borrow_global_mut.move:7:19
+  │
+6 │         let _t2 = borrow_global_mut<R>(addr);
+  │                   -------------------------- struct `M::R` previously mutably borrowed here
+7 │         let _t6 = borrow_global_mut<R>(addr);
+  │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+8 │         *&mut _t6.f = *&_t2.f;
+  │                         ----- conflicting reference `_t2` used here
+
+error: cannot mutably borrow `M::R` since it is already borrowed
+   ┌─ borrow_global_mut.move:12:19
+   │
+11 │         let _t2 = borrow_global<R>(addr);
+   │                   ---------------------- struct `M::R` previously borrowed here
+12 │         let _t6 = borrow_global_mut<R>(addr);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+13 │         *&mut _t6.f = *&_t2.f;
+   │                         ----- conflicting reference `_t2` used here
+
+error: cannot mutably borrow `M::R` since it is already borrowed
+   ┌─ borrow_global_mut.move:17:19
+   │
+16 │         let _t2 = borrow_global_mut<R>(addr);
+   │                   -------------------------- struct `M::R` previously mutably borrowed here
+17 │         let _t6 = borrow_global_mut<R>(addr);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+18 │         *&mut _t6.f = *&_t2.f;
+   │                         ----- conflicting reference `_t2` used here
+
+error: cannot mutably borrow `M::R` since it is already borrowed
+   ┌─ borrow_global_mut.move:31:24
+   │
+29 │         let _t9 = borrow_global<R>(addr);
+   │                   ---------------------- struct `M::R` previously borrowed here
+30 │         if (cond) {
+31 │             let _t14 = borrow_global_mut<R>(addr);
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+   ·
+34 │         *&mut _t4.f = *&_t9.f;
+   │                         ----- conflicting reference `_t9` used here

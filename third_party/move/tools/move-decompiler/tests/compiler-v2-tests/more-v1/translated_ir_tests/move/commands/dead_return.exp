@@ -1,0 +1,7 @@
+module 0x8675309::Test {
+    public fun t(): u64 {
+        100
+    }
+}
+
+============ recompilation succeeded ========

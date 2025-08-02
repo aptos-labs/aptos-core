@@ -1,0 +1,17 @@
+module 0x42::m {
+    fun test_for_each_mut() {
+        let _t0 = vector[1, 2, 3];
+        let _t1 = 0;
+        let _t9 = 0x1::vector::length<u64>(&_t0);
+        let _t3 = &mut _t0;
+        while (_t1 < _t9) {
+            let _t16 = 0x1::vector::borrow_mut<u64>(_t3, _t1);
+            *_t16 = 2;
+            _t1 = _t1 + 1;
+            continue;
+        };
+        if (!(_t0 == vector[2, 3, 4])) abort 0;
+    }
+}
+
+============ recompilation succeeded ========

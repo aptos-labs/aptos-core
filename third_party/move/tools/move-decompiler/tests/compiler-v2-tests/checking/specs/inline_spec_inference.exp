@@ -1,0 +1,7 @@
+module 0x42::m {
+    fun foo() {
+        let _t3 = 10 + 1;
+    }
+}
+
+============ recompilation succeeded ========
