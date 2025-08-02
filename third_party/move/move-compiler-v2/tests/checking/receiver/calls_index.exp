@@ -165,9 +165,9 @@ module 0x42::m {
     }
     fun merge(self: &mut W, s: W) {
         {
-            let $t2 = s.x;
-            let $t1 = &mut self.x;
-            *$t1 = *$t1 + $t2
+            let _t2 = s.x;
+            let _t1 = &mut self.x;
+            *_t1 = *_t1 + _t2
         };
     }
     fun unwrap<T: copy>(self: &Wrapper<T>): T {

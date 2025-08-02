@@ -3,7 +3,6 @@ module 0xc0ffee::m {
         1
     }
 }
-
 module 0xc0ffee::n {
     use 0xc0ffee::m;
     fun bar(): u64 {
