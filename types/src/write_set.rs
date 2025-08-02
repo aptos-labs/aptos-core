@@ -483,32 +483,7 @@ impl TransactionWrite for WriteOp {
 #[allow(clippy::format_collect)]
 impl Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use BaseStateOp::*;
-
-        match &self.0 {
-            Creation(v) => write!(
-                f,
-                "Creation({}, metadata:{:?})",
-                v.bytes()
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>(),
-                v.metadata(),
-            ),
-            Modification(v) => write!(
-                f,
-                "Modification({}, metadata:{:?})",
-                v.bytes()
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>(),
-                v.metadata(),
-            ),
-            Deletion(metadata) => {
-                write!(f, "Deletion(metadata:{:?})", metadata,)
-            },
-            MakeHot { .. } | Eviction { .. } => unreachable!("malformed write op"),
-        }
+        write!(f, "{}", self.0.as_ref())
     }
 }
 
