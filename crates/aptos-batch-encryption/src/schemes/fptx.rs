@@ -24,7 +24,7 @@ use crate::shared::digest::{Digest, EvalProofs, EvalProofsPromise};
 use crate::shared::ids::free_roots::ComputedCoeffs;
 use crate::shared::ids::free_roots::UncomputedCoeffs;
 use crate::shared::ids::{FreeRootId, FreeRootIdSet};
-use crate::shared::key_derivation::{self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare, BIBEVerificationKey};
+use crate::shared::key_derivation::{self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey, BIBEMasterSecretKeyShare, BIBEVerificationKey};
 use crate::{group::*, shared::{digest::DigestKey, ids::{Id, IdSet}}, traits::{BatchThresholdEncryption, Plaintext}};
 use rand_core::SeedableRng;
 use crate::shared::ark_serialize::*;
@@ -59,7 +59,7 @@ impl EncryptionKey {
     pub fn verify_decryption_key(
         &self,
         digest: &Digest,
-        decryption_key: &BIBEDecryptionKey) -> Result<()> 
+        decryption_key: &BIBEDecryptionKey) -> Result<()>
     {
         BIBEMasterPublicKey(self.sig_mpk_g2).verify_decryption_key(digest, decryption_key)
     }

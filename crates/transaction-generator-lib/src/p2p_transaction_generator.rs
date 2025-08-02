@@ -228,9 +228,7 @@ impl P2PTransactionGenerator {
             aptos_stdlib::aptos_coin_transfer(*to, num_coins)
         };
         let mut rng = thread_rng();
-        info!("encrypting payload");
         let encrypted_payload = payload.clone().encrypt(encryption_key, &mut rng).unwrap();
-        info!("encrypted payload");
         let signed_encrypted_txn = from.sign_with_transaction_builder(txn_factory.payload(encrypted_payload));
         assert!(signed_encrypted_txn.is_encrypted());
         signed_encrypted_txn
@@ -390,7 +388,6 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
                 Box::new(BurnAndRecycleSampler::new(recycle_batch_size))
             },
         };
-        info!("txn emitter starts setup");
         let encryption_key = if self.encrypted {
             let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
             let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
@@ -399,7 +396,6 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
         } else {
             None
         };
-        info!("txn emitter finishes setup");
         Box::new(P2PTransactionGenerator::new(
             rng,
             self.amount,

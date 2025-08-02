@@ -35,7 +35,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{DecConfig, DecKey, DecMetadata, DecShare, DigestKey, FastDecShare, DECRYPTION_POOL, MasterSecretKeyShare}, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
+    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{DecConfig, DecKey, DecMetadata, DecShare, DigestKey, FastDecShare, DECRYPTION_POOL, MasterSecretKeyShare, EncryptionKey}, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         SignedTransaction, Transaction,
     }, validator_signer::ValidatorSigner
@@ -49,7 +49,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_batch_encryption::{schemes::fptx::FPTX, shared::digest, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{schemes::fptx::{self, FPTX}, shared::digest, traits::BatchThresholdEncryption};
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -412,6 +412,7 @@ impl PipelineBuilder {
             let digest_key: DigestKey = self.dec_config.as_ref().unwrap().digest_key().clone();
             let msk_share: MasterSecretKeyShare = self.dec_config.as_ref().unwrap().msk_share().clone();
             let fast_msk_share: MasterSecretKeyShare = self.fast_dec_config.as_ref().unwrap().msk_share().clone();
+            let encryption_key: EncryptionKey = self.dec_config.as_ref().unwrap().encryption_key().clone();
 
             let compute_digest_fut = spawn_shared_fut(
                 Self::compute_digest(block.clone(), digest_key.clone()),
@@ -425,12 +426,12 @@ impl PipelineBuilder {
                 Self::compute_eval_proofs(compute_digest_fut, digest_key, block.clone()),
                 Some(&mut abort_handles),
             );
-            let _ = spawn_shared_fut(
-                Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
-                Some(&mut abort_handles),
-            );
+            // let _ = spawn_shared_fut(
+            //     Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
+            //     Some(&mut abort_handles),
+            // );
             let compute_decryption_fut = spawn_shared_fut(
-                Self::compute_decryption(decryption_key_fut, compute_eval_proofs_fut, block.clone()),
+                Self::compute_decryption(decryption_key_fut, compute_eval_proofs_fut, block.clone(), encryption_key.clone()),
                 Some(&mut abort_handles),
             );
             (Some(compute_decryption_share_fut), Some(compute_decryption_fut))
@@ -615,6 +616,9 @@ impl PipelineBuilder {
             assert!(block.is_encrypted());
             decryption_fut.await?
         } else {
+            if block.is_encrypted() {
+                assert!(maybe_decrypted_txns.is_some());
+            }
             Arc::new(maybe_decrypted_txns.unwrap_or_default())
         };
 
@@ -634,12 +638,13 @@ impl PipelineBuilder {
                 .map(|t| Transaction::UserTransaction(t).into())
                 .collect::<Vec<_>>()
         });
+
         // daniel todo: order them properly
-        let sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
+        let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
 
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
-        Ok((Arc::new(sig_verified_txns), block_gas_limit))
+        Ok((Arc::new(all_sig_verified_txns), block_gas_limit))
     }
 
     fn check_block_encrypted(block: Arc<Block>) -> TaskResult<()> {
@@ -720,13 +725,15 @@ impl PipelineBuilder {
 
     /// Precondition: 1. decryption_key is available, 2. decryption_aux_info is available
     /// What it does: Compute the decryption for the block
-    async fn compute_decryption(decryption_key_fut: TaskFuture<DecKey>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>) -> TaskResult<DecryptionResult> {
+    async fn compute_decryption(decryption_key_fut: TaskFuture<DecKey>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
         Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_decryption", &block);
         let decryption_key = decryption_key_fut.await?;
         let proofs = proofs_fut.await?;
 
         tracker.start_working();
+
+        let _ = encryption_key.verify_decryption_key(&decryption_key.metadata.digest, &decryption_key.key)?;
 
         let encrypted_payload = block.encrypted_payload().unwrap();
         let decrypted_txns = encrypted_payload.clone().decrypt(&decryption_key.key, &proofs, &DECRYPTION_POOL)?;

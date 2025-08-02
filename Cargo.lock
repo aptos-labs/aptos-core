@@ -5061,7 +5061,7 @@ dependencies = [
 [[package]]
 name = "ark-bls12-381"
 version = "0.5.0-alpha.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -5083,7 +5083,7 @@ dependencies = [
 [[package]]
 name = "ark-bn254"
 version = "0.5.0-alpha.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -5130,7 +5130,7 @@ dependencies = [
 [[package]]
 name = "ark-ec"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ahash 0.8.11",
  "ark-ff 0.5.0",
@@ -5172,7 +5172,7 @@ dependencies = [
 [[package]]
 name = "ark-ff"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ark-ff-asm 0.5.0",
  "ark-ff-macros 0.5.0",
@@ -5202,7 +5202,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-asm"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "quote",
  "syn 2.0.87",
@@ -5224,7 +5224,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-macros"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
@@ -5266,7 +5266,7 @@ dependencies = [
 [[package]]
 name = "ark-poly"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ahash 0.8.11",
  "ark-ff 0.5.0",
@@ -5305,7 +5305,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
@@ -5329,7 +5329,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize-derive"
 version = "0.5.0"
-source = "git+ssh://git@github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#e95ba75eef62eecdacaa52b82fb0276da8e5b5b4"
 dependencies = [
  "proc-macro2",
  "quote",

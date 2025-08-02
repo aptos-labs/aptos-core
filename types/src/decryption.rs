@@ -35,10 +35,10 @@ pub type Author = AccountAddress;
 pub const PROTOTYPE_SETUP_SEED: u64 = 233;
 pub const PROTOTYPE_BATCH_SIZE: usize = 128;
 pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 1;
-pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 4;
-pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 3;
-pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 2;
-pub const PROTOTYPE_DECRYPTION_POOL_SIZE: usize = 8;
+pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 7;
+pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 5;
+pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 4;
+pub const PROTOTYPE_DECRYPTION_POOL_SIZE: usize = 16;
 
 pub static DECRYPTION_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -176,11 +176,12 @@ pub struct DecConfig {
     msk_share: MasterSecretKeyShare,
     verification_keys: Vec<VerificationKey>,
     config: ThresholdConfig,
+    encryption_key: EncryptionKey,
 }
 
 impl DecConfig {
-    pub fn new(author: Author, epoch: u64, validator: Arc<ValidatorVerifier>, digest_key: DigestKey, msk_share: MasterSecretKeyShare, verification_keys: Vec<VerificationKey>, config: ThresholdConfig) -> Self {
-        Self { author, epoch, validator, digest_key, msk_share, verification_keys, config }
+    pub fn new(author: Author, epoch: u64, validator: Arc<ValidatorVerifier>, digest_key: DigestKey, msk_share: MasterSecretKeyShare, verification_keys: Vec<VerificationKey>, config: ThresholdConfig, encryption_key: EncryptionKey) -> Self {
+        Self { author, epoch, validator, digest_key, msk_share, verification_keys, config, encryption_key }
     }
 
     pub fn get_id(&self, peer: &Author) -> usize {
@@ -210,5 +211,9 @@ impl DecConfig {
     pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
         // daniel todo: use weighted config
         1
+    }
+
+    pub fn encryption_key(&self) -> &EncryptionKey {
+        &self.encryption_key
     }
 }

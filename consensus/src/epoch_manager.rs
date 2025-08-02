@@ -1262,15 +1262,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
 
         info!("[daniel] start setup for testing");
-        let (_, digest_key, verification_keys_slow_path, msk_shares_slow_path, verification_keys_fast_path, msk_shares_fast_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+        let (encryption_key, digest_key, verification_keys_fast_path, msk_shares_fast_path, verification_keys_slow_path, msk_shares_slow_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
         info!("[daniel] setup for testing done");
 
         let self_index = epoch_state.verifier.address_to_validator_index().get(&self.author).expect("self should be in the index");
         let self_msk_share_slow_path = msk_shares_slow_path[*self_index].clone();
         let self_msk_share_fast_path = msk_shares_fast_path[*self_index].clone();
 
-        let dec_config_slow_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key.clone(), self_msk_share_slow_path, verification_keys_slow_path, tc_slow_path));
-        let dec_config_fast_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key, self_msk_share_fast_path, verification_keys_fast_path, tc_fast_path));
+        let dec_config_slow_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key.clone(), self_msk_share_slow_path, verification_keys_slow_path, tc_slow_path, encryption_key.clone()));
+        let dec_config_fast_path = Some(DecConfig::new(self.author, epoch_state.epoch, epoch_state.verifier.clone(), digest_key, self_msk_share_fast_path, verification_keys_fast_path, tc_fast_path, encryption_key));
 
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",

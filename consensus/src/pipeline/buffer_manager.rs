@@ -413,15 +413,11 @@ impl BufferManager {
         for block in &ordered_blocks {
             if block.block().is_encrypted() {
                 if let Some(futures) = block.pipeline_futs() {
+                    assert!(futures.maybe_compute_decryption_fut.is_some() ^ block.dec_txns_is_set());
                     if let Some(fut) = futures.maybe_compute_decryption_fut.as_ref() {
                         let dec_txns = fut.clone().await.expect("Decryption failed");
                         num_encrypted_txns.push(dec_txns.len());
                         block.set_dec_txns(dec_txns.to_vec());
-                    } else {
-                        error!(
-                            "Block {} is encrypted but maybe_compute_decryption_fut is not set",
-                            block.block().id()
-                        );
                     }
                 } else {
                     error!(

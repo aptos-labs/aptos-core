@@ -417,16 +417,17 @@ impl InlineEncryptedTxns {
         let mut decrypted_txns = Vec::new();
 
         for (i, (mut original_txn, plaintext_bytes)) in self.encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
-            // Try to deserialize the plaintext as a TransactionExecutable
-            let decrypted_executable = match bcs::from_bytes::<aptos_types::transaction::TransactionExecutable>(&plaintext_bytes) {
-                Ok(executable) => executable,
-                Err(e) => {
-                    return Err(anyhow::anyhow!(
-                        "Failed to deserialize decrypted executable at index {}: {}",
-                        i,
-                        e
-                    ));
-                }
+            // Try to deserialize the plaintext as the inner content that was actually encrypted
+            // The encryption process only serializes the inner Script or EntryFunction, not the full enum
+            let decrypted_executable = if let Ok(script) = bcs::from_bytes::<aptos_types::transaction::Script>(&plaintext_bytes) {
+                aptos_types::transaction::TransactionExecutable::Script(script)
+            } else if let Ok(entry_function) = bcs::from_bytes::<aptos_types::transaction::EntryFunction>(&plaintext_bytes) {
+                aptos_types::transaction::TransactionExecutable::EntryFunction(entry_function)
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Failed to deserialize decrypted executable at index {}: neither Script nor EntryFunction could be deserialized",
+                    i
+                ));
             };
 
             // Create a new RawTransaction with the decrypted executable
@@ -462,8 +463,11 @@ impl InlineEncryptedTxns {
                 }
             }
 
-            original_txn.update_payload(payload);
-            decrypted_txns.push(original_txn);
+            let authenticator = original_txn.authenticator().clone();
+            let mut raw_txn = original_txn.into_raw_transaction();
+            raw_txn.update_payload(payload.clone());
+            let signed_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator);
+            decrypted_txns.push(signed_txn);
         }
 
         Ok(decrypted_txns)
