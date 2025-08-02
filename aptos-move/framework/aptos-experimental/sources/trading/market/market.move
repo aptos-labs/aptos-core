@@ -95,6 +95,7 @@ module aptos_experimental::market {
     const ENOT_ORDER_CREATOR: u64 = 12;
 
     const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
+    const U64_MAX: u64 = 0xffffffffffffffff;
 
     enum Market<M: store + copy + drop> has store {
         V1 {
@@ -144,7 +145,7 @@ module aptos_experimental::market {
         /// FILLED - size_delta will be amount of size filled
         /// REJECTED - size_delta will always be 0
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         /// Whether the order crosses the orderbook.
         is_taker: bool,
@@ -272,7 +273,7 @@ module aptos_experimental::market {
 
     public fun is_taker_order<M: store + copy + drop>(
         self: &Market<M>,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
@@ -322,7 +323,7 @@ module aptos_experimental::market {
     ): OrderMatchResult {
         self.place_order_with_order_id(
             signer::address_of(user),
-            option::some(limit_price),
+            limit_price,
             orig_size,
             orig_size,
             is_bid,
@@ -352,7 +353,7 @@ module aptos_experimental::market {
     ): OrderMatchResult {
         self.place_order_with_order_id(
             signer::address_of(user),
-            option::none(),
+            if (is_bid) { U64_MAX } else { 1 },
             orig_size,
             orig_size,
             is_bid,
@@ -386,7 +387,7 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         is_taker: bool,
         status: OrderStatus,
@@ -423,7 +424,7 @@ module aptos_experimental::market {
     fun place_maker_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         orig_size: u64,
         remaining_size: u64,
         fill_sizes: vector<u64>,
@@ -438,8 +439,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
-        if (time_in_force == market_types::immediate_or_cancel()
-            || limit_price.is_none()) {
+        if (time_in_force == market_types::immediate_or_cancel()) {
             return self.cancel_order_internal(
                 user_addr,
                 limit_price,
@@ -481,7 +481,7 @@ module aptos_experimental::market {
             user_addr,
             order_id,
             is_bid,
-            limit_price.destroy_some(),
+            limit_price,
             remaining_size,
             metadata
         );
@@ -490,7 +490,7 @@ module aptos_experimental::market {
                 user_addr,
                 order_id,
                 client_order_id,
-                limit_price.destroy_some(),
+                limit_price,
                 orig_size,
                 remaining_size,
                 is_bid,
@@ -526,7 +526,7 @@ module aptos_experimental::market {
             maker_order.get_orig_size(),
             0,
             maker_cancel_size,
-            option::some(maker_order.get_price()),
+            maker_order.get_price(),
             maker_order.is_bid(),
             false,
             market_types::order_status_cancelled(),
@@ -547,7 +547,7 @@ module aptos_experimental::market {
     fun cancel_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
         orig_size: u64,
@@ -592,7 +592,7 @@ module aptos_experimental::market {
     fun settle_single_trade<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        price: Option<u64>,
+        price: u64,
         orig_size: u64,
         remaining_size: &mut u64,
         is_bid: bool,
@@ -649,7 +649,7 @@ module aptos_experimental::market {
                 orig_size,
                 *remaining_size,
                 settled_size,
-                option::some(maker_order.get_price()),
+                maker_order.get_price(),
                 is_bid,
                 true,
                 market_types::order_status_filled(),
@@ -666,7 +666,7 @@ module aptos_experimental::market {
                 maker_order.get_orig_size(),
                 maker_order.get_remaining_size() + unsettled_maker_size,
                 settled_size,
-                option::some(maker_order.get_price()),
+                maker_order.get_price(),
                 !is_bid,
                 false,
                 market_types::order_status_filled(),
@@ -748,7 +748,7 @@ module aptos_experimental::market {
     public fun place_order_with_order_id<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
@@ -803,6 +803,7 @@ module aptos_experimental::market {
                 is_taker_order, // is_taker
                 is_bid,
                 limit_price,
+                time_in_force,
                 remaining_size,
                 metadata
             )) {
@@ -1081,7 +1082,7 @@ module aptos_experimental::market {
             orig_size,
             0,
             remaining_size,
-            option::some(price),
+            price,
             is_bid,
             false,
             market_types::order_status_cancelled(),
@@ -1128,7 +1129,7 @@ module aptos_experimental::market {
             orig_size,
             remaining_size,
             size_delta,
-            option::some(price),
+            price,
             is_bid,
             false,
             market_types::order_status_size_reduced(),
@@ -1183,17 +1184,17 @@ module aptos_experimental::market {
     /// Returns all the pending order ready to be executed based on the oracle price. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>, oracle_price: u64
+        self: &mut Market<M>, oracle_price: u64, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_price_based_orders(oracle_price)
+        self.order_book.take_ready_price_based_orders(oracle_price, order_limit)
     }
 
     /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>
+        self: &mut Market<M>, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_time_based_orders()
+        self.order_book.take_ready_time_based_orders(order_limit)
     }
 
     // ============================= test_only APIs ====================================
@@ -1245,7 +1246,7 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         is_taker: bool,
         status: OrderStatus

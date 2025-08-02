@@ -198,7 +198,7 @@ module aptos_experimental::order_book {
     /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
@@ -363,7 +363,7 @@ module aptos_experimental::order_book {
     /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
     public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut OrderBook<M>,
-        price: Option<u64>,
+        price: u64,
         size: u64,
         is_bid: bool
     ): SingleOrderMatch<M> {
@@ -484,10 +484,10 @@ module aptos_experimental::order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut OrderBook<M>, current_price: u64
+        self: &mut OrderBook<M>, current_price: u64, order_limit: u64
     ): vector<Order<M>> {
         let self_orders = &mut self.orders;
-        let order_ids = self.pending_orders.take_ready_price_based_orders(current_price);
+        let order_ids = self.pending_orders.take_ready_price_based_orders(current_price, order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
@@ -514,10 +514,10 @@ module aptos_experimental::order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the time condition.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut OrderBook<M>
+        self: &mut OrderBook<M>, order_limit: u64
     ): vector<Order<M>> {
         let self_orders = &mut self.orders;
-        let order_ids = self.pending_orders.take_time_time_based_orders();
+        let order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
@@ -563,7 +563,7 @@ module aptos_experimental::order_book {
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
             if (!self.is_taker_order(
-                option::some(order_req.price), order_req.is_bid, order_req.trigger_condition
+                order_req.price, order_req.is_bid, order_req.trigger_condition
             )) {
                 self.place_maker_order(
                     OrderRequest::V1 {
@@ -582,7 +582,7 @@ module aptos_experimental::order_book {
             };
             let match_result =
                 self.get_single_match_for_taker(
-                    option::some(order_req.price), remaining_size, order_req.is_bid
+                    order_req.price, remaining_size, order_req.is_bid
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
@@ -616,7 +616,7 @@ module aptos_experimental::order_book {
     public fun trigger_pending_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>, oracle_price: u64
     ): vector<SingleOrderMatch<M>> {
-        let ready_orders = self.take_ready_price_based_orders(oracle_price);
+        let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
         let all_matches = vector::empty();
         let i = 0;
         while (i < ready_orders.length()) {
