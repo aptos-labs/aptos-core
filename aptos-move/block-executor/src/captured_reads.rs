@@ -1260,7 +1260,9 @@ mod test {
             types::{raw_metadata, KeyType, ValueType},
         },
     };
+    use aptos_crypto::HashValue;
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
+    use aptos_types::transaction::{BlockEndInfo, FeeDistribution};
     use claims::{
         assert_err, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
@@ -1578,6 +1580,18 @@ mod test {
 
         fn user_txn_bytes_len(&self) -> usize {
             0
+        }
+
+        fn into_txn(self) -> aptos_types::transaction::Transaction {
+            unreachable!("TestTransactionType does not support into_txn")
+        }
+
+        fn from_txn(_txn: aptos_types::transaction::Transaction) -> Self {
+            unreachable!("TestTransactionType does not support from_txn")
+        }
+
+        fn block_epilogue_v1(_block_id: HashValue, _block_end_info: BlockEndInfo, _fee_distribution: FeeDistribution) -> Self {
+            unreachable!("TestTransactionType does not support block_epilogue_v1")
         }
     }
 

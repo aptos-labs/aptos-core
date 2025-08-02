@@ -2860,18 +2860,6 @@ impl Transaction {
         })
     }
 
-    pub fn block_epilogue_v1(
-        block_id: HashValue,
-        block_end_info: BlockEndInfo,
-        fee_distribution: FeeDistribution,
-    ) -> Self {
-        Self::BlockEpilogue(BlockEpiloguePayload::V1 {
-            block_id,
-            block_end_info,
-            fee_distribution,
-        })
-    }
-
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -2980,9 +2968,17 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         None
     }
 
-    fn from_txn(_txn: Transaction) -> Self {
-        unimplemented!()
-    }
+    fn from_txn(_txn: Transaction) -> Self;
+
+    fn into_txn(self) -> Transaction;
+
+    // Provided as a trait method in order to be able to mock it in block executor's
+    // concurrent combinatorial testing framework.
+    fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

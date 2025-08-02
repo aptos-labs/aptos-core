@@ -4,7 +4,9 @@
 use crate::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{BlockExecutableTransaction, SignedTransaction, Transaction},
+    transaction::{
+        BlockEpiloguePayload, BlockExecutableTransaction, SignedTransaction, Transaction,
+    },
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -106,8 +108,24 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         }
     }
 
+    fn into_txn(self) -> Transaction {
+        self.into_inner()
+    }
+
     fn from_txn(txn: Transaction) -> Self {
         txn.into()
+    }
+
+    fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: super::BlockEndInfo,
+        fee_distribution: super::FeeDistribution,
+    ) -> Self {
+        Self::from_txn(Transaction::BlockEpilogue(BlockEpiloguePayload::V1 {
+            block_id,
+            block_end_info,
+            fee_distribution,
+        }))
     }
 }
 

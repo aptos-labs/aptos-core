@@ -4,6 +4,7 @@
 
 use crate::types::delayed_field_mock_serialization::serialize_delayed_field_tuple;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
@@ -15,7 +16,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{BlockEndInfo, BlockExecutableTransaction as Transaction, FeeDistribution},
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
@@ -418,6 +419,10 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
         /// If we are testing with deltas, are we testing delayed_fields? (or AggregatorV1).
         delta_test_kind: DeltaTestKind,
+        // Set only if the MockTransaction is generated to be a block epilogue txn. The actual
+        // concrete types are ignored, just the property of being epilogue txn is asserted and the
+        // stored value is used to satisfy the traits (as opposed to having a bool flag).
+        maybe_epilogue_txn: Option<aptos_types::transaction::Transaction>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest(u64),
@@ -431,6 +436,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
             delta_test_kind: DeltaTestKind::None,
+            maybe_epilogue_txn: None,
         }
     }
 
@@ -439,6 +445,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
             delta_test_kind: DeltaTestKind::None,
+            maybe_epilogue_txn: None,
         }
     }
 
@@ -495,11 +502,30 @@ impl<
         match txn {
             aptos_types::transaction::Transaction::StateCheckpoint(_)
             | aptos_types::transaction::Transaction::BlockEpilogue(_) => {
-                let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 0);
-                Self::from_behavior(behaivor)
+                Self::from_behavior(MockIncarnation::new(vec![], vec![], vec![], vec![], 0))
             },
             _ => unreachable!(),
         }
+    }
+
+    fn into_txn(self) -> aptos_types::transaction::Transaction {
+        match self {
+            MockTransaction::Write {
+                maybe_epilogue_txn, ..
+            } => maybe_epilogue_txn.expect("must only be used for block epilogue txn"),
+            _ => unreachable!("Must be MockTransaction::Write"),
+        }
+    }
+
+    fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        unimplemented!()
+        // TODO: lazy static. set the transaction actually.
+        // TODO: in setup use effective block gas limit.
+        // Maybe we do block epilogue v0 not V1 for MOCK - easier?
     }
 }
 

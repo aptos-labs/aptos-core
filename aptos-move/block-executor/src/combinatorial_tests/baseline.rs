@@ -557,6 +557,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     incarnation_counter,
                     incarnation_behaviors,
                     delta_test_kind,
+                    maybe_epilogue_txn: _maybe_epilogue_txn,
                 } => {
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during

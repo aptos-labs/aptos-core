@@ -119,9 +119,9 @@ fn test_block_epilogue_happy_path() {
 
 #[test]
 fn test_block_epilogue_block_gas_limit_reached() {
-    let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 10);
-    let t_0 = MockTransaction::from_behavior(behaivor.clone());
-    let t_1 = MockTransaction::from_behavior(behaivor);
+    let behavior = MockIncarnation::new(vec![], vec![], vec![], vec![], 10);
+    let t_0 = MockTransaction::from_behavior(behavior.clone());
+    let t_1 = MockTransaction::from_behavior(behavior);
     let transactions = vec![t_0, t_1];
 
     let executor_thread_pool = Arc::new(
