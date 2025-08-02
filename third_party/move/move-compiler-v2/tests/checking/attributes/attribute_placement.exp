@@ -110,14 +110,14 @@ module <SELF>_0 {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::N {
     friend 0x42::M;
-    public fun bar() {
+    #[attr] public fun bar() {
     }
 }
 module 0x42::M {
     use 0x42::N;
     struct S {
     }
-    public fun foo() {
+    #[attr] public fun foo() {
         N::bar()
     }
 }

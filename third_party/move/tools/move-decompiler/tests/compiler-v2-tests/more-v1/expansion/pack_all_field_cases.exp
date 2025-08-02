@@ -1,0 +1,18 @@
+module 0x8675309::M {
+    struct T has drop {
+    }
+    struct S has drop {
+        f: u64,
+        g: u64,
+    }
+    fun foo() {
+        let _t1 = T{};
+        let _t3 = T{};
+        let _t6 = S{f: 0,g: 1};
+        let _t9 = S{f: 0,g: 0};
+        let _t12 = S{f: 0,g: 0};
+        let _t15 = S{f: 0,g: 1};
+    }
+}
+
+============ recompilation succeeded ========

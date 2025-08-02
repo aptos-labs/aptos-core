@@ -1,0 +1,17 @@
+module 0x42::m {
+    struct Scalar has copy, drop, store {
+        data: vector<u8>,
+    }
+    public fun new_scalar_from_u8(byte: u8): Scalar {
+        let _t3 = scalar_zero();
+        let _t1 = _t3;
+        let _t7 = 0x1::vector::borrow_mut<u8>(&mut (&mut _t1).data, 0);
+        *_t7 = byte;
+        _t1
+    }
+    public fun scalar_zero(): Scalar {
+        Scalar{data: vector[0u8]}
+    }
+}
+
+============ recompilation succeeded ========

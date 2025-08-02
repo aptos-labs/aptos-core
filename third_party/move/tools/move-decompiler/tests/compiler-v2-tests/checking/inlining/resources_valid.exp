@@ -1,0 +1,21 @@
+module 0x42::objects {
+    struct ReaderRef<phantom T: key> has store {
+        addr: address,
+    }
+    public fun get_addr<T: key>(ref: &ReaderRef<T>): address {
+        *&ref.addr
+    }
+}
+module 0x42::token {
+    use 0x42::objects;
+    struct Token has key {
+        val: u64,
+    }
+    public fun get_value(ref: &objects::ReaderRef<Token>): u64 {
+        let _t2 = objects::get_addr<Token>(ref);
+        let _t3 = borrow_global<Token>(_t2);
+        *&_t3.val
+    }
+}
+
+============ recompilation succeeded ========

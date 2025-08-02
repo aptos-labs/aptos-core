@@ -1,0 +1,8 @@
+module 0xcafe::vectors {
+    public entry fun guess_flips_break2(flips: vector<u8>): u64 {
+        let _t2 = 0x1::vector::length<u8>(&flips);
+        _t2
+    }
+}
+
+============ recompilation succeeded ========

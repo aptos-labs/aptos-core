@@ -1,0 +1,14 @@
+module 0x42::m {
+    struct S has copy, drop {
+    }
+    fun d() {
+        let S{} = S{};
+        let S{} = S{};
+        let S{} = S{};
+    }
+    fun f(_s: S): S {
+        S{}
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,57 @@
+module 0x42::mod2 {
+    struct Registry<F: copy + store> has store, key {
+        func: F,
+    }
+    public fun get_item<F: copy + store>(addr: address): F {
+        let _t2 = borrow_global<Registry<F>>(addr);
+        *&_t2.func
+    }
+    public fun item_exists<F: copy + store>(addr: address): bool {
+        exists<Registry<F>>(addr)
+    }
+    public fun save_item<F: copy + store>(owner: &signer, f: F) {
+        move_to<Registry<F>>(owner, Registry<F>{func: f});
+    }
+}
+module 0x42::mod3 {
+    use 0x42::mod2;
+    use 0x1::signer;
+    struct MyStruct1 has copy, store, key {
+        x: u64,
+    }
+    struct MyStruct2 has copy, store, key {
+        y: u8,
+    }
+    public fun test_item1(owner: signer) {
+        test_items(owner, true);
+    }
+    public fun test_items(owner: signer, use_1: bool) {
+        let _t2 = MyStruct1{x: 3};
+        let _t14 = signer::address_of(&owner);
+        let _t5 = _t14;
+        mod2::save_item<MyStruct1>(&owner, _t2);
+        move_to<MyStruct1>(&owner, _t2);
+        if (use_1) mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0)) else mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0));
+        let _t23 = mod2::item_exists<|address|(bool) has copy + store>(_t5);
+        if (!_t23) abort 14566554180833181696;
+        let _t25 : |address|(bool) has copy + store = mod2::get_item<|address|(bool) has copy + store>(_t5);
+        if (!(use_1 == _t25(_t5))) abort 14566554180833181696;
+    }
+    public fun test_item2(owner: signer) {
+        test_items(owner, false);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unable to infer instantiation of type `copy + store` (consider providing type arguments or annotating the type)
+   ┌─ generic_func.move:34:92
+   │
+34 │         if (use_1) mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0)) else mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0));
+   │                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unable to infer instantiation of type `copy + store` (consider providing type arguments or annotating the type)
+   ┌─ generic_func.move:34:194
+   │
+34 │         if (use_1) mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0)) else mod2::save_item<|address|(bool) has copy + drop + store>(&owner, |arg0| mod2::item_exists(arg0));
+   │                                                                                                                                                                                                  ^^^^^^^^^^^^^^^^^^^^^^^

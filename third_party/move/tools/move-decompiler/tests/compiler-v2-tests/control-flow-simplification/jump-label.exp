@@ -1,0 +1,39 @@
+module 0x42::test {
+    use 0x1::string;
+    fun test<T>(x: vector<u8>): T {
+        let _t2 = foo<T>();
+        let _t1 = _t2;
+        let _t5 = string::utf8(vector[98u8, 111u8, 111u8, 108u8]);
+        'l0: loop {
+            loop {
+                if (!(_t1 == _t5)) {
+                    let _t12 = string::utf8(vector[117u8, 56u8]);
+                    if (_t1 == _t12) break;
+                    let _t19 = string::utf8(vector[117u8, 54u8, 52u8]);
+                    if (_t1 == _t19) break 'l0;
+                    abort 0;
+                };
+                let _t8 = baz<bool>(x);
+                let _t9 = bar<T>(_t8);
+                return _t9;
+            };
+            let _t15 = baz<bool>(x);
+            let _t16 = bar<T>(_t15);
+            return _t16;
+        };
+        let _t22 = baz<bool>(x);
+        let _t23 = bar<T>(_t22);
+        _t23
+    }
+    fun foo<T>(): string::String {
+        abort 0
+    }
+    fun baz<T>(_x: vector<u8>): T {
+        abort 0
+    }
+    fun bar<T>(_x: bool): T {
+        abort 0
+    }
+}
+
+============ recompilation succeeded ========

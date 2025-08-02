@@ -1,0 +1,12 @@
+module 0x42::m {
+    struct A has key {
+        addr: address,
+    }
+    public fun foo(input: address): address {
+        let _t2 = move_from<A>(input);
+        let A{addr: _t3} = _t2;
+        _t3
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,13 @@
+module 0x42::M {
+    friend 0x42::A;
+    friend 0x42::B;
+    friend 0x42::C;
+}
+module 0x42::A {
+}
+module 0x42::B {
+}
+module 0x42::C {
+}
+
+============ recompilation succeeded ========

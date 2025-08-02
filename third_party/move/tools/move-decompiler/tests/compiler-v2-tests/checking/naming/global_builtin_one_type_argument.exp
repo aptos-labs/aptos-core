@@ -1,0 +1,14 @@
+module 0x8675309::M {
+    struct R has key {
+    }
+    fun t(account: &signer) {
+        let _t4 = exists<R>(@0x0);
+        move_to<R>(account, R{});
+        let _t9 = borrow_global<R>(@0x0);
+        let _t11 = borrow_global_mut<R>(@0x0);
+        let _t13 = move_from<R>(@0x0);
+        let R{} = _t13;
+    }
+}
+
+============ recompilation succeeded ========

@@ -1076,14 +1076,17 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, None, rhs);
             },
-            MoveTo(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveTo, srcs);
+            MoveTo(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveTo, srcs);
             },
-            MoveFrom(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveFrom, srcs);
+            MoveFrom(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::MoveFrom, srcs);
             },
-            Exists(_, _, inst) => {
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::Exists(None), srcs);
+            Exists(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(ctx, Some(&vec![ty]), dests, Operation::Exists(None), srcs);
             },
             TestVariant(mid, sid, variant, inst) => {
                 self.gen_call_stm(
@@ -1108,13 +1111,16 @@ impl Generator {
                 let rhs = self.make_temp(ctx, srcs[0]);
                 self.gen_match(ctx, dests, qsid, Some(*variant), rhs);
             },
-            BorrowGlobal(_, _, inst) => self.gen_call_stm(
-                ctx,
-                Some(inst),
-                dests,
-                Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
-                srcs,
-            ),
+            BorrowGlobal(mid, sid, inst) => {
+                let ty = Type::Struct(*mid, *sid, inst.to_vec());
+                self.gen_call_stm(
+                    ctx,
+                    Some(&vec![ty]),
+                    dests,
+                    Operation::BorrowGlobal(ctx.ref_kind(dests[0])),
+                    srcs,
+                );
+            },
             BorrowLoc => self.gen_call_stm(
                 ctx,
                 None,
@@ -2082,17 +2088,6 @@ struct AssignTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
-impl AssignTransformer<'_> {
-    /// Check if an expression is safe to eliminate, assuming its result is never used.
-    /// [TODO]: refine the rules to consider other side-effect-carrying operations.
-    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
-        matches!(
-            exp.as_ref(),
-            ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..)
-        )
-    }
-}
-
 impl ExpRewriterFunctions for AssignTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         if let ExpData::Sequence(id, stms) = exp.as_ref() {
@@ -2122,7 +2117,7 @@ impl AssignTransformer<'_> {
         let mut blocks = vec![];
         let mut new_stms = vec![];
         let mut substitution: BTreeMap<Symbol, Exp> = BTreeMap::new();
-        for stm in stms {
+        for (idx, stm) in stms.iter().enumerate() {
             let stm_usage = self.usage[&stm.node_id()].clone();
             match stm.as_ref() {
                 // Check whether an assignment can be eliminated because it is used only once.
@@ -2138,7 +2133,8 @@ impl AssignTransformer<'_> {
                     // happens if we are in a loop).
                     stm_usage.is_single_assignment(*var, id) &&
                     // Must not be borrowed after this statement
-                    !stm_usage.is_borrowed(*var)
+                    !stm_usage.is_borrowed(*var) &&
+                    Self::safe_to_simplify(var, rhs, stms.get(idx+1..).unwrap_or(&[]))
                 =>
                     {
                         substitution.insert(
@@ -2146,7 +2142,7 @@ impl AssignTransformer<'_> {
                             self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
 
                         if stm_usage.read_count(*var) == 0 && !self.safe_to_eliminate(rhs) {
-                            new_stms.push(self.builder.unfold(&substitution, rhs.clone()));
+                            new_stms.push(self.builder.unfold(&substitution, stm.clone()));
                         }
                     },
                 _ => {
@@ -2167,6 +2163,80 @@ impl AssignTransformer<'_> {
             new_stms.push(block)
         }
         new_stms
+    }
+
+    /// Check if the following pattern
+    /// ```move
+    ///  let _t = rhs;
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(_t)
+    /// ```
+    ///  can be safely simplified to
+    /// ```move
+    ///  stmt1
+    ///  stmt2
+    ///  ...
+    ///  stmtN
+    ///  use(rhs)
+    /// ```
+    ///
+
+    fn safe_to_simplify(target_var: &Symbol, rhs: &Exp, stmts: &[Exp]) -> bool {
+        // Check 1: check if rhs is code location dependent
+        if matches!(rhs.as_ref(),
+            ExpData::Call(_,
+                Operation::MoveFunction(_, _) |
+                Operation::BorrowGlobal(_) |
+                Operation::MoveFrom |
+                Operation::MoveTo
+                ,_)) {
+            return false;
+        }
+
+        // Check 2: check if any vars used by `rhs` might be written or mutably borrowed by `stmt1..stmtN`
+        // Get free vars used by the RHS
+        let mut rhs_free_vars = BTreeSet::new();
+        rhs.visit_free_local_vars(|_, var| {
+            rhs_free_vars.insert(var);
+        });
+
+        for stmt in stmts {
+            // Get var usage by each statement
+            let mut stmt_usage = UsageInfo::default();
+            let mut visitor = |e: &ExpData| {
+                fetch_usage(&mut stmt_usage, e);
+                true
+            };
+            stmt.visit_pre_order(&mut visitor);
+
+            // If any of the free vars used by the RHS is written to/mutably borrowed in the statement,
+            if rhs_free_vars.iter().any(|var| stmt_usage.writes.contains_key(var)) {
+                return false;
+            }
+
+            // If the target var has been reached, we are good to go!
+            let mut stmt_free_vars = BTreeSet::new();
+            stmt.visit_free_local_vars(|_, var| {
+                stmt_free_vars.insert(var);
+            });
+            if stmt_free_vars.contains(target_var) {
+                // If the variable is used in the statement, we cannot simplify it.
+                return true;
+            }
+        }
+        true
+    }
+
+    /// Check if an expression is safe to eliminate, assuming its result is never used.
+    /// [TODO]: refine the rules to consider other side-effect-carrying operations.
+    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
+        matches!(
+            exp.as_ref(),
+            ExpData::Value(..) | ExpData::LocalVar(..) | ExpData::Temporary(..) | ExpData::Call(_, Operation::Closure(..) | Operation::Select(..) | Operation::SelectVariants(..) | Operation::Freeze(..), _)
+        )
     }
 }
 

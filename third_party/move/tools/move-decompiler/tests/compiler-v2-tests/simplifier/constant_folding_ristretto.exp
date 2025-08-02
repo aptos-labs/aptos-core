@@ -1,0 +1,7 @@
+module 0xcafe::Ristretto {
+    public fun test() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

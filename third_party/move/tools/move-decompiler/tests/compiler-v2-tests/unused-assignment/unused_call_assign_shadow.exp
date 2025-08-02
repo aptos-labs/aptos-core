@@ -1,0 +1,18 @@
+module 0x42::test {
+    fun bar(x: bool): u8 {
+        let _t10;
+        let _t6;
+        let _t1 = 0;
+        if (x) _t6 = _t1 + 1 else _t10 = _t1 + 2;
+        42u8
+    }
+    fun baz() {
+        ()
+    }
+    fun foo(a: u8, _b: u8) {
+        let _t4 = 0 + 1;
+        let _t6 = bar(false);
+    }
+}
+
+============ recompilation succeeded ========

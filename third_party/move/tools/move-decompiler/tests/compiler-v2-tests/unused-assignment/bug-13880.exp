@@ -1,0 +1,81 @@
+module 0x42::create_signer {
+    friend 0x42::object;
+    friend native fun create_signer(addr: address): signer;
+}
+module 0x42::error {
+    public fun permission_denied(i: u64): u64 {
+        i
+    }
+}
+module 0x42::event {
+    struct EventHandle<phantom T: drop + store> has store {
+        counter: u64,
+        guid: u64,
+    }
+    public fun emit<T: drop + store>(_msg: T) {
+        ()
+    }
+    public fun emit_event<T: drop + store>(_handle_ref: &mut EventHandle<T>, _msg: T) {
+        ()
+    }
+}
+module 0x42::signer {
+    public fun address_of(s: &signer): address {
+        let _t2 = borrow_address(s);
+        *_t2
+    }
+    public native fun borrow_address(s: &signer): &address;
+}
+module 0x42::object {
+    use 0x42::create_signer;
+    use 0x42::event;
+    use 0x42::signer;
+    struct Object<phantom T> has copy, drop, store {
+        inner: address,
+    }
+    struct ObjectCore has key {
+        guid_creation_num: u64,
+        owner: address,
+        transfer_events: event::EventHandle<TransferEvent>,
+    }
+    struct TransferEvent has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+    struct TombStone has key {
+        original_owner: address,
+    }
+    struct Transfer has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+    public fun owner<T: key>(object: Object<T>): address {
+        if (!exists<ObjectCore>(*&(&object).inner)) abort 5;
+        let _t8 = borrow_global<ObjectCore>(*&(&object).inner);
+        *&_t8.owner
+    }
+    public entry fun burn<T: key>(owner: &signer, object: Object<T>, a1: bool) {
+        let _t9 = signer::address_of(owner);
+        let _t3 = _t9;
+        let _t12 = is_owner<T>(object, _t3);
+        if (!_t12) abort 4;
+        let _t4 = *&(&object).inner;
+        let _t17 = create_signer::create_signer(_t4);
+        move_to<TombStone>(&_t17, TombStone{original_owner: _t3});
+        let _t23 = borrow_global_mut<ObjectCore>(_t4);
+        let _t7 = _t23;
+        if (*&_t7.owner != @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff) {
+            if (a1) event::emit<Transfer>(Transfer{object: _t4,from: *&_t7.owner,to: @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            event::emit_event<TransferEvent>(&mut _t7.transfer_events, TransferEvent{object: _t4,from: *&_t7.owner,to: @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff});
+            *&mut _t7.owner = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        };
+    }
+    public fun is_owner<T: key>(object: Object<T>, owner: address): bool {
+        let _t3 = owner<T>(object);
+        _t3 == owner
+    }
+}
+
+============ recompilation succeeded ========

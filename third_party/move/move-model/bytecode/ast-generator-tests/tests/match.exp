@@ -313,10 +313,10 @@ module 0x815::m {
         let _t1 = &self;
         if ((_t1 is Person) && *&_t1.id > 0) {
             let Entity::Person{id: _t20} = self;
-            _t2 = _t20
+            _t2 = _t20;
         } else if (_t1 is Institution) {
             let Entity::Institution{id: _t9,admin: _t10} = self;
-            _t2 = _t9
+            _t2 = _t9;
         } else _t2 = 0;
         _t2
     }

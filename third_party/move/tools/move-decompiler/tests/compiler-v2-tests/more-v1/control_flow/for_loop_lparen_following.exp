@@ -1,0 +1,14 @@
+script {
+    fun main_0() {
+        let _t0 = 0;
+        let _t1 = false;
+        loop {
+            let _t4 = _t1;
+            if (_t4) _t0 = _t0 + 1 else _t1 = true;
+            if (_t0 < 10) continue;
+            break;
+        };
+    }
+}
+
+============ recompilation succeeded ========

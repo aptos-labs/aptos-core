@@ -1,0 +1,7 @@
+module 0x1::A {
+    public fun a_call() {
+        abort 0
+    }
+}
+
+============ recompilation succeeded ========

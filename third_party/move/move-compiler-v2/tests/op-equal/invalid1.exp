@@ -30,12 +30,12 @@ module 0x42::test {
         let p = &mut x;
         {
             let $t = 1;
-            x = x + $t
+            x = x + $t;
         };
         {
             let $t2 = 1;
             let $t1 = p;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
         x;
     }

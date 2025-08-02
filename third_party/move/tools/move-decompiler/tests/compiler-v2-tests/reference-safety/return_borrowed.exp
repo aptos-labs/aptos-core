@@ -1,0 +1,18 @@
+module 0x42::m {
+    use 0x1::vector;
+    struct S has copy, drop {
+        f: vector<u64>,
+    }
+    fun f(r1: &S, r2: &u64): &u64 {
+        let _t3;
+        let _t2 = &r1.f;
+        let _t8 = vector::is_empty<u64>(_t2);
+        if (_t8) _t3 = r2 else {
+            let _t15 = vector::borrow<u64>(_t2, 0);
+            _t3 = _t15;
+        };
+        _t3
+    }
+}
+
+============ recompilation succeeded ========

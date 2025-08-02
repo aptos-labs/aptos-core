@@ -1,0 +1,9 @@
+module 0x2::M {
+    struct S {
+    }
+    fun foo<S: copy + drop>(s: S): S {
+        s
+    }
+}
+
+============ recompilation succeeded ========

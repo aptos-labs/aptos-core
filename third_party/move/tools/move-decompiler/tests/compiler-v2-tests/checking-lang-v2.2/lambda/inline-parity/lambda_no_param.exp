@@ -1,0 +1,23 @@
+module 0xdecafbad::m {
+    fun bar(f: ||(u64)): u64 {
+        f()
+    }
+    fun foo(f: ||) {
+        f();
+    }
+    public fun one() {
+        foo(|| lambda__1__one());
+    }
+    fun lambda__1__one() {
+        ()
+    }
+    public fun two(x: u64): u64 {
+        let _t3 = bar(|| lambda__1__two(x));
+        _t3
+    }
+    fun lambda__1__two(x: u64): u64 {
+        x
+    }
+}
+
+============ recompilation succeeded ========

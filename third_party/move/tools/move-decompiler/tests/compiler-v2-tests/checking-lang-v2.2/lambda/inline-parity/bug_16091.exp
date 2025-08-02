@@ -1,0 +1,13 @@
+module 0x42::Test {
+    struct T has drop, key {
+        t: S<u64>,
+    }
+    struct S<T1> has drop, store {
+        t1: T1,
+    }
+    public fun test() {
+        let _t4 = &S<u64>{t1: 2};
+    }
+}
+
+============ recompilation succeeded ========

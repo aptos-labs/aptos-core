@@ -1,0 +1,18 @@
+module 0x99::basic_struct {
+    struct Wrapper<T> has key {
+        fv: T,
+    }
+    fun add_resource_with_struct(acc: &signer, f: |&||(u64)|(u64) has copy + drop + store) {
+        move_to<Wrapper<|&||(u64)|(u64) has copy + drop + store>>(acc, Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f});
+    }
+    #[persistent] fun test(f: &||(u64)): u64 {
+        let _t1;
+        if (f == f) _t1 = 1 else _t1 = 2;
+        _t1
+    }
+    public fun test_driver(acc: &signer) {
+        add_resource_with_struct(acc, |arg0| test(arg0));
+    }
+}
+
+============ recompilation succeeded ========

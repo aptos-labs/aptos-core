@@ -44,21 +44,21 @@ module 0xc0ffee::m {
         {
             let (p) = (0);
             let (x) = (p);
-            1
+            1;
         };
     }
     fun unused_lambda_suppressed1() {
         {
             let (p) = (0);
             let (_x) = (p);
-            1
+            1;
         };
     }
     fun unused_lambda_suppressed2() {
         {
             let (p) = (0);
             let (_) = (p);
-            1
+            1;
         };
     }
 }

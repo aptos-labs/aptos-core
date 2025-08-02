@@ -1,0 +1,7 @@
+script {
+    fun main_0() {
+        loop continue
+    }
+}
+
+============ recompilation succeeded ========

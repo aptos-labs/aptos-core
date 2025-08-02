@@ -1,0 +1,7 @@
+script {
+    fun main_0() {
+        if (!(5 == 5)) abort 42;
+    }
+}
+
+============ recompilation succeeded ========

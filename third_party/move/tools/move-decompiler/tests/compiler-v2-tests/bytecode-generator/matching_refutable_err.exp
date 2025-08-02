@@ -1,0 +1,14 @@
+module 0x815::m {
+    enum E {
+        None,
+        Some {
+            _0: u64,
+        }
+    }
+    fun t(self: E): u64 {
+        let E::Some{_0: _t2} = self;
+        _t2
+    }
+}
+
+============ recompilation succeeded ========

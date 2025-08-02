@@ -1,0 +1,29 @@
+module 0x8675309::M {
+    struct G<T> has drop {
+        f: T,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S has drop {
+        u: u64,
+    }
+    fun t0(r: &R, r_mut: &mut R, s: S, s_ref: &S, s_mut: &mut S) {
+        let _t11 = &0 == &1;
+        let _t14 = &s == s_ref;
+        let _t18 = freeze(&mut s) == s_ref;
+        let _t23 = freeze(&mut s) == freeze(s_mut);
+        let _t27 = &s == freeze(s_mut);
+        let _t31 = s_ref == freeze(s_mut);
+        let _t36 = freeze(s_mut) == freeze(s_mut);
+        let _t40 = S{u: 0} == s;
+        let _t43 = r == r;
+        let _t48 = freeze(r_mut) == freeze(r_mut);
+        let _t52 = r == freeze(r_mut);
+        let _t56 = freeze(r_mut) == r;
+        let _t61 = G<u64>{f: 1} == G<u64>{f: 1};
+        let _t66 = G<u64>{f: 1} == G<u64>{f: 1};
+    }
+}
+
+============ recompilation succeeded ========

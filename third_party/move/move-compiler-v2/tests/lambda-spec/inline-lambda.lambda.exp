@@ -121,7 +121,7 @@ module 0x42::Test {
             }
              */
             ;
-            y
+            y;
         };
     }
     public fun test_apply(a1: u64, a2: u64) {

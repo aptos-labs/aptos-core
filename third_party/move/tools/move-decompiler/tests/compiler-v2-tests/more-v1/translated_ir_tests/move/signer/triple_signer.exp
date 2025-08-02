@@ -1,0 +1,27 @@
+script {
+    fun main_0(_s: signer, _s2: signer, _s3: signer) {
+        ()
+    }
+}
+script {
+    fun main_1(_s: signer, _s2: signer, _s3: signer, _u: u64) {
+        ()
+    }
+}
+script {
+    fun main_2(_s: signer, _s2: signer, _u: u64, _s3: signer) {
+        ()
+    }
+}
+script {
+    fun main_3(_u: u64, _s2: signer) {
+        ()
+    }
+}
+script {
+    fun main_4(_s: signer, _u: u64, _s2: signer) {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

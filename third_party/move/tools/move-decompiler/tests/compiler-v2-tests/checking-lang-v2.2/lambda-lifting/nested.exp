@@ -1,0 +1,21 @@
+module 0xcafe::m {
+    fun map1(x: u64, f: |u64|(u64)): u64 {
+        f(x)
+    }
+    fun map2(x: u8, f: |u8|(u8)): u8 {
+        f(x)
+    }
+    fun nested(x: u64, c: u64): u64 {
+        let _t5 = map1(x, |arg0| lambda__2__nested(c, arg0));
+        _t5
+    }
+    fun lambda__2__nested(c: u64, y: u64): u64 {
+        let _t8 = map2((y - c) as u8, |arg0| lambda__1__nested(c, arg0));
+        _t8 as u64
+    }
+    fun lambda__1__nested(c: u64, y: u8): u8 {
+        y + (c as u8)
+    }
+}
+
+============ recompilation succeeded ========

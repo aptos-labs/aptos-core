@@ -1,0 +1,14 @@
+module 0x42::enum_types {
+    use 0x1::string;
+    enum MessageHolder has drop, key {
+        Empty,
+        Message {
+            message: string::String,
+        }
+        NewMessage {
+            message: string::String,
+        }
+    }
+}
+
+============ recompilation succeeded ========

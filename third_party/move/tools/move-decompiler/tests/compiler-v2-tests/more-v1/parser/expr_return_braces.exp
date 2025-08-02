@@ -1,0 +1,9 @@
+module 0x8675309::M {
+    fun f(v: u64): u64 {
+        let _t1;
+        if (v > 10) _t1 = 10 else _t1 = v;
+        _t1
+    }
+}
+
+============ recompilation succeeded ========

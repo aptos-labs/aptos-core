@@ -1,0 +1,23 @@
+module 0x2::X {
+    struct S has drop {
+    }
+    public fun foo(): S {
+        S{}
+    }
+}
+module 0x2::M {
+    use 0x2::X;
+    struct F {
+        f: X::S,
+        g: X::S,
+        h: X::S,
+    }
+    fun foo(_x: X::S, _y: X::S, _z: X::S): (X::S, X::S, X::S) {
+        let _t3 = X::foo();
+        let _t4 = X::foo();
+        let _t5 = X::foo();
+        (_t3, _t4, _t5)
+    }
+}
+
+============ recompilation succeeded ========

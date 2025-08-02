@@ -1,0 +1,10 @@
+module 0x8675309::M {
+    fun t0() {
+        loop continue
+    }
+    fun t1() {
+        loop continue
+    }
+}
+
+============ recompilation succeeded ========

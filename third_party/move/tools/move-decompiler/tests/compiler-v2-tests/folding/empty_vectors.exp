@@ -1,0 +1,38 @@
+module 0x42::m {
+    use 0x1::vector;
+    public entry fun init() {
+        let _t11 = vector::empty<u64>();
+        let _t12 = vector::empty<vector<u8>>();
+        let _t1 = _t12;
+        vector::reverse<vector<u8>>(&mut _t1);
+        let _t2 = _t1;
+        let _t16 = vector::length<vector<u8>>(&_t2);
+        let _t3 = _t16;
+        while (_t3 > 0) {
+            let _t21 = vector::pop_back<vector<u8>>(&mut _t2);
+            let _t4 = &mut _t11;
+            let _t24 = vector::length<u8>(&_t21);
+            let _t7 = _t24 + 2;
+            vector::push_back<u64>(_t4, _t7);
+            _t3 = _t3 - 1;
+            continue;
+        };
+        vector::destroy_empty<vector<u8>>(_t2);
+        let _t33 = vector::empty<u64>();
+        let _t34 = vector::empty<u64>();
+        let _t9 = _t34;
+        vector::reverse<u64>(&mut _t9);
+        let _t10 = _t9;
+        let _t38 = vector::length<u64>(&_t10);
+        _t3 = _t38;
+        while (_t3 > 0) {
+            let _t43 = vector::pop_back<u64>(&mut _t10);
+            vector::push_back<u64>(&mut _t33, _t43 + 3);
+            _t3 = _t3 - 1;
+            continue;
+        };
+        vector::destroy_empty<u64>(_t10);
+    }
+}
+
+============ recompilation succeeded ========

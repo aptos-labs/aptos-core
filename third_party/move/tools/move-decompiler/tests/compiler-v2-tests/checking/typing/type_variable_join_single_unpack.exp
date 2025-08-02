@@ -1,0 +1,17 @@
+module 0x8675309::M {
+    struct Box<T> has drop {
+        f1: T,
+        f2: T,
+    }
+    fun new<T>(): Box<T> {
+        abort 0
+    }
+    fun t0() {
+        let _t0 = new<u64>();
+        let Box<u64>{f1: _t1,f2: _t2} = _t0;
+        let _t3 = new<Box<u64>>();
+        let Box<Box<u64>>{f1: _t4,f2: _t5} = _t3;
+    }
+}
+
+============ recompilation succeeded ========

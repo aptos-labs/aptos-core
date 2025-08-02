@@ -1,0 +1,15 @@
+module 0x42::OrderSensitiveTest1 {
+}
+module 0x42::OrderSensitiveTest2 {
+}
+module 0x42::OrderSensitiveTest3 {
+    public fun fun2(a: u64, b: u64): u64 {
+        let _t4 = 7 * (a * b + 5);
+        let _t3 = b;
+        let _t2 = _t4 * _t3 + 3;
+        let _t5 = _t4 * _t3 + 4;
+        _t2 * _t5 + 2 * (_t2 * _t5 + 2) + 3 * (_t4 * _t3 + 3) + 5 * (_t4 * _t3 + 4) + 9 * (a * b + 6)
+    }
+}
+
+============ recompilation succeeded ========

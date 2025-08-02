@@ -110,10 +110,10 @@ module 0xc0ffee::m {
     inline fun outer(): u64 {
         {
             let ();
-            secret() + secret()
+            secret() + secret();
         } + {
             let ();
-            secret() + secret()
+            secret() + secret();
         }
     }
     fun secret(): u64 {
@@ -124,11 +124,11 @@ module 0xc0ffee::m {
             let ();
             {
                 let ();
-                secret() + secret()
+                secret() + secret();
             } + {
                 let ();
-                secret() + secret()
-            }
+                secret() + secret();
+            };
         } == 168) () else abort 14566554180833181696;
     }
 }
@@ -141,11 +141,11 @@ module 0xc0ffee::n {
             let ();
             {
                 let ();
-                non_secret() + non_secret()
+                non_secret() + non_secret();
             } + {
                 let ();
-                non_secret() + non_secret()
-            }
+                non_secret() + non_secret();
+            };
         } == 168) () else abort 14566554180833181696;
     }
     public fun non_secret(): u64 {
@@ -154,10 +154,10 @@ module 0xc0ffee::n {
     friend inline fun outer_friend(): u64 {
         {
             let ();
-            non_secret() + non_secret()
+            non_secret() + non_secret();
         } + {
             let ();
-            non_secret() + non_secret()
+            non_secret() + non_secret();
         }
     }
 }
@@ -170,11 +170,11 @@ module 0xc0ffee::o {
             let ();
             {
                 let ();
-                non_secret() + non_secret()
+                non_secret() + non_secret();
             } + {
                 let ();
-                non_secret() + non_secret()
-            }
+                non_secret() + non_secret();
+            };
         } == 168) () else abort 14566554180833181696;
     }
     public fun non_secret(): u64 {
@@ -183,10 +183,10 @@ module 0xc0ffee::o {
     friend inline fun outer_package(): u64 {
         {
             let ();
-            non_secret() + non_secret()
+            non_secret() + non_secret();
         } + {
             let ();
-            non_secret() + non_secret()
+            non_secret() + non_secret();
         }
     }
 }

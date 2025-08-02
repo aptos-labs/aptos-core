@@ -1,0 +1,9 @@
+module 0xc0ffee::dummy1 {
+}
+module 0xc0ffee::dummy2 {
+    public fun main(): u64 {
+        1
+    }
+}
+
+============ recompilation succeeded ========

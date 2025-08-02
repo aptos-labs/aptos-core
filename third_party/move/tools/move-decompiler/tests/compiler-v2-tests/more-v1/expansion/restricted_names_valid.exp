@@ -1,0 +1,26 @@
+module 0x2::N {
+    public fun t(): u64 {
+        0
+    }
+}
+module 0x2::M {
+    use 0x2::N;
+    fun t(): u64 {
+        let _t0 = N::t();
+        let _t1 = N::t();
+        let _t3 = N::t();
+        let _t5 = N::t();
+        let _t7 = N::t();
+        let _t9 = N::t();
+        let _t11 = N::t();
+        let _t13 = N::t();
+        let _t15 = N::t();
+        let _t17 = N::t();
+        let _t19 = N::t();
+        let _t21 = N::t();
+        let _t22 = _t0 + _t1 + _t3 + _t5 + _t7 + _t9 + _t11 + _t13 + _t15 + _t17 + _t19 + _t21;
+        0
+    }
+}
+
+============ recompilation succeeded ========

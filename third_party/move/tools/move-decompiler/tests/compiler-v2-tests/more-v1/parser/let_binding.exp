@@ -1,0 +1,20 @@
+module 0x8675309::M {
+    struct Generic<T> has copy, drop {
+        g: T,
+    }
+    struct R has copy, drop {
+        f: u64,
+    }
+    fun g(r: R, g: Generic<R>) {
+        let R{f: _t3} = r;
+        let R{f: _t5} = r;
+        let R{f: _t7} = r;
+        let Generic<R>{g: _t9} = g;
+        let R{f: _t10} = _t9;
+    }
+    fun f() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

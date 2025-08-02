@@ -1,0 +1,16 @@
+module 0x42::m {
+    fun mut_ref_id(x: u64) {
+        let _t5 = freeze(&mut x) == freeze(&mut x);
+    }
+    fun mut_ref_to_mut_ref(x: u64, y: u64) {
+        let _t6 = freeze(&mut x) == freeze(&mut y);
+    }
+    fun mut_ref_to_ref(x: u64, y: u64) {
+        let _t5 = freeze(&mut x) == &y;
+    }
+    fun ref_to_ref(x: u64, y: u64) {
+        let _t4 = &x == &y;
+    }
+}
+
+============ recompilation succeeded ========

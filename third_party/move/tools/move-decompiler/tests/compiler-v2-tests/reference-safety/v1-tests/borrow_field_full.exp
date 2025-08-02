@@ -1,0 +1,61 @@
+module 0x8675309::M {
+    struct Inner has copy, drop {
+        f1: u64,
+        f2: u64,
+    }
+    struct Outer has copy, drop {
+        s1: Inner,
+        s2: Inner,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0(outer: &mut Outer) {
+        let _t1 = &outer.s1;
+        let _t2 = _t1;
+        let _t11 = *_t2;
+        let _t13 = *_t1;
+        let _t14 = *&_t1.f1;
+        let _t16 = *_t1;
+        let _t18 = *_t2;
+        _t1 = &outer.s1;
+        let _t22 = id<Inner>(_t1);
+        _t2 = _t22;
+        let _t26 = *_t2;
+        let _t28 = *_t1;
+        let _t29 = *&_t1.f1;
+        let _t31 = *_t1;
+        let _t33 = *_t2;
+        let _t3 = &mut outer.s1;
+        _t1 = freeze(_t3);
+        let _t41 = *_t1;
+        let _t43 = *_t3;
+        let _t44 = *&_t3.f1;
+        let _t46 = *_t3;
+        let _t48 = *_t1;
+        _t3 = &mut outer.s1;
+        let _t53 = id<Inner>(freeze(_t3));
+        _t1 = _t53;
+        let _t57 = *_t1;
+        let _t59 = *_t3;
+        let _t60 = *&_t3.f1;
+        let _t62 = *_t3;
+        let _t64 = *_t1;
+        _t3 = &mut outer.s1;
+        let _t4 = _t3;
+        let _t70 = *&mut _t4.f1;
+        let _t72 = *_t4;
+        let _t74 = *_t3;
+        _t3 = &mut outer.s1;
+        let _t78 = id_mut<Inner>(_t3);
+        _t4 = _t78;
+        let _t81 = *&mut _t4.f1;
+        let _t83 = *_t4;
+        let _t85 = *_t3;
+    }
+}
+
+============ recompilation succeeded ========

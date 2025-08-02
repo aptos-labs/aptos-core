@@ -1,0 +1,10 @@
+module 0x8675309::M {
+    public fun f() {
+        ()
+    }
+    fun lambda__1__f(i: u64): u64 {
+        i + 1
+    }
+}
+
+============ recompilation succeeded ========

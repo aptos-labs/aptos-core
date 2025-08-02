@@ -1,0 +1,28 @@
+module 0x8675309::M {
+    fun t0() {
+        let _t2 = &0;
+        let _t3 = &mut 0;
+        let _t11 = take_imm_mut_give_mut(_t2, _t3);
+        let _t13 = *_t2;
+        *_t11 = 1;
+    }
+    fun take_imm_mut_give_mut(_x: &u64, y: &mut u64): &mut u64 {
+        y
+    }
+    fun t1() {
+        let _t2 = &0;
+        let _t3 = &mut 0;
+        let _t11 = take_imm_mut_give_imm(_t2, _t3);
+        let _t4 = _t11;
+        let _t13 = *_t4;
+        let _t15 = *_t2;
+        let _t17 = *_t3;
+        let _t19 = *_t2;
+        let _t21 = *_t4;
+    }
+    fun take_imm_mut_give_imm(_x: &u64, y: &mut u64): &u64 {
+        freeze(y)
+    }
+}
+
+============ recompilation succeeded ========

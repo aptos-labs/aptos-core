@@ -1,0 +1,28 @@
+module 0x42::test {
+    struct T has drop, store, key {
+    }
+    struct R has drop, store, key {
+    }
+    public entry fun test(addr: address) {
+        let _t2 = move_from<R>(addr);
+        let R{} = _t2;
+    }
+    fun test2(): bool {
+        *&(&R{}).dummy_field
+    }
+    public entry fun test3(addr: address) {
+        let _t2 = move_from<T>(addr);
+        let T{} = _t2;
+    }
+    public entry fun test4(s: &signer) {
+        move_to<T>(s, T{});
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: empty struct `test::R` cannot access the field `dummy_field`
+   ┌─ dummy_field.move:11:11
+   │
+11 │         *&(&R{}).dummy_field
+   │           ^^^^^^^^^^^^^^^^^^

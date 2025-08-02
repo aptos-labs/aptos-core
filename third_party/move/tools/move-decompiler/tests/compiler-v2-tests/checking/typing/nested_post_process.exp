@@ -1,0 +1,42 @@
+module 0x42::simple_map {
+    use 0x1::option;
+    use 0x1::error;
+    struct Element<Key, Value> has copy, drop, store {
+        key: Key,
+        value: Value,
+    }
+    struct SimpleMap<Key, Value> has copy, drop, store {
+        data: vector<Element<Key, Value>>,
+    }
+    public fun borrow<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): &Value {
+        let _t6 = find<Key,Value>(map, key);
+        let _t2 = _t6;
+        let _t8 = option::is_some<u64>(&_t2);
+        if (!_t8) {
+            let _t18 = error::invalid_argument(2);
+            abort _t18;
+        };
+        let _t10 = option::extract<u64>(&mut _t2);
+        let _t14 = 0x1::vector::borrow<Element<Key, Value>>(&map.data, _t10);
+        &_t14.value
+    }
+    fun find<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): option::Option<u64> {
+        let _t6 = 0x1::vector::length<Element<Key, Value>>(&map.data);
+        let _t3 = 0;
+        'l0: loop {
+            loop {
+                if (!(_t3 < _t6)) break 'l0;
+                let _t14 = 0x1::vector::borrow<Element<Key, Value>>(&map.data, _t3);
+                if (&_t14.key == key) break;
+                _t3 = _t3 + 1;
+                continue;
+            };
+            let _t21 = option::some<u64>(_t3);
+            return _t21;
+        };
+        let _t27 = option::none<u64>();
+        _t27
+    }
+}
+
+============ recompilation succeeded ========

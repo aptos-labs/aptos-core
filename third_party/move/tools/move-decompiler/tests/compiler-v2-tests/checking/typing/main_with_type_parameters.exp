@@ -1,0 +1,7 @@
+script {
+    fun main_0<T1: drop, T2, T3: key>() {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

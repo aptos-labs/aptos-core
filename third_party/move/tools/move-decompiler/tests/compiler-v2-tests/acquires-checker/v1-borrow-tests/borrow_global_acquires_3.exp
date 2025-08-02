@@ -1,0 +1,45 @@
+module 0x8675309::A {
+    use 0x1::signer;
+    struct T1 has key {
+        v: u64,
+    }
+    struct T2 has key {
+        v: u64,
+    }
+    fun acquires_t1(account: &signer) {
+        let _t2 = signer::address_of(account);
+        let _t3 = move_from<T1>(_t2);
+        let T1{v: _t4} = _t3;
+    }
+    fun acquires_t2(account: &signer) {
+        let _t2 = signer::address_of(account);
+        let _t3 = move_from<T2>(_t2);
+        let T2{v: _t4} = _t3;
+    }
+    fun get_v(x: &mut T1): &mut u64 {
+        &mut x.v
+    }
+    public fun test1(account: &signer) {
+        let _t3 = signer::address_of(account);
+        let _t4 = borrow_global_mut<T1>(_t3);
+        let _t5 = get_v(_t4);
+        acquires_t2(account);
+        acquires_t1(account);
+    }
+    public fun test2(account: &signer) {
+        let _t3 = signer::address_of(account);
+        let _t4 = borrow_global_mut<T1>(_t3);
+        let _t5 = get_v(_t4);
+        acquires_t1(account);
+        acquires_t2(account);
+    }
+    public fun test3(account: &signer) {
+        let _t3 = signer::address_of(account);
+        let _t4 = borrow_global_mut<T1>(_t3);
+        let _t5 = get_v(_t4);
+        acquires_t2(account);
+        acquires_t1(account);
+    }
+}
+
+============ recompilation succeeded ========

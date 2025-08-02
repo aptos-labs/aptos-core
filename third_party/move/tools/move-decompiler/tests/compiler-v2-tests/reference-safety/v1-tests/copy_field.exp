@@ -1,0 +1,22 @@
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+        g: u64,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0() {
+        let _t9 = *&(&S{f: 0,g: 0}).f;
+        let _t15 = *&mut (&mut S{f: 0,g: 0}).f;
+        let _t21 = id<u64>(&(&S{f: 0,g: 0}).f);
+        let _t22 = *_t21;
+        let _t28 = id_mut<u64>(&mut (&mut S{f: 0,g: 0}).f);
+        let _t29 = *_t28;
+    }
+}
+
+============ recompilation succeeded ========

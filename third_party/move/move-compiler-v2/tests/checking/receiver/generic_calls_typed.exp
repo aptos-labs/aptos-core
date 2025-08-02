@@ -83,7 +83,7 @@ module 0x42::m {
         let (s) = (s);
         {
             let (s) = (s);
-            id<u64>(s)
+            id<u64>(s);
         };
     }
 }

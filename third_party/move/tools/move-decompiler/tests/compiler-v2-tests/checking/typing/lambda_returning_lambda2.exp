@@ -1,0 +1,8 @@
+module 0x8675309::M {
+    public fun whacky_foreach2() {
+        let _t3 = &vector[1, 2, 3];
+        abort 1
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,28 @@
+module 0x42::test {
+    struct T {
+        z: S,
+    }
+    struct S {
+        x: u8,
+        y: bool,
+    }
+    fun unused_assign_in_nested_pattern() {
+        let T{z: _t4} = T{z: S{x: 42u8,y: true}};
+        let S{x: _t5,y: _t6} = _t4;
+    }
+    fun unused_assign_in_pattern() {
+        let S{x: _t3,y: _t4} = S{x: 42u8,y: true};
+    }
+    fun unused_decl_in_nested_pattern() {
+        let T{z: _t4} = T{z: S{x: 42u8,y: true}};
+        let S{x: _t5,y: _t6} = _t4;
+    }
+    fun unused_decl_in_pattern() {
+        let S{x: _t3,y: _t4} = S{x: 42u8,y: true};
+    }
+    fun unused_in_pattern_ok() {
+        let S{x: _t3,y: _t4} = S{x: 42u8,y: true};
+    }
+}
+
+============ recompilation succeeded ========

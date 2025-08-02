@@ -1,0 +1,13 @@
+module 0x8675::M {
+    public fun test(): u64 {
+        let _t0 = 10;
+        let _t2 = 0;
+        while (_t0 > 0) {
+            _t0 = _t0 - 1;
+            _t2 = _t2 + _t0;
+        };
+        _t0 + _t0 + _t2
+    }
+}
+
+============ recompilation succeeded ========

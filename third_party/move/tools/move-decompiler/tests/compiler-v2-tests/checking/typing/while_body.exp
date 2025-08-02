@@ -1,0 +1,20 @@
+module 0x8675309::M {
+    fun t0(cond: bool) {
+        while (cond) continue;
+        while (cond) continue;
+        while (cond) continue;
+        while (cond) continue;
+        while (cond) continue;
+        while (cond) continue;
+        while (cond) continue;
+        'l0: loop {
+            if (!cond) loop {
+                if (cond) continue;
+                break 'l0;
+            };
+            return ();
+        };
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,7 @@
+module 0xcafe::Module0 {
+    public fun function2(var4: u8): bool {
+        freeze(&mut var4) != freeze(&mut var4)
+    }
+}
+
+============ recompilation succeeded ========

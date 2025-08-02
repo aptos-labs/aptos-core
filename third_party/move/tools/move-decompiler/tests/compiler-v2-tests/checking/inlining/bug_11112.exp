@@ -1,0 +1,19 @@
+module 0xcafe::vectors {
+    fun test_for_each_mut() {
+        let _t0 = vector[1, 2, 3];
+        let _t1 = 2;
+        let _t2 = &mut _t0;
+        let _t3 = 0;
+        let _t12 = 0x1::vector::length<u64>(freeze(_t2));
+        while (_t3 < _t12) {
+            let _t18 = 0x1::vector::borrow_mut<u64>(_t2, _t3);
+            *_t18 = _t1;
+            _t1 = _t1 + 1;
+            _t3 = _t3 + 1;
+            continue;
+        };
+        if (!(_t0 == vector[2, 3, 4])) abort 0;
+    }
+}
+
+============ recompilation succeeded ========

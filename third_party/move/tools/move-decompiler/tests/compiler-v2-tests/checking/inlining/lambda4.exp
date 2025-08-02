@@ -1,0 +1,7 @@
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        abort 1
+    }
+}
+
+============ recompilation succeeded ========

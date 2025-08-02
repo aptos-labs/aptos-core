@@ -85,8 +85,8 @@ module 0x42::m {
                         let (elem) = (e);
                         0x1::vector::push_back<0x1::string::String>(&mut result, {
                             let (key) = (elem);
-                            0x1::string::utf8(key)
-                        })
+                            0x1::string::utf8(key);
+                        });
                     };
                 };
             };
@@ -104,8 +104,8 @@ module 0x42::m {
                         let (elem) = (e);
                         0x1::vector::push_back<vector<u8>>(&mut result, {
                             let (v) = (elem);
-                            0x1::bcs::to_bytes<u64>(&v)
-                        })
+                            0x1::bcs::to_bytes<u64>(&v);
+                        });
                     };
                 };
             };

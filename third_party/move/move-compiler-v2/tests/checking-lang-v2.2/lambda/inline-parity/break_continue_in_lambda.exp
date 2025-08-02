@@ -111,7 +111,7 @@ module 0xc0ffee::m {
                 brk2(|()| __lambda__1__bar());
                 brk2(|()| __lambda__2__bar());
                 brk2(|()| __lambda__3__bar());
-            }
+            };
         };
         i
     }
@@ -145,7 +145,7 @@ module 0xc0ffee::m {
                 brk();
                 brk3();
                 brk4();
-            }
+            };
         };
         i
     }

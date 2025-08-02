@@ -1,0 +1,9 @@
+module 0xcafe::Module0 {
+    struct S {
+    }
+    public fun f() {
+        abort 1
+    }
+}
+
+============ recompilation succeeded ========

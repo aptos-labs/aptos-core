@@ -76,7 +76,7 @@ module 0x42::Test {
                     a = a + 1;
                     sum = sum + a;
                 };
-                sum
+                sum;
             } + sum;
         };
         sum

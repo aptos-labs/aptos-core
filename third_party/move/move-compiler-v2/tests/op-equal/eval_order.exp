@@ -81,14 +81,14 @@ module 0xc0ffee::m {
         {
             let $t2 = 2;
             let $t1 = r;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun mod2(r: &mut u64): u64 {
         {
             let $t2 = 2;
             let $t1 = r;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
         *r
     }
@@ -100,15 +100,15 @@ module 0xc0ffee::m {
                     let $t = {
                         {
                             let $t = 2;
-                            v = v + $t
+                            v = v + $t;
                         };
                         v
                     };
-                    v = v + $t
+                    v = v + $t;
                 };
                 v
             };
-            v = v + $t
+            v = v + $t;
         };
         v
     }
@@ -118,11 +118,11 @@ module 0xc0ffee::m {
             let $t = {
                 {
                     let $t = 2;
-                    v = v + $t
+                    v = v + $t;
                 };
                 v
             };
-            v = v + $t
+            v = v + $t;
         };
         v
     }
@@ -133,7 +133,7 @@ module 0xc0ffee::m {
                 mod1(&mut v);
                 v
             };
-            v = v + $t
+            v = v + $t;
         };
         v
     }
@@ -141,7 +141,7 @@ module 0xc0ffee::m {
         let v = 1;
         {
             let $t = mod2(&mut v);
-            v = v + $t
+            v = v + $t;
         };
         v
     }

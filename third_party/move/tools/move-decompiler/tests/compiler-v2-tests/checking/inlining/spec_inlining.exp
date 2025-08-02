@@ -1,0 +1,8 @@
+module 0x42::Test {
+    public fun test_apply(x: u64) {
+        if (!(x >= 0)) abort 1;
+        if (!(x != 0)) abort 2;
+    }
+}
+
+============ recompilation succeeded ========

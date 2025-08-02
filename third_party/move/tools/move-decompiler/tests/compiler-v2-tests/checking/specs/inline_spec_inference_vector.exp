@@ -1,0 +1,8 @@
+module 0x42::bit_vector {
+    public fun new(_length: u64) {
+        let _t2 = 0x1::vector::empty<bool>();
+        0x1::vector::push_back<bool>(&mut _t2, false);
+    }
+}
+
+============ recompilation succeeded ========

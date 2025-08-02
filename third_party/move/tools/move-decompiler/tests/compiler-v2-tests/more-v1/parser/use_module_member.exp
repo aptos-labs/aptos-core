@@ -1,0 +1,38 @@
+module 0x1::Z {
+    struct S {
+    }
+    public fun foo() {
+        ()
+    }
+}
+module 0x1::Y {
+    struct S {
+    }
+    public fun foo() {
+        ()
+    }
+}
+module 0x1::X {
+    struct S {
+    }
+    public fun foo() {
+        ()
+    }
+}
+module 0x1::M {
+    use 0x1::Z;
+    use 0x1::Y;
+    use 0x1::X;
+    struct A {
+        f1: X::S,
+        f2: Y::S,
+        f3: Z::S,
+    }
+    public fun m() {
+        X::foo();
+        Y::foo();
+        Z::foo();
+    }
+}
+
+============ recompilation succeeded ========

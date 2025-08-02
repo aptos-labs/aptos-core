@@ -1,0 +1,16 @@
+module 0x99::basic_enum {
+    enum FV<T> has key {
+        V1 {
+            v1: |&mut T|(T) has copy + store,
+        }
+    }
+    #[persistent] fun increment_by_one(x: &mut u64): u64 {
+        *x = *x + 1;
+        *x
+    }
+    fun test_fun_vec(s: &signer) {
+        move_to<FV<u64>>(s, FV::V1<u64>{v1: |arg0| increment_by_one(arg0)});
+    }
+}
+
+============ recompilation succeeded ========

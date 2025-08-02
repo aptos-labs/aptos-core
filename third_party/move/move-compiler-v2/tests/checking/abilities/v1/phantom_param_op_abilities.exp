@@ -80,15 +80,15 @@ module 0x42::M {
         (copy x, x)
     }
     fun f5(s: &signer, x: HasKey<NoAbilities, u64>) {
-        move_to<HasKey<NoAbilities, u64>>(s, x);
+        move_to<HasKey<NoAbilities, u64>>(x, s);
     }
     fun f6(): HasKey<NoAbilities, u64>
         acquires HasKey
     {
-        move_from<HasKey<NoAbilities, u64>>(0x0)
+        move_from<HasKey<NoAbilities, u64>>(@0x0)
     }
     fun f7(): bool {
-        exists<HasKey<NoAbilities, u64>>(0x0)
+        exists<HasKey<NoAbilities, u64>>(@0x0)
     }
     fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
         RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities,u64>{a: 1}}

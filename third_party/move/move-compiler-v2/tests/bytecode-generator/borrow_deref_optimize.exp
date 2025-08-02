@@ -47,7 +47,7 @@ module 0x42::test {
     fun no_optimize_resource(): bool
         acquires X
     {
-        let x = &mut *borrow_global<X>(0x1);
+        let x = &mut *borrow_global<X>(@0x1);
         x.value
     }
     fun no_optimize_vector() {
@@ -57,7 +57,7 @@ module 0x42::test {
     fun optimize_resource(): bool
         acquires X
     {
-        let x = &*borrow_global<X>(0x1);
+        let x = &*borrow_global<X>(@0x1);
         x.value
     }
     fun optimize_vector() {

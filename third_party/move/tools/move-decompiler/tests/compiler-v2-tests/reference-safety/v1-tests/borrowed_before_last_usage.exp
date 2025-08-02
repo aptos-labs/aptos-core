@@ -1,0 +1,7 @@
+script {
+    fun main_0() {
+        if (!(*&0 == 0)) abort 0;
+    }
+}
+
+============ recompilation succeeded ========

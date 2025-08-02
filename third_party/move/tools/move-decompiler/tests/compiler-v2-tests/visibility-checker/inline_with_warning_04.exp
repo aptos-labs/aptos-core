@@ -1,0 +1,10 @@
+module 0xdeadbeef::n {
+    friend 0xdeadbeef::m;
+    friend fun foo(): u64 {
+        42
+    }
+}
+module 0xdeadbeef::m {
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,19 @@
+module 0x2::M {
+    struct S1 {
+        b: bool,
+    }
+    struct S2 {
+        u: u64,
+    }
+    fun t() {
+        ()
+    }
+    fun check(): bool {
+        false
+    }
+    fun num(): u64 {
+        0
+    }
+}
+
+============ recompilation succeeded ========

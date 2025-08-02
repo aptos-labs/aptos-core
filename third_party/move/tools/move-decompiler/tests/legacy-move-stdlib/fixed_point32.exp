@@ -3,9 +3,10 @@ module 0x1::fixed_point32 {
         value: u64,
     }
     public fun ceil(self: FixedPoint32): u64 {
-        let _t1 = floor(self) << 32u8;
+        let _t3 = floor(self);
+        let _t1 = _t3 << 32u8;
         if (*&(&self).value == _t1) return _t1 >> 32u8;
-        (_t1 as u128) + 4294967296u128 >> 32u8 as u64
+        ((_t1 as u128) + 4294967296u128 >> 32u8) as u64
     }
     public fun floor(self: FixedPoint32): u64 {
         *&(&self).value >> 32u8
@@ -30,7 +31,7 @@ module 0x1::fixed_point32 {
     }
     public fun divide_u64(val: u64, divisor: FixedPoint32): u64 {
         if (!(*&(&divisor).value != 0)) abort 65540;
-        let _t2 = ((val as u128) << 32u8) / (*&(&divisor).value as u128);
+        let _t2 = ((val as u128) << 32u8) / ((*&(&divisor).value) as u128);
         if (!(_t2 <= 18446744073709551615u128)) abort 131074;
         _t2 as u64
     }
@@ -51,25 +52,20 @@ module 0x1::fixed_point32 {
         _t2
     }
     public fun multiply_u64(val: u64, multiplier: FixedPoint32): u64 {
-        let _t2 = (val as u128) * (*&(&multiplier).value as u128) >> 32u8;
+        let _t2 = (val as u128) * ((*&(&multiplier).value) as u128) >> 32u8;
         if (!(_t2 <= 18446744073709551615u128)) abort 131075;
         _t2 as u64
     }
     public fun round(self: FixedPoint32): u64 {
-        let _t1 = floor(self) << 32u8;
+        let _t4 = floor(self);
+        let _t1 = _t4 << 32u8;
         let _t2 = _t1 + 2147483648;
-        if (*&(&self).value < _t2) _t2 = _t1 >> 32u8 else _t2 = ceil(self);
+        if (*&(&self).value < _t2) _t2 = _t1 >> 32u8 else {
+            let _t20 = ceil(self);
+            _t2 = _t20;
+        };
         _t2
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: unexpected token
-  ┌─ fixed_point32.move:8:48
-  │
-8 │         (_t1 as u128) + 4294967296u128 >> 32u8 as u64
-  │                                                ^^
-  │                                                │
-  │                                                Unexpected 'as'
-  │                                                Expected ';'
+============ recompilation succeeded ========

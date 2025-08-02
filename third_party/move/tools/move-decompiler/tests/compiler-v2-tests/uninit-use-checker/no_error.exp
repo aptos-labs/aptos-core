@@ -1,0 +1,7 @@
+module 0xc0::m {
+    fun foo(p: u64, q: u64): u64 {
+        p + q + 1 + 1
+    }
+}
+
+============ recompilation succeeded ========

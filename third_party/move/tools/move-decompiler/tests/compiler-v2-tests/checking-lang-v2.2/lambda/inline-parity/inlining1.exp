@@ -1,0 +1,18 @@
+module 0x42::Test {
+    fun foo(f: |u64|(u64), x: u64): u64 {
+        f(x)
+    }
+    public fun main() {
+        let _t0 = test();
+        if (!(_t0 == 3)) abort 5;
+    }
+    public fun test(): u64 {
+        let _t2 = foo(|arg0| lambda__1__test(arg0), 10);
+        _t2
+    }
+    fun lambda__1__test(param_0: u64): u64 {
+        3
+    }
+}
+
+============ recompilation succeeded ========

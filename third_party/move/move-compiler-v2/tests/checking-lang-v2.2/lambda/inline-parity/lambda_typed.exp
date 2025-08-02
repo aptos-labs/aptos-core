@@ -270,7 +270,7 @@ module 0x42::LambdaTest1 {
     public inline fun inline_apply1(f: |u64|u64, b: u64): u64 {
         let (a,b) = (f(b) + 1, {
             let (a,b) = (3, 4);
-            a * b
+            a * b;
         });
         a * b
     }
@@ -293,18 +293,18 @@ module 0x42::LambdaTest2 {
                 let (a,b) = (c, {
                     let (b) = (3);
                     let (x) = (b);
-                    x
+                    x;
                 });
-                a * b
+                a * b;
             }));
             let (a,b) = ({
                 let (z) = (b);
-                z
+                z;
             } + 1, {
                 let (a,b) = (3, 4);
-                a * b
+                a * b;
             });
-            a * b
+            a * b;
         } + 2
     }
     public inline fun inline_apply3(c: u64): u64 {
@@ -315,18 +315,18 @@ module 0x42::LambdaTest2 {
                     let (x) = (b);
                     let (b) = (x);
                     let (y) = (b);
-                    y
+                    y;
                 });
-                a * b
+                a * b;
             });
             let (a,b) = ({
                 let (x) = (b);
-                x + 1
+                x + 1;
             } + 1, {
                 let (a,b) = (3, 4);
-                a * b
+                a * b;
             });
-            a * b
+            a * b;
         } + 4
     }
     public fun test_inline_lambda() {
@@ -340,11 +340,11 @@ module 0x42::LambdaTest2 {
                     let (e) = (0x1::vector::borrow<u64>(v, i));
                     product = {
                         let (a,b) = (product, *e);
-                        a * b
-                    }
+                        a * b;
+                    };
                 };
                 i = i + 1;
-            }
+            };
         };
     }
 }
@@ -362,26 +362,26 @@ module 0x42::LambdaTest {
                         let (a,b) = (c, {
                             let (b) = (3);
                             let (x) = (b);
-                            x
+                            x;
                         });
-                        a * b
+                        a * b;
                     });
-                    x + 1
+                    x + 1;
                 });
                 let (a,b) = ({
                     let (z) = (b);
-                    z
+                    z;
                 } + 1, {
                     let (a,b) = (3, 4);
-                    a * b
+                    a * b;
                 });
-                a * b
-            } + 2
+                a * b;
+            } + 2;
         } + {
             let (c) = ({
                 let (b) = (3);
                 let (y) = (b);
-                y
+                y;
             });
             {
                 let (b) = ({
@@ -389,21 +389,21 @@ module 0x42::LambdaTest {
                         let (a,b) = (c, {
                             let (b) = (3);
                             let (x) = (b);
-                            x
+                            x;
                         });
-                        a * b
+                        a * b;
                     });
-                    x * x
+                    x * x;
                 });
                 let (a,b) = ({
                     let (z) = (b);
-                    z
+                    z;
                 } + 1, {
                     let (a,b) = (3, 4);
-                    a * b
+                    a * b;
                 });
-                a * b
-            } + 2
+                a * b;
+            } + 2;
         }
     }
     fun test_lambda() {
@@ -417,26 +417,26 @@ module 0x42::LambdaTest {
                             let (a,b) = (c, {
                                 let (b) = (3);
                                 let (x) = (b);
-                                x
+                                x;
                             });
-                            a * b
+                            a * b;
                         });
-                        x + 1
+                        x + 1;
                     });
                     let (a,b) = ({
                         let (z) = (b);
-                        z
+                        z;
                     } + 1, {
                         let (a,b) = (3, 4);
-                        a * b
+                        a * b;
                     });
-                    a * b
-                } + 2
+                    a * b;
+                } + 2;
             } + {
                 let (c) = ({
                     let (b) = (3);
                     let (y) = (b);
-                    y
+                    y;
                 });
                 {
                     let (b) = ({
@@ -444,21 +444,21 @@ module 0x42::LambdaTest {
                             let (a,b) = (c, {
                                 let (b) = (3);
                                 let (x) = (b);
-                                x
+                                x;
                             });
-                            a * b
+                            a * b;
                         });
-                        x * x
+                        x * x;
                     });
                     let (a,b) = ({
                         let (z) = (b);
-                        z
+                        z;
                     } + 1, {
                         let (a,b) = (3, 4);
-                        a * b
+                        a * b;
                     });
-                    a * b
-                } + 2
+                    a * b;
+                } + 2;
             }
         };
         if (a == 1) () else abort 0;

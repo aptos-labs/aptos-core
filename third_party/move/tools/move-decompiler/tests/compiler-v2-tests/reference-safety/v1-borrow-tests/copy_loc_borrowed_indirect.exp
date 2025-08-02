@@ -1,0 +1,16 @@
+module 0x8675309::Tester {
+    fun t() {
+        let _t1 = &0;
+        let _t3 = &0;
+        let _t13 = foo(_t1, _t3);
+        _t3 = &0;
+        let _t20 = foo(_t3, &0);
+        let _t23 = 0 + 0;
+        let _t26 = 0 + 0;
+    }
+    fun foo(_r: &u64, r2: &u64): &u64 {
+        r2
+    }
+}
+
+============ recompilation succeeded ========

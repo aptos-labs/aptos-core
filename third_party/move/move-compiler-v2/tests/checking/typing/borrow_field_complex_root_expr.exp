@@ -50,7 +50,7 @@ module 0x8675309::M {
         &mut (if (cond) s_mut else s_mut).f;
         &{
             let s = S{f: 0};
-            &s
+            &s;
         }.f;
     }
 }

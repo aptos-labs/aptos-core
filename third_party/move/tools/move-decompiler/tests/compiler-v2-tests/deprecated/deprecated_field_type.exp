@@ -1,0 +1,25 @@
+module 0x42::event {
+    struct EventHandle<phantom T: drop + store> has store {
+        counter: u64,
+        guid: u64,
+    }
+}
+module 0x41::coin {
+    use 0x42::event;
+    struct Coin<phantom T> has store {
+    }
+    struct CoinStore<phantom CoinType> has key {
+        coin: Coin<CoinType>,
+        frozen: bool,
+        deposit_events: event::EventHandle<DepositEvent>,
+        withdraw_events: event::EventHandle<WithdrawEvent>,
+    }
+    struct CoinType has key {
+    }
+    struct DepositEvent has drop, store {
+    }
+    struct WithdrawEvent has drop, store {
+    }
+}
+
+============ recompilation succeeded ========

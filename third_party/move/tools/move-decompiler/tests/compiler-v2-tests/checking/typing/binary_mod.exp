@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    fun t0(x: u64, r: R) {
+        let _t4 = 0 % 0;
+        let _t7 = 1 % 0;
+        let _t10 = x % x;
+        let _t17 = *&(&r).f % *&(&r).f;
+        let _t28 = 1 % *&(&r).f % *&(&r).f % 0;
+        let R{f: _t30} = r;
+    }
+}
+
+============ recompilation succeeded ========

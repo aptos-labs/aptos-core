@@ -1,0 +1,16 @@
+module 0x42::if_else {
+    fun if_else(cond: bool, x: u64): u64 {
+        let _t2;
+        if (cond) _t2 = x + 1 else _t2 = x - 1;
+        _t2
+    }
+    fun if_else_nested(cond: bool, x: u64): u64 {
+        let _t2;
+        let _t3;
+        if (cond) _t2 = x + 1 else _t2 = x - 1;
+        if (_t2 > 10) _t3 = x * 2 else _t3 = x / 2;
+        _t3
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,51 @@
+module 0x8675309::A {
+    use 0x1::signer;
+    struct T has key {
+        v: u64,
+    }
+    struct U has key {
+        v: u64,
+    }
+    public fun A0(account: &signer) {
+        let _t4 = signer::address_of(account);
+        let _t1 = _t4;
+        let _t6 = borrow_global_mut<T>(_t1);
+        let _t8 = borrow_global_mut<T>(_t1);
+    }
+    public fun A1(account: &signer) {
+        let _t5 = signer::address_of(account);
+        let _t1 = _t5;
+        let _t7 = borrow_global_mut<T>(_t1);
+        let _t9 = borrow_global_mut<U>(_t1);
+    }
+    public fun A2(account: &signer, b: bool) {
+        let _t3;
+        let _t6 = signer::address_of(account);
+        let _t2 = _t6;
+        if (b) {
+            let _t9 = borrow_global_mut<T>(_t2);
+            _t3 = _t9;
+        } else {
+            let _t12 = borrow_global_mut<T>(_t2);
+            _t3 = _t12;
+        };
+    }
+    public fun A3(account: &signer, b: bool) {
+        let _t8;
+        let _t5 = signer::address_of(account);
+        if (b) _t8 = borrow_global_mut<T>(_t5);
+    }
+    public fun A4(account: &signer) {
+        let _t5 = signer::address_of(account);
+        let _t1 = _t5;
+        let _t7 = move_from<T>(_t1);
+        let _t9 = borrow_global_mut<T>(_t1);
+        move_to<T>(account, _t7);
+    }
+    public fun A5(account: &signer) {
+        let _t3 = signer::address_of(account);
+        let _t4 = borrow_global<T>(_t3);
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,7 @@
+module 0x8675309::Tester {
+    fun t() {
+        let _t10 = 0 + 0;
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    struct R has key {
+        data: vector<u8>,
+    }
+    public fun is_ok(addr: address): bool {
+        let _t3 = borrow_global<R>(@0x1d8);
+        let _t5 = is_ok_(&addr, &_t3.data);
+        _t5
+    }
+    fun is_ok_(_addr: &address, _data: &vector<u8>): bool {
+        true
+    }
+}
+
+============ recompilation succeeded ========

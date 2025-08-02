@@ -1,0 +1,14 @@
+module 0x2::X {
+    public fun u() {
+        ()
+    }
+}
+module 0x2::M {
+    use 0x2::X;
+    fun foo() {
+        X::u();
+        X::u();
+    }
+}
+
+============ recompilation succeeded ========

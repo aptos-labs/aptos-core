@@ -103,10 +103,10 @@ module 0xc0ffee::m {
     friend inline fun foo(): u64 {
         {
             let ();
-            secret() + secret()
+            secret() + secret();
         } + {
             let ();
-            secret() + secret()
+            secret() + secret();
         }
     }
     fun secret(): u64 {
@@ -117,11 +117,11 @@ module 0xc0ffee::m {
             let ();
             {
                 let ();
-                secret() + secret()
+                secret() + secret();
             } + {
                 let ();
-                secret() + secret()
-            }
+                secret() + secret();
+            };
         } == 168) () else abort 14566554180833181696;
     }
 }
@@ -134,10 +134,10 @@ module 0xc0ffee::o {
     friend inline fun foo(): u64 {
         {
             let ();
-            secret() + secret()
+            secret() + secret();
         } + {
             let ();
-            secret() + secret()
+            secret() + secret();
         }
     }
     fun secret(): u64 {
@@ -148,11 +148,11 @@ module 0xc0ffee::o {
             let ();
             {
                 let ();
-                secret() + secret()
+                secret() + secret();
             } + {
                 let ();
-                secret() + secret()
-            }
+                secret() + secret();
+            };
         } == 168) () else abort 14566554180833181696;
     }
 }

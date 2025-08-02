@@ -1,0 +1,16 @@
+module 0x815::m {
+    enum Positional has drop {
+        A {
+            _0: u8,
+        }
+        B {
+            _0: u8,
+        }
+    }
+    fun test_common_access(): u8 {
+        *&mut (&mut Positional::A{_0: 42u8})._0 = 19u8;
+        20u8
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,37 @@
+script {
+    fun main_0() {
+        ()
+    }
+}
+script {
+    fun main_1() {
+        abort 0
+    }
+}
+script {
+    fun main_2() {
+        ()
+    }
+}
+script {
+    fun main_3() {
+        abort 0
+    }
+}
+script {
+    fun main_4(cond: bool) {
+        if (cond) return ();
+    }
+}
+script {
+    fun main_5(cond: bool) {
+        if (!cond) abort 0;
+    }
+}
+script {
+    fun main_6(cond: bool) {
+        if (cond) abort 0;
+    }
+}
+
+============ recompilation succeeded ========

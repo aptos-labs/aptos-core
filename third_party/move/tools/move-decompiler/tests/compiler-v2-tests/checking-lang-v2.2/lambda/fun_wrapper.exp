@@ -1,0 +1,25 @@
+module 0x66::test {
+    struct Work has drop {
+        _0: |u64|(u64) has drop,
+    }
+    fun t1(): bool {
+        Work{_0: |arg0| lambda__1__t1(arg0)} == Work{_0: |arg0| lambda__2__t1(arg0)}
+    }
+    fun lambda__1__t1(x: u64): u64 {
+        x + 1
+    }
+    fun lambda__2__t1(x: u64): u64 {
+        x + 2
+    }
+    fun t2() {
+        take_work(Work{_0: |arg0| lambda__1__t2(arg0)});
+    }
+    fun lambda__1__t2(x: u64): u64 {
+        x + 1
+    }
+    fun take_work(_work: Work) {
+        ()
+    }
+}
+
+============ recompilation succeeded ========

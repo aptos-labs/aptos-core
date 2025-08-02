@@ -1,0 +1,31 @@
+module 0x42::borrow {
+    struct S {
+        f: u64,
+    }
+    fun field(s: &S): u64 {
+        *&s.f
+    }
+    fun local(param: u64): u64 {
+        *&33
+    }
+    fun param(param: u64): u64 {
+        *&param
+    }
+    fun mut_field(s: &mut S): u64 {
+        let _t1 = &mut s.f;
+        *_t1 = 22;
+        *_t1
+    }
+    fun mut_local(param: u64): u64 {
+        let _t2 = &mut 33;
+        *_t2 = 22;
+        *_t2
+    }
+    fun mut_param(param: u64): u64 {
+        let _t1 = &mut param;
+        *_t1 = 22;
+        *_t1
+    }
+}
+
+============ recompilation succeeded ========

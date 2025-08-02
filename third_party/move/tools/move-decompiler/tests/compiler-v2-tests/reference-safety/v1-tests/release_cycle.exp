@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    fun t0(cond: bool) {
+        let _t3;
+        let _t2;
+        if (cond) {
+            _t2 = &0;
+            _t3 = _t2;
+        } else {
+            _t3 = &0;
+            _t2 = _t3;
+        };
+    }
+}
+
+============ recompilation succeeded ========

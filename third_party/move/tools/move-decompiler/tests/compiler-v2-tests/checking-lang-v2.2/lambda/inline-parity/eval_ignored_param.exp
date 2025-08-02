@@ -1,0 +1,24 @@
+module 0x42::Test {
+    fun foo(f: |u64, u64, u64|(u64), g: |u64, u64, u64|(u64), x: u64, _: u64, y: u64, z: u64): u64 {
+        x = x + 1;
+        y = y + 1;
+        z = z + 1;
+        x = x + 1;
+        y = y + 1;
+        z = z + 1;
+        f(x, y, z) + g(x, y, z) + 3 * x + 5 * y + 7 * z
+    }
+    public fun test() {
+        let _t7 = foo(|arg0,arg1,arg2| lambda__1__test(arg0, arg1, arg2), |arg0,arg1,arg2| lambda__2__test(arg0, arg1, arg2), 1, 10, 100, 1000);
+        let _t0 = _t7;
+        if (!(_t0 == 9637)) abort _t0;
+    }
+    fun lambda__1__test(x: u64, param_1: u64, z: u64): u64 {
+        x * z
+    }
+    fun lambda__2__test(param_0: u64, y: u64, param_2: u64): u64 {
+        y
+    }
+}
+
+============ recompilation succeeded ========

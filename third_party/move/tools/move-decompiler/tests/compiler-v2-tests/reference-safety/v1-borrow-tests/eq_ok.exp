@@ -1,0 +1,20 @@
+module 0x8675309::Tester {
+    fun eqtest1() {
+        let _t1 = &mut 0;
+        let _t9 = freeze(_t1) == freeze(_t1);
+    }
+    fun eqtest2() {
+        let _t1 = &mut 0;
+        let _t8 = freeze(_t1) == freeze(_t1);
+    }
+    fun neqtest1() {
+        let _t1 = &mut 0;
+        let _t9 = freeze(_t1) != freeze(_t1);
+    }
+    fun neqtest2() {
+        let _t1 = &mut 0;
+        let _t8 = freeze(_t1) != freeze(_t1);
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,19 @@
+module 0x1::Test {
+    struct S has drop {
+        x: u8,
+    }
+    fun foo(xs: vector<S>) {
+        let _t1 = 0u8;
+        let _t2 = &xs;
+        let _t3 = 0;
+        let _t10 = 0x1::vector::length<S>(_t2);
+        while (_t3 < _t10) {
+            let _t16 = 0x1::vector::borrow<S>(_t2, _t3);
+            _t1 = _t1 + *&_t16.x;
+            _t3 = _t3 + 1;
+            continue;
+        };
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,17 @@
+module 0x42::m {
+    struct E {
+        k: u8,
+    }
+    struct S {
+        data: vector<E>,
+    }
+    fun bar() {
+        ()
+    }
+    public fun foo(v: &S): u8 {
+        let _t4 = 0x1::vector::borrow<E>(&v.data, 0);
+        *&_t4.k
+    }
+}
+
+============ recompilation succeeded ========

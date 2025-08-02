@@ -1,0 +1,38 @@
+module 0x42::m {
+    use 0x1::string;
+    use 0x1::vector;
+    use 0x1::bcs;
+    public entry fun init() {
+        let _t11 = vector::empty<string::String>();
+        let _t1 = vector[vector[3u8]];
+        vector::reverse<vector<u8>>(&mut _t1);
+        let _t2 = _t1;
+        let _t16 = vector::length<vector<u8>>(&_t2);
+        let _t3 = _t16;
+        while (_t3 > 0) {
+            let _t21 = vector::pop_back<vector<u8>>(&mut _t2);
+            let _t4 = _t21;
+            let _t24 = string::utf8(_t4);
+            vector::push_back<string::String>(&mut _t11, _t24);
+            _t3 = _t3 - 1;
+            continue;
+        };
+        vector::destroy_empty<vector<u8>>(_t2);
+        let _t29 = vector::empty<vector<u8>>();
+        let _t6 = vector[3];
+        vector::reverse<u64>(&mut _t6);
+        let _t7 = _t6;
+        let _t34 = vector::length<u64>(&_t7);
+        _t3 = _t34;
+        while (_t3 > 0) {
+            let _t39 = vector::pop_back<u64>(&mut _t7);
+            let _t42 = bcs::to_bytes<u64>(&_t39);
+            vector::push_back<vector<u8>>(&mut _t29, _t42);
+            _t3 = _t3 - 1;
+            continue;
+        };
+        vector::destroy_empty<u64>(_t7);
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,17 @@
+module 0x1::m {
+    struct R has drop, key {
+        value: bool,
+    }
+    fun f1() {
+        let _t2 = borrow_global_mut<R>(@0x1);
+        *&mut _t2.value = false;
+        let _t7 = borrow_global<R>(@0x1);
+        if (!(*&_t7.value == false)) abort 1;
+        let _t14 = borrow_global_mut<R>(@0x1);
+        *&mut _t14.value = true;
+        let _t17 = borrow_global<R>(@0x1);
+        if (!(*&_t17.value == true)) abort 2;
+    }
+}
+
+============ recompilation succeeded ========

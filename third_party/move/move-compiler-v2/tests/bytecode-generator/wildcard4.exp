@@ -24,7 +24,7 @@ module 0xc0ffee::m {
         let x = 3;
         let r = &mut x;
         let y = &mut x;
-        let _ = /*freeze*/y;
+        let _ = freeze(y);
         *r = 4;
     }
 }

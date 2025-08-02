@@ -1,0 +1,35 @@
+module 0x8675309::M {
+    struct R {
+    }
+    struct S has drop {
+    }
+    fun t0(b: bool, u: u64, s: S, r: R): R {
+        let _t12 = &b;
+        let _t13 = &b;
+        let _t14 = &mut b;
+        let _t15 = &u;
+        let _t16 = &mut u;
+        let _t17 = &s;
+        let _t18 = &mut s;
+        let _t19 = &r;
+        let _t20 = &mut r;
+        r
+    }
+    fun t1(): R {
+        let _t0 = true;
+        let _t1 = 0;
+        let _t2 = S{};
+        let _t3 = R{};
+        let _t18 = &_t0;
+        let _t19 = &mut _t0;
+        let _t20 = &_t1;
+        let _t21 = &mut _t1;
+        let _t22 = &_t2;
+        let _t23 = &mut _t2;
+        let _t24 = &_t3;
+        let _t25 = &mut _t3;
+        _t3
+    }
+}
+
+============ recompilation succeeded ========

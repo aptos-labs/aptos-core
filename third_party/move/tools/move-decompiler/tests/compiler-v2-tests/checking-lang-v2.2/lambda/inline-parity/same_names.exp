@@ -1,0 +1,33 @@
+module 0x42::a {
+    struct MyList has drop {
+        len: u64,
+    }
+    public fun len(self: &MyList): u64 {
+        *&self.len
+    }
+}
+module 0x42::b {
+    struct MyOtherList has drop {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        *&self.len
+    }
+}
+module 0x42::c {
+    use 0x42::a;
+    use 0x42::b;
+    fun foo(f: |a::MyList, b::MyOtherList|, x: a::MyList, y: b::MyOtherList) {
+        f(x, y);
+    }
+    fun test(x: a::MyList, y: b::MyOtherList) {
+        foo(|arg0,arg1| lambda__1__test(arg0, arg1), x, y);
+    }
+    fun lambda__1__test(x: a::MyList, y: b::MyOtherList) {
+        let _t3 = a::len(&x);
+        let _t5 = b::len(&y);
+        if (!(_t3 + _t5 == 1)) abort 1;
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,18 @@
+module 0x8675309::M {
+    public entry fun f0() {
+        ()
+    }
+    public entry fun f1() {
+        ()
+    }
+    entry fun f2() {
+        ()
+    }
+    entry native fun f3();
+    entry native fun f4();
+    public entry native fun f5();
+    public entry native fun f6();
+    public entry native fun f7();
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,90 @@
+module 0x42::m {
+    struct T has drop, store, key {
+        w: W,
+    }
+    struct W has drop, store, key {
+        x: u64,
+    }
+    struct S has drop, key {
+        t: T,
+    }
+    struct Wrapper<T: copy> has copy, drop, store, key {
+        inner: T,
+    }
+    fun boo(v: vector<S>, w: W) {
+        let _t4 = 0x1::vector::borrow_mut<S>(&mut v, 0);
+        merge(&mut (&mut _t4.t).w, w);
+    }
+    fun merge(self: &mut W, s: W) {
+        let _t3 = &mut self.x;
+        *_t3 = *_t3 + *&(&s).x;
+    }
+    fun boo_(v: vector<S>, w: W) {
+        let _t4 = 0x1::vector::borrow_mut<S>(&mut v, 0);
+        merge(&mut (&mut _t4.t).w, w);
+    }
+    fun boo_greater(v: vector<S>, w: W): bool {
+        let _t4 = 0x1::vector::borrow<S>(&v, 0);
+        let _t8 = greater(&(&_t4.t).w, w);
+        _t8
+    }
+    fun greater(self: &W, s: W): bool {
+        *&self.x > *&(&s).x
+    }
+    fun boo_greater_(v: vector<S>, w: W): bool {
+        let _t4 = 0x1::vector::borrow_mut<S>(&mut v, 0);
+        let _t9 = greater(freeze(&mut (&mut _t4.t).w), w);
+        _t9
+    }
+    fun boo_greater_2(v: vector<W>, w: W): bool {
+        let _t4 = 0x1::vector::borrow<W>(&v, 0);
+        let _t6 = greater(_t4, w);
+        _t6
+    }
+    fun boo_greater_2_(v: vector<W>, w: W): bool {
+        let _t4 = 0x1::vector::borrow<W>(&v, 0);
+        let _t6 = greater(_t4, w);
+        _t6
+    }
+    fun dispatch<T: copy + store>(account: address): T {
+        let _t2 = borrow_global<Wrapper<T>>(account);
+        let _t3 = unwrap<T>(_t2);
+        _t3
+    }
+    fun unwrap<T: copy>(self: &Wrapper<T>): T {
+        *&self.inner
+    }
+    fun foo(account: address, w: W) {
+        let _t3 = borrow_global_mut<S>(account);
+        merge(&mut (&mut _t3.t).w, w);
+    }
+    fun foo_(account: address, w: W) {
+        let _t3 = borrow_global_mut<S>(account);
+        merge(&mut (&mut _t3.t).w, w);
+    }
+    fun foo_2(account: address, w: W) {
+        let _t3 = borrow_global_mut<W>(account);
+        merge(_t3, w);
+    }
+    fun foo_3(account: address, w: W) {
+        let _t3 = borrow_global_mut<W>(account);
+        merge(_t3, w);
+    }
+    fun foo_greater(account: address, w: W): bool {
+        let _t3 = borrow_global<S>(account);
+        let _t7 = greater(&(&_t3.t).w, w);
+        _t7
+    }
+    fun foo_greater_(account: address, w: W): bool {
+        let _t3 = borrow_global_mut<S>(account);
+        let _t8 = greater(freeze(&mut (&mut _t3.t).w), w);
+        _t8
+    }
+    fun foo_greater_2(account: address, w: W): bool {
+        let _t3 = borrow_global<W>(account);
+        let _t5 = greater(_t3, w);
+        _t5
+    }
+}
+
+============ recompilation succeeded ========

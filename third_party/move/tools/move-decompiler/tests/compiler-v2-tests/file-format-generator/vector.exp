@@ -1,0 +1,37 @@
+module 0x42::vector {
+    use 0x1::vector;
+    public fun remove<Element>(v: &mut vector<Element>, i: u64): Element {
+        let _t5 = vector::length<Element>(freeze(v));
+        let _t2 = _t5;
+        if (i >= _t2) abort 1;
+        while (i < _t2 - 1) {
+            let _t18 = i;
+            i = i + 1;
+            vector::swap<Element>(v, _t18, i);
+            continue;
+        };
+        let _t24 = vector::pop_back<Element>(v);
+        _t24
+    }
+    fun create(): vector<u64> {
+        vector[1, 2, 3]
+    }
+    fun test_fold() {
+        let _t0 = 0;
+        let _t1 = vector[1];
+        vector::reverse<u64>(&mut _t1);
+        let _t2 = _t1;
+        let _t9 = vector::length<u64>(&_t2);
+        let _t3 = _t9;
+        while (_t3 > 0) {
+            let _t14 = vector::pop_back<u64>(&mut _t2);
+            _t0 = 0;
+            _t3 = _t3 - 1;
+            continue;
+        };
+        vector::destroy_empty<u64>(_t2);
+        if (!(_t0 == 0)) abort 0;
+    }
+}
+
+============ recompilation succeeded ========

@@ -1,0 +1,17 @@
+module 0x42::m {
+    struct S has drop {
+        x: u64,
+        y: u64,
+    }
+    fun c(_x: &mut u64, _y: &mut u64) {
+        ()
+    }
+    fun t0(s: S) {
+        c(&mut (&mut s).x, &mut (&mut s).y);
+    }
+    fun t1(s: S) {
+        c(&mut (&mut s).x, &mut (&mut s).y);
+    }
+}
+
+============ recompilation succeeded ========

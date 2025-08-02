@@ -1,0 +1,14 @@
+module 0x42::test {
+    struct Test has key {
+        value: u64,
+    }
+    public fun call_modify_without_acquire() {
+        modify();
+    }
+    public fun modify() {
+        let _t2 = borrow_global_mut<Test>(@0xcafe);
+        *&mut _t2.value = 2;
+    }
+}
+
+============ recompilation succeeded ========

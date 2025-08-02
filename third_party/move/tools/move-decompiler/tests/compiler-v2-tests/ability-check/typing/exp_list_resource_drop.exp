@@ -1,0 +1,15 @@
+module 0x8675309::M {
+    struct Box<T> has drop {
+        f: T,
+    }
+    struct R<T> {
+        f: T,
+    }
+    struct S {
+    }
+    fun t0() {
+        abort 0
+    }
+}
+
+============ recompilation succeeded ========
