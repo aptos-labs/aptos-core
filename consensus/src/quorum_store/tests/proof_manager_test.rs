@@ -6,12 +6,12 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    proof_of_store::{BatchInfo, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::HashValue;
-use aptos_types::{aggregate_signature::AggregateSignature, PeerId};
+use aptos_types::{aggregate_signature::AggregateSignature, quorum_store::BatchId, PeerId};
 use futures::channel::oneshot;
 use std::{cmp::max, collections::HashSet};
 

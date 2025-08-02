@@ -19,7 +19,7 @@ use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};
 
 pub(in crate::pruner) struct StateMerkleShardPruner<S> {
-    shard_id: u8,
+    shard_id: usize,
     db_shard: Arc<DB>,
     _phantom: PhantomData<S>,
 }
@@ -29,7 +29,7 @@ where
     StaleNodeIndex: KeyCodec<S>,
 {
     pub(in crate::pruner) fn new(
-        shard_id: u8,
+        shard_id: usize,
         db_shard: Arc<DB>,
         metadata_progress: Version,
     ) -> Result<Self> {
@@ -50,7 +50,7 @@ where
             "Catching up {} shard {shard_id}.",
             S::name(),
         );
-        myself.prune(progress, metadata_progress)?;
+        myself.prune(progress, metadata_progress, usize::MAX)?;
 
         Ok(myself)
     }
@@ -59,6 +59,7 @@ where
         &self,
         current_progress: Version,
         target_version: Version,
+        max_nodes_to_prune: usize,
     ) -> Result<()> {
         loop {
             let mut batch = SchemaBatch::new();
@@ -66,6 +67,7 @@ where
                 &self.db_shard,
                 current_progress,
                 target_version,
+                max_nodes_to_prune,
             )?;
 
             indices.into_iter().try_for_each(|index| {
@@ -97,7 +99,7 @@ where
         Ok(())
     }
 
-    pub(in crate::pruner) fn shard_id(&self) -> u8 {
+    pub(in crate::pruner) fn shard_id(&self) -> usize {
         self.shard_id
     }
 }

@@ -513,6 +513,18 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 }
 {%- endif %}
 
+{%- if impl.fun_borrow_with_default != "" %}
+procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}}, default: {{V}}) returns (v: {{V}}) {
+    var enc_k: int;
+    enc_k := {{ENC}}(k);
+    if (!ContainsTable(t, enc_k)) {
+        v := default;
+    } else {
+        v := GetTable(t, {{ENC}}(k));
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_spec_len != "" %}
 function {:inline} {{impl.fun_spec_len}}{{S}}(t: ({{Self}})): int {
     LenTable(t)
@@ -602,6 +614,23 @@ axiom (forall v: int :: {$1_bcs_serialize'address'(v)}
      ( var r := $1_bcs_serialize'address'(v); LenVec(r) == $serialized_address_len));
 {% endif %}
 {% endmacro hash_module %}
+
+
+{# FROM_BCS
+   ====
+#}
+
+{% macro from_bcs_module(instance) %}
+{%- set S = "'" ~ instance.suffix ~ "'" -%}
+{%- set T = instance.name -%}
+
+procedure $1_from_bcs_from_bytes{{S}}(v: Vec int) returns (res: {{T}});
+
+function $1_from_bcs_$from_bytes{{S}}(v: Vec int): {{T}};
+axiom (forall v: Vec int :: {$1_from_bcs_deserialize{{S}}(v)}
+     ( var r := $1_from_bcs_$from_bytes{{S}}(v); r == $1_from_bcs_deserialize{{S}}(v) ));
+
+{% endmacro from_bcs_module %}
 
 
 {# Event Module

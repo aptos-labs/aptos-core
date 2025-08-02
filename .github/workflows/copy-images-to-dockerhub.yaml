@@ -39,7 +39,7 @@ permissions:
 jobs:
   copy-images:
     # Run on a machine with more local storage for large docker images
-    runs-on: runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +58,7 @@ jobs:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 

@@ -25,7 +25,7 @@ use aptos_vm_types::{
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     sync::Arc,
 };
@@ -56,8 +56,7 @@ pub struct Accesses<K> {
 }
 
 /// Trait for single threaded transaction executor.
-// TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
-pub trait ExecutorTask: Sync {
+pub trait ExecutorTask {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -109,16 +108,14 @@ pub trait TransactionOutput: Send + Sync + Debug {
         Option<Arc<MoveTypeLayout>>,
     )>;
 
-    fn module_write_set(
-        &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>;
+    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
 
     fn aggregator_v1_write_set(
         &self,
     ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator V1 deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
@@ -140,19 +137,31 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn resource_group_write_set(
         &self,
-    ) -> Vec<(
+    ) -> HashMap<
         <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-        ResourceGroupSize,
-        BTreeMap<
-            <Self::Txn as Transaction>::Tag,
-            (
-                <Self::Txn as Transaction>::Value,
-                Option<Arc<MoveTypeLayout>>,
-            ),
-        >,
-    )>;
+        (
+            <Self::Txn as Transaction>::Value,
+            ResourceGroupSize,
+            BTreeMap<
+                <Self::Txn as Transaction>::Tag,
+                (
+                    <Self::Txn as Transaction>::Value,
+                    Option<Arc<MoveTypeLayout>>,
+                ),
+            >,
+        ),
+    >;
 
+    fn for_each_resource_group_key_and_tags<F>(&self, callback: F) -> Result<(), PanicError>
+    where
+        F: FnMut(
+            &<Self::Txn as Transaction>::Key,
+            HashSet<&<Self::Txn as Transaction>::Tag>,
+        ) -> Result<(), PanicError>;
+
+    // For now, the below interfaces for keys and metada and keys and tags are provided
+    // to avoid unnecessarily cloning the whole resource group write set.
+    // TODO: get rid of these interfaces when we can have zero-copy access to the output.
     fn resource_group_metadata_ops(
         &self,
     ) -> Vec<(
@@ -161,7 +170,19 @@ pub trait TransactionOutput: Send + Sync + Debug {
     )> {
         self.resource_group_write_set()
             .into_iter()
-            .map(|(key, op, _, _)| (key, op))
+            .map(|(key, (op, _, _))| (key, op))
+            .collect()
+    }
+
+    fn resource_group_tags(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        HashSet<<Self::Txn as Transaction>::Tag>,
+    )> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, (_, _, group_ops))| (key, group_ops.keys().cloned().collect()))
             .collect()
     }
 
@@ -171,7 +192,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Execution output for transactions that should be discarded.
     fn discard_output(discard_code: StatusCode) -> Self;
 
-    fn materialize_agg_v1(
+    // !!![CAUTION]!!! This method should never be used in parallel execution.
+    fn legacy_sequential_materialize_agg_v1(
         &self,
         view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     );
@@ -179,6 +201,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Will be called once per transaction when the output is ready to be committed.
     /// Ensures that any writes corresponding to materialized deltas and group updates
     /// (recorded in output separately) are incorporated into the transaction output.
+    /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
+    /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
@@ -193,6 +217,15 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    /// Returns true iff the TransactionsStatus is Retry.
+    fn is_retry(&self) -> bool;
+
+    /// Returns true iff it has a new epoch event.
+    fn has_new_epoch_event(&self) -> bool;
+
+    /// Returns true iff the execution status is Keep(Success).
+    fn is_success(&self) -> bool;
 
     /// Deterministic, but approximate size of the output, as
     /// before creating actual TransactionOutput, we don't know the exact size of it.

@@ -1,7 +1,23 @@
-processed 4 tasks
-
-task 1 'run'. lines 14-14:
-return values: false
-
-task 3 'run'. lines 27-27:
+processed 7 tasks
+task 0 lines 1-29:  publish [module 0xc0ffee::m {]
+task 1 lines 31-31:  run 0xc0ffee::m::test1
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(453),
+    location: 0x1::bcs,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 0)],
+}
+task 2 lines 33-33:  run 0xc0ffee::m::test2
+task 3 lines 35-35:  run 0xc0ffee::m::test3
+task 4 lines 37-46:  publish [module 0xc0ffee::n {]
+task 5 lines 48-48:  run 0xc0ffee::n::test --args 42
 return values: 42
+task 6 lines 50-59:  publish [module 0xc0ffee::o {]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::o'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0xc0ffee::o,
+    indices: [],
+    offsets: [],
+}

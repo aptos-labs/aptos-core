@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Cfg due to delayed_field_mock_serialization use and to avoid warning.
+#[cfg(test)]
+use crate::types::delayed_field_mock_serialization::{
+    deserialize_to_delayed_field_id, mock_layout,
+};
 use crate::view::{LatestView, ViewState};
 use aptos_aggregator::{
     resolver::TDelayedFieldView,
@@ -14,12 +19,15 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
+// Cfg due to delayed_field_mock_serialization use and to avoid warning.
+#[cfg(test)]
+use fail::fail_point;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
 use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
-    value_serde::{ValueSerDeContext, ValueToIdentifierMapping},
+    value_serde::{FunctionValueExtension, ValueSerDeContext, ValueToIdentifierMapping},
     value_traversal::find_identifiers_in_value,
     values::Value,
 };
@@ -110,13 +118,27 @@ where
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<DelayedFieldID>> {
+        // Cfg due to deserialize_to_delayed_field_id use.
+        #[cfg(test)]
+        fail_point!("delayed_field_test", |_| {
+            assert_eq!(
+                *layout,
+                mock_layout(),
+                "Layout does not match expected mock layout"
+            );
+
+            let (id, _) = deserialize_to_delayed_field_id(bytes)
+                .expect("Mock deserialization failed in delayed field test.");
+            Ok(HashSet::from([id]))
+        });
+
         // TODO[agg_v2](optimize): this performs 2 traversals of a value:
         //   1) deserialize,
         //   2) find identifiers to populate the set.
         //   See if can cache identifiers in advance, or combine it with
         //   deserialization.
         let function_value_extension = self.as_function_value_extension();
-        let value = ValueSerDeContext::new()
+        let value = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)

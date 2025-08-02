@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-pub use super::raw_module_data::PreBuiltPackagesImpl;
+pub use super::prebuilt_packages::PreBuiltPackagesImpl;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -255,6 +255,8 @@ pub enum EntryPoints {
 
     OrderBook {
         state: Arc<OrderBookState>,
+        /// Number of markets to use.
+        num_markets: u32,
         /// Buy and sell price is picked randomly from their respective ranges.
         ///  `overlap_ratio` defines what portion of the range they overlap on.
         overlap_ratio: f64,
@@ -836,6 +838,7 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::OrderBook {
                 state,
+                num_markets,
                 overlap_ratio,
                 buy_frequency,
                 max_buy_size,
@@ -843,17 +846,19 @@ impl EntryPointTrait for EntryPoints {
             } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
 
+                let market_id = rng.gen_range(0, *num_markets);
                 let price_range = 1000000;
-                let is_buy = rng.gen_bool(*buy_frequency);
-                let size = rng.gen_range(1, 1 + if is_buy { max_buy_size } else { max_sell_size });
-                let price = if is_buy {
+                let is_bid = rng.gen_bool(*buy_frequency);
+                let size = rng.gen_range(1, 1 + if is_bid { max_buy_size } else { max_sell_size });
+                let price = if is_bid {
                     0
                 } else {
                     (price_range as f64 * (1.0 - *overlap_ratio)) as u64
                 } + rng.gen_range(0, price_range);
 
-                // (account_order_id: u64, bid_price: u64, volume: u64, is_buy: bool)
+                // (account_order_id: u64, bid_price: u64, volume: u64, is_bid: bool)
                 get_payload(module_id, ident_str!("place_order").to_owned(), vec![
+                    bcs::to_bytes(&market_id).unwrap(),
                     bcs::to_bytes(&AccountAddress::random()).unwrap(),
                     bcs::to_bytes(
                         &state
@@ -863,7 +868,7 @@ impl EntryPointTrait for EntryPoints {
                     .unwrap(),
                     bcs::to_bytes(&price).unwrap(),  // bid_price
                     bcs::to_bytes(&size).unwrap(),   // volume
-                    bcs::to_bytes(&is_buy).unwrap(), // is_buy
+                    bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
         }

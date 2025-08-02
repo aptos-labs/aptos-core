@@ -8,22 +8,22 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
+        values::{function_values_impl::mock::MockAbstractFunction, values_impl, Struct, Value},
     };
-    use better_any::{Tid, TidAble, TidExt};
+    use better_any::TidExt;
     use claims::{assert_err, assert_ok, assert_some};
     use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{ClosureMask, MoveClosure, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+        function::{ClosureMask, MoveClosure},
         identifier::Identifier,
-        language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
         u256,
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
     use serde::{Deserialize, Serialize};
-    use std::{cmp::Ordering, iter};
+    use std::iter;
     // ==========================================================================
     // Enums
 
@@ -99,11 +99,11 @@ mod tests {
             )),
         ];
         for value in good_values {
-            let blob = ValueSerDeContext::new()
+            let blob = ValueSerDeContext::new(None)
                 .serialize(&value, &layout)
                 .unwrap()
                 .expect("serialization succeeds");
-            let de_value = ValueSerDeContext::new()
+            let de_value = ValueSerDeContext::new(None)
                 .deserialize(&blob, &layout)
                 .expect("deserialization succeeds");
             assert!(
@@ -113,7 +113,7 @@ mod tests {
         }
         let bad_tag_value = Value::struct_(Struct::pack_variant(3, [Value::u64(42)]));
         assert!(
-            ValueSerDeContext::new()
+            ValueSerDeContext::new(None)
                 .serialize(&bad_tag_value, &layout)
                 .unwrap()
                 .is_none(),
@@ -121,7 +121,7 @@ mod tests {
         );
         let bad_struct_value = Value::struct_(Struct::pack([Value::u64(42)]));
         assert!(
-            ValueSerDeContext::new()
+            ValueSerDeContext::new(None)
                 .serialize(&bad_struct_value, &layout)
                 .unwrap()
                 .is_none(),
@@ -184,7 +184,7 @@ mod tests {
             RustEnum::BoolNumber(true, 13),
         ];
         for (move_value, rust_value) in move_values.into_iter().zip(rust_values) {
-            let from_move = ValueSerDeContext::new()
+            let from_move = ValueSerDeContext::new(None)
                 .serialize(&move_value, &layout)
                 .unwrap()
                 .expect("from move succeeds");
@@ -192,7 +192,7 @@ mod tests {
             assert_eq!(to_rust, rust_value);
 
             let from_rust = bcs::to_bytes(&rust_value).expect("from rust succeeds");
-            let to_move = ValueSerDeContext::new()
+            let to_move = ValueSerDeContext::new(None)
                 .deserialize(&from_rust, &layout)
                 .expect("to move succeeds");
             assert!(
@@ -214,13 +214,15 @@ mod tests {
         vec![
             TypeTag::Address,
             TypeTag::Function(Box::new(FunctionTag {
-                args: vec![TypeTag::Struct(Box::new(StructTag {
-                    address: AccountAddress::TEN,
-                    module: Identifier::new("mod").unwrap(),
-                    name: Identifier::new("st").unwrap(),
-                    type_args: vec![TypeTag::Signer],
-                }))],
-                results: vec![TypeTag::Address],
+                args: vec![FunctionParamOrReturnTag::Value(TypeTag::Struct(Box::new(
+                    StructTag {
+                        address: AccountAddress::TEN,
+                        module: Identifier::new("mod").unwrap(),
+                        name: Identifier::new("st").unwrap(),
+                        type_args: vec![TypeTag::Signer],
+                    },
+                )))],
+                results: vec![FunctionParamOrReturnTag::Value(TypeTag::Address)],
                 abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
@@ -333,61 +335,6 @@ mod tests {
     // --------------------------------------------------------------------------------------
     // VM Values
 
-    // Since Abstract functions are `Tid`, we cannot auto-mock them, so need to mock manually.
-    #[derive(Clone, Tid)]
-    struct MockAbstractFunction {
-        data: SerializedFunctionData,
-    }
-
-    impl MockAbstractFunction {
-        fn new(
-            fun_name: &str,
-            ty_args: Vec<TypeTag>,
-            mask: ClosureMask,
-            captured_layouts: Vec<MoveTypeLayout>,
-        ) -> MockAbstractFunction {
-            Self {
-                data: SerializedFunctionData {
-                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-                    module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
-                    fun_id: Identifier::new(fun_name).unwrap(),
-                    ty_args,
-                    mask,
-                    captured_layouts,
-                },
-            }
-        }
-
-        fn new_from_data(data: SerializedFunctionData) -> Self {
-            Self { data }
-        }
-    }
-
-    impl AbstractFunction for MockAbstractFunction {
-        fn closure_mask(&self) -> ClosureMask {
-            unimplemented!()
-        }
-
-        fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
-            // We only need equality for tests
-            let other_mock = other.downcast_ref::<MockAbstractFunction>().unwrap();
-            Ok(if self.data == other_mock.data {
-                Ordering::Equal
-            } else {
-                Ordering::Less
-            })
-        }
-
-        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
-            unimplemented!()
-        }
-
-        fn to_stable_string(&self) -> String {
-            // Needed for assertion failure printing
-            "<some function>".to_string()
-        }
-    }
-
     fn round_trip_vm_closure_value(
         fun: MockAbstractFunction,
         captured: Vec<Value>,
@@ -407,11 +354,11 @@ mod tests {
             .expect_create_from_serialization_data()
             .returning(move |data| Ok(Box::new(MockAbstractFunction::new_from_data(data))));
         let value = Value::closure(Box::new(fun), captured);
-        let blob = assert_ok!(ValueSerDeContext::new()
+        let blob = assert_ok!(ValueSerDeContext::new(None)
             .with_func_args_deserialization(&ext_mock)
             .serialize(&value, &fun_layout))
         .expect("serialization result not None");
-        let de_value = ValueSerDeContext::new()
+        let de_value = ValueSerDeContext::new(None)
             .with_func_args_deserialization(&ext_mock)
             .deserialize_or_err(&blob, &fun_layout);
         (value, de_value)
@@ -550,11 +497,11 @@ mod tests {
             ),
         ];
         for (value, layout) in good_values_layouts_sizes {
-            let bytes = assert_some!(assert_ok!(ValueSerDeContext::new()
+            let bytes = assert_some!(assert_ok!(ValueSerDeContext::new(None)
                 .with_delayed_fields_serde()
                 .serialize(&value, &layout)));
 
-            let size = assert_ok!(ValueSerDeContext::new()
+            let size = assert_ok!(ValueSerDeContext::new(None)
                 .with_delayed_fields_serde()
                 .serialized_size(&value, &layout));
             assert_eq!(size, bytes.len());
@@ -570,7 +517,7 @@ mod tests {
             (Value::u64(12), Native(Aggregator, Box::new(U64))),
         ];
         for (value, layout) in bad_values_layouts_sizes {
-            assert_err!(ValueSerDeContext::new()
+            assert_err!(ValueSerDeContext::new(None)
                 .with_delayed_fields_serde()
                 .serialized_size(&value, &layout));
         }
@@ -585,13 +532,13 @@ mod tests {
         let bytes = move_value.simple_serialize().unwrap();
 
         let vm_value = Value::master_signer(AccountAddress::ZERO);
-        let vm_bytes = ValueSerDeContext::new()
+        let vm_bytes = ValueSerDeContext::new(None)
             .serialize(&vm_value, &MoveTypeLayout::Signer)
             .unwrap()
             .unwrap();
 
         // VM Value Roundtrip
-        assert!(ValueSerDeContext::new()
+        assert!(ValueSerDeContext::new(None)
             .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
             .unwrap()
             .equals(&vm_value)
@@ -605,20 +552,20 @@ mod tests {
 
         // Permissioned Signer Roundtrip
         let vm_value = Value::permissioned_signer(AccountAddress::ZERO, AccountAddress::ONE);
-        let vm_bytes = ValueSerDeContext::new()
+        let vm_bytes = ValueSerDeContext::new(None)
             .serialize(&vm_value, &MoveTypeLayout::Signer)
             .unwrap()
             .unwrap();
 
         // VM Value Roundtrip
-        assert!(ValueSerDeContext::new()
+        assert!(ValueSerDeContext::new(None)
             .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
             .unwrap()
             .equals(&vm_value)
             .unwrap());
 
         // Cannot serialize permissioned signer into bytes with legacy signer
-        assert!(ValueSerDeContext::new()
+        assert!(ValueSerDeContext::new(None)
             .with_legacy_signer()
             .serialize(&vm_value, &MoveTypeLayout::Signer)
             .unwrap()
@@ -631,14 +578,14 @@ mod tests {
         let bytes = move_value.simple_serialize().unwrap();
 
         let vm_value = Value::master_signer(AccountAddress::ZERO);
-        let vm_bytes = ValueSerDeContext::new()
+        let vm_bytes = ValueSerDeContext::new(None)
             .with_legacy_signer()
             .serialize(&vm_value, &MoveTypeLayout::Signer)
             .unwrap()
             .unwrap();
 
         // VM Value Roundtrip
-        assert!(ValueSerDeContext::new()
+        assert!(ValueSerDeContext::new(None)
             .with_legacy_signer()
             .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
             .is_none());

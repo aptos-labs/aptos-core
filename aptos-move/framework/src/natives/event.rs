@@ -87,14 +87,16 @@ fn native_write_to_event_store(
     // TODO(Gas): Get rid of abstract memory size
     context.charge(
         EVENT_WRITE_TO_EVENT_STORE_BASE
-            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let (layout, has_aggregator_lifting) =
-        context.type_to_type_layout_with_identifier_mappings(&ty)?;
+    let (layout, contains_delayed_fields) = context
+        .type_to_type_layout_with_delayed_fields(&ty)?
+        .unpack();
 
     let function_value_extension = context.function_value_extension();
-    let blob = ValueSerDeContext::new()
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
@@ -113,7 +115,7 @@ fn native_write_to_event_store(
             abort_code: ECANNOT_CREATE_EVENT,
         })?;
     ctx.events
-        .push((event, has_aggregator_lifting.then_some(layout)));
+        .push((event, contains_delayed_fields.then_some(layout)));
     Ok(smallvec![])
 }
 
@@ -154,14 +156,15 @@ fn native_emitted_events_by_handle(
         .value_as::<AccountAddress>()?;
     let key = EventKey::new(creation_num, addr);
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
     let ctx = context.extensions().get::<NativeEventContext>();
     let events = ctx
         .emitted_v1_events(&key, &ty_tag)
         .into_iter()
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
-            ValueSerDeContext::new()
+            let max_value_nest_depth = context.max_value_nest_depth();
+            ValueSerDeContext::new(max_value_nest_depth)
                 .with_func_args_deserialization(&function_value_extension)
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
@@ -186,7 +189,7 @@ fn native_emitted_events(
     let ty = ty_args.pop().unwrap();
 
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
     let ctx = context.extensions().get::<NativeEventContext>();
 
     let events = ctx
@@ -194,7 +197,8 @@ fn native_emitted_events(
         .into_iter()
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
-            ValueSerDeContext::new()
+            let max_value_nest_depth = context.max_value_nest_depth();
+            ValueSerDeContext::new(max_value_nest_depth)
                 .with_func_args_deserialization(&function_value_extension)
                 .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
@@ -222,7 +226,7 @@ fn native_write_module_event_to_store(
 
     context.charge(
         EVENT_WRITE_TO_EVENT_STORE_BASE
-            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
 
     let type_tag = context.type_to_type_tag(&ty)?;
@@ -258,11 +262,13 @@ fn native_write_module_event_to_store(
         )));
     }
 
-    let (layout, has_identifier_mappings) =
-        context.type_to_type_layout_with_identifier_mappings(&ty)?;
+    let (layout, contains_delayed_fields) = context
+        .type_to_type_layout_with_delayed_fields(&ty)?
+        .unpack();
 
     let function_value_extension = context.function_value_extension();
-    let blob = ValueSerDeContext::new()
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
@@ -277,7 +283,7 @@ fn native_write_module_event_to_store(
         abort_code: ECANNOT_CREATE_EVENT,
     })?;
     ctx.events
-        .push((event, has_identifier_mappings.then_some(layout)));
+        .push((event, contains_delayed_fields.then_some(layout)));
 
     Ok(smallvec![])
 }

@@ -26,13 +26,12 @@ use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
     ReadOptions, DB,
 };
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
+use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;
-use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -96,10 +95,10 @@ impl StateKvDb {
         let state_kv_db_shards = (0..NUM_STATE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let shard_root_path = db_paths.state_kv_db_shard_root_path(shard_id as u8);
+                let shard_root_path = db_paths.state_kv_db_shard_root_path(shard_id);
                 let db = Self::open_shard(
                     shard_root_path,
-                    shard_id as u8,
+                    shard_id,
                     &state_kv_db_config,
                     readonly,
                     /* is_hot = */ false,
@@ -120,11 +119,10 @@ impl StateKvDb {
                 (0..NUM_STATE_SHARDS)
                     .into_par_iter()
                     .map(|shard_id| {
-                        let shard_root_path =
-                            db_paths.hot_state_kv_db_shard_root_path(shard_id as u8);
+                        let shard_root_path = db_paths.hot_state_kv_db_shard_root_path(shard_id);
                         let db = Self::open_shard(
                             shard_root_path,
-                            shard_id as u8,
+                            shard_id,
                             &state_kv_db_config,
                             readonly,
                             /* is_hot = */ true,
@@ -157,11 +155,7 @@ impl StateKvDb {
     }
 
     pub(crate) fn new_sharded_native_batches(&self) -> ShardedStateKvSchemaBatch {
-        (0..NUM_STATE_SHARDS)
-            .map(|shard_id| self.db_shard(shard_id as u8).new_native_batch())
-            .collect_vec()
-            .try_into()
-            .expect("known to be 16 shards")
+        std::array::from_fn(|shard_id| self.db_shard(shard_id).new_native_batch())
     }
 
     pub(crate) fn commit(
@@ -185,7 +179,7 @@ impl StateKvDb {
                         .expect("Not sufficient number of sharded state kv batches");
                     s.spawn(move |_| {
                         // TODO(grao): Consider propagating the error instead of panic, if necessary.
-                        self.commit_single_shard(version, shard_id as u8, state_kv_batch)
+                        self.commit_single_shard(version, shard_id, state_kv_batch)
                             .unwrap_or_else(|err| {
                                 panic!("Failed to commit shard {shard_id}: {err}.")
                             });
@@ -239,10 +233,10 @@ impl StateKvDb {
         // TODO(HotState): should handle hot state as well.
         for shard_id in 0..NUM_STATE_SHARDS {
             state_kv_db
-                .db_shard(shard_id as u8)
+                .db_shard(shard_id)
                 .create_checkpoint(Self::db_shard_path(
                     cp_root_path.as_ref(),
-                    shard_id as u8,
+                    shard_id,
                     /* is_hot = */ false,
                 ))?;
         }
@@ -258,20 +252,20 @@ impl StateKvDb {
         Arc::clone(&self.state_kv_metadata_db)
     }
 
-    pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
-        &self.state_kv_db_shards[shard_id as usize]
+    pub(crate) fn db_shard(&self, shard_id: usize) -> &DB {
+        &self.state_kv_db_shards[shard_id]
     }
 
-    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
-        Arc::clone(&self.state_kv_db_shards[shard_id as usize])
+    pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
+        Arc::clone(&self.state_kv_db_shards[shard_id])
     }
 
     pub(crate) fn enabled_sharding(&self) -> bool {
         self.enabled_sharding
     }
 
-    pub(crate) fn num_shards(&self) -> u8 {
-        NUM_STATE_SHARDS as u8
+    pub(crate) fn num_shards(&self) -> usize {
+        NUM_STATE_SHARDS
     }
 
     pub(crate) fn hack_num_real_shards(&self) -> usize {
@@ -285,19 +279,19 @@ impl StateKvDb {
     pub(crate) fn commit_single_shard(
         &self,
         version: Version,
-        shard_id: u8,
+        shard_id: usize,
         mut batch: impl WriteBatch,
     ) -> Result<()> {
         batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvShardCommitProgress(shard_id as usize),
+            &DbMetadataKey::StateKvShardCommitProgress(shard_id),
             &DbMetadataValue::Version(version),
         )?;
-        self.state_kv_db_shards[shard_id as usize].write_schemas(batch)
+        self.state_kv_db_shards[shard_id].write_schemas(batch)
     }
 
     fn open_shard<P: AsRef<Path>>(
         db_root_path: P,
-        shard_id: u8,
+        shard_id: usize,
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
         is_hot: bool,
@@ -338,7 +332,7 @@ impl StateKvDb {
         open_func(&rocksdb_opts, path, name, cfds)
     }
 
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: u8, is_hot: bool) -> PathBuf {
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
         let shard_sub_path = format!(
             "{}_{}",
             if is_hot { "hot_shard" } else { "shard" },

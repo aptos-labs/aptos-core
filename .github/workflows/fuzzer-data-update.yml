@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   update-fuzzer-data:
-    runs-on: runs-on,cpu=16,family=m6id,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,17 +39,37 @@ jobs:
       # - move_bytecode_verifier_compiled_modules_seed_corpus
       # All of them reuse the same seed corpus, so we only need to download/upload one of them.
       - name: Download existing corpus
+        working-directory: testsuite/fuzzer/
         run: |
           gcloud storage cp gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus.zip
+          gcloud storage cp gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip move_aptosvm_publish_and_run_transactional_seed_corpus.zip
           unzip -q move_aptosvm_publish_and_run_seed_corpus.zip -d move_aptosvm_publish_and_run_seed_corpus
+          unzip -q move_aptosvm_publish_and_run_transactional_seed_corpus.zip -d move_aptosvm_publish_and_run_transactional_seed_corpus
 
-      - name: Generate runnable states
+      - name: Generate runnable states from data
+        working-directory: testsuite/fuzzer/
         run: |
           chmod +x ./fuzz.sh
-          ./fuzz.sh block-builder generate_runnable_states_recursive testsuite/fuzzer/data/0x1/ move_aptosvm_publish_and_run_seed_corpus
+          ./fuzz.sh block-builder generate_runnable_states_recursive data/0x1/ move_aptosvm_publish_and_run_seed_corpus
+      
+      # TODO: split task based on directory changes
+      - name: Generate runnable states from e2e tests
+        working-directory: testsuite/fuzzer/
+        run: |
+          ./fuzz.sh block-builder generate_runnable_states_recursive /aptos-move/e2e-move-tests move_aptosvm_publish_and_run_seed_corpus
 
+      - name: Generate runnable states transactional from transactional tests
+        working-directory: testsuite/fuzzer/
+        run: |
+          ./fuzz.sh block-builder generate_runnable_states_from_all_tests move_aptosvm_publish_and_run_transactional_seed_corpus
+
+      # TODO: run distillation before pushing(?)
       - name: Create and upload new corpus
+        working-directory: testsuite/fuzzer/
         run: |
           zip -r move_aptosvm_publish_and_run_seed_corpus.zip move_aptosvm_publish_and_run_seed_corpus
           gcloud storage cp move_aptosvm_publish_and_run_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip
-          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --add-acl=publicRead
+          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --canned-acl=publicRead
+          zip -r move_aptosvm_publish_and_run_transactional_seed_corpus.zip move_aptosvm_publish_and_run_transactional_seed_corpus
+          gcloud storage cp move_aptosvm_publish_and_run_transactional_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip
+          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip--canned-acl=publicRead

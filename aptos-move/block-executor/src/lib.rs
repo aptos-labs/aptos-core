@@ -136,13 +136,11 @@ and threads that perform these tasks can already detect validation failures
 due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
 **/
-#[macro_use(defer)]
-extern crate scopeguard;
-
 mod captured_reads;
 mod code_cache;
 pub mod code_cache_global;
 pub mod code_cache_global_manager;
+pub(crate) mod combinatorial_tests;
 pub mod counters;
 pub mod errors;
 pub mod executor;
@@ -150,11 +148,10 @@ mod executor_utilities;
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
 mod limit_processor;
-#[cfg(any(test, feature = "fuzzing"))]
-pub mod proptest_types;
 mod scheduler;
 mod scheduler_status;
 mod scheduler_v2;
+mod scheduler_wrapper;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;

@@ -97,6 +97,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::CMP_REWRITE.to_string(),
+            description: "Rewrite comparison operations".to_string(),
+            default: Given(true),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -265,6 +270,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string(),
+            description: "Treat all package functions with same address as visible (currently necessary for prover in filter mode)"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -282,6 +293,7 @@ impl Experiment {
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
+    pub const CMP_REWRITE: &'static str = "cmp-rewrite";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
@@ -312,6 +324,7 @@ impl Experiment {
     pub const STOP_BEFORE_FILE_FORMAT: &'static str = "stop-before-file-format";
     pub const STOP_BEFORE_STACKLESS_BYTECODE: &'static str = "stop-before-stackless-bytecode";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNSAFE_PACKAGE_VISIBILITY: &'static str = "unsafe-package-visibility";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";

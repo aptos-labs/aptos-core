@@ -22,8 +22,8 @@ use aptos_types::{
     on_chain_config::{ConfigurationResource, ValidatorSet},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionArgument, TransactionAuxiliaryData, TransactionExecutableRef, TransactionOutput,
         TransactionStatus, WriteSetPayload,
     },
@@ -36,7 +36,10 @@ use aptos_vm::{
 };
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -71,8 +74,8 @@ impl VMBlockExecutor for MockVM {
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput, VMStatus> {
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -92,7 +95,10 @@ impl VMBlockExecutor for MockVM {
             }
 
             let txn = txn_provider.get_txn(idx as u32).expect_valid();
-            if matches!(txn, Transaction::StateCheckpoint(_)) {
+            if matches!(
+                txn,
+                Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_)
+            ) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
                     vec![],
@@ -195,7 +201,22 @@ impl VMBlockExecutor for MockVM {
             }
         }
 
-        Ok(BlockOutput::new(outputs, None))
+        let mut block_epilogue_txn = None;
+        if !skip_rest {
+            if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+                block_epilogue_txn = Some(Transaction::block_epilogue_v0(
+                    block_id,
+                    BlockEndInfo::new_empty(),
+                ));
+                outputs.push(TransactionOutput::new_empty_success());
+            }
+        }
+
+        Ok(BlockOutput::new(
+            outputs,
+            block_epilogue_txn,
+            BTreeMap::new(),
+        ))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

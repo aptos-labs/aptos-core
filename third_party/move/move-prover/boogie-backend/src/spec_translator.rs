@@ -8,11 +8,12 @@ use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
         boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
-        boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
-        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_type, boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob,
-        boogie_well_formed_expr, boogie_well_formed_expr_bv,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_num_type_base_bv,
+        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
+        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
+        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
+        boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
@@ -575,6 +576,13 @@ impl SpecTranslator<'_> {
                 ..self.clone()
             };
 
+            let skip_immutable_reference = |ty: &Type| {
+                if !ty.is_mutable_reference() {
+                    ty.skip_reference().clone()
+                } else {
+                    ty.clone()
+                }
+            };
             // Pairs of context parameter names and boogie types
             let param_decls = info
                 .free_vars
@@ -582,14 +590,15 @@ impl SpecTranslator<'_> {
                 .map(|(s, ty)| {
                     (
                         s.display(env.symbol_pool()).to_string(),
-                        boogie_type(env, ty.skip_reference()),
+                        boogie_type(env, &skip_immutable_reference(ty)),
                     )
                 })
-                .chain(
-                    info.used_temps
-                        .iter()
-                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty.skip_reference()))),
-                )
+                .chain(info.used_temps.iter().map(|(t, ty)| {
+                    (
+                        format!("$t{}", t),
+                        boogie_type(env, &skip_immutable_reference(ty)),
+                    )
+                }))
                 .chain(info.used_memory.iter().map(|(m, l)| {
                     let struct_env = &env.get_struct(m.to_qualified_id());
                     (
@@ -606,6 +615,11 @@ impl SpecTranslator<'_> {
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
                 let suffix = boogie_type_suffix(env, ty.skip_reference());
+                let n = if ty.is_mutable_reference() {
+                    format!("$Dereference({})", n)
+                } else {
+                    n.to_owned()
+                };
                 emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);
@@ -1026,7 +1040,11 @@ impl SpecTranslator<'_> {
                 let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
                 if exp_arith_flag {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
-                    let literal = boogie_num_type_base(&arg_node_type);
+                    let literal = boogie_num_type_base(
+                        self.env,
+                        Some(self.env.get_node_loc(args[0].node_id())),
+                        &arg_node_type,
+                    );
                     emit!(self.writer, "$int2bv.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
@@ -1038,7 +1056,11 @@ impl SpecTranslator<'_> {
                 let exp_bv_flag = global_state.get_node_num_oper(args[0].node_id()) == Bitwise;
                 if exp_bv_flag {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
-                    let literal = boogie_num_type_base(&arg_node_type);
+                    let literal = boogie_num_type_base(
+                        self.env,
+                        Some(self.env.get_node_loc(args[0].node_id())),
+                        &arg_node_type,
+                    );
                     emit!(self.writer, "$bv2int.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
@@ -1242,8 +1264,9 @@ impl SpecTranslator<'_> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
-        let bv_flag = if is_vector_table_module && !args.is_empty() {
+        let is_vector_table_cmp_module =
+            module_env.is_std_vector() || module_env.is_table() || module_env.is_cmp();
+        let bv_flag = if is_vector_table_cmp_module && !args.is_empty() {
             global_state.get_node_num_oper(args[0].node_id()) == Bitwise
         } else {
             global_state.get_node_num_oper(node_id) == Bitwise
@@ -1432,12 +1455,6 @@ impl SpecTranslator<'_> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
-            self.env.error(
-                &self.env.get_node_loc(node_id),
-                "cannot test variants of intrinsic struct",
-            );
-        }
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, _) = struct_type.skip_reference().require_struct();
         let inst = self.env.get_node_instantiation(node_id);
@@ -1942,16 +1959,11 @@ impl SpecTranslator<'_> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
+            let oper_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
             emit!(self.writer, "${}'{}'(", bv_op, oper_base);
             self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
             emit!(self.writer, ")");
@@ -1971,16 +1983,11 @@ impl SpecTranslator<'_> {
             .expect("global number operation state");
         let binding = self.env.get_node_type(args[0].node_id());
         let common_type = binding.skip_reference();
-        let oper_base = match common_type {
-            Type::Primitive(PrimitiveType::U8) => "Bv8",
-            Type::Primitive(PrimitiveType::U16) => "Bv16",
-            Type::Primitive(PrimitiveType::U32) => "Bv32",
-            Type::Primitive(PrimitiveType::U64) => "Bv64",
-            Type::Primitive(PrimitiveType::U128) => "Bv128",
-            Type::Primitive(PrimitiveType::U256) => "Bv256",
-            Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-            _ => unreachable!(),
-        };
+        let oper_base = boogie_num_type_base_bv(
+            self.env,
+            Some(self.env.get_node_loc(args[0].node_id())),
+            common_type,
+        );
         emit!(self.writer, "{}'{}'(", boogie_op, oper_base);
         self.translate_seq(args.iter(), ", ", |e| {
             let num_oper_e = global_state.get_node_num_oper(e.node_id());
@@ -1990,7 +1997,11 @@ impl SpecTranslator<'_> {
                     emit!(
                         self.writer,
                         "$int2bv.{}(",
-                        boogie_num_type_base(common_type)
+                        boogie_num_type_base(
+                            self.env,
+                            Some(self.env.get_node_loc(e.node_id())),
+                            common_type
+                        )
                     );
                 } else {
                     self.env.error(
@@ -2033,12 +2044,31 @@ impl SpecTranslator<'_> {
             .env
             .get_cloned_extension::<GlobalNumberOperationState>();
         let arg = args[0].clone();
-        self.env
-            .update_node_type(arg.node_id(), self.env.get_node_type(node_id));
         let cast_oper = global_state.get_node_num_oper(node_id);
         global_state.update_node_oper(args[0].node_id(), cast_oper, true);
         self.env.set_extension(global_state);
-        self.translate_exp(&arg);
+        let target_type = self.env.get_node_type(node_id).skip_reference().clone();
+        let source_type = self
+            .env
+            .get_node_type(arg.node_id())
+            .skip_reference()
+            .clone();
+        let check_cast =
+            |ty: &Type| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num));
+        if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {
+            let target_base =
+                boogie_num_type_base(self.env, Some(self.env.get_node_loc(node_id)), &target_type);
+            let source_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(arg.node_id())),
+                &source_type,
+            );
+            emit!(self.writer, "$castBv{}to{}(", source_base, target_base);
+            self.translate_exp(&arg);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(&arg);
+        }
     }
 
     fn translate_primitive_call(&self, fun: &str, args: &[Exp]) {
@@ -2054,17 +2084,16 @@ impl SpecTranslator<'_> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_left_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
-            let oper_right_base = boogie_num_type_base(&self.env.get_node_type(args[1].node_id()));
+            let oper_left_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
+            let oper_right_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[1].node_id())),
+                &self.env.get_node_type(args[1].node_id()),
+            );
             emit!(
                 self.writer,
                 "{}{}From{}(",
@@ -2086,17 +2115,16 @@ impl SpecTranslator<'_> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_left_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
-            let oper_right_base = boogie_num_type_base(&self.env.get_node_type(args[1].node_id()));
+            let oper_left_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
+            let oper_right_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[1].node_id())),
+                &self.env.get_node_type(args[1].node_id()),
+            );
             emit!(
                 self.writer,
                 "{}{}From{}(",

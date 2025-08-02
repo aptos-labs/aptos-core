@@ -1049,6 +1049,9 @@ impl ExpTranslator<'_, '_, '_> {
                 if inner.is_reference() {
                     self.error(loc, "reference to a reference is not allowed");
                 }
+                if inner.is_tuple() {
+                    self.error(loc, "reference to a tuple is not allowed");
+                }
                 Type::Reference(ReferenceKind::from_is_mut(*is_mut), Box::new(inner))
             },
             Fun(args, result, abilities) => {
@@ -1066,11 +1069,11 @@ impl ExpTranslator<'_, '_, '_> {
                         vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
-                Type::function(
-                    Type::tuple(arg_tys),
-                    Type::tuple(result_tys),
-                    self.parent.translate_abilities(abilities),
-                )
+                let ability_set = self.parent.translate_abilities(abilities);
+                if ability_set.has_key() {
+                    self.error(loc, "function types cannot have `key` ability");
+                }
+                Type::function(Type::tuple(arg_tys), Type::tuple(result_tys), ability_set)
             },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => {
@@ -3746,7 +3749,7 @@ impl ExpTranslator<'_, '_, '_> {
 
             return ExpData::Call(
                 id,
-                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
                 vec![],
             );
         }

@@ -33,10 +33,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};
@@ -159,7 +156,7 @@ where
 impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
     for AptosCodeStorageAdapter<'_, S, E>
 {
-    fn fetch_state_value_metadata(
+    fn get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,

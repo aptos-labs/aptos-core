@@ -131,7 +131,7 @@ jobs:
 
   build-windows-binary:
     name: "Build Windows binary"
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,7 +189,7 @@ jobs:
         with:
           formula-name: aptos
           tag-name: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
-          base-branch: master
+          base-branch: main
           create-pullrequest: true
           commit-message: |
             {{formulaName}} {{version}}

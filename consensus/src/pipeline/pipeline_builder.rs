@@ -5,7 +5,6 @@ use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
     counters::{self, update_counters_for_block, update_counters_for_compute_result},
-    execution_pipeline::SIG_VERIFY_POOL,
     monitor,
     payload_manager::TPayloadManager,
     txn_notifier::TxnNotifier,
@@ -37,12 +36,14 @@ use aptos_types::{
     randomness::Randomness,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        SignedTransaction, Transaction,
+        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
+        Transaction,
     },
     validator_signer::ValidatorSigner,
 };
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     future::Future,
@@ -50,6 +51,15 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(16)
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .expect("Failed to create signature verification thread pool"),
+    )
+});
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -273,6 +283,14 @@ impl PipelineBuilder {
             },
             Some(abort_handles),
         );
+        let rand_fut = spawn_shared_fut(
+            async move {
+                rand_rx
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("randomness tx cancelled")))
+            },
+            Some(abort_handles),
+        );
         (
             PipelineInputTx {
                 qc_tx: Some(qc_tx),
@@ -283,7 +301,7 @@ impl PipelineBuilder {
             },
             PipelineInputRx {
                 qc_rx,
-                rand_rx,
+                rand_fut,
                 order_vote_rx,
                 order_proof_fut,
                 commit_proof_fut,
@@ -355,7 +373,7 @@ impl PipelineBuilder {
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             qc_rx,
-            rand_rx,
+            rand_fut,
             order_vote_rx,
             order_proof_fut,
             commit_proof_fut,
@@ -369,14 +387,14 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
-                rand_rx,
+                rand_fut,
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let ledger_update_fut = spawn_shared_fut(
             Self::ledger_update(
@@ -385,7 +403,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let commit_vote_fut = spawn_shared_fut(
             Self::sign_commit_vote(
@@ -409,7 +427,7 @@ impl PipelineBuilder {
                 block.clone(),
                 self.pre_commit_status(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
         let commit_ledger_fut = spawn_shared_fut(
             Self::commit_ledger(
@@ -419,7 +437,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
             ),
-            Some(&mut abort_handles),
+            None,
         );
 
         let post_ledger_update_fut = spawn_shared_fut(
@@ -527,7 +545,7 @@ impl PipelineBuilder {
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
-        randomness_rx: oneshot::Receiver<Option<Randomness>>,
+        randomness_rx: TaskFuture<Option<Randomness>>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,
@@ -564,11 +582,30 @@ impl PipelineBuilder {
             user_txns.as_ref().clone(),
         ]
         .concat();
+        let proposer_index = block
+            .author()
+            .and_then(|proposer| validator.iter().position(|&v| v == proposer));
+        let auxiliary_info = txns
+            .iter()
+            .map(|txn| {
+                txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                    AuxiliaryInfo::new_empty(),
+                    |_| {
+                        AuxiliaryInfo::new(
+                            PersistedAuxiliaryInfo::None,
+                            proposer_index.map(|index| EphemeralAuxiliaryInfo {
+                                proposer_index: index as u64,
+                            }),
+                        )
+                    },
+                )
+            })
+            .collect();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor
                 .execute_and_update_state(
-                    (block.id(), txns).into(),
+                    (block.id(), txns, auxiliary_info).into(),
                     block.parent_id(),
                     onchain_execution_config,
                 )

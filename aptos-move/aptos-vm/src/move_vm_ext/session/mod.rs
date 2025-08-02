@@ -44,7 +44,11 @@ use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    gas::GasMeter,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
@@ -176,7 +180,7 @@ where
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
@@ -184,7 +188,7 @@ where
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
@@ -357,9 +361,16 @@ where
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
+                    // INVARIANT:
+                    //   We do not need to meter metadata access here. If this resource is in data
+                    //   cache, we must have already fetched metadata for its tag.
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .unmetered_get_existing_module_metadata(
+                            &struct_tag.address,
+                            &struct_tag.module,
+                        )
                         .map_err(|e| e.to_partial())?;
+
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };
 

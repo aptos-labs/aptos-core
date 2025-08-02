@@ -25,9 +25,9 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -100,7 +100,7 @@ impl From<aptos_secure_net::Error> for Error {
 macro_rules! delegate_read {
     ($(
         $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+        fn $name:ident(&self $(, $arg: ident : $ty: ty)* $(,)?) -> $return_type:ty;
     )+) => {
         $(
             $(#[$($attr)*])*
@@ -139,7 +139,7 @@ pub trait DbReader: Send + Sync {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProofV2>;
 
         /// See [AptosDB::get_transaction_by_hash].
         ///
@@ -166,6 +166,15 @@ pub trait DbReader: Send + Sync {
             version: Version,
         ) -> Result<Option<TransactionAuxiliaryData>>;
 
+        /// See [AptosDB::get_persisted_auxiliary_info_iterator].
+        ///
+        /// [AptosDB::get_persisted_auxiliary_info_iterator]: ../aptosdb/struct.AptosDB.html#method.get_persisted_auxiliary_info_iterator
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>>;
+
         /// See [AptosDB::get_first_txn_version].
         ///
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
@@ -189,7 +198,7 @@ pub trait DbReader: Send + Sync {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProofV2>;
 
         /// Returns events by given event key
         fn get_events(
@@ -550,7 +559,7 @@ pub trait DbWriter: Send + Sync {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         unimplemented!()

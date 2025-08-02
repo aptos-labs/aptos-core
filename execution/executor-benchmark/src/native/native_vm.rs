@@ -41,7 +41,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionStatus, WriteSetPayload,
+        TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     write_set::WriteOp,
     AptosCoinType,
@@ -90,7 +90,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -149,20 +149,19 @@ impl ExecutorTask for NativeVMExecutorTask {
         txn: &SignatureVerifiedTransaction,
         _txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let gas_units = 4;
-
         match self.execute_transaction_impl(
             executor_with_group_view,
             txn,
-            gas_units,
             self.fa_migration_complete,
         ) {
-            Ok(change_set) => ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
-                change_set,
-                ModuleWriteSet::empty(),
-                FeeStatement::new(gas_units, gas_units, 0, 0, 0),
-                TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
-            ))),
+            Ok((change_set, gas_units)) => {
+                ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
+                    change_set,
+                    ModuleWriteSet::empty(),
+                    FeeStatement::new(gas_units, gas_units, 0, 0, 0),
+                    TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
+                )))
+            },
             Err(_) => ExecutionStatus::SpeculativeExecutionAbortError("something".to_string()),
         }
     }
@@ -185,9 +184,9 @@ impl NativeVMExecutorTask {
         &self,
         view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
-        gas_units: u64,
         fa_migration_complete: bool,
-    ) -> Result<VMChangeSet, ()> {
+    ) -> Result<(VMChangeSet, u64), ()> {
+        let gas_units = 4;
         let gas = gas_units * 100;
 
         let mut resource_write_set = BTreeMap::new();
@@ -352,6 +351,7 @@ impl NativeVMExecutorTask {
                     }
                 }
             },
+            NativeTransaction::BlockEpilogue => return Ok((VMChangeSet::empty(), 0)),
         };
 
         events.push((
@@ -361,12 +361,15 @@ impl NativeVMExecutorTask {
             None,
         ));
 
-        Ok(VMChangeSet::new(
-            resource_write_set,
-            events,
-            delayed_field_change_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
+        Ok((
+            VMChangeSet::new(
+                resource_write_set,
+                events,
+                delayed_field_change_set,
+                aggregator_v1_write_set,
+                aggregator_v1_delta_set,
+            ),
+            gas_units,
         ))
     }
 

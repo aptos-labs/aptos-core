@@ -1,6 +1,5 @@
 processed 5 tasks
-
-task 0 'publish'. lines 1-91:
+task 0 lines 1-91:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: duplicate declaration of `_`
    ┌─ TEMPFILE:38:37
@@ -19,8 +18,7 @@ error: duplicate declaration of `_`
    │                              previous declaration of `_`
 
 
-
-task 1 'run'. lines 93-95:
+task 1 lines 93-95:  run 0xc0ffee::m::test9 [// //# run 0xc0ffee::m::test10a]
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -28,8 +26,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 97-97:
+task 2 lines 97-97:  run 0xc0ffee::m::test10b
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -37,8 +34,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 3 'run'. lines 99-99:
+task 3 lines 99-99:  run 0xc0ffee::m::test10c
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -46,8 +42,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 4 'run'. lines 101-101:
+task 4 lines 101-101:  run 0xc0ffee::m::test11
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

@@ -4,7 +4,6 @@
 use crate::{
     loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
-    storage::ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
     LoadedFunction, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
@@ -27,10 +26,7 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
-    },
+    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -59,7 +55,10 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
-    fn fetch_module_size_in_bytes(
+    ///
+    /// Note: this API is not metered! It is only used to get the size of a module so that metering
+    /// can actually be implemented before loading a module.
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -67,7 +66,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
-    fn fetch_module_metadata(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -75,12 +76,14 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns the metadata in the module. An error is returned if there is a storage error,
     /// module fails deserialization, or does not exist.
-    fn fetch_existing_module_metadata(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Vec<Metadata>> {
-        self.fetch_module_metadata(address, module_name)?
+        self.unmetered_get_module_metadata(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -138,9 +141,12 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
-    /// Returns a struct type corresponding to the specified name. The module containing the struct
-    /// will be fetched and cached beforehand.
-    fn fetch_struct_ty(
+    /// Returns a struct definition corresponding to the specified name. The module containing the
+    /// struct will be fetched and cached beforehand. Returns an error if the module or struct does
+    /// not exist.
+    ///
+    /// Note: This API is not metered.
+    fn unmetered_get_struct_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -154,19 +160,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .map_err(|err| err.to_partial())
     }
 
-    fn fetch_struct_ty_by_idx(&self, idx: &StructNameIndex) -> PartialVMResult<Arc<StructType>> {
-        let struct_name = self
-            .runtime_environment()
-            .struct_name_index_map()
-            .idx_to_struct_name_ref(*idx)?;
-
-        self.fetch_struct_ty(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
-    }
-
     /// Returns a runtime type corresponding to the specified type tag (file format type
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
@@ -178,7 +171,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
             .vm_config()
             .ty_builder
             .create_ty(ty_tag, |st| {
-                self.fetch_struct_ty(
+                self.unmetered_get_struct_definition(
                     &st.address,
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),
@@ -274,7 +267,7 @@ where
             .map(|(module, _)| module.extension().bytes().clone()))
     }
 
-    fn fetch_module_size_in_bytes(
+    fn unmetered_get_module_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -285,7 +278,7 @@ where
             .map(|(module, _)| module.extension().bytes().len()))
     }
 
-    fn fetch_module_metadata(
+    fn unmetered_get_module_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -552,6 +545,7 @@ where
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
+    #[allow(dead_code)]
     pub(crate) module_storage: &'a dyn ModuleStorage,
 }
 
@@ -579,40 +573,23 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
         &self,
         fun: &dyn AbstractFunction,
     ) -> PartialVMResult<SerializedFunctionData> {
-        match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
+        match &*LazyLoadedFunction::expect_this_impl(fun)?.state.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
-            LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
-                let ty_converter = StorageLayoutConverter::new(self.module_storage);
-                let ty_builder = &self
-                    .module_storage
-                    .runtime_environment()
-                    .vm_config()
-                    .ty_builder;
-
-                let captured_layouts = mask
-                    .extract(fun.param_tys(), true)
-                    .into_iter()
-                    .map(|ty| {
-                        let (layout, contains_delayed_fields) = if fun.ty_args.is_empty() {
-                            ty_converter.type_to_type_layout_with_identifier_mappings(ty)?
-                        } else {
-                            let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                            ty_converter.type_to_type_layout_with_identifier_mappings(&ty)?
-                        };
-
-                        // Do not allow delayed fields to be serialized.
-                        if contains_delayed_fields {
-                            let err = PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
-                                .with_message(
-                                "Function values that capture delayed fields cannot be serialized"
-                                    .to_string(),
-                            );
-                            return Err(err);
-                        }
-
-                        Ok(layout)
-                    })
-                    .collect::<PartialVMResult<Vec<_>>>()?;
+            LazyLoadedFunctionState::Resolved {
+                fun,
+                mask,
+                ty_args,
+                captured_layouts,
+            } => {
+                // If there are no captured layouts, then this closure is non-storable, i.e., the
+                // function is not persistent (not public or not private with #[persistent]
+                // attribute). This means that anonymous lambda-lifted functions are cannot be
+                // serialized as well.
+                let captured_layouts = captured_layouts.as_ref().cloned().ok_or_else(|| {
+                    let msg = "Captured layouts must always be computed for storable closures";
+                    PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                        .with_message(msg.to_string())
+                })?;
 
                 Ok(SerializedFunctionData {
                     format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
@@ -631,5 +608,13 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
                 })
             },
         }
+    }
+
+    fn max_value_nest_depth(&self) -> Option<u64> {
+        let vm_config = self.module_storage.runtime_environment().vm_config();
+        vm_config
+            .enable_depth_checks
+            .then_some(vm_config.max_value_nest_depth)
+            .flatten()
     }
 }

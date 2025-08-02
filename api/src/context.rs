@@ -837,10 +837,11 @@ impl Context {
     ) -> Result<Vec<TransactionOnChainData>> {
         let data = self
             .db
-            .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
+            .get_transaction_outputs(start_version, limit as u64, ledger_version)?
+            .consume_output_list_with_proof();
 
         let txn_start_version = data
-            .first_transaction_output_version
+            .get_first_output_version()
             .ok_or_else(|| format_err!("no start version from database"))?;
         ensure!(
             txn_start_version == start_version,
@@ -1075,6 +1076,7 @@ impl Context {
         let (_, txn_output) = &self
             .db
             .get_transaction_outputs(txn.version, 1, txn.version)?
+            .consume_output_list_with_proof()
             .transactions_and_outputs[0];
         self.get_accumulator_root_hash(txn.version)
             .map(|h| (txn, h, txn_output).into())

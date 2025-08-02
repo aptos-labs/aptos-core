@@ -6,7 +6,7 @@ use crate::{
     diag, diagnostics::Diagnostic, parser::syntax::make_loc, shared::CompilationEnv,
     FileCommentMap, MatchedFileCommentMap,
 };
-use move_command_line_common::files::FileHash;
+use move_command_line_common::{character_sets::is_permitted_chars, files::FileHash};
 use move_ir_types::location::Loc;
 use std::fmt;
 
@@ -541,7 +541,7 @@ fn find_token(
                     let loc = make_loc(file_hash, start_offset, start_offset);
                     return Err(Box::new(diag!(
                         Syntax::InvalidCharacter,
-                        (loc, format!("Invalid character: '{}'; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
+                        (loc, format!("Invalid character: `{}`; string literal must begin with `b\"` and closing quote `\"` must appear on same line", c))
                     )));
                 },
             }
@@ -678,12 +678,30 @@ fn find_token(
             let loc = make_loc(file_hash, start_offset, start_offset);
             return Err(Box::new(diag!(
                 Syntax::InvalidCharacter,
-                (loc, format!("Invalid character: '{}'", c))
+                (loc, format!("Invalid character: `{}`", c))
             )));
         },
     };
 
-    Ok((tok, len))
+    if let Some(invalid_chr_idx) = find_invalid_char(text.as_bytes(), len) {
+        let loc = make_loc(
+            file_hash,
+            invalid_chr_idx + start_offset,
+            invalid_chr_idx + start_offset,
+        );
+        Err(Box::new(diag!(
+            Syntax::InvalidCharacter,
+            (
+                loc,
+                format!(
+                    "Invalid character: `{}`",
+                    text.chars().nth(invalid_chr_idx).unwrap()
+                )
+            )
+        )))
+    } else {
+        Ok((tok, len))
+    }
 }
 
 // Return the length of the substring matching [a-zA-Z0-9_]. Note that
@@ -735,13 +753,17 @@ fn get_string_len(text: &str) -> Option<usize> {
     while let Some(chr) = iter.next() {
         if chr == '\\' {
             // Skip over the escaped character (e.g., a quote or another backslash)
-            if iter.next().is_some() {
-                pos += 1;
+            if let Some(next_chr) = iter.next() {
+                // Count the number of bytes in the escaped character
+                // Utf-8 characters are accepted for now, which will be checked later by find_token
+                pos += next_chr.len_utf8();
             }
         } else if chr == '"' {
             return Some(pos);
         }
-        pos += 1;
+        // Count the number of bytes in the current character
+        // Utf-8 characters are accepted for now, which will be checked later by find_token
+        pos += chr.len_utf8();
     }
     None
 }
@@ -793,6 +815,19 @@ fn trim_start_whitespace(text: &str) -> &str {
     }
 
     &text[pos..]
+}
+
+// find if any invalid character exists in the token represented as text[0..len]
+fn find_invalid_char(text: &[u8], len: usize) -> Option<usize> {
+    let mut idx: usize = 0;
+    while idx < len {
+        if !is_permitted_chars(text, idx) {
+            return Some(idx);
+        }
+        // All characters shall have one byte until the first invalid one
+        idx += 1;
+    }
+    None
 }
 
 #[cfg(test)]

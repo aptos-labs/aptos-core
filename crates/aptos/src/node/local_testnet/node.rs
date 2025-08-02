@@ -164,6 +164,9 @@ impl NodeManager {
         node_config.indexer_grpc.address.set_ip(IpAddr::V4(bind_to));
         node_config.admin_service.address = bind_to.to_string();
         node_config.inspection_service.address = bind_to.to_string();
+        node_config.indexer_db_config.enable_event = true;
+        node_config.indexer_db_config.enable_statekeys = true;
+        node_config.indexer_db_config.enable_transaction = true;
 
         Ok(NodeManager {
             config: node_config,

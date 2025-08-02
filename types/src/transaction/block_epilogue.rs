@@ -1,18 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    state_store::{state_key::StateKey, state_slot::StateSlot},
-    transaction::TransactionOutput,
-    write_set::{HotStateOp, WriteSet},
-};
-use anyhow::Result;
+use crate::state_store::state_key::StateKey;
 use aptos_crypto::HashValue;
 use derive_more::Deref;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -21,13 +16,34 @@ pub enum BlockEpiloguePayload {
         block_id: HashValue,
         block_end_info: BlockEndInfo,
     },
+    V1 {
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    },
 }
 
 impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
+            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum FeeDistribution {
+    V0 {
+        // Validator index -> Octa
+        amount: BTreeMap<u64, u64>,
+    },
+}
+
+impl FeeDistribution {
+    pub fn new(amount: BTreeMap<u64, u64>) -> Self {
+        Self::V0 { amount }
     }
 }
 
@@ -46,6 +62,15 @@ pub enum BlockEndInfo {
 }
 
 impl BlockEndInfo {
+    pub fn new_empty() -> Self {
+        Self::V0 {
+            block_gas_limit_reached: false,
+            block_output_limit_reached: false,
+            block_effective_block_gas_units: 0,
+            block_approx_output_size: 0,
+        }
+    }
+
     pub fn limit_reached(&self) -> bool {
         match self {
             BlockEndInfo::V0 {
@@ -68,17 +93,13 @@ impl BlockEndInfo {
 
 /// Wrapper type to temporarily host the hot_state_ops which will not serialize until
 /// the hot state is made entirely deterministic
+/// TODO(HotState): maybe get rid of this struct now that it doesn't have anything more than
+/// `BlockEndInfo`?
 #[derive(Debug, Deref)]
 pub struct TBlockEndInfoExt<Key: Debug> {
     #[deref]
     inner: BlockEndInfo,
-    /// TODO(HotState): remove
-    /// Changes to the hot state.
-    /// n.b. only involves keys that are not written to by the user transactions.
-    /// TODO(HotState): add evictions
-    /// TODO(HotState): once hot state is deterministic across all nodes, add BlockEndInfo::V1 and
-    ///                 serialize the promoted and evicted keys in the transaction.
-    slots_to_make_hot: BTreeMap<Key, StateSlot>,
+    _phantom: PhantomData<Key>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
@@ -86,37 +107,19 @@ pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
 impl<Key: Debug> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
-            inner: BlockEndInfo::V0 {
-                block_gas_limit_reached: false,
-                block_output_limit_reached: false,
-                block_effective_block_gas_units: 0,
-                block_approx_output_size: 0,
-            },
-            slots_to_make_hot: BTreeMap::new(),
+            inner: BlockEndInfo::new_empty(),
+            _phantom: PhantomData,
         }
     }
 
-    pub fn new(inner: BlockEndInfo, slots_to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
+    pub fn new(inner: BlockEndInfo) -> Self {
         Self {
             inner,
-            slots_to_make_hot,
+            _phantom: PhantomData,
         }
     }
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
-    }
-}
-
-impl BlockEndInfoExt {
-    pub fn to_transaction_output(&self) -> Result<TransactionOutput> {
-        let write_ops = self
-            .slots_to_make_hot
-            .iter()
-            .map(|(key, slot)| Ok((key.clone(), HotStateOp::make_hot(slot.clone()))))
-            .collect::<Result<_>>()?;
-        Ok(TransactionOutput::new_success_with_write_set(
-            WriteSet::Hotness(write_ops),
-        ))
     }
 }

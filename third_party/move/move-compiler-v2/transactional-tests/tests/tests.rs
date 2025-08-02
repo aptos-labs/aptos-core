@@ -29,6 +29,14 @@ struct TestConfig {
     exclude: &'static [&'static str],
 }
 
+/// Set of exclusions that apply when using `include: &[]` in TestConfig.
+const COMMON_EXCLUSIONS: &[&str] = &[
+    "/operator_eval/",
+    "/no-recursive-check/",
+    "/no-access-check/",
+    "/no-recursive-type-check/",
+];
+
 /// Note that any config which has different output for a test directory
 /// *must* be added to the `SEPARATE_BASELINE` array below, so that a
 /// special output file `test.foo.exp` will be generated for the output
@@ -40,8 +48,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
         runner: |p| run(p, get_config_by_name("baseline")),
         experiments: &[],
         language_version: LanguageVersion::latest(),
-        include: &[],
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        include: &[], // all tests except those excluded below
+        exclude: COMMON_EXCLUSIONS,
     },
     // Test optimize/no-optimize/etc., except for `/access_control/`
     TestConfig {
@@ -53,7 +61,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         ],
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        exclude: COMMON_EXCLUSIONS,
     },
     TestConfig {
         name: "no-optimize",
@@ -61,7 +69,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::OPTIMIZE, false)],
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
-        exclude: &["/operator_eval/", "/no-recursive-check/"],
+        exclude: COMMON_EXCLUSIONS,
     },
     // Test `/operator_eval/` with language version 1 and 2
     TestConfig {
@@ -86,6 +94,22 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-check/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "no-access-check",
+        runner: |p| run(p, get_config_by_name("no-access-check")),
+        experiments: &[(Experiment::ACCESS_CHECK, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/no-access-check/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "no-recursive-type-check",
+        runner: |p| run(p, get_config_by_name("no-recursive-type-check")),
+        experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/no-recursive-type-check/"],
         exclude: &[],
     },
 ];
@@ -121,6 +145,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "optimization/bug_14223_unused_non_droppable.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
+    // Different error messages depending on optimizations or not
+    "no-v1-comparison/fv_as_keys.move",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
@@ -145,7 +171,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    let vm_test_config = TestRunConfig::compiler_v2(language_version, experiments);
+    let vm_test_config = TestRunConfig::new(language_version, experiments);
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }

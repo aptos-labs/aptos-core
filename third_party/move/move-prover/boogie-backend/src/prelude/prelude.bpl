@@ -3,7 +3,7 @@ Copyright (c) The Diem Core Contributors
 SPDX-License-Identifier: Apache-2.0
 
 This files contains a Tera Rust template for the prover's Boogie prelude.
-(See https://tera.netlify.app/docs).
+(See https://docs.rs/tera/latest/tera/).
 
 The following variables and filters are bound in the template context:
 
@@ -32,7 +32,9 @@ options provided to the prover.
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
 
+{%-if S != "'$1_cmp_Ordering'" %}
 function $Arbitrary_value_of{{S}}(): {{T}};
+{% endif %}
 
 {% endfor %}
 
@@ -670,6 +672,23 @@ procedure {:inline 1} $CastBv{{instance}}to{{impl.base}}(src: bv{{instance}}) re
     {%- endif %}
 }
 
+{% if impl.base in bv_in_all_types and instance in  bv_in_all_types %}
+function $castBv{{instance}}to{{impl.base}}(src: bv{{instance}}) returns (bv{{impl.base}})
+{
+    {%- if base_diff < 0 %}
+    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then
+        $Arbitrary_value_of'bv{{impl.base}}'()
+    {%- endif %}
+    {%- if base_diff < 0 %}
+    else
+    src[{{impl.base}}:0]
+    {%- elif base_diff == 0 %}
+    src
+    {%- else %}
+    0bv{{base_diff}} ++ src
+    {%- endif %}
+}
+{% endif %}
 
 function $shlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (bv{{impl.base}})
 {
@@ -684,10 +703,15 @@ function $shlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{in
 
 procedure {:inline 1} $ShlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (dst: bv{{impl.base}})
 {
+    {%- if impl.base != 256 or instance != 8 %}
     if ($Ge'Bv{{instance}}'(src2, {{impl.base}}bv{{instance}})) {
         call $ExecFailureAbort();
         return;
     }
+    {% else %}
+    assume $bv2int.{{instance}}(src2) >= 0 && $bv2int.{{instance}}(src2) < 256;
+    {%- endif %}
+
     {%- if base_diff > 0 %}
     dst := $Shl'Bv{{impl.base}}'(src1, 0bv{{base_diff}} ++ src2);
     {%- elif base_diff == 0 %}
@@ -710,10 +734,15 @@ function $shrBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{in
 
 procedure {:inline 1} $ShrBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (dst: bv{{impl.base}})
 {
+    {%- if impl.base != 256 or instance != 8 %}
     if ($Ge'Bv{{instance}}'(src2, {{impl.base}}bv{{instance}})) {
         call $ExecFailureAbort();
         return;
     }
+    {% else %}
+    assume $bv2int.{{instance}}(src2) >= 0 && $bv2int.{{instance}}(src2) < 256;
+    {%- endif %}
+
     {%- if base_diff > 0 %}
     dst := $Shr'Bv{{impl.base}}'(src1, 0bv{{base_diff}} ++ src2);
     {%- elif base_diff == 0 %}
@@ -1176,6 +1205,18 @@ procedure {:inline 1} $1_Signature_ed25519_verify(
 // Native BCS implementation for element type `{{instance.suffix}}`
 
 {{ native::bcs_module(instance=instance) -}}
+{%- endfor %}
+
+
+// ==================================================================================
+// Native from_bcs::from_bytes
+
+{%- for instance in from_bcs_instances %}
+
+// ----------------------------------------------------------------------------------
+// Native FROM_BCS implementation for element type `{{instance.suffix}}`
+
+{{ native::from_bcs_module(instance=instance) -}}
 {%- endfor %}
 
 

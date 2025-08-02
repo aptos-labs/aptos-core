@@ -51,12 +51,12 @@ impl ClosureMask {
         Self(mask)
     }
 
-    pub fn new_for_leading(n: usize) -> Self {
+    pub fn new_for_leading(n: usize) -> Result<Self, String> {
         let mut mask = Self::new(0);
         for i in 0..n {
-            mask.set_captured(i)
+            mask.set_captured(i)?;
         }
-        mask
+        Ok(mask)
     }
 
     pub fn bits(&self) -> u64 {
@@ -70,9 +70,16 @@ impl ClosureMask {
     }
 
     /// Sets the ith argument to be captured
-    pub fn set_captured(&mut self, i: usize) {
-        assert!(i < Self::MAX_ARGS);
-        self.0 |= 1 << i
+    pub fn set_captured(&mut self, i: usize) -> Result<(), String> {
+        if i >= Self::MAX_ARGS {
+            return Err(format!(
+                "Captured argument index {} exceeds maximum allowed captured arguments {}",
+                i,
+                Self::MAX_ARGS
+            ));
+        }
+        self.0 |= 1 << i;
+        Ok(())
     }
 
     /// Apply a closure mask to a list of elements, returning only those
@@ -380,40 +387,5 @@ mod serialization_tests {
                 .expect("deserialization must succeed"),
             "deserialized value not equal to original one"
         );
-    }
-}
-
-//===========================================================================================
-
-impl fmt::Display for MoveClosure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let MoveClosure {
-            module_id,
-            fun_id,
-            ty_args,
-            mask,
-            captured,
-        } = self;
-        let captured_str = mask
-            .format_arguments(captured.iter().map(|v| v.1.to_string()).collect())
-            .join(", ");
-        let inst_str = if ty_args.is_empty() {
-            "".to_string()
-        } else {
-            format!(
-                "<{}>",
-                ty_args
-                    .iter()
-                    .map(|t| t.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
-        };
-        write!(
-            f,
-            // this will print `a::m::f<T>(a1,_,a2,_)`
-            "{}::{}{}({})",
-            module_id, fun_id, inst_str, captured_str
-        )
     }
 }

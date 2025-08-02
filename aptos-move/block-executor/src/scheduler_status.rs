@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(BlockSTMv2): enable dead code lint.
-#![allow(dead_code)]
-
 use crate::scheduler_v2::ExecutionQueueManager;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -316,7 +313,7 @@ pub(crate) struct ExecutionStatuses {
     /// Allows adding or removing transactions from the execution queue based on
     /// their status changes. Used when stalls are added/removed or when
     /// a new incarnation is created.
-    execution_queue_manager: ExecutionQueueManager,
+    execution_queue_manager: CachePadded<ExecutionQueueManager>,
 }
 
 impl ExecutionStatuses {
@@ -325,7 +322,7 @@ impl ExecutionStatuses {
             statuses: (0..num_txns)
                 .map(|_| CachePadded::new(ExecutionStatus::new()))
                 .collect(),
-            execution_queue_manager: ExecutionQueueManager::new(num_txns),
+            execution_queue_manager: CachePadded::new(ExecutionQueueManager::new(num_txns)),
         }
     }
 
@@ -654,6 +651,7 @@ impl ExecutionStatuses {
     /// This can be called during an ongoing execution to determine if the
     /// execution has been concurrently aborted. This allows the executor
     /// to return early and to discard the results.
+    #[inline]
     pub(crate) fn already_started_abort(
         &self,
         txn_idx: TxnIndex,
@@ -795,7 +793,7 @@ impl ExecutionStatuses {
     ) -> Self {
         Self {
             statuses: statuses.into_iter().map(CachePadded::new).collect(),
-            execution_queue_manager,
+            execution_queue_manager: CachePadded::new(execution_queue_manager),
         }
     }
 

@@ -846,6 +846,7 @@ Scheme identifier for Ed25519 signatures used to derive authentication keys for 
 
 <a id="0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM"></a>
 
+This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EEXCEEDED_MAX_GUID_CREATION_NUM">EEXCEEDED_MAX_GUID_CREATION_NUM</a>: u64 = 20;
@@ -965,6 +966,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 <a id="0x1_account_ENO_SIGNER_CAPABILITY_OFFERED"></a>
 
+The signer capability is not offered to any address
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>: u64 = 19;
@@ -1038,6 +1040,16 @@ Sequence number exceeds the maximum value for a u64
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ESEQUENCE_NUMBER_TOO_BIG">ESEQUENCE_NUMBER_TOO_BIG</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED"></a>
+
+The set_originating_address is disabled due to potential poisoning from account abstraction
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED">ESET_ORIGINATING_ADDRESS_DISABLED</a>: u64 = 27;
 </code></pre>
 
 
@@ -2191,6 +2203,8 @@ authority of the new authentication key.
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account.md#0x1_account_ESET_ORIGINATING_ADDRESS_DISABLED">ESET_ORIGINATING_ADDRESS_DISABLED</a>);
+
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <b>let</b> auth_key_as_address =

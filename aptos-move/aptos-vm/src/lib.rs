@@ -132,7 +132,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    state_store::StateView,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,
@@ -173,7 +173,7 @@ pub trait VMBlockExecutor: Send + Sync {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput, VMStatus>;
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions and returns output for each one of them, without applying
     /// any block limit.

@@ -30,7 +30,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    state_store::StateView,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
@@ -41,7 +41,10 @@ use aptos_vm::{
     AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
-use std::sync::{mpsc::channel, Arc};
+use std::{
+    collections::BTreeMap,
+    sync::{mpsc::channel, Arc},
+};
 
 pub struct PtxBlockExecutor;
 
@@ -56,7 +59,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput, VMStatus> {
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();
@@ -106,7 +109,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret, None))
+        Ok(BlockOutput::new(ret, None, BTreeMap::new()))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(

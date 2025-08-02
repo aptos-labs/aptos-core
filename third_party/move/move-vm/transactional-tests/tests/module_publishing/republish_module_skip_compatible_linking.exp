@@ -1,6 +1,10 @@
 processed 6 tasks
-
-task 5 'run'. lines 69-69:
+task 0 lines 1-14:  publish [module 0x42.A {]
+task 1 lines 16-33:  publish [module 0x43.B {]
+task 2 lines 35-44:  publish [module 0x44.C {]
+task 3 lines 46-46:  run 0x44::C::m
+task 4 lines 49-66:  publish --skip-check-struct-and-pub-function-linking [module 0x42.A {]
+task 5 lines 69-69:  run 0x44::C::m
 Error: Function execution failed with VMError: {
     major_status: UNEXPECTED_VERIFIER_ERROR,
     sub_status: None,

@@ -52,6 +52,7 @@ pub enum ApiError {
     SequenceNumberTooOld(Option<String>),
     VmError(Option<String>),
     MempoolIsFull(Option<String>),
+    RejectedByFilter(Option<String>),
 }
 
 impl std::fmt::Display for ApiError {
@@ -142,6 +143,7 @@ impl ApiError {
             MempoolIsFull(_) => 32,
             CoinTypeFailedToBeFetched(_) => 33,
             StateValueNotFound(_) => 34,
+            RejectedByFilter(_) => 35,
         }
     }
 
@@ -201,6 +203,7 @@ impl ApiError {
             ApiError::VmError(_) => "Transaction submission failed due to VM error",
             ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
             ApiError::GasEstimationFailed(_) => "Gas estimation failed",
+            ApiError::RejectedByFilter(_) => "Transaction was rejected by the transaction filter",
         }
     }
 
@@ -300,6 +303,9 @@ impl From<RestError> for ApiError {
                     ApiError::SequenceNumberTooOld(Some(err.error.message))
                 },
                 AptosErrorCode::VmError => ApiError::VmError(Some(err.error.message)),
+                AptosErrorCode::RejectedByFilter => {
+                    ApiError::RejectedByFilter(Some(err.error.message))
+                },
                 AptosErrorCode::HealthCheckFailed => {
                     ApiError::InternalError(Some(err.error.message))
                 },

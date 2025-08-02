@@ -17,7 +17,7 @@ use crate::{
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
-    write_set::WriteSet,
+    write_set::{HotStateOp, WriteSet},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -36,6 +36,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
+    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
@@ -53,7 +54,7 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
+pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -61,12 +62,13 @@ use crate::{
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     keyless::FederatedKeylessPublicKey,
+    on_chain_config::{FeatureFlag, Features},
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-pub use block_output::{BlockOutput, TBlockOutput};
+pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -1463,53 +1465,52 @@ pub enum TransactionStatus {
 impl TransactionStatus {
     pub fn status(&self) -> Result<ExecutionStatus, StatusCode> {
         match self {
-            TransactionStatus::Keep(status) => Ok(status.clone()),
-            TransactionStatus::Discard(code) => Err(*code),
-            TransactionStatus::Retry => Err(StatusCode::UNKNOWN_VALIDATION_STATUS),
+            Self::Keep(status) => Ok(status.clone()),
+            Self::Discard(code) => Err(*code),
+            Self::Retry => Err(StatusCode::UNKNOWN_VALIDATION_STATUS),
         }
     }
 
     pub fn is_discarded(&self) -> bool {
         match self {
-            TransactionStatus::Discard(_) => true,
-            TransactionStatus::Keep(_) => false,
-            TransactionStatus::Retry => true,
+            Self::Discard(_) | Self::Retry => true,
+            Self::Keep(_) => false,
         }
     }
 
+    pub fn is_kept(&self) -> bool {
+        !self.is_discarded()
+    }
+
     pub fn is_retry(&self) -> bool {
-        match self {
-            TransactionStatus::Discard(_) => false,
-            TransactionStatus::Keep(_) => false,
-            TransactionStatus::Retry => true,
-        }
+        matches!(self, Self::Retry)
     }
 
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
-            TransactionStatus::Keep(s) => Ok(s.clone()),
+            Self::Keep(s) => Ok(s.clone()),
             _ => Err(format_err!("Not Keep.")),
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
+    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
+                    Self::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
                 },
-                _ => TransactionStatus::Keep(recorded.into()),
+                _ => Self::Keep(recorded.into()),
             },
             Err(code) => {
                 if code.status_type() == StatusType::InvariantViolation
-                    && charge_invariant_violation
+                    && features.is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION)
                 {
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+                    Self::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
                 } else {
-                    TransactionStatus::Discard(code)
+                    Self::Discard(code)
                 }
             },
         }
@@ -1517,7 +1518,7 @@ impl TransactionStatus {
 
     pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
         if vm_status == VMStatus::Executed {
-            TransactionStatus::Keep(ExecutionStatus::Success)
+            Self::Keep(ExecutionStatus::Success)
         } else {
             panic!("Auto-conversion should not be called with non-executed status.")
         }
@@ -1526,7 +1527,7 @@ impl TransactionStatus {
 
 impl From<ExecutionStatus> for TransactionStatus {
     fn from(txn_execution_status: ExecutionStatus) -> Self {
-        TransactionStatus::Keep(txn_execution_status)
+        Self::Keep(txn_execution_status)
     }
 }
 
@@ -1621,37 +1622,6 @@ impl Default for TransactionAuxiliaryData {
 }
 
 impl TransactionAuxiliaryData {
-    pub fn from_vm_status(vm_status: &VMStatus) -> Self {
-        let detail_error_message = match vm_status.clone().keep_or_discard() {
-            Ok(KeptVMStatus::MiscellaneousError) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, None))
-            },
-            Ok(KeptVMStatus::ExecutionFailure {
-                location: _,
-                function: _,
-                code_offset: _,
-                message,
-            }) => {
-                let status_code = vm_status.status_code();
-                Some(VMErrorDetail::new(status_code, message))
-            },
-            Err(status_code) => {
-                // emulate the behavior of
-                if status_code.status_type() == StatusType::InvariantViolation {
-                    Some(VMErrorDetail::new(status_code, None))
-                } else {
-                    None
-                }
-            },
-            _ => None,
-        };
-
-        Self::V1(TransactionAuxiliaryDataV1 {
-            detail_error_message,
-        })
-    }
-
     pub fn get_detail_error_message(&self) -> Option<&VMErrorDetail> {
         match self {
             Self::V1(data) => data.detail_error_message.as_ref(),
@@ -1842,6 +1812,10 @@ impl TransactionOutput {
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
         self.write_set.state_update_refs()
     }
+
+    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+        self.write_set.add_hotness(hotness);
+    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
@@ -1860,6 +1834,7 @@ impl TransactionInfo {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
             transaction_hash,
@@ -1868,6 +1843,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            auxiliary_info_hash,
         ))
     }
 
@@ -1884,6 +1860,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
+            None,
         )
     }
 
@@ -1896,6 +1873,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
+            None,
         )
     }
 }
@@ -1936,8 +1914,8 @@ pub struct TransactionInfoV0 {
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
 
-    /// Potentially summarizes all evicted items from state. Always `None` for now.
-    state_cemetery_hash: Option<HashValue>,
+    /// The hash value summarizing PersistedAuxiliaryInfo.
+    auxiliary_info_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1948,6 +1926,7 @@ impl TransactionInfoV0 {
         state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
     ) -> Self {
         Self {
             gas_used,
@@ -1956,7 +1935,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
-            state_cemetery_hash: None,
+            auxiliary_info_hash,
         }
     }
 
@@ -1974,6 +1953,10 @@ impl TransactionInfoV0 {
 
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        self.auxiliary_info_hash
     }
 
     pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
@@ -2160,6 +2143,16 @@ impl TransactionListWithProof {
         )
     }
 
+    /// Returns the first version in the transaction list
+    pub fn get_first_transaction_version(&self) -> Option<Version> {
+        self.first_transaction_version
+    }
+
+    /// Returns the number of transactions in the transaction list
+    pub fn get_num_transactions(&self) -> usize {
+        self.transactions.len()
+    }
+
     /// Verifies the transaction list with proof using the given `ledger_info`.
     /// This method will ensure:
     /// 1. All transactions exist on the given `ledger_info`.
@@ -2174,19 +2167,19 @@ impl TransactionListWithProof {
     ) -> Result<()> {
         // Verify the first transaction versions match
         ensure!(
-            self.first_transaction_version == first_transaction_version,
+            self.get_first_transaction_version() == first_transaction_version,
             "First transaction version ({:?}) doesn't match given version ({:?}).",
-            self.first_transaction_version,
+            self.get_first_transaction_version(),
             first_transaction_version,
         );
 
         // Verify the lengths of the transactions and transaction infos match
         ensure!(
-            self.proof.transaction_infos.len() == self.transactions.len(),
+            self.proof.transaction_infos.len() == self.get_num_transactions(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions ({}).",
             self.proof.transaction_infos.len(),
-            self.transactions.len(),
+            self.get_num_transactions(),
         );
 
         // Verify the transaction hashes match those of the transaction infos
@@ -2208,15 +2201,15 @@ impl TransactionListWithProof {
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_version)?;
+            .verify(ledger_info, self.get_first_transaction_version())?;
 
         // Verify the events if they exist.
         if let Some(event_lists) = &self.events {
             ensure!(
-                event_lists.len() == self.transactions.len(),
+                event_lists.len() == self.get_num_transactions(),
                 "The length of event_lists ({}) does not match the number of transactions ({}).",
                 event_lists.len(),
-                self.transactions.len(),
+                self.get_num_transactions(),
             );
             event_lists
                 .into_par_iter()
@@ -2229,12 +2222,156 @@ impl TransactionListWithProof {
     }
 }
 
-/// This differs from TransactionListWithProof in that TransactionOutputs are
-/// stored (no transactions). Events are stored inside each TransactionOutput.
-///
-/// Note: the proof cannot verify the TransactionOutputs themselves. This
-/// requires speculative execution of each TransactionOutput to verify that the
-/// resulting state matches the expected state in the proof (for each version).
+// Note: this type must remain an enum to accommodate future changes/extensions
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub enum TransactionListWithProofV2 {
+    TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos),
+}
+
+impl TransactionListWithProofV2 {
+    pub fn new(transaction_list_with_auxiliary_infos: TransactionListWithAuxiliaryInfos) -> Self {
+        Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos)
+    }
+
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_empty())
+    }
+
+    /// A convenience function to create a v2 list from a v1 list
+    pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
+        Self::TransactionListWithAuxiliaryInfos(TransactionListWithAuxiliaryInfos::new_from_v1(
+            transaction_list_with_proof,
+        ))
+    }
+
+    /// Consumes and returns the inner transaction list with proof
+    pub fn consume_transaction_list_with_proof(self) -> TransactionListWithProof {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos.transaction_list_with_proof
+            },
+        }
+    }
+
+    /// Returns the first version in the transaction list
+    pub fn get_first_transaction_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .get_first_transaction_version()
+            },
+        }
+    }
+
+    /// Returns the number of transactions in the transaction list
+    pub fn get_num_transactions(&self) -> usize {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                transaction_list_with_auxiliary_infos
+                    .transaction_list_with_proof
+                    .get_num_transactions()
+            },
+        }
+    }
+
+    /// Returns a reference to the inner transaction list with proof
+    pub fn get_transaction_list_with_proof(&self) -> &TransactionListWithProof {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                &transaction_list_with_auxiliary_infos.transaction_list_with_proof
+            },
+        }
+    }
+
+    /// Returns a reference to the inner persisted auxiliary infos
+    pub fn get_persisted_auxiliary_infos(&self) -> &Vec<PersistedAuxiliaryInfo> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(transaction_list_with_auxiliary_infos) => {
+                &transaction_list_with_auxiliary_infos.persisted_auxiliary_infos
+            },
+        }
+    }
+
+    /// Splits the transaction list with proof v2 into its components
+    pub fn into_parts(self) -> (TransactionListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(txn_list_with_auxiliary_infos) => (
+                txn_list_with_auxiliary_infos.transaction_list_with_proof,
+                txn_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
+        }
+    }
+
+    /// Verifies the transaction list with proof v2 against the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionListWithAuxiliaryInfos {
+    pub transaction_list_with_proof: TransactionListWithProof,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+}
+
+impl TransactionListWithAuxiliaryInfos {
+    pub fn new(
+        transaction_list_with_proof: TransactionListWithProof,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            transaction_list_with_proof,
+            persisted_auxiliary_infos,
+        }
+    }
+
+    /// A convenience function to create an empty list. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::new(TransactionListWithProof::new_empty(), vec![])
+    }
+
+    /// A convenience function to create a v2 transaction list from
+    /// a v1 list. In this case, all auxiliary infos are set to None.
+    pub fn new_from_v1(transaction_list_with_proof: TransactionListWithProof) -> Self {
+        let num_transaction_infos = transaction_list_with_proof.proof.transaction_infos.len();
+        let persisted_auxiliary_infos = vec![PersistedAuxiliaryInfo::None; num_transaction_infos];
+
+        Self {
+            transaction_list_with_proof,
+            persisted_auxiliary_infos,
+        }
+    }
+
+    /// Verifies the transaction list with auxiliary infos using the given ledger
+    /// info. This method verifies the inner transaction list first, before ensuring
+    /// that the auxiliary infos are valid using the transaction infos in the proof.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the inner transaction list with proof
+        self.transaction_list_with_proof
+            .verify(ledger_info, first_transaction_version)?;
+
+        // Verify the auxiliary infos against the transaction infos
+        verify_auxiliary_infos_against_transaction_infos(
+            &self.persisted_auxiliary_infos,
+            &self.transaction_list_with_proof.proof.transaction_infos,
+        )
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct TransactionOutputListWithProof {
     pub transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
@@ -2260,41 +2397,47 @@ impl TransactionOutputListWithProof {
         Self::new(vec![], None, TransactionInfoListWithProof::new_empty())
     }
 
+    /// Returns the first version in the transaction output list
+    pub fn get_first_output_version(&self) -> Option<Version> {
+        self.first_transaction_output_version
+    }
+
+    /// Returns the number of outputs in the transaction output list
+    pub fn get_num_outputs(&self) -> usize {
+        self.transactions_and_outputs.len()
+    }
+
     /// Verifies the transaction output list with proof using the given `ledger_info`.
     /// This method will ensure:
     /// 1. All transaction infos exist on the given `ledger_info`.
     /// 2. If `first_transaction_output_version` is None, the transaction output list is empty.
     ///    Otherwise, the list starts at `first_transaction_output_version`.
-    /// 3. Events, gas, status in each transaction output match the expected event root hashes,
+    /// 3. Events, gas, write set, status in each transaction output match the expected event root hashes,
     ///    the gas used and the transaction execution status in the proof, respectively.
     /// 4. The transaction hashes match those of the transaction infos.
-    ///
-    /// Note: the proof cannot verify the TransactionOutputs themselves. This
-    /// requires speculative execution of each TransactionOutput to verify that the
-    /// resulting state matches the expected state in the proof (for each version).
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,
         first_transaction_output_version: Option<Version>,
     ) -> Result<()> {
-        // Verify the first transaction/output versions match
+        // Verify the first transaction output versions match
         ensure!(
-            self.first_transaction_output_version == first_transaction_output_version,
+            self.get_first_output_version() == first_transaction_output_version,
             "First transaction and output version ({:?}) doesn't match given version ({:?}).",
-            self.first_transaction_output_version,
+            self.get_first_output_version(),
             first_transaction_output_version,
         );
 
-        // Verify the lengths of the transaction(output)s and transaction infos match
+        // Verify the lengths of the transactions and outputs match the transaction infos
         ensure!(
-            self.proof.transaction_infos.len() == self.transactions_and_outputs.len(),
+            self.proof.transaction_infos.len() == self.get_num_outputs(),
             "The number of TransactionInfo objects ({}) does not match the number of \
              transactions and outputs ({}).",
             self.proof.transaction_infos.len(),
-            self.transactions_and_outputs.len(),
+            self.get_num_outputs(),
         );
 
-        // Verify the events, status, gas used and transaction hashes.
+        // Verify the events, write set, status, gas used and transaction hashes.
         self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
         .map(|((txn, txn_output), txn_info)| {
             // Check the events against the expected events root hash
@@ -2343,7 +2486,7 @@ impl TransactionOutputListWithProof {
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_output_version)?;
+            .verify(ledger_info, self.get_first_output_version())?;
 
         Ok(())
     }
@@ -2364,6 +2507,217 @@ fn verify_events_against_root_hash(
         event_root_hash,
         transaction_info.event_root_hash()
     );
+    Ok(())
+}
+
+// Note: this type must remain an enum to accommodate future changes/extensions
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub enum TransactionOutputListWithProofV2 {
+    TransactionOutputListWithAuxiliaryInfos(TransactionOutputListWithAuxiliaryInfos),
+}
+
+impl TransactionOutputListWithProofV2 {
+    pub fn new(
+        transaction_output_list_with_auxiliary_infos: TransactionOutputListWithAuxiliaryInfos,
+    ) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
+    }
+
+    /// A convenience function to create an empty proof. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_empty(),
+        )
+    }
+
+    /// A convenience function to create a v2 output list from a v1 list
+    pub fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfos(
+            TransactionOutputListWithAuxiliaryInfos::new_from_v1(
+                transaction_output_list_with_proof,
+            ),
+        )
+    }
+
+    /// Consumes and returns the inner transaction output list
+    pub fn consume_output_list_with_proof(self) -> TransactionOutputListWithProof {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+        }
+    }
+
+    /// Returns the first version in the transaction output list
+    pub fn get_first_output_version(&self) -> Option<Version> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .get_first_output_version()
+            },
+        }
+    }
+
+    /// Returns the number of outputs in the transaction output list
+    pub fn get_num_outputs(&self) -> usize {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                output_list_with_auxiliary_infos
+                    .transaction_output_list_with_proof
+                    .get_num_outputs()
+            },
+        }
+    }
+
+    /// Returns a reference to the inner transaction output list with proof
+    pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                &output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+        }
+    }
+
+    /// Returns a reference to the inner persisted auxiliary infos
+    pub fn get_persisted_auxiliary_infos(&self) -> &Vec<PersistedAuxiliaryInfo> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
+                &output_list_with_auxiliary_infos.persisted_auxiliary_infos
+            },
+        }
+    }
+
+    /// Splits the transaction output list with proof v2 into its components
+    pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
+                output_list_with_auxiliary_infos.transaction_output_list_with_proof,
+                output_list_with_auxiliary_infos.persisted_auxiliary_infos,
+            ),
+        }
+    }
+
+    /// Verifies the transaction output list with proof v2 against the given ledger info
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        match self {
+            Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionOutputListWithAuxiliaryInfos {
+    pub transaction_output_list_with_proof: TransactionOutputListWithProof,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+}
+
+impl TransactionOutputListWithAuxiliaryInfos {
+    pub fn new(
+        transaction_output_list_with_proof: TransactionOutputListWithProof,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+        }
+    }
+
+    /// A convenience function to create an empty list. Mostly used for tests.
+    pub fn new_empty() -> Self {
+        Self::new(TransactionOutputListWithProof::new_empty(), vec![])
+    }
+
+    /// A convenience function to create a v2 output list from a
+    /// v1 list. In this case, all auxiliary infos are set to None.
+    fn new_from_v1(transaction_output_list_with_proof: TransactionOutputListWithProof) -> Self {
+        let num_transaction_infos = transaction_output_list_with_proof
+            .proof
+            .transaction_infos
+            .len();
+        let persisted_auxiliary_infos = vec![PersistedAuxiliaryInfo::None; num_transaction_infos];
+
+        Self {
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+        }
+    }
+
+    /// Verifies the transaction output list with auxiliary infos using the given ledger
+    /// info. This method verifies the inner transaction output list first, before ensuring
+    /// that the auxiliary infos are valid using the transaction infos in the proof.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        // Verify the inner transaction output list with proof
+        self.transaction_output_list_with_proof
+            .verify(ledger_info, first_transaction_output_version)?;
+
+        // Verify the auxiliary infos against the transaction infos
+        verify_auxiliary_infos_against_transaction_infos(
+            &self.persisted_auxiliary_infos,
+            &self
+                .transaction_output_list_with_proof
+                .proof
+                .transaction_infos,
+        )
+    }
+}
+
+/// Verifies the auxiliary infos against the given transaction infos.
+///
+/// Note: this function assumes that the transaction infos have already
+/// been verified against a ledger info proof, so it only checks the
+/// consistency between auxiliary infos and transaction infos.
+fn verify_auxiliary_infos_against_transaction_infos(
+    auxiliary_infos: &[PersistedAuxiliaryInfo],
+    transaction_infos: &[TransactionInfo],
+) -> Result<()> {
+    // Verify the lengths of the auxiliary infos and transaction infos match
+    ensure!(
+        auxiliary_infos.len() == transaction_infos.len(),
+        "The number of auxiliary infos ({}) does not match the number of transaction infos ({})",
+        auxiliary_infos.len(),
+        transaction_infos.len(),
+    );
+
+    // Verify the auxiliary info hashes match those of the transaction infos
+    auxiliary_infos
+        .par_iter()
+        .zip_eq(transaction_infos.par_iter())
+        .map(|(aux_info, txn_info)| {
+            match aux_info {
+                PersistedAuxiliaryInfo::None => {
+                    ensure!(
+                        txn_info.auxiliary_info_hash().is_none(),
+                        "The transaction info has an auxiliary info hash: {:?}, \
+                             but the persisted auxiliary info is None!",
+                        txn_info.auxiliary_info_hash()
+                    );
+                },
+                PersistedAuxiliaryInfo::V1 { .. } => {
+                    let aux_info_hash = CryptoHash::hash(aux_info);
+                    ensure!(
+                        txn_info.auxiliary_info_hash() == Some(aux_info_hash),
+                        "The auxiliary info hash does not match the transaction info! \
+                             Auxiliary info hash: {:?}. Auxiliary info hash in txn_info: {:?}.",
+                        aux_info_hash,
+                        txn_info.auxiliary_info_hash()
+                    );
+                },
+            }
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     Ok(())
 }
 
@@ -2499,10 +2853,22 @@ impl From<BlockMetadataExt> for Transaction {
 }
 
 impl Transaction {
-    pub fn block_epilogue(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
+    pub fn block_epilogue_v0(block_id: HashValue, block_end_info: BlockEndInfo) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V0 {
             block_id,
             block_end_info,
+        })
+    }
+
+    pub fn block_epilogue_v1(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V1 {
+            block_id,
+            block_end_info,
+            fee_distribution,
         })
     }
 
@@ -2603,20 +2969,140 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    type Value: Send + Sync + Debug + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + Eq + PartialEq + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+
+    /// None if it is not a user transaction.
+    fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
+        None
+    }
+
+    fn from_txn(_txn: Transaction) -> Self {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ViewFunctionError {
+    // This is to represent errors are from a MoveAbort and has error info from the module metadata to display.
+    // The ExecutionStatus is used to construct the error message in the same way as MoveAborts for entry functions.
+    MoveAbort(ExecutionStatus, Option<StatusCode>),
+    // This is a generic error message that takes in a string and display it in the error response.
+    ErrorMessage(String, Option<StatusCode>),
+}
+
+impl std::fmt::Display for ViewFunctionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ViewFunctionError::MoveAbort(status, vm_status) => {
+                write!(
+                    f,
+                    "Execution status: {:?}, VM status: {:?}",
+                    status, vm_status
+                )
+            },
+            ViewFunctionError::ErrorMessage(msg, vm_status) => {
+                write!(f, "Error: {}, VM status: {:?}", msg, vm_status)
+            },
+        }
+    }
 }
 
 pub struct ViewFunctionOutput {
-    pub values: Result<Vec<Vec<u8>>>,
+    pub values: Result<Vec<Vec<u8>>, ViewFunctionError>,
     pub gas_used: u64,
 }
 
 impl ViewFunctionOutput {
-    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+    pub fn new(values: Result<Vec<Vec<u8>>, ViewFunctionError>, gas_used: u64) -> Self {
         Self { values, gas_used }
     }
+
+    pub fn new_ok(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
+        Self {
+            values: Ok(values),
+            gas_used,
+        }
+    }
+
+    pub fn new_error_message(
+        message: String,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::ErrorMessage(message, vm_status)),
+            gas_used,
+        }
+    }
+
+    pub fn new_move_abort_error(
+        status: ExecutionStatus,
+        vm_status: Option<StatusCode>,
+        gas_used: u64,
+    ) -> Self {
+        Self {
+            values: Err(ViewFunctionError::MoveAbort(status, vm_status)),
+            gas_used,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AuxiliaryInfo {
+    persisted_info: PersistedAuxiliaryInfo,
+    ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+}
+
+impl AuxiliaryInfo {
+    pub fn new(
+        persisted_info: PersistedAuxiliaryInfo,
+        ephemeral_info: Option<EphemeralAuxiliaryInfo>,
+    ) -> Self {
+        Self {
+            persisted_info,
+            ephemeral_info,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
+        self.persisted_info
+    }
+
+    pub fn persisted_info(&self) -> &PersistedAuxiliaryInfo {
+        &self.persisted_info
+    }
+
+    pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
+        &self.ephemeral_info
+    }
+}
+
+#[derive(
+    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum PersistedAuxiliaryInfo {
+    None,
+    // The index of the transaction in a block (after shuffler, before execution).
+    // Note that this would be slightly different from the index of transactions that get committed
+    // onchain, as this considers transactions that may get discarded.
+    V1 { transaction_index: u32 },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EphemeralAuxiliaryInfo {
+    // TODO(grao): After execution pool is implemented we might want this information be persisted
+    // onchain?
+    pub proposer_index: u64,
 }

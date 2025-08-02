@@ -56,6 +56,7 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
+aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 move-package = { workspace = true }
 passkey-types = { workspace = true }
 percent-encoding = { workspace = true }

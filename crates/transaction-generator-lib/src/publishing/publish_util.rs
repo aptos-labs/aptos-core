@@ -25,9 +25,7 @@ use aptos_sdk::{
 };
 use move_binary_format::{
     access::ModuleAccess,
-    deserializer::DeserializerConfig,
     file_format::{CompiledScript, FunctionHandleIndex, IdentifierIndex, SignatureToken},
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
     CompiledModule,
 };
 use rand::{rngs::StdRng, Rng};
@@ -100,13 +98,7 @@ impl PackageHandler {
                 (tracker.publishers.len() - 1, false)
             },
         };
-        let mut package = tracker.package.update(
-            tracker.publishers[idx].publisher,
-            0,
-            // TODO cleanup.
-            // unnecessary to have indices for module published under different accout,
-            // they can all be named the same
-        );
+        let mut package = tracker.package.update(tracker.publishers[idx].publisher);
         if self.is_simple {
             if version {
                 update_simple_move_version(package.get_mut_module("simple"));
@@ -134,13 +126,9 @@ pub enum Package {
 
 impl Package {
     pub fn by_name(pre_built: &'static dyn PreBuiltPackages, name: &str) -> Self {
-        let (modules, metadata) = Self::load_package(
-            pre_built.package_metadata(name),
-            pre_built.package_modules(name),
-        );
-        let script = pre_built
-            .package_script(name)
-            .map(|code| CompiledScript::deserialize(code).expect("Script must deserialize"));
+        let modules = pre_built.package_modules(name);
+        let metadata = pre_built.package_metadata(name);
+        let script = pre_built.package_script(name);
         Self::Simple {
             modules,
             metadata,
@@ -174,45 +162,15 @@ impl Package {
         }
     }
 
-    fn load_package(
-        package_bytes: &[u8],
-        modules_bytes: &[Vec<u8>],
-    ) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
-        let metadata = bcs::from_bytes::<PackageMetadata>(package_bytes)
-            .expect("PackageMetadata for GenericModule must deserialize");
-        let mut modules = Vec::new();
-
-        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
-
-        for module_content in modules_bytes {
-            let (module, binary_format_version) = if let Ok(module) =
-                CompiledModule::deserialize_with_config(module_content, &default_config)
-            {
-                (module, VERSION_DEFAULT)
-            } else {
-                let module = CompiledModule::deserialize(module_content)
-                    .expect("Simple.move must deserialize");
-                (module, VERSION_MAX)
-            };
-
-            modules.push((
-                module.self_id().name().to_string(),
-                module,
-                binary_format_version,
-            ));
-        }
-        (modules, metadata)
-    }
-
     // Given an "original" package, updates all modules with the given publisher.
-    pub fn update(&self, publisher: AccountAddress, suffix: u64) -> Self {
+    pub fn update(&self, publisher: AccountAddress) -> Self {
         match self {
             Self::Simple {
                 modules,
                 metadata,
                 script,
             } => {
-                let (new_modules, metadata) = update(modules, metadata, publisher, suffix);
+                let (new_modules, metadata) = update(modules, metadata, publisher);
                 Self::Simple {
                     modules: new_modules,
                     metadata,
@@ -297,21 +255,19 @@ fn update(
     modules: &[(String, CompiledModule, u32)],
     metadata: &PackageMetadata,
     publisher: AccountAddress,
-    suffix: u64,
 ) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
     let mut new_modules = Vec::new();
+    let original_address = get_module_address(&modules[0].1);
     for (original_name, module, binary_format_version) in modules {
+        assert_eq!(original_address, get_module_address(module));
+
         let mut new_module = module.clone();
-        let module_handle = new_module
-            .module_handles
-            .get(module.self_handle_idx().0 as usize)
-            .expect("ModuleId for self must exists");
-        let original_address_idx = module_handle.address.0;
-        let original_address = new_module.address_identifiers[original_address_idx as usize];
-        let _ = std::mem::replace(
-            &mut new_module.address_identifiers[original_address_idx as usize],
-            publisher,
-        );
+
+        for i in 0..new_module.address_identifiers.len() {
+            if new_module.address_identifiers[i] == original_address {
+                let _ = std::mem::replace(&mut new_module.address_identifiers[i], publisher);
+            }
+        }
 
         for constant in new_module.constant_pool.iter_mut() {
             if constant.type_ == SignatureToken::Address
@@ -321,20 +277,6 @@ fn update(
             }
         }
 
-        if suffix > 0 {
-            for module_handle in &new_module.module_handles {
-                if module_handle.address.0 == original_address_idx {
-                    let mut new_name =
-                        new_module.identifiers[module_handle.name.0 as usize].to_string();
-                    new_name.push('_');
-                    new_name.push_str(suffix.to_string().as_str());
-                    let _ = std::mem::replace(
-                        &mut new_module.identifiers[module_handle.name.0 as usize],
-                        Identifier::new(new_name).expect("Identifier must be legal"),
-                    );
-                }
-            }
-        }
         if let Some(mut metadata) = get_metadata_from_compiled_code(&new_module) {
             metadata
                 .struct_attributes
@@ -373,15 +315,21 @@ fn update(
         new_modules.push((original_name.clone(), new_module, *binary_format_version));
     }
     let mut metadata = metadata.clone();
-    if suffix > 0 {
-        for module in &mut metadata.modules {
-            let mut new_name = module.name.clone();
-            new_name.push('_');
-            new_name.push_str(suffix.to_string().as_str());
-            module.name = new_name;
+    for dep in &mut metadata.deps {
+        if dep.account == original_address {
+            dep.account = publisher;
         }
     }
     (new_modules, metadata)
+}
+
+fn get_module_address(module: &CompiledModule) -> AccountAddress {
+    let module_handle = module
+        .module_handles
+        .get(module.self_handle_idx().0 as usize)
+        .expect("ModuleId for self must exists");
+    let original_address_idx = module_handle.address.0;
+    module.address_identifiers[original_address_idx as usize]
 }
 
 //

@@ -2,18 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::publish_util::Package;
+use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     move_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
+use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use rand::rngs::StdRng;
+use std::path::PathBuf;
 
 pub trait PreBuiltPackages: std::fmt::Debug + Sync + Send {
-    fn package_metadata(&self, package_name: &str) -> &[u8];
-    fn package_modules(&self, package_name: &str) -> &[Vec<u8>];
-    fn package_script(&self, package_name: &str) -> Option<&Vec<u8>>;
+    fn package_metadata_path(&self, package_name: &str) -> PathBuf;
+    fn package_modules_paths(
+        &self,
+        package_name: &str,
+    ) -> anyhow::Result<Box<dyn Iterator<Item = PathBuf>>>;
+    fn package_script_path(&self, package_name: &str) -> PathBuf;
+
+    fn package_metadata(&self, package_name: &str) -> PackageMetadata;
+
+    fn package_modules(&self, package_name: &str) -> Vec<(String, CompiledModule, u32)>;
+
+    fn package_script(&self, package_name: &str) -> Option<CompiledScript>;
 }
 
 pub enum MultiSigConfig {

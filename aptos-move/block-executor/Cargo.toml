@@ -16,7 +16,9 @@ rust-version = { workspace = true }
 ambassador = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }

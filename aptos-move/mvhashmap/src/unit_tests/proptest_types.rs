@@ -37,7 +37,7 @@ enum Operator<V: Debug + Clone> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ExpectedOutput<V: Debug + Clone + PartialEq> {
+enum ExpectedOutput<V: Clone + Debug + Eq + PartialEq> {
     NotInMap,
     Deleted,
     Value(V),
@@ -46,14 +46,14 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
-#[derive(Debug, Clone)]
-struct Value<V> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MockValue<V: Eq + PartialEq> {
     maybe_value: Option<V>,
     maybe_bytes: Option<Bytes>,
 }
 
-impl<V: Into<Vec<u8>> + Clone> Value<V> {
-    fn new(maybe_value: Option<V>) -> Self {
+impl<V: Into<Vec<u8>> + Clone + Eq + PartialEq> MockValue<V> {
+    pub(crate) fn new(maybe_value: Option<V>) -> Self {
         let maybe_bytes = maybe_value.clone().map(|v| {
             let mut bytes = v.into();
             bytes.resize(16, 0);
@@ -66,7 +66,7 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Debug + Eq + PartialEq> TransactionWrite for MockValue<V> {
     fn bytes(&self) -> Option<&Bytes> {
         self.maybe_bytes.as_ref()
     }
@@ -88,23 +88,23 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     }
 }
 
-enum Data<V> {
-    Write(Value<V>),
+enum Data<V: Eq + PartialEq> {
+    Write(MockValue<V>),
     Delta(DeltaOp),
 }
-struct Baseline<K, V>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
+struct Baseline<K, V: Eq + PartialEq>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
     K: Hash + Eq + Clone + Debug,
-    V: Clone + Into<Vec<u8>> + Debug + PartialEq,
+    V: Clone + Into<Vec<u8>> + Debug + Eq + PartialEq,
 {
     pub fn new(txns: &[(K, Operator<V>)], ignore_updates: bool) -> Self {
         let mut baseline: HashMap<K, BTreeMap<TxnIndex, Data<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
-                Operator::Insert(v) => Data::Write(Value::new(Some(v.clone()))),
-                Operator::Remove => Data::Write(Value::new(None)),
+                Operator::Insert(v) => Data::Write(MockValue::new(Some(v.clone()))),
+                Operator::Remove => Data::Write(MockValue::new(None)),
                 Operator::Update(d) => {
                     if ignore_updates {
                         continue;
@@ -195,7 +195,7 @@ fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V
             if v % 2 == 0 {
                 Operator::Update(delta_sub(v as u128, u32::MAX as u128))
             } else {
-        Operator::Update(delta_add(v as u128, u32::MAX as u128))
+                Operator::Update(delta_add(v as u128, u32::MAX as u128))
             }
         }),
         1 => Just(Operator::Remove),
@@ -213,7 +213,7 @@ fn run_and_assert<K, V>(
 ) -> Result<(), TestCaseError>
 where
     K: PartialOrd + Send + Clone + Hash + Eq + Sync + Debug,
-    V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Sync,
+    V: Send + Into<Vec<u8>> + Debug + Clone + Eq + PartialEq + Sync,
 {
     let transactions: Vec<(K, Operator<V>)> = transaction_gens
         .into_iter()
@@ -221,7 +221,7 @@ where
         .collect::<Vec<_>>();
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ()>::new();
+    let map = MVHashMap::<KeyType<K>, usize, MockValue<V>, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -236,7 +236,7 @@ where
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
         let key = KeyType(key);
-        let value = Value::new(None);
+        let value = MockValue::new(None);
         let idx = idx as TxnIndex;
         if test_group {
             map.group_data
@@ -252,8 +252,9 @@ where
                     HashSet::new(),
                 )
                 .unwrap();
+            let tags_5: Vec<usize> = vec![5];
             map.group_data()
-                .mark_estimate(&key, idx, [5usize].into_iter().collect());
+                .mark_estimate(&key, idx, tags_5.iter().collect());
         } else {
             map.data().write(key.clone(), idx, 0, Arc::new(value), None);
             map.data().mark_estimate(&key, idx);
@@ -279,7 +280,7 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
-                        let assert_value = |v: ValueWithLayout<Value<V>>| match v
+                        let assert_value = |v: ValueWithLayout<MockValue<V>>| match v
                             .extract_value_no_layout()
                             .maybe_value
                             .as_ref()
@@ -295,7 +296,7 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             if test_group {
-                                match map.group_data.fetch_tagged_data(
+                                match map.group_data.fetch_tagged_data_no_record(
                                     &KeyType(key.clone()),
                                     &5,
                                     idx as TxnIndex,
@@ -314,7 +315,7 @@ where
                             } else {
                                 match map
                                     .data()
-                                    .fetch_data(&KeyType(key.clone()), idx as TxnIndex)
+                                    .fetch_data_no_record(&KeyType(key.clone()), idx as TxnIndex)
                                 {
                                     Ok(Versioned(_, v)) => {
                                         assert_value(v);
@@ -358,7 +359,7 @@ where
                     },
                     Operator::Remove => {
                         let key = KeyType(key.clone());
-                        let value = Value::new(None);
+                        let value = MockValue::new(None);
                         if test_group {
                             map.group_data()
                                 .write(
@@ -377,7 +378,7 @@ where
                     },
                     Operator::Insert(v) => {
                         let key = KeyType(key.clone());
-                        let value = Value::new(Some(v.clone()));
+                        let value = MockValue::new(Some(v.clone()));
                         if test_group {
                             map.group_data()
                                 .write(
@@ -407,8 +408,6 @@ where
 
     Ok(())
 }
-
-// TODO: proptest MVHashMap delete and dependency handling!
 
 proptest! {
     #[test]

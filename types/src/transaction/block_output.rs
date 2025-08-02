@@ -1,47 +1,45 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::block_epilogue::TBlockEndInfoExt;
-use crate::{state_store::state_key::StateKey, transaction::TransactionOutput};
-use std::fmt::Debug;
+use super::Transaction;
+use crate::state_store::state_slot::StateSlot;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Debug)]
-pub struct TBlockOutput<Output: Debug, Key: Debug> {
+pub struct BlockOutput<Key, Output: Debug> {
     transaction_outputs: Vec<Output>,
-    block_end_info: Option<TBlockEndInfoExt<Key>>,
+    // A BlockEpilogueTxn might be appended to the block.
+    // This field will be None iff the input is not a block, or an epoch change is triggered.
+    block_epilogue_txn: Option<Transaction>,
+    to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
-pub type BlockOutput = TBlockOutput<TransactionOutput, StateKey>;
-
-impl<Output: Debug, Key: Debug> TBlockOutput<Output, Key> {
+impl<Key, Output: Debug> BlockOutput<Key, Output> {
     pub fn new(
         transaction_outputs: Vec<Output>,
-        block_end_info: Option<TBlockEndInfoExt<Key>>,
+        block_epilogue_txn: Option<Transaction>,
+        to_make_hot: BTreeMap<Key, StateSlot>,
     ) -> Self {
         Self {
             transaction_outputs,
-            block_end_info,
+            block_epilogue_txn,
+            to_make_hot,
         }
     }
 
-    fn is_block_limit_reached(&self) -> bool {
-        self.block_end_info
-            .as_ref()
-            .is_some_and(|b| b.limit_reached())
-    }
-
-    /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        assert!(!self.is_block_limit_reached());
         self.transaction_outputs
     }
 
-    pub fn into_inner(self) -> (Vec<Output>, Option<TBlockEndInfoExt<Key>>) {
-        (self.transaction_outputs, self.block_end_info)
+    pub fn into_inner(self) -> (Vec<Output>, Option<Transaction>, BTreeMap<Key, StateSlot>) {
+        (
+            self.transaction_outputs,
+            self.block_epilogue_txn,
+            self.to_make_hot,
+        )
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        assert!(!self.is_block_limit_reached());
         &self.transaction_outputs
     }
 }

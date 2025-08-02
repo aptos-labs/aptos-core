@@ -56,7 +56,9 @@ pub struct SingleRunResults {
 }
 
 pub fn default_benchmark_features() -> Features {
-    Features::default()
+    let mut features = Features::default();
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
@@ -656,7 +658,10 @@ mod tests {
         account_address::AccountAddress,
         on_chain_config::{FeatureFlag, Features},
         state_store::state_key::inner::StateKeyInner,
-        transaction::{Transaction, TransactionPayload},
+        transaction::{
+            signature_verified_transaction::into_signature_verified_block, Transaction,
+            TransactionOutput, TransactionPayload,
+        },
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use itertools::Itertools;
@@ -758,7 +763,7 @@ mod tests {
             let block_id = HashValue::random();
             vm_executor
                 .execute_and_update_state(
-                    (block_id, vec![txn.clone()]).into(),
+                    (block_id, into_signature_verified_block(vec![txn.clone()])).into(),
                     parent_block_id,
                     BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
                 )
@@ -779,7 +784,7 @@ mod tests {
         let block_id = HashValue::random();
         other_executor
             .execute_and_update_state(
-                (block_id, vec![txn]).into(),
+                (block_id, into_signature_verified_block(vec![txn])).into(),
                 parent_block_id,
                 BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -801,7 +806,7 @@ mod tests {
         let other_txn_output = &other_to_commit.transaction_outputs[0];
         let other_cp_txn_output = &other_to_commit.transaction_outputs[1];
 
-        assert_eq!(vm_cp_txn_output, other_cp_txn_output);
+        assert_equal_transaction_outputs(vm_cp_txn_output, other_cp_txn_output);
 
         let vm_event_types = vm_txn_output
             .events()
@@ -874,6 +879,16 @@ mod tests {
         if values_match {
             assert_eq!(vm_txn_output, other_txn_output);
         }
+    }
+
+    // TODO(HotState): hotness computation not implemented in all VMs, so their hotness part of the
+    // write set might be different.
+    fn assert_equal_transaction_outputs(output1: &TransactionOutput, output2: &TransactionOutput) {
+        assert_eq!(output1.write_set().as_v0(), output2.write_set().as_v0());
+        assert_eq!(output1.events(), output2.events());
+        assert_eq!(output1.gas_used(), output2.gas_used());
+        assert_eq!(output1.status(), output2.status());
+        assert_eq!(output1.auxiliary_data(), output2.auxiliary_data());
     }
 
     fn test_generic_benchmark<E>(

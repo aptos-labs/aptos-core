@@ -44,6 +44,9 @@ use std::{
 async fn test_analyze_validators() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.indexer_db_config.enable_event = true;
+        }))
         .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
         }))
@@ -623,6 +626,7 @@ async fn test_nodes_rewards() {
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
+            conf.indexer_db_config.enable_event = true;
         }))
         .with_init_genesis_stake(Arc::new(|i, genesis_stake_amount| {
             // make sure we have quorum
