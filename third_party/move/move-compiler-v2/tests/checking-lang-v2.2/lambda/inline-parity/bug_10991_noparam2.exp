@@ -31,14 +31,14 @@ module 0x42::Test {
         f(x) + g(x)
     }
     public fun test() {
-        if (foo(|arg0| __lambda__1__test(arg0), |arg0| __lambda__2__test(arg0), 10, 100) == 13) () else abort 0;
+        if (foo(|arg0| lambda__1__test(arg0), |arg0| lambda__2__test(arg0), 10, 100) == 13) () else abort 0;
     }
-    fun __lambda__1__test(param$0: u64): u64 {
-        let _ = param$0;
+    fun lambda__1__test(param_0: u64): u64 {
+        let _ = param_0;
         3
     }
-    fun __lambda__2__test(param$0: u64): u64 {
-        let _ = param$0;
+    fun lambda__2__test(param_0: u64): u64 {
+        let _ = param_0;
         10
     }
 }

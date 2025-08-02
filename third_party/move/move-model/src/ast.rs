@@ -18,7 +18,10 @@ use either::Either;
 use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::file_format::{CodeOffset, Visibility};
-use move_core_types::{account_address::AccountAddress, function::ClosureMask};
+use move_core_types::{
+    account_address::AccountAddress, function::ClosureMask,
+    language_storage::pseudo_script_module_id,
+};
 use num::BigInt;
 use std::{
     borrow::Borrow,
@@ -3064,15 +3067,18 @@ impl ModuleName {
     }
 
     /// Return the pseudo module name used for scripts, incorporating the `index`.
-    /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
+    /// Our compiler infrastructure uses `SCRIPT_MODULE_ID` for pseudo modules created from scripts.
     pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
         let name = pool.make(Self::pseudo_script_name_builder(SCRIPT_MODULE_NAME, index).as_str());
-        ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
+        ModuleName(
+            Address::Numerical(*pseudo_script_module_id().address()),
+            name,
+        )
     }
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
-        self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
+        self.0 == Address::Numerical(*pseudo_script_module_id().address())
     }
 }
 

@@ -206,8 +206,9 @@ return _t13
 loop {
   loop {
     if (Not(Gt(x, 0))) break[1];
+    _t6: bool = Gt(x, 10);
     loop {
-      if (Not(Gt(x, 10))) break;
+      if (Not(_t6)) break;
       x: u64 = Sub(x, 1);
       break
     };
@@ -221,7 +222,8 @@ return x
 --- If-Transformed Generated AST
 loop {
   if (Not(Gt(x, 0))) break;
-  if (Gt(x, 10)) x: u64 = Sub(x, 1);
+  _t6: bool = Gt(x, 10);
+  if (_t6) x: u64 = Sub(x, 1);
   x: u64 = Sub(x, 1);
   continue
 };
@@ -230,9 +232,12 @@ return x
 --- Var-Bound Generated AST
 loop {
   if (Not(Gt(x, 0))) break;
-  if (Gt(x, 10)) x: u64 = Sub(x, 1);
-  x: u64 = Sub(x, 1);
-  continue
+  {
+    let _t6: bool = Gt(x, 10);
+    if (_t6) x: u64 = Sub(x, 1);
+    x: u64 = Sub(x, 1);
+    continue
+  }
 };
 return x
 
@@ -560,8 +565,10 @@ module 0x815::m {
     }
     fun nested_loop(x: u64): u64 {
         while (x > 0) {
-            if (x > 10) x = x - 1;
-            x = x - 1
+            let _t6 = x > 10;
+            if (_t6) x = x - 1;
+            x = x - 1;
+            continue
         };
         x
     }

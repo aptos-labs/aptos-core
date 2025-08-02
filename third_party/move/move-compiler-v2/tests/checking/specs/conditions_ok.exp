@@ -33,7 +33,7 @@ module 0x42::M {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::M {
-    struct Ghost$some_global has copy, drop, store, key {
+    struct Ghost_some_global has copy, drop, store, key {
         v: u64,
     }
     fun add_some(x: &mut u64): u64 {

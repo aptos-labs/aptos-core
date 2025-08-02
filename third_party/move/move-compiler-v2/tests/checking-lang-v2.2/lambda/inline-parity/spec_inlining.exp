@@ -54,7 +54,7 @@ module 0x42::Test {
         predicate(v)
     }
     public fun test_apply(x: u64) {
-        let r1 = apply(x, |arg0| __lambda__1__test_apply(arg0));
+        let r1 = apply(x, |arg0| lambda__1__test_apply(arg0));
 
         /* spec {
           assert r1;
@@ -62,7 +62,7 @@ module 0x42::Test {
          */
         ;
         if (r1) () else abort 1;
-        let r2 = apply(x, |arg0| __lambda__2__test_apply(arg0));
+        let r2 = apply(x, |arg0| lambda__2__test_apply(arg0));
 
         /* spec {
           assert r2;
@@ -71,10 +71,10 @@ module 0x42::Test {
         ;
         if (r2) () else abort 2;
     }
-    fun __lambda__1__test_apply(v: u64): bool {
+    fun lambda__1__test_apply(v: u64): bool {
         v >= 0
     }
-    fun __lambda__2__test_apply(v: u64): bool {
+    fun lambda__2__test_apply(v: u64): bool {
         v != 0
     }
 }

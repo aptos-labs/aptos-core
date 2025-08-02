@@ -108,9 +108,9 @@ module 0xc0ffee::m {
         while (i < 10) {
             i = i + 1;
             if (i == 5) {
-                brk2(|()| __lambda__1__bar());
-                brk2(|()| __lambda__2__bar());
-                brk2(|()| __lambda__3__bar());
+                brk2(|| lambda__1__bar());
+                brk2(|| lambda__2__bar());
+                brk2(|| lambda__3__bar());
             }
         };
         i
@@ -149,13 +149,13 @@ module 0xc0ffee::m {
         };
         i
     }
-    fun __lambda__1__bar() {
+    fun lambda__1__bar() {
         break
     }
-    fun __lambda__2__bar() {
+    fun lambda__2__bar() {
         while (true) break
     }
-    fun __lambda__3__bar() {
+    fun lambda__3__bar() {
         while (true) continue
     }
 }

@@ -3,29 +3,28 @@ module 0x42::test {
         value: bool,
     }
     fun no_optimize_resource(): bool {
-        *&(&mut *borrow_global(0x1)).value
+        let _t1 = @0x1;
+        *&(&mut *borrow_global<X>(_t1)).value
     }
     fun no_optimize_vector() {
-        0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow<vector<u64>>(&vector[vector[1, 2]], 0), 1);
+        let _t4 = &vector[vector[1, 2]];
+        let _t5 = 0;
+        let _t6 = 0x1::vector::borrow<vector<u64>>(_t4, _t5);
+        let _t8 = &mut *_t6;
+        let _t9 = 1;
+        let _t10 = 0x1::vector::borrow_mut<u64>(_t8, _t9);
     }
     fun optimize_resource(): bool {
-        *&borrow_global(0x1).value
+        let _t0 = @0x1;
+        *&borrow_global<X>(_t0).value
     }
     fun optimize_vector() {
-        0x1::vector::borrow_mut<u64>(0x1::vector::borrow_mut<vector<u64>>(&mut vector[vector[1, 2]], 0), 1);
+        let _t3 = &mut vector[vector[1, 2]];
+        let _t4 = 0;
+        let _t5 = 0x1::vector::borrow_mut<vector<u64>>(_t3, _t4);
+        let _t6 = 1;
+        let _t7 = 0x1::vector::borrow_mut<u64>(_t5, _t6);
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot use `integer` with an operator which expects a value of type `address`
-  ┌─ borrow_deref_optimize.move:6:32
-  │
-6 │         *&(&mut *borrow_global(0x1)).value
-  │                                ^^^
-
-error: cannot use `integer` with an operator which expects a value of type `address`
-   ┌─ borrow_deref_optimize.move:12:25
-   │
-12 │         *&borrow_global(0x1).value
-   │                         ^^^
+============ recompilation succeeded ========

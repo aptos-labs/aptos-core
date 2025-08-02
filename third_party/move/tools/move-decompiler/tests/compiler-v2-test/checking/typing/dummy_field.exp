@@ -4,16 +4,16 @@ module 0x42::test {
     struct R has drop, store, key {
     }
     public entry fun test(addr: address) {
-        let R{} = move_from(addr);
+        let R{} = move_from<R>(addr);
     }
     fun test2(): bool {
         *&(&R{}).dummy_field
     }
     public entry fun test3(addr: address) {
-        let T{} = move_from(addr);
+        let T{} = move_from<T>(addr);
     }
     public entry fun test4(s: &signer) {
-        move_to(T{}, s);
+        move_to<T>(s, T{});
     }
 }
 
@@ -24,9 +24,3 @@ error: empty struct `test::R` cannot access the field `dummy_field`
    │
 10 │         *&(&R{}).dummy_field
    │           ^^^^^^^^^^^^^^^^^^
-
-error: cannot use `T` with an operator which expects a value of type `&signer`
-   ┌─ dummy_field.move:16:17
-   │
-16 │         move_to(T{}, s);
-   │                 ^^^

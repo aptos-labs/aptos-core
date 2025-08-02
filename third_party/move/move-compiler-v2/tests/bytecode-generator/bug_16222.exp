@@ -26,9 +26,9 @@ module 0xc0ffee::m {
         0: || has drop,
     }
     public fun make_lazy(): Lazy {
-        Lazy(|()| __lambda__1__make_lazy())
+        Lazy(|| lambda__1__make_lazy())
     }
-    fun __lambda__1__make_lazy() {
+    fun lambda__1__make_lazy() {
     }
 }
 module 0xc0ffee::n {

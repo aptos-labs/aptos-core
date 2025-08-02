@@ -8,7 +8,7 @@ module 0x42::m {
     struct S has store {
     }
     fun make_up_address(_x: u64): address {
-        0x42
+        @0x42
     }
     fun f10(x: u64) {
         ()
@@ -48,10 +48,4 @@ module 0x42::m {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot return `integer` from a function with result type `address`
-   ┌─ access_ok.move:11:9
-   │
-11 │         0x42
-   │         ^^^^
+============ recompilation succeeded ========

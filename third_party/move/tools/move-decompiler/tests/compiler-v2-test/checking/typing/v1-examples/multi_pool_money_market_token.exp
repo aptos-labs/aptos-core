@@ -4,19 +4,30 @@ module 0x2::Token {
         value: u64,
     }
     public fun split<ATy: copy + drop>(coin: Coin<ATy>, amount: u64): (Coin<ATy>, Coin<ATy>) {
-        (coin, withdraw<ATy>(&mut coin, amount))
+        let _t7 = coin;
+        (_t7, withdraw<ATy>(&mut coin, amount))
     }
     public fun withdraw<ATy: copy + drop>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
-        if (!(*&coin.value >= amount)) abort 10;
-        &mut coin.value = *&coin.value - amount;
+        let _t6 = *&coin.value >= amount;
+        if (!_t6) abort 10;
+        let _t11 = *&coin.value - amount;
+        *&mut coin.value = _t11;
         Coin<ATy>{type: *&coin.type,value: amount}
     }
 }
 
 --- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ multi_pool_money_market_token.move:11:9
-   │
-11 │         &mut coin.value = *&coin.value - amount;
-   │         ^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+exiting with stackless-bytecode checks failed
+error: local `coin` of type `Coin<ATy>` does not have the `copy` ability
+  ┌─ multi_pool_money_market_token.move:7:19
+  │
+7 │         let _t7 = coin;
+  │                   ^^^^ copy needed here because value is still in use
+8 │         (_t7, withdraw<ATy>(&mut coin, amount))
+  │                             --------- used here
+
+error: local `coin` of type `Coin<ATy>` does not have the `drop` ability
+  ┌─ multi_pool_money_market_token.move:8:29
+  │
+8 │         (_t7, withdraw<ATy>(&mut coin, amount))
+  │                             ^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

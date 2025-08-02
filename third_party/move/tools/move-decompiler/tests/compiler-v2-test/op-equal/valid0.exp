@@ -3,14 +3,9 @@ module 0x42::test {
         _0: u256,
     }
     fun coin_inc_old_1(self: &mut Coin) {
-        &mut self._0 = *&self._0 + 0u256;
+        let _t5 = *&self._0 + 1u256;
+        *&mut self._0 = _t5;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-  ┌─ valid0.move:6:9
-  │
-6 │         &mut self._0 = *&self._0 + 0u256;
-  │         ^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

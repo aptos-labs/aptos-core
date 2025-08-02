@@ -7,20 +7,14 @@ module 0x8675309::M {
     fun t1(root: &mut S, cond: bool) {
         let _t2;
         if (cond) _t2 = &mut root.f else _t2 = &mut root.g;
-        &mut root.h = 0;
+        *&mut root.h = 0;
     }
     fun t2(root: &mut S, cond: bool) {
         let _t2;
         if (cond) _t2 = &mut root.f else _t2 = &mut root.g;
-        &mut root.f;
-        &mut root.g;
+        let _t8 = &mut root.f;
+        let _t10 = &mut root.g;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ writeref_borrow_valid2.move:10:9
-   │
-10 │         &mut root.h = 0;
-   │         ^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

@@ -766,7 +766,7 @@ fn run_env_pipeline(
             );
             if is_first_pipeline {
                 // Print the sourcified model during the first env pipeline.
-                let sourcifier = Sourcifier::new(&*env);
+                let sourcifier = Sourcifier::new(&*env, true);
                 for module in env.get_modules() {
                     if module.is_primary_target() {
                         sourcifier.print_module(module.get_id())

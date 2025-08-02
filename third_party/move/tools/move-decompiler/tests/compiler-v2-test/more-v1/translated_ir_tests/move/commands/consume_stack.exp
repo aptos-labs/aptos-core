@@ -3,17 +3,14 @@ module 0x8675309::M {
         data: vector<u8>,
     }
     public fun is_ok(addr: address): bool {
-        is_ok_(&addr, &borrow_global(0x1d8).data)
+        let _t1 = &addr;
+        let _t2 = @0x1d8;
+        let _t5 = is_ok_(_t1, &borrow_global<R>(_t2).data);
+        _t5
     }
     fun is_ok_(_addr: &address, _data: &vector<u8>): bool {
         true
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot use `u16|u32|u64|u128|u256` with an operator which expects a value of type `address`
-  ┌─ consume_stack.move:6:38
-  │
-6 │         is_ok_(&addr, &borrow_global(0x1d8).data)
-  │                                      ^^^^^
+============ recompilation succeeded ========

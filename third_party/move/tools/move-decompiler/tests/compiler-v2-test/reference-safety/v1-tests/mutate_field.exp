@@ -10,43 +10,21 @@ module 0x8675309::M {
         r
     }
     fun t1(s: &mut S) {
-        *&s.f;
-        &mut s.g = 0;
+        let _t3 = *&s.f;
+        *&mut s.g = 0;
         *s = S{f: 0,g: 0};
-        *&mut s.f;
-        &mut s.g = 0;
+        let _t13 = *&mut s.f;
+        *&mut s.g = 0;
         *s = S{f: 0,g: 0};
-        *id<u64>(&s.f);
-        &mut s.g = 0;
+        let _t23 = id<u64>(&s.f);
+        let _t24 = *_t23;
+        *&mut s.g = 0;
         *s = S{f: 0,g: 0};
-        *id_mut<u64>(&mut s.f);
-        &mut s.g = 0;
+        let _t34 = id_mut<u64>(&mut s.f);
+        let _t35 = *_t34;
+        *&mut s.g = 0;
         *s = S{f: 0,g: 0};
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ mutate_field.move:14:9
-   │
-14 │         &mut s.g = 0;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
-
-error: invalid assignment
-   ┌─ mutate_field.move:17:9
-   │
-17 │         &mut s.g = 0;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
-
-error: invalid assignment
-   ┌─ mutate_field.move:20:9
-   │
-20 │         &mut s.g = 0;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
-
-error: invalid assignment
-   ┌─ mutate_field.move:23:9
-   │
-23 │         &mut s.g = 0;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

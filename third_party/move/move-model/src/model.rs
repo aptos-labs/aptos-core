@@ -1715,6 +1715,26 @@ impl GlobalEnv {
         mod_data.source_map = Some(source_map);
     }
 
+    /// Updates modules previously loaded into the environment
+    pub fn update_loaded_modules(&mut self) {
+        // update friend modules that are not ready when loading a module
+        let friend_modules_vec: Vec<Option<BTreeSet<ModuleId>>> =
+            self.module_data
+                .iter()
+                .map(|mod_data| {
+                    mod_data.compiled_module.as_ref().map(|compiled_module| {
+                        self.get_friend_modules_from_bytecode(compiled_module)
+                    })
+                })
+                .collect();
+
+        for (mod_data, friend_modules_opt) in self.module_data.iter_mut().zip(friend_modules_vec) {
+            if let Some(friend_modules) = friend_modules_opt {
+                mod_data.friend_modules = friend_modules;
+            }
+        }
+    }
+
     fn get_used_funs_from_bytecode(
         &self,
         module: &CompiledModule,

@@ -6,7 +6,7 @@
 //! scripts (`CompiledScript`) to the global env.
 
 use crate::{
-    ast::{Address, ModuleName},
+    ast::{Address, Attribute, ModuleName},
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
         ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant, TypeParameter,
@@ -14,12 +14,14 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use itertools::Itertools;
 use move_binary_format::{
     file_format::{
-        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureToken,
-        StructDefinitionIndex, StructHandleIndex, TableIndex, VariantIndex, Visibility,
+        FunctionAttribute, FunctionDefinitionIndex, FunctionHandleIndex, MemberCount,
+        SignatureToken, StructDefinitionIndex, StructHandleIndex, TableIndex, VariantIndex,
+        Visibility,
     },
     internals::ModuleIndex,
     views::{
@@ -65,6 +67,7 @@ impl GlobalEnv {
         loader.load();
         let BinaryModuleLoader { module_id, .. } = loader;
         self.attach_compiled_module(module_id, module, source_map);
+        self.update_loaded_modules();
         module_id
     }
 }
@@ -418,6 +421,32 @@ impl<'a> BinaryModuleLoader<'a> {
             // defaults
             (Visibility::Public, false, FunctionKind::Regular)
         };
+
+        // add attributes to the function
+        let mut attributes = vec![];
+        for attr in handle_view.attributes() {
+            match attr {
+                FunctionAttribute::Persistent => {
+                    if !visibility.is_public() {
+                        let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                        let sym = self
+                            .env
+                            .symbol_pool()
+                            .make(well_known::PERSISTENT_ATTRIBUTE);
+                        attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    }
+                },
+                FunctionAttribute::ModuleLock => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self
+                        .env
+                        .symbol_pool()
+                        .make(well_known::MODULE_LOCK_ATTRIBUTE);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+            }
+        }
+
         let mut new = false;
         let fun_data = self.env.module_data[module_id.to_usize()]
             .function_data
@@ -428,6 +457,7 @@ impl<'a> BinaryModuleLoader<'a> {
                     visibility,
                     is_native,
                     kind,
+                    attributes,
                     ..FunctionData::new(fun_id.symbol(), loc)
                 }
             });

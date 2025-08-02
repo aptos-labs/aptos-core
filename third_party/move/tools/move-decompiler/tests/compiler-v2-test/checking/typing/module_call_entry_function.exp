@@ -1,9 +1,9 @@
 module 0x2::Y {
+    friend 0x2::M;
     friend fun f_friend() {
         ()
     }
 }
-
 module 0x2::X {
     public fun f_public() {
         ()
@@ -12,7 +12,6 @@ module 0x2::X {
         ()
     }
 }
-
 module 0x2::M {
     use 0x2::Y;
     use 0x2::X;
@@ -51,13 +50,4 @@ module 0x2::M {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with env checking errors
-error: function `0x2::Y::f_friend` cannot be called from function `0x2::M::f_script_call_friend` because module `0x2::M` is not a `friend` of `0x2::Y`
-   ┌─ module_call_entry_function.move:2:16
-   │
- 2 │     friend fun f_friend() {
-   │                ^^^^^^^^ callee
-   ·
-32 │         Y::f_friend();
-   │         ------------- called here
+============ recompilation succeeded ========
