@@ -124,7 +124,7 @@ impl DoGetExecutionOutput {
             .map(|t| t.into_inner())
             .collect_vec();
         if let Some(block_epilogue_txn) = block_epilogue_txn {
-            transactions.push(block_epilogue_txn);
+            transactions.push(block_epilogue_txn.into_inner());
             // TODO(grao): Double check if we want to put anything into AuxiliaryInfo here.
             auxiliary_info.push(AuxiliaryInfo::new_empty());
         }
@@ -242,7 +242,7 @@ impl DoGetExecutionOutput {
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
         Ok(executor.execute_block(
             txn_provider,
