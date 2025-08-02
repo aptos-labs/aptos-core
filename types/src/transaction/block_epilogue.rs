@@ -47,6 +47,7 @@ impl FeeDistribution {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum BlockEndInfo {
     V0 {
         /// Whether block gas limit was reached
