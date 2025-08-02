@@ -75,7 +75,7 @@ impl VMBlockExecutor for MockVM {
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -214,7 +214,7 @@ impl VMBlockExecutor for MockVM {
 
         Ok(BlockOutput::new(
             outputs,
-            block_epilogue_txn,
+            block_epilogue_txn.map(Into::into),
             BTreeMap::new(),
         ))
     }

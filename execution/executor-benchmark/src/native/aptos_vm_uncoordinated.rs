@@ -10,7 +10,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    state_store::{state_key::StateKey, StateView},
+    state_store::StateView,
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, Transaction, TransactionOutput,
@@ -37,7 +37,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         // let features = Features::fetch_config(&state_view).unwrap_or_default();
@@ -79,7 +79,7 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
 
         Ok(BlockOutput::new(
             transaction_outputs,
-            Some(block_epilogue_txn),
+            Some(block_epilogue_txn.into()),
             BTreeMap::new(),
         ))
     }
