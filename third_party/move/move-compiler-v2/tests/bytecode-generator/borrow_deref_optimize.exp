@@ -47,22 +47,22 @@ module 0x42::test {
     fun no_optimize_resource(): bool
         acquires X
     {
-        let x = &mut (*borrow_global<X>(@0x1));
+        let x = &mut *borrow_global<X>(@0x1);
         x.value
     }
     fun no_optimize_vector() {
         let x = vector[vector[1, 2]];
-        let _ = 0x1::vector::borrow_mut<u64>(&mut (*0x1::vector::borrow<vector<u64>>(&x, 0)), 1);
+        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow<vector<u64>>(&x, 0), 1);
     }
     fun optimize_resource(): bool
         acquires X
     {
-        let x = &(*borrow_global<X>(@0x1));
+        let x = &*borrow_global<X>(@0x1);
         x.value
     }
     fun optimize_vector() {
         let x = vector[vector[1, 2]];
-        let _ = 0x1::vector::borrow_mut<u64>(&mut (*0x1::vector::borrow_mut<vector<u64>>(&mut x, 0)), 1);
+        let _ = 0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow_mut<vector<u64>>(&mut x, 0), 1);
     }
 }
 

@@ -960,15 +960,12 @@ impl<'a> ExpSourcifier<'a> {
                     Prio::Postfix
                 };
                 self.parenthesize(context_prio, given_prio, || {
-                    let mut context_prio = Prio::Prefix;
                     if result_ty.is_immutable_reference() {
                         emit!(self.wr(), "&");
-                        context_prio = Prio::Postfix;
                     } else if result_ty.is_mutable_reference() {
                         emit!(self.wr(), "&mut ");
-                        context_prio = Prio::Postfix;
                     }
-                    self.print_exp(context_prio, false, &args[0]);
+                    self.print_exp(Prio::Postfix, false, &args[0]);
                     emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
@@ -985,15 +982,12 @@ impl<'a> ExpSourcifier<'a> {
                     Prio::Postfix
                 };
                 self.parenthesize(context_prio, given_prio, || {
-                    let mut context_prio = Prio::Prefix;
                     if result_ty.is_immutable_reference() {
                         emit!(self.wr(), "&");
-                        context_prio = Prio::Postfix;
                     } else if result_ty.is_mutable_reference() {
                         emit!(self.wr(), "&mut ");
-                        context_prio = Prio::Postfix;
                     }
-                    self.print_exp(context_prio, false, &args[0]);
+                    self.print_exp(Prio::Postfix, false, &args[0]);
                     emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
                 })
             },
@@ -1084,7 +1078,13 @@ impl<'a> ExpSourcifier<'a> {
                 } else {
                     emit!(self.wr(), "&")
                 }
-                self.print_exp(Prio::Postfix, false, &args[0])
+                let inner_ty = self.env().get_node_type(args[0].node_id());
+                let context_prio = if inner_ty.is_reference() {
+                    Prio::Postfix
+                } else {
+                    Prio::Prefix
+                };
+                self.print_exp(context_prio, false, &args[0])
             }),
             Operation::Deref => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "*");

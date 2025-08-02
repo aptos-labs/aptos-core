@@ -141,10 +141,10 @@ module 0x8675::M {
     fun test1b(r: S): u64 {
         let x = S{f: 3};
         let tref = &mut (if (r.f < 4) r else x);
-        *tref.f = 10;
+        (*tref).f = 10;
         let y = r;
         let tref2 = &mut y;
-        *tref2.f = *tref2.f + 1;
+        (*tref2).f = (*tref2).f + 1;
         let z = y;
         let tref3 = &mut z.f;
         *tref3 = *tref3 + 1;
