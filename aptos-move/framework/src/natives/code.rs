@@ -205,9 +205,10 @@ pub struct NativeCodeContext {
 
 impl NativeCodeContext {
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(disallow_module_publishing: bool) -> Self {
+        let enabled = !disallow_module_publishing;
         Self {
-            enabled: true,
+            enabled,
             requested_module_bundle: None,
         }
     }

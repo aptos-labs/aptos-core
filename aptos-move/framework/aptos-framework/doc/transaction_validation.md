@@ -1716,7 +1716,7 @@ If there is no fee_payer, fee_payer = sender
             refund_from_scheduling_deposit
         );
         <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(deposit_store_addr, burn_amount);
-    } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+    } <b>else</b> {
         // <b>return</b> the full deposit and mint the remaining
         <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
             deposit_store_owner,
@@ -1724,7 +1724,9 @@ If there is no fee_payer, fee_payer = sender
             scheduling_deposit
         );
         <b>let</b> mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
-        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+        <b>if</b> (mint_and_refund_amount &gt; 0) {
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+        };
     };
 }
 </code></pre>

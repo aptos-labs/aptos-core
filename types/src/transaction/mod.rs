@@ -47,6 +47,7 @@ mod block_output;
 mod change_set;
 mod module;
 mod multisig;
+pub mod scheduled_txn;
 mod script;
 pub mod signature_verified_transaction;
 pub mod use_case;
@@ -63,6 +64,7 @@ use crate::{
     keyless::FederatedKeylessPublicKey,
     proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::scheduled_txn::ScheduledTransactionInfoWithKey,
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
@@ -2478,6 +2480,9 @@ pub enum Transaction {
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
 
+    /// Transaction that was originally scheduled by user; it will be executed by the system
+    ScheduledTransaction(ScheduledTransactionInfoWithKey),
+
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
@@ -2554,6 +2559,7 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(vt) => vt.type_name(),
+            Transaction::ScheduledTransaction(_) => "scheduled_transaction",
             Transaction::BlockMetadataExt(bmet) => bmet.type_name(),
         }
     }
@@ -2570,7 +2576,8 @@ impl Transaction {
             | Transaction::GenesisTransaction(_)
             | Transaction::BlockMetadata(_)
             | Transaction::BlockMetadataExt(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 
@@ -2581,7 +2588,8 @@ impl Transaction {
             | Transaction::BlockEpilogue(_)
             | Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
-            | Transaction::ValidatorTransaction(_) => false,
+            | Transaction::ValidatorTransaction(_)
+            | Transaction::ScheduledTransaction(_) => false,
         }
     }
 }

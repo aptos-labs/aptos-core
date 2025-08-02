@@ -892,6 +892,7 @@ pub enum TransactionType {
     StateCheckpoint,
     Validator,
     BlockEpilogue,
+    ScheduledTransaction,
 }
 
 impl Display for TransactionType {
@@ -905,6 +906,7 @@ impl Display for TransactionType {
             StateCheckpoint => "StateCheckpoint",
             Validator => "Validator",
             BlockEpilogue => "BlockEpilogue",
+            ScheduledTransaction => "ScheduledTransaction",
         })
     }
 }
@@ -931,6 +933,12 @@ impl Transaction {
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
             BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
+            ScheduledTransaction(_) => (
+                TransactionType::ScheduledTransaction,
+                None,
+                txn.info,
+                txn.events,
+            ),
         };
 
         // Operations must be sequential and operation index must always be in the same order
