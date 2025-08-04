@@ -68,6 +68,7 @@ async fn test_cachable_requests_compression() {
                     include_events,
                     *use_compression,
                     use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
                 )
                 .await
                 .unwrap();
@@ -139,6 +140,7 @@ async fn test_cachable_requests_data_versions() {
                     include_events,
                     true,
                     use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
                 )
                 .await
                 .unwrap();
