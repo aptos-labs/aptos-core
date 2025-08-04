@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-6:
+task 0 lines 1-6:  publish [module 0xc0ffee::m {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::m'. Got VMError: {
     major_status: TOO_MANY_PARAMETERS,
     sub_status: None,

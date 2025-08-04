@@ -20,12 +20,14 @@ public fun f_store_drop(): |u64|u32 has store+drop
     add
     ret
 
+// The next only executes in paranoid mode when bv is turned off
+
 //# run --verbose
 script
 
 use 0x66::helpers as h
 
-fun ok()
+fun paranoid_fails()
     local f: |u64|u32
     call h::f_store_drop
     call h::pack

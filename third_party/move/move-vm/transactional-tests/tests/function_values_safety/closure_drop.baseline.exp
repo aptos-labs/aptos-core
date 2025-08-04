@@ -1,7 +1,7 @@
 processed 3 tasks
-task 0 lines 1-35:  publish
-task 1 lines 38-48:  run --verbose
-task 2 lines 51-59:  run --verbose
+task 0 lines 1-35:  publish [module 0x66::helpers]
+task 1 lines 38-48:  run --verbose [script]
+task 2 lines 51-59:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: None,
     major_status: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP,

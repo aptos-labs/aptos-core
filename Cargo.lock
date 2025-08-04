@@ -709,6 +709,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-gas-schedule",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -6297,7 +6298,10 @@ name = "bytecode-verifier-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "libtest-mimic",
  "move-transactional-test-runner",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]
@@ -12320,11 +12324,11 @@ dependencies = [
  "itertools 0.13.0",
  "legacy-move-compiler",
  "log",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
  "move-core-types",
- "move-disassembler",
  "move-ir-types",
  "move-prover-test-utils",
  "move-symbol-pool",
@@ -12728,6 +12732,7 @@ dependencies = [
  "anyhow",
  "better_any",
  "bytes",
+ "cfg-if",
  "claims",
  "fail",
  "hashbrown 0.14.3",

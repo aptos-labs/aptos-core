@@ -110,148 +110,142 @@ impl<const N: usize> BitsetTypeParameterConstraints<N> {
     }
 }
 
-/// Checks if the given type is well formed and has the required abilities.
-///
-/// This function does NOT require the context (type parameter abilities) to be specified.
-/// Instead, it will construct a minimal set of ability constraints each type parameter needs to satisfy,
-/// which the caller can then verify in individual contexts.
-/// This allows us to cache the results in the extreme case where a signature is being
-/// referenced many many times.
-///
-/// Time Complexity: `O(size_of_type * num_of_abilities * log(num_of_ty_params))`.
-/// Can be treated as `O(size_of_type)` if there are only a handful of abilities and type params.
-fn check_ty<const N: usize>(
-    struct_handles: &[StructHandle],
-    ty: &SignatureToken,
-    allow_ref: bool,
-    required_abilities: AbilitySet,
-    param_constraints: &mut BitsetTypeParameterConstraints<N>,
-) -> PartialVMResult<()> {
-    use SignatureToken::*;
+impl<'a, const N: usize> SignatureChecker<'a, N> {
+    /// Checks if the given type is well formed and has the required abilities.
+    ///
+    /// This function does NOT require the context (type parameter abilities) to be specified.
+    /// Instead, it will construct a minimal set of ability constraints each type parameter needs to satisfy,
+    /// which the caller can then verify in individual contexts.
+    /// This allows us to cache the results in the extreme case where a signature is being
+    /// referenced many many times.
+    ///
+    /// Time Complexity: `O(size_of_type * num_of_abilities * log(num_of_ty_params))`.
+    /// Can be treated as `O(size_of_type)` if there are only a handful of abilities and type params.
+    fn check_ty(
+        &self,
+        ty: &SignatureToken,
+        allow_ref: bool,
+        required_abilities: AbilitySet,
+        param_constraints: &mut BitsetTypeParameterConstraints<N>,
+    ) -> PartialVMResult<()> {
+        use SignatureToken::*;
 
-    let assert_abilities = |abilities: AbilitySet, required: AbilitySet| -> PartialVMResult<()> {
-        if !required.is_subset(abilities) {
-            Err(
-                PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(format!(
+        let assert_abilities =
+            |abilities: AbilitySet, required: AbilitySet| -> PartialVMResult<()> {
+                if !required.is_subset(abilities) {
+                    Err(
+                        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(
+                            format!(
                     "expected type with abilities {:?} got type actual {:?} with incompatible \
                 abilities {:?}",
                     required, ty, abilities
-                )),
-            )
-        } else {
-            Ok(())
-        }
-    };
-
-    match ty {
-        TypeParameter(param_idx) => param_constraints.insert(*param_idx, required_abilities),
-        U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address => {
-            assert_abilities(AbilitySet::PRIMITIVES, required_abilities)?;
-        },
-        Signer => {
-            assert_abilities(AbilitySet::SIGNER, required_abilities)?;
-        },
-        Reference(ty) | MutableReference(ty) => {
-            if allow_ref {
-                assert_abilities(AbilitySet::REFERENCES, required_abilities)?;
-                check_ty(
-                    struct_handles,
-                    ty,
-                    false,
-                    AbilitySet::EMPTY,
-                    param_constraints,
-                )?;
-            } else {
-                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
-                    .with_message("reference not allowed".to_string()));
-            }
-        },
-        Vector(ty) => {
-            assert_abilities(AbilitySet::VECTOR, required_abilities)?;
-            check_ty(
-                struct_handles,
-                ty,
-                false,
-                required_abilities.requires(),
-                param_constraints,
-            )?;
-        },
-        Function(_, _, abilities) => {
-            assert_abilities(*abilities, required_abilities)?;
-            // Note we do not need to check abilities of argument or result types,
-            // they do not matter for the `required_abilities`.
-        },
-        Struct(sh_idx) => {
-            let handle = &struct_handles[sh_idx.0 as usize];
-            assert_abilities(handle.abilities, required_abilities)?;
-        },
-        StructInstantiation(sh_idx, ty_args) => {
-            let handle = &struct_handles[sh_idx.0 as usize];
-
-            assert_abilities(handle.abilities, required_abilities)?;
-
-            // TODO: is this needed?
-            if handle.type_parameters.len() != ty_args.len() {
-                return Err(
-                    PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
-                        .with_message(format!(
-                            "expected {} type argument(s), got {}",
-                            handle.type_parameters.len(),
-                            ty_args.len()
-                        )),
-                );
-            }
-            for (ty_param, ty_arg) in handle.type_parameters.iter().zip(ty_args.iter()) {
-                let required_abilities = if ty_param.is_phantom {
-                    ty_param.constraints
+                ),
+                        ),
+                    )
                 } else {
-                    ty_param.constraints.union(required_abilities.requires())
-                };
+                    Ok(())
+                }
+            };
 
-                check_ty(
-                    struct_handles,
-                    ty_arg,
-                    false,
-                    required_abilities,
-                    param_constraints,
-                )?;
-            }
-        },
+        match ty {
+            TypeParameter(param_idx) => param_constraints.insert(*param_idx, required_abilities),
+            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address => {
+                assert_abilities(AbilitySet::PRIMITIVES, required_abilities)?;
+            },
+            Signer => {
+                assert_abilities(AbilitySet::SIGNER, required_abilities)?;
+            },
+            Reference(ty) | MutableReference(ty) => {
+                if allow_ref {
+                    assert_abilities(AbilitySet::REFERENCES, required_abilities)?;
+                    self.check_ty(ty, false, AbilitySet::EMPTY, param_constraints)?;
+                } else {
+                    return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
+                        .with_message("reference not allowed".to_string()));
+                }
+            },
+            Vector(ty) => {
+                assert_abilities(AbilitySet::VECTOR, required_abilities)?;
+                self.check_ty(ty, false, required_abilities.requires(), param_constraints)?;
+            },
+            Function(params, results, abilities) => {
+                assert_abilities(*abilities, required_abilities)?;
+                if self.sig_checker_v2_fix_function_signatures {
+                    for ty in params.iter().chain(results) {
+                        self.check_ty(
+                            ty,
+                            // Immediate params and returns can be references.
+                            true,
+                            // Note we do not need to check abilities of argument or result types,
+                            // they do not matter for the `required_abilities`.
+                            AbilitySet::EMPTY,
+                            param_constraints,
+                        )?
+                    }
+                }
+            },
+            Struct(sh_idx) => {
+                let struct_handles = self.resolver.struct_handles();
+                let handle = &struct_handles[sh_idx.0 as usize];
+                assert_abilities(handle.abilities, required_abilities)?;
+            },
+            StructInstantiation(sh_idx, ty_args) => {
+                let struct_handles = self.resolver.struct_handles();
+                let handle = &struct_handles[sh_idx.0 as usize];
+
+                assert_abilities(handle.abilities, required_abilities)?;
+
+                // TODO: is this needed?
+                if handle.type_parameters.len() != ty_args.len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
+                            .with_message(format!(
+                                "expected {} type argument(s), got {}",
+                                handle.type_parameters.len(),
+                                ty_args.len()
+                            )),
+                    );
+                }
+                for (ty_param, ty_arg) in handle.type_parameters.iter().zip(ty_args.iter()) {
+                    let required_abilities = if ty_param.is_phantom {
+                        ty_param.constraints
+                    } else {
+                        ty_param.constraints.union(required_abilities.requires())
+                    };
+
+                    self.check_ty(ty_arg, false, required_abilities, param_constraints)?;
+                }
+            },
+        }
+
+        Ok(())
     }
 
-    Ok(())
-}
+    /// Checks if the given type is well formed and has the required abilities within a context.
+    ///
+    /// Calls `check_ty` internally.
+    ///
+    /// Time complexity: same as `check_ty`.
+    fn check_ty_in_context(
+        &self,
+        ability_context: &BitsetTypeParameterConstraints<N>,
+        ty: &SignatureToken,
+        allow_ref: bool,
+        required_abilities: AbilitySet,
+    ) -> PartialVMResult<()> {
+        let mut param_constraints = BitsetTypeParameterConstraints::new();
 
-/// Checks if the given type is well formed and has the required abilities within a context.
-///
-/// Calls `check_ty` internally.
-///
-/// Time complexity: same as `check_ty`.
-fn check_ty_in_context<const N: usize>(
-    struct_handles: &[StructHandle],
-    ability_context: &BitsetTypeParameterConstraints<N>,
-    ty: &SignatureToken,
-    allow_ref: bool,
-    required_abilities: AbilitySet,
-) -> PartialVMResult<()> {
-    let mut param_constraints = BitsetTypeParameterConstraints::new();
+        self.check_ty(ty, allow_ref, required_abilities, &mut param_constraints)?;
 
-    check_ty(
-        struct_handles,
-        ty,
-        allow_ref,
-        required_abilities,
-        &mut param_constraints,
-    )?;
-
-    param_constraints
-        .check_in_context(ability_context)
-        .map_err(|err| {
-            err.with_message(format!(
-                "expected type with abilities {:?} got type {:?} within context {:?}",
-                required_abilities, ty, ability_context,
-            ))
-        })
+        param_constraints
+            .check_in_context(ability_context)
+            .map_err(|err| {
+                err.with_message(format!(
+                    "expected type with abilities {:?} got type {:?} within context {:?}",
+                    required_abilities, ty, ability_context,
+                ))
+            })
+    }
 }
 
 /// Helper function to check if a type contains phantom type parameters in non-phantom positions.
@@ -304,6 +298,8 @@ fn check_phantom_params(
 
 struct SignatureChecker<'a, const N: usize> {
     resolver: BinaryIndexedView<'a>,
+    // If enabled, recurses into function signature to check type signatures.
+    sig_checker_v2_fix_function_signatures: bool,
 
     // Here the arena is used as a scoped interner, allowing us to store references in the
     // caches below.
@@ -346,10 +342,12 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     fn new(
         constraints: &'a Arena<BitsetTypeParameterConstraints<N>>,
         resolver: BinaryIndexedView<'a>,
+        sig_checker_v2_fix_function_signatures: bool,
     ) -> Self {
         Self {
             resolver,
             constraints,
+            sig_checker_v2_fix_function_signatures,
 
             ty_results: RefCell::new(BTreeMap::new()),
             sig_results: RefCell::new(BTreeMap::new()),
@@ -373,6 +371,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         sig_idx: SignatureIndex,
         ty_idx: usize,
         required_abilities: AbilitySet,
+        allow_ref: bool,
     ) -> PartialVMResult<&'a BitsetTypeParameterConstraints<N>> {
         let r = match self
             .ty_results
@@ -384,17 +383,11 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 let mut param_constraints = BitsetTypeParameterConstraints::new();
                 let sig = self.resolver.signature_at(sig_idx);
                 let ty = &sig.0[ty_idx];
-                check_ty(
-                    self.resolver.struct_handles(),
-                    ty,
-                    true,
-                    required_abilities,
-                    &mut param_constraints,
-                )
-                .map_err(|err| {
-                    err.append_message_with_separator(' ', format!("at type {}", ty_idx))
-                        .at_index(IndexKind::Signature, sig_idx.0)
-                })?;
+                self.check_ty(ty, allow_ref, required_abilities, &mut param_constraints)
+                    .map_err(|err| {
+                        err.append_message_with_separator(' ', format!("at type {}", ty_idx))
+                            .at_index(IndexKind::Signature, sig_idx.0)
+                    })?;
 
                 let r = self.constraints.alloc(param_constraints);
 
@@ -415,6 +408,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     fn verify_signature_contextless(
         &self,
         sig_idx: SignatureIndex,
+        allow_ref: bool,
     ) -> PartialVMResult<&'a BitsetTypeParameterConstraints<N>> {
         let r = match self.sig_results.borrow_mut().entry(sig_idx) {
             btree_map::Entry::Occupied(entry) => *entry.into_mut(),
@@ -426,6 +420,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         sig_idx,
                         ty_idx,
                         AbilitySet::EMPTY,
+                        allow_ref,
                     )?)
                 }
 
@@ -439,7 +434,11 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     /// Verifies that all signatures in the signature pool are well-formed, in a context-less fashion.
     fn verify_signature_pool_contextless(&self) -> PartialVMResult<()> {
         for sig_idx in 0..self.resolver.signatures().len() {
-            self.verify_signature_contextless(SignatureIndex(sig_idx as u16))?;
+            // Here we check signatures, which can be locals for instance, so references should be
+            // allowed. Note that this function will cache results, which means that the signature
+            // which is not supposed reference is cached with references allowed. One must make
+            // sure any later checks do not go through cache, but explicitly reject references.
+            self.verify_signature_contextless(SignatureIndex(sig_idx as u16), true)?;
         }
         Ok(())
     }
@@ -451,8 +450,9 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         &self,
         ability_context: &BitsetTypeParameterConstraints<N>,
         sig_idx: SignatureIndex,
+        allow_ref: bool,
     ) -> PartialVMResult<()> {
-        let constraints = self.verify_signature_contextless(sig_idx)?;
+        let constraints = self.verify_signature_contextless(sig_idx, allow_ref)?;
         constraints.check_in_context(ability_context)?;
         Ok(())
     }
@@ -499,6 +499,10 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
                 let mut constraints = BitsetTypeParameterConstraints::new();
                 for (ty_idx, ty) in ty_args.iter().enumerate() {
+                    // IMPORTANT:
+                    //   This check should be kept here at all times, because it is possible
+                    //   that the signature is already cached when allowing references, so the
+                    //   below traversal will not complain about references...
                     if ty.is_reference() {
                         return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
                             .with_message("reference not allowed".to_string())
@@ -509,6 +513,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         ty_args_idx,
                         ty_idx,
                         func_handle.type_parameters[ty_idx],
+                        false,
                     )?)
                 }
 
@@ -643,11 +648,6 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
         let mut constraints = BitsetTypeParameterConstraints::new();
         for (ty_idx, ty) in ty_args.iter().enumerate() {
-            if ty.is_reference() {
-                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
-                    .with_message("reference not allowed".to_string()));
-            }
-
             let arg_abilities = if struct_handle.type_parameters[ty_idx].is_phantom {
                 struct_handle.type_parameters[ty_idx].constraints
             } else {
@@ -656,10 +656,20 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                     .union(required_abilities.requires())
             };
 
+            // IMPORTANT:
+            //   This check should be kept here at all times, because it is possible
+            //   that the signature is already cached when allowing references, so the
+            //   below traversal will not complain about references...
+            if ty.is_reference() {
+                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
+                    .with_message("reference not allowed".to_string()));
+            }
+
             constraints.merge(self.verify_type_in_signature_contextless(
                 ty_args_idx,
                 ty_idx,
                 arg_abilities,
+                false,
             )?);
         }
         Ok(constraints)
@@ -780,8 +790,9 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     /// Time complexity: `O(total_size_of_all_types)` if not cached.
     fn verify_function_handle(&self, fh: &FunctionHandle) -> PartialVMResult<()> {
         let ability_context = BitsetTypeParameterConstraints::from(fh.type_parameters.as_slice());
-        self.verify_signature_in_context(&ability_context, fh.parameters)?;
-        self.verify_signature_in_context(&ability_context, fh.return_)?;
+        // Reference are allowed to be in parameter and return signatures.
+        self.verify_signature_in_context(&ability_context, fh.parameters, true)?;
+        self.verify_signature_in_context(&ability_context, fh.return_, true)?;
         Ok(())
     }
 
@@ -808,7 +819,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
         let ability_context = BitsetTypeParameterConstraints::from(ability_context);
 
-        self.verify_signature_in_context(&ability_context, code.locals)
+        // Locals can be references, so we pass `true` here.
+        self.verify_signature_in_context(&ability_context, code.locals, true)
             .map_err(|err| err.at_index(IndexKind::Signature, code.locals.0))?;
 
         // Local caches to avoid re-verifying identical instantiations within the same context.
@@ -923,13 +935,18 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                             ))));
                         }
 
+                        // IMPORTANT:
+                        //   This check should be kept here at all times, because it is possible
+                        //   that the signature is already cached when allowing references, so the
+                        //   below traversal will not complain about references...
                         if ty_args[0].is_reference() {
                             return map_err(Err(PartialVMError::new(
                                 StatusCode::INVALID_SIGNATURE_TOKEN,
                             )
                             .with_message("reference not allowed".to_string())));
                         }
-                        map_err(self.verify_signature_in_context(&ability_context, *idx))?;
+
+                        map_err(self.verify_signature_in_context(&ability_context, *idx, false))?;
 
                         entry.insert(());
                     }
@@ -1052,14 +1069,14 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         match &struct_def.field_information {
             StructFieldInformation::Native => Ok(()),
             StructFieldInformation::Declared(fields) => self.verify_fields_of_struct(
-                &struct_handle,
+                struct_handle,
                 &context,
                 required_abilities_conditional,
                 &context_all_abilities,
                 fields.iter(),
             ),
             StructFieldInformation::DeclaredVariants(variants) => self.verify_fields_of_struct(
-                &struct_handle,
+                struct_handle,
                 &context,
                 required_abilities_conditional,
                 &context_all_abilities,
@@ -1070,7 +1087,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
 
     fn verify_fields_of_struct<'l>(
         &self,
-        struct_handle: &&StructHandle,
+        struct_handle: &StructHandle,
         context: &BitsetTypeParameterConstraints<{ N }>,
         required_abilities_conditional: AbilitySet,
         context_all_abilities: &BitsetTypeParameterConstraints<{ N }>,
@@ -1080,17 +1097,10 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             let field_ty = &field_def.signature.0;
 
             // Check if the field type itself is well-formed.
-            check_ty_in_context(
-                self.resolver.struct_handles(),
-                context,
-                field_ty,
-                false,
-                AbilitySet::EMPTY,
-            )?;
+            self.check_ty_in_context(context, field_ty, false, AbilitySet::EMPTY)?;
 
             // Check if the field type satisfies the conditional ability requirements.
-            check_ty_in_context(
-                self.resolver.struct_handles(),
+            self.check_ty_in_context(
                 context_all_abilities,
                 field_ty,
                 false,
@@ -1118,9 +1128,16 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     }
 }
 
-fn verify_module_impl<const N: usize>(module: &CompiledModule) -> PartialVMResult<()> {
+fn verify_module_impl<const N: usize>(
+    config: &VerifierConfig,
+    module: &CompiledModule,
+) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Module(module));
+    let checker = SignatureChecker::new(
+        &arena,
+        BinaryIndexedView::Module(module),
+        config.sig_checker_v2_fix_function_signatures,
+    );
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.
@@ -1138,9 +1155,16 @@ fn verify_module_impl<const N: usize>(module: &CompiledModule) -> PartialVMResul
     Ok(())
 }
 
-fn verify_script_impl<const N: usize>(script: &CompiledScript) -> PartialVMResult<()> {
+fn verify_script_impl<const N: usize>(
+    config: &VerifierConfig,
+    script: &CompiledScript,
+) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Script(script));
+    let checker = SignatureChecker::new(
+        &arena,
+        BinaryIndexedView::Script(script),
+        config.sig_checker_v2_fix_function_signatures,
+    );
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.
@@ -1151,6 +1175,8 @@ fn verify_script_impl<const N: usize>(script: &CompiledScript) -> PartialVMResul
     checker.verify_signature_in_context(
         &BitsetTypeParameterConstraints::from(script.type_parameters.as_slice()),
         script.parameters,
+        // Script parameters can be signer references.
+        true,
     )?;
     checker.verify_code(&script.type_parameters, &script.code)?;
 
@@ -1209,15 +1235,15 @@ fn max_num_of_ty_params_or_args(resolver: BinaryIndexedView) -> usize {
     n
 }
 
-pub fn verify_module(module: &CompiledModule) -> VMResult<()> {
+pub fn verify_module(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
     let max_num = max_num_of_ty_params_or_args(BinaryIndexedView::Module(module));
 
     let res = if max_num <= NUM_PARAMS_PER_WORD {
-        verify_module_impl::<1>(module)
+        verify_module_impl::<1>(config, module)
     } else if max_num <= NUM_PARAMS_PER_WORD * 2 {
-        verify_module_impl::<2>(module)
+        verify_module_impl::<2>(config, module)
     } else if max_num <= NUM_PARAMS_PER_WORD * 16 {
-        verify_module_impl::<16>(module)
+        verify_module_impl::<16>(config, module)
     } else {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1236,11 +1262,11 @@ pub fn verify_script(config: &VerifierConfig, script: &CompiledScript) -> VMResu
     }
 
     let res = if max_num <= NUM_PARAMS_PER_WORD {
-        verify_script_impl::<1>(script)
+        verify_script_impl::<1>(config, script)
     } else if max_num <= NUM_PARAMS_PER_WORD * 2 {
-        verify_script_impl::<2>(script)
+        verify_script_impl::<2>(config, script)
     } else if max_num <= NUM_PARAMS_PER_WORD * 16 {
-        verify_script_impl::<16>(script)
+        verify_script_impl::<16>(config, script)
     } else {
         return Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

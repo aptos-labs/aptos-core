@@ -1,0 +1,28 @@
+{% for ty1 in ["u64", "&u8"] %}
+
+{% set suffix = mangle(repr=ty1) %}
+
+//# publish
+module 0x66::incompatible_field_type_{{suffix}}
+struct A has drop
+    x: |{{ty1}}|u32 has drop
+
+
+{% for ty2 in ["u16", "address", "&mut u8"] %}
+
+{% if ty1 != ty2 %}
+
+//# publish --verbose
+module 0x66::incompatible_field_type_{{suffix}}
+struct A has drop
+    x: |{{ty2}}|u32 has drop
+
+
+//# publish --verbose
+module 0x66::incompatible_field_type_{{suffix}}
+struct A has drop
+    x: |{{ty1}}|{{ty2}} has drop
+
+{% endif %}
+{% endfor %}
+{% endfor %}

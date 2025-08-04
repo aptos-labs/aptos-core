@@ -32,8 +32,8 @@
 -  [Function `get_active_matched_size`](#0x7_order_book_types_get_active_matched_size)
 -  [Function `get_matched_size`](#0x7_order_book_types_get_matched_size)
 -  [Function `new_order_with_state`](#0x7_order_book_types_new_order_with_state)
--  [Function `tp_trigger_condition`](#0x7_order_book_types_tp_trigger_condition)
--  [Function `sl_trigger_condition`](#0x7_order_book_types_sl_trigger_condition)
+-  [Function `price_move_up_condition`](#0x7_order_book_types_price_move_up_condition)
+-  [Function `price_move_down_condition`](#0x7_order_book_types_price_move_down_condition)
 -  [Function `index`](#0x7_order_book_types_index)
 -  [Function `get_order_from_state`](#0x7_order_book_types_get_order_from_state)
 -  [Function `get_metadata_from_state`](#0x7_order_book_types_get_metadata_from_state)
@@ -386,7 +386,7 @@
 
 
 <details>
-<summary>TakeProfit</summary>
+<summary>PriceMoveAbove</summary>
 
 
 <details>
@@ -408,7 +408,7 @@
 </details>
 
 <details>
-<summary>StopLoss</summary>
+<summary>PriceMoveBelow</summary>
 
 
 <details>
@@ -998,13 +998,13 @@
 
 </details>
 
-<a id="0x7_order_book_types_tp_trigger_condition"></a>
+<a id="0x7_order_book_types_price_move_up_condition"></a>
 
-## Function `tp_trigger_condition`
+## Function `price_move_up_condition`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_tp_trigger_condition">tp_trigger_condition</a>(take_profit: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_price_move_up_condition">price_move_up_condition</a>(price: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
 </code></pre>
 
 
@@ -1013,8 +1013,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_tp_trigger_condition">tp_trigger_condition</a>(take_profit: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
-    TriggerCondition::TakeProfit(take_profit)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_price_move_up_condition">price_move_up_condition</a>(price: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
+    TriggerCondition::PriceMoveAbove(price)
 }
 </code></pre>
 
@@ -1022,13 +1022,13 @@
 
 </details>
 
-<a id="0x7_order_book_types_sl_trigger_condition"></a>
+<a id="0x7_order_book_types_price_move_down_condition"></a>
 
-## Function `sl_trigger_condition`
+## Function `price_move_down_condition`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_sl_trigger_condition">sl_trigger_condition</a>(stop_loss: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_price_move_down_condition">price_move_down_condition</a>(price: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
 </code></pre>
 
 
@@ -1037,8 +1037,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_sl_trigger_condition">sl_trigger_condition</a>(stop_loss: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
-    TriggerCondition::StopLoss(stop_loss)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_price_move_down_condition">price_move_down_condition</a>(price: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
+    TriggerCondition::PriceMoveBelow(price)
 }
 </code></pre>
 
@@ -1052,7 +1052,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>, is_bid: bool): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1061,22 +1061,14 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>, is_bid: bool):
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>):
     (Option&lt;u64&gt;, Option&lt;u64&gt;, Option&lt;u64&gt;) {
     match(self) {
-        TriggerCondition::TakeProfit(tp) =&gt; {
-            <b>if</b> (is_bid) {
-                (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*tp), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
-            } <b>else</b> {
-                (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*tp), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
-            }
+        TriggerCondition::PriceMoveAbove(price) =&gt; {
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
         }
-        TriggerCondition::StopLoss(sl) =&gt; {
-            <b>if</b> (is_bid) {
-                (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*sl), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
-            } <b>else</b> {
-                (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*sl), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
-            }
+        TriggerCondition::PriceMoveBelow(price) =&gt; {
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
         }
         TriggerCondition::TimeBased(time) =&gt; {
             (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*time))

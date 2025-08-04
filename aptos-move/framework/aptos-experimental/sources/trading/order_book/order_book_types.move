@@ -74,8 +74,8 @@ module aptos_experimental::order_book_types {
     }
 
     enum TriggerCondition has store, drop, copy {
-        TakeProfit(u64),
-        StopLoss(u64),
+        PriceMoveAbove(u64),
+        PriceMoveBelow(u64),
         TimeBased(u64)
     }
 
@@ -189,31 +189,23 @@ module aptos_experimental::order_book_types {
         OrderWithState::V1 { order, is_active }
     }
 
-    public fun tp_trigger_condition(take_profit: u64): TriggerCondition {
-        TriggerCondition::TakeProfit(take_profit)
+    public fun price_move_up_condition(price: u64): TriggerCondition {
+        TriggerCondition::PriceMoveAbove(price)
     }
 
-    public fun sl_trigger_condition(stop_loss: u64): TriggerCondition {
-        TriggerCondition::StopLoss(stop_loss)
+    public fun price_move_down_condition(price: u64): TriggerCondition {
+        TriggerCondition::PriceMoveBelow(price)
     }
 
     // Returns the price move down index and price move up index for a particular trigger condition
-    public fun index(self: &TriggerCondition, is_bid: bool):
+    public fun index(self: &TriggerCondition):
         (Option<u64>, Option<u64>, Option<u64>) {
         match(self) {
-            TriggerCondition::TakeProfit(tp) => {
-                if (is_bid) {
-                    (option::some(*tp), option::none(), option::none())
-                } else {
-                    (option::none(), option::some(*tp), option::none())
-                }
+            TriggerCondition::PriceMoveAbove(price) => {
+                (option::none(), option::some(*price), option::none())
             }
-            TriggerCondition::StopLoss(sl) => {
-                if (is_bid) {
-                    (option::none(), option::some(*sl), option::none())
-                } else {
-                    (option::some(*sl), option::none(), option::none())
-                }
+            TriggerCondition::PriceMoveBelow(price) => {
+                (option::some(*price), option::none(), option::none())
             }
             TriggerCondition::TimeBased(time) => {
                 (option::none(), option::none(), option::some(*time))
