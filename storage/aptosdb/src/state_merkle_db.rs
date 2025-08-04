@@ -4,7 +4,7 @@
 use crate::{
     db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
-    metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
+    metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
@@ -43,7 +43,6 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Instant,
 };
 
 pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
@@ -762,15 +761,11 @@ impl StateMerkleDb {
 }
 
 impl TreeReader<StateKey> for StateMerkleDb {
-    fn get_node_option(&self, node_key: &NodeKey, tag: &str) -> Result<Option<Node>> {
-        let start_time = Instant::now();
+    fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node>> {
         if !self.cache_enabled() {
             let node_opt = self
                 .db_by_key(node_key)
                 .get::<JellyfishMerkleNodeSchema>(node_key)?;
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "cache_disabled"])
-                .observe(start_time.elapsed().as_secs_f64());
             return Ok(node_opt);
         }
         if let Some(node_cache) = self
@@ -780,17 +775,11 @@ impl TreeReader<StateKey> for StateMerkleDb {
             .get_version(node_key.version())
         {
             let node = node_cache.get(node_key).cloned();
-            NODE_CACHE_SECONDS
-                .with_label_values(&[tag, "versioned_cache_hit"])
-                .observe(start_time.elapsed().as_secs_f64());
             return Ok(node);
         }
 
         if let Some(lru_cache) = &self.lru_cache {
             if let Some(node) = lru_cache.get(node_key) {
-                NODE_CACHE_SECONDS
-                    .with_label_values(&[tag, "lru_cache_hit"])
-                    .observe(start_time.elapsed().as_secs_f64());
                 return Ok(Some(node));
             }
         }
@@ -803,9 +792,6 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 lru_cache.put(node_key.clone(), node.clone());
             }
         }
-        NODE_CACHE_SECONDS
-            .with_label_values(&[tag, "cache_miss"])
-            .observe(start_time.elapsed().as_secs_f64());
         Ok(node_opt)
     }
 
