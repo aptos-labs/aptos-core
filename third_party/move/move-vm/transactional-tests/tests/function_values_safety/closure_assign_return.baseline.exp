@@ -1,9 +1,9 @@
 processed 5 tasks
-task 0 lines 1-22:  publish
-task 1 lines 25-35:  publish
+task 0 lines 1-22:  publish [module 0x66::helpers]
+task 1 lines 25-35:  publish [module 0x66::ok]
 task 2 lines 37-37:  run --verbose 0x66::ok::assignable
 return values: 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..), 0x0000000000000000000000000000000000000000000000000000000000000066::helpers::action(..)
-task 3 lines 39-49:  publish
+task 3 lines 39-49:  publish [module 0x66::not_ok]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::not_ok'. Got VMError: {
     major_status: RET_TYPE_MISMATCH_ERROR,
     sub_status: None,

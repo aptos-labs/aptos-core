@@ -1,4 +1,4 @@
 processed 3 tasks
-task 0 lines 1-9:  publish
-task 1 lines 11-26:  publish
-task 2 lines 28-34:  run --signers 0x1
+task 0 lines 1-9:  publish [module 0x2.A {]
+task 1 lines 11-26:  publish [module 0x2.B {]
+task 2 lines 28-34:  run --signers 0x1 [import 0x2.B;]

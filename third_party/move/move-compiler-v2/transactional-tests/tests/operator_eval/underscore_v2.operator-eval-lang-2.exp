@@ -1,13 +1,10 @@
 processed 5 tasks
-
-task 1 'run'. lines 93-95:
+task 0 lines 1-91:  publish [module 0xc0ffee::m {]
+task 1 lines 93-95:  run 0xc0ffee::m::test9 [// //# run 0xc0ffee::m::test10a]
 return values: 7
-
-task 2 'run'. lines 97-97:
+task 2 lines 97-97:  run 0xc0ffee::m::test10b
 return values: 7
-
-task 3 'run'. lines 99-99:
+task 3 lines 99-99:  run 0xc0ffee::m::test10c
 return values: 7
-
-task 4 'run'. lines 101-101:
+task 4 lines 101-101:  run 0xc0ffee::m::test11
 return values: 1

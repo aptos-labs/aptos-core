@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 9-17:
+task 0 lines 1-7:  publish [module 0x42.Test {]
+task 1 lines 9-17:  run [import 0x42.Test;]
 Error: Script execution failed with VMError: {
     major_status: CALL_TYPE_MISMATCH_ERROR,
     sub_status: None,

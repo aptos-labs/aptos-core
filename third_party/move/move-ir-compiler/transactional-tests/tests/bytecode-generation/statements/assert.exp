@@ -1,24 +1,20 @@
 processed 1 task
+task 0 lines 1-8:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 3
+    st_loc l0
+    copy_loc l0
+    ld_u64 2
+    gt
+    // @5
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret
 
-task 0 'print-bytecode'. lines 1-8:
-// Move bytecode v7
-script {
 
-
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(3)
-	1: StLoc[0](loc0: u64)
-	2: CopyLoc[0](loc0: u64)
-	3: LdU64(2)
-	4: Gt
-	5: Not
-	6: BrFalse(9)
-B1:
-	7: LdU64(42)
-	8: Abort
-B2:
-	9: Ret
-}
-}

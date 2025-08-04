@@ -140,6 +140,7 @@ mod captured_reads;
 mod code_cache;
 pub mod code_cache_global;
 pub mod code_cache_global_manager;
+pub(crate) mod combinatorial_tests;
 pub mod counters;
 pub mod errors;
 pub mod executor;
@@ -147,8 +148,6 @@ mod executor_utilities;
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
 mod limit_processor;
-#[cfg(any(test, feature = "fuzzing"))]
-pub mod proptest_types;
 mod scheduler;
 mod scheduler_status;
 mod scheduler_v2;

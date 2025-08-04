@@ -1,8 +1,8 @@
 processed 13 tasks
-task 0 lines 1-4:  publish
-task 1 lines 6-24:  publish
-task 2 lines 26-47:  publish
-task 3 lines 49-70:  publish
+task 0 lines 1-4:  publish [module 0x2.a {]
+task 1 lines 6-24:  publish [module 0x2.b {]
+task 2 lines 26-47:  publish [module 0x2.a {]
+task 3 lines 49-70:  publish [module 0x2.c {]
 task 4 lines 72-72:  run 0x2::a::call_private_function
 Error: Function execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -30,7 +30,7 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(1), 0)],
 }
 task 9 lines 82-82:  run 0x2::c::call_public_function
-task 10 lines 84-90:  run --signers 0x1
+task 10 lines 84-90:  run --signers 0x1 [import 0x2.b;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -38,7 +38,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 11 lines 92-98:  run --signers 0x1
+task 11 lines 92-98:  run --signers 0x1 [import 0x2.b;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -46,4 +46,4 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-task 12 lines 100-106:  run --signers 0x1
+task 12 lines 100-106:  run --signers 0x1 [import 0x2.b;]

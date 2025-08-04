@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-19:  publish --print-bytecode --verbose
+task 0 lines 1-19:  publish --print-bytecode --verbose [module 0x66::test]
 
 == BEGIN Bytecode ==
 // Bytecode version v7

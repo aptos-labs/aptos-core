@@ -273,8 +273,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         }
         if options.prover.dump_bytecode {
             if let Some(out) = module_env.disassemble() {
-                let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
-                fs::write(dump_file, out).expect("dumping disassembled module");
+                debug!("disassembled bytecode:\n{}", out);
             }
         }
         for func_env in module_env.get_functions() {

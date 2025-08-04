@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 1-18:  publish
+task 0 lines 1-18:  publish [// entry points can now return values]
 task 1 lines 20-20:  run 0x42::M::t --signers 0x1 --args 0 2 3 4
 mutable inputs after call: local#4: { 4 }
 return values: 0, { 0, 0000000000000000000000000000000000000000000000000000000000000001 }, { 2 }, { 3 }, 3, 4

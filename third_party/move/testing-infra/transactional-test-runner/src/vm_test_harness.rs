@@ -532,8 +532,8 @@ impl TestRunConfig {
                 paranoid_type_checks: true,
                 ..VMConfig::default()
             },
-            use_masm: false,
-            echo: false,
+            use_masm: true,
+            echo: true,
         }
     }
 
