@@ -517,6 +517,12 @@ pub enum TestRunConfig {
     },
 }
 
+impl Default for TestRunConfig {
+    fn default() -> Self {
+        TestRunConfig::compiler_v2(LanguageVersion::latest(), vec![])
+    }
+}
+
 impl TestRunConfig {
     /// Returns compiler V2 config with default VM config.
     pub fn compiler_v2(
