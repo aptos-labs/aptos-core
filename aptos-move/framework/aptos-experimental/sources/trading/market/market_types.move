@@ -102,7 +102,7 @@ module aptos_experimental::market_types {
             /// settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
             settle_trade_f:  |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
             /// validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
-            validate_order_placement_f: |address, OrderIdType, bool, bool, Option<u64>, u64, M| bool has drop + copy,
+            validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
             /// place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
             place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
             /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size
@@ -130,7 +130,7 @@ module aptos_experimental::market_types {
         // settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
         settle_trade_f: |address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
         // validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
-        validate_order_placement_f: |address, OrderIdType, bool, bool, Option<u64>, u64, M| bool has drop + copy,
+        validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
         // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
         place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
         // cleanup_order_f arguments: account, order_id, is_bid, remaining_size
@@ -183,10 +183,11 @@ module aptos_experimental::market_types {
         order_id: OrderIdType,
         is_taker: bool,
         is_bid: bool,
-        price: Option<u64>,
+        price: u64,
+        time_in_force: TimeInForce,
         size: u64,
         order_metadata: M): bool {
-        (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, size, order_metadata)
+        (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, time_in_force, size, order_metadata)
     }
 
     public(friend) fun place_maker_order<M: store + copy + drop>(

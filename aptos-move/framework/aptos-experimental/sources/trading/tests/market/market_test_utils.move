@@ -16,10 +16,12 @@ module aptos_experimental::market_test_utils {
 
     use aptos_experimental::market::{OrderEvent, Market, OrderMatchResult};
 
+    const U64_MAX: u64 = 0xffffffffffffffff;
+
     public fun place_order_and_verify<M: store + copy + drop>(
         market: &mut Market<M>,
         user: &signer,
-        limit_price: Option<u64>,
+        price: Option<u64>,
         size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
@@ -31,10 +33,10 @@ module aptos_experimental::market_test_utils {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderIdType {
         let user_addr = signer::address_of(user);
-        if (limit_price.is_some()) {
+        let (limit_price, is_taker) = if (price.is_some()) {
             market.place_limit_order(
                 user,
-                limit_price.destroy_some(),
+                price.destroy_some(),
                 size,
                 is_bid, // is_bid
                 time_in_force, // order_type
@@ -45,7 +47,9 @@ module aptos_experimental::market_test_utils {
                 true,
                 callbacks
             );
+            (price.destroy_some(), is_taker)
         } else {
+            // Market order
             market.place_market_order(
                 user,
                 size,
@@ -56,6 +60,11 @@ module aptos_experimental::market_test_utils {
                 true,
                 callbacks
             );
+            if (is_bid) {
+                (U64_MAX, true) // Market buy order
+            } else {
+                (1, true) // Market sell order
+            }
         };
         let events = latest_emitted_events<OrderEvent>(event_store, option::none());
         if (!is_cancelled) {
@@ -155,6 +164,11 @@ module aptos_experimental::market_test_utils {
         let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
         let order_place_event = events[0];
         let order_id = order_place_event.get_order_id_from_event();
+        let limit_price = if (taker_price.is_some()) {
+            taker_price.destroy_some()
+        } else {
+            if (is_bid) { U64_MAX } else { 1 }
+        };
         // Taker order is opened
         order_place_event.verify_order_event(
             order_id,
@@ -164,7 +178,7 @@ module aptos_experimental::market_test_utils {
             size,
             size,
             size,
-            taker_price,
+            limit_price,
             is_bid,
             true,
             order_status_open()
@@ -175,7 +189,7 @@ module aptos_experimental::market_test_utils {
     public fun place_taker_order_and_verify_fill<M: store + copy + drop>(
         market: &mut Market<M>,
         taker: &signer,
-        limit_price: Option<u64>,
+        limit_price: u64,
         size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
@@ -197,7 +211,7 @@ module aptos_experimental::market_test_utils {
                 market,
                 taker,
                 option::none(), // client_order_id
-                limit_price,
+                option::some(limit_price),
                 size,
                 is_bid,
                 time_in_force,
@@ -235,7 +249,7 @@ module aptos_experimental::market_test_utils {
         is_taker: bool,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
-        price: Option<u64>,
+        price: u64,
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
@@ -266,7 +280,7 @@ module aptos_experimental::market_test_utils {
         taker: &signer,
         taker_order_id: OrderIdType,
         taker_client_order_id: Option<u64>,
-        taker_price: Option<u64>,
+        taker_price: u64,
         size: u64,
         is_bid: bool,
         fill_sizes: vector<u64>,
@@ -315,7 +329,7 @@ module aptos_experimental::market_test_utils {
                 size,
                 size - taker_total_fill,
                 fill_size,
-                option::some(fill_price),
+                fill_price,
                 is_bid,
                 true,
                 order_status_filled()
@@ -330,7 +344,7 @@ module aptos_experimental::market_test_utils {
                 maker_orig_size,
                 maker_remaining_size - fill_size,
                 fill_size,
-                option::some(fill_price),
+                fill_price,
                 !is_bid,
                 false,
                 order_status_filled()
