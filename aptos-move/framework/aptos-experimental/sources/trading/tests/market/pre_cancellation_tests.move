@@ -126,7 +126,7 @@ module aptos_experimental::pre_cancellation_tests {
             false, // Not a maker order
             order_id,
             option::some(1000),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,
