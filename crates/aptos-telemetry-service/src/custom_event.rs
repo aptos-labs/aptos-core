@@ -3,6 +3,7 @@
 
 use crate::{
     auth::with_auth,
+    constants::IP_ADDRESS_KEY,
     context::Context,
     debug, error,
     errors::{CustomEventIngestError, ServiceError},
@@ -34,6 +35,7 @@ pub fn custom_event_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
             NodeType::UnknownFullNode,
         ]))
         .and(warp::body::json())
+        .and(warp::header::optional("X-Forwarded-For"))
         .and_then(handle_custom_event)
         .boxed()
 }
@@ -65,13 +67,23 @@ fn validate_custom_event_body(
 pub(crate) async fn handle_custom_event(
     context: Context,
     claims: Claims,
-    body: TelemetryDump,
+    mut body: TelemetryDump,
+    forwarded_for: Option<String>,
 ) -> anyhow::Result<impl Reply, Rejection> {
     validate_custom_event_body(&claims, &body)?;
 
     let mut insert_request = TableDataInsertAllRequest::new();
 
-    let telemetry_event = &body.events[0];
+    let client_ip = forwarded_for
+        .as_ref()
+        .and_then(|xff| xff.split(',').next())
+        .unwrap_or("UNKNOWN");
+
+    let telemetry_event = &mut body.events[0];
+    telemetry_event
+        .params
+        .insert(IP_ADDRESS_KEY.into(), client_ip.into());
+
     let event_params: Vec<serde_json::Value> = telemetry_event
         .params
         .iter()
