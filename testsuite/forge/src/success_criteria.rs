@@ -505,7 +505,7 @@ impl SuccessCriteriaChecker {
             });
         }
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            results.add_result("Check system metrics", CheckType::Soft, {
+            results.add_result("Check system metrics", CheckType::Hard, {
                 Self::check_system_metrics(
                     swarm.clone(),
                     start_time,
