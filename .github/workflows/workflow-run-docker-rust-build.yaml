@@ -122,14 +122,20 @@ jobs:
       
       - name: Lock Check and Creation
         run: |
-          echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
-          if gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt --if-not-exists; then
-            echo "Lock created successfully"
-          else
-            echo "Lock already exists"
-            echo "Checkback when the following workflow is finished building images: "
-            gcloud storage cat gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+          set +e
+          gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+          result=$?
+          set -e
+          if [ $result -eq 0 ]; then
+            echo "Lock file exists: Current workflow building: "
+            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+            echo "Rerun again when the image is finished building"
             exit 1
+          else
+            echo "Lock file does not exist"
+            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
+            gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+            echo "Docker Build locked"
           fi
 
       - name: Build and Push Rust images
