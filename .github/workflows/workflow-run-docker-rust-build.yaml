@@ -113,11 +113,26 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
       
+      - name: Setup GCloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: 'gcloud'
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Configure GCloud
+        run: |
+          gcloud config set project aptos-ci
+
       - name: Lock File Check and Lock if not exists
         id: check-lock
         if: steps.check-images.outcome == 'failure'
         run:  |
-          gcloud config set account aptos-ci
           echo "Checking lock file"
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
