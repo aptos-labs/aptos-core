@@ -75,9 +75,8 @@ permissions:
 jobs:
   pre-build-validation:
     outputs: 
-      image-exist: ${{ steps.check-images.outputs.image-exist }}
-      lock-exist: ${{ steps.check-lock.outputs.lock-exist }}
-    runs-on: runs-on,cpu=8,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=small
+      image-exist: ${{ steps.set-output.outputs.image-exist }}
+    runs-on: runs-on,cpu=4,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=small
     steps:       
       - uses: actions/checkout@v4
         with:
@@ -102,33 +101,29 @@ jobs:
             echo "image-exist=false" >> $GITHUB_OUTPUT
           fi
       
-      - name: Check Docker Build Lock File
+      - name: Lock File Check and Lock if not exists
         id: check-lock
         if: steps.check-images.outcome == 'failure'
-        continue-on-error: true
         run:  |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
-          if [ $? -eq 0 ]; then
+          result=$?
+          set -e
+          if [ $result -eq 0 ]; then
             echo "Lock file exists: Current workflow building: "
             gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
-            echo "lock-exist=true" >> $GITHUB_OUTPUT
+            echo "Rerun again when the image is finished building" && exit 1
           else
             echo "Lock file does not exist"
-            echo "lock-exist=false" >> $GITHUB_OUTPUT
+            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
+            gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+            echo "Docker Build locked"
           fi
-      
-      - name: Lock Build
-        if: steps.check-images.outcome == 'failure' && steps.check-lock.outputs.lock-exist == 'false'
-        run: | 
-          echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
-          gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
-          echo "Docker Build locked"
 
   rust-all:
     runs-on: runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
     needs: pre-build-validation
-    if: needs.pre-build-validation.outputs.image-exist == 'false' && needs.pre-build-validation.outputs.lock-exist == 'false'
+    if: needs.pre-build-validation.outputs.image-exist == 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -177,6 +172,6 @@ jobs:
       - name: Post-run Lock Cleanup 
         if: always()
         run: | 
-          gcloud storage rm gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt || true
+          gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
           echo "Docker Build unlocked"
 

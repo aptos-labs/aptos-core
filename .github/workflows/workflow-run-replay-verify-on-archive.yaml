@@ -96,7 +96,7 @@ jobs:
         uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
         with:
           GIT_SHA: ${{ env.IMAGE_TAG }}
-          TARGET_CACHE_ID: TBD
+          TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
       - name: Schedule replay verify
         env:
