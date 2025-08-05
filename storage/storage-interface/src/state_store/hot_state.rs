@@ -56,15 +56,13 @@ impl<'a> HotStateLRU<'a> {
             Some(head) => {
                 let mut old_head_slot = self.expect_hot_slot(&head);
                 old_head_slot.set_prev(Some(key.clone()));
-                slot.set_prev(None);
-                slot.set_next(Some(head.clone()));
+                slot.init_lru(None, Some(head.clone()));
                 self.pending.insert(head, old_head_slot);
                 self.pending.insert(key.clone(), slot);
                 self.head = Some(key);
             },
             None => {
-                slot.set_prev(None);
-                slot.set_next(None);
+                slot.init_lru(None, None);
                 self.pending.insert(key.clone(), slot);
                 self.head = Some(key.clone());
                 self.tail = Some(key);
