@@ -510,7 +510,7 @@ async-channel = "1.7.1"
 async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-trait = "0.1.53"
-axum = "0.7.5"
+axum = { version = "0.7.5", features = ["ws", "json"] }
 base64 = "0.13.0"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"

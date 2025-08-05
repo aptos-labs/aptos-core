@@ -10,3 +10,4 @@ mod service;
 mod status_page;
 #[cfg(test)]
 mod test;
+mod websocket;

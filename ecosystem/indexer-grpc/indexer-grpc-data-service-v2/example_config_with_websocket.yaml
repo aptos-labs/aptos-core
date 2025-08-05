@@ -1,0 +1,41 @@
+# Example configuration for indexer-grpc-data-service-v2 with WebSocket support
+chain_id: 1
+
+# Service configuration - choose either gRPC or WebSocket (not both)
+service_config:
+  # For WebSocket mode:
+  type: "websocket"
+  listen_address: "0.0.0.0:8000"
+
+  # For gRPC mode (uncomment to use instead):
+  # type: "grpc"
+  # listen_address: "0.0.0.0:50051"
+  # Optional TLS configuration for gRPC:
+  # tls_config:
+  #   cert_path: "/path/to/cert.pem"
+  #   key_path: "/path/to/key.pem"
+
+# Live data service configuration
+live_data_service_config:
+  enabled: true
+  num_slots: 5000000
+  size_limit_bytes: 10000000000
+
+# Historical data service configuration
+historical_data_service_config:
+  enabled: true
+  file_store_config:
+    # Configure your file store settings here
+    type: "local"  # or "gcs"
+    local_file_store_config:
+      data_path: "/path/to/data"
+
+# Manager addresses (empty list if not using managers)
+grpc_manager_addresses: []
+
+# Self-advertised address
+self_advertised_address: "127.0.0.1:50051"
+
+# Optional settings with defaults
+max_transaction_filter_size_bytes: 10000
+data_service_response_channel_size: 5

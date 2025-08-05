@@ -6,6 +6,7 @@ use crate::{
     historical_data_service::HistoricalDataService,
     live_data_service::LiveDataService,
     service::{DataServiceWrapper, DataServiceWrapperWrapper},
+    websocket::{websocket_events_handler, websocket_transactions_handler},
 };
 use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
@@ -15,6 +16,7 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
+use axum::{routing::get, Router};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
@@ -46,10 +48,26 @@ pub struct TlsConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ServiceConfig {
+pub struct GrpcServiceConfig {
     /// The address to listen on.
-    pub(crate) listen_address: SocketAddr,
-    pub(crate) tls_config: Option<TlsConfig>,
+    pub listen_address: SocketAddr,
+    pub tls_config: Option<TlsConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WebSocketServiceConfig {
+    /// The address to listen on for WebSocket connections.
+    pub listen_address: SocketAddr,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum ServiceConfig {
+    #[serde(rename = "grpc")]
+    Grpc(GrpcServiceConfig),
+    #[serde(rename = "websocket")]
+    WebSocket(WebSocketServiceConfig),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -205,21 +223,6 @@ impl IndexerGrpcDataServiceConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcDataServiceConfig {
     async fn run(&self) -> Result<()> {
-        let reflection_service = tonic_reflection::server::Builder::configure()
-            // Note: It is critical that the file descriptor set is registered for every
-            // file that the top level API proto depends on recursively. If you don't,
-            // compilation will still succeed but reflection will fail at runtime.
-            //
-            // TODO: Add a test for this / something in build.rs, this is a big footgun.
-            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
-            .build_v1alpha()
-            .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?
-            .send_compressed(CompressionEncoding::Zstd)
-            .accept_compressed(CompressionEncoding::Zstd)
-            .accept_compressed(CompressionEncoding::Gzip);
-
         let mut tasks = vec![];
 
         let live_data_service = self.create_live_data_service(&mut tasks).await;
@@ -229,51 +232,101 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             live_data_service,
             historical_data_service,
         ));
-        let wrapper_service_raw =
-            aptos_protos::indexer::v1::raw_data_server::RawDataServer::from_arc(wrapper.clone())
-                .send_compressed(CompressionEncoding::Zstd)
-                .accept_compressed(CompressionEncoding::Zstd)
-                .accept_compressed(CompressionEncoding::Gzip)
-                .max_decoding_message_size(MAX_MESSAGE_SIZE)
-                .max_encoding_message_size(MAX_MESSAGE_SIZE);
-        let wrapper_service =
-            aptos_protos::indexer::v1::data_service_server::DataServiceServer::from_arc(wrapper)
-                .send_compressed(CompressionEncoding::Zstd)
-                .accept_compressed(CompressionEncoding::Zstd)
-                .accept_compressed(CompressionEncoding::Gzip)
-                .max_decoding_message_size(MAX_MESSAGE_SIZE)
-                .max_encoding_message_size(MAX_MESSAGE_SIZE);
 
-        let listen_address = self.service_config.listen_address;
-        let mut server_builder = Server::builder()
-            .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
-            .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION));
-        if let Some(config) = &self.service_config.tls_config {
-            let cert = tokio::fs::read(config.cert_path.clone()).await?;
-            let key = tokio::fs::read(config.key_path.clone()).await?;
-            let identity = tonic::transport::Identity::from_pem(cert, key);
-            server_builder = server_builder
-                .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?;
-            info!(
-                grpc_address = listen_address.to_string().as_str(),
-                "[Data Service] Starting gRPC server with TLS."
-            );
-        } else {
-            info!(
-                grpc_address = listen_address.to_string().as_str(),
-                "[data service] starting gRPC server with non-TLS."
-            );
+        match &self.service_config {
+            ServiceConfig::Grpc(grpc_config) => {
+                let reflection_service = tonic_reflection::server::Builder::configure()
+                    // Note: It is critical that the file descriptor set is registered for every
+                    // file that the top level API proto depends on recursively. If you don't,
+                    // compilation will still succeed but reflection will fail at runtime.
+                    //
+                    // TODO: Add a test for this / something in build.rs, this is a big footgun.
+                    .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
+                    .register_encoded_file_descriptor_set(
+                        TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+                    )
+                    .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
+                    .build_v1alpha()
+                    .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Gzip);
+
+                let wrapper_service_raw =
+                    aptos_protos::indexer::v1::raw_data_server::RawDataServer::from_arc(
+                        wrapper.clone(),
+                    )
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(MAX_MESSAGE_SIZE)
+                    .max_encoding_message_size(MAX_MESSAGE_SIZE);
+                let wrapper_service =
+                    aptos_protos::indexer::v1::data_service_server::DataServiceServer::from_arc(
+                        wrapper.clone(),
+                    )
+                    .send_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Zstd)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(MAX_MESSAGE_SIZE)
+                    .max_encoding_message_size(MAX_MESSAGE_SIZE);
+
+                let listen_address = grpc_config.listen_address;
+                let mut server_builder = Server::builder()
+                    .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
+                    .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION));
+
+                if let Some(tls_config) = &grpc_config.tls_config {
+                    let cert = tokio::fs::read(tls_config.cert_path.clone()).await?;
+                    let key = tokio::fs::read(tls_config.key_path.clone()).await?;
+                    let identity = tonic::transport::Identity::from_pem(cert, key);
+                    server_builder = server_builder
+                        .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?;
+                    info!(
+                        grpc_address = listen_address.to_string().as_str(),
+                        "[Data Service] Starting gRPC server with TLS."
+                    );
+                } else {
+                    info!(
+                        grpc_address = listen_address.to_string().as_str(),
+                        "[Data Service] Starting gRPC server with non-TLS."
+                    );
+                }
+
+                tasks.push(tokio::spawn(async move {
+                    server_builder
+                        .add_service(wrapper_service)
+                        .add_service(wrapper_service_raw)
+                        .add_service(reflection_service)
+                        .serve(listen_address)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e))
+                }));
+            },
+            ServiceConfig::WebSocket(ws_config) => {
+                let listen_address = ws_config.listen_address;
+
+                tasks.push(tokio::spawn(async move {
+                    let app = Router::new()
+                        .route("/ws/transactions", get(websocket_transactions_handler))
+                        .route("/ws/events", get(websocket_events_handler))
+                        .with_state(wrapper);
+
+                    info!(
+                        websocket_address = listen_address.to_string().as_str(),
+                        "[Data Service] Starting WebSocket server."
+                    );
+
+                    let listener = tokio::net::TcpListener::bind(listen_address)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to bind WebSocket listener: {}", e))?;
+
+                    axum::serve(listener, app)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("WebSocket server error: {}", e))
+                }));
+            },
         }
-
-        tasks.push(tokio::spawn(async move {
-            server_builder
-                .add_service(wrapper_service)
-                .add_service(wrapper_service_raw)
-                .add_service(reflection_service)
-                .serve(listen_address)
-                .await
-                .map_err(|e| anyhow::anyhow!(e))
-        }));
 
         futures::future::try_join_all(tasks).await?;
         Ok(())
