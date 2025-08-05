@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::result::TestResult;
 use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use log::info;
 use serde::Serialize;

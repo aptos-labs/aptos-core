@@ -18,7 +18,6 @@ use aptos_config::config::{ConsensusConfig, MempoolConfig, NodeConfig};
 use aptos_forge::{
     args::TransactionTypeArg,
     emitter::NumAccountsMode,
-    result::TestResult,
     success_criteria::{
         LatencyType, MetricsThreshold, StateProgressThreshold, SuccessCriteria,
         SystemMetricsThreshold,

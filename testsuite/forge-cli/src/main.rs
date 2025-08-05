@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 use futures::{future, FutureExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
-use std::{self, env, fmt::format, num::NonZeroUsize, process, process::ExitCode, time::Duration};
+use std::{self, num::NonZeroUsize, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
@@ -28,7 +28,6 @@ use suites::{
     },
 };
 use tokio::runtime::Runtime;
-use url::Url;
 
 mod suites;
 
@@ -56,8 +55,6 @@ struct Args {
         default_value = "land_blocking"
     )]
     suite: String,
-    #[clap(long, num_args = 0..)]
-    changelog: Option<Vec<String>>,
 
     // subcommand groups
     #[clap(subcommand)]
@@ -288,7 +285,7 @@ fn main() -> Result<()> {
                         duration,
                         LocalFactory::from_workspace(swarm_dir)?,
                     );
-                    run_forge_with_changelog(forge, &args.options, args.changelog.clone())
+                    run_forge(forge, &args.options)
                 },
                 TestCommand::K8sSwarm(k8s) => {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
@@ -330,7 +327,7 @@ fn main() -> Result<()> {
                             k8s.deployer_profile.clone(),
                         )?,
                     );
-                    run_forge_with_changelog(forge, &args.options, args.changelog)
+                    run_forge(forge, &args.options)
                 },
             }
         },
@@ -416,11 +413,7 @@ fn main() -> Result<()> {
     }
 }
 
-pub fn run_forge_with_changelog<F: Factory>(
-    forge: Forge<F>,
-    options: &Options,
-    optional_changelog: Option<Vec<String>>,
-) -> Result<()> {
+pub fn run_forge<F: Factory>(forge: Forge<F>, options: &Options) -> Result<()> {
     if options.list {
         forge.list()?;
 

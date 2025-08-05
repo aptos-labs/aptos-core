@@ -10,13 +10,9 @@ use crate::{
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
-use aptos::node::{
-    analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata},
-    NodeTool::CheckNetworkConnectivity,
-};
+use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
 use aptos_logger::info as aptos_logger_info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
-use futures::future::{err, BoxFuture};
 use log::info;
 use prometheus_http_query::response::Sample;
 use serde_json::json;
@@ -294,25 +290,21 @@ impl std::ops::Deref for CheckError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SuccessCriteriaErrors {
     errors: Vec<CheckError>,
 }
 
 impl SuccessCriteriaErrors {
-    pub fn new() -> Self {
-        Self { errors: Vec::new() }
-    }
-
-    pub fn push(&mut self, check_error: CheckError) {
+    fn push(&mut self, check_error: CheckError) {
         self.errors.push(check_error);
     }
 
-    pub fn extend(&mut self, errors: SuccessCriteriaErrors) {
+    fn extend(&mut self, errors: SuccessCriteriaErrors) {
         self.errors.extend(errors.errors);
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
 }
@@ -321,14 +313,15 @@ impl std::fmt::Display for SuccessCriteriaErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut errors_json = Vec::new();
 
-        for error in self.errors {
+        for error in self.errors.iter() {
             let causes: Vec<String> = error.chain().map(|c| c.to_string()).collect();
             errors_json.push(json!({
+                "name": error.name,
                 "error": error.to_string(),
                 "causes": causes
             }));
         }
-        write!(f, "{}", json!({ "errors": errors_json }).to_string())?;
+        write!(f, "{}", json!({ "errors": errors_json }))?;
         Ok(())
     }
 }
@@ -353,31 +346,26 @@ impl From<SuccessCriteriaErrors> for TestResult {
     }
 }
 
+#[derive(Default)]
 pub struct SuccessCriteriaResults {
     check_errors: SuccessCriteriaErrors,
 }
 
 impl SuccessCriteriaResults {
-    pub fn new() -> Self {
-        Self {
-            check_errors: SuccessCriteriaErrors::new(),
-        }
-    }
-
-    pub fn add_result(&mut self, name: &str, check_type: CheckType, result: anyhow::Result<()>) {
+    fn add_result(&mut self, name: &str, check_type: CheckType, result: anyhow::Result<()>) {
         if let Err(e) = result {
             self.check_errors
                 .push(CheckError::new(name.to_string(), check_type, e))
         }
     }
 
-    pub fn extend(&mut self, result: anyhow::Result<(), SuccessCriteriaErrors>) {
+    fn extend(&mut self, result: anyhow::Result<(), SuccessCriteriaErrors>) {
         if let Err(e) = result {
             self.check_errors.extend(e)
         }
     }
 
-    pub fn evaluate(self) -> Result<(), SuccessCriteriaErrors> {
+    fn evaluate(self) -> Result<(), SuccessCriteriaErrors> {
         if self.check_errors.is_empty() {
             Ok(())
         } else {
@@ -400,7 +388,7 @@ impl SuccessCriteriaChecker {
             .map(|n| format!(" for {}", n))
             .unwrap_or_default();
 
-        let mut results = SuccessCriteriaResults::new();
+        let mut results = SuccessCriteriaResults::default();
 
         results.extend(Self::check_throughput(
             success_criteria.min_avg_tps,
@@ -452,7 +440,7 @@ impl SuccessCriteriaChecker {
 
         let no_traffic_name_addition = "".to_string();
 
-        let mut results = SuccessCriteriaResults::new();
+        let mut results = SuccessCriteriaResults::default();
 
         results.extend(Self::check_throughput(
             success_criteria.min_avg_tps,
@@ -687,7 +675,7 @@ impl SuccessCriteriaChecker {
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
     ) -> anyhow::Result<(), SuccessCriteriaErrors> {
-        let mut runner = SuccessCriteriaResults::new();
+        let mut runner = SuccessCriteriaResults::default();
 
         runner.add_result(
             "Min avg tps",

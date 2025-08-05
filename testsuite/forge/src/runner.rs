@@ -12,7 +12,7 @@ use crate::{
     NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
     NAMESPACE_CLEANUP_DURATION_BUFFER_SECS,
 };
-use anyhow::{bail, format_err, Error, Result};
+use anyhow::{format_err, Error, Result};
 use aptos_config::config::NodeConfig;
 use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
-use crate::{result::TestResult, CoreContext, Result, TestReport};
+use crate::{CoreContext, Result, TestReport};
 use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_logger::info;
