@@ -7,6 +7,8 @@ module aptos_experimental::order_book_types {
     friend aptos_experimental::order_book;
     friend aptos_experimental::pending_order_book_index;
     friend aptos_experimental::market;
+    friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::bulk_order_book_types;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 

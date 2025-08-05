@@ -343,6 +343,15 @@ types of pending orders are supported.
 
 
 
+<a id="0x7_order_book_E_REINSERT_ORDER_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x7_order_book_EINVALID_ADD_SIZE_TO_ORDER"></a>
 
 
@@ -393,15 +402,6 @@ types of pending orders are supported.
 
 
 <pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_NOT_ACTIVE_ORDER">E_NOT_ACTIVE_ORDER</a>: u64 = 7;
-</code></pre>
-
-
-
-<a id="0x7_order_book_E_REINSERT_ORDER_MISMATCH"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
 </code></pre>
 
 
