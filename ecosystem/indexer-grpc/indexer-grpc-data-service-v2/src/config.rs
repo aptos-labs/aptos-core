@@ -137,16 +137,15 @@ impl IndexerGrpcDataServiceConfig {
         let config = self.live_data_service_config.clone();
         let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
         tasks.push(tokio::task::spawn_blocking(move || {
-            LIVE_DATA_SERVICE
-                .get_or_init(|| {
-                    LiveDataService::new(
-                        chain_id,
-                        config,
-                        connection_manager,
-                        max_transaction_filter_size_bytes,
-                    )
-                })
-                .run(handler_rx);
+            let service = LIVE_DATA_SERVICE.get_or_init(|| {
+                LiveDataService::new(
+                    chain_id,
+                    config,
+                    connection_manager,
+                    max_transaction_filter_size_bytes,
+                )
+            });
+            service.run(handler_rx);
             Ok(())
         }));
 
@@ -187,16 +186,15 @@ impl IndexerGrpcDataServiceConfig {
         let config = self.historical_data_service_config.clone();
         let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
         tasks.push(tokio::task::spawn_blocking(move || {
-            HISTORICAL_DATA_SERVICE
-                .get_or_init(|| {
-                    HistoricalDataService::new(
-                        chain_id,
-                        config,
-                        connection_manager,
-                        max_transaction_filter_size_bytes,
-                    )
-                })
-                .run(handler_rx);
+            let service = HISTORICAL_DATA_SERVICE.get_or_init(|| {
+                HistoricalDataService::new(
+                    chain_id,
+                    config,
+                    connection_manager,
+                    max_transaction_filter_size_bytes,
+                )
+            });
+            service.run(handler_rx);
             Ok(())
         }));
 

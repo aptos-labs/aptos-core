@@ -26,11 +26,14 @@ use aptos_indexer_grpc_utils::{
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
-    indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
+    indexer::v1::{
+        raw_data_server::RawData, EventWithMetadata, EventsResponse, GetEventsRequest,
+        GetTransactionsRequest, TransactionsResponse,
+    },
     transaction::v1::{transaction::TxnData, Transaction},
 };
 use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use prost::Message;
 use redis::Client;
 use std::{
@@ -135,6 +138,7 @@ enum TransactionsDataStatus {
 /// RawDataServerWrapper handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
 impl RawData for RawDataServerWrapper {
+    type GetEventsStream = Pin<Box<dyn Stream<Item = Result<EventsResponse, Status>> + Send>>;
     type GetTransactionsStream = ResponseStream;
 
     /// GetTransactionsStream is a streaming GRPC endpoint:
@@ -221,6 +225,74 @@ impl RawData for RawDataServerWrapper {
             tonic::metadata::MetadataValue::from_str(&request_metadata.request_connection_id)
                 .unwrap(),
         );
+        Ok(response)
+    }
+
+    async fn get_events(
+        &self,
+        req: Request<GetEventsRequest>,
+    ) -> Result<Response<Self::GetEventsStream>, Status> {
+        // Convert GetEventsRequest to GetTransactionsRequest
+        let transactions_req = Request::new(GetTransactionsRequest {
+            starting_version: req.get_ref().starting_version,
+            transactions_count: req.get_ref().transactions_count,
+            batch_size: req.get_ref().batch_size,
+            transaction_filter: req.get_ref().transaction_filter.clone(),
+        });
+
+        // Get the response from get_transactions
+        let transactions_response = self.get_transactions(transactions_req).await?;
+        let transactions_stream = transactions_response.into_inner();
+
+        // Transform transaction responses to event responses
+        let events_stream = transactions_stream.map(|result| {
+            result.map(|transactions_response| {
+                let mut events = Vec::new();
+
+                for transaction in transactions_response.transactions {
+                    if let Some(ref txn_info) = transaction.info {
+                        let timestamp = transaction.timestamp;
+                        let version = transaction.version;
+                        let hash = txn_info.hash.clone();
+                        let success = txn_info.success;
+                        let vm_status = txn_info.vm_status.clone();
+                        let block_height = transaction.block_height;
+
+                        // Extract events from transaction data
+                        if let Some(txn_data) = &transaction.txn_data {
+                            let transaction_events = match txn_data {
+                                TxnData::User(user_txn) => &user_txn.events,
+                                TxnData::Genesis(genesis_txn) => &genesis_txn.events,
+                                TxnData::BlockMetadata(block_meta_txn) => &block_meta_txn.events,
+                                TxnData::StateCheckpoint(_) => continue, // No events
+                                TxnData::Validator(validator_txn) => &validator_txn.events,
+                                TxnData::BlockEpilogue(_) => continue, // No events typically
+                            };
+
+                            for event in transaction_events {
+                                events.push(EventWithMetadata {
+                                    event: Some(event.clone()),
+                                    timestamp,
+                                    version,
+                                    hash: hash.clone(),
+                                    success,
+                                    vm_status: vm_status.clone(),
+                                    block_height,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                EventsResponse {
+                    events,
+                    chain_id: transactions_response.chain_id,
+                    processed_range: transactions_response.processed_range,
+                }
+            })
+        });
+
+        let response = Response::new(Box::pin(events_stream) as Self::GetEventsStream);
         Ok(response)
     }
 }

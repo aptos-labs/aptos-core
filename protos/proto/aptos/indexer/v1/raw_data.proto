@@ -7,6 +7,7 @@ package aptos.indexer.v1;
 
 import "aptos/indexer/v1/filter.proto";
 import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
 
 // This is for storage only.
 message TransactionsInStorage {
@@ -48,7 +49,51 @@ message TransactionsResponse {
   optional ProcessedRange processed_range = 3;
 }
 
+// EventWithMetadata combines Event data with key transaction metadata.
+message EventWithMetadata {
+  // Required; the event data.
+  aptos.transaction.v1.Event event = 1;
+
+  // Required; transaction metadata.
+  optional aptos.util.timestamp.Timestamp timestamp = 2;
+  uint64 version = 3 [jstype = JS_STRING];
+  bytes hash = 4;
+  bool success = 5;
+  string vm_status = 6;
+  uint64 block_height = 7 [jstype = JS_STRING];
+}
+
+message GetEventsRequest {
+  // Required; start version of current stream.
+  optional uint64 starting_version = 1 [jstype = JS_STRING];
+
+  // Optional; number of transactions to process in current stream.
+  // If not present, return an infinite stream of events.
+  optional uint64 transactions_count = 2 [jstype = JS_STRING];
+
+  // Optional; number of events in each `EventsResponse` for current stream.
+  // If not present, default to 1000. If larger than 1000, request will be rejected.
+  optional uint64 batch_size = 3;
+
+  // If provided, only transactions that match the filter will be included,
+  // and only events from those transactions will be returned.
+  optional BooleanTransactionFilter transaction_filter = 4;
+}
+
+message EventsResponse {
+  // Required; events data with metadata.
+  repeated EventWithMetadata events = 1;
+
+  // Required; chain id.
+  optional uint64 chain_id = 2 [jstype = JS_STRING];
+
+  optional ProcessedRange processed_range = 3;
+}
+
 service RawData {
   // Get transactions batch without any filtering from starting version and end if transaction count is present.
   rpc GetTransactions(GetTransactionsRequest) returns (stream TransactionsResponse);
+  
+  // Get events with metadata from transactions, supporting the same filtering as GetTransactions.
+  rpc GetEvents(GetEventsRequest) returns (stream EventsResponse);
 }

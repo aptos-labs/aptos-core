@@ -109,4 +109,5 @@ service GrpcManager {
 service DataService {
   rpc Ping(PingDataServiceRequest) returns (PingDataServiceResponse);
   rpc GetTransactions(GetTransactionsRequest) returns (stream TransactionsResponse);
+  rpc GetEvents(GetEventsRequest) returns (stream EventsResponse);
 }

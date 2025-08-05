@@ -18,7 +18,7 @@ import type {
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { Timestamp } from "../../util/timestamp/timestamp";
-import { GetTransactionsRequest, TransactionsResponse } from "./raw_data";
+import { EventsResponse, GetEventsRequest, GetTransactionsRequest, TransactionsResponse } from "./raw_data";
 
 export interface StreamProgressSampleProto {
   timestamp?: Timestamp | undefined;
@@ -2066,11 +2066,21 @@ export const DataServiceService = {
     responseSerialize: (value: TransactionsResponse) => Buffer.from(TransactionsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer) => TransactionsResponse.decode(value),
   },
+  getEvents: {
+    path: "/aptos.indexer.v1.DataService/GetEvents",
+    requestStream: false,
+    responseStream: true,
+    requestSerialize: (value: GetEventsRequest) => Buffer.from(GetEventsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => GetEventsRequest.decode(value),
+    responseSerialize: (value: EventsResponse) => Buffer.from(EventsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => EventsResponse.decode(value),
+  },
 } as const;
 
 export interface DataServiceServer extends UntypedServiceImplementation {
   ping: handleUnaryCall<PingDataServiceRequest, PingDataServiceResponse>;
   getTransactions: handleServerStreamingCall<GetTransactionsRequest, TransactionsResponse>;
+  getEvents: handleServerStreamingCall<GetEventsRequest, EventsResponse>;
 }
 
 export interface DataServiceClient extends Client {
@@ -2098,6 +2108,12 @@ export interface DataServiceClient extends Client {
     metadata?: Metadata,
     options?: Partial<CallOptions>,
   ): ClientReadableStream<TransactionsResponse>;
+  getEvents(request: GetEventsRequest, options?: Partial<CallOptions>): ClientReadableStream<EventsResponse>;
+  getEvents(
+    request: GetEventsRequest,
+    metadata?: Metadata,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<EventsResponse>;
 }
 
 export const DataServiceClient = makeGenericClientConstructor(
