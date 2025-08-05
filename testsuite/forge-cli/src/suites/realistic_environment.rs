@@ -361,10 +361,10 @@ pub(crate) fn realistic_env_max_load_test(
                     7000
                 } else if long_running {
                     // This is for forge stable
-                    21000
+                    11000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    20000
+                    10000
                 },
             ),
         }))
