@@ -382,7 +382,9 @@ impl TransactionDataCache {
     }
 
     fn find_entry(&self, addr: &AccountAddress, ty: &Type) -> Option<&DataCacheEntry> {
-        self.account_map.get(addr).and_then(|account_cache| account_cache.get(ty))
+        self.account_map
+            .get(addr)
+            .and_then(|account_cache| account_cache.get(ty))
     }
 
     fn expect_entry_mut(
@@ -415,7 +417,8 @@ impl TransactionDataCache {
 
     /// Returns true if resource is present in the cache and we know its whole value, not just the size.
     pub(crate) fn contains_resource_data(&self, addr: &AccountAddress, ty: &Type) -> bool {
-        self.find_entry(addr, ty).is_some_and(|entry| matches!(entry.value, CachedInformation::Value(_)))
+        self.find_entry(addr, ty)
+            .is_some_and(|entry| matches!(entry.value, CachedInformation::Value(_)))
     }
 
     /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does

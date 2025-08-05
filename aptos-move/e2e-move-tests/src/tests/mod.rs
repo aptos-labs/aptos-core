@@ -22,6 +22,7 @@ mod enum_upgrade_fv;
 mod enum_variant_count;
 mod error_map;
 mod events;
+mod existence_check;
 mod fee_payer;
 mod function_value_depth;
 mod function_values;
