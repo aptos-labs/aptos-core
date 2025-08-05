@@ -52,6 +52,12 @@ jobs:
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
           fetch-depth: 10
 
+      - name: Build Docker images
+        uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+        with:
+          GIT_SHA: ${{ env.IMAGE_TAG }}
+          TARGET_CACHE_ID: ${{ github.ref_name }}
+      
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
