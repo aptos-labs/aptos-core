@@ -14,7 +14,6 @@ module aptos_framework::transaction_validation {
     use aptos_framework::coin;
     use aptos_framework::create_signer;
     use aptos_framework::permissioned_signer;
-    use aptos_framework::scheduled_txns;
     use aptos_framework::scheduled_txns::ScheduleMapKey;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -869,7 +868,7 @@ module aptos_framework::transaction_validation {
     fun scheduled_txn_epilogue(
         deposit_store_owner: &signer,
         account: address,
-        txn_key: ScheduleMapKey,
+        _txn_key: ScheduleMapKey,
         storage_fee_refunded: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -897,7 +896,7 @@ module aptos_framework::transaction_validation {
                 refund_from_scheduling_deposit
             );
             transaction_fee::burn_fee(deposit_store_addr, burn_amount);
-        } else if (transaction_fee_amount < storage_fee_refunded) {
+        } else {
             // return the full deposit and mint the remaining
             coin::transfer<AptosCoin>(
                 deposit_store_owner,
@@ -905,7 +904,9 @@ module aptos_framework::transaction_validation {
                 scheduling_deposit
             );
             let mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
-            transaction_fee::mint_and_refund(account, mint_and_refund_amount);
+            if (mint_and_refund_amount > 0) {
+                transaction_fee::mint_and_refund(account, mint_and_refund_amount);
+            };
         };
     }
 

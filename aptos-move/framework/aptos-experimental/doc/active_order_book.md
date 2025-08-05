@@ -192,15 +192,6 @@ There is a code bug that breaks internal invariant
 
 
 
-<a id="0x7_active_order_book_EINVALID_MAKER_ORDER"></a>
-
-
-
-<pre><code><b>const</b> <a href="active_order_book.md#0x7_active_order_book_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_active_order_book_new_active_order_book"></a>
 
 ## Function `new_active_order_book`
