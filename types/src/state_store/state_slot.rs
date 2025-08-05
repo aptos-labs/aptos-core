@@ -186,30 +186,37 @@ impl StateSlot {
 impl THotStateSlot for StateSlot {
     type Key = StateKey;
 
+    fn init_lru(&mut self, prev: Option<Self::Key>, next: Option<Self::Key>) {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.init(prev, next),
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
     fn prev(&self) -> Option<&Self::Key> {
         match self {
-            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev.as_ref(),
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev().as_ref(),
             _ => panic!("Should not be called on cold slots."),
         }
     }
 
     fn next(&self) -> Option<&Self::Key> {
         match self {
-            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next.as_ref(),
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next().as_ref(),
             _ => panic!("Should not be called on cold slots."),
         }
     }
 
     fn set_prev(&mut self, prev: Option<Self::Key>) {
         match self {
-            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev = prev,
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.set_prev(prev),
             _ => panic!("Should not be called on cold slots."),
         }
     }
 
     fn set_next(&mut self, next: Option<Self::Key>) {
         match self {
-            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next = next,
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.set_next(next),
             _ => panic!("Should not be called on cold slots."),
         }
     }
