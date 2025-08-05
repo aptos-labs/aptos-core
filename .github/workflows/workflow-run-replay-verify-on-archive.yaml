@@ -92,6 +92,12 @@ jobs:
         with:
           pyproject_directory: testsuite/replay-verify
 
+      - name: Build Docker images
+        uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+        with:
+          GIT_SHA: ${{ env.IMAGE_TAG }}
+          TARGET_CACHE_ID: TBD
+
       - name: Schedule replay verify
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
