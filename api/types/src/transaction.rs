@@ -43,7 +43,6 @@ use std::{
     convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
@@ -489,15 +488,6 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
-        if let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            if self.expiration_timestamp_secs.0 <= now.as_secs() {
-                bail!(
-                    "Expiration time for transaction is in the past, {}",
-                    self.expiration_timestamp_secs.0
-                )
-            }
-        }
-
         self.payload.verify()
     }
 }
