@@ -64,7 +64,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
                 &phase_stats.emitter_stats.rate(),
                 None,
                 Some("inner traffic".to_string()),
-            )?;
+            )
+            .await?;
         }
 
         Ok(())

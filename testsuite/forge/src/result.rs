@@ -172,7 +172,7 @@ impl TestSummary {
     pub fn success(&self) -> bool {
         self.failed.is_empty() && self.soft_failure.is_empty()
     }
-    
+
     pub fn is_soft_failure(&self) -> bool {
         !self.soft_failure.is_empty() && self.failed.is_empty()
     }

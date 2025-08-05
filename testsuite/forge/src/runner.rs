@@ -7,7 +7,7 @@ use crate::{
     config::ForgeConfig,
     observer::junit::JunitTestObserver,
     result::{TestResult, TestSummary},
-    success_criteria::CriteriaCheckerErrors,
+    success_criteria::SuccessCriteriaErrors,
     AdminContext, AdminTest, AptosContext, AptosTest, CoreContext, Factory, NetworkContext,
     NetworkContextSynchronizer, NetworkTest, ShouldFail, Test, TestReport, Version,
     NAMESPACE_CLEANUP_DURATION_BUFFER_SECS,
@@ -391,7 +391,7 @@ fn process_test_result(result: Result<()>) -> TestResult {
         Err(e) => {
             let test_result = e
                 .downcast()
-                .map(|e: CriteriaCheckerErrors| e.into())
+                .map(|e: SuccessCriteriaErrors| e.into())
                 .unwrap_or_else(|e| TestResult::InfraFailure(format!("Error: {:?}", e)));
             let is_triggerd_by_github_actions =
                 std::env::var("FORGE_TRIGGERED_BY").unwrap_or_default() == "github-actions";

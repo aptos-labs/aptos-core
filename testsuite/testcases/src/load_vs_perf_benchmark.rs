@@ -417,7 +417,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
                     &rate,
                     Some(&target_result.latency_breakdown),
                     Some(target_result.name.clone()),
-                )?;
+                )
+                .await?;
             }
         }
 
@@ -437,7 +438,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
                         &rate,
                         None,
                         Some(name),
-                    )?;
+                    )
+                    .await?;
                 }
             }
         }
