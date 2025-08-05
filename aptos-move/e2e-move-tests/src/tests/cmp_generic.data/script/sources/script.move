@@ -3,6 +3,8 @@ script {
         first: signer,
         second: signer
     ) {
-            assert!(first <= second, 0);
+            let a = &first;
+            let b = &second;
+            assert!(a <= b && first <= second, 0);
     }
 }
