@@ -2,7 +2,7 @@
 module aptos_experimental::order_book_client_order_id {
     use std::option;
     use std::signer;
-    use aptos_experimental::order_book_types::new_order_id_type;
+    use aptos_experimental::order_book_types::{new_order_id_type, good_till_cancelled};
     use aptos_experimental::order_book::{new_order_book, new_order_request};
 
     #[test(user1 = @0x456)]
@@ -26,6 +26,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -84,6 +85,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -125,6 +127,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(order_req_1);
@@ -140,6 +143,7 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 43 // metadata
             );
         order_book.place_maker_order(order_req_2);
@@ -155,6 +159,7 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 44 // metadata
             );
         order_book.place_maker_order(order_req_3);
@@ -219,6 +224,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -254,6 +260,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -275,6 +282,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req2);
@@ -320,6 +328,7 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -388,6 +397,7 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
@@ -425,6 +435,7 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -484,6 +495,7 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);

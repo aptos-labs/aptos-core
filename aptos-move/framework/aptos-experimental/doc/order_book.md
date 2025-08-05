@@ -133,6 +133,12 @@ types of pending orders are supported.
 
 </dd>
 <dt>
+<code>time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>metadata: M</code>
 </dt>
 <dd>
@@ -412,7 +418,7 @@ types of pending orders are supported.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -430,6 +436,7 @@ types of pending orders are supported.
     remaining_size: u64,
     is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;,
+    time_in_force: TimeInForce,
     metadata: M
 ): <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt; {
     OrderRequest::V1 {
@@ -441,6 +448,7 @@ types of pending orders are supported.
         remaining_size,
         is_bid,
         trigger_condition,
+        time_in_force,
         metadata
     }
 }
@@ -518,6 +526,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _size,
             is_bid,
             _,
+            _,
             _
         ) = order.destroy_order();
         self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
@@ -537,6 +546,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _size,
             _is_bid,
             trigger_condition,
+            _,
             _
         ) = order.destroy_order();
         self.pending_orders.cancel_pending_order(
@@ -694,6 +704,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.remaining_size,
             order_req.is_bid,
             order_req.trigger_condition,
+            order_req.time_in_force,
             order_req.metadata
         );
     self.orders.add(order_req.order_id, new_order_with_state(order, <b>true</b>));
@@ -903,6 +914,7 @@ it is added to the order book, if it exists, it's size is updated.
             order_req.remaining_size,
             order_req.is_bid,
             order_req.trigger_condition,
+            order_req.time_in_force,
             order_req.metadata
         );
 
