@@ -117,6 +117,8 @@ jobs:
         id: check-lock
         if: steps.check-images.outcome == 'failure'
         run:  |
+          gcloud config set account aptos-ci
+          echo "Checking lock file"
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
           result=$?
