@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(BlockSTMv2): remove once integrated.
-#![allow(dead_code)]
-
 use crate::{explicit_sync_wrapper::ExplicitSyncWrapper, scheduler_status::ExecutionStatuses};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -102,8 +99,8 @@ struct PendingRequirement<R: Clone + Ord> {
 /// a shared pointer to the other worker (instead of cloning BTreeSet under status lock).
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ValidationRequirement<'a, R: Clone + Ord> {
-    requirements: &'a BTreeSet<R>,
-    is_deferred: bool,
+    pub(crate) requirements: &'a BTreeSet<R>,
+    pub(crate) is_deferred: bool,
 }
 
 impl<'a, R: Clone + Ord> ValidationRequirement<'a, R> {
@@ -174,7 +171,7 @@ pub(crate) struct ColdValidationRequirements<R: Clone + Ord> {
     /// If dedicated worker is not yet assigned, the caller takes on the responsibility.
     /// Pending requirements are processsed by the dedicated worker and transformed into
     /// active requirements (but this is done later and off the commit sequential path).
-    pending_requirements: Mutex<Vec<PendingRequirement<R>>>,
+    pending_requirements: CachePadded<Mutex<Vec<PendingRequirement<R>>>>,
 
     /// No cache padding since these are accessed less frequently and by the designated
     /// worker. Note: It is important to make sure there are no dangling references.
@@ -192,7 +189,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             deferred_requirements_status: (0..num_txns)
                 .map(|_| CachePadded::new(AtomicU32::new(0)))
                 .collect(),
-            pending_requirements: Mutex::new(Vec::new()),
+            pending_requirements: CachePadded::new(Mutex::new(Vec::new())),
             active_requirements: ExplicitSyncWrapper::new(ActiveRequirements {
                 requirements: BTreeSet::new(),
                 versions: BTreeMap::new(),
@@ -213,7 +210,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         worker_id: u32,
         calling_txn_idx: TxnIndex,
         min_never_scheduled_idx: TxnIndex,
-        requirements: impl Iterator<Item = R>,
+        requirements: BTreeSet<R>,
     ) -> Result<(), PanicError> {
         if min_never_scheduled_idx > self.num_txns || min_never_scheduled_idx <= calling_txn_idx {
             return Err(code_invariant_error(format!(
@@ -227,7 +224,6 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             return Ok(());
         }
 
-        let requirements = requirements.collect::<BTreeSet<_>>();
         if requirements.is_empty() {
             return Err(code_invariant_error(format!(
                 "Empty requirements to record for calling_txn_idx = {}",
@@ -331,7 +327,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
     /// (the calls must be alternating).
     ///
     /// Note that processing validation requirement may mean (a) completing the actual
-    /// required validation (always it requirement was not deferred), or (b) scheduling it
+    /// required validation (always if requirement was not deferred), or (b) scheduling it
     /// in deferred case to be performed if the txn was observed to still be executing.
     /// validation_completed parameter is true in case (a) and false in case (b).
     ///
@@ -342,7 +338,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         worker_id: u32,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        validation_completed: bool,
+        validation_still_needed: bool,
     ) -> Result<bool, PanicError> {
         if !self.is_dedicated_worker(worker_id) {
             return Err(code_invariant_error(format!(
@@ -372,7 +368,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
                 required_incarnation, incarnation
             )));
         }
-        if !validation_completed {
+        if validation_still_needed {
             // min_idx_with_unprocessed_validation_requirement may be increased below, after
             // deferred status is already updated. When checking if txn can be committed, the
             // access order is opposite, ensuring that if minimum index is higher, we will
@@ -632,7 +628,7 @@ mod tests {
 
         // Record requirements
         requirements
-            .record_requirements(1, 3, 9, vec![100].into_iter())
+            .record_requirements(1, 3, 9, BTreeSet::from([100]))
             .unwrap();
         assert!(requirements.is_dedicated_worker(1));
 
@@ -654,13 +650,13 @@ mod tests {
             let worker_id = 1;
             let calling_txn_idx = 3;
             let min_not_scheduled_idx = 7;
-            let test_requirements = vec![100, 200, 300];
+            let test_requirements = BTreeSet::from([100, 200, 300]);
 
             let result = requirements.record_requirements(
                 worker_id,
                 calling_txn_idx,
                 min_not_scheduled_idx,
-                test_requirements.into_iter(),
+                test_requirements,
             );
 
             assert!(result.is_ok());
@@ -690,11 +686,11 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
             // Test void requirements (adjacent indices)
-            let result = requirements.record_requirements(5, 5, 6, vec![100].into_iter());
+            let result = requirements.record_requirements(5, 5, 6, BTreeSet::from([100]));
             assert!(result.is_ok());
 
             // Test last transaction
-            let result = requirements.record_requirements(0, 9, 10, vec![100].into_iter());
+            let result = requirements.record_requirements(0, 9, 10, BTreeSet::from([100]));
             assert!(result.is_ok());
 
             assert!(requirements.pending_requirements.lock().is_empty());
@@ -710,19 +706,19 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
             // Test invalid min_not_scheduled_idx > num_txns
-            assert_err!(requirements.record_requirements(0, 5, 15, vec![100].into_iter()));
+            assert_err!(requirements.record_requirements(0, 5, 15, BTreeSet::from([100])));
 
             // Test min_not_scheduled_idx <= calling_txn_idx
-            assert_err!(requirements.record_requirements(0, 5, 5, vec![100].into_iter()));
-            assert_err!(requirements.record_requirements(0, 5, 4, vec![100].into_iter()));
+            assert_err!(requirements.record_requirements(0, 5, 5, BTreeSet::from([100])));
+            assert_err!(requirements.record_requirements(0, 5, 4, BTreeSet::from([100])));
 
-            assert_ok!(requirements.record_requirements(0, 1, 5, vec![100].into_iter()));
-            assert_ok!(requirements.record_requirements(0, 1, 5, vec![100].into_iter()));
+            assert_ok!(requirements.record_requirements(0, 1, 5, BTreeSet::from([100])));
+            assert_ok!(requirements.record_requirements(0, 1, 5, BTreeSet::from([100])));
             // test that calling_txn_idx > min_not_scheduled_idx is checked.
-            assert_err!(requirements.record_requirements(0, 2, 5, vec![100].into_iter()));
+            assert_err!(requirements.record_requirements(0, 2, 5, BTreeSet::from([100])));
 
             // Empty requirements should be rejected.
-            assert_err!(requirements.record_requirements(0, 1, 5, vec![].into_iter()));
+            assert_err!(requirements.record_requirements(0, 1, 5, BTreeSet::new()));
         }
     }
 
@@ -738,12 +734,12 @@ mod tests {
             assert!(!requirements.is_dedicated_worker(1));
 
             // First worker to record requirements becomes dedicated
-            assert_ok!(requirements.record_requirements(5, 2, 8, vec![100].into_iter()));
+            assert_ok!(requirements.record_requirements(5, 2, 8, BTreeSet::from([100])));
             assert!(requirements.is_dedicated_worker(5));
             assert!(!requirements.is_dedicated_worker(3));
 
             // Second worker cannot become dedicated
-            assert_ok!(requirements.record_requirements(3, 1, 9, vec![200].into_iter()));
+            assert_ok!(requirements.record_requirements(3, 1, 9, BTreeSet::from([200])));
             assert!(requirements.is_dedicated_worker(5)); // Still worker 5
             assert!(!requirements.is_dedicated_worker(3));
         }
@@ -763,7 +759,7 @@ mod tests {
 
             // Record requirements
             requirements
-                .record_requirements(1, 3, 7, vec![100].into_iter())
+                .record_requirements(1, 3, 7, BTreeSet::from([100]))
                 .unwrap();
             assert!(requirements.is_dedicated_worker(1));
             test_active_requirements_empty(&requirements);
@@ -779,7 +775,7 @@ mod tests {
                 })
             );
             assert!(!requirements
-                .validation_requirement_processed(1, 4, 1, true)
+                .validation_requirement_processed(1, 4, 1, false)
                 .unwrap());
 
             assert!(requirements.is_dedicated_worker(1));
@@ -793,7 +789,7 @@ mod tests {
                 })
             );
             assert!(requirements
-                .validation_requirement_processed(1, 5, 2, true)
+                .validation_requirement_processed(1, 5, 2, false)
                 .unwrap());
 
             // Worker should be reset when no more requirements.
@@ -809,10 +805,10 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
             let txn_configs: BTreeMap<TxnIndex, (SchedulingStatus, Incarnation)> = [
-                (2, (SchedulingStatus::Executing, 3)),
+                (2, (SchedulingStatus::Executing(BTreeSet::new()), 3)),
                 (3, (SchedulingStatus::Executed, 1)),
                 (5, (SchedulingStatus::Executed, 2)),
-                (6, (SchedulingStatus::Executing, 1)),
+                (6, (SchedulingStatus::Executing(BTreeSet::new()), 1)),
                 (7, (SchedulingStatus::Executed, 2)),
             ]
             .into_iter()
@@ -820,7 +816,7 @@ mod tests {
             let statuses = create_execution_statuses_with_txns(10, txn_configs.clone());
 
             // Record requirements
-            assert_ok!(requirements.record_requirements(1, 2, 7, vec![100, 200].into_iter()));
+            assert_ok!(requirements.record_requirements(1, 2, 7, BTreeSet::from([100, 200])));
 
             let btree_reqs = BTreeSet::from([100, 200]);
 
@@ -859,7 +855,7 @@ mod tests {
                 assert!(requirements.is_commit_blocked(txn_idx, incarnation));
 
                 assert_ok_eq!(
-                    requirements.validation_requirement_processed(1, txn_idx, incarnation, true),
+                    requirements.validation_requirement_processed(1, txn_idx, incarnation, false),
                     txn_idx == 6
                 );
 
@@ -880,7 +876,7 @@ mod tests {
             );
 
             // Record requirements
-            assert_ok!(requirements.record_requirements(1, 3, 9, vec![100].into_iter()));
+            assert_ok!(requirements.record_requirements(1, 3, 9, BTreeSet::from([100])));
 
             // Get validation requirement with low threshold
             assert_none!(requirements
@@ -898,17 +894,17 @@ mod tests {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
             let statuses = create_execution_statuses_with_txns(
                 10,
-                [(4, (SchedulingStatus::Executing, 1))]
+                [(4, (SchedulingStatus::Executing(BTreeSet::new()), 1))]
                     .into_iter()
                     .collect(),
             );
 
             // Record and activate requirements.
-            assert_ok!(requirements.record_requirements(1, 3, 7, vec![100].into_iter()));
+            assert_ok!(requirements.record_requirements(1, 3, 7, BTreeSet::from([100])));
             assert_ok!(requirements.activate_pending_requirements(&statuses));
 
             // Process as deferred (not completed) w.o. calling get (not needed for test).
-            assert_ok!(requirements.validation_requirement_processed(1, 4, 1, false));
+            assert_ok!(requirements.validation_requirement_processed(1, 4, 1, true));
 
             // Should still be blocked for commit
             assert!(requirements.is_commit_blocked(4, 1));
@@ -925,16 +921,16 @@ mod tests {
         fn test_validation_requirement_processed_error_conditions() {
             let requirements = ColdValidationRequirements::<TestRequirement>::new(10);
 
-            assert_err!(requirements.validation_requirement_processed(2, 4, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 6, 2, false));
-            assert_err!(requirements.validation_requirement_processed(1, 5, 1, true));
+            assert_err!(requirements.validation_requirement_processed(2, 4, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 6, 2, true));
+            assert_err!(requirements.validation_requirement_processed(1, 5, 1, false));
 
             let statuses = create_execution_statuses_with_txns(
                 10,
                 [(7, (SchedulingStatus::Executed, 1))].into_iter().collect(),
             );
             requirements
-                .record_requirements(1, 3, 8, vec![100].into_iter())
+                .record_requirements(1, 3, 8, BTreeSet::from([100]))
                 .unwrap();
             assert_some_eq!(
                 requirements
@@ -946,10 +942,10 @@ mod tests {
                 })
             );
             // Wrong worker ID, wrong txn indices, and wrong incarnations should fail.
-            assert_err!(requirements.validation_requirement_processed(2, 7, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 6, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 8, 1, true));
-            assert_err!(requirements.validation_requirement_processed(1, 7, 2, false));
+            assert_err!(requirements.validation_requirement_processed(2, 7, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 6, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 8, 1, false));
+            assert_err!(requirements.validation_requirement_processed(1, 7, 2, true));
         }
     }
 
@@ -969,7 +965,7 @@ mod tests {
             );
             assert_eq!(requirements.pending_requirements.lock().len(), 0);
 
-            assert_ok!(requirements.record_requirements(1, 10, 15, vec![500].into_iter()));
+            assert_ok!(requirements.record_requirements(1, 10, 15, BTreeSet::from([500])));
             assert_eq!(
                 requirements
                     .min_idx_with_unprocessed_validation_requirement
@@ -978,7 +974,7 @@ mod tests {
             );
             assert_eq!(requirements.pending_requirements.lock().len(), 1);
 
-            assert_ok!(requirements.record_requirements(2, 5, 12, vec![300, 400].into_iter()));
+            assert_ok!(requirements.record_requirements(2, 5, 12, BTreeSet::from([300, 400])));
             assert_eq!(
                 requirements
                     .min_idx_with_unprocessed_validation_requirement
@@ -987,7 +983,7 @@ mod tests {
             );
             assert_eq!(requirements.pending_requirements.lock().len(), 2);
 
-            assert_ok!(requirements.record_requirements(3, 2, 8, vec![100, 200].into_iter()));
+            assert_ok!(requirements.record_requirements(3, 2, 8, BTreeSet::from([100, 200])));
             assert_eq!(
                 requirements
                     .min_idx_with_unprocessed_validation_requirement
@@ -1016,15 +1012,15 @@ mod tests {
                 15,
                 [
                     (6, (SchedulingStatus::Executed, 1)),
-                    (9, (SchedulingStatus::Executing, 2)),
+                    (9, (SchedulingStatus::Executing(BTreeSet::new()), 2)),
                 ]
                 .into_iter()
                 .collect(),
             );
 
             // Record overlapping requirements
-            assert_ok!(requirements.record_requirements(1, 6, 10, vec![100, 200].into_iter()));
-            assert_ok!(requirements.record_requirements(2, 5, 8, vec![300, 400].into_iter()));
+            assert_ok!(requirements.record_requirements(1, 6, 10, BTreeSet::from([100, 200])));
+            assert_ok!(requirements.record_requirements(2, 5, 8, BTreeSet::from([300, 400])));
 
             let btree_reqs = BTreeSet::from([100, 200, 300, 400]);
 
@@ -1038,7 +1034,7 @@ mod tests {
                     is_deferred: false
                 })
             );
-            assert_ok!(requirements.validation_requirement_processed(1, 6, 1, true));
+            assert_ok!(requirements.validation_requirement_processed(1, 6, 1, false));
 
             assert_some_eq!(
                 requirements
@@ -1049,7 +1045,7 @@ mod tests {
                     is_deferred: true
                 })
             );
-            assert_ok!(requirements.validation_requirement_processed(1, 9, 2, false));
+            assert_ok!(requirements.validation_requirement_processed(1, 9, 2, true));
             test_active_requirements_empty(&requirements);
         }
     }
