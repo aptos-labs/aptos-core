@@ -419,14 +419,12 @@ where
                     let mut old_head_entry = self.shard.get_mut(&head).expect("Head must exist.");
                     old_head_entry.set_prev(Some(key.clone()));
                 }
-                value.set_prev(None);
-                value.set_next(Some(head));
+                value.init_lru(None, Some(head));
                 self.shard.insert(key.clone(), value);
                 *self.head = Some(key);
             },
             None => {
-                value.set_prev(None);
-                value.set_next(None);
+                value.init_lru(None, None);
                 self.shard.insert(key.clone(), value);
                 *self.head = Some(key.clone());
                 *self.tail = Some(key);
@@ -495,6 +493,11 @@ mod tests {
 
     impl THotStateSlot for TestSlot {
         type Key = u32;
+
+        fn init_lru(&mut self, prev: Option<Self::Key>, next: Option<Self::Key>) {
+            self.prev = prev;
+            self.next = next;
+        }
 
         fn prev(&self) -> Option<&Self::Key> {
             self.prev.as_ref()
