@@ -9,7 +9,9 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use aptos_vm_types::resolver::StateStorageView;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -21,6 +23,20 @@ use std::collections::VecDeque;
 #[derive(Tid)]
 pub struct NativeStateStorageContext<'a> {
     resolver: &'a dyn StateStorageView<Key = StateKey>,
+}
+
+impl<'a> VersionControlledNativeExtension for NativeStateStorageContext<'a> {
+    fn undo(&mut self) {
+        // No-op: nothing to undo.
+    }
+
+    fn save(&mut self) {
+        // No-op: nothing to save.
+    }
+
+    fn update(&mut self, _txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        // No-op: nothing to update.
+    }
 }
 
 impl<'a> NativeStateStorageContext<'a> {

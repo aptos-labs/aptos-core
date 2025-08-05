@@ -37,7 +37,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -414,12 +414,11 @@ impl SimpleVMTestAdapter<'_> {
         let return_values = MoveVM::execute_loaded_function(
             function,
             args,
-            &mut data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, module_storage),
             &mut gas_status,
             &mut TraversalContext::new(&traversal_storage),
             &mut extensions,
             module_storage,
-            &self.storage,
         )?;
 
         let change_set = data_cache

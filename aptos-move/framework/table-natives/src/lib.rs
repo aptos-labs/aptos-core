@@ -10,14 +10,29 @@
 //! See [`Table.move`](../sources/Table.move) for language use.
 //! See [`README.md`](../README.md) for integration into an adapter.
 
+use aptos_gas_meter::AptosGasMeter;
 use aptos_gas_schedule::gas_params::natives::table::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::{
+    state_store::{
+        state_key::StateKey, state_value::StateValueMetadata,
+        table::TableHandle as AptosTableHandle,
+    },
+    vm::versioning::{VersionController, VersionedSlot},
+    write_set::WriteOp,
+};
+use aptos_vm_types::{
+    abstract_write_op::{AbstractResourceWriteOp, InPlaceDelayedFieldChangeOp},
+    change_set::WriteOpInfo,
+    resolver::ExecutorView,
+    storage::{change_set_configs::ChangeSetSizeTracker, space_pricing::ChargeAndRefund},
+};
 use better_any::{Tid, TidAble};
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::{PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
     value::MoveTypeLayout, vm_status::StatusCode,
@@ -25,8 +40,12 @@ use move_core_types::{
 // ===========================================================================================
 // Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
-use move_vm_runtime::native_functions::{LoaderContext, NativeFunctionTable};
+use move_vm_runtime::{
+    native_extensions::VersionControlledNativeExtension,
+    native_functions::{LoaderContext, NativeFunctionTable},
+};
 use move_vm_types::{
+    delayed_values::delayed_field_id::DelayedFieldID,
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Reference, StructRef, Value},
@@ -35,7 +54,8 @@ use sha3::{Digest, Sha3_256};
 use smallvec::{smallvec, SmallVec};
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet, VecDeque},
     mem::drop,
     sync::Arc,
 };
@@ -66,7 +86,11 @@ const _NOT_EMPTY: u64 = (102 << 8) + _ECATEGORY_INVALID_STATE as u64;
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
 struct TableData {
+    vc: VersionController,
+    // TODO: add versioning here or remove.
     new_tables: BTreeMap<TableHandle, TableInfo>,
+    new_tables_counter: u32,
+    // TODO: add versioning here or remove.
     removed_tables: BTreeSet<TableHandle>,
     tables: BTreeMap<TableHandle, Table>,
 }
@@ -78,12 +102,23 @@ struct LayoutInfo {
     contains_delayed_fields: bool,
 }
 
+#[derive(Debug, Clone)]
+struct MaterializedGlobalValue {
+    op: AbstractResourceWriteOp,
+    previous_size: u64,
+}
+
+struct TableItem {
+    gv: VersionedSlot<GlobalValue>,
+    materialization: VersionedSlot<MaterializedGlobalValue>,
+}
+
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
     value_layout_info: LayoutInfo,
-    content: BTreeMap<Vec<u8>, GlobalValue>,
+    content: BTreeMap<Vec<u8>, TableItem>,
 }
 
 /// The field index of the `handle` field in the `Table` Move struct.
@@ -105,6 +140,21 @@ pub struct TableChange {
 // =========================================================================================
 // Implementation of Native Table Context
 
+impl<'a> VersionControlledNativeExtension for NativeTableContext<'a> {
+    fn undo(&mut self) {
+        self.table_data.borrow_mut().vc.undo();
+    }
+
+    fn save(&mut self) {
+        self.table_data.borrow_mut().vc.save();
+    }
+
+    fn update(&mut self, txn_hash: &[u8; 32], _script_hash: &[u8]) {
+        self.txn_hash = *txn_hash;
+        self.table_data.borrow_mut().new_tables_counter = 0;
+    }
+}
+
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
@@ -116,6 +166,431 @@ impl<'a> NativeTableContext<'a> {
         }
     }
 
+    pub fn materialize(
+        &self,
+        executor_view: &dyn ExecutorView,
+        function_extension: &impl FunctionValueExtension,
+        new_slot_metadata: &Option<StateValueMetadata>,
+        delayed_field_ids: &HashSet<DelayedFieldID>,
+        inherit_metadata: bool,
+    ) -> PartialVMResult<()> {
+        let mut table_data = self.table_data.borrow_mut();
+        let current_version = table_data.vc.current_version();
+
+        for (handle, table) in table_data.tables.iter_mut() {
+            for (key, slot) in table.content.iter_mut() {
+                let gv = slot.gv.latest_versioned(current_version);
+                let materialization = slot.materialization.latest_versioned(current_version);
+
+                match (gv, materialization) {
+                    // No-op: value does not exist / there was an undo which pruned existing value
+                    // and its materialization.
+                    (None, None) => {
+                        continue;
+                    },
+                    // This should not be possible: for every materialization, there is a
+                    // corresponding value at the same version or higher.
+                    (Some((gv, gv_version, gv_incarnation)), None) => {
+                        let state_key = StateKey::table_item(&AptosTableHandle(handle.0), key);
+                        let op = match gv.effect() {
+                            Some(op) => op,
+                            None => {
+                                if let Some(layout) =
+                                    table.value_layout_info.layout_if_contains_delayed_fields()
+                                {
+                                    // TODO: cache metadata on read, cache previous size on read.
+                                    if let Some((metadata, materialized_size)) = executor_view
+                                        .get_read_needing_exchange(&state_key, delayed_field_ids)?
+                                    {
+                                        let change = InPlaceDelayedFieldChangeOp {
+                                            // TODO:
+                                            //   Do we need to compare with layout that was captured?
+                                            layout,
+                                            materialized_size,
+                                            metadata,
+                                        };
+                                        let op = AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                                            change,
+                                        );
+                                        let materialization = MaterializedGlobalValue {
+                                            op,
+                                            // Previous size is the same as materialized size.
+                                            previous_size: materialized_size,
+                                        };
+                                        slot.materialization.set(
+                                            materialization,
+                                            gv_version,
+                                            gv_incarnation,
+                                        )?;
+                                    }
+                                }
+                                return Ok(());
+                            },
+                        };
+
+                        let op = op.and_then(|value| {
+                            serialize_value(function_extension, &table.value_layout_info, value)
+                        })?;
+
+                        let state_value_metadata =
+                            executor_view.get_resource_state_value_metadata(&state_key)?;
+                        let previous_size =
+                            executor_view.get_resource_state_value_size(&state_key)?;
+
+                        let write_op = match op {
+                            Op::New((bytes, _)) => {
+                                if state_value_metadata.is_some() {
+                                    return Err(PartialVMError::new(
+                                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                    ));
+                                }
+
+                                match new_slot_metadata {
+                                    None => WriteOp::legacy_creation(bytes),
+                                    Some(metadata) => WriteOp::creation(bytes, metadata.clone()),
+                                }
+                            },
+                            Op::Modify((bytes, _)) => {
+                                let state_value_metadata =
+                                    state_value_metadata.ok_or_else(|| {
+                                        PartialVMError::new(
+                                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                        )
+                                    })?;
+                                WriteOp::modification(bytes, state_value_metadata)
+                            },
+                            Op::Delete => {
+                                let state_value_metadata =
+                                    state_value_metadata.ok_or_else(|| {
+                                        PartialVMError::new(
+                                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                        )
+                                    })?;
+                                WriteOp::deletion(state_value_metadata)
+                            },
+                        };
+
+                        let op = AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+                            write_op,
+                            table.value_layout_info.layout_if_contains_delayed_fields(),
+                        );
+
+                        let materialization = MaterializedGlobalValue { op, previous_size };
+                        slot.materialization
+                            .set(materialization, gv_version, gv_incarnation)?;
+                    },
+                    (None, Some(_)) => {
+                        unreachable!("Value and materialization slots are out of sync for table")
+                    },
+                    (
+                        Some((gv, gv_version, gv_incarnation)),
+                        Some((
+                            old_materialization,
+                            materialization_version,
+                            materialization_incarnation,
+                        )),
+                    ) => {
+                        match gv_version.cmp(&materialization_version) {
+                            Ordering::Less => {
+                                unreachable!("Materialized version cannot be larger than value version for tables: {} vs {}", gv_version, materialization_version)
+                            },
+                            Ordering::Equal => {
+                                if gv_incarnation > materialization_incarnation {
+                                    let state_key =
+                                        StateKey::table_item(&AptosTableHandle(handle.0), key);
+                                    let op = match gv.effect() {
+                                        Some(op) => op,
+                                        None => {
+                                            if let Some(layout) = table
+                                                .value_layout_info
+                                                .layout_if_contains_delayed_fields()
+                                            {
+                                                // TODO: cache metadata on read, cache previous size on read.
+                                                if let Some((metadata, materialized_size)) =
+                                                    executor_view.get_read_needing_exchange(
+                                                        &state_key,
+                                                        delayed_field_ids,
+                                                    )?
+                                                {
+                                                    let change = InPlaceDelayedFieldChangeOp {
+                                                        // TODO:
+                                                        //   Do we need to compare with layout that was captured?
+                                                        layout,
+                                                        materialized_size,
+                                                        metadata,
+                                                    };
+                                                    let op =
+                                                        AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                                                            change,
+                                                        );
+                                                    let materialization = MaterializedGlobalValue {
+                                                        op,
+                                                        // Previous size is the same as materialized size.
+                                                        previous_size: materialized_size,
+                                                    };
+                                                    slot.materialization.set(
+                                                        materialization,
+                                                        gv_version,
+                                                        gv_incarnation,
+                                                    )?;
+                                                }
+                                            }
+                                            return Ok(());
+                                        },
+                                    };
+
+                                    let op = op.and_then(|value| {
+                                        serialize_value(
+                                            function_extension,
+                                            &table.value_layout_info,
+                                            value,
+                                        )
+                                    })?;
+
+                                    let state_value_metadata = if inherit_metadata {
+                                        Some(old_materialization.op.metadata().clone())
+                                    } else {
+                                        executor_view
+                                            .get_resource_state_value_metadata(&state_key)?
+                                    };
+                                    let previous_size =
+                                        executor_view.get_resource_state_value_size(&state_key)?;
+
+                                    let write_op = match op {
+                                        Op::New((bytes, _)) => {
+                                            if state_value_metadata.is_some() {
+                                                return Err(PartialVMError::new(
+                                                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                                ));
+                                            }
+
+                                            match new_slot_metadata {
+                                                None => WriteOp::legacy_creation(bytes),
+                                                Some(metadata) => {
+                                                    WriteOp::creation(bytes, metadata.clone())
+                                                },
+                                            }
+                                        },
+                                        Op::Modify((bytes, _)) => {
+                                            let state_value_metadata =
+                                                state_value_metadata.ok_or_else(|| {
+                                                    PartialVMError::new(
+                                                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                                    )
+                                                })?;
+                                            WriteOp::modification(bytes, state_value_metadata)
+                                        },
+                                        Op::Delete => {
+                                            let state_value_metadata =
+                                                state_value_metadata.ok_or_else(|| {
+                                                    PartialVMError::new(
+                                                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                                    )
+                                                })?;
+                                            WriteOp::deletion(state_value_metadata)
+                                        },
+                                    };
+
+                                    let op = AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+                                        write_op,
+                                        table.value_layout_info.layout_if_contains_delayed_fields(),
+                                    );
+
+                                    let materialization =
+                                        MaterializedGlobalValue { op, previous_size };
+                                    slot.materialization.set(
+                                        materialization,
+                                        gv_version,
+                                        gv_incarnation,
+                                    )?;
+                                } else {
+                                    // No-op: can keep this materialization.
+                                }
+                            },
+                            Ordering::Greater => {
+                                let state_key =
+                                    StateKey::table_item(&AptosTableHandle(handle.0), key);
+                                let op = match gv.effect() {
+                                    Some(op) => op,
+                                    None => {
+                                        if let Some(layout) = table
+                                            .value_layout_info
+                                            .layout_if_contains_delayed_fields()
+                                        {
+                                            // TODO: cache metadata on read, cache previous size on read.
+                                            if let Some((metadata, materialized_size)) =
+                                                executor_view.get_read_needing_exchange(
+                                                    &state_key,
+                                                    delayed_field_ids,
+                                                )?
+                                            {
+                                                let change = InPlaceDelayedFieldChangeOp {
+                                                    // TODO:
+                                                    //   Do we need to compare with layout that was captured?
+                                                    layout,
+                                                    materialized_size,
+                                                    metadata,
+                                                };
+                                                let op =
+                                                    AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                                                        change,
+                                                    );
+                                                let materialization = MaterializedGlobalValue {
+                                                    op,
+                                                    // Previous size is the same as materialized size.
+                                                    previous_size: materialized_size,
+                                                };
+                                                slot.materialization.set(
+                                                    materialization,
+                                                    gv_version,
+                                                    gv_incarnation,
+                                                )?;
+                                            }
+                                        }
+                                        return Ok(());
+                                    },
+                                };
+
+                                let op = op.and_then(|value| {
+                                    serialize_value(
+                                        function_extension,
+                                        &table.value_layout_info,
+                                        value,
+                                    )
+                                })?;
+
+                                let state_value_metadata = if inherit_metadata {
+                                    Some(old_materialization.op.metadata().clone())
+                                } else {
+                                    executor_view.get_resource_state_value_metadata(&state_key)?
+                                };
+                                let previous_size =
+                                    executor_view.get_resource_state_value_size(&state_key)?;
+
+                                let write_op = match op {
+                                    Op::New((bytes, _)) => {
+                                        if state_value_metadata.is_some() {
+                                            return Err(PartialVMError::new(
+                                                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                            ));
+                                        }
+
+                                        match new_slot_metadata {
+                                            None => WriteOp::legacy_creation(bytes),
+                                            Some(metadata) => {
+                                                WriteOp::creation(bytes, metadata.clone())
+                                            },
+                                        }
+                                    },
+                                    Op::Modify((bytes, _)) => {
+                                        let state_value_metadata = state_value_metadata
+                                            .ok_or_else(|| {
+                                                PartialVMError::new(
+                                                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                                )
+                                            })?;
+                                        WriteOp::modification(bytes, state_value_metadata)
+                                    },
+                                    Op::Delete => {
+                                        let state_value_metadata = state_value_metadata
+                                            .ok_or_else(|| {
+                                                PartialVMError::new(
+                                                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                                                )
+                                            })?;
+                                        WriteOp::deletion(state_value_metadata)
+                                    },
+                                };
+
+                                let op =
+                                    AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+                                        write_op,
+                                        table.value_layout_info.layout_if_contains_delayed_fields(),
+                                    );
+
+                                let materialization = MaterializedGlobalValue { op, previous_size };
+                                slot.materialization.set(
+                                    materialization,
+                                    gv_version,
+                                    gv_incarnation,
+                                )?;
+                            },
+                        }
+                    },
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn charge_write_ops(
+        &self,
+        change_set_size_tracker: &mut ChangeSetSizeTracker,
+        gas_meter: &mut impl AptosGasMeter,
+    ) -> VMResult<()> {
+        // TODO: materialize here?
+
+        let mut table_data = self.table_data.borrow_mut();
+
+        let current_version = table_data.vc.current_version();
+        for (handle, key, table_item) in table_data.tables.iter_mut().flat_map(|(handle, table)| {
+            table
+                .content
+                .iter_mut()
+                .map(move |(key, table_item)| (handle, key, table_item))
+        }) {
+            // TODO: cache state keys.
+            let state_key = StateKey::table_item(&AptosTableHandle(handle.0), key);
+            if let Some(materialized_value) = table_item
+                .materialization
+                .latest_mut_sync_for_read(current_version)
+            {
+                let MaterializedGlobalValue { op, previous_size } = materialized_value;
+
+                if let Some(pricing) = change_set_size_tracker.disk_pricing {
+                    let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
+                        change_set_size_tracker.txn_gas_params.unwrap(),
+                        WriteOpInfo {
+                            key: &state_key,
+                            op_size: op.materialized_size(),
+                            prev_size: *previous_size,
+                            metadata_mut: op.metadata_mut(),
+                        },
+                    );
+                    change_set_size_tracker.write_fee += charge;
+                    change_set_size_tracker.total_refund += refund;
+                }
+
+                change_set_size_tracker.record_write_op(&state_key, op.materialized_size())?;
+                gas_meter.charge_io_gas_for_write(&state_key, &op.materialized_size())?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn take_writes(&mut self) -> VMResult<BTreeMap<StateKey, AbstractResourceWriteOp>> {
+        // TODO: Materialize here?
+
+        let mut changes = BTreeMap::new();
+        let mut table_data = self.table_data.borrow_mut();
+
+        let current_version = table_data.vc.current_version();
+        for (handle, key, table_item) in table_data.tables.iter_mut().flat_map(|(handle, table)| {
+            table
+                .content
+                .iter_mut()
+                .map(move |(key, table_item)| (handle, key, table_item))
+        }) {
+            // TODO: cache state keys.
+            let state_key = StateKey::table_item(&AptosTableHandle(handle.0), key);
+            if let Some(materialization) = table_item.materialization.take_latest(current_version) {
+                let MaterializedGlobalValue { op, .. } = materialization;
+                changes.insert(state_key, op);
+            }
+        }
+        Ok(changes)
+    }
+
     /// Computes the change set from a NativeTableContext.
     pub fn into_change_set(
         self,
@@ -123,11 +598,16 @@ impl<'a> NativeTableContext<'a> {
     ) -> PartialVMResult<TableChangeSet> {
         let NativeTableContext { table_data, .. } = self;
         let TableData {
+            vc,
             new_tables,
             removed_tables,
             tables,
+            ..
         } = table_data.into_inner();
+
+        let current_version = vc.current_version();
         let mut changes = BTreeMap::new();
+
         for (handle, table) in tables {
             let Table {
                 value_layout_info,
@@ -135,8 +615,12 @@ impl<'a> NativeTableContext<'a> {
                 ..
             } = table;
             let mut entries = BTreeMap::new();
-            for (key, gv) in content {
-                let op = match gv.into_effect() {
+            for (key, mut slot) in content {
+                let op = match slot
+                    .gv
+                    .take_latest(current_version)
+                    .and_then(|gv| gv.into_effect())
+                {
                     Some(op) => op,
                     None => continue,
                 };
@@ -219,6 +703,14 @@ impl LayoutInfo {
             contains_delayed_fields,
         })
     }
+
+    fn layout_if_contains_delayed_fields(&self) -> Option<Arc<MoveTypeLayout>> {
+        self.contains_delayed_fields.then(|| self.layout.clone())
+    }
+
+    fn layout_ref_if_contains_delayed_fields(&self) -> Option<&MoveTypeLayout> {
+        self.contains_delayed_fields.then(|| self.layout.as_ref())
+    }
 }
 
 impl Table {
@@ -227,41 +719,70 @@ impl Table {
         function_value_extension: &dyn FunctionValueExtension,
         table_context: &NativeTableContext,
         key: Vec<u8>,
+        current_version: u32,
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
-        Ok(match self.content.entry(key) {
-            Entry::Vacant(entry) => {
-                // If there is an identifier mapping, we need to pass layout to
-                // ensure it gets recorded.
-                let data = table_context
-                    .resolver
-                    .resolve_table_entry_bytes_with_layout(
-                        &self.handle,
-                        entry.key(),
-                        if self.value_layout_info.contains_delayed_fields {
-                            Some(&self.value_layout_info.layout)
-                        } else {
-                            None
-                        },
-                    )?;
+        let init_table_item = || -> PartialVMResult<_> {
+            // If there are delayed fields, we need to pass layout when resolving bytes from
+            // storage.
+            let layout_if_contains_delayed_fields = self
+                .value_layout_info
+                .layout_ref_if_contains_delayed_fields();
+            let data = table_context
+                .resolver
+                .resolve_table_entry_bytes_with_layout(
+                    &self.handle,
+                    &key,
+                    layout_if_contains_delayed_fields,
+                )?;
 
-                let (gv, loaded) = match data {
-                    Some(val_bytes) => {
-                        let val = deserialize_value(
-                            function_value_extension,
-                            &val_bytes,
-                            &self.value_layout_info,
-                        )?;
-                        (
-                            GlobalValue::cached(val)?,
-                            Some(NumBytes::new(val_bytes.len() as u64)),
-                        )
-                    },
-                    None => (GlobalValue::none(), None),
-                };
-                (entry.insert(gv), Some(loaded))
-            },
-            Entry::Occupied(entry) => (entry.into_mut(), None),
-        })
+            Ok(match data {
+                Some(val_bytes) => {
+                    let val = deserialize_value(
+                        function_value_extension,
+                        &val_bytes,
+                        &self.value_layout_info,
+                    )?;
+                    (
+                        GlobalValue::cached(val)?,
+                        Some(NumBytes::new(val_bytes.len() as u64)),
+                    )
+                },
+                None => (GlobalValue::none(), None),
+            })
+        };
+
+        let requires_initialization = match self.content.get_mut(&key) {
+            None => true,
+            Some(slot) => slot.gv.latest(current_version).is_none(),
+        };
+
+        if requires_initialization {
+            let (gv, bytes_loaded) = init_table_item()?;
+            let gv = match self.content.entry(key) {
+                Entry::Vacant(entry) => {
+                    let table_item = TableItem {
+                        gv: VersionedSlot::new(gv, current_version),
+                        materialization: VersionedSlot::empty(),
+                    };
+                    entry
+                        .insert(table_item)
+                        .gv
+                        .latest_mut(current_version)?
+                        .expect("Valur must exist at current version")
+                },
+                Entry::Occupied(entry) => entry.into_mut().gv.set(gv, current_version, 0)?,
+            };
+            return Ok((gv, Some(bytes_loaded)));
+        }
+
+        let gv = self
+            .content
+            .get_mut(&key)
+            .expect("Table item exists")
+            .gv
+            .latest_mut(current_version)?
+            .expect("Table item contains a value");
+        Ok((gv, None))
     }
 }
 
@@ -342,9 +863,8 @@ fn native_new_table_handle(
     // produced so far, sha256 this to produce a unique handle. Given the txn hash
     // is unique, this should create a unique and deterministic global id.
     let mut digest = Sha3_256::new();
-    let table_len = table_data.new_tables.len() as u32; // cast usize to u32 to ensure same length
     Digest::update(&mut digest, table_context.txn_hash);
-    Digest::update(&mut digest, table_len.to_be_bytes());
+    Digest::update(&mut digest, table_data.new_tables_counter.to_be_bytes());
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
         .map_err(|_| partial_extension_error("Unable to create table handle"))?;
@@ -354,6 +874,7 @@ fn native_new_table_handle(
         .new_tables
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
         .is_none());
+    table_data.new_tables_counter += 1;
 
     Ok(smallvec![Value::address(handle)])
 }
@@ -372,6 +893,7 @@ fn native_add_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let val = args.pop_back().unwrap();
     let key = args.pop_back().unwrap();
@@ -384,8 +906,12 @@ fn native_add_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -428,6 +954,7 @@ fn native_borrow_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -439,8 +966,12 @@ fn native_borrow_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -483,6 +1014,7 @@ fn native_contains_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -494,8 +1026,12 @@ fn native_contains_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {
@@ -532,6 +1068,7 @@ fn native_remove_box(
         context.extensions_with_loader_context_and_gas_params();
     let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
+    let current_version = table_data.vc.current_version();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
@@ -543,8 +1080,12 @@ fn native_remove_box(
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
-    let (gv, loaded) =
-        table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
+    let (gv, loaded) = table.get_or_create_global_value(
+        &function_value_extension,
+        table_context,
+        key_bytes,
+        current_version,
+    )?;
     let mem_usage = gv
         .view()
         .map(|val| {

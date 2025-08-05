@@ -13,8 +13,11 @@ use move_core_types::{
 };
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache, module_traversal::*, move_vm::MoveVM,
-    native_extensions::NativeContextExtensions, native_functions::NativeFunction,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
+    module_traversal::*,
+    move_vm::MoveVM,
+    native_extensions::NativeContextExtensions,
+    native_functions::NativeFunction,
     AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -197,15 +200,15 @@ fn main() -> Result<()> {
     };
     let args: Vec<Vec<u8>> = vec![];
 
+    let mut data_cache = TransactionDataCache::empty();
     let return_values = MoveVM::execute_loaded_function(
         func,
         args,
-        &mut TransactionDataCache::empty(),
+        &mut MoveVmDataCacheAdapter::new(&mut data_cache, &storage, &code_storage),
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &mut extensions,
         &code_storage,
-        &storage,
     )?;
     println!("{:?}", return_values);
 

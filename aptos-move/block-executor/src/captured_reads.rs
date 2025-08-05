@@ -631,6 +631,23 @@ where
             .collect()
     }
 
+    pub(crate) fn get_read_value_needing_exchange<SV: TStateView<Key = T::Key>>(
+        &self,
+        view: &LatestView<T, SV>,
+        key: &T::Key,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        Ok(
+            if let Some(DataRead::Versioned(_, value, Some(layout))) = self.data_reads.get(key) {
+                view.filter_value_for_exchange(value, layout, delayed_write_set_ids, key)
+                    .transpose()?
+                    .map(|(_, (metadata, size, _))| (metadata, size))
+            } else {
+                None
+            },
+        )
+    }
+
     // Return an iterator over the captured group reads that contain a delayed field
     pub(crate) fn get_group_read_values_with_delayed_fields<'a>(
         &'a self,
@@ -643,6 +660,21 @@ where
                     .iter()
                     .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
         })
+    }
+
+    pub(crate) fn get_group_read_value_with_delayed_fields<'a>(
+        &'a self,
+        key: &T::Key,
+    ) -> Option<&'a GroupRead<T>> {
+        let group_read = self.group_reads.get(key)?;
+        if group_read
+            .inner_reads
+            .iter()
+            .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+        {
+            return Some(group_read);
+        }
+        None
     }
 
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks

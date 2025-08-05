@@ -241,6 +241,15 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 
+    fn get_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        self.executor_view
+            .get_read_needing_exchange(key, delayed_write_set_ids)
+    }
+
     fn get_group_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
@@ -248,6 +257,15 @@ impl<E: ExecutorView> TDelayedFieldView for StorageAdapter<'_, E> {
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
+
+    fn get_group_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        self.executor_view
+            .get_group_read_needing_exchange(key, delayed_write_set_ids)
     }
 }
 

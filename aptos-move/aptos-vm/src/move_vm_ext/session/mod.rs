@@ -6,6 +6,7 @@ use crate::{
     move_vm_ext::{
         resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
     },
+    v2::AptosSession,
 };
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
@@ -38,7 +39,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -73,6 +74,77 @@ pub struct SessionExt<'r, R> {
     is_storage_slot_metadata_enabled: bool,
 }
 
+pub struct LegacySessionAdapter<'a, 'b, 'c, DataView, CodeView> {
+    session: &'a mut SessionExt<'b, DataView>,
+    code_view: &'a CodeView,
+    traversal_context: &'a mut TraversalContext<'c>,
+}
+
+impl<'a, 'b, 'c, DataView, CodeView> LegacySessionAdapter<'a, 'b, 'c, DataView, CodeView>
+where
+    DataView: AptosMoveResolver,
+    CodeView: ModuleStorage,
+{
+    pub fn new(
+        session: &'a mut SessionExt<'b, DataView>,
+        code_view: &'a CodeView,
+        traversal_context: &'a mut TraversalContext<'c>,
+    ) -> Self {
+        Self {
+            session,
+            code_view,
+            traversal_context,
+        }
+    }
+}
+
+impl<'a, 'b, 'c, DataView, CodeView> AptosSession
+    for LegacySessionAdapter<'a, 'b, 'c, DataView, CodeView>
+where
+    DataView: AptosMoveResolver,
+    CodeView: ModuleStorage,
+{
+    type CodeView = CodeView;
+
+    fn execute_function_bypass_visibility(
+        &mut self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+        gas_meter: &mut impl GasMeter,
+    ) -> VMResult<SerializedReturnValues> {
+        self.session.execute_function_bypass_visibility(
+            module_id,
+            function_name,
+            ty_args,
+            args,
+            gas_meter,
+            self.traversal_context,
+            self.code_view,
+        )
+    }
+
+    fn execute_loaded_function(
+        &mut self,
+        func: LoadedFunction,
+        args: Vec<Vec<u8>>,
+        gas_meter: &mut impl GasMeter,
+    ) -> VMResult<SerializedReturnValues> {
+        self.session.execute_loaded_function(
+            func,
+            args,
+            gas_meter,
+            self.traversal_context,
+            self.code_view,
+        )
+    }
+
+    fn code_view(&self) -> &Self::CodeView {
+        self.code_view
+    }
+}
+
 impl<'r, R> SessionExt<'r, R>
 where
     R: AptosMoveResolver,
@@ -85,34 +157,13 @@ where
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
-        let mut extensions = NativeContextExtensions::default();
-        let txn_hash: [u8; 32] = session_id
-            .as_uuid()
-            .to_vec()
-            .try_into()
-            .expect("HashValue should convert to [u8; 32]");
-
-        extensions.add(NativeTableContext::new(txn_hash, resolver));
-        extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
+        let extensions = make_aptos_extensions(
             resolver,
-            vm_config.delayed_field_optimization_enabled,
-            resolver,
-        ));
-        extensions.add(RandomnessContext::new());
-        extensions.add(NativeTransactionContext::new(
-            txn_hash.to_vec(),
-            session_id.into_script_hash(),
-            chain_id.id(),
+            chain_id,
+            vm_config,
+            session_id,
             maybe_user_transaction_context,
-        ));
-        extensions.add(NativeCodeContext::new());
-        extensions.add(NativeStateStorageContext::new(resolver));
-        extensions.add(NativeEventContext::default());
-        extensions.add(NativeObjectContext::default());
-
+        );
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
             data_cache: TransactionDataCache::empty(),
@@ -133,16 +184,7 @@ where
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
         let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        self.execute_loaded_function(func, args, gas_meter, traversal_context, module_storage)
     }
 
     pub fn execute_loaded_function(
@@ -156,12 +198,11 @@ where
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut self.data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, module_storage),
             gas_meter,
             traversal_context,
             &mut self.extensions,
             module_storage,
-            self.resolver,
         )
     }
 
@@ -536,4 +577,41 @@ pub fn convert_modules_into_write_ops(
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
+}
+
+/// Initializes and returns Aptos native extensions.
+pub(crate) fn make_aptos_extensions<'a, DataView>(
+    data_view: &'a DataView,
+    chain_id: ChainId,
+    vm_config: &VMConfig,
+    session_id: SessionId,
+    user_transaction_context: Option<UserTransactionContext>,
+) -> NativeContextExtensions<'a>
+where
+    DataView: AptosMoveResolver,
+{
+    let mut extensions = NativeContextExtensions::default();
+    let txn_hash = session_id.txn_hash();
+
+    extensions.add(NativeTableContext::new(txn_hash, data_view));
+    extensions.add(NativeRistrettoPointContext::new());
+    extensions.add(AlgebraContext::new());
+    extensions.add(NativeAggregatorContext::new(
+        txn_hash,
+        data_view,
+        vm_config.delayed_field_optimization_enabled,
+        data_view,
+    ));
+    extensions.add(RandomnessContext::new());
+    extensions.add(NativeTransactionContext::new(
+        txn_hash.to_vec(),
+        session_id.into_script_hash(),
+        chain_id.id(),
+        user_transaction_context,
+    ));
+    extensions.add(NativeCodeContext::new());
+    extensions.add(NativeStateStorageContext::new(data_view));
+    extensions.add(NativeEventContext::default());
+    extensions.add(NativeObjectContext::default());
+    extensions
 }

@@ -1368,6 +1368,32 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             .collect()
     }
 
+    fn get_read_needing_exchange_sequential(
+        &self,
+        read_set: &HashSet<T::Key>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        key: &T::Key,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        Ok(if read_set.contains(key) {
+            match unsync_map.fetch_data(key) {
+                Some(ValueWithLayout::Exchanged(value, Some(layout))) => self
+                    .filter_value_for_exchange(value.as_ref(), &layout, delayed_write_set_ids, key)
+                    .transpose()?
+                    .map(|(_, (metadata, size, _))| (metadata, size)),
+                Some(ValueWithLayout::Exchanged(_, None)) => None,
+                Some(ValueWithLayout::RawFromStorage(_)) => {
+                    return Err(code_invariant_error(
+                        "Cannot exchange value that was not exchanged before",
+                    ));
+                },
+                None => None,
+            }
+        } else {
+            None
+        })
+    }
+
     fn get_group_reads_needing_exchange_parallel(
         &self,
         parallel_state: &ParallelState<'a, T>,
@@ -1423,6 +1449,56 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             })
             .flat_map(Result::transpose)
             .collect()
+    }
+
+    fn get_group_read_needing_exchange_parallel(
+        &self,
+        parallel_state: &ParallelState<'a, T>,
+        key: &T::Key,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        let reads = parallel_state.captured_reads.borrow();
+        let inner_reads = match reads.get_group_read_value_with_delayed_fields(key) {
+            Some(GroupRead { inner_reads, .. }) => inner_reads,
+            None => {
+                return Ok(None);
+            },
+        };
+
+        // TODO[agg_v2](clean-up): Once ids can be extracted without possible failure,
+        // the following is just an any call on iterator (same for resource reads).
+        let mut resources_needing_delayed_field_exchange = false;
+        for data_read in inner_reads.values() {
+            if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                let needs_exchange = self
+                    .does_value_need_exchange(value, layout.as_ref(), delayed_write_set_ids)
+                    .map_err(PartialVMError::from)?;
+
+                if needs_exchange {
+                    resources_needing_delayed_field_exchange = true;
+                    break;
+                }
+            }
+        }
+        if !resources_needing_delayed_field_exchange {
+            return Ok(None);
+        }
+
+        match self.get_resource_state_value_metadata(key)? {
+            Some(metadata) => match parallel_state.read_group_size(key, self.txn_idx)? {
+                Some(group_size) => Ok(Some((metadata, group_size.get()))),
+                None => Err(code_invariant_error(format!(
+                    "Cannot compute metadata op size for the group read {:?}",
+                    key
+                ))
+                .into()),
+            },
+            None => Err(code_invariant_error(format!(
+                "Metadata op not present for the group read {:?}",
+                key
+            ))
+            .into()),
+        }
     }
 
     fn get_group_reads_needing_exchange_sequential(
@@ -1482,6 +1558,58 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
             })
             .flat_map(Result::transpose)
             .collect()
+    }
+
+    fn get_group_read_needing_exchange_sequential(
+        &self,
+        group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        key: &T::Key,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        if let Some(tags) = group_read_set.get(key) {
+            if let Some(value_vec) = unsync_map.fetch_group_data(key) {
+                // TODO[agg_v2](cleanup) - can we use .any() instead?
+                let mut resources_needing_delayed_field_exchange = false;
+                for (tag, value_with_layout) in value_vec {
+                    if tags.contains(&tag) {
+                        if let ValueWithLayout::Exchanged(value, Some(layout)) = value_with_layout {
+                            let needs_exchange = self.does_value_need_exchange(
+                                &value,
+                                layout.as_ref(),
+                                delayed_write_set_ids,
+                            )?;
+                            if needs_exchange {
+                                resources_needing_delayed_field_exchange = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if !resources_needing_delayed_field_exchange {
+                    return Ok(None);
+                }
+                match self.get_resource_state_value_metadata(key)? {
+                    Some(metadata) => match unsync_map.get_group_size(key) {
+                        Some(group_size) => Ok(Some((metadata, group_size.get()))),
+                        None => Err(code_invariant_error(format!(
+                            "Sequential cannot find metadata op size for the group read {:?}",
+                            key
+                        ))
+                        .into()),
+                    },
+                    None => Err(code_invariant_error(format!(
+                        "Sequential cannot find metadata op for the group read {:?}",
+                        key,
+                    ))
+                    .into()),
+                }
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_resource_from_group_impl(
@@ -1955,6 +2083,28 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestVi
         }
     }
 
+    fn get_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        match &self.latest_view {
+            ViewState::Sync(state) => state
+                .captured_reads
+                .borrow()
+                .get_read_value_needing_exchange(self, key, delayed_write_set_ids),
+            ViewState::Unsync(state) => {
+                let read_set = state.read_set.borrow();
+                self.get_read_needing_exchange_sequential(
+                    &read_set.resource_reads,
+                    state.unsync_map,
+                    key,
+                    delayed_write_set_ids,
+                )
+            },
+        }
+    }
+
     fn get_group_reads_needing_exchange(
         &self,
         delayed_write_set_ids: &HashSet<Self::Identifier>,
@@ -1971,6 +2121,27 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestVi
                     state.unsync_map,
                     delayed_write_set_ids,
                     skip,
+                )
+            },
+        }
+    }
+
+    fn get_group_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                self.get_group_read_needing_exchange_parallel(state, key, delayed_write_set_ids)
+            },
+            ViewState::Unsync(state) => {
+                let read_set = state.read_set.borrow();
+                self.get_group_read_needing_exchange_sequential(
+                    &read_set.group_reads,
+                    state.unsync_map,
+                    key,
+                    delayed_write_set_ids,
                 )
             },
         }

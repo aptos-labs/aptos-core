@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
