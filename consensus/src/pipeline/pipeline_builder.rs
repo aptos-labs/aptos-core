@@ -426,10 +426,10 @@ impl PipelineBuilder {
                 Self::compute_eval_proofs(compute_digest_fut, digest_key, block.clone()),
                 Some(&mut abort_handles),
             );
-            // let _ = spawn_shared_fut(
-            //     Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
-            //     Some(&mut abort_handles),
-            // );
+            let _ = spawn_shared_fut(
+                Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
+                Some(&mut abort_handles),
+            );
             let compute_decryption_fut = spawn_shared_fut(
                 Self::compute_decryption(decryption_key_fut, compute_eval_proofs_fut, block.clone(), encryption_key.clone()),
                 Some(&mut abort_handles),
