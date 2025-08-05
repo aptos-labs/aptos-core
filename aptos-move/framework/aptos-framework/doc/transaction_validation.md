@@ -1682,7 +1682,7 @@ If there is no fee_payer, fee_payer = sender
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, _txn_key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, scheduling_deposit: u64, gas_units_remaining: u64)
 </code></pre>
 
 
@@ -1694,7 +1694,7 @@ If there is no fee_payer, fee_payer = sender
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_scheduled_txn_epilogue">scheduled_txn_epilogue</a>(
     deposit_store_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
-    txn_key: ScheduleMapKey,
+    _txn_key: ScheduleMapKey,
     storage_fee_refunded: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
@@ -1722,7 +1722,7 @@ If there is no fee_payer, fee_payer = sender
             refund_from_scheduling_deposit
         );
         <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(deposit_store_addr, burn_amount);
-    } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+    } <b>else</b> {
         // <b>return</b> the full deposit and mint the remaining
         <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(
             deposit_store_owner,
@@ -1730,7 +1730,9 @@ If there is no fee_payer, fee_payer = sender
             scheduling_deposit
         );
         <b>let</b> mint_and_refund_amount = storage_fee_refunded - transaction_fee_amount;
-        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+        <b>if</b> (mint_and_refund_amount &gt; 0) {
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(<a href="account.md#0x1_account">account</a>, mint_and_refund_amount);
+        };
     };
 }
 </code></pre>
