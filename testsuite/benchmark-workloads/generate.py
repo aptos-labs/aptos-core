@@ -19,10 +19,12 @@ PREBUILT_PACKAGES_DIR = "../../crates/transaction-workloads-lib/prebuilt-package
 if __name__ == "__main__":
     subprocess.run(f"rm -rf {PREBUILT_PACKAGES_DIR}/*", shell=True)
 
-    for (dir, latest_language_arg) in DIRECTORIES:
+    for dir, latest_language_arg in DIRECTORIES:
         # By default, we built in dev mode with local framework.
-        command = (f"cargo run --package package-generator -- --dev --use-local-std --packages-path {dir} "
-                   f"--prebuilt-packages-path {PREBUILT_PACKAGES_DIR}{latest_language_arg}")
+        command = (
+            f"cargo run --package package-generator -- --dev --use-local-std --packages-path {dir} "
+            f"--prebuilt-packages-path {PREBUILT_PACKAGES_DIR}{latest_language_arg}"
+        )
         print(command)
         subprocess.run(command, shell=True)
 
