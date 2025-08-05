@@ -152,6 +152,10 @@ impl NodeManager {
         node_config.indexer_grpc.enabled = run_txn_stream;
         node_config.indexer_grpc.use_data_service_interface = run_txn_stream;
         node_config.indexer_grpc.address.set_port(txn_stream_port);
+        
+        // Enable WebSocket stream alongside gRPC when transaction stream is enabled.
+        node_config.indexer_grpc.websocket_enabled = run_txn_stream;
+        node_config.indexer_grpc.websocket_address.set_port(txn_stream_port + 1);
 
         node_config.indexer_table_info.table_info_service_mode = match run_txn_stream {
             // Localnet should be responsible for backup or restore of table info tables.
@@ -162,6 +166,7 @@ impl NodeManager {
         // Bind to the requested address.
         node_config.api.address.set_ip(IpAddr::V4(bind_to));
         node_config.indexer_grpc.address.set_ip(IpAddr::V4(bind_to));
+        node_config.indexer_grpc.websocket_address.set_ip(IpAddr::V4(bind_to));
         node_config.admin_service.address = bind_to.to_string();
         node_config.inspection_service.address = bind_to.to_string();
         node_config.indexer_db_config.enable_event = true;
@@ -181,6 +186,10 @@ impl NodeManager {
 
     pub fn get_data_service_url(&self) -> Url {
         socket_addr_to_url(&self.config.indexer_grpc.address, "http").unwrap()
+    }
+
+    pub fn get_websocket_service_url(&self) -> Url {
+        socket_addr_to_url(&self.config.indexer_grpc.websocket_address, "ws").unwrap()
     }
 }
 

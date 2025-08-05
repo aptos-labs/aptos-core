@@ -8,6 +8,7 @@ pub mod convert;
 pub mod counters;
 pub mod fullnode_data_service;
 pub mod localnet_data_service;
+pub mod localnet_websocket_service;
 pub mod runtime;
 pub mod stream_coordinator;
 

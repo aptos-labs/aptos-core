@@ -144,6 +144,11 @@ pub fn start_node(
             IP_LOCAL_HOST,
             indexer_grpc_port
         );
+        no_panic_println!(
+            "WebSocket stream is ready. Endpoint: ws://{}:{}/",
+            IP_LOCAL_HOST,
+            indexer_grpc_port + 1
+        );
 
         Ok(indexer_grpc_port)
     };

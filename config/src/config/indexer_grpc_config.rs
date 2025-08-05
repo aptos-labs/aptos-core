@@ -18,6 +18,7 @@ const DEFAULT_PROCESSOR_TASK_COUNT: u16 = 20;
 const DEFAULT_PROCESSOR_BATCH_SIZE: u16 = 1000;
 const DEFAULT_OUTPUT_BATCH_SIZE: u16 = 100;
 pub const DEFAULT_GRPC_STREAM_PORT: u16 = 50051;
+pub const DEFAULT_WEBSOCKET_PORT: u16 = 50052;
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -41,6 +42,12 @@ pub struct IndexerGrpcConfig {
 
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
+
+    /// Whether to enable WebSocket streaming alongside gRPC
+    pub websocket_enabled: bool,
+
+    /// The address that the WebSocket server will listen on
+    pub websocket_address: SocketAddr,
 }
 
 impl Debug for IndexerGrpcConfig {
@@ -55,6 +62,8 @@ impl Debug for IndexerGrpcConfig {
             .field("processor_task_count", &self.processor_task_count)
             .field("processor_batch_size", &self.processor_batch_size)
             .field("output_batch_size", &self.output_batch_size)
+            .field("websocket_enabled", &self.websocket_enabled)
+            .field("websocket_address", &self.websocket_address)
             .finish()
     }
 }
@@ -74,6 +83,11 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
+            websocket_enabled: false,
+            websocket_address: SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                DEFAULT_WEBSOCKET_PORT,
+            )),
         }
     }
 }

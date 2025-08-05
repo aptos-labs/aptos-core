@@ -3,6 +3,7 @@
 
 use crate::{
     fullnode_data_service::FullnodeDataService, localnet_data_service::LocalnetDataService,
+    localnet_websocket_service::{websocket_events_handler, websocket_transactions_handler},
     ServiceContext,
 };
 use aptos_api::context::Context;
@@ -19,6 +20,7 @@ use aptos_protos::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use axum::{routing::get, Router};
 use futures::channel::oneshot;
 use std::sync::Arc;
 use tokio::{net::TcpListener, runtime::Runtime};
@@ -54,6 +56,8 @@ pub fn bootstrap(
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
+    let websocket_enabled = node_config.indexer_grpc.websocket_enabled;
+    let websocket_address = node_config.indexer_grpc.websocket_address;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(
@@ -117,10 +121,45 @@ pub fn bootstrap(
         }
         let incoming = TcpIncoming::from_listener(listener, false, None).unwrap();
 
-        // Make port into a config
-        router.serve_with_incoming(incoming).await.unwrap();
+        // Start gRPC server
+        let grpc_handle = tokio::spawn(async move {
+            router.serve_with_incoming(incoming).await.unwrap();
+        });
 
         info!(address = address, "[indexer-grpc] Started GRPC server");
+
+        // Start WebSocket server if enabled
+        if websocket_enabled {
+            let service_context_ws = Arc::new(ServiceContext {
+                context: context.clone(),
+                processor_task_count,
+                processor_batch_size,
+                output_batch_size,
+            });
+
+            let ws_handle = tokio::spawn(async move {
+                let app = Router::new()
+                    .route("/ws/transactions", get(websocket_transactions_handler))
+                    .route("/ws/events", get(websocket_events_handler))
+                    .with_state(service_context_ws);
+
+                info!(
+                    websocket_address = websocket_address.to_string().as_str(),
+                    "[indexer-grpc] Starting WebSocket server"
+                );
+
+                let listener = TcpListener::bind(websocket_address).await.unwrap();
+                axum::serve(listener, app).await.unwrap();
+            });
+
+            info!(address = websocket_address, "[indexer-grpc] Started WebSocket server");
+
+            // Wait for both servers
+            let _ = tokio::try_join!(grpc_handle, ws_handle);
+        } else {
+            // Wait for just gRPC server
+            let _ = grpc_handle.await;
+        }
     });
     Some(runtime)
 }

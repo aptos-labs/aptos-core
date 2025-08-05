@@ -87,6 +87,8 @@ pub async fn websocket_events_handler(
 async fn handle_transactions_websocket(socket: WebSocket, service: Arc<DataServiceWrapperWrapper>) {
     let (mut sender, mut receiver) = socket.split();
 
+    // todo it might be better to do this how we do it in localnet_websocket_service.rs (and dedupe),
+    // where we sort of implement it natively instead of just wrapping the grpc stream.
     // Wait for the initial request
     if let Some(msg) = receiver.next().await {
         match msg {
