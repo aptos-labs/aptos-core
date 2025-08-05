@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Cyclomatic complexity measures the number of independent execution paths
+//! Cyclomatic complexity measures the number of linearly independent execution paths
 //! through a function.  A high value generally correlates with code that is
 //! harder to test and maintain.
 //!
