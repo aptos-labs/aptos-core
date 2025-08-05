@@ -842,6 +842,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             baseline_flag,
                         );
                     },
+
                     BitOr | BitAnd | Xor => self.check_and_update_oper_dest(
                         state,
                         dests,
@@ -1053,7 +1054,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 .insert(new_field_id, merged_oper);
                         }
                     },
-                    Function(msid, fsid, _) => {
+                    Function(msid, fsid, _) | Closure(msid, fsid, _, _) => {
                         let module_env = &self.func_target.global_env().get_module(*msid);
                         // Vector functions are handled separately
                         if !module_env.is_std_vector() && !module_env.is_table() {
@@ -1173,6 +1174,18 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 }
                             } // empty, do nothing
                         }
+                    },
+                    Invoke => {
+                        self.check_and_update_oper(
+                            state,
+                            dests,
+                            srcs,
+                            NumOperation::default(),
+                            cur_mid,
+                            cur_fid,
+                            &mut global_state,
+                            baseline_flag,
+                        );
                     },
                     // TODO(#14349): add support for enum type related operation
                     _ => {},

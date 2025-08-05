@@ -12433,7 +12433,6 @@ dependencies = [
  "once_cell",
  "serde",
  "shell-words",
- "simplelog",
  "tempfile",
  "toml 0.7.8",
  "walkdir",
@@ -16882,17 +16881,6 @@ dependencies = [
  "num-traits",
  "thiserror",
  "time",
-]
-
-[[package]]
-name = "simplelog"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc0ffd69814a9b251d43afcabf96dad1b29f5028378056257be9e3fecc9f720"
-dependencies = [
- "chrono",
- "log",
- "termcolor",
 ]
 
 [[package]]

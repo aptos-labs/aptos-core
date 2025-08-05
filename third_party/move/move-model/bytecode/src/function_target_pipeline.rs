@@ -573,7 +573,7 @@ impl FunctionTargetPipeline {
     }
 
     fn debug_dump(base_name: &str, step_count: usize, suffix: &str, content: &str) {
-        let name = format!("bytecode of {}_{}_{}", base_name, step_count, suffix);
+        let name = format!("bytecode of {}#step{}_{}", base_name, step_count, suffix);
         debug!("{}:\n{}\n", name, content.trim())
     }
 

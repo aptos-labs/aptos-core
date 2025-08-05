@@ -1178,7 +1178,12 @@ impl ExpData {
     pub fn called_funs(&self) -> BTreeSet<QualifiedId<FunId>> {
         let mut called = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
-            if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
+            if let ExpData::Call(
+                _,
+                Operation::MoveFunction(mid, fid) | Operation::Closure(mid, fid, _),
+                _,
+            ) = e
+            {
                 called.insert(mid.qualified(*fid));
             };
             true // keep going
@@ -1209,7 +1214,12 @@ impl ExpData {
     pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
         let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
         let mut visitor = |e: &ExpData| {
-            if let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = e {
+            if let ExpData::Call(
+                node_id,
+                Operation::MoveFunction(mid, fid) | Operation::Closure(mid, fid, _),
+                _,
+            ) = e
+            {
                 called
                     .entry(mid.qualified(*fid))
                     .or_default()
