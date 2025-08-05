@@ -6,9 +6,7 @@ mod code_cache_tests;
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
-    errors::SequentialBlockExecutionError,
-    executor::BlockExecutor,
-    proptest_types::{
+    combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
         types::{
@@ -16,6 +14,8 @@ use crate::{
             ValueType,
         },
     },
+    errors::SequentialBlockExecutionError,
+    executor::BlockExecutor,
     scheduler::{
         DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
     },
@@ -90,7 +90,7 @@ fn test_block_epilogue_happy_path() {
                 false,
             )
             .unwrap();
-        let (output, block_epilogue_txn) = result.into_inner();
+        let (output, block_epilogue_txn, _to_make_hot) = result.into_inner();
         assert!(block_epilogue_txn.is_some());
         assert_eq!(output.len(), 3);
         assert!(!output[0].skipped);
@@ -108,7 +108,7 @@ fn test_block_epilogue_happy_path() {
                 &mut guard,
             )
             .unwrap();
-        let (output, block_epilogue_txn) = result.into_inner();
+        let (output, block_epilogue_txn, _to_make_hot) = result.into_inner();
         assert!(block_epilogue_txn.is_some());
         assert_eq!(output.len(), 3);
         assert!(!output[0].skipped);
@@ -157,7 +157,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
                 false,
             )
             .unwrap();
-        let (output, block_epilogue_txn) = result.into_inner();
+        let (output, block_epilogue_txn, _to_make_hot) = result.into_inner();
         assert!(block_epilogue_txn.is_some());
         assert_eq!(output.len(), 3);
         assert!(!output[0].skipped);
@@ -175,7 +175,7 @@ fn test_block_epilogue_block_gas_limit_reached() {
                 &mut guard,
             )
             .unwrap();
-        let (output, block_epilogue_txn) = result.into_inner();
+        let (output, block_epilogue_txn, _to_make_hot) = result.into_inner();
         assert!(block_epilogue_txn.is_some());
         assert_eq!(output.len(), 3);
         assert!(!output[0].skipped);

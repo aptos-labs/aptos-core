@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.6.1"
+version = "7.7.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -709,6 +709,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-gas-schedule",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -4125,6 +4126,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -6296,7 +6298,10 @@ name = "bytecode-verifier-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "libtest-mimic",
  "move-transactional-test-runner",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]
@@ -12319,11 +12324,11 @@ dependencies = [
  "itertools 0.13.0",
  "legacy-move-compiler",
  "log",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
  "move-core-types",
- "move-disassembler",
  "move-ir-types",
  "move-prover-test-utils",
  "move-symbol-pool",
@@ -12367,6 +12372,24 @@ dependencies = [
  "toml 0.7.8",
  "walkdir",
  "whoami",
+]
+
+[[package]]
+name = "move-package-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-rest-client",
+ "fs2",
+ "futures",
+ "git2 0.16.1",
+ "hex",
+ "move-core-types",
+ "percent-encoding",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -12630,6 +12653,7 @@ dependencies = [
  "once_cell",
  "regex",
  "tempfile",
+ "tera",
  "termcolor",
 ]
 
@@ -12689,6 +12713,7 @@ dependencies = [
  "move-vm-types",
  "smallvec",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
@@ -12707,6 +12732,7 @@ dependencies = [
  "anyhow",
  "better_any",
  "bytes",
+ "cfg-if",
  "claims",
  "fail",
  "hashbrown 0.14.3",
@@ -12726,6 +12752,7 @@ dependencies = [
  "proptest",
  "serde",
  "smallbitvec",
+ "test-case",
  "triomphe",
  "typed-arena",
 ]
@@ -16992,6 +17019,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-filters",
  "aptos-types",
  "aptos-vault-client",
  "aptos-vm",

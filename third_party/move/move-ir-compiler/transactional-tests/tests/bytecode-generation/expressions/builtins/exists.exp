@@ -1,24 +1,21 @@
 processed 4 tasks
+task 0 lines 1-11:  print-bytecode --input=module [module 0x5d5.M {]
+// Bytecode version v7
+module 0x5d5::M
+struct T
+  b: bool
 
-task 0 'print-bytecode'. lines 1-11:
-// Move bytecode v7
-module 5d5.M {
-struct T has key {
-	b: bool
-}
+// Function definition at index 0
+fun f()
+    local l0: bool
+    ld_u64 4
+    exists T
+    st_loc l0
+    ret
 
-f() /* def_idx: 0 */ {
-L0:	loc0: bool
-B0:
-	0: LdU64(4)
-	1: Exists[0](T)
-	2: StLoc[0](loc0: bool)
-	3: Ret
-}
-}
 
-task 2 'print-bytecode'. lines 18-27:
+task 1 lines 13-16:  publish [module 0x6d5.M {]
+task 2 lines 18-27:  print-bytecode --input=module [// Checking the existence of a struct type defined in a different module is invalid.]
 Error: Missing struct definition for T
-
-task 3 'print-bytecode'. lines 29-37:
+task 3 lines 29-37:  print-bytecode [// Checking the existence of a struct type within a script (which cannot define its own]
 Error: Missing struct definition for T

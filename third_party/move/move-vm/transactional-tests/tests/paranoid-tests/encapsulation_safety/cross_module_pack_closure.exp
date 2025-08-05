@@ -1,6 +1,9 @@
 processed 13 tasks
-
-task 4 'run'. lines 54-54:
+task 0 lines 1-4:  publish [module 0x2::a {]
+task 1 lines 6-13:  publish [module 0x2::b {]
+task 2 lines 16-33:  publish [module 0x2::a {]
+task 3 lines 35-52:  publish [module 0x2::c {]
+task 4 lines 54-54:  run 0x2::a::call_private_function
 Error: Function execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -8,8 +11,9 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(1), 0)],
 }
-
-task 7 'run'. lines 60-60:
+task 5 lines 56-56:  run 0x2::a::call_friend_function
+task 6 lines 58-58:  run 0x2::a::call_public_function
+task 7 lines 60-60:  run 0x2::c::call_private_function
 Error: Function execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -17,8 +21,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(1), 0)],
 }
-
-task 8 'run'. lines 62-62:
+task 8 lines 62-62:  run 0x2::c::call_friend_function
 Error: Function execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -26,8 +29,8 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-
-task 10 'run'. lines 66-74:
+task 9 lines 64-64:  run 0x2::c::call_public_function
+task 10 lines 66-74:  run --signers 0x1 [script {]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -35,8 +38,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
-
-task 11 'run'. lines 76-84:
+task 11 lines 76-84:  run --signers 0x1 [script {]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -44,3 +46,4 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
+task 12 lines 86-94:  run --signers 0x1 [script {]

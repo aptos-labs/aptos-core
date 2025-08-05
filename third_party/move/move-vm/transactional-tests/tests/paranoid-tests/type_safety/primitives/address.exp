@@ -1,6 +1,7 @@
 processed 7 tasks
-
-task 2 'run'. lines 33-41:
+task 0 lines 1-21:  publish [module 0x2.A {]
+task 1 lines 23-31:  run --signers 0x1 [import 0x2.A;]
+task 2 lines 33-41:  run --signers 0x1 [import 0x2.A;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -8,8 +9,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 3)],
 }
-
-task 3 'run'. lines 43-53:
+task 3 lines 43-53:  run --signers 0x1 [main(account: signer) {]
 Error: Script execution failed with VMError: {
     major_status: INTERNAL_TYPE_ERROR,
     sub_status: None,
@@ -17,8 +17,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 4)],
 }
-
-task 4 'run'. lines 55-65:
+task 4 lines 55-65:  run --signers 0x1 [main(account: signer) {]
 Error: Script execution failed with VMError: {
     major_status: INTERNAL_TYPE_ERROR,
     sub_status: None,
@@ -26,8 +25,8 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 4)],
 }
-
-task 6 'run'. lines 78-87:
+task 5 lines 67-76:  run --signers 0x1 [main(account: signer) {]
+task 6 lines 78-87:  run --signers 0x1 [main(account: signer) {]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),

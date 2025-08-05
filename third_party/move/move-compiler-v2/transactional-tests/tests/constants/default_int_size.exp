@@ -1,6 +1,8 @@
 processed 4 tasks
-
-task 3 'run'. lines 40-53:
+task 0 lines 1-12:  run [script {]
+task 1 lines 14-25:  run [script {]
+task 2 lines 27-38:  run [script {]
+task 3 lines 40-53:  run [script {]
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,

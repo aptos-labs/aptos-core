@@ -281,6 +281,10 @@ impl AsmParser {
         !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline)
     }
 
+    fn lookahead_indent(&self) -> bool {
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Indent(_))
+    }
+
     #[allow(unused)]
     fn lookahead_soft_kw(&self, kw: &str) -> bool {
         !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Ident(s) if s == kw)
@@ -440,7 +444,7 @@ impl AsmParser {
             };
             self.expect_special("|")?;
             let res_tys = if self.is_type_tuple() {
-                self.type_tuple()?
+                self.result_type_tuple()?
             } else {
                 vec![]
             };
@@ -464,13 +468,13 @@ impl AsmParser {
         self.list(Self::type_, ",")
     }
 
-    fn type_tuple(&mut self) -> AsmResult<Vec<Type>> {
+    fn result_type_tuple(&mut self) -> AsmResult<Vec<Type>> {
         if self.is_special("(") {
             self.advance()?;
             let res = self.type_list()?;
             self.expect_special(")")?;
             Ok(res)
-        } else if self.is_type() {
+        } else if self.is_type() || self.is_special("|") {
             Ok(vec![self.type_()?])
         } else {
             Err(error(self.next_loc, "expected type or type tuple"))
@@ -626,6 +630,13 @@ impl AsmParser {
         let label = if self.is_special(":") {
             self.advance()?;
             let label = Some(name);
+            if self.is_tok(&Token::Newline) && self.lookahead_indent() {
+                // Allow
+                //  l:
+                //    inst
+                self.advance()?;
+                self.advance()?;
+            }
             loc = self.next_loc;
             name = self.ident()?;
             label
@@ -785,7 +796,7 @@ impl AsmParser {
         self.expect_special(")")?;
         let result = if self.is_special(":") {
             self.advance()?;
-            self.type_tuple()?
+            self.result_type_tuple()?
         } else {
             vec![]
         };

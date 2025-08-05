@@ -1,13 +1,10 @@
 processed 5 tasks
-
-task 1 'run'. lines 33-33:
+task 0 lines 1-31:  publish [module 0xdeadbeef::test {]
+task 1 lines 33-33:  run 0xdeadbeef::test::test1
 return values: 6
-
-task 2 'run'. lines 35-35:
+task 2 lines 35-35:  run 0xdeadbeef::test::test2
 return values: 8
-
-task 3 'run'. lines 37-37:
+task 3 lines 37-37:  run 0xdeadbeef::test::test3
 return values: 7
-
-task 4 'run'. lines 39-39:
+task 4 lines 39-39:  run 0xdeadbeef::test::test4
 return values: 9

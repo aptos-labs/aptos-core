@@ -549,6 +549,8 @@ pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
+    // Captured always, but used for aggregator v1 validation in BlockSTMv2 flow.
+    aggregator_v1_reads: HashSet<T::Key>,
 
     module_reads: hashbrown::HashMap<K, ModuleRead<DC, VC, S>>,
 
@@ -578,6 +580,7 @@ impl<T: Transaction, K, DC, VC, S> CapturedReads<T, K, DC, VC, S> {
             data_reads: HashMap::new(),
             group_reads: HashMap::new(),
             delayed_field_reads: HashMap::new(),
+            aggregator_v1_reads: HashSet::new(),
             module_reads: hashbrown::HashMap::new(),
             delayed_field_speculative_failure: false,
             non_delayed_field_speculative_failure: false,
@@ -742,6 +745,10 @@ where
         }
     }
 
+    pub(crate) fn capture_aggregator_v1_read(&mut self, key: T::Key) {
+        self.aggregator_v1_reads.insert(key);
+    }
+
     pub(crate) fn capture_data_read(
         &mut self,
         group_key: T::Key,
@@ -899,30 +906,29 @@ where
         self.incorrect_use
     }
 
-    pub(crate) fn validate_data_reads(
-        &self,
+    fn validate_data_reads_impl<'a>(
+        &'a self,
+        iter: impl Iterator<Item = (&'a T::Key, &'a DataRead<T::Value>)>,
         data_map: &VersionedData<T::Key, T::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool {
-        if self.non_delayed_field_speculative_failure {
-            return false;
-        }
-
         use MVDataError::*;
         use MVDataOutput::*;
-        self.data_reads.iter().all(|(k, r)| {
+        for (key, read) in iter {
             // We use fetch_data even with BlockSTMv2, because we don't want to record reads.
-            match data_map.fetch_data_no_record(k, idx_to_validate) {
-                Ok(Versioned(version, v)) => {
+            if !match data_map.fetch_data_no_record(key, idx_to_validate) {
+                Ok(Versioned(version, value)) => {
                     matches!(
-                        self.data_read_comparator
-                            .compare_data_reads(&DataRead::from_value_with_layout(version, v), r),
+                        self.data_read_comparator.compare_data_reads(
+                            &DataRead::from_value_with_layout(version, value),
+                            read
+                        ),
                         DataReadComparison::Contains
                     )
                 },
                 Ok(Resolved(value)) => matches!(
                     self.data_read_comparator
-                        .compare_data_reads(&DataRead::Resolved(value), r),
+                        .compare_data_reads(&DataRead::Resolved(value), read),
                     DataReadComparison::Contains
                 ),
                 // Dependency implies a validation failure, and if the original read were to
@@ -932,8 +938,72 @@ where
                 | Err(Unresolved(_))
                 | Err(DeltaApplicationFailure)
                 | Err(Uninitialized) => false,
+            } {
+                return false;
             }
-        })
+        }
+        true
+    }
+
+    pub(crate) fn validate_data_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.non_delayed_field_speculative_failure {
+            return false;
+        }
+
+        // This includes AggregatorV1 reads and keeps BlockSTMv1 behavior intact.
+        self.validate_data_reads_impl(self.data_reads.iter(), data_map, idx_to_validate)
+    }
+
+    // This method is only used in the BlockSTMv2 flow. BlockSTMv1 validates
+    // aggregator v1 reads as a part of data reads.
+    pub(crate) fn validate_aggregator_v1_reads(
+        &self,
+        data_map: &VersionedData<T::Key, T::Value>,
+        aggregator_write_keys: impl Iterator<Item = T::Key>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        // Few aggregator v1 instances exist in the system (and legacy now, deprecated
+        // by DelayedFields), hence the efficiency of construction below is not a concern.
+        let mut aggregator_v1_iterable = Vec::with_capacity(self.aggregator_v1_reads.len());
+        for k in &self.aggregator_v1_reads {
+            match self.data_reads.get(k) {
+                Some(data_read) => aggregator_v1_iterable.push((k, data_read)),
+                None => {
+                    return Err(code_invariant_error(format!(
+                        "Aggregator v1 read {:?} not found among captured data reads",
+                        k
+                    )));
+                },
+            }
+        }
+
+        let ret = self.validate_data_reads_impl(
+            aggregator_v1_iterable.into_iter(),
+            data_map,
+            idx_to_validate,
+        );
+
+        if ret {
+            // Additional invariant check (that AggregatorV1 reads are captured for
+            // aggregator write keys). This protects against the case where aggregator v1
+            // state value read was read by a wrong interface (e.g. via resource API).
+            for key in aggregator_write_keys {
+                if self.data_reads.contains_key(&key) && !self.aggregator_v1_reads.contains(&key) {
+                    // Not assuming read-before-write here: if there was a read, it must also be
+                    // captured as an aggregator_v1 read.
+                    return Err(code_invariant_error(format!(
+                        "Captured read at aggregator key {:?} not found among AggregatorV1 reads",
+                        key
+                    )));
+                }
+            }
+        }
+
+        Ok(ret)
     }
 
     /// Records the read to global cache that spans across multiple blocks.
@@ -1185,7 +1255,7 @@ mod test {
     use super::*;
     use crate::{
         code_cache_global::GlobalModuleCache,
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{raw_metadata, KeyType, ValueType},
         },

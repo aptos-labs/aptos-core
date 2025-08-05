@@ -1,6 +1,5 @@
 processed 4 tasks
-
-task 1 'publish'. lines 4-22:
+task 1 lines 4-22:  publish --private-key alice [module alice::foo {]
 warning: to be used as an entry function, all signers should precede non-signers
    ┌─ TEMPFILE:12:41
    │
@@ -20,8 +19,7 @@ warning: to be used as an entry function, all signers should precede non-signers
    │                                                                               ^^^
 
 
-
-task 2 'publish'. lines 24-30:
+task 2 lines 24-30:  publish --private-key alice [module alice::bar {]
 Error: extended checks failed:
 
 error: entry function cannot return values
@@ -31,8 +29,7 @@ error: entry function cannot return values
    │               ^^^^^^^^^^^^^^^^
 
 
-
-task 3 'publish'. lines 32-38:
+task 3 lines 32-38:  publish --private-key alice [module alice::baz {]
 Error: extended checks failed:
 
 error: type `0x1::bit_vector::BitVector` is not supported as a transaction parameter type

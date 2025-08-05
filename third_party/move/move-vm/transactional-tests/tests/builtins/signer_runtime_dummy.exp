@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-5:  run --signers 0x1 [main(s: signer) {]
+task 1 lines 7-11:  run --signers 0x1 --args 0 [main(s: signer, u: u64) {]
+task 2 lines 13-17:  run --signers 0x1 --args 0 @0x1 [main(s: signer, u: u64, b: address) {]

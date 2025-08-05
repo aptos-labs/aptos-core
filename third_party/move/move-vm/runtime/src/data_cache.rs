@@ -5,23 +5,19 @@
 use crate::{
     module_traversal::TraversalContext,
     storage::{
+        loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
         module_storage::FunctionValueExtensionAdapter,
-        ty_layout_converter::{LayoutConverter, StorageLayoutConverter},
+        ty_layout_converter::LayoutConverter,
     },
     ModuleStorage, RuntimeEnvironment,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
-    account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes},
-    gas_algebra::NumBytes,
-    language_storage::{StructTag, TypeTag},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
+    account_address::AccountAddress, effects::{AccountChanges, ChangeSet, Changes}, gas_algebra::NumBytes, identifier::IdentStr, language_storage::{StructTag, TypeTag}, value::MoveTypeLayout, vm_status::StatusCode
 };
 use move_vm_types::{
-    gas::GasMeter,
+    gas::{DependencyGasMeter, GasMeter},
     loaded_data::runtime_types::Type,
     resolver::{ResourceResolver, ResourceSizeInfo},
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -80,6 +76,29 @@ struct DataCacheEntry {
     layout: MoveTypeLayout,
     contains_delayed_fields: bool,
     value: CachedInformation,
+}
+
+pub enum DataCacheGasMeterWrapper<'a, T: GasMeter> {
+    DependencyOnly(&'a mut dyn DependencyGasMeter),
+    Full(&'a mut T),
+}
+
+impl<'a, T: GasMeter> DataCacheGasMeterWrapper<'a, T> {
+    fn get_full_gas_meter(&mut self) -> Option<&mut T> {
+        match self {
+            Self::DependencyOnly(_) => None,
+            Self::Full(gm) => Some(gm),
+        }
+    }
+}
+
+impl<'a, T: GasMeter> DependencyGasMeter for DataCacheGasMeterWrapper<'a, T> {
+    fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>  {
+        match self {
+            DataCacheGasMeterWrapper::DependencyOnly(dgm) => dgm.charge_dependency(is_new, addr, name, size),
+            DataCacheGasMeterWrapper::Full(gm) => gm.charge_dependency(is_new, addr, name, size),
+        }
+    }
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -169,17 +188,22 @@ impl TransactionDataCache {
     }
 
     fn create_cached_info(
-        load_data: bool,
-        resource_resolver: &dyn ResourceResolver,
+        metadata_loader: &impl ModuleMetadataLoader,
+        dependency_gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
         module_storage: &dyn ModuleStorage,
-        struct_tag: &StructTag,
+        resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
+        struct_tag: &StructTag,
         layout: &MoveTypeLayout,
         contains_delayed_fields: bool,
+        load_data: bool,
     ) -> PartialVMResult<(CachedInformation, u64)> {
-        let metadata = module_storage
-            .fetch_existing_module_metadata(&struct_tag.address, struct_tag.module.as_ident_str())
-            .map_err(|err| err.to_partial())?;
+        let metadata = metadata_loader.load_module_metadata(
+            dependency_gas_meter,
+            traversal_context,
+            &struct_tag.module_id(),
+        )?;
 
         Ok(if load_data {
             let (data, bytes_loaded) = {
@@ -240,10 +264,12 @@ impl TransactionDataCache {
     /// If `load_data` is false, only resource existence information will be retrieved
     pub(crate) fn create_and_insert_or_upgrade_and_charge_data_cache_entry(
         &mut self,
+        metadata_loader: &impl ModuleMetadataLoader,
+        layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
+        mut gas_meter: DataCacheGasMeterWrapper<impl GasMeter>,
+        traversal_context: &mut TraversalContext,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
-        maybe_gas_meter: Option<&mut impl GasMeter>,
-        _traversal_context: &mut TraversalContext,
         addr: &AccountAddress,
         ty: &Type,
         mut load_data: bool,
@@ -265,23 +291,28 @@ impl TransactionDataCache {
                     },
                 };
 
-                // TODO(Gas): Shall we charge for this?
-                let (layout, contains_delayed_fields) = StorageLayoutConverter::new(module_storage)
-                    .type_to_type_layout_with_identifier_mappings(ty)?;
+                let (layout, contains_delayed_fields) = layout_converter.type_to_type_layout_with_delayed_fields(
+                    &mut gas_meter,
+                    traversal_context,
+                    ty,
+                )?.unpack();
 
                 let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
-                    load_data,
-                    resource_resolver,
+                    metadata_loader,
+                    &mut gas_meter,
+                    traversal_context,
                     module_storage,
-                    &struct_tag,
+                    resource_resolver,
                     addr,
+                    &struct_tag,
                     &layout,
                     contains_delayed_fields,
+                    load_data,
                 )?;
 
                 let num_bytes_loaded = NumBytes::new(bytes_loaded as u64);
-                if let Some(gas_meter) = maybe_gas_meter {
-                    gas_meter.charge_load_resource(
+                if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
+                    full_gas_meter.charge_load_resource(
                         *addr,
                         TypeWithRuntimeEnvironment {
                             ty,
@@ -309,17 +340,20 @@ impl TransactionDataCache {
                 let num_bytes_loaded = NumBytes::zero();
                 if load_data && !matches!(occupied_entry.get().value, CachedInformation::Value(_)) {
                     let (cached_info, _) = TransactionDataCache::create_cached_info(
-                        load_data,
-                        resource_resolver,
+                        metadata_loader,
+                        &mut gas_meter,
+                        traversal_context,
                         module_storage,
-                        &occupied_entry.get().struct_tag,
+                        resource_resolver,
                         addr,
+                        &occupied_entry.get().struct_tag,
                         &occupied_entry.get().layout,
                         occupied_entry.get().contains_delayed_fields,
+                        load_data,
                     )?;
 
-                    if let Some(gas_meter) = maybe_gas_meter {
-                        gas_meter.charge_load_resource(
+                    if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
+                        full_gas_meter.charge_load_resource(
                             *addr,
                             TypeWithRuntimeEnvironment {
                                 ty,

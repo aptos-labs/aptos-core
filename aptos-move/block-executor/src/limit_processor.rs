@@ -8,7 +8,7 @@ use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::TStateView,
+    state_store::{state_slot::StateSlot, TStateView},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -291,14 +291,19 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
-        let slots_to_make_hot = if let Some(x) = &self.hot_state_op_accumulator {
-            x.get_slots_to_make_hot()
-        } else {
-            warn!("BlockHotStateOpAccumulator is not set.");
-            BTreeMap::new()
-        };
 
-        TBlockEndInfoExt::new(inner, slots_to_make_hot)
+        TBlockEndInfoExt::new(inner)
+    }
+
+    pub(crate) fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+        if self.hot_state_op_accumulator.is_none() {
+            warn!("BlockHotStateOpAccumulator is not set.");
+        }
+
+        self.hot_state_op_accumulator
+            .as_ref()
+            .map(|x| x.get_slots_to_make_hot())
+            .unwrap_or_default()
     }
 }
 
@@ -306,7 +311,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
 mod test {
     use super::*;
     use crate::{
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{KeyType, MockTransaction},
         },

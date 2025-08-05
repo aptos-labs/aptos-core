@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-179:
+task 0 lines 1-179:  publish [module 0x9A2D1C77326B441F3C4D46BA03C92B5DF09D75609AFDF1C491CD4529080A0385::Module0 {]
 Error: compilation errors:
  warning: Unused value of parameter `var0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_var0`), or binding to `_`
    ┌─ TEMPFILE:30:27
