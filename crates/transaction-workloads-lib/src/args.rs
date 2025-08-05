@@ -102,6 +102,8 @@ pub enum TransactionTypeArg {
     /// A set of workloads where X% of transactions modify a resource and other trnasactions just check its existence
     /// All modifications are strictly serialized but existence checks should be perfectly parallelizable
     ExistenceCheck0Pct,
+    ExistenceCheck5Pct,
+    ExistenceCheck10Pct,
     ExistenceCheck20Pct,
     ExistenceCheck50Pct,
     ExistenceCheck80Pct,
@@ -457,6 +459,16 @@ impl TransactionTypeArg {
                     modify_frequency: 0.0,
                 })
             },
+            TransactionTypeArg::ExistenceCheck5Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.05,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck10Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.1,
+                })
+            },
             TransactionTypeArg::ExistenceCheck20Pct => {
                 call_custom_module(EntryPoints::ExistenceModificationConflicts {
                     modify_frequency: 0.2,
@@ -477,7 +489,9 @@ impl TransactionTypeArg {
                     modify_frequency: 1.0,
                 })
             },
-            TransactionTypeArg::CheckAndModify => call_custom_module(EntryPoints::CheckExistsAndModify),
+            TransactionTypeArg::CheckAndModify => {
+                call_custom_module(EntryPoints::CheckExistsAndModify)
+            },
         }
     }
 

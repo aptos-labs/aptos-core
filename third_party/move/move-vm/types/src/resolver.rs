@@ -22,10 +22,7 @@ pub struct ResourceSizeInfo {
 
 impl ResourceSizeInfo {
     pub fn new(size: Option<u64>, bytes_loaded: u64) -> Self {
-        Self {
-            size,
-            bytes_loaded,
-        }
+        Self { size, bytes_loaded }
     }
 }
 
@@ -56,6 +53,9 @@ pub trait ResourceResolver {
     ) -> PartialVMResult<ResourceSizeInfo> {
         let (bytes, bytes_loaded) = self
             .get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, layout)?;
-        Ok(ResourceSizeInfo::new(bytes.map(|bytes| bytes.len() as u64), bytes_loaded as u64))
+        Ok(ResourceSizeInfo::new(
+            bytes.map(|bytes| bytes.len() as u64),
+            bytes_loaded as u64,
+        ))
     }
 }

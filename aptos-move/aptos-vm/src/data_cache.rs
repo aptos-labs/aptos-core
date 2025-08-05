@@ -130,7 +130,9 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
-        if let Some(result) = self.get_resource_group_member_bytes(address, struct_tag, metadata, maybe_layout)? {
+        if let Some(result) =
+            self.get_resource_group_member_bytes(address, struct_tag, metadata, maybe_layout)?
+        {
             return Ok(result);
         }
 
@@ -149,8 +151,13 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<ResourceSizeInfo> {
-        if let Some((bytes, bytes_loaded)) = self.get_resource_group_member_bytes(address, struct_tag, metadata, maybe_layout)? {
-            return Ok(ResourceSizeInfo::new(bytes.map(|bytes| bytes.len() as u64), bytes_loaded as u64));
+        if let Some((bytes, bytes_loaded)) =
+            self.get_resource_group_member_bytes(address, struct_tag, metadata, maybe_layout)?
+        {
+            return Ok(ResourceSizeInfo::new(
+                bytes.map(|bytes| bytes.len() as u64),
+                bytes_loaded as u64,
+            ));
         }
         let state_key = resource_state_key(address, struct_tag)?;
         let size = self

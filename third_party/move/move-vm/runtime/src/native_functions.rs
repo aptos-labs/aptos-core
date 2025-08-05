@@ -3,11 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, data_cache::{CachedInformation, DataCacheGasMeterWrapper, TransactionDataCache}, dispatch_loader, interpreter::InterpreterDebugInterface, loader::{LazyLoadedFunction, LazyLoadedFunctionState}, module_traversal::TraversalContext, native_extensions::NativeContextExtensions, storage::{
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
+    data_cache::{CachedInformation, DataCacheGasMeterWrapper, TransactionDataCache},
+    dispatch_loader,
+    interpreter::InterpreterDebugInterface,
+    loader::{LazyLoadedFunction, LazyLoadedFunctionState},
+    module_traversal::TraversalContext,
+    native_extensions::NativeContextExtensions,
+    storage::{
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
-    }, Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    },
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -25,7 +33,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter, UnmeteredGasMeter},
+    gas::{
+        ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter, UnmeteredGasMeter,
+    },
     loaded_data::runtime_types::{StructType, Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
@@ -146,14 +156,11 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         address: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)> {
-        // TODO(#16516):
-        //   Propagate exists call all the way to resolver, because we can implement the check more
-        //   efficiently, without the need to actually load bytes, deserialize the value and cache
-        //   it in the data cache.
         Ok(
             if !self.data_store.contains_resource_existence(&address, ty) {
                 let (mut context, data_store) = self.load_context_and_data_store();
-                let (entry, bytes_loaded) = context.create_data_cache_entry(data_store, address, ty, false)?;
+                let (entry, bytes_loaded) =
+                    context.create_data_cache_entry(data_store, address, ty, false)?;
                 let exists = entry.exists()?;
                 (exists, Some(bytes_loaded))
             } else {
@@ -270,7 +277,9 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         )
     }
 
-    pub fn load_context_and_data_store(&mut self) -> (LoaderContext<'_, 'c>, &mut TransactionDataCache) {
+    pub fn load_context_and_data_store(
+        &mut self,
+    ) -> (LoaderContext<'_, 'c>, &mut TransactionDataCache) {
         (
             LoaderContext::new(
                 self.resource_resolver,
@@ -399,7 +408,9 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
             data_store.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 &loader,
                 &LayoutConverter::new(&loader),
-                DataCacheGasMeterWrapper::DependencyOnly::<UnmeteredGasMeter>(self.gas_meter.inner_mut()),
+                DataCacheGasMeterWrapper::DependencyOnly::<UnmeteredGasMeter>(
+                    self.gas_meter.inner_mut(),
+                ),
                 self.traversal_context,
                 &self.module_storage,
                 self.resource_resolver,

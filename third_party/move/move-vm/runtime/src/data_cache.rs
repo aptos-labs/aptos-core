@@ -14,7 +14,13 @@ use crate::{
 use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
-    account_address::AccountAddress, effects::{AccountChanges, ChangeSet, Changes}, gas_algebra::NumBytes, identifier::IdentStr, language_storage::{StructTag, TypeTag}, value::MoveTypeLayout, vm_status::StatusCode
+    account_address::AccountAddress,
+    effects::{AccountChanges, ChangeSet, Changes},
+    gas_algebra::NumBytes,
+    identifier::IdentStr,
+    language_storage::{StructTag, TypeTag},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::{DependencyGasMeter, GasMeter},
@@ -78,15 +84,27 @@ struct DataCacheEntry {
     value: CachedInformation,
 }
 
+/// Because of native functions sometimes data cache has access to only [[DependencyGasMeter]].
+/// If that is the case, we should charge only for module loading.
+/// Otherwise, we should also charge for data loading.
+/// This helper class wraps whatever gas meter we have for convenient use
 pub enum DataCacheGasMeterWrapper<'a, T: GasMeter> {
     DependencyOnly(&'a mut dyn DependencyGasMeter),
     Full(&'a mut T),
 }
 
 impl<'a, T: GasMeter> DependencyGasMeter for DataCacheGasMeterWrapper<'a, T> {
-    fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>  {
+    fn charge_dependency(
+        &mut self,
+        is_new: bool,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
         match self {
-            DataCacheGasMeterWrapper::DependencyOnly(dgm) => dgm.charge_dependency(is_new, addr, name, size),
+            DataCacheGasMeterWrapper::DependencyOnly(dgm) => {
+                dgm.charge_dependency(is_new, addr, name, size)
+            },
             DataCacheGasMeterWrapper::Full(gm) => gm.charge_dependency(is_new, addr, name, size),
         }
     }
@@ -234,7 +252,7 @@ impl TransactionDataCache {
             };
             (CachedInformation::Value(value), bytes_loaded as u64)
         } else {
-            let ResourceSizeInfo{size, bytes_loaded} = resource_resolver
+            let ResourceSizeInfo { size, bytes_loaded } = resource_resolver
                 .get_resource_size_with_metadata_and_layout(
                     addr,
                     struct_tag,
@@ -282,11 +300,9 @@ impl TransactionDataCache {
                     },
                 };
 
-                let (layout, contains_delayed_fields) = layout_converter.type_to_type_layout_with_delayed_fields(
-                    &mut gas_meter,
-                    traversal_context,
-                    ty,
-                )?.unpack();
+                let (layout, contains_delayed_fields) = layout_converter
+                    .type_to_type_layout_with_delayed_fields(&mut gas_meter, traversal_context, ty)?
+                    .unpack();
 
                 let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
                     metadata_loader,
@@ -301,7 +317,7 @@ impl TransactionDataCache {
                     load_data,
                 )?;
 
-                let num_bytes_loaded = NumBytes::new(bytes_loaded as u64);
+                let num_bytes_loaded = NumBytes::new(bytes_loaded);
                 if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
                     full_gas_meter.charge_load_resource(
                         *addr,
@@ -309,10 +325,7 @@ impl TransactionDataCache {
                             ty,
                             runtime_environment: module_storage.runtime_environment(),
                         },
-                        match cached_info.maybe_value() {
-                            None => None,
-                            Some(v) => v.view(),
-                        },
+                        cached_info.maybe_value().and_then(|v| v.view()),
                         num_bytes_loaded,
                     )?;
                 }
@@ -369,21 +382,28 @@ impl TransactionDataCache {
     }
 
     fn find_entry(&self, addr: &AccountAddress, ty: &Type) -> Option<&DataCacheEntry> {
-        if let Some(account_cache) = self.account_map.get(addr) {
-            account_cache.get(ty)
-        } else {
-            None
-        }
+        self.account_map.get(addr).and_then(|account_cache| account_cache.get(ty))
     }
 
-    fn expect_entry_mut(&mut self, addr: &AccountAddress, ty: &Type) -> PartialVMResult<&mut DataCacheEntry> {
-        match self.account_map.get_mut(addr).and_then(|account_cache| account_cache.get_mut(ty)) {
+    fn expect_entry_mut(
+        &mut self,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<&mut DataCacheEntry> {
+        match self
+            .account_map
+            .get_mut(addr)
+            .and_then(|account_cache| account_cache.get_mut(ty))
+        {
             Some(entry) => Ok(entry),
             None => {
-                let msg = format!("Resource entry for {:?} at {} must exist in data cache", ty, addr);
+                let msg = format!(
+                    "Resource entry for {:?} at {} must exist in data cache",
+                    ty, addr
+                );
                 let err = PartialVMError::new_invariant_violation(msg);
                 Err(err)
-            }
+            },
         }
     }
 
@@ -395,10 +415,7 @@ impl TransactionDataCache {
 
     /// Returns true if resource is present in the cache and we know its whole value, not just the size.
     pub(crate) fn contains_resource_data(&self, addr: &AccountAddress, ty: &Type) -> bool {
-        match self.find_entry(addr, ty) {
-            None => false,
-            Some(entry) => matches!(entry.value, CachedInformation::Value(_)),
-        }
+        self.find_entry(addr, ty).is_some_and(|entry| matches!(entry.value, CachedInformation::Value(_)))
     }
 
     /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
@@ -408,7 +425,8 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&mut GlobalValue> {
-        self.expect_entry_mut(addr, ty).and_then(|entry| entry.value.value_mut())
+        self.expect_entry_mut(addr, ty)
+            .and_then(|entry| entry.value.value_mut())
     }
 
     pub(crate) fn get_resource_existence(
@@ -416,6 +434,7 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<bool> {
-        self.expect_entry_mut(addr, ty).and_then(|entry| entry.value.exists())
+        self.expect_entry_mut(addr, ty)
+            .and_then(|entry| entry.value.exists())
     }
 }

@@ -413,7 +413,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
-            EntryPoints::ExistenceModificationConflicts { .. } | EntryPoints::CheckExistsAndModify => "existence",
+            EntryPoints::ExistenceModificationConflicts { .. }
+            | EntryPoints::CheckExistsAndModify => "existence",
         }
     }
 
