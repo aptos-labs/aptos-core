@@ -377,7 +377,7 @@ impl SuccessCriteriaResults {
 pub struct SuccessCriteriaChecker {}
 
 impl SuccessCriteriaChecker {
-    pub async fn check_core_for_success(
+    pub fn check_core_for_success(
         success_criteria: &SuccessCriteria,
         _report: &mut TestReport,
         stats_rate: &TxnStatsRate,
