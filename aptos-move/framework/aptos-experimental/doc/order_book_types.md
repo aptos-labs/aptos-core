@@ -12,10 +12,15 @@
 -  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
 -  [Enum `SingleOrderMatch`](#0x7_order_book_types_SingleOrderMatch)
+-  [Enum `TimeInForce`](#0x7_order_book_types_TimeInForce)
 -  [Enum `Order`](#0x7_order_book_types_Order)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
 -  [Enum `OrderWithState`](#0x7_order_book_types_OrderWithState)
 -  [Constants](#@Constants_0)
+-  [Function `time_in_force_from_index`](#0x7_order_book_types_time_in_force_from_index)
+-  [Function `good_till_cancelled`](#0x7_order_book_types_good_till_cancelled)
+-  [Function `post_only`](#0x7_order_book_types_post_only)
+-  [Function `immediate_or_cancel`](#0x7_order_book_types_immediate_or_cancel)
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
 -  [Function `get_slippage_pct_precision`](#0x7_order_book_types_get_slippage_pct_precision)
 -  [Function `new_time_based_trigger_condition`](#0x7_order_book_types_new_time_based_trigger_condition)
@@ -42,6 +47,7 @@
 -  [Function `get_account`](#0x7_order_book_types_get_account)
 -  [Function `get_unique_priority_idx`](#0x7_order_book_types_get_unique_priority_idx)
 -  [Function `get_metadata_from_order`](#0x7_order_book_types_get_metadata_from_order)
+-  [Function `get_time_in_force`](#0x7_order_book_types_get_time_in_force)
 -  [Function `get_trigger_condition_from_order`](#0x7_order_book_types_get_trigger_condition_from_order)
 -  [Function `increase_remaining_size`](#0x7_order_book_types_increase_remaining_size)
 -  [Function `decrease_remaining_size`](#0x7_order_book_types_decrease_remaining_size)
@@ -277,6 +283,72 @@
 
 </details>
 
+<a id="0x7_order_book_types_TimeInForce"></a>
+
+## Enum `TimeInForce`
+
+Order time in force
+
+
+<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>GTC</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>POST_ONLY</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>IOC</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
 <a id="0x7_order_book_types_Order"></a>
 
 ## Enum `Order`
@@ -351,6 +423,12 @@
 </dd>
 <dt>
 <code>trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a></code>
 </dt>
 <dd>
 
@@ -530,6 +608,15 @@
 
 
 
+<a id="0x7_order_book_types_EINVALID_TIME_IN_FORCE"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_EINVALID_TIME_IN_FORCE">EINVALID_TIME_IN_FORCE</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x7_order_book_types_EINVALID_TRIGGER_CONDITION"></a>
 
 
@@ -574,6 +661,110 @@
 </code></pre>
 
 
+
+<a id="0x7_order_book_types_time_in_force_from_index"></a>
+
+## Function `time_in_force_from_index`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_time_in_force_from_index">time_in_force_from_index</a>(index: u8): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_time_in_force_from_index">time_in_force_from_index</a>(index: u8): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
+    <b>if</b> (index == 0) {
+        TimeInForce::GTC
+    } <b>else</b> <b>if</b> (index == 1) {
+        TimeInForce::POST_ONLY
+    } <b>else</b> <b>if</b> (index == 2) {
+        TimeInForce::IOC
+    } <b>else</b> {
+        <b>abort</b> <a href="order_book_types.md#0x7_order_book_types_EINVALID_TIME_IN_FORCE">EINVALID_TIME_IN_FORCE</a>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_good_till_cancelled"></a>
+
+## Function `good_till_cancelled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_good_till_cancelled">good_till_cancelled</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_good_till_cancelled">good_till_cancelled</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
+    TimeInForce::GTC
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_post_only"></a>
+
+## Function `post_only`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_post_only">post_only</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_post_only">post_only</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
+    TimeInForce::POST_ONLY
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_immediate_or_cancel"></a>
+
+## Function `immediate_or_cancel`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_immediate_or_cancel">immediate_or_cancel</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_immediate_or_cancel">immediate_or_cancel</a>(): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
+    TimeInForce::IOC
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x7_order_book_types_new_default_big_ordered_map"></a>
 
@@ -856,7 +1047,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order">new_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order">new_order</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;
 </code></pre>
 
 
@@ -875,6 +1066,7 @@
     size: u64,
     is_bid: bool,
     trigger_condition: Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;,
+    time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>,
     metadata: M
 ): <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt; {
     Order::V1 {
@@ -885,8 +1077,9 @@
         price,
         orig_size,
         remaining_size: size,
-        is_bid: is_bid,
+        is_bid,
         trigger_condition,
+        time_in_force,
         metadata
     }
 }
@@ -1257,6 +1450,32 @@
 
 </details>
 
+<a id="0x7_order_book_types_get_time_in_force"></a>
+
+## Function `get_time_in_force`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_time_in_force">get_time_in_force</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_time_in_force">get_time_in_force</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
+): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
+    self.time_in_force
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_get_trigger_condition_from_order"></a>
 
 ## Function `get_trigger_condition_from_order`
@@ -1542,7 +1761,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, M)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
 </code></pre>
 
 
@@ -1554,7 +1773,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order">destroy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_Order">Order</a>&lt;M&gt;
 ): (
-    <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, M
+    <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, Option&lt;u64&gt;, u64, u64, u64, bool, Option&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M
 ) {
     <b>let</b> Order::V1 {
         order_id,
@@ -1566,6 +1785,7 @@
         remaining_size,
         is_bid,
         trigger_condition,
+        time_in_force,
         metadata
     } = self;
     (
@@ -1577,6 +1797,7 @@
         remaining_size,
         is_bid,
         trigger_condition,
+        time_in_force,
         metadata
     )
 }
