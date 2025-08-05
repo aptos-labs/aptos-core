@@ -176,7 +176,7 @@ class ForgeResult:
     @classmethod
     @contextmanager
     def with_context(
-        cls, context: "ForgeContext"
+            cls, context: "ForgeContext"
     ) -> Generator["ForgeResult", None, None]:
         result = cls()
         result.state = ForgeState.RUNNING
@@ -204,10 +204,10 @@ class ForgeResult:
             )
         result._end_time = context.time.now()
         if result.state not in (
-            ForgeState.PASS,
-            ForgeState.SOFT_FAIL,
-            ForgeState.FAIL,
-            ForgeState.SKIP,
+                ForgeState.PASS,
+                ForgeState.SOFT_FAIL,
+                ForgeState.FAIL,
+                ForgeState.SKIP,
         ):
             raise Exception("Forge result never entered terminal state")
         if result.output is None:
@@ -353,15 +353,15 @@ def format_report(context: ForgeContext, result: ForgeResult) -> str:
             debugging_appendix
         )
     else:
-        if result.state == ForgeState.FAIL or result.state == ForgeState.SOFT_FAIL:
+        if result.state in (ForgeState.FAIL, ForgeState.SOFT_FAIL):
             return "{}\n{}".format(report_text, debugging_appendix)
         return report_text
 
 
 def get_dashboard_link(
-    forge_namespace: str,
-    forge_chain_name: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        forge_namespace: str,
+        forge_chain_name: str,
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     if time_filter is True:
         grafana_time_filter = "&refresh=10s&from=now-15m&to=now"
@@ -384,10 +384,10 @@ class ContainerName(str, Enum):
 
 
 def get_cpu_profile_link(
-    container_name: ContainerName,
-    forge_namespace: str,
-    start_time: datetime | None = None,
-    end_time: datetime | None = None,
+        container_name: ContainerName,
+        forge_namespace: str,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
 ) -> str:
     base_url = "https://grafana.aptoslabs.com/a/grafana-pyroscope-app/profiles-explorer"
     start_timestamp = str(int(start_time.timestamp())) if start_time else "now-1h"
@@ -412,8 +412,8 @@ def milliseconds(timestamp: datetime) -> int:
 
 
 def apply_humio_time_filter(
-    urlparts: Mapping[str, Union[str, bool, int]],
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        urlparts: Mapping[str, Union[str, bool, int]],
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> Mapping:
     if time_filter is True:
         urlparts = {
@@ -436,8 +436,8 @@ def apply_humio_time_filter(
 
 
 def get_humio_link_for_test_runner_logs(
-    forge_namespace: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        forge_namespace: str,
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the forge test runner logs in humio for a given test run in a given namespace"""
     columns = [
@@ -478,8 +478,8 @@ def get_humio_link_for_test_runner_logs(
 
 
 def get_humio_link_for_node_logs(
-    forge_namespace: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        forge_namespace: str,
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the node logs in humio for a given test run in a given namespace"""
     query = (
@@ -531,8 +531,8 @@ def get_humio_link_for_node_logs(
 
 
 def get_axiom_link_for_test_runner_logs(
-    forge_namespace: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        forge_namespace: str,
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the forge test runner logs in axiom for a given test run in a given namespace"""
 
@@ -548,8 +548,8 @@ def get_axiom_link_for_test_runner_logs(
 
 
 def get_axiom_link_for_node_logs(
-    forge_namespace: str,
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        forge_namespace: str,
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
     """Get a link to the node logs in axiom for a given test run in a given namespace"""
 
@@ -569,7 +569,7 @@ def get_axiom_link_for_node_logs(
 
 
 def apply_axiom_time_filter(
-    time_filter: Union[bool, Tuple[datetime, datetime]],
+        time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> Mapping:
     if time_filter is True:
         return {"quickRange": "30m"}
@@ -630,8 +630,8 @@ def format_pre_comment(context: ForgeContext) -> str:
     )
 
     return (
-        textwrap.dedent(
-            f"""
+            textwrap.dedent(
+                f"""
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
@@ -639,8 +639,8 @@ def format_pre_comment(context: ForgeContext) -> str:
             * [Validator CPU Profile]({validator_cpu_profile_link})
             * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
             """
-        ).lstrip()
-        + format_github_info(context)
+            ).lstrip()
+            + format_github_info(context)
     )
 
 
@@ -683,15 +683,15 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         raise Exception(f"Invalid forge state: {result.state}")
 
     return (
-        textwrap.dedent(
-            f"""
+            textwrap.dedent(
+                f"""
         {forge_comment_header}
         ```
         """
-        ).lstrip()
-        + format_report(context, result)
-        + textwrap.dedent(
-            f"""
+            ).lstrip()
+            + format_report(context, result)
+            + textwrap.dedent(
+        f"""
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
@@ -699,8 +699,8 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         * [Validator CPU Profile]({validator_cpu_profile_link})
         * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
         """
-        )
-        + format_github_info(context)
+    )
+            + format_github_info(context)
     )
 
 
@@ -737,9 +737,9 @@ class ForgeRunner:
 
 
 def dump_forge_state(
-    shell: Shell,
-    forge_namespace: str,
-    kubeconf: Optional[str] = None,
+        shell: Shell,
+        forge_namespace: str,
+        kubeconf: Optional[str] = None,
 ) -> str:
     try:
         assert kubeconf is not None, "kubeconf is required"
@@ -764,9 +764,9 @@ def dump_forge_state(
 
 
 def find_the_killer(
-    shell: Shell,
-    forge_namespace: str,
-    kubeconf: str,
+        shell: Shell,
+        forge_namespace: str,
+        kubeconf: str,
 ) -> str:
     killer = shell.run(
         [
@@ -862,7 +862,7 @@ class K8sForgeRunner(ForgeRunner):
             forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/{ECR_REPO_PREFIX}/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif (
-            context.cloud == Cloud.GCP
+                context.cloud == Cloud.GCP
         ):  # the GCP project for images is separate than the cluster
             forge_image_full = f"{GAR_REPO_NAME}/forge:{context.forge_image_tag}"
             validator_node_selector = ""  # no selector
@@ -1034,10 +1034,10 @@ def add_build_variant_prefix(image_tag: str, variant: str) -> str:
 
 
 def ensure_provided_image_tags_has_profile_or_features(
-    image_tag: Optional[str],
-    upgrade_image_tag: Optional[str],
-    enable_failpoints: bool,
-    enable_performance_profile: bool,
+        image_tag: Optional[str],
+        upgrade_image_tag: Optional[str],
+        enable_failpoints: bool,
+        enable_performance_profile: bool,
 ) -> Tuple[str, str]:
     """
     Ensure that the build variant specified is reflected in the image tag. If not, then return the image tag
@@ -1060,12 +1060,12 @@ def ensure_provided_image_tags_has_profile_or_features(
 
 
 def find_recent_images_by_profile_or_features(
-    shell: Shell,
-    git: Git,
-    num_images: int,
-    enable_failpoints: Optional[bool],
-    enable_performance_profile: Optional[bool],
-    cloud: Cloud = Cloud.GCP,
+        shell: Shell,
+        git: Git,
+        num_images: int,
+        enable_failpoints: Optional[bool],
+        enable_performance_profile: Optional[bool],
+        cloud: Cloud = Cloud.GCP,
 ) -> Sequence[str]:
     image_tag_prefix = ""
     if enable_failpoints and enable_performance_profile:
@@ -1089,13 +1089,13 @@ def find_recent_images_by_profile_or_features(
 
 
 def find_recent_images(
-    shell: Shell,
-    git: Git,
-    num_images: int,
-    image_name: str,
-    image_tag_prefixes: List[str] = [""],
-    commit_threshold: int = 100,
-    cloud: Cloud = Cloud.GCP,
+        shell: Shell,
+        git: Git,
+        num_images: int,
+        image_name: str,
+        image_tag_prefixes: List[str] = [""],
+        commit_threshold: int = 100,
+        cloud: Cloud = Cloud.GCP,
 ) -> Sequence[str]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
@@ -1133,10 +1133,10 @@ def find_recent_images(
 
 
 def image_exists(
-    shell: Shell,
-    image_name: str,
-    image_tag: str,
-    cloud: Cloud = Cloud.GCP,
+        shell: Shell,
+        image_name: str,
+        image_tag: str,
+        cloud: Cloud = Cloud.GCP,
 ) -> bool:
     """Check if an image exists in a given repository"""
     if cloud == Cloud.GCP:
@@ -1180,7 +1180,7 @@ def sanitize_k8s_resource_name(resource: str, max_length: int = 63) -> str:
 
     if sanitized_resource.endswith("-"):
         sanitized_resource = (
-            sanitized_resource[:-1] + "0"
+                sanitized_resource[:-1] + "0"
         )  # Set the last character to '0'
 
     return sanitized_resource
@@ -1200,22 +1200,22 @@ def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> s
 
 
 def create_forge_command(
-    forge_runner_mode: Optional[str],
-    forge_test_suite: Optional[str],
-    forge_runner_duration_secs: Optional[str],
-    forge_num_validators: Optional[str],
-    forge_num_validator_fullnodes: Optional[str],
-    image_tag: str,
-    upgrade_image_tag: str,
-    forge_namespace: str,
-    forge_namespace_reuse: Optional[str],
-    forge_namespace_keep: Optional[str],
-    forge_enable_haproxy: Optional[str],
-    forge_enable_indexer: Optional[str],
-    forge_deployer_profile: Optional[str],
-    cargo_args: Optional[Sequence[str]],
-    forge_cli_args: Optional[Sequence[str]],
-    test_args: Optional[Sequence[str]],
+        forge_runner_mode: Optional[str],
+        forge_test_suite: Optional[str],
+        forge_runner_duration_secs: Optional[str],
+        forge_num_validators: Optional[str],
+        forge_num_validator_fullnodes: Optional[str],
+        image_tag: str,
+        upgrade_image_tag: str,
+        forge_namespace: str,
+        forge_namespace_reuse: Optional[str],
+        forge_namespace_keep: Optional[str],
+        forge_enable_haproxy: Optional[str],
+        forge_enable_indexer: Optional[str],
+        forge_deployer_profile: Optional[str],
+        cargo_args: Optional[Sequence[str]],
+        forge_cli_args: Optional[Sequence[str]],
+        test_args: Optional[Sequence[str]],
 ) -> List[str]:
     """
     Cargo args get passed before forge directly to cargo (i.e. features)
@@ -1294,14 +1294,14 @@ def create_forge_command(
 
 
 async def run_multiple(
-    context: SystemContext,
-    forge_test_suites: List[str],
-    disabled_suites: Set[str],
-    forge_namespace: str,
-    forge_pre_comment: Optional[str],
-    forge_comment: Optional[str],
-    forge_runner_mode: Optional[str],
-    github_step_summary: Optional[str],
+        context: SystemContext,
+        forge_test_suites: List[str],
+        disabled_suites: Set[str],
+        forge_namespace: str,
+        forge_pre_comment: Optional[str],
+        forge_comment: Optional[str],
+        forge_runner_mode: Optional[str],
+        github_step_summary: Optional[str],
 ) -> None:
     # Remove formatting environment variables
     os.environ["FORGE_OUTPUT"] = ""
@@ -1430,44 +1430,44 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 )
 @click.argument("test_suites", nargs=-1)
 def test(
-    forge_output: Optional[str],
-    forge_report: Optional[str],
-    forge_pre_comment: Optional[str],
-    forge_comment: Optional[str],
-    cloud: str,
-    aws_region: str,
-    gcp_zone: str,
-    forge_runner_mode: str,
-    forge_cluster_name: Optional[str],
-    forge_num_validators: Optional[str],
-    forge_num_validator_fullnodes: Optional[str],
-    forge_namespace_keep: Optional[str],
-    forge_namespace_reuse: Optional[str],
-    forge_enable_failpoints: Optional[str],
-    forge_enable_performance: Optional[str],
-    forge_enable_haproxy: Optional[str],
-    forge_enable_indexer: Optional[str],
-    forge_deployer_profile: Optional[str],
-    forge_test_suite: str,
-    forge_runner_duration_secs: str,
-    forge_image_tag: Optional[str],
-    forge_retain_debug_logs: str,
-    forge_junit_xml_path: Optional[str],
-    image_tag: Optional[str],
-    upgrade_image_tag: Optional[str],
-    forge_namespace: Optional[str],
-    verbose: Optional[str],
-    github_actions: str,
-    balance_clusters: bool,
-    forge_blocking: Optional[str],
-    github_server_url: Optional[str],
-    github_repository: Optional[str],
-    github_run_id: Optional[str],
-    github_step_summary: Optional[str],
-    cargo_args: Optional[List[str]],
-    forge_cli_args: Optional[List[str]],
-    test_args: Optional[List[str]],
-    test_suites: Tuple[str],
+        forge_output: Optional[str],
+        forge_report: Optional[str],
+        forge_pre_comment: Optional[str],
+        forge_comment: Optional[str],
+        cloud: str,
+        aws_region: str,
+        gcp_zone: str,
+        forge_runner_mode: str,
+        forge_cluster_name: Optional[str],
+        forge_num_validators: Optional[str],
+        forge_num_validator_fullnodes: Optional[str],
+        forge_namespace_keep: Optional[str],
+        forge_namespace_reuse: Optional[str],
+        forge_enable_failpoints: Optional[str],
+        forge_enable_performance: Optional[str],
+        forge_enable_haproxy: Optional[str],
+        forge_enable_indexer: Optional[str],
+        forge_deployer_profile: Optional[str],
+        forge_test_suite: str,
+        forge_runner_duration_secs: str,
+        forge_image_tag: Optional[str],
+        forge_retain_debug_logs: str,
+        forge_junit_xml_path: Optional[str],
+        image_tag: Optional[str],
+        upgrade_image_tag: Optional[str],
+        forge_namespace: Optional[str],
+        verbose: Optional[str],
+        github_actions: str,
+        balance_clusters: bool,
+        forge_blocking: Optional[str],
+        github_server_url: Optional[str],
+        github_repository: Optional[str],
+        github_run_id: Optional[str],
+        github_step_summary: Optional[str],
+        cargo_args: Optional[List[str]],
+        forge_cli_args: Optional[List[str]],
+        test_args: Optional[List[str]],
+        test_suites: Tuple[str],
 ) -> None:
     """Run a forge test"""
 
@@ -1774,8 +1774,8 @@ def test(
 
 
 async def get_all_forge_jobs(
-    context: SystemContext,
-    clusters: List[str],
+        context: SystemContext,
+        clusters: List[str],
 ) -> List[ForgeJob]:
     # Get all cluster contexts
     all_jobs = []
@@ -1810,8 +1810,8 @@ def job() -> None:
 @click.option("--phase", multiple=True, help="Only show jobs in this phase")
 @click.option("--regex", help="Only show jobs matching this regex")
 def list_jobs(
-    phase: List[str],
-    regex: str,
+        phase: List[str],
+        regex: str,
 ) -> None:
     """List all running forge jobs"""
     shell = LocalShell()
@@ -1849,7 +1849,7 @@ def list_jobs(
 @main.command()
 @click.argument("job_name")
 def tail(
-    job_name: str,
+        job_name: str,
 ) -> None:
     """Tail the logs for a running job"""
     shell = LocalShell()
@@ -1957,9 +1957,9 @@ def ensure_forge_config(value: Any) -> ForgeConfigValue:
 
 
 def get_forge_config_diff(
-    old_config: ForgeConfigValue,
-    new_config: ForgeConfigValue,
-    full_diff: Optional[bool] = False,
+        old_config: ForgeConfigValue,
+        new_config: ForgeConfigValue,
+        full_diff: Optional[bool] = False,
 ) -> Iterator[str]:
     """Returns a list of diffs between the old and new config"""
     config_string = json.dumps(new_config, indent=2)
@@ -2136,10 +2136,10 @@ def keyword_argument(value: str) -> Tuple[str, str]:
 @click.argument("values", type=keyword_argument, nargs=-1)
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def set_config(
-    force: Optional[bool],
-    config_path: Optional[str],
-    values: List[Tuple[str, str]],
-    y: bool,
+        force: Optional[bool],
+        config_path: Optional[str],
+        values: List[Tuple[str, str]],
+        y: bool,
 ) -> None:
     """Replace forge configuration values with local config"""
     shell = LocalShell()
@@ -2231,7 +2231,7 @@ def helm_config_get(chart: str) -> None:
 @click.option("--force", is_flag=True, help="Disable config validation")
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def helm_config_set(
-    chart: str, config_path: str, force: Optional[bool], y: bool
+        chart: str, config_path: str, force: Optional[bool], y: bool
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2283,9 +2283,9 @@ def cluster_config() -> None:
 @click.option("--force", is_flag=True, help="Disable config validation")
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def cluster_config_delete(
-    cluster: str,
-    force: Optional[bool],
-    y: bool,
+        cluster: str,
+        force: Optional[bool],
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2376,8 +2376,8 @@ def cluster_config_enable(cluster: str, y: bool) -> None:
 @click.argument("cluster")
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def cluster_config_disable(
-    cluster: str,
-    y: bool,
+        cluster: str,
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2437,9 +2437,9 @@ def test_config() -> None:
 @click.argument("test_name", required=False)
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def test_config_add(
-    suite_name: str,
-    test_name: Optional[str],
-    y: bool,
+        suite_name: str,
+        test_name: Optional[str],
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2486,7 +2486,7 @@ def test_config_add(
 @test_config.command("show")
 @click.argument("suite", required=False)
 def test_config_show(
-    suite: Optional[str],
+        suite: Optional[str],
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2536,9 +2536,9 @@ def test_config_list() -> None:
 @click.argument("test_name", required=False)
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def test_config_delete(
-    suite_name: str,
-    test_name: Optional[str],
-    y: bool,
+        suite_name: str,
+        test_name: Optional[str],
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2576,9 +2576,9 @@ def test_config_delete(
 @click.argument("test_name")
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def test_config_enable(
-    suite_name: str,
-    test_name: str,
-    y: bool,
+        suite_name: str,
+        test_name: str,
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
@@ -2618,9 +2618,9 @@ def test_config_enable(
 @click.argument("test_name")
 @click.option("-y", is_flag=True, help="Accept all interactive prompts")
 def test_config_disable(
-    suite_name: str,
-    test_name: str,
-    y: bool,
+        suite_name: str,
+        test_name: str,
+        y: bool,
 ) -> None:
     shell = LocalShell()
     filesystem = LocalFilesystem()
