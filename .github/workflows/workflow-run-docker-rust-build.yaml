@@ -93,7 +93,6 @@ jobs:
 
       - name: Set output
         id: set-output
-        needs: check-images
         run: |
           if [ "${{ steps.check-images.outcome }}" = "success" ]; then
             echo "image-exist=true" >> $GITHUB_OUTPUT
