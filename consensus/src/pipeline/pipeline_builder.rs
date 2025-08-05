@@ -29,7 +29,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, warn};
+use aptos_logger::{debug, error, info, warn};
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -192,7 +192,7 @@ impl Tracker {
     }
 
     fn log_start(&self) {
-        info!(
+        debug!(
             "[Pipeline] Block {} {} {} enters {}",
             self.block_id, self.epoch, self.round, self.name
         );
@@ -210,7 +210,7 @@ impl Tracker {
         counters::PIPELINE_TRACING
             .with_label_values(&[self.name, "work_time"])
             .observe(work_time.as_secs_f64());
-        info!(
+        debug!(
             "[Pipeline] Block {} {} {} finishes {}, waits {}ms, takes {}ms",
             self.block_id,
             self.epoch,

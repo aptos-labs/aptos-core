@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{DataCacheGasMeterWrapper, TransactionDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -1138,11 +1138,10 @@ where
             data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 self.loader,
                 self.layout_converter,
-                self.gas_meter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
+                traversal_context,
                 module_storage,
                 resource_resolver,
-                Some(gas_meter),
-                traversal_context,
                 &addr,
                 ty,
                 true,
@@ -1163,10 +1162,12 @@ where
     ) -> PartialVMResult<bool> {
         if !data_cache.contains_resource_existence(&addr, ty) {
             data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
+                self.loader,
+                self.layout_converter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
+                traversal_context,
                 module_storage,
                 resource_resolver,
-                Some(gas_meter),
-                traversal_context,
                 &addr,
                 ty,
                 // This value will be overridden if lightweight resource existence feature is disabled

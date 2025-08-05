@@ -160,7 +160,7 @@ module aptos_experimental::clearinghouse_test {
         new_market_clearinghouse_callbacks(
             |taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
             | { settle_trade(taker, maker, size, is_taker_long) },
-            |_account, order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+            |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
             |_account, order_id, _is_bid, _price, _size, _order_metadata| {
@@ -185,7 +185,7 @@ module aptos_experimental::clearinghouse_test {
             | {
                 settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
             },
-            |_account, order_id, _is_taker, _is_bid, _price, _size, _order_metadata| {
+            |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
                 validate_order_placement(order_id)
             },
             |_account, _order_id, _is_bid, _price, _size, _order_metadata| {

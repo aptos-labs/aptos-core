@@ -7,7 +7,7 @@ use crate::{
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
-    }, ModuleStorage, WithRuntimeEnvironment
+    }, Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;

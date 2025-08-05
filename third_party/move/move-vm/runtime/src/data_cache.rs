@@ -83,15 +83,6 @@ pub enum DataCacheGasMeterWrapper<'a, T: GasMeter> {
     Full(&'a mut T),
 }
 
-impl<'a, T: GasMeter> DataCacheGasMeterWrapper<'a, T> {
-    fn get_full_gas_meter(&mut self) -> Option<&mut T> {
-        match self {
-            Self::DependencyOnly(_) => None,
-            Self::Full(gm) => Some(gm),
-        }
-    }
-}
-
 impl<'a, T: GasMeter> DependencyGasMeter for DataCacheGasMeterWrapper<'a, T> {
     fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>  {
         match self {
