@@ -112,11 +112,6 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
-      
-      - name: Setup GCloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          install_components: 'gcloud'
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -124,33 +119,39 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Configure GCloud
-        run: |
-          gcloud config set project aptos-ci
-
-      - name: Lock File Check and Lock if not exists
+      
+      - name: Check if lock file exists
         id: check-lock
         if: steps.check-images.outcome == 'failure'
-        run:  |
-          echo "Checking lock file"
+        run: |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
-          result=$?
-          set -e
-          if [ $result -eq 0 ]; then
-            echo "Lock file exists: Current workflow building: "
-            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
-            echo "Rerun again when the image is finished building" && exit 1
+          if [ $? -eq 0 ]; then
+            echo "lock-exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Lock file does not exist"
-            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
-            gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
-            echo "Docker Build locked"
+            echo "lock-exists=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Show lock file content
+        if: steps.check-lock.outputs.lock-exists == 'true'
+        run: |
+          echo "Lock file exists: Current workflow building: "
+          gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+          echo "Rerun again when the image is finished building"
+          exit 1
+
+      - name: Create and upload lock file
+        id: create-lock
+        if: steps.check-lock.outputs.lock-exists == 'false'
+        run: |
+          echo "Lock file does not exist"
+          echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
+          gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+          echo "Docker Build locked"
 
       - name: Build and Push Rust images
         run: docker/builder/docker-bake-rust-all.sh
+        if: steps.create-lock.outcome == 'success'
         env:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}
@@ -159,6 +160,7 @@ jobs:
           TARGET_REGISTRY: ${{ env.TARGET_REGISTRY }}
       
       - name: Prepare Docker for Caching
+        if: steps.create-lock.outcome == 'success'
         run: |
           if [ ! -f /home/runner/docker-cache.tzst ]; then
             sudo systemctl stop docker
