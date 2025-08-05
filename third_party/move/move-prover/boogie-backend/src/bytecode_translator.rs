@@ -541,7 +541,7 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(
             self.writer,
             "$unknown_function'{}'(id: int)",
-            fun_ty_boogie_name
+            boogie_type_suffix(self.env, fun_type),
         );
         self.writer.unindent();
         emitln!(self.writer, "}");
@@ -1476,14 +1476,13 @@ impl FunctionTranslator<'_> {
         for i in num_args..fun_target.get_local_count() {
             let num_oper = global_state
                 .get_temp_index_oper(mid, fid, i, baseline_flag)
-                .copied()
-                .unwrap_or_default();
+                .unwrap();
             let local_type = &self.get_local_type(i);
             emitln!(
                 writer,
                 "var $t{}: {};",
                 i,
-                self.boogie_type_for_fun(env, local_type, &num_oper)
+                self.boogie_type_for_fun(env, local_type, num_oper)
             );
         }
         // Generate declarations for renamed parameters.
