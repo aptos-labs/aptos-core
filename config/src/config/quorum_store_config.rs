@@ -5,12 +5,12 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
-use aptos_types::{chain_id::ChainId, decryption::PROTOTYPE_BATCH_SIZE};
+use aptos_types::{chain_id::ChainId, decryption::{PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_VALIDATORS}};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-pub const DEFEAULT_MAX_BATCH_TXNS: usize = PROTOTYPE_BATCH_SIZE;
+pub const DEFEAULT_MAX_BATCH_TXNS: usize = PROTOTYPE_BATCH_SIZE / PROTOTYPE_NUMBER_OF_VALIDATORS;
 const DEFAULT_MAX_NUM_BATCHES: usize = 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
