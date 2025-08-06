@@ -311,7 +311,7 @@ impl DecManager {
         let dec_store = self.dec_store.clone();
         let task = async move {
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let maybe_existing_shares = dec_store.lock().get_all_shares_authors(metadata.digest.clone());
+            let maybe_existing_shares = dec_store.lock().get_all_shares_authors(&metadata);
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;
                 let request = RequestDecShare::new(metadata.clone());

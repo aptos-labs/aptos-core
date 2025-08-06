@@ -656,17 +656,9 @@ impl PipelineBuilder {
         Ok((Arc::new(all_sig_verified_txns), block_gas_limit))
     }
 
-    fn check_block_encrypted(block: Arc<Block>) -> TaskResult<()> {
-        if !block.is_encrypted() {
-            return Err(TaskError::from(anyhow!("Block does not contain encrypted payload, should not trigger compute_digest")));
-        }
-        Ok(())
-    }
-
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the digest of the encrypted payload
     async fn compute_digest(block: Arc<Block>, digest_key: DigestKey) -> TaskResult<DigestResult> {
-        Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_digest", &block);
         tracker.start_working();
 
@@ -682,7 +674,6 @@ impl PipelineBuilder {
     /// Precondition: compute_digest finishes
     /// What it does: Compute the decryption share for the block
     async fn compute_decryption_share(digest_fut: TaskFuture<DigestResult>, block: Arc<Block>, author: Author, msk_share: MasterSecretKeyShare, fast_msk_share: MasterSecretKeyShare) -> TaskResult<DecryptionShareResult> {
-        Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_decryption_share", &block);
         let (digest, proofs_promise) = digest_fut.await?;
         tracker.start_working();
@@ -700,7 +691,6 @@ impl PipelineBuilder {
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the decryption aux info for the block
     async fn compute_eval_proofs(digest_fut: TaskFuture<DigestResult>, digest_key: DigestKey, block: Arc<Block>) -> TaskResult<EvalProofsResult> {
-        Self::check_block_encrypted(block.clone())?;
         let (_digest, proofs_promise) = digest_fut.await?;
         let mut tracker = Tracker::start_waiting("compute_eval_proofs", &block);
         tracker.start_working();
@@ -714,7 +704,6 @@ impl PipelineBuilder {
     /// Precondition: 1. compute_decryption_share finishes, 2. ready to broadcast order vote
     /// What it does: Broadcast the fast decryption share to the network
     async fn broadcast_fast_decryption_share(decryption_share_fut: TaskFuture<DecryptionShareResult>, order_vote_fut: TaskFuture<()>, block: Arc<Block>, network: Arc<NetworkSender>) -> TaskResult<BroadcastDecryptionShareResult> {
-        Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("broadcast_decryption_share", &block);
         let (_, fast_dec_share) = decryption_share_fut.await?;
         let _ = order_vote_fut.await?;
@@ -733,7 +722,6 @@ impl PipelineBuilder {
     /// Precondition: 1. decryption_key is available, 2. decryption_aux_info is available
     /// What it does: Compute the decryption for the block
     async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<DecKey>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
-        Self::check_block_encrypted(block.clone())?;
         let mut tracker = Tracker::start_waiting("compute_decryption", &block);
         let (input_txns, _) = prepare_fut.await?;
         let decryption_key = decryption_key_fut.await?;

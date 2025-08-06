@@ -219,9 +219,9 @@ pub struct DecStore {
     epoch: u64,
     author: Author,
     dec_config: DecConfig,
-    dec_map: HashMap<Digest, DecItem>,
+    dec_map: HashMap<DecMetadata, DecItem>,
     fast_dec_config: Option<DecConfig>,
-    fast_dec_map: Option<HashMap<Digest, DecItem>>,
+    fast_dec_map: Option<HashMap<DecMetadata, DecItem>>,
     highest_known_round: u64,
     decision_tx: Sender<DecKey>,
 }
@@ -253,7 +253,7 @@ impl DecStore {
     pub fn add_dec_metadata(&mut self, metadata: DecMetadata) {
         let dec_item = self
             .dec_map
-            .entry(metadata.digest.clone())
+            .entry(metadata.clone())
             .or_insert_with(|| DecItem::new(self.author, PathType::Slow));
         dec_item.add_metadata(&self.dec_config, metadata.clone());
         dec_item.try_aggregate(&self.dec_config, self.decision_tx.clone());
@@ -262,7 +262,7 @@ impl DecStore {
             (self.fast_dec_map.as_mut(), self.fast_dec_config.as_ref())
         {
             let fast_dec_item = fast_dec_map
-                .entry(metadata.digest.clone())
+                .entry(metadata.clone())
                 .or_insert_with(|| DecItem::new(self.author, PathType::Fast));
             fast_dec_item.add_metadata(fast_dec_config, metadata.clone());
             fast_dec_item.try_aggregate(fast_dec_config, self.decision_tx.clone());
@@ -285,7 +285,7 @@ impl DecStore {
                 (Some(fast_dec_config), Some(fast_dec_map)) => (
                     fast_dec_config,
                     fast_dec_map
-                        .entry(metadata.digest.clone())
+                        .entry(metadata.clone())
                         .or_insert_with(|| DecItem::new(self.author, path)),
                 ),
                 _ => anyhow::bail!("Fast path not enabled"),
@@ -294,7 +294,7 @@ impl DecStore {
             (
                 &self.dec_config,
                 self.dec_map
-                    .entry(metadata.digest.clone())
+                    .entry(metadata.clone())
                     .or_insert_with(|| DecItem::new(self.author, PathType::Slow)),
             )
         };
@@ -306,9 +306,9 @@ impl DecStore {
 
     /// This should only be called after the block is added, returns None if already decided
     /// Otherwise returns existing shares' authors
-    pub fn get_all_shares_authors(&self, digest: Digest) -> Option<HashSet<Author>> {
+    pub fn get_all_shares_authors(&self, metadata: &DecMetadata) -> Option<HashSet<Author>> {
         self.dec_map
-            .get(&digest)
+            .get(metadata)
             .and_then(|item| item.get_all_shares_authors())
     }
 
@@ -324,7 +324,7 @@ impl DecStore {
         );
         Ok(self
             .dec_map
-            .get(&metadata.digest)
+            .get(metadata)
             .and_then(|item| item.get_self_share())
             .filter(|share| &share.metadata == metadata))
     }
