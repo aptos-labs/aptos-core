@@ -50,19 +50,16 @@ on:
         description: If true, the workflow will not run replay verify.
         default: false
 jobs:
-
-  # Should only build images if IMAGE_TAG is provided; otherwise, we will find and use the latest image 
   build-images:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: change back to main
     with:
-      GIT_SHA: ${{ inputs.IMAGE_TAG }}
-      TARGET_CACHE_ID: ${{ github.ref_name }}
+      GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
+      TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
   run-replay-verify:
     runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
     timeout-minutes: 420 # 7 hours
     needs: build-images
-    if: ${{ inputs.DRY_RUN == false }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,6 +110,7 @@ jobs:
           pyproject_directory: testsuite/replay-verify
 
       - name: Schedule replay verify
+        if: ${{ inputs.DRY_RUN == false }}
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
         run: | 
@@ -133,6 +131,7 @@ jobs:
         timeout-minutes: 420 # 7 hours
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
+        if: ${{ inputs.DRY_RUN == false }}
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
         if: ${{ always() }}  
