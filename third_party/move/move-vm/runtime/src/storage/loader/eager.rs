@@ -2,18 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    check_dependencies_and_charge_gas,
+    check_dependencies_and_charge_gas, check_type_tag_dependencies_and_charge_gas,
     module_traversal::TraversalContext,
     storage::loader::traits::{
-        Loader, ModuleMetadataLoader, NativeModuleLoader, StructDefinitionLoader,
+        FunctionDefinitionLoader, InstantiatedFunctionLoader, InstantiatedFunctionLoaderHelper,
+        LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader,
+        StructDefinitionLoader,
     },
-    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{language_storage::ModuleId, metadata::Metadata};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_core_types::{
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
+    vm_status::StatusCode,
+};
 use move_vm_types::{
     gas::DependencyGasMeter,
-    loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
 };
 use std::sync::Arc;
 
@@ -32,6 +42,25 @@ where
     /// Returns a new eager loader.
     pub fn new(module_storage: &'a T) -> Self {
         Self { module_storage }
+    }
+}
+
+impl<'a, T> EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    /// Converts a type tag into a runtime type. Can load struct definitions.
+    fn unmetered_load_type(&self, tag: &TypeTag) -> PartialVMResult<Type> {
+        self.runtime_environment()
+            .vm_config()
+            .ty_builder
+            .create_ty(tag, |st| {
+                self.module_storage.unmetered_get_struct_definition(
+                    &st.address,
+                    st.module.as_ident_str(),
+                    st.name.as_ident_str(),
+                )
+            })
     }
 }
 
@@ -69,6 +98,33 @@ where
             struct_name.module.name(),
             struct_name.name.as_ident_str(),
         )
+    }
+}
+
+impl<'a, T> FunctionDefinitionLoader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_function_definition(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
+        self.module_storage
+            .unmetered_get_function_definition(module_id.address(), module_id.name(), function_name)
+            .map_err(|err| {
+                // Note: legacy loader implementation used this error, so we need to remap.
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!(
+                        "Module or function do not exist for {}::{}::{}",
+                        module_id.address(),
+                        module_id.name(),
+                        function_name
+                    ))
+                    .finish(err.location().clone())
+            })
     }
 }
 
@@ -120,4 +176,72 @@ where
     }
 }
 
-impl<'a, T> Loader for EagerLoader<'a, T> where T: ModuleStorage {}
+impl<'a, T> InstantiatedFunctionLoaderHelper for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_ty_arg(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        ty_arg: &TypeTag,
+    ) -> VMResult<Type> {
+        self.unmetered_load_type(ty_arg)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+}
+
+impl<'a, T> InstantiatedFunctionLoader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_instantiated_function(
+        &self,
+        config: &LegacyLoaderConfig,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        if config.charge_for_dependencies {
+            // Charge gas for function code loading.
+            let arena_id = traversal_context
+                .referenced_module_ids
+                .alloc(module_id.clone());
+            check_dependencies_and_charge_gas(
+                self.module_storage,
+                gas_meter,
+                traversal_context,
+                [(arena_id.address(), arena_id.name())],
+            )?;
+        }
+
+        if config.charge_for_ty_tag_dependencies {
+            // Charge gas for code loading of modules used by type arguments.
+            check_type_tag_dependencies_and_charge_gas(
+                self.module_storage,
+                gas_meter,
+                traversal_context,
+                ty_args,
+            )?;
+        }
+
+        let (module, function) = self.module_storage.unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
+
+        self.build_instantiated_function(gas_meter, traversal_context, module, function, ty_args)
+    }
+}
+
+impl<'a, T> Loader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn unmetered_module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+}

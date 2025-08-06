@@ -4,15 +4,25 @@
 use crate::{
     module_traversal::TraversalContext,
     storage::loader::traits::{
-        Loader, ModuleMetadataLoader, NativeModuleLoader, StructDefinitionLoader,
+        FunctionDefinitionLoader, InstantiatedFunctionLoader, InstantiatedFunctionLoaderHelper,
+        LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader,
+        StructDefinitionLoader,
     },
-    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{gas_algebra::NumBytes, language_storage::ModuleId, metadata::Metadata};
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_core_types::{
+    gas_algebra::NumBytes,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
+};
 use move_vm_types::{
     gas::DependencyGasMeter,
-    loaded_data::{runtime_types::StructType, struct_name_indexing::StructNameIndex},
+    loaded_data::{
+        runtime_types::{StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     module_linker_error,
 };
 use std::sync::Arc;
@@ -55,6 +65,26 @@ where
         }
         Ok(())
     }
+
+    /// Converts a type tag into a runtime type, metering any loading of struct definitions.
+    fn metered_load_type(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        tag: &TypeTag,
+    ) -> PartialVMResult<Type> {
+        self.runtime_environment()
+            .vm_config()
+            .ty_builder
+            .create_ty(tag, |st| {
+                self.charge_module(gas_meter, traversal_context, &st.module_id())?;
+                self.module_storage.unmetered_get_struct_definition(
+                    &st.address,
+                    &st.module,
+                    st.name.as_ident_str(),
+                )
+            })
+    }
 }
 
 impl<'a, T> WithRuntimeEnvironment for LazyLoader<'a, T>
@@ -95,6 +125,27 @@ where
     }
 }
 
+impl<'a, T> FunctionDefinitionLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_function_definition(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
+        self.charge_module(gas_meter, traversal_context, module_id)
+            .map_err(|err| err.finish(Location::Module(module_id.clone())))?;
+        self.module_storage.unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )
+    }
+}
+
 impl<'a, T> NativeModuleLoader for LazyLoader<'a, T>
 where
     T: ModuleStorage,
@@ -127,4 +178,47 @@ where
     }
 }
 
-impl<'a, T> Loader for LazyLoader<'a, T> where T: ModuleStorage {}
+impl<'a, T> InstantiatedFunctionLoaderHelper for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_ty_arg(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        ty_arg: &TypeTag,
+    ) -> VMResult<Type> {
+        self.metered_load_type(gas_meter, traversal_context, ty_arg)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+}
+
+impl<'a, T> InstantiatedFunctionLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_instantiated_function(
+        &self,
+        // For lazy loading, not used!
+        _config: &LegacyLoaderConfig,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let (module, function) =
+            self.load_function_definition(gas_meter, traversal_context, module_id, function_name)?;
+
+        self.build_instantiated_function(gas_meter, traversal_context, module, function, ty_args)
+    }
+}
+
+impl<'a, T> Loader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn unmetered_module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+}
