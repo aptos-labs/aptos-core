@@ -131,6 +131,7 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
       
       - name: Lock Check and Creation
+        id: lock
         run: |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
@@ -166,7 +167,7 @@ jobs:
           fi
       
       - name: Post-run Lock Cleanup 
-        if: always()
+        if: ${{ always() && steps.lock.outcome == 'success' }}
         run: | 
           gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
           echo "Docker Build unlocked"
