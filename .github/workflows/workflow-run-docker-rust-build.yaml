@@ -143,13 +143,13 @@ jobs:
             exit 1
           else
             echo "Lock file does not exist"
-            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
-            gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${{ env.GIT_SHA }}.txt
+            gcloud storage cp ${{ env.GIT_SHA }}.txt gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
             echo "Docker Build locked"
           fi
 
       - name: Build and Push Rust images
-        if: ${{ inputs.DRY_RUN == false }}
+        # if: ${{ inputs.DRY_RUN == false }} TODO: re-enable this after testing
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
