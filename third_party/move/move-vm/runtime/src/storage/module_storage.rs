@@ -39,7 +39,9 @@ use std::sync::Arc;
 pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -47,7 +49,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -63,6 +67,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>>;
+
+    /// Returns the size of a module in bytes, or an error if it does not exist. An error is also
+    /// returned if the there is a storage error.
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_module_size(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<usize> {
+        self.unmetered_get_module_size(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
@@ -90,7 +107,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
     ///   1. the deserialization fails, or
     ///   2. there is an error from the underlying storage.
-    fn fetch_deserialized_module(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -100,12 +119,14 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   1. the deserialization fails,
     ///   2. there is an error from the underlying storage,
     ///   3. module does not exist.
-    fn fetch_existing_deserialized_module(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
+        self.unmetered_get_deserialized_module(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -247,7 +268,7 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -256,7 +277,7 @@ where
         Ok(self.get_module_or_build_with(&id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -289,7 +310,7 @@ where
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
-    fn fetch_deserialized_module(
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
