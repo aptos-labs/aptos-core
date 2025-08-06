@@ -396,13 +396,8 @@ pub(crate) fn realistic_env_max_load_test(
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
-        // .with_validator_resource_override(resource_override)
-        // .with_fullnode_resource_override(resource_override)
-        .with_validator_resource_override(NodeResourceOverride {
-            cpu_cores: Some(58),
-            memory_gib: None,
-            storage_gib: None,
-        })
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
 }
 
 pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
