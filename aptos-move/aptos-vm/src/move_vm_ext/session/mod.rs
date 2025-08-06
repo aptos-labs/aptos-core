@@ -39,10 +39,12 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
+    ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -132,17 +134,26 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        dispatch_loader!(module_storage, loader, {
+            let func = loader.load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                gas_meter,
+                traversal_context,
+                module_id,
+                function_name,
+                &ty_args,
+            )?;
+            MoveVM::execute_loaded_function(
+                func,
+                args,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                &mut self.extensions,
+                &loader,
+                self.resolver,
+            )
+        })
     }
 
     pub fn execute_loaded_function(
@@ -153,16 +164,18 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        dispatch_loader!(module_storage, loader, {
+            MoveVM::execute_loaded_function(
+                func,
+                args,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                &mut self.extensions,
+                &loader,
+                self.resolver,
+            )
+        })
     }
 
     pub fn finish(

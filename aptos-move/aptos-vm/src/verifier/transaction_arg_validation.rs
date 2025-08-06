@@ -558,9 +558,10 @@ fn load_constructor_function(
     function_name: &IdentStr,
     expected_return_ty: &Type,
 ) -> VMResult<LoadedFunction> {
-    // Here, we do not charge gas for module loading due to invoking a constructor function. This
-    // is safe to do because all constructor functions are located at 0x1 (special address) and so
-    // should not be charged.
+    // INVARIANT:
+    //   We do not need to charge gas for module loading due to invoking a constructor function,
+    //   i.e., a function like `utf8()`, or `address_to_object()`. This is safe to do because all
+    //   constructor functions are located at 0x1 (special address) and so should not be charged.
     if !module_id.address().is_special() {
         let msg = format!(
             "Constructor function {}::{}::{} has a non-special address!",
@@ -573,7 +574,7 @@ fn load_constructor_function(
             .finish(Location::Undefined);
         return Err(err);
     }
-    let (module, function) = module_storage.fetch_function_definition(
+    let (module, function) = module_storage.unmetered_get_function_definition(
         module_id.address(),
         module_id.name(),
         function_name,

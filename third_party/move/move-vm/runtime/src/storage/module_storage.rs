@@ -164,9 +164,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// representation). If a struct type is constructed, the module containing the struct
     /// definition is fetched and cached.
     fn fetch_ty(&self, ty_tag: &TypeTag) -> PartialVMResult<Type> {
-        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
-        //                  seem better fit. Here we map error to VMError to reuse existing
-        //                  type builder implementation, and then strip the location info.
         self.runtime_environment()
             .vm_config()
             .ty_builder
@@ -176,15 +173,15 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),
                 )
-                .map_err(|err| err.finish(Location::Undefined))
             })
-            .map_err(|err| err.to_partial())
     }
 
     /// Returns the function definition corresponding to the specified name, as well as the module
     /// where this function is defined. The returned function can contain uninstantiated generic
     /// types and its signature. The returned module is verified.
-    fn fetch_function_definition(
+    ///
+    /// Note: This API is not gas-metered.
+    fn unmetered_get_function_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -203,8 +200,11 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ) -> VMResult<LoadedFunction> {
         let _timer = VM_TIMER.timer_with_label("Loader::load_function");
 
-        let (module, function) =
-            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
+        let (module, function) = self.unmetered_get_function_definition(
+            module_id.address(),
+            module_id.name(),
+            function_name,
+        )?;
 
         let ty_args = ty_args
             .iter()
