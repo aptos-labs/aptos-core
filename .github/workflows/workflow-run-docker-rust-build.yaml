@@ -126,7 +126,7 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/wait-images-ci-release-default-only # TODO: change back to main
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
