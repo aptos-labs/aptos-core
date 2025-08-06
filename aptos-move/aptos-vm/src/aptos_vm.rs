@@ -139,7 +139,7 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -1385,9 +1385,9 @@ impl AptosVM {
         let modules: &Vec<CompiledModule> =
             traversal_context.referenced_module_bundles.alloc(modules);
 
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
+        // Whether loading modules lazily, or as a full transitive closure, we always need to meter
+        // 1) old versions of modules because they are used for compatibility checks, and 2) new
+        // modules.
         if self.gas_feature_version() >= RELEASE_V1_10 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
@@ -1403,7 +1403,12 @@ impl AptosVM {
                     .map(|v| v as u64);
                 if let Some(old_size) = size_if_old_module_exists {
                     gas_meter
-                        .charge_dependency(false, addr, name, NumBytes::new(old_size))
+                        .charge_dependency(
+                            DependencyKind::Existing,
+                            addr,
+                            name,
+                            NumBytes::new(old_size),
+                        )
                         .map_err(|err| {
                             err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
                         })?;
@@ -1412,41 +1417,31 @@ impl AptosVM {
 
             // Charge all modules in the bundle that is about to be published.
             for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
+                let addr = module.self_addr();
+                let name = module.self_name();
                 gas_meter
                     .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
+                        DependencyKind::New,
+                        addr,
+                        name,
                         NumBytes::new(blob.code().len() as u64),
                     )
                     .map_err(|err| err.finish(Location::Undefined))?;
+
+                // In case of lazy loading: add all modules in a bundle as visited to avoid double
+                // charging during module initialization.
+                if self.features().is_lazy_loading_enabled() {
+                    traversal_context.visit_if_not_special_address(addr, name);
+                }
             }
 
-            // Charge all dependencies.
-            //
-            // Must exclude the ones that are in the current bundle because they have not
-            // been published yet.
-            let module_ids_in_bundle = modules
-                .iter()
-                .map(|module| (module.self_addr(), module.self_name()))
-                .collect::<BTreeSet<_>>();
-
-            check_dependencies_and_charge_gas(
+            // Charge all immediate dependencies of a published package.
+            self.charge_package_dependencies(
                 module_storage,
                 gas_meter,
                 traversal_context,
-                modules
-                    .iter()
-                    .flat_map(|module| {
-                        module
-                            .immediate_dependencies_iter()
-                            .chain(module.immediate_friends_iter())
-                    })
-                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                modules,
             )?;
-
-            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
         }
 
         for (module, blob) in modules.iter().zip(bundle.iter()) {
@@ -1494,11 +1489,93 @@ impl AptosVM {
         )
     }
 
+    fn charge_package_dependencies<'a>(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        modules: &'a [CompiledModule],
+    ) -> Result<(), VMStatus> {
+        // Compute all IDs used in the bundle. Later, exclude these from the set of immediate
+        // dependencies and friends of the bundle for charging / checks.
+        let module_ids_in_bundle = modules
+            .iter()
+            .map(|module| (module.self_addr(), module.self_name()))
+            .collect::<BTreeSet<_>>();
+
+        // Not lazy loading: traverse all transitive dependencies and charge gas. This will
+        // recursively traverse all dependencies of the immediate dependencies and friends of the
+        // published bundle.
+        if !self.features().is_lazy_loading_enabled() {
+            check_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                modules
+                    .iter()
+                    .flat_map(|module| {
+                        module
+                            .immediate_dependencies_iter()
+                            .chain(module.immediate_friends_iter())
+                    })
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+            )?;
+            return Ok(());
+        }
+
+        // Lazy loading otherwise.
+
+        // With lazy loading, we will check only immediate dependencies for linking checks,
+        // not the whole transitive dependencies closure, so charge gas here for them.
+        // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
+        for (dep_addr, dep_name) in modules
+            .iter()
+            .flat_map(|module| module.immediate_dependencies_iter())
+            .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name))
+        {
+            if traversal_context.visit_if_not_special_address(dep_addr, dep_name) {
+                let size = module_storage
+                    .unmetered_get_existing_module_size(dep_addr, dep_name)
+                    .map(|v| v as u64)?;
+                gas_meter
+                    .charge_dependency(
+                        DependencyKind::Existing,
+                        dep_addr,
+                        dep_name,
+                        NumBytes::new(size),
+                    )
+                    .map_err(|err| err.finish(Location::Undefined))?;
+            }
+        }
+
+        // Also, we need to make sure friends, when published, are limited to the same
+        // package (bundle).
+        for (friend_addr, friend_name) in modules
+            .iter()
+            .flat_map(|module| module.immediate_friends_iter())
+        {
+            // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
+            if !module_ids_in_bundle.contains(&(friend_addr, friend_name)) {
+                let msg = format!(
+                    "Module {}::{} is declared as a friend and should be part of the \
+                             module bundle, but it is not",
+                    friend_addr, friend_name
+                );
+                let err = PartialVMError::new(StatusCode::FRIEND_NOT_FOUND_IN_MODULE_BUNDLE)
+                    .with_message(msg)
+                    .finish(Location::Undefined)
+                    .into_vm_status();
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+
     /// Validate a publish request.
     fn validate_publish_request(
         &self,
         module_storage: &impl AptosModuleStorage,
-        traversal_context: &TraversalContext,
+        traversal_context: &mut TraversalContext,
         gas_meter: &mut impl GasMeter,
         modules: &[CompiledModule],
         mut expected_modules: BTreeSet<String>,
@@ -1543,7 +1620,6 @@ impl AptosVM {
         )?;
         event_validation::validate_module_events(
             self.features(),
-            self.gas_feature_version(),
             module_storage,
             traversal_context,
             modules,
