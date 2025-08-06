@@ -4,7 +4,7 @@
 // These images are typically built on push to the main branch or on a PR, from the "docker-build-test.yaml" workflow.
 
 // Try it out:
-// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600 --release-default-only
+// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) RELEASE_DEFAULT_ONLY=true ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600
 import {
   assertExecutingInRepoRoot,
   CargoBuildFeatures,
@@ -27,8 +27,6 @@ async function main() {
 
   await assertExecutingInRepoRoot();
   await installCrane();
-
-  const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
 
   const imagesToWaitFor = getImagesToWaitFor(parsedArgs.RELEASE_DEFAULT_ONLY);
   

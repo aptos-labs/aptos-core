@@ -124,11 +124,11 @@ export const CargoBuildProfiles = {
 
 export function getImagesToWaitFor(releaseDefaultOnly) {
   const perfImages = ["validator", "validator-testing"];
-  const images = ["indexer-grpc", "forge", "tools"];
+  const images = ["forge", "tools", "indexer-grpc"];
   const imagesToWaitFor = {};
-  for (const image of images) {
+  for (const image of [...perfImages, ...images]) {
     imagesToWaitFor[image] = {
-      [CargoBuildProfiles.Release]: releaseDefaultOnly && !perfImages.includes(image) ? [
+      [CargoBuildProfiles.Release]: releaseDefaultOnly || !perfImages.includes(image) ? [
         CargoBuildFeatures.Default,
       ] : [
         CargoBuildFeatures.Default,
