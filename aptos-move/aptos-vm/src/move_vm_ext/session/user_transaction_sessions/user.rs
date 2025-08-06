@@ -84,7 +84,7 @@ impl<'r> UserSession<'r> {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         features: &Features,
-        gas_feature_version: u64,
+        _gas_feature_version: u64,
         change_set_configs: &ChangeSetConfigs,
         destination: AccountAddress,
         bundle: ModuleBundle,
@@ -108,50 +108,25 @@ impl<'r> UserSession<'r> {
             }
 
             self.session.execute(|session| {
-                if gas_feature_version <= RELEASE_V1_30 {
-                    let module_id = module.self_id();
-                    let init_function_exists = staging_module_storage
-                        .load_function(&module_id, init_func_name, &[])
-                        .is_ok();
+                let module = staging_module_storage
+                    .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
+                if let Ok(function) = module.get_function(init_func_name) {
+                    verifier::module_init::verify_init_module_function(&function)?;
 
-                    if init_function_exists {
-                        // We need to check that init_module function we found is well-formed.
-                        verifier::module_init::legacy_verify_module_init_function(module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-
-                        session.execute_function_bypass_visibility(
-                            &module_id,
-                            init_func_name,
-                            vec![],
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
-                            gas_meter,
-                            traversal_context,
-                            &staging_module_storage,
-                        )?;
-                    }
-                } else {
-                    let module = staging_module_storage
-                        .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
-                    if let Ok(function) = module.get_function(init_func_name) {
-                        verifier::module_init::verify_init_module_function(&function)?;
-
-                        let loaded_function = LoadedFunction {
-                            owner: LoadedFunctionOwner::Module(module),
-                            ty_args: vec![],
-                            function,
-                        };
-                        session.execute_loaded_function(
-                            loaded_function,
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
-                            gas_meter,
-                            traversal_context,
-                            &staging_module_storage,
-                        )?;
-                    }
+                    let loaded_function = LoadedFunction {
+                        owner: LoadedFunctionOwner::Module(module),
+                        ty_args: vec![],
+                        function,
+                    };
+                    session.execute_loaded_function(
+                        loaded_function,
+                        vec![MoveValue::Signer(destination)
+                            .simple_serialize()
+                            .expect("Signer is always serializable")],
+                        gas_meter,
+                        traversal_context,
+                        &staging_module_storage,
+                    )?;
                 }
                 Ok::<_, VMStatus>(())
             })?;
