@@ -78,7 +78,9 @@ fn test_lightweight_resource_existence() {
         }
 
         public entry fun read() acquires T {
-            let _ = borrow_global<T>(@0x123);
+            if (exists<T>(@0x123)) {
+                let _ = borrow_global<T>(@0x123);
+            }
         }
 
         public entry fun modify() acquires T {
