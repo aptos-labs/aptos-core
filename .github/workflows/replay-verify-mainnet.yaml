@@ -20,6 +20,11 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not run replay verify.
+        default: false
   pull_request:
     paths:
       - ".github/workflows/replay-verify-mainnet.yaml"
@@ -60,3 +65,4 @@ jobs:
       IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
       START_VERSION: ${{ inputs.START_VERSION }}
       END_VERSION: ${{ inputs.END_VERSION }}
+      DRY_RUN: ${{ inputs.DRY_RUN }}
