@@ -131,10 +131,9 @@ jobs:
         timeout-minutes: 420 # 7 hours
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
-        if: ${{ inputs.DRY_RUN == false }}
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
-        if: ${{ always() }}  
+        if: ${{ always() && inputs.DRY_RUN != false}}  
         run: |
           cd testsuite/replay-verify
           CMD="poetry run python main.py --network ${{ inputs.NETWORK }} --cleanup"  
