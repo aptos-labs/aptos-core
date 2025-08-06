@@ -11,7 +11,7 @@ use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 use codespan_reporting::diagnostic::Severity;
-use log::info;
+use log::debug;
 use move_model::{
     ast::{Exp, Spec},
     model::{FunId, GlobalEnv, NodeId, QualifiedId},
@@ -19,7 +19,7 @@ use move_model::{
 };
 
 pub fn run_spec_checker(env: &GlobalEnv) {
-    info!("checking specifications");
+    debug!("checking specifications");
 
     // Targets are all spec functions and spec blocks, as well as functions to
     // process inline specs.
