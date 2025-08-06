@@ -133,11 +133,11 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
-    check_type_tag_dependencies_and_charge_gas,
+    check_dependencies_and_charge_gas, dispatch_loader,
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
+    ScriptLoader, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -175,6 +175,44 @@ macro_rules! unwrap_or_discard {
                 let o = discarded_output(s.status_code());
                 return (s, o);
             },
+        }
+    };
+}
+
+macro_rules! dispatch_transaction_arg_validation {
+    (
+        $session:ident,
+        $loader:expr,
+        $gas_meter:expr,
+        $traversal_context:expr,
+        $serialized_signers:ident,
+        $args:expr,
+        $function:expr,
+        $struct_constructors_enabled:expr,
+    ) => {
+        if move_vm_runtime::StructDefinitionLoader::is_lazy_loading_enabled($loader) {
+            transaction_arg_validation::validate_combine_signer_and_txn_args(
+                $session,
+                $loader,
+                $gas_meter,
+                $traversal_context,
+                $serialized_signers,
+                $args,
+                $function,
+                $struct_constructors_enabled,
+            )
+        } else {
+            let traversal_storage = TraversalStorage::new();
+            transaction_arg_validation::validate_combine_signer_and_txn_args(
+                $session,
+                $loader,
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                $serialized_signers,
+                $args,
+                $function,
+                $struct_constructors_enabled,
+            )
         }
     };
 }
@@ -797,45 +835,38 @@ impl AptosVM {
             }
         }
 
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version() >= RELEASE_V1_10 {
-            check_script_dependencies_and_check_gas(
-                code_storage,
+        dispatch_loader!(code_storage, loader, {
+            let legacy_loader_config = LegacyLoaderConfig {
+                charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
+                charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
+            };
+            let func = loader.load_script(
+                &legacy_loader_config,
                 gas_meter,
                 traversal_context,
                 serialized_script.code(),
-            )?;
-        }
-        if self.gas_feature_version() >= RELEASE_V1_27 {
-            check_type_tag_dependencies_and_charge_gas(
-                code_storage,
-                gas_meter,
-                traversal_context,
                 serialized_script.ty_args(),
             )?;
-        }
 
-        let func =
-            code_storage.load_script(serialized_script.code(), serialized_script.ty_args())?;
+            // Check that unstable bytecode cannot be executed on mainnet and verify events.
+            let script = func.owner_as_script()?;
+            self.reject_unstable_bytecode_for_script(script)?;
+            event_validation::verify_no_event_emission_in_compiled_script(script)?;
 
-        // Check that unstable bytecode cannot be executed on mainnet and verify events.
-        let script = func.owner_as_script()?;
-        self.reject_unstable_bytecode_for_script(script)?;
-        event_validation::verify_no_event_emission_in_compiled_script(script)?;
+            let args = dispatch_transaction_arg_validation!(
+                session,
+                &loader,
+                gas_meter,
+                traversal_context,
+                serialized_signers,
+                convert_txn_args(serialized_script.args()),
+                &func,
+                self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            )?;
 
-        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            code_storage,
-            serialized_signers,
-            convert_txn_args(serialized_script.args()),
-            &func,
-            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-        )?;
-
-        session.execute_loaded_function(func, args, gas_meter, traversal_context, code_storage)?;
-        Ok(())
+            session.execute_loaded_function(func, args, gas_meter, traversal_context, &loader)?;
+            Ok(())
+        })
     }
 
     fn validate_and_execute_entry_function(
@@ -847,78 +878,66 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
     ) -> Result<(), VMStatus> {
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version() >= RELEASE_V1_10 {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(entry_fn.module().clone());
-            check_dependencies_and_charge_gas(module_storage, gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
-        }
-
-        if self.gas_feature_version() >= RELEASE_V1_27 {
-            check_type_tag_dependencies_and_charge_gas(
-                module_storage,
+        dispatch_loader!(module_storage, loader, {
+            let legacy_loader_config = LegacyLoaderConfig {
+                charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
+                charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
+            };
+            let function = loader.load_instantiated_function(
+                &legacy_loader_config,
                 gas_meter,
                 traversal_context,
+                entry_fn.module(),
+                entry_fn.function(),
                 entry_fn.ty_args(),
             )?;
-        }
 
-        let function = module_storage.load_function(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
-        )?;
-
-        // Native entry function is forbidden.
-        if function.is_native() {
-            return Err(
-                PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
-                    .with_message(
-                        "Executing user defined native entry function is not allowed".to_string(),
-                    )
-                    .finish(Location::Module(entry_fn.module().clone()))
-                    .into_vm_status(),
-            );
-        }
-
-        // The check below should have been feature-gated in 1.11...
-        if function.is_friend_or_private() {
-            let maybe_randomness_annotation = get_randomness_annotation_for_entry_function(
-                entry_fn,
-                &function.owner_as_module()?.metadata,
-            );
-            if maybe_randomness_annotation.is_some() {
-                session.mark_unbiasable();
+            // Native entry function is forbidden.
+            if function.is_native() {
+                return Err(
+                    PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
+                        .with_message(
+                            "Executing user defined native entry function is not allowed"
+                                .to_string(),
+                        )
+                        .finish(Location::Module(entry_fn.module().clone()))
+                        .into_vm_status(),
+                );
             }
-        }
 
-        let struct_constructors_enabled =
-            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let args = transaction_arg_validation::validate_combine_signer_and_txn_args(
-            session,
-            module_storage,
-            serialized_signers,
-            entry_fn.args().to_vec(),
-            &function,
-            struct_constructors_enabled,
-        )?;
+            // The check below should have been feature-gated in 1.11...
+            if function.is_friend_or_private() {
+                let maybe_randomness_annotation = get_randomness_annotation_for_entry_function(
+                    entry_fn,
+                    &function.owner_as_module()?.metadata,
+                );
+                if maybe_randomness_annotation.is_some() {
+                    session.mark_unbiasable();
+                }
+            }
 
-        // Execute the function. The function also must be an entry function!
-        function.is_entry_or_err()?;
-        session.execute_loaded_function(
-            function,
-            args,
-            gas_meter,
-            traversal_context,
-            module_storage,
-        )?;
-        Ok(())
+            let args = dispatch_transaction_arg_validation!(
+                session,
+                &loader,
+                gas_meter,
+                traversal_context,
+                serialized_signers,
+                entry_fn.args().to_vec(),
+                &function,
+                self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            )?;
+
+            // Execute the function. The function also must be an entry function!
+            function.is_entry_or_err()?;
+            session.execute_loaded_function(
+                function,
+                args,
+                gas_meter,
+                traversal_context,
+                &loader,
+            )?;
+            Ok(())
+        })
     }
 
     fn execute_script_or_entry_function<'a, 'r>(
@@ -2592,33 +2611,45 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<Vec<Vec<u8>>, VMError> {
-        let func = module_storage.load_function(&module_id, &func_name, &ty_args)?;
-        let metadata = get_metadata(&func.owner_as_module()?.metadata);
+        dispatch_loader!(module_storage, loader, {
+            let func = loader.load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                gas_meter,
+                traversal_context,
+                &module_id,
+                &func_name,
+                &ty_args,
+            )?;
 
-        let arguments = view_function::validate_view_function(
-            session,
-            module_storage,
-            arguments,
-            func_name.as_ident_str(),
-            &func,
-            metadata.as_ref().map(Arc::as_ref),
-            vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-        )
-        .map_err(|e| e.finish(Location::Module(module_id)))?;
+            let metadata = get_metadata(&func.owner_as_module()?.metadata);
 
-        let result = session.execute_loaded_function(
-            func,
-            arguments,
-            gas_meter,
-            traversal_context,
-            module_storage,
-        )?;
+            let arguments = view_function::validate_view_function(
+                session,
+                &loader,
+                gas_meter,
+                traversal_context,
+                arguments,
+                func_name.as_ident_str(),
+                &func,
+                metadata.as_ref().map(Arc::as_ref),
+                vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            )
+            .map_err(|e| e.finish(Location::Module(module_id)))?;
 
-        Ok(result
-            .return_values
-            .into_iter()
-            .map(|(bytes, _ty)| bytes)
-            .collect::<Vec<_>>())
+            let result = session.execute_loaded_function(
+                func,
+                arguments,
+                gas_meter,
+                traversal_context,
+                &loader,
+            )?;
+
+            Ok(result
+                .return_values
+                .into_iter()
+                .map(|(bytes, _ty)| bytes)
+                .collect::<Vec<_>>())
+        })
     }
 
     fn run_prologue_with_payload(

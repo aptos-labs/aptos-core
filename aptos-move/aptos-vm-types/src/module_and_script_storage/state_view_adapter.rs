@@ -7,7 +7,7 @@ use crate::{
     module_and_script_storage::module_storage::AptosModuleStorage,
     resolver::BlockSynchronizationKillSwitch,
 };
-use ambassador::Delegate;
+use ambassador::{delegate_to_methods, Delegate};
 use aptos_types::{
     error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, TStateView},
@@ -20,20 +20,16 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
 use move_vm_runtime::{
-    ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
-    ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, CodeStorage, Function,
-    LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
-    UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage,
+    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
+    WithRuntimeEnvironment,
 };
 use move_vm_types::{
-    code::{ModuleBytesStorage, ModuleCode},
-    loaded_data::runtime_types::{StructType, Type},
+    code::{ambassador_impl_ScriptCache, Code, ModuleBytesStorage, ModuleCode, ScriptCache},
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};
@@ -91,16 +87,24 @@ where
     where = "S: StateView, E: WithRuntimeEnvironment"
 )]
 #[delegate(ModuleStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
-#[delegate(CodeStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
 pub struct AptosCodeStorageAdapter<'ctx, S, E> {
     storage: UnsyncCodeStorage<UnsyncModuleStorage<'ctx, StateViewAdapter<'ctx, S, E>>>,
 }
 
+#[delegate_to_methods]
+#[delegate(ScriptCache, target_ref = "as_script_cache")]
 impl<S, E> AptosCodeStorageAdapter<'_, S, E>
 where
     S: StateView,
     E: WithRuntimeEnvironment,
 {
+    /// Returns the script cache.
+    fn as_script_cache(
+        &self,
+    ) -> &dyn ScriptCache<Key = [u8; 32], Deserialized = CompiledScript, Verified = Script> {
+        &self.storage
+    }
+
     /// Drains cached verified modules from the code storage, transforming them into format used by
     /// global caches.
     pub fn into_verified_module_code_iter(
@@ -156,7 +160,7 @@ where
 impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
     for AptosCodeStorageAdapter<'_, S, E>
 {
-    fn get_module_state_value_metadata(
+    fn unmetered_get_module_state_value_metadata(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,

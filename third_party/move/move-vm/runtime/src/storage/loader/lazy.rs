@@ -5,12 +5,16 @@ use crate::{
     module_traversal::TraversalContext,
     storage::loader::traits::{
         FunctionDefinitionLoader, InstantiatedFunctionLoader, InstantiatedFunctionLoaderHelper,
-        LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader,
+        LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
         StructDefinitionLoader,
     },
-    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script,
+    WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMResult, VMResult},
+    file_format::CompiledScript,
+};
 use move_core_types::{
     gas_algebra::NumBytes,
     identifier::IdentStr,
@@ -18,11 +22,13 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_vm_types::{
+    code::{Code, ScriptCache},
     gas::{DependencyGasMeter, DependencyKind},
     loaded_data::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
     },
+    sha3_256,
 };
 use std::sync::Arc;
 
@@ -69,6 +75,20 @@ where
         Ok(())
     }
 
+    /// Loads a module, metering it and performing lazy verification (no loading of transitive
+    /// dependencies).
+    fn metered_load_module(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        module_id: &ModuleId,
+    ) -> VMResult<Arc<Module>> {
+        self.charge_module(gas_meter, traversal_context, module_id)
+            .map_err(|err| err.finish(Location::Undefined))?;
+        self.module_storage
+            .unmetered_get_existing_lazily_verified_module(module_id)
+    }
+
     /// Converts a type tag into a runtime type, metering any loading of struct definitions.
     fn metered_load_type(
         &self,
@@ -80,13 +100,59 @@ where
             .vm_config()
             .ty_builder
             .create_ty(tag, |st| {
-                self.charge_module(gas_meter, traversal_context, &st.module_id())?;
-                self.module_storage.unmetered_get_struct_definition(
-                    &st.address,
-                    &st.module,
-                    st.name.as_ident_str(),
+                self.metered_load_module(
+                    gas_meter,
+                    traversal_context,
+                    &ModuleId::new(st.address, st.module.to_owned()),
                 )
+                .and_then(|module| module.get_struct(&st.name))
+                .map_err(|err| err.to_partial())
             })
+    }
+}
+
+impl<'a, T> LazyLoader<'a, T>
+where
+    T: ModuleStorage
+        + ScriptCache<Key = [u8; 32], Deserialized = CompiledScript, Verified = Script>,
+{
+    fn metered_verify_and_cache_script(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        serialized_script: &[u8],
+    ) -> VMResult<Arc<Script>> {
+        use Code::*;
+
+        let hash = sha3_256(serialized_script);
+        let deserialized_script = match self.module_storage.get_script(&hash) {
+            Some(Verified(script)) => return Ok(script),
+            Some(Deserialized(deserialized_script)) => deserialized_script,
+            None => self
+                .runtime_environment()
+                .deserialize_into_script(serialized_script)
+                .map(Arc::new)?,
+        };
+
+        let locally_verified_script = self
+            .runtime_environment()
+            .build_locally_verified_script(deserialized_script)?;
+
+        let immediate_dependencies = locally_verified_script
+            .immediate_dependencies_iter()
+            .map(|(addr, name)| {
+                let module_id = ModuleId::new(*addr, name.to_owned());
+                self.metered_load_module(gas_meter, traversal_context, &module_id)
+            })
+            .collect::<VMResult<Vec<_>>>()?;
+
+        let verified_script = self
+            .runtime_environment()
+            .build_verified_script(locally_verified_script, &immediate_dependencies)?;
+
+        Ok(self
+            .module_storage
+            .insert_verified_script(hash, verified_script))
     }
 }
 
@@ -119,12 +185,9 @@ where
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        self.charge_module(gas_meter, traversal_context, &struct_name.module)?;
-        self.module_storage.unmetered_get_struct_definition(
-            struct_name.module.address(),
-            struct_name.module.name(),
-            struct_name.name.as_ident_str(),
-        )
+        self.metered_load_module(gas_meter, traversal_context, &struct_name.module)
+            .and_then(|module| module.get_struct(&struct_name.name))
+            .map_err(|err| err.to_partial())
     }
 }
 
@@ -139,13 +202,9 @@ where
         module_id: &ModuleId,
         function_name: &IdentStr,
     ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        self.charge_module(gas_meter, traversal_context, module_id)
-            .map_err(|err| err.finish(Location::Module(module_id.clone())))?;
-        self.module_storage.unmetered_get_function_definition(
-            module_id.address(),
-            module_id.name(),
-            function_name,
-        )
+        let module = self.metered_load_module(gas_meter, traversal_context, module_id)?;
+        let function = module.get_function(function_name)?;
+        Ok((module, function))
     }
 }
 
@@ -190,9 +249,8 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty_arg: &TypeTag,
-    ) -> VMResult<Type> {
+    ) -> PartialVMResult<Type> {
         self.metered_load_type(gas_meter, traversal_context, ty_arg)
-            .map_err(|e| e.finish(Location::Undefined))
     }
 }
 
@@ -223,5 +281,25 @@ where
 {
     fn unmetered_module_storage(&self) -> &dyn ModuleStorage {
         self.module_storage
+    }
+}
+
+impl<'a, T> ScriptLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage
+        + ScriptCache<Key = [u8; 32], Deserialized = CompiledScript, Verified = Script>,
+{
+    fn load_script(
+        &self,
+        // For lazy loading, config is a no-op.
+        _config: &LegacyLoaderConfig,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        serialized_script: &[u8],
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let script =
+            self.metered_verify_and_cache_script(gas_meter, traversal_context, serialized_script)?;
+        self.build_instantiated_script(gas_meter, traversal_context, script, ty_args)
     }
 }
