@@ -297,7 +297,7 @@ impl TransactionDataCache {
                                        struct_tag,
                                        layout,
                                        contains_delayed_fields,
-                                       charge_for_bytes|
+                                       existed_before: bool|
          -> PartialVMResult<(CachedInformation, NumBytes)> {
             let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
                 metadata_loader,
@@ -311,21 +311,33 @@ impl TransactionDataCache {
                 contains_delayed_fields,
                 load_data,
             )?;
-            let num_bytes_loaded = if charge_for_bytes {
+            let num_bytes_loaded = if !existed_before {
                 NumBytes::new(bytes_loaded)
             } else {
                 NumBytes::zero()
             };
             if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
-                full_gas_meter.charge_load_resource(
-                    *addr,
-                    TypeWithRuntimeEnvironment {
-                        ty,
-                        runtime_environment: module_storage.runtime_environment(),
-                    },
-                    cached_info.maybe_value().and_then(|v| v.view()),
-                    num_bytes_loaded,
-                )?;
+                if !existed_before {
+                    full_gas_meter.charge_resource_fetch(
+                        *addr,
+                        &TypeWithRuntimeEnvironment {
+                            ty,
+                            runtime_environment: module_storage.runtime_environment(),
+                        },
+                        cached_info.exists()?,
+                        num_bytes_loaded,
+                    )?;
+                }
+                if let Some(v) = cached_info.maybe_value().and_then(|v| v.view()) {
+                    full_gas_meter.charge_loaded_bytes(
+                        *addr,
+                        &TypeWithRuntimeEnvironment {
+                            ty,
+                            runtime_environment: module_storage.runtime_environment(),
+                        },
+                        v,
+                    )?;
+                }
             }
             Ok((cached_info, num_bytes_loaded))
         };
@@ -351,7 +363,7 @@ impl TransactionDataCache {
                     &struct_tag,
                     &layout,
                     contains_delayed_fields,
-                    true,
+                    false,
                 )?;
 
                 let new_entry = DataCacheEntry {
@@ -373,7 +385,7 @@ impl TransactionDataCache {
                         &v.struct_tag,
                         &v.layout,
                         v.contains_delayed_fields,
-                        false,
+                        true,
                     )?;
                     occupied_entry.get_mut().value = cached_info;
                 }

@@ -4,11 +4,17 @@
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
-    account_address::AccountAddress, move_utils::MemberId, on_chain_config::FeatureFlag, transaction::TransactionOutput,
+    account_address::AccountAddress, move_utils::MemberId, on_chain_config::FeatureFlag,
+    transaction::TransactionOutput,
 };
 use std::{path::Path, str::FromStr};
 
-fn run_transactions(enabled_features: Vec<FeatureFlag>, disabled_features: Vec<FeatureFlag>, path: &Path, function_names: &[&str]) -> Vec<TransactionOutput> {
+fn run_transactions(
+    enabled_features: Vec<FeatureFlag>,
+    disabled_features: Vec<FeatureFlag>,
+    path: &Path,
+    function_names: &[&str],
+) -> Vec<TransactionOutput> {
     println!("Running with features: {:?}", enabled_features);
     let mut h = MoveHarness::new_with_features(enabled_features, disabled_features);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
@@ -34,8 +40,18 @@ fn run_transactions(enabled_features: Vec<FeatureFlag>, disabled_features: Vec<F
 
 fn check_for_transactions(path: &Path, function_names: &[&str]) {
     assert_eq!(
-        run_transactions(vec![], vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE], path, function_names),
-        run_transactions(vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE], vec![], path, function_names),
+        run_transactions(
+            vec![],
+            vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE],
+            path,
+            function_names
+        ),
+        run_transactions(
+            vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE],
+            vec![],
+            path,
+            function_names
+        ),
     );
 }
 
@@ -80,11 +96,11 @@ fn test_lightweight_resource_existence() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    // check_for_transactions(path.path(), &["check"]);
-    // check_for_transactions(path.path(), &["modify"]);
-    // check_for_transactions(path.path(), &["check", "modify"]);
-    // check_for_transactions(path.path(), &["check", "check", "modify"]);
-    // check_for_transactions(path.path(), &["check", "modify", "check", "modify"]);
+    check_for_transactions(path.path(), &["check"]);
+    check_for_transactions(path.path(), &["modify"]);
+    check_for_transactions(path.path(), &["check", "modify"]);
+    check_for_transactions(path.path(), &["check", "check", "modify"]);
+    check_for_transactions(path.path(), &["check", "modify", "check", "modify"]);
     check_for_transactions(path.path(), &["read"]);
-    // check_for_transactions(path.path(), &["check", "read"]);
+    check_for_transactions(path.path(), &["check", "read"]);
 }

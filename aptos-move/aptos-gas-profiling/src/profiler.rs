@@ -521,17 +521,37 @@ where
         res
     }
 
-    fn charge_load_resource(
+    fn charge_resource_fetch(
         &mut self,
         addr: AccountAddress,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
+        ty: &impl TypeView,
+        resource_exists: bool,
         bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         let ty_tag = ty.to_type_tag();
 
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_load_resource(addr, ty, val, bytes_loaded));
+        let (cost, res) = self.delegate_charge(|base| {
+            base.charge_resource_fetch(addr, ty, resource_exists, bytes_loaded)
+        });
+
+        self.record_gas_event(ExecutionGasEvent::LoadResource {
+            addr,
+            ty: ty_tag,
+            cost,
+        });
+
+        res
+    }
+
+    fn charge_loaded_bytes(
+        &mut self,
+        addr: AccountAddress,
+        ty: &impl TypeView,
+        val: impl ValueView,
+    ) -> PartialVMResult<()> {
+        let ty_tag = ty.to_type_tag();
+
+        let (cost, res) = self.delegate_charge(|base| base.charge_loaded_bytes(addr, ty, val));
 
         self.record_gas_event(ExecutionGasEvent::LoadResource {
             addr,

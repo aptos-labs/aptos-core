@@ -390,12 +390,21 @@ impl GasMeter for GasStatus {
         )
     }
 
-    fn charge_load_resource(
+    fn charge_resource_fetch(
         &mut self,
         _addr: AccountAddress,
-        _ty: impl TypeView,
-        _val: Option<impl ValueView>,
+        _ty: &impl TypeView,
+        _resource_exists: bool,
         _bytes_loaded: NumBytes,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_loaded_bytes(
+        &mut self,
+        _addr: AccountAddress,
+        _ty: &impl TypeView,
+        _val: impl ValueView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
