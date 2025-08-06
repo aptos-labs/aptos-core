@@ -103,8 +103,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<Option<(Option<Bytes>, usize)>> {
-        let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
-        if let Some(resource_group) = resource_group {
+        if let Some(resource_group) = get_resource_group_member_from_metadata(struct_tag, metadata) {
             let key = StateKey::resource_group(address, &resource_group);
             let buf =
                 self.resource_group_view

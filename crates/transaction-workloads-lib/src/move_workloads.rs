@@ -269,7 +269,8 @@ pub enum EntryPoints {
     },
 
     ExistenceModificationConflicts {
-        // Modifications enforce serialization, workload should parallelize to the factor of 1/modify_frequency
+        // Modifications enforce serialization,
+        // workload should parallelize to the factor of 1/modify_frequency
         modify_frequency: f64,
     },
 

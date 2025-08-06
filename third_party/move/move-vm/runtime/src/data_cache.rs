@@ -123,18 +123,21 @@ impl<'a, T: GasMeter> DependencyGasMeter for DataCacheGasMeterWrapper<'a, T> {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
+///
+/// If `check_resource_existence_without_load` is set, when checking resource existence
+/// the actual data will not be loaded and deserialized.
 pub struct TransactionDataCache {
     account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
-    enable_resource_existence_optimization: bool,
+    check_resource_existence_without_load: bool,
 }
 
 impl TransactionDataCache {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub fn empty(enable_resource_existence_optimization: bool) -> Self {
+    pub fn empty(check_resource_existence_without_load: bool) -> Self {
         TransactionDataCache {
             account_map: BTreeMap::new(),
-            enable_resource_existence_optimization,
+            check_resource_existence_without_load,
         }
     }
 
@@ -283,7 +286,7 @@ impl TransactionDataCache {
         ty: &Type,
         mut load_data: bool,
     ) -> PartialVMResult<(&CachedInformation, NumBytes)> {
-        if !self.enable_resource_existence_optimization {
+        if !self.check_resource_existence_without_load {
             // Without the feature flag we will always load and deserialize the whole resource
             load_data = true;
         }
