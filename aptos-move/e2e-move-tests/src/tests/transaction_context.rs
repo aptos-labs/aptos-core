@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, harness::MoveHarness, tests::common, BlockSplit, SUCCESS};
+use crate::{assert_success, feature_flags_for_orderless, harness::MoveHarness, tests::common, BlockSplit, SUCCESS};
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
@@ -15,6 +15,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
     parser::parse_struct_tag,
 };
+use rstest::rstest;
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -304,7 +305,7 @@ fn test_transaction_context_gas_payer_as_separate_account() {
     let mut harness = new_move_harness();
 
     let alice = setup(&mut harness);
-    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, Some(0));
 
     let fun: MemberId =
         str::parse("0x1::transaction_context_test::store_gas_payer_from_native_txn_context")
@@ -348,7 +349,7 @@ fn test_transaction_context_secondary_signers() {
     let mut harness = new_move_harness();
 
     let alice = setup(&mut harness);
-    let bob = harness.new_account_with_balance_and_sequence_number(1000000, 0);
+    let bob = harness.new_account_with_balance_and_sequence_number(1000000, Some(0));
 
     let fun: MemberId = str::parse(
         "0x1::transaction_context_test::store_secondary_signers_from_native_txn_context_multi",
@@ -388,9 +389,24 @@ fn test_transaction_context_secondary_signers() {
     assert_eq!(secondary_signers, vec![*bob.address()]);
 }
 
-#[test]
-fn test_transaction_context_entry_function_payload() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_transaction_context_entry_function_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut harness = new_move_harness();
+    harness.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    harness.use_txn_payload_v2_format = use_txn_payload_v2_format;
+    harness.use_orderless_transactions = use_orderless_transactions;
     let account = setup(&mut harness);
 
     let (account_address, module_name, function_name, type_arg_names, args) =
@@ -413,9 +429,24 @@ fn test_transaction_context_entry_function_payload() {
     ]);
 }
 
-#[test]
-fn test_transaction_context_multisig_payload() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn test_transaction_context_multisig_payload(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut harness = new_move_harness();
+    harness.enable_features(
+        feature_flags_for_orderless(use_txn_payload_v2_format, use_orderless_transactions),
+        vec![],
+    );
+    harness.use_txn_payload_v2_format = use_txn_payload_v2_format;
+    harness.use_orderless_transactions = use_orderless_transactions;
     let account = setup(&mut harness);
 
     let multisig_transaction_payload =

@@ -30,7 +30,12 @@ move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
 proptest = { workspace = true }
+<<<<<<< HEAD
 test-case = { workspace = true }
+=======
+rand = { workspace = true }
+rstest = { workspace = true }
+>>>>>>> 2ab3d8879e (Move tests for orderless transactions)
 
 [features]
 default = [

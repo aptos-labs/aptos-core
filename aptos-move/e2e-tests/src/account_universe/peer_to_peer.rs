@@ -34,6 +34,8 @@ impl AUTransactionGen for P2PTransferGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
@@ -47,6 +49,9 @@ impl AUTransactionGen for P2PTransferGen {
             sender.sequence_number,
             self.amount,
             1, // sets unit gas price, ensures an aggregator is used for total supply.
+            0, // current_time
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         );
 
         // Now figure out whether the transaction will actually work.
@@ -66,7 +71,10 @@ impl AUTransactionGen for P2PTransferGen {
         match (enough_max_gas, enough_to_transfer, enough_to_succeed) {
             (true, true, true) => {
                 // Success!
-                sender.sequence_number += 1;
+                if !use_orderless_transactions {
+                    sender.sequence_number =
+                        sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
+                }
                 sender.balance -= to_deduct;
 
                 receiver.balance += self.amount;
@@ -78,7 +86,10 @@ impl AUTransactionGen for P2PTransferGen {
                 // Enough gas to pass validation and to do the transfer, but not enough to succeed
                 // in the epilogue. The transaction will be run and gas will be deducted from the
                 // sender, but no other changes will happen.
-                sender.sequence_number += 1;
+                if !use_orderless_transactions {
+                    sender.sequence_number =
+                        sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
+                }
                 gas_used = sender.peer_to_peer_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
                 // the balance was insufficient while trying to deduct gas costs in the
@@ -96,7 +107,10 @@ impl AUTransactionGen for P2PTransferGen {
             (true, false, _) => {
                 // Enough to pass validation but not to do the transfer. The transaction will be run
                 // and gas will be deducted from the sender, but no other changes will happen.
-                sender.sequence_number += 1;
+                if !use_orderless_transactions {
+                    sender.sequence_number =
+                        sender.sequence_number.map_or(Some(1), |seq| Some(seq + 1));
+                }
                 gas_used = sender.peer_to_peer_too_low_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
                 // the balance was insufficient while trying to transfer.

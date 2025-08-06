@@ -48,7 +48,7 @@ impl PartitionStrategy for RandomizedStrategy {
 
 pub struct RandomExecutor {
     strategy: RandomizedStrategy,
-    executor: FakeExecutor,
+    pub executor: FakeExecutor,
 }
 
 impl RandomExecutor {

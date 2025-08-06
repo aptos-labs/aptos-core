@@ -9,9 +9,17 @@ use aptos_types::{
     vm_status::DiscardedVMStatus,
 };
 use move_core_types::{value::MoveValue, vm_status::StatusCode};
+use rstest::rstest;
 
-#[test]
-fn invariant_violation_error() {
+#[rstest(
+    stateless_account,
+    use_orderless_transactions,
+    case(true, false),
+    case(true, true),
+    case(false, false),
+    case(false, true)
+)]
+fn invariant_violation_error(stateless_account: bool, use_orderless_transactions: bool) {
     let _scenario = fail::FailScenario::setup();
     fail::cfg("aptos_vm::execute_script_or_entry_function", "100%return").unwrap();
 
@@ -19,13 +27,23 @@ fn invariant_violation_error() {
 
     let mut executor = FakeExecutor::from_head_genesis();
 
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    let receiver = executor.create_raw_account_data(100_000, 10);
+    let sender =
+        executor.create_raw_account_data(1_000_000, if stateless_account { None } else { Some(0) });
+    let receiver = executor.create_raw_account_data(100_000, Some(10));
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
     let transfer_amount = 1_000;
-    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0);
+    let txn = peer_to_peer_txn(
+        sender.account(),
+        receiver.account(),
+        Some(0),
+        transfer_amount,
+        0,
+        executor.get_block_time_seconds(),
+        true,
+        use_orderless_transactions,
+    );
 
     // execute transaction
     let output = executor.execute_transaction(txn.clone());

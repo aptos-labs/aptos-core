@@ -18,7 +18,7 @@ use move_ir_compiler::Compiler;
 fn move_from_across_blocks() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, Some(11));
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
@@ -96,7 +96,7 @@ fn move_from_across_blocks() {
 fn borrow_after_move() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, Some(11));
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
@@ -146,7 +146,7 @@ fn borrow_after_move() {
 fn change_after_move() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 11);
+    let sender = executor.create_raw_account_data(1_000_000, Some(11));
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource

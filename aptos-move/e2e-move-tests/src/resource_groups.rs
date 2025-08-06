@@ -122,10 +122,12 @@ impl ResourceGroupsTestHarness {
         // Mint the account 10M Aptos coins (with 8 decimals).
         let balance = 1_000_000_000_000_000;
 
-        let result = self.harness.store_and_fund_account(&acc, balance, seq_num);
+        let result = self
+            .harness
+            .store_and_fund_account(&acc, balance, Some(seq_num));
 
         for h in self.comparison_harnesses.iter_mut() {
-            h.store_and_fund_account(&acc, balance, seq_num);
+            h.store_and_fund_account(&acc, balance, Some(seq_num));
         }
 
         result

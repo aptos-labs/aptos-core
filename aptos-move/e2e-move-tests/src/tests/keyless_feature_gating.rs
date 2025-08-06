@@ -374,7 +374,7 @@ fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account 
             AccountPublicKey::AnyPublicKey(AnyPublicKey::Keyless { public_key: pk }),
         ),
         100000000,
-        0,
+        Some(0),
     );
 
     println!("Actual address: {}", addr.to_hex());
@@ -443,7 +443,7 @@ fn create_federated_keyless_account(
             AccountPublicKey::AnyPublicKey(AnyPublicKey::FederatedKeyless { public_key: fed_pk }),
         ),
         100000000,
-        0,
+        Some(0),
     );
 
     println!("Actual address: {}", addr.to_hex());

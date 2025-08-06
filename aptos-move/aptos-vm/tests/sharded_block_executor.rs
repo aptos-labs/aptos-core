@@ -223,6 +223,7 @@ mod test_utils {
     use std::{
         collections::HashMap,
         sync::{Arc, Mutex},
+        time::SystemTime,
     };
 
     pub fn generate_account_at(
@@ -231,7 +232,7 @@ mod test_utils {
     ) -> AccountData {
         let acc = Account::new_genesis_account(address);
         state_store
-            .store_and_fund_account(acc, 1_000_000_000_000_000, 0)
+            .store_and_fund_account(acc, 1_000_000_000_000_000, Some(0))
             .unwrap()
     }
 
@@ -239,8 +240,8 @@ mod test_utils {
         rng: &mut KeyGen,
         state_store: &impl SimulationStateStore,
     ) -> (AccountData, AccountData) {
-        let sender = AccountData::new_from_seed(rng, 3_000_000_000, 0);
-        let receiver = AccountData::new_from_seed(rng, 3_000_000_000, 0);
+        let sender = AccountData::new_from_seed(rng, 3_000_000_000, Some(0));
+        let receiver = AccountData::new_from_seed(rng, 3_000_000_000, Some(0));
         state_store.add_account_data(&sender).unwrap();
         state_store.add_account_data(&receiver).unwrap();
         (sender, receiver)
@@ -268,6 +269,12 @@ mod test_utils {
             sender.sequence_number(),
             transfer_amount,
             100,
+            SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            false,
+            false,
         ))
         .into();
         sender.increment_sequence_number();

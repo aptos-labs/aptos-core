@@ -74,7 +74,7 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
 
     let sender_acc = if true {
         // create sender pub/priv key. initialize and fund account
-        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
+        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), Some(0))
             .remove(0)
     } else {
         // only create sender pub/priv key. do not initialize
