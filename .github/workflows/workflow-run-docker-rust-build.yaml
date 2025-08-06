@@ -30,6 +30,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      RELEASE_DEFAULT_ONLY:
+        required: false
+        type: boolean
+        description: If true, only wait for the release default images to be available
+        default: false
       DRY_RUN: 
         required: false
         type: boolean
@@ -61,6 +66,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      RELEASE_DEFAULT_ONLY:
+        required: false
+        type: boolean
+        description: If true, only wait for the release default images to be available
+        default: false
       DRY_RUN: 
         required: false
         type: boolean
@@ -116,12 +126,13 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/verify-and-build-images-for-workflows # TODO: change back to main
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
+          RELEASE_DEFAULT_ONLY: ${{ inputs.RELEASE_DEFAULT_ONLY }}
 
       - name: Authenticate to Google Cloud
         id: auth
