@@ -11230,9 +11230,9 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
- "test-case",
  "rand 0.7.3",
  "rstest",
+ "test-case",
 ]
 
 [[package]]

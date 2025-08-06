@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, feature_flags_for_orderless, harness::MoveHarness, tests::common, BlockSplit, SUCCESS};
+use crate::{
+    assert_success, feature_flags_for_orderless, harness::MoveHarness, tests::common, BlockSplit,
+    SUCCESS,
+};
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
@@ -15,8 +18,8 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
     parser::parse_struct_tag,
 };
-use rstest::rstest;
 use proptest::prelude::*;
+use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]

@@ -636,7 +636,7 @@ fn execute_script_for_test(
         .expect("Failed to compile");
 
     // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     let txn = sender

@@ -345,10 +345,13 @@ impl TransactionBuilder {
         use_orderless_transactions: bool,
     ) -> Self {
         if let Some(program) = self.program {
-            self.program = Some(program.upgrade_payload(
-                rng,
+            self.program = Some(program.upgrade_payload_with_fn(
                 use_txn_payload_v2_format,
-                use_orderless_transactions,
+                if use_orderless_transactions {
+                    Some(|| rng.gen())
+                } else {
+                    None
+                },
             ));
         }
         if use_orderless_transactions {
