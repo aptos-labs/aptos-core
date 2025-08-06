@@ -54,7 +54,6 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-  # TODO: Remove pull_request from the if statement after testing
   replay:
     if: |
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
