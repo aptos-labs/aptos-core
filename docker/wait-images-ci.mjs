@@ -4,7 +4,7 @@
 // These images are typically built on push to the main branch or on a PR, from the "docker-build-test.yaml" workflow.
 
 // Try it out:
-// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600 --release-only
+// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600 --release-default-only
 import {
   assertExecutingInRepoRoot,
   CargoBuildFeatures,
@@ -15,49 +15,13 @@ import {
   pnpmInstall,
   waitForImageToBecomeAvailable,
   joinTagSegments,
+  getImagesToWaitFor,
 } from "./image-helpers.js";
-
-const IMAGES_TO_WAIT_FOR = {
-  validator: {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-      CargoBuildFeatures.Failpoints,
-    ],
-  },
-  "validator-testing": {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-      CargoBuildFeatures.Failpoints,
-    ],
-  },
-  forge: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-  tools: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-  "indexer-grpc": {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-};
-
 
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
-  const BOOLEAN_ARGS = ["RELEASE_ONLY"];
+  const BOOLEAN_ARGS = ["RELEASE_DEFAULT_ONLY"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
@@ -66,11 +30,13 @@ async function main() {
 
   const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
 
+  const imagesToWaitFor = getImagesToWaitFor(parsedArgs.RELEASE_DEFAULT_ONLY);
+  
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
   // iterate over all images to wait for
-  for (const [image, imageConfig] of Object.entries(IMAGES_TO_WAIT_FOR)) {
+  for (const [image, imageConfig] of Object.entries(imagesToWaitFor)) {
     for (const [profile, features] of Object.entries(imageConfig)) {
       // build profiles that are not the default "release" will have a separate prefix
       const profilePrefix = profile === CargoBuildProfiles.Release ? "" : profile;
