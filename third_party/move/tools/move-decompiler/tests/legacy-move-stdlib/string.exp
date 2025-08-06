@@ -1,4 +1,3 @@
-
 module 0x1::string {
     use 0x1::vector;
     use 0x1::option;
@@ -23,14 +22,7 @@ module 0x1::string {
         let _t4;
         let _t3;
         _t3 = &self.bytes;
-        loop {
-            if (at <= vector::length<u8>(_t3)) {
-                _t4 = internal_is_char_boundary(_t3, at);
-                break
-            };
-            _t4 = false;
-            break
-        };
+        if (at <= vector::length<u8>(_t3)) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
         if (!_t4) abort 2;
         _t6 = sub_string(/*freeze*/self, 0, at);
         append(&mut _t6, o);
@@ -44,30 +36,9 @@ module 0x1::string {
         let _t5;
         let _t3;
         _t3 = &self.bytes;
-        loop {
-            if (j <= vector::length<u8>(_t3)) {
-                _t5 = i <= j;
-                break
-            };
-            _t5 = false;
-            break
-        };
-        loop {
-            if (_t5) {
-                _t6 = internal_is_char_boundary(_t3, i);
-                break
-            };
-            _t6 = false;
-            break
-        };
-        loop {
-            if (_t6) {
-                _t7 = internal_is_char_boundary(_t3, j);
-                break
-            };
-            _t7 = false;
-            break
-        };
+        if (j <= vector::length<u8>(_t3)) _t5 = i <= j else _t5 = false;
+        if (_t5) _t6 = internal_is_char_boundary(_t3, i) else _t6 = false;
+        if (_t6) _t7 = internal_is_char_boundary(_t3, j) else _t7 = false;
         if (!_t7) abort 2;
         String{bytes: internal_sub_string(_t3, i, j)}
     }
@@ -85,14 +56,10 @@ module 0x1::string {
     native fun internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8>;
     public fun try_utf8(bytes: vector<u8>): option::Option<String> {
         let _t1;
-        loop {
-            if (internal_check_utf8(&bytes)) {
-                _t1 = option::some<String>(String{bytes: bytes});
-                break
-            };
-            _t1 = option::none<String>();
-            break
-        };
+        if (internal_check_utf8(&bytes)) _t1 = option::some<String>(String{bytes: bytes}) else _t1 = option::none<String>();
         _t1
     }
 }
+
+
+============ recompilation succeeded ========
