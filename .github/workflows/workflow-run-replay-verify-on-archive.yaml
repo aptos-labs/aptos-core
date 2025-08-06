@@ -41,10 +41,12 @@ on:
         description: The end version to use for the backup. If not specified, it will use the latest version.
 jobs:
 
+  # Should only build images if IMAGE_TAG is provided; otherwise, we will find and use the latest image 
   build-images:
+    if: inputs.IMAGE_TAG != ''
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: change back to main
     with:
-      GIT_SHA: ${{ env.GIT_SHA }}
+      GIT_SHA: ${{ inputs.IMAGE_TAG }}
       TARGET_CACHE_ID: ${{ github.ref_name }}
 
   run-replay-verify:
