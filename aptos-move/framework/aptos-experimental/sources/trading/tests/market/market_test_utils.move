@@ -9,10 +9,9 @@ module aptos_experimental::market_test_utils {
         order_status_cancelled,
         order_status_filled,
         order_status_open,
-        TimeInForce,
         MarketClearinghouseCallbacks
     };
-    use aptos_experimental::order_book_types::{OrderIdType, Order};
+    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce};
 
     use aptos_experimental::market::{OrderEvent, Market, OrderMatchResult};
 

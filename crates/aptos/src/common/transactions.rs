@@ -163,6 +163,7 @@ impl TxnOptions {
 
     pub async fn simulate_remotely(
         &self,
+        rng: &mut rand::rngs::StdRng,
         payload: TransactionPayload,
     ) -> CliTypedResult<TransactionSummary> {
         let client = self.rest_client()?;
@@ -203,7 +204,7 @@ impl TxnOptions {
             .sequence_number(sequence_number)
             .expiration_timestamp_secs(expiration_time_secs);
         if self.replay_protection_type == ReplayProtectionType::Nonce {
-            txn_builder = txn_builder.upgrade_payload(true, true);
+            txn_builder = txn_builder.upgrade_payload(rng, true, true);
         }
         let unsigned_transaction = txn_builder.build();
 

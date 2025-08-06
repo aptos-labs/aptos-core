@@ -271,11 +271,11 @@ impl TransactionDataCache {
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
     /// If `load_data` is false, only resource existence information will be retrieved
-    pub(crate) fn create_and_insert_or_upgrade_and_charge_data_cache_entry(
+    pub(crate) fn create_and_insert_or_upgrade_and_charge_data_cache_entry<T: GasMeter>(
         &mut self,
         metadata_loader: &impl ModuleMetadataLoader,
         layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
-        mut gas_meter: DataCacheGasMeterWrapper<impl GasMeter>,
+        mut gas_meter: DataCacheGasMeterWrapper<T>,
         traversal_context: &mut TraversalContext,
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
@@ -288,6 +288,44 @@ impl TransactionDataCache {
             load_data = true;
         }
         let existing_entry = self.account_map.entry(*addr).or_default().entry(ty.clone());
+
+        let create_and_charge_entry = |gas_meter: &mut DataCacheGasMeterWrapper<'_, T>,
+                                       traversal_context,
+                                       struct_tag,
+                                       layout,
+                                       contains_delayed_fields,
+                                       charge_for_bytes|
+         -> PartialVMResult<(CachedInformation, NumBytes)> {
+            let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
+                metadata_loader,
+                gas_meter,
+                traversal_context,
+                module_storage,
+                resource_resolver,
+                addr,
+                struct_tag,
+                layout,
+                contains_delayed_fields,
+                load_data,
+            )?;
+            let num_bytes_loaded = if charge_for_bytes {
+                NumBytes::new(bytes_loaded)
+            } else {
+                NumBytes::zero()
+            };
+            if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
+                full_gas_meter.charge_load_resource(
+                    *addr,
+                    TypeWithRuntimeEnvironment {
+                        ty,
+                        runtime_environment: module_storage.runtime_environment(),
+                    },
+                    cached_info.maybe_value().and_then(|v| v.view()),
+                    num_bytes_loaded,
+                )?;
+            }
+            Ok((cached_info, num_bytes_loaded))
+        };
 
         let (entry, bytes_loaded) = match existing_entry {
             Entry::Vacant(vacant_entry) => {
@@ -304,31 +342,14 @@ impl TransactionDataCache {
                     .type_to_type_layout_with_delayed_fields(&mut gas_meter, traversal_context, ty)?
                     .unpack();
 
-                let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
-                    metadata_loader,
+                let (cached_info, num_bytes_loaded) = create_and_charge_entry(
                     &mut gas_meter,
                     traversal_context,
-                    module_storage,
-                    resource_resolver,
-                    addr,
                     &struct_tag,
                     &layout,
                     contains_delayed_fields,
-                    load_data,
+                    true,
                 )?;
-
-                let num_bytes_loaded = NumBytes::new(bytes_loaded);
-                if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
-                    full_gas_meter.charge_load_resource(
-                        *addr,
-                        TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        },
-                        cached_info.maybe_value().and_then(|v| v.view()),
-                        num_bytes_loaded,
-                    )?;
-                }
 
                 let new_entry = DataCacheEntry {
                     struct_tag,
@@ -341,40 +362,19 @@ impl TransactionDataCache {
             },
             Entry::Occupied(mut occupied_entry) => {
                 // If entry already exists we might only need to upgrade it from SizeOnly to Value and charge for bytes
-                let num_bytes_loaded = NumBytes::zero();
                 if load_data && !matches!(occupied_entry.get().value, CachedInformation::Value(_)) {
-                    let (cached_info, _) = TransactionDataCache::create_cached_info(
-                        metadata_loader,
+                    let v = occupied_entry.get();
+                    let (cached_info, _) = create_and_charge_entry(
                         &mut gas_meter,
                         traversal_context,
-                        module_storage,
-                        resource_resolver,
-                        addr,
-                        &occupied_entry.get().struct_tag,
-                        &occupied_entry.get().layout,
-                        occupied_entry.get().contains_delayed_fields,
-                        load_data,
+                        &v.struct_tag,
+                        &v.layout,
+                        v.contains_delayed_fields,
+                        false,
                     )?;
-
-                    if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
-                        full_gas_meter.charge_load_resource(
-                            *addr,
-                            TypeWithRuntimeEnvironment {
-                                ty,
-                                runtime_environment: module_storage.runtime_environment(),
-                            },
-                            match cached_info.maybe_value() {
-                                None => None,
-                                Some(v) => v.view(),
-                            },
-                            num_bytes_loaded,
-                        )?;
-                    }
-
                     occupied_entry.get_mut().value = cached_info;
                 }
-
-                (occupied_entry.into_mut(), num_bytes_loaded)
+                (occupied_entry.into_mut(), NumBytes::zero())
             },
         };
 
