@@ -747,11 +747,11 @@ impl Options {
     /// Sets up logging based on provided options. This should be called as early as possible
     /// and before any use of info!, warn! etc.
     pub fn setup_logging(&self) {
-        move_compiler_v2::logging::setup_logging()
+        move_compiler_v2::logging::setup_logging(Some(self.verbosity_level))
     }
 
     pub fn setup_logging_for_test(&self) {
-        move_compiler_v2::logging::setup_logging_for_testing()
+        move_compiler_v2::logging::setup_logging_for_testing(Some(self.verbosity_level))
     }
 
     /// Convenience function to enable debugging (like high verbosity) on this instance.

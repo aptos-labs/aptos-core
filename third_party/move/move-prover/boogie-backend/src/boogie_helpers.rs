@@ -361,13 +361,13 @@ fn fun_type(env: &GlobalEnv, params: &Type, results: &Type, _abilities: AbilityS
         .clone()
         .flatten()
         .iter()
-        .map(|t| boogie_type(env, t))
+        .map(|t| boogie_type_suffix(env, t))
         .join("_");
     let results = results
         .clone()
         .flatten()
         .iter()
-        .map(|t| boogie_type(env, t))
+        .map(|t| boogie_type_suffix(env, t))
         .join("_");
     format!("$fun#{}#{}", params, results)
 }

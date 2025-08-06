@@ -10,7 +10,7 @@ use crate::{
 };
 use core::fmt;
 use itertools::{Either, Itertools};
-use log::{debug, info};
+use log::debug;
 use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
 use std::{
@@ -424,7 +424,7 @@ impl FunctionTargetPipeline {
         AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder) -> bool,
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
-        info!("transforming bytecode");
+        debug!("transforming bytecode");
         hook_before_pipeline(targets);
         for (step_count, processor) in self.processors.iter().enumerate() {
             if processor.is_single_run() {
