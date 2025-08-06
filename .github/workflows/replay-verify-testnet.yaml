@@ -52,7 +52,7 @@ jobs:
   # TODO: Remove pull_request from the if statement after testing
   replay:
     if: |
-      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
     secrets: inherit
