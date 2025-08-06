@@ -1,4 +1,3 @@
-
 module 0x1::fixed_point32 {
     struct FixedPoint32 has copy, drop, store {
         value: u64,
@@ -71,3 +70,14 @@ module 0x1::fixed_point32 {
         _t2
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+  ┌─ fixed_point32.move:9:48
+  │
+9 │         (_t1 as u128) + 4294967296u128 >> 32u8 as u64
+  │                                                ^^
+  │                                                │
+  │                                                Unexpected 'as'
+  │                                                Expected ';'

@@ -1,4 +1,3 @@
-
 module 0x1::option {
     use 0x1::vector;
     struct Option<Element> has copy, drop, store {
@@ -100,3 +99,19 @@ module 0x1::option {
         _t2
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with stackless-bytecode checks failed
+error: local `_t1` of type `vector<Element>` does not have the `copy` ability
+   ┌─ option.move:49:9
+   │
+49 │         vector::destroy_empty<Element>(_t1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
+50 │         vector::pop_back<Element>(&mut _t1)
+   │                                   -------- used here
+
+error: local `_t1` of type `vector<Element>` does not have the `drop` ability
+   ┌─ option.move:50:35
+   │
+50 │         vector::pop_back<Element>(&mut _t1)
+   │                                   ^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
