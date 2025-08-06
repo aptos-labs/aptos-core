@@ -20,6 +20,11 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not run replay verify.
+        default: false
   pull_request:
     paths:
       - ".github/workflows/replay-verify-testnet.yaml"
@@ -49,10 +54,9 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-  # TODO: Remove pull_request from the if statement after testing
   replay:
     if: |
-      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
     secrets: inherit
@@ -61,3 +65,4 @@ jobs:
       IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
       START_VERSION: ${{ inputs.START_VERSION }}
       END_VERSION: ${{ inputs.END_VERSION }}
+      DRY_RUN: ${{ inputs.DRY_RUN }}
