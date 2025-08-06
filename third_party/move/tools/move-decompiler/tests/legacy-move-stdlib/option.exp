@@ -1,4 +1,3 @@
-
 module 0x1::option {
     use 0x1::vector;
     struct Option<Element> has copy, drop, store {
@@ -29,14 +28,7 @@ module 0x1::option {
         let _t3;
         let _t2;
         _t2 = &self.vec;
-        loop {
-            if (vector::is_empty<Element>(_t2)) {
-                _t3 = default_ref;
-                break
-            };
-            _t3 = vector::borrow<Element>(_t2, 0);
-            break
-        };
+        if (vector::is_empty<Element>(_t2)) _t3 = default_ref else _t3 = vector::borrow<Element>(_t2, 0);
         _t3
     }
     public fun destroy_none<Element>(self: Option<Element>) {
@@ -63,14 +55,7 @@ module 0x1::option {
         let _t5;
         Option<Element>{vec: _t5} = self;
         _t2 = _t5;
-        loop {
-            if (vector::is_empty<Element>(/*freeze*/&mut _t2)) {
-                _t3 = default;
-                break
-            };
-            _t3 = vector::pop_back<Element>(&mut _t2);
-            break
-        };
+        if (vector::is_empty<Element>(/*freeze*/&mut _t2)) _t3 = default else _t3 = vector::pop_back<Element>(&mut _t2);
         _t3
     }
     public fun extract<Element>(self: &mut Option<Element>): Element {
@@ -91,14 +76,7 @@ module 0x1::option {
         let _t3;
         let _t2;
         _t2 = &self.vec;
-        loop {
-            if (vector::is_empty<Element>(_t2)) {
-                _t3 = default;
-                break
-            };
-            _t3 = *vector::borrow<Element>(_t2, 0);
-            break
-        };
+        if (vector::is_empty<Element>(_t2)) _t3 = default else _t3 = *vector::borrow<Element>(_t2, 0);
         _t3
     }
     public fun none<Element>(): Option<Element> {
@@ -111,14 +89,7 @@ module 0x1::option {
         let _t3;
         let _t2;
         _t2 = &mut self.vec;
-        loop {
-            if (vector::is_empty<Element>(/*freeze*/_t2)) {
-                _t3 = none<Element>();
-                break
-            };
-            _t3 = some<Element>(vector::pop_back<Element>(_t2));
-            break
-        };
+        if (vector::is_empty<Element>(/*freeze*/_t2)) _t3 = none<Element>() else _t3 = some<Element>(vector::pop_back<Element>(_t2));
         vector::push_back<Element>(_t2, e);
         _t3
     }
@@ -128,3 +99,19 @@ module 0x1::option {
         _t2
     }
 }
+
+--- unable to recompile the decompiled code:
+exiting with stackless-bytecode checks failed
+error: local `_t1` of type `vector<Element>` does not have the `copy` ability
+   ┌─ option.move:49:9
+   │
+49 │         vector::destroy_empty<Element>(_t1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
+50 │         vector::pop_back<Element>(&mut _t1)
+   │                                   -------- used here
+
+error: local `_t1` of type `vector<Element>` does not have the `drop` ability
+   ┌─ option.move:50:35
+   │
+50 │         vector::pop_back<Element>(&mut _t1)
+   │                                   ^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
