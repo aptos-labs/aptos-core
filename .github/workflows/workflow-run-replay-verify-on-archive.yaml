@@ -40,9 +40,20 @@ on:
         type: string
         description: The end version to use for the backup. If not specified, it will use the latest version.
 jobs:
+
+  # Should only build images if IMAGE_TAG is provided; otherwise, we will find and use the latest image 
+  build-images:
+    if: inputs.IMAGE_TAG != ''
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: change back to main
+    with:
+      GIT_SHA: ${{ inputs.IMAGE_TAG }}
+      TARGET_CACHE_ID: ${{ github.ref_name }}
+
   run-replay-verify:
     runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
     timeout-minutes: 420 # 7 hours
+    needs: build-images
+    if: needs.build-images.result == 'success' || needs.build-images.result == 'skipped'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,12 +62,6 @@ jobs:
           # get the last 10 commits to find images that have been built
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
           fetch-depth: 10
-
-      - name: Build Docker images
-        uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-        with:
-          GIT_SHA: ${{ env.IMAGE_TAG }}
-          TARGET_CACHE_ID: ${{ github.ref_name }}
       
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
