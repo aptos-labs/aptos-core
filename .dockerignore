@@ -17,6 +17,7 @@
 !**/*.mv
 !**/*.rs
 !**/*.mrb
+!**/*.mpb
 !**/*.errmap
 !config/src/config/test_data
 !aptos-move/aptos-gas-profiling/templates/
