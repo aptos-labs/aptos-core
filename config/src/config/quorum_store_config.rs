@@ -116,7 +116,7 @@ impl Default for QuorumStoreConfig {
             sender_max_total_txns: 1500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
-            receiver_max_batch_txns: PROTOTYPE_BATCH_SIZE,
+            receiver_max_batch_txns: PROTOTYPE_BATCH_SIZE / PROTOTYPE_NUMBER_OF_VALIDATORS,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,
