@@ -3,7 +3,7 @@
 
 use crate::{
     module_traversal::TraversalContext, Function, LoadedFunction, LoadedFunctionOwner, Module,
-    ModuleStorage, WithRuntimeEnvironment,
+    ModuleStorage, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
@@ -103,7 +103,7 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         ty_arg: &TypeTag,
-    ) -> VMResult<Type>;
+    ) -> PartialVMResult<Type>;
 
     /// Helper to construct a loaded function instance given the function and its module.
     fn build_instantiated_function(
@@ -116,7 +116,10 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
     ) -> VMResult<LoadedFunction> {
         let ty_args = ty_args
             .iter()
-            .map(|ty_arg| self.load_ty_arg(gas_meter, traversal_context, ty_arg))
+            .map(|ty_arg| {
+                self.load_ty_arg(gas_meter, traversal_context, ty_arg)
+                    .map_err(|err| err.finish(Location::Undefined))
+            })
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
                 // User provided type argument failed to load. Set extra sub status to distinguish
@@ -134,6 +137,31 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
             function,
+        })
+    }
+
+    /// Helper to construct a loaded function instance from script's entrypoint.
+    fn build_instantiated_script(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        script: Arc<Script>,
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction> {
+        let ty_args = ty_args
+            .iter()
+            .map(|ty_tag| self.load_ty_arg(gas_meter, traversal_context, ty_tag))
+            .collect::<PartialVMResult<Vec<_>>>()
+            .map_err(|err| err.finish(Location::Script))?;
+
+        let main = script.entry_point();
+        Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
+            .map_err(|err| err.finish(Location::Script))?;
+
+        Ok(LoadedFunction {
+            owner: LoadedFunctionOwner::Script(script),
+            ty_args,
+            function: main,
         })
     }
 }
@@ -201,4 +229,18 @@ pub trait Loader:
     /// Allows to convert loader to raw module storage which does not enforce gas metering for any
     /// module access! Used to pass to native context. Any other use-cases are discouraged.
     fn unmetered_module_storage(&self) -> &dyn ModuleStorage;
+}
+
+/// Required for any metered script loading.
+#[allow(private_bounds)]
+pub trait ScriptLoader: InstantiatedFunctionLoaderHelper {
+    /// Loads a script, charging gas for dependencies if needed.
+    fn load_script(
+        &self,
+        config: &LegacyLoaderConfig,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        serialized_script: &[u8],
+        ty_args: &[TypeTag],
+    ) -> VMResult<LoadedFunction>;
 }

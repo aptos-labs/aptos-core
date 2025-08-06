@@ -25,11 +25,11 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction, LoadedFunctionOwner, ModuleStorage, RuntimeEnvironment,
+    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, Loader,
+    RuntimeEnvironment,
 };
 use move_vm_types::{
-    gas::{GasMeter, UnmeteredGasMeter},
+    gas::GasMeter,
     loaded_data::runtime_types::{Type, TypeParamMap},
 };
 use once_cell::sync::Lazy;
@@ -107,7 +107,9 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -131,13 +133,13 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(module_storage.runtime_environment(), &ty, allowed_structs);
+        let valid = is_valid_txn_arg(loader.runtime_environment(), &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -170,7 +172,9 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        module_storage,
+        loader,
+        gas_meter,
+        traversal_context,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -225,7 +229,9 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -233,23 +239,23 @@ pub(crate) fn construct_args(
     is_view: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // Perhaps in a future we should do proper gas metering here
-    let mut gas_meter = UnmeteredGasMeter;
     let mut res_args = vec![];
     if types.len() != args.len() {
         return Err(invalid_signature());
     }
 
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
     for (ty, arg) in types.iter().zip(args) {
         let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let arg = construct_arg(
             session,
-            module_storage,
+            loader,
+            gas_meter,
+            traversal_context,
             &ty,
             allowed_structs,
             arg,
-            &mut gas_meter,
             is_view,
         )?;
         res_args.push(arg);
@@ -263,11 +269,12 @@ fn invalid_signature() -> VMStatus {
 
 fn construct_arg(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
-    gas_meter: &mut impl GasMeter,
     is_view: bool,
 ) -> Result<Vec<u8>, VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
@@ -280,12 +287,13 @@ fn construct_arg(
             let mut max_invocations = 10; // Read from config in the future
             recursively_construct_arg(
                 session,
-                module_storage,
+                loader,
+                gas_meter,
+                traversal_context,
                 ty,
                 allowed_structs,
                 &mut cursor,
                 initial_cursor_len,
-                gas_meter,
                 &mut max_invocations,
                 &mut new_arg,
             )?;
@@ -319,12 +327,13 @@ fn construct_arg(
 // constructed types into the output parameter arg.
 pub(crate) fn recursively_construct_arg(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
-    gas_meter: &mut impl GasMeter,
     max_invocations: &mut u64,
     arg: &mut Vec<u8>,
 ) -> Result<(), VMStatus> {
@@ -338,12 +347,13 @@ pub(crate) fn recursively_construct_arg(
             while len > 0 {
                 recursively_construct_arg(
                     session,
-                    module_storage,
+                    loader,
+                    gas_meter,
+                    traversal_context,
                     inner,
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
-                    gas_meter,
                     max_invocations,
                     arg,
                 )?;
@@ -351,7 +361,7 @@ pub(crate) fn recursively_construct_arg(
             }
         },
         Struct { .. } | StructInstantiation { .. } => {
-            let (module_id, identifier) = module_storage
+            let (module_id, identifier) = loader
                 .runtime_environment()
                 .get_struct_name(ty)
                 .map_err(|_| {
@@ -368,13 +378,14 @@ pub(crate) fn recursively_construct_arg(
             // of the argument.
             arg.append(&mut validate_and_construct(
                 session,
-                module_storage,
+                loader,
+                gas_meter,
+                traversal_context,
                 ty,
                 constructor,
                 allowed_structs,
                 cursor,
                 initial_cursor_len,
-                gas_meter,
                 max_invocations,
             )?);
         },
@@ -397,13 +408,14 @@ pub(crate) fn recursively_construct_arg(
 // value and returning the BCS serialized representation.
 fn validate_and_construct(
     session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
-    gas_meter: &mut impl GasMeter,
     max_invocations: &mut u64,
 ) -> Result<Vec<u8>, VMStatus> {
     if *max_invocations == 0 {
@@ -457,13 +469,15 @@ fn validate_and_construct(
     }
 
     let function = load_constructor_function(
-        module_storage,
+        loader,
+        gas_meter,
+        traversal_context,
         &constructor.module_id,
         constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];
-    let ty_builder = &module_storage.runtime_environment().vm_config().ty_builder;
+    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder
@@ -472,25 +486,20 @@ fn validate_and_construct(
 
         recursively_construct_arg(
             session,
-            module_storage,
+            loader,
+            gas_meter,
+            traversal_context,
             &arg_ty,
             allowed_structs,
             cursor,
             initial_cursor_len,
-            gas_meter,
             max_invocations,
             &mut arg,
         )?;
         args.push(arg);
     }
-    let storage = TraversalStorage::new();
-    let serialized_result = session.execute_loaded_function(
-        function,
-        args,
-        gas_meter,
-        &mut TraversalContext::new(&storage),
-        module_storage,
-    )?;
+    let serialized_result =
+        session.execute_loaded_function(function, args, gas_meter, traversal_context, loader)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals
@@ -553,15 +562,13 @@ fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result
 }
 
 fn load_constructor_function(
-    module_storage: &impl ModuleStorage,
+    loader: &impl Loader,
+    gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
     module_id: &ModuleId,
     function_name: &IdentStr,
     expected_return_ty: &Type,
 ) -> VMResult<LoadedFunction> {
-    // INVARIANT:
-    //   We do not need to charge gas for module loading due to invoking a constructor function,
-    //   i.e., a function like `utf8()`, or `address_to_object()`. This is safe to do because all
-    //   constructor functions are located at 0x1 (special address) and so should not be charged.
     if !module_id.address().is_special() {
         let msg = format!(
             "Constructor function {}::{}::{} has a non-special address!",
@@ -574,11 +581,9 @@ fn load_constructor_function(
             .finish(Location::Undefined);
         return Err(err);
     }
-    let (module, function) = module_storage.unmetered_get_function_definition(
-        module_id.address(),
-        module_id.name(),
-        function_name,
-    )?;
+
+    let (module, function) =
+        loader.load_function_definition(gas_meter, traversal_context, module_id, function_name)?;
 
     if function.return_tys().len() != 1 {
         // For functions that are marked constructor this should not happen.

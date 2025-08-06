@@ -15,7 +15,8 @@ use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     data_cache::TransactionDataCache, dispatch_loader, module_traversal::*, move_vm::MoveVM,
     native_extensions::NativeContextExtensions, native_functions::NativeFunction,
-    AsUnsyncCodeStorage, CodeStorage, ModuleStorage, RuntimeEnvironment,
+    AsUnsyncCodeStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment,
+    ScriptLoader,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -34,7 +35,7 @@ enum Entrypoint {
 fn make_native_create_signer() -> NativeFunction {
     Arc::new(|_context, ty_args: Vec<Type>, mut args: VecDeque<Value>| {
         assert!(ty_args.is_empty());
-        assert!(args.len() == 1);
+        assert_eq!(args.len(), 1);
 
         let address = pop_arg!(args, AccountAddress);
 
@@ -186,24 +187,41 @@ fn main() -> Result<()> {
     let mut extensions = NativeContextExtensions::default();
     extensions.add(NativeTableContext::new([0; 32], &storage));
 
+    let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
+    let mut traversal_context = TraversalContext::new(&traversal_storage);
+
     let code_storage = storage.as_unsync_code_storage();
 
-    let func = match &entrypoint {
-        Entrypoint::Script(script_blob) => code_storage.load_script(script_blob, &[])?,
-        Entrypoint::Module(module_id) => {
-            code_storage.load_function(module_id, ident_str!("run"), &[])?
-        },
-    };
-    let args: Vec<Vec<u8>> = vec![];
-
     let return_values = dispatch_loader!(&code_storage, loader, {
+        // There was no charging for loading scripts or functions here prior to lazy loading.
+        let legacy_loader_config = LegacyLoaderConfig::unmetered();
+
+        let func = match &entrypoint {
+            Entrypoint::Script(script_blob) => loader.load_script(
+                &legacy_loader_config,
+                &mut gas_meter,
+                &mut traversal_context,
+                script_blob,
+                &[],
+            )?,
+            Entrypoint::Module(module_id) => loader.load_instantiated_function(
+                &legacy_loader_config,
+                &mut gas_meter,
+                &mut traversal_context,
+                module_id,
+                ident_str!("run"),
+                &[],
+            )?,
+        };
+
         MoveVM::execute_loaded_function(
             func,
-            args,
+            // No arguments.
+            Vec::<Vec<u8>>::new(),
             &mut TransactionDataCache::empty(),
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
+            &mut gas_meter,
+            &mut traversal_context,
             &mut extensions,
             &loader,
             &storage,

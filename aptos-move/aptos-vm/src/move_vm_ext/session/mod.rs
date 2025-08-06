@@ -44,7 +44,7 @@ use move_vm_runtime::{
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
-    ModuleStorage, VerifiedModuleBundle,
+    Loader, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -162,20 +162,18 @@ where
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
-        dispatch_loader!(module_storage, loader, {
-            MoveVM::execute_loaded_function(
-                func,
-                args,
-                &mut self.data_cache,
-                gas_meter,
-                traversal_context,
-                &mut self.extensions,
-                &loader,
-                self.resolver,
-            )
-        })
+        MoveVM::execute_loaded_function(
+            func,
+            args,
+            &mut self.data_cache,
+            gas_meter,
+            traversal_context,
+            &mut self.extensions,
+            loader,
+            self.resolver,
+        )
     }
 
     pub fn finish(
