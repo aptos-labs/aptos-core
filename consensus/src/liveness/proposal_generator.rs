@@ -646,7 +646,7 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        if payload.encrypted_txns().is_some() {
+        if payload.num_encrypted_txns() > 0 {
             let mut next_encryption_round = self.next_encryption_round.lock();
             *next_encryption_round += 1;
         }

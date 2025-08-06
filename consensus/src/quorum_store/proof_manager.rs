@@ -108,7 +108,7 @@ impl ProofManager {
             PayloadFilter::DirectMempool(_) => {
                 unreachable!()
             },
-            PayloadFilter::InQuorumStore(batches, _) => batches,
+            PayloadFilter::InQuorumStore(batches) => batches,
         };
 
         let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized) =

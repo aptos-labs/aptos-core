@@ -35,9 +35,9 @@ pub type Author = AccountAddress;
 pub const PROTOTYPE_SETUP_SEED: u64 = 233;
 pub const PROTOTYPE_BATCH_SIZE: usize = 128;
 pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 1;
-pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 7;
-pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 5;
-pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 4;
+pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 4;
+pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 3;
+pub const PROTOTYPE_THRESHOLD_SLOW_PATH: usize = 2;
 pub const PROTOTYPE_DECRYPTION_POOL_SIZE: usize = 16;
 
 pub static DECRYPTION_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {

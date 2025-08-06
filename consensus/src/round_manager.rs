@@ -1023,7 +1023,9 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
 
-        if let Some(last_round) = proposal.encrypted_payload().map(|payload| payload.encryption_round()) {
+        if proposal.payload().map_or(false, |payload| payload.num_encrypted_txns() > 0) {
+            // daniel todo: should be encryption round
+            let last_round = proposal.round();
             let mut next_encryption_round = self.next_encryption_round.lock();
             *next_encryption_round = last_round + 1;
         }

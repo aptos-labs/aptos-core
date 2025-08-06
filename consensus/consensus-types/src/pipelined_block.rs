@@ -508,7 +508,7 @@ impl PipelinedBlock {
     }
 
     pub fn num_encrypted_txns(&self) -> usize {
-        self.block().encrypted_payload().map(|p| p.num_txns()).unwrap_or(0)
+        self.payload().map_or(0, |payload| payload.num_encrypted_txns())
     }
 
     pub fn num_decrypted_txns(&self) -> usize {

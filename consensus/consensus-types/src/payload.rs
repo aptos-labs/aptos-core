@@ -328,156 +328,9 @@ impl OptQuorumStorePayloadV1 {
     }
 }
 
-static DEFAULT_INLINE_ENCRYPTED_TXNS: InlineEncryptedTxns = InlineEncryptedTxns {
-    encrypted_txns: Vec::new(),
-    encryption_round: 0,
-};
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct InlineEncryptedTxns{
-    encrypted_txns: Vec<SignedTransaction>,
-    encryption_round: Round,
-}
-
-impl InlineEncryptedTxns {
-    pub fn new(txns: Vec<SignedTransaction>, encryption_round: Round) -> Self {
-        Self {
-            encrypted_txns: txns,
-            encryption_round,
-        }
-    }
-
-    pub fn txns(&self) -> &Vec<SignedTransaction> {
-        &self.encrypted_txns
-    }
-
-    pub fn num_txns(&self) -> usize {
-        self.encrypted_txns.len()
-    }
-
-    pub fn encryption_round(&self) -> Round {
-        self.encryption_round
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.encrypted_txns.is_empty()
-    }
-
-    pub fn num_bytes(&self) -> usize {
-        self.encrypted_txns.iter().map(|txn| txn.txn_bytes_len()).sum()
-    }
-
-    pub fn ids(&self) -> Vec<Id> {
-        self.encrypted_txns.iter().map(|txn| txn.ct_id().unwrap()).collect()
-    }
-
-    pub fn add(&mut self, encrypted_txns: Vec<SignedTransaction>) {
-        self.encrypted_txns.extend(encrypted_txns);
-    }
-
-    pub fn verify_ids(&self) -> anyhow::Result<()> {
-        // check if all encrypted txns have id
-        ensure!(self.encrypted_txns.iter().all(|txn| txn.ct_id().is_some()), "All encrypted txns must have id");
-        Ok(())
-    }
-
-    pub fn verify(&self) -> anyhow::Result<()> {
-        // verify ciphertexts
-        DECRYPTION_POOL.install(|| {
-            <Vec<SignedTransaction> as AsRef<Vec<SignedTransaction>>>::as_ref(&self.encrypted_txns)
-            // self.encrypted_txns
-            //     .as_ref()
-                .clone()
-                .into_par_iter()
-                .with_min_len(optimal_min_len(self.encrypted_txns.len(), 32))
-                .try_for_each(|t| t.verify_ciphertext())
-        })
-    }
-
-    pub fn ciphertexts(&self) -> Vec<Ciphertext> {
-        self.encrypted_txns.iter().filter_map(|txn| txn.ciphertext()).collect()
-    }
-
-    pub fn decrypt(self, decryption_key: &DecryptionKey, proofs: &EvalProofs, pool: &rayon::ThreadPool) -> anyhow::Result<Vec<SignedTransaction>> {
-        let ciphertexts = self.ciphertexts();
-
-        // Ensure we have the same number of ciphertexts as transactions
-        if ciphertexts.len() != self.encrypted_txns.len() {
-            return Err(anyhow::anyhow!(
-                "Mismatch between number of ciphertexts ({}) and transactions ({})",
-                ciphertexts.len(),
-                self.encrypted_txns.len()
-            ));
-        }
-
-        // Decrypt the ciphertexts to get plaintexts
-        let plaintexts: Vec<Vec<u8>> = FPTX::decrypt(decryption_key, &ciphertexts, proofs, pool)?;
-
-        // Reconstruct SignedTransaction objects from the decrypted plaintexts
-        let mut decrypted_txns = Vec::new();
-
-        for (i, (mut original_txn, plaintext_bytes)) in self.encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
-            // Try to deserialize the plaintext as the inner content that was actually encrypted
-            // The encryption process only serializes the inner Script or EntryFunction, not the full enum
-            let decrypted_executable = if let Ok(script) = bcs::from_bytes::<aptos_types::transaction::Script>(&plaintext_bytes) {
-                aptos_types::transaction::TransactionExecutable::Script(script)
-            } else if let Ok(entry_function) = bcs::from_bytes::<aptos_types::transaction::EntryFunction>(&plaintext_bytes) {
-                aptos_types::transaction::TransactionExecutable::EntryFunction(entry_function)
-            } else {
-                return Err(anyhow::anyhow!(
-                    "Failed to deserialize decrypted executable at index {}: neither Script nor EntryFunction could be deserialized",
-                    i
-                ));
-            };
-
-            // Create a new RawTransaction with the decrypted executable
-            let mut raw_txn = original_txn.clone().into_raw_transaction();
-            let mut payload = raw_txn.into_payload();
-
-            // Replace the payload's executable with the decrypted one
-            match payload {
-                aptos_types::transaction::TransactionPayload::Payload(inner) => {
-                    match inner {
-                        aptos_types::transaction::TransactionPayloadInner::V1 { executable, extra_config } => {
-                            let new_payload = aptos_types::transaction::TransactionPayload::Payload(
-                                aptos_types::transaction::TransactionPayloadInner::V1 {
-                                    executable: decrypted_executable,
-                                    extra_config: extra_config,
-                                }
-                            );
-                            payload = new_payload;
-                        }
-                        _ => {
-                            return Err(anyhow::anyhow!(
-                                "Unsupported payload type for decryption at index {}",
-                                i
-                            ));
-                        }
-                    }
-                }
-                _ => {
-                    return Err(anyhow::anyhow!(
-                        "Unsupported payload type for decryption at index {}",
-                        i
-                    ));
-                }
-            }
-
-            let authenticator = original_txn.authenticator().clone();
-            let mut raw_txn = original_txn.into_raw_transaction();
-            raw_txn.update_payload(payload.clone());
-            let signed_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator);
-            decrypted_txns.push(signed_txn);
-        }
-
-        Ok(decrypted_txns)
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum OptQuorumStorePayload {
     V1(OptQuorumStorePayloadV1),
-    V2(OptQuorumStorePayloadV1, InlineEncryptedTxns),
 }
 
 impl OptQuorumStorePayload {
@@ -496,17 +349,14 @@ impl OptQuorumStorePayload {
     }
 
     pub(crate) fn num_txns(&self) -> usize {
-        self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns() + self.inline_encrypted_txns().num_txns()
+        self.opt_batches.num_txns() + self.proofs.num_txns() + self.inline_batches.num_txns()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty() && self.inline_encrypted_txns().is_empty()
+        self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty()
     }
 
     pub(crate) fn extend(mut self, other: Self) -> Self {
-        if let OptQuorumStorePayload::V2(_, ref mut inline_encrypted_txns) = self {
-            inline_encrypted_txns.add(other.inline_encrypted_txns().txns().clone());
-        }
         let other: OptQuorumStorePayloadV1 = other.into_inner();
         self.inline_batches.extend(other.inline_batches.0);
         self.opt_batches.extend(other.opt_batches);
@@ -516,13 +366,12 @@ impl OptQuorumStorePayload {
     }
 
     pub(crate) fn num_bytes(&self) -> usize {
-        self.opt_batches.num_bytes() + self.proofs.num_bytes() + self.inline_batches.num_bytes() + self.inline_encrypted_txns().num_bytes()
+        self.opt_batches.num_bytes() + self.proofs.num_bytes() + self.inline_batches.num_bytes()
     }
 
     pub fn into_inner(self) -> OptQuorumStorePayloadV1 {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
-            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 
@@ -542,25 +391,21 @@ impl OptQuorumStorePayload {
         self.execution_limits = execution_limits;
     }
 
-    pub fn inline_encrypted_txns(&self) -> &InlineEncryptedTxns {
-        match self {
-            OptQuorumStorePayload::V1(_) => &DEFAULT_INLINE_ENCRYPTED_TXNS,
-            OptQuorumStorePayload::V2(_, inline_encrypted_txns) => inline_encrypted_txns,
-        }
-    }
-
-    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>, encryption_round: Round) {
-        if encrypted_txns.is_empty() {
-            return;
-        }
+    pub fn ct_ids(&self) -> Vec<Id> {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => {
-                // change to v2
-                *self = OptQuorumStorePayload::V2(opt_qs_payload.clone(), InlineEncryptedTxns::new(encrypted_txns, encryption_round));
+                let mut ct_ids = Vec::new();
+                for batch in opt_qs_payload.inline_batches.iter() {
+                    ct_ids.extend(batch.info().ct_ids());
+                }
+                for batch in opt_qs_payload.opt_batches.iter() {
+                    ct_ids.extend(batch.ct_ids());
+                }
+                for proof in opt_qs_payload.proofs.iter() {
+                    ct_ids.extend(proof.info().ct_ids());
+                }
+                ct_ids
             }
-            OptQuorumStorePayload::V2(_, ref mut inline_encrypted_txns) => {
-                inline_encrypted_txns.add(encrypted_txns);
-            },
         }
     }
 }
@@ -571,7 +416,6 @@ impl Deref for OptQuorumStorePayload {
     fn deref(&self) -> &Self::Target {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
-            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 }
@@ -580,7 +424,6 @@ impl DerefMut for OptQuorumStorePayload {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
-            OptQuorumStorePayload::V2(opt_qs_payload, _) => opt_qs_payload,
         }
     }
 }

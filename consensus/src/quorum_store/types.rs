@@ -13,6 +13,10 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
 };
+use aptos_types::decryption::{Id, DECRYPTION_POOL};
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use rayon::iter::IntoParallelIterator;
+use rayon::prelude::*;
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub struct PersistedValue {
@@ -136,6 +140,7 @@ impl Batch {
         batch_author: PeerId,
         gas_bucket_start: u64,
     ) -> Self {
+        let ct_ids = payload.iter().filter_map(|txn| txn.ct_id()).collect::<Vec<Id>>();
         let payload = BatchPayload::new(batch_author, payload);
         let batch_info = BatchInfo::new(
             batch_author,
@@ -146,6 +151,7 @@ impl Batch {
             payload.num_txns() as u64,
             payload.num_bytes() as u64,
             gas_bucket_start,
+            ct_ids,
         );
         Self {
             batch_info,
@@ -174,8 +180,17 @@ impl Batch {
             ensure!(
                 txn.gas_unit_price() >= self.gas_bucket_start(),
                 "Payload gas unit price doesn't match batch info"
-            )
+            );
         }
+        let encrypted_txns = self.payload.txns().iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
+        let len = encrypted_txns.len();
+        // verify encrypted txns
+        DECRYPTION_POOL.install(|| {
+            encrypted_txns
+                .into_par_iter()
+                .with_min_len(optimal_min_len(len, 32))
+                .try_for_each(|t| t.verify_ciphertext())
+        })?;
         Ok(())
     }
 

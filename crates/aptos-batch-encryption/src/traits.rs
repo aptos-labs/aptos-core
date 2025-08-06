@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use anyhow::Result;
 
 use crate::shared::algebra::shamir::ThresholdConfig;
-
+use crate::shared::ids::FreeRootId;
 
 pub trait BatchThresholdEncryption {
 
@@ -73,7 +73,7 @@ pub trait BatchThresholdEncryption {
 
 
     /// Derive a digest from a [`DigestKey`] and a slice of ciphertexts.
-    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &ThreadPool)
+    fn digest(digest_key: &Self::DigestKey, ids: &Vec<Self::Id>, round: Self::Round, pool: &ThreadPool)
         -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to

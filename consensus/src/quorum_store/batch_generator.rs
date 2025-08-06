@@ -335,7 +335,6 @@ impl BatchGenerator {
                 max_count,
                 self.config.sender_max_total_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
-                false,
             )
             .await
             .unwrap_or_default();

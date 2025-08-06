@@ -391,13 +391,18 @@ pub(crate) fn realistic_env_max_load_test(
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .mode(EmitJobMode::ConstTps { tps: 10 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
-        .with_validator_resource_override(resource_override)
-        .with_fullnode_resource_override(resource_override)
+        // .with_validator_resource_override(resource_override)
+        // .with_fullnode_resource_override(resource_override)
+        .with_validator_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: None,
+            storage_gib: None,
+        })
 }
 
 pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {

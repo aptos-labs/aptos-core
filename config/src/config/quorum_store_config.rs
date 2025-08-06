@@ -5,12 +5,12 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, decryption::PROTOTYPE_BATCH_SIZE};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-pub const DEFEAULT_MAX_BATCH_TXNS: usize = 250;
+pub const DEFEAULT_MAX_BATCH_TXNS: usize = PROTOTYPE_BATCH_SIZE;
 const DEFAULT_MAX_NUM_BATCHES: usize = 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -116,7 +116,7 @@ impl Default for QuorumStoreConfig {
             sender_max_total_txns: 1500,
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
-            receiver_max_batch_txns: 250,
+            receiver_max_batch_txns: PROTOTYPE_BATCH_SIZE,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,

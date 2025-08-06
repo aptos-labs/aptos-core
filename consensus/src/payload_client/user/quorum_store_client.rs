@@ -11,7 +11,7 @@ use aptos_consensus_types::{
     payload_pull_params::{OptQSPayloadPullParams, PayloadPullParameters},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
-    payload::{OptQuorumStorePayload, InlineEncryptedTxns},
+    payload::OptQuorumStorePayload,
 };
 use aptos_logger::info;
 use fail::fail_point;
@@ -51,14 +51,6 @@ impl QuorumStoreClient {
             wait_for_full_blocks_above_pending_blocks,
             mempool_proxy,
         }
-    }
-
-    pub async fn pull_inline_encrypted_txns(&self,
-        max_items: u64,
-        max_bytes: u64,
-        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
-    ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
-        self.mempool_proxy.pull_internal(max_items, max_bytes, exclude_transactions, true).await
     }
 
     async fn pull_internal(
@@ -102,28 +94,28 @@ impl QuorumStoreClient {
             },
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 GetPayloadResponse::GetPayloadResponse(mut payload) => {
-                    // Pull encrypted transactions if needed
-                    let mut encrypted_txns_to_add = vec![];
-                    if max_inline_encrypted_txns.count() > 0 && max_inline_encrypted_txns.size_in_bytes() > 0 {
-                        let excluded_encrypted_txns = match exclude_payloads {
-                            PayloadFilter::DirectMempool(excluded_txns) => excluded_txns,
-                            PayloadFilter::InQuorumStore(_, excluded_txns) => excluded_txns,
-                            _ => vec![],
-                        };
-                        // Note: TransactionInProgress is not used when pulling transactions, so we use a dummy value
-                        let excluded_txns: BTreeMap<TransactionSummary, TransactionInProgress> = excluded_encrypted_txns.into_iter().map(|txn| (txn.clone(), TransactionInProgress::new(0))).collect();
+                    // // Pull encrypted transactions if needed
+                    // let mut encrypted_txns_to_add = vec![];
+                    // if max_inline_encrypted_txns.count() > 0 && max_inline_encrypted_txns.size_in_bytes() > 0 {
+                    //     let excluded_encrypted_txns = match exclude_payloads {
+                    //         PayloadFilter::DirectMempool(excluded_txns) => excluded_txns,
+                    //         PayloadFilter::InQuorumStore(_, excluded_txns) => excluded_txns,
+                    //         _ => vec![],
+                    //     };
+                    //     // Note: TransactionInProgress is not used when pulling transactions, so we use a dummy value
+                    //     let excluded_txns: BTreeMap<TransactionSummary, TransactionInProgress> = excluded_encrypted_txns.into_iter().map(|txn| (txn.clone(), TransactionInProgress::new(0))).collect();
 
-                        if let Ok(encrypted_txns) = self.pull_inline_encrypted_txns(
-                            max_inline_encrypted_txns.count(),
-                            max_inline_encrypted_txns.size_in_bytes(),
-                            excluded_txns,
-                        ).await {
-                            if !encrypted_txns.is_empty() {
-                                encrypted_txns_to_add = encrypted_txns;
-                            }
-                        }
-                    }
-                    payload.add_encrypted_txns(encrypted_txns_to_add, encryption_round);
+                    //     if let Ok(encrypted_txns) = self.pull_inline_encrypted_txns(
+                    //         max_inline_encrypted_txns.count(),
+                    //         max_inline_encrypted_txns.size_in_bytes(),
+                    //         excluded_txns,
+                    //     ).await {
+                    //         if !encrypted_txns.is_empty() {
+                    //             encrypted_txns_to_add = encrypted_txns;
+                    //         }
+                    //     }
+                    // }
+                    // payload.add_encrypted_txns(encrypted_txns_to_add, encryption_round);
                     Ok(payload)
                 },
             },

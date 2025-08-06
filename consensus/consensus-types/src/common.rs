@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits, InlineEncryptedTxns},
+    payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
 use anyhow::ensure;
@@ -27,6 +27,9 @@ use std::{
     collections::HashSet,
     fmt::{self, Write},
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_types::decryption::{DECRYPTION_POOL, Id};
+use rayon::ThreadPool;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -487,33 +490,15 @@ impl Payload {
         !matches!(self, Payload::DirectMempool(_))
     }
 
-    pub fn add_encrypted_txns(&mut self, encrypted_txns: Vec<SignedTransaction>, encryption_round: Round) {
-        if encrypted_txns.is_empty() {
-            return;
-        }
-        match self {
-            Payload::OptQuorumStore(opt_qs_payload) => {
-                opt_qs_payload.add_encrypted_txns(encrypted_txns, encryption_round);
-            }
-            _ => {}
-        }
-    }
-
-    pub fn encrypted_txns(&self) -> Option<&InlineEncryptedTxns> {
-        match self {
-            Payload::OptQuorumStore(opt_qs_payload) => {
-                if !opt_qs_payload.inline_encrypted_txns().is_empty() {
-                    Some(opt_qs_payload.inline_encrypted_txns())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
     pub fn num_encrypted_txns(&self) -> usize {
-        self.encrypted_txns().map(|txns| txns.num_txns()).unwrap_or(0)
+        self.ct_ids().len()
+    }
+
+    pub fn ct_ids(&self) -> Vec<Id> {
+        match self {
+            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.ct_ids(),
+            _ => Vec::new(),
+        }
     }
 
     /// This is potentially computationally expensive
@@ -573,6 +558,13 @@ impl Payload {
                 computed_digest,
                 batch.digest()
             );
+            // verify encrypted txns
+            DECRYPTION_POOL.install(|| {
+                payload
+                    .into_par_iter()
+                    .with_min_len(optimal_min_len(payload.len(), 32))
+                    .try_for_each(|t| t.verify_ciphertext())
+            })?;
         }
         Ok(())
     }
@@ -591,12 +583,6 @@ impl Payload {
             );
         }
         Ok(())
-    }
-
-    pub fn verify_inline_encrypted_txns(
-        inline_encrypted_txns: &InlineEncryptedTxns,
-    ) -> anyhow::Result<()> {
-        inline_encrypted_txns.verify()
     }
 
     pub fn verify(
@@ -633,7 +619,6 @@ impl Payload {
                         .map(|batch| (batch.info(), batch.transactions())),
                 )?;
                 Self::verify_opt_batches(verifier, opt_quorum_store.opt_batches())?;
-                Self::verify_inline_encrypted_txns(opt_quorum_store.inline_encrypted_txns())?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -773,7 +758,7 @@ impl BatchPayload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(HashSet<BatchInfo>, Vec<TransactionSummary>),
+    InQuorumStore(HashSet<BatchInfo>),
     Empty,
 }
 
@@ -800,7 +785,6 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             PayloadFilter::DirectMempool(exclude_txns)
         } else {
             let mut exclude_batches = HashSet::new();
-            let mut exclude_txns = Vec::new();
             for payload in exclude_payloads {
                 match payload {
                     Payload::InQuorumStore(proof_with_status) => {
@@ -835,20 +819,10 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         for proof in &opt_qs_payload.proof_with_data().batch_summary {
                             exclude_batches.insert(proof.info().clone());
                         }
-                        for txn in opt_qs_payload.inline_encrypted_txns().txns() {
-                            // if let Some(encrypted_txn_id) = txn.encrypted_txn_id() {
-                            //     exclude_encrypted_txns.insert(encrypted_txn_id.id);
-                            // }
-                            exclude_txns.push(TransactionSummary {
-                                sender: txn.sender(),
-                                replay_protector: txn.replay_protector(),
-                                hash: txn.committed_hash(),
-                            });
-                        }
                     },
                 }
             }
-            PayloadFilter::InQuorumStore(exclude_batches, exclude_txns)
+            PayloadFilter::InQuorumStore(exclude_batches)
         }
     }
 }
@@ -863,13 +837,10 @@ impl fmt::Display for PayloadFilter {
                 }
                 write!(f, "{}", txns_str)
             },
-            PayloadFilter::InQuorumStore(excluded_proofs, excluded_txns) => {
+            PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut proofs_str = "".to_string();
                 for proof in excluded_proofs.iter() {
                     write!(proofs_str, "{} ", proof.digest())?;
-                }
-                for tx in excluded_txns.iter() {
-                    write!(proofs_str, "{} ", tx)?;
                 }
                 write!(f, "{}", proofs_str)
             },

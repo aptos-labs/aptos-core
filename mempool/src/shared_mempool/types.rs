@@ -183,9 +183,6 @@ pub enum QuorumStoreRequest {
         BTreeMap<TransactionSummary, TransactionInProgress>,
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
-        // if true, pull encrypted txns only
-        // if false, pull non-encrypted txns only
-        bool,
     ),
     // TODO: Do we use it in the real QS as well?
     /// Notifications about *rejected* committed txns.
@@ -206,15 +203,13 @@ impl fmt::Display for QuorumStoreRequest {
                 return_non_full,
                 excluded_txns,
                 _,
-                pull_encrypted_txns_only,
             ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}, pull_encrypted_txns_only: {:?}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
                     return_non_full,
                     excluded_txns.len(),
-                    pull_encrypted_txns_only,
                 )
             },
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {

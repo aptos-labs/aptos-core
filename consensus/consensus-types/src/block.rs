@@ -6,7 +6,6 @@ use crate::{
     block_data::{BlockData, BlockType},
     common::{Author, Payload, Round},
     quorum_cert::QuorumCert,
-    payload::InlineEncryptedTxns,
 };
 use anyhow::{bail, ensure, format_err};
 use aptos_bitvec::BitVec;
@@ -108,22 +107,17 @@ impl Block {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.encrypted_payload().is_some()
-    }
-
-    pub fn encrypted_payload(&self) -> Option<&InlineEncryptedTxns> {
-        match self.block_data.payload() {
-            Some(payload) => payload.encrypted_txns(),
-            None => None,
-        }
+        self.payload().map_or(false, |payload| payload.ct_ids().len() > 0)
     }
 
     pub fn encrypted_payload_size(&self) -> usize {
-        match self.block_data.payload() {
-            Some(payload) => payload.encrypted_txns().map_or(0, |txns| txns.num_txns()),
-            None => 0,
-        }
+        self.payload().map_or(0, |payload| payload.ct_ids().len())
     }
+
+    // daniel todo
+    // pub fn encryption_round(&self) -> Option<Round> {
+    //     self.payload().map(|payload| payload.encryption_round())
+    // }
 
     pub fn payload_size(&self) -> usize {
         match self.block_data.payload() {

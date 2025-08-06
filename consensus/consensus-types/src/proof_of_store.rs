@@ -6,8 +6,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
-    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::AggregateSignature, decryption::Id, ledger_info::SignatureWithStatus, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId
 };
 use mini_moka::sync::Cache;
 use rand::{seq::SliceRandom, thread_rng};
@@ -78,6 +77,7 @@ pub struct BatchInfo {
     num_txns: u64,
     num_bytes: u64,
     gas_bucket_start: u64,
+    ct_ids: Vec<Id>,
 }
 
 impl BatchInfo {
@@ -90,6 +90,7 @@ impl BatchInfo {
         num_txns: u64,
         num_bytes: u64,
         gas_bucket_start: u64,
+        ct_ids: Vec<Id>,
     ) -> Self {
         Self {
             author,
@@ -100,6 +101,7 @@ impl BatchInfo {
             num_txns,
             num_bytes,
             gas_bucket_start,
+            ct_ids,
         }
     }
 
@@ -137,6 +139,10 @@ impl BatchInfo {
 
     pub fn gas_bucket_start(&self) -> u64 {
         self.gas_bucket_start
+    }
+
+    pub fn ct_ids(&self) -> &Vec<Id> {
+        &self.ct_ids
     }
 }
 

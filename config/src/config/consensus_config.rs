@@ -10,13 +10,13 @@ use crate::config::{
     QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
 use aptos_crypto::_once_cell::sync::Lazy;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, decryption::PROTOTYPE_BATCH_SIZE};
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
+const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = PROTOTYPE_BATCH_SIZE as u64;
 const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));

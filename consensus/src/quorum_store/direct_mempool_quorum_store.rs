@@ -60,7 +60,6 @@ impl DirectMempoolQuorumStore {
             return_non_full,
             exclude_txns,
             callback,
-            false,
         );
         self.mempool_sender
             .clone()
@@ -98,7 +97,7 @@ impl DirectMempoolQuorumStore {
         let get_batch_start_time = Instant::now();
         let exclude_txns = match payload_filter {
             PayloadFilter::DirectMempool(exclude_txns) => exclude_txns,
-            PayloadFilter::InQuorumStore(_, _) => {
+            PayloadFilter::InQuorumStore(_) => {
                 unreachable!("Unknown payload_filter: {}", payload_filter)
             },
             PayloadFilter::Empty => Vec::new(),

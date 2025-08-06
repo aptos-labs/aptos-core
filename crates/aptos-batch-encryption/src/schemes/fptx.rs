@@ -139,15 +139,11 @@ impl BatchThresholdEncryption for FPTX {
         ek.encrypt(rng, msg)
     }
 
-    fn digest(digest_key: &Self::DigestKey, cts: &[Self::Ciphertext], round: Self::Round, pool: &rayon::ThreadPool)
+    fn digest(digest_key: &Self::DigestKey, ids: &Vec<Self::Id>, round: Self::Round, pool: &rayon::ThreadPool)
     -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)>
     {
         let mut ids : FreeRootIdSet<UncomputedCoeffs>
-        = FreeRootIdSet::from_slice(
-            &cts
-                .into_iter()
-                .map(|ct| ct.id())
-                .collect::<Vec<FreeRootId>>())
+        = FreeRootIdSet::from_slice(ids)
             .ok_or(anyhow!(""))?;
 
         pool.install(|| digest_key.digest(&mut ids, round))
