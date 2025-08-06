@@ -30,6 +30,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
   workflow_dispatch:
     inputs:
@@ -56,6 +61,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -139,6 +149,7 @@ jobs:
           fi
 
       - name: Build and Push Rust images
+        if: ${{ inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
