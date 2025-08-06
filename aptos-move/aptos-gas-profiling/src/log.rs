@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::render::Render;
 use aptos_gas_algebra::{Fee, GasScalingFactor, InternalGas, NumBytes};
 use aptos_types::state_store::state_key::StateKey;
 use move_binary_format::{file_format::CodeOffset, file_format_common::Opcodes};
@@ -9,6 +10,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
+use move_vm_types::gas::DependencyKind;
 use smallvec::{smallvec, SmallVec};
 
 /// An event occurred during the execution of a function, along with the
@@ -106,10 +108,20 @@ pub struct EventStorage {
 #[derive(Debug, Clone)]
 /// Struct representing the cost of a dependency.
 pub struct Dependency {
-    pub is_new: bool,
+    pub kind: DependencyKind,
     pub id: ModuleId,
     pub size: NumBytes,
     pub cost: InternalGas,
+}
+
+impl Dependency {
+    pub(crate) fn render(&self) -> String {
+        let kind = match self.kind {
+            DependencyKind::New => " (new)",
+            DependencyKind::Existing => "",
+        };
+        format!("{}{}", Render(&self.id), kind,)
+    }
 }
 
 /// Struct containing all execution and io costs.

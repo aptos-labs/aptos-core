@@ -12,9 +12,9 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMError, VMResult},
     CompiledModule,
 };
-use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
+use move_core_types::{gas_algebra::NumBytes, language_storage::StructTag, vm_status::StatusCode};
 use move_vm_runtime::{module_traversal::TraversalContext, ModuleStorage};
-use move_vm_types::gas::GasMeter;
+use move_vm_types::gas::{DependencyKind, GasMeter};
 use std::collections::{BTreeMap, BTreeSet};
 
 fn metadata_validation_err(msg: &str) -> Result<(), VMError> {
@@ -36,17 +36,20 @@ fn metadata_validation_error(msg: &str) -> VMError {
 pub(crate) fn validate_resource_groups(
     features: &Features,
     module_storage: &impl ModuleStorage,
-    // TODO(lazy-loading): add a check that the old module has been visited + charge for metadata.
-    _traversal_context: &TraversalContext,
-    _gas_meter: &mut impl GasMeter,
+    traversal_context: &mut TraversalContext,
+    gas_meter: &mut impl GasMeter,
     new_modules: &[CompiledModule],
 ) -> Result<(), VMError> {
     let mut groups = BTreeMap::new();
     let mut members = BTreeMap::new();
 
     for new_module in new_modules {
-        let (new_groups, new_members) =
-            validate_module_and_extract_new_entries(module_storage, new_module, features)?;
+        let (new_groups, new_members) = validate_module_and_extract_new_entries(
+            module_storage,
+            new_module,
+            features,
+            traversal_context,
+        )?;
         groups.insert(new_module.self_id(), new_groups);
         members.insert(new_module.self_id(), new_members);
     }
@@ -55,8 +58,25 @@ pub(crate) fn validate_resource_groups(
         for group_tag in inner_members.values() {
             let group_module_id = group_tag.module_id();
             if !groups.contains_key(&group_module_id) {
-                // Note: module must exist for the group member to refer to it!
-                let old_module = module_storage.fetch_existing_deserialized_module(
+                // Note: module must exist for the group member to refer to it! Also, we need to
+                // charge gas because this module is not in a bundle.
+                if features.is_lazy_loading_enabled()
+                    && traversal_context.visit_if_not_special_module_id(&group_module_id)
+                {
+                    let size = module_storage.unmetered_get_existing_module_size(
+                        group_module_id.address(),
+                        group_module_id.name(),
+                    )?;
+                    gas_meter
+                        .charge_dependency(
+                            DependencyKind::Existing,
+                            group_module_id.address(),
+                            group_module_id.name(),
+                            NumBytes::new(size as u64),
+                        )
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+                let old_module = module_storage.unmetered_get_existing_deserialized_module(
                     group_module_id.address(),
                     group_module_id.name(),
                 )?;
@@ -91,6 +111,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
     module_storage: &impl ModuleStorage,
     new_module: &CompiledModule,
     features: &Features,
+    traversal_context: &TraversalContext,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
@@ -102,8 +123,18 @@ pub(crate) fn validate_module_and_extract_new_entries(
             (BTreeMap::new(), BTreeMap::new())
         };
 
+    // INVARIANT:
+    //   No need to charge gas for this module access: below we fetch old version of the module
+    //   (based on the new module's name). Old versions are all charged when processing the publish
+    //   request.
+    if features.is_lazy_loading_enabled() {
+        traversal_context
+            .check_is_special_or_visited(new_module.address(), new_module.name())
+            .map_err(|err| err.finish(Location::Undefined))?;
+    }
+
     let (original_groups, original_members, mut structs) = module_storage
-        .fetch_deserialized_module(new_module.address(), new_module.name())?
+        .unmetered_get_deserialized_module(new_module.address(), new_module.name())?
         .map_or_else(
             || Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new())),
             |old_module| extract_resource_group_metadata_from_module(&old_module),

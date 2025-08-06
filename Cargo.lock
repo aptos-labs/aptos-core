@@ -2852,7 +2852,6 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
- "claims",
  "goldenfile",
  "move-binary-format",
  "move-command-line-common",
@@ -4574,7 +4573,6 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -11849,15 +11847,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module-publish"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
-]
-
-[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12068,6 +12057,7 @@ dependencies = [
  "clap 4.5.21",
  "codespan",
  "codespan-reporting",
+ "colored",
  "ethnum",
  "flexi_logger",
  "im",
@@ -12433,7 +12423,6 @@ dependencies = [
  "once_cell",
  "serde",
  "shell-words",
- "simplelog",
  "tempfile",
  "toml 0.7.8",
  "walkdir",
@@ -13549,11 +13538,8 @@ name = "package-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
- "aptos-transaction-workloads-lib",
- "bcs 0.1.4",
+ "aptos-transaction-generator-lib",
  "clap 4.5.21",
- "move-package",
 ]
 
 [[package]]
@@ -16882,17 +16868,6 @@ dependencies = [
  "num-traits",
  "thiserror",
  "time",
-]
-
-[[package]]
-name = "simplelog"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc0ffd69814a9b251d43afcabf96dad1b29f5028378056257be9e3fecc9f720"
-dependencies = [
- "chrono",
- "log",
- "termcolor",
 ]
 
 [[package]]

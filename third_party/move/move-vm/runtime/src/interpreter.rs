@@ -4,7 +4,6 @@
 
 use crate::{
     access_control::AccessControlState,
-    check_type_tag_dependencies_and_charge_gas,
     config::VMConfig,
     data_cache::{DataCacheGasMeterWrapper, TransactionDataCache},
     frame::Frame,
@@ -20,10 +19,10 @@ use crate::{
         verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
     },
     storage::{
-        dependencies_gas_charging::check_dependencies_and_charge_gas, loader::traits::Loader,
-        ty_depth_checker::TypeDepthChecker, ty_layout_converter::LayoutConverter,
+        loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
+        ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, ModuleStorage, RuntimeEnvironment,
+    trace, LoadedFunction, RuntimeEnvironment,
 };
 use fail::fail_point;
 use move_binary_format::{
@@ -126,7 +125,6 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
-        module_storage: &impl ModuleStorage,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -142,7 +140,6 @@ impl Interpreter {
             function,
             args,
             data_cache,
-            module_storage,
             loader,
             ty_depth_checker,
             layout_converter,
@@ -164,7 +161,6 @@ where
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
-        module_storage: &impl ModuleStorage,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -176,7 +172,7 @@ where
         let interpreter = InterpreterImpl {
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
-            vm_config: module_storage.runtime_environment().vm_config(),
+            vm_config: loader.runtime_environment().vm_config(),
             access_control: AccessControlState::default(),
             reentrancy_checker: ReentrancyChecker::default(),
             loader,
@@ -191,7 +187,6 @@ where
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -202,7 +197,6 @@ where
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -217,16 +211,22 @@ where
     /// at the call-site.
     fn load_generic_function_no_visibility_checks(
         &mut self,
-        module_storage: &impl ModuleStorage,
-        current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
         let ty_args = current_frame
             .instantiate_generic_function(Some(gas_meter), idx)
             .map_err(|e| set_err_info!(current_frame, e))?;
         let function = current_frame
-            .build_loaded_function_from_instantiation_and_ty_args(module_storage, idx, ty_args)
+            .build_loaded_function_from_instantiation_and_ty_args(
+                self.loader,
+                gas_meter,
+                traversal_context,
+                idx,
+                ty_args,
+            )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
     }
@@ -235,12 +235,19 @@ where
     /// (i.e., visible to the caller). The visibility check should be done at the call-site.
     fn load_function_no_visibility_checks(
         &mut self,
-        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         current_frame: &Frame,
         fh_idx: FunctionHandleIndex,
     ) -> VMResult<LoadedFunction> {
         let function = current_frame
-            .build_loaded_function_from_handle_and_ty_args(module_storage, fh_idx, vec![])
+            .build_loaded_function_from_handle_and_ty_args(
+                self.loader,
+                gas_meter,
+                traversal_context,
+                fh_idx,
+                vec![],
+            )
             .map_err(|e| self.set_location(e))?;
         Ok(function)
     }
@@ -249,7 +256,6 @@ where
         self,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -260,7 +266,6 @@ where
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -271,7 +276,6 @@ where
             self.execute_main::<RTTCheck, NoRuntimeCaches>(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 extensions,
@@ -291,7 +295,6 @@ where
         mut self,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -336,7 +339,6 @@ where
                     &mut self,
                     data_cache,
                     resource_resolver,
-                    module_storage,
                     gas_meter,
                     traversal_context,
                 )
@@ -401,7 +403,8 @@ where
                                 btree_map::Entry::Vacant(entry) => {
                                     let function =
                                         Rc::new(self.load_function_no_visibility_checks(
-                                            module_storage,
+                                            gas_meter,
+                                            traversal_context,
                                             &current_frame,
                                             fh_idx,
                                         )?);
@@ -421,7 +424,8 @@ where
                         }
                     } else {
                         let function = Rc::new(self.load_function_no_visibility_checks(
-                            module_storage,
+                            gas_meter,
+                            traversal_context,
                             &current_frame,
                             fh_idx,
                         )?);
@@ -453,7 +457,6 @@ where
                             &mut current_frame,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -496,14 +499,13 @@ where
                                     (Rc::clone(&entry.0), Rc::clone(&entry.1))
                                 },
                                 btree_map::Entry::Vacant(entry) => {
-                                    let function = Rc::<LoadedFunction>::new(
-                                        self.load_generic_function_no_visibility_checks(
-                                            module_storage,
-                                            &current_frame,
+                                    let function =
+                                        Rc::new(self.load_generic_function_no_visibility_checks(
                                             gas_meter,
+                                            traversal_context,
+                                            &current_frame,
                                             idx,
-                                        )?,
-                                    );
+                                        )?);
                                     let frame_cache =
                                         FrameTypeCache::make_rc_for_function(&function);
 
@@ -519,14 +521,12 @@ where
                             }
                         }
                     } else {
-                        let function = Rc::<LoadedFunction>::new(
-                            self.load_generic_function_no_visibility_checks(
-                                module_storage,
-                                &current_frame,
-                                gas_meter,
-                                idx,
-                            )?,
-                        );
+                        let function = Rc::new(self.load_generic_function_no_visibility_checks(
+                            gas_meter,
+                            traversal_context,
+                            &current_frame,
+                            idx,
+                        )?);
                         let frame_cache = FrameTypeCache::make_rc();
                         (function, frame_cache)
                     };
@@ -548,7 +548,7 @@ where
                                 .iter()
                                 .map(|ty| TypeWithRuntimeEnvironment {
                                     ty,
-                                    runtime_environment: module_storage.runtime_environment(),
+                                    runtime_environment: self.loader.runtime_environment(),
                                 }),
                             self.operand_stack
                                 .last_n(function.param_tys().len())
@@ -562,7 +562,6 @@ where
                             &mut current_frame,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -594,50 +593,26 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
 
-                    // Before trying to resolve the function, charge gas for associated
-                    // module loading.
-                    let module_id = lazy_function.with_name_and_ty_args(
-                        |module_opt, _func_name, ty_arg_tags| {
-                            let Some(module_id) = module_opt else {
-                                // Note:
-                                //   Module ID of a function should always exist because functions
-                                //   are defined in modules. The only way to have `None` here is
-                                //   when function is a script entrypoint. Note that in this case,
-                                //   entrypoint function cannot be packed as a closure, nor there
-                                //   can be any lambda-lifting in the script.
-                                let err = PartialVMError::new_invariant_violation(format!(
-                                    "module id required to charge gas for function `{}`",
-                                    lazy_function.to_canonical_string()
-                                ));
-                                return Err(set_err_info!(current_frame, err));
-                            };
-
-                            // Charge gas for function code loading.
-                            let arena_id = traversal_context
-                                .referenced_module_ids
-                                .alloc(module_id.clone());
-                            check_dependencies_and_charge_gas(
-                                module_storage,
-                                gas_meter,
-                                traversal_context,
-                                [(arena_id.address(), arena_id.name())],
-                            )?;
-
-                            // Charge gas for code loading of modules used by type arguments.
-                            check_type_tag_dependencies_and_charge_gas(
-                                module_storage,
-                                gas_meter,
-                                traversal_context,
-                                ty_arg_tags,
-                            )?;
-                            Ok(module_id.clone())
-                        },
-                    )?;
+                    let module_id = lazy_function.with_name_and_ty_args(|module_id, _, _| {
+                        module_id.cloned().ok_or_else(|| {
+                            // Note:
+                            //   Module ID of a function should always exist because functions
+                            //   are defined in modules. The only way to have `None` here is
+                            //   when function is a script entrypoint. Note that in this case,
+                            //   entrypoint function cannot be packed as a closure, nor there
+                            //   can be any lambda-lifting in the script.
+                            let err = PartialVMError::new_invariant_violation(format!(
+                                "module id required to charge gas for function `{}`",
+                                lazy_function.to_canonical_string()
+                            ));
+                            set_err_info!(current_frame, err)
+                        })
+                    })?;
 
                     // Resolve the function. This may lead to loading the code related
                     // to this function.
                     let callee = lazy_function
-                        .as_resolved(module_storage)
+                        .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     RTTCheck::check_call_visibility(
@@ -674,7 +649,6 @@ where
                             &mut current_frame,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             extensions,
@@ -844,7 +818,6 @@ where
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -857,7 +830,6 @@ where
             current_frame,
             data_cache,
             resource_resolver,
-            module_storage,
             gas_meter,
             traversal_context,
             extensions,
@@ -888,7 +860,6 @@ where
         current_frame: &mut Frame,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
@@ -937,7 +908,7 @@ where
         gas_meter.charge_native_function_before_execution(
             ty_args.iter().map(|ty| TypeWithRuntimeEnvironment {
                 ty,
-                runtime_environment: module_storage.runtime_environment(),
+                runtime_environment: self.loader.runtime_environment(),
             }),
             args.iter(),
         )?;
@@ -946,7 +917,7 @@ where
             self,
             data_cache,
             resource_resolver,
-            module_storage,
+            self.loader.unmetered_module_storage(),
             extensions,
             gas_meter,
             traversal_context,
@@ -1013,7 +984,9 @@ where
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
                 let target_func = current_frame.build_loaded_function_from_name_and_ty_args(
-                    module_storage,
+                    self.loader,
+                    gas_meter,
+                    traversal_context,
                     &module_name,
                     &func_name,
                     ty_args,
@@ -1128,7 +1101,6 @@ where
         &self,
         data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
@@ -1140,7 +1112,7 @@ where
                 self.layout_converter,
                 DataCacheGasMeterWrapper::Full(gas_meter),
                 traversal_context,
-                module_storage,
+                self.loader.unmetered_module_storage(),
                 resource_resolver,
                 &addr,
                 ty,
@@ -1154,7 +1126,6 @@ where
         &self,
         data_cache: &'c mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
@@ -1166,7 +1137,7 @@ where
                 self.layout_converter,
                 DataCacheGasMeterWrapper::Full(gas_meter),
                 traversal_context,
-                module_storage,
+                self.loader.unmetered_module_storage(),
                 resource_resolver,
                 &addr,
                 ty,
@@ -1184,18 +1155,16 @@ where
         is_generic: bool,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let runtime_environment = module_storage.runtime_environment();
+        let runtime_environment = self.loader.runtime_environment();
         let res = self
             .load_resource(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 addr,
@@ -1265,17 +1234,15 @@ where
         is_generic: bool,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let runtime_environment = module_storage.runtime_environment();
+        let runtime_environment = self.loader.runtime_environment();
         let exists = self.load_resource_existence(
             data_cache,
             resource_resolver,
-            module_storage,
             gas_meter,
             traversal_context,
             addr,
@@ -1300,18 +1267,16 @@ where
         is_generic: bool,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let runtime_environment = module_storage.runtime_environment();
+        let runtime_environment = self.loader.runtime_environment();
         let resource = match self
             .load_resource(
                 data_cache,
                 resource_resolver,
-                module_storage,
                 gas_meter,
                 traversal_context,
                 addr,
@@ -1354,18 +1319,16 @@ where
         is_generic: bool,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let runtime_environment = module_storage.runtime_environment();
+        let runtime_environment = self.loader.runtime_environment();
         let gv = self.load_resource(
             data_cache,
             resource_resolver,
-            module_storage,
             gas_meter,
             traversal_context,
             addr,
@@ -1776,7 +1739,6 @@ impl Frame {
         interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<ExitCode> {
@@ -1784,7 +1746,6 @@ impl Frame {
             interpreter,
             data_cache,
             resource_resolver,
-            module_storage,
             gas_meter,
             traversal_context,
         )
@@ -1803,7 +1764,6 @@ impl Frame {
         interpreter: &mut InterpreterImpl<impl Loader>,
         data_cache: &mut TransactionDataCache,
         resource_resolver: &impl ResourceResolver,
-        module_storage: &impl ModuleStorage,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<ExitCode> {
@@ -1813,7 +1773,7 @@ impl Frame {
             ($ty:expr) => {
                 TypeWithRuntimeEnvironment {
                     ty: $ty,
-                    runtime_environment: module_storage.runtime_environment(),
+                    runtime_environment: interpreter.loader.runtime_environment(),
                 }
             };
         }
@@ -1828,7 +1788,7 @@ impl Frame {
                     &self.locals,
                     self.pc,
                     instruction,
-                    module_storage.runtime_environment(),
+                    interpreter.loader.runtime_environment(),
                     interpreter
                 );
 
@@ -2327,7 +2287,9 @@ impl Frame {
 
                         let function = self
                             .build_loaded_function_from_handle_and_ty_args(
-                                module_storage,
+                                interpreter.loader,
+                                gas_meter,
+                                traversal_context,
                                 *fh_idx,
                                 vec![],
                             )
@@ -2365,7 +2327,9 @@ impl Frame {
                             self.instantiate_generic_function(Some(gas_meter), *fi_idx)?;
                         let function = self
                             .build_loaded_function_from_instantiation_and_ty_args(
-                                module_storage,
+                                interpreter.loader,
+                                gas_meter,
+                                traversal_context,
                                 *fi_idx,
                                 ty_args,
                             )
@@ -2557,7 +2521,6 @@ impl Frame {
                             false,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2575,7 +2538,6 @@ impl Frame {
                             true,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2589,7 +2551,6 @@ impl Frame {
                             false,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2604,7 +2565,6 @@ impl Frame {
                             true,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2618,7 +2578,6 @@ impl Frame {
                             false,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2633,7 +2592,6 @@ impl Frame {
                             true,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2653,7 +2611,6 @@ impl Frame {
                             false,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,
@@ -2675,7 +2632,6 @@ impl Frame {
                             true,
                             data_cache,
                             resource_resolver,
-                            module_storage,
                             gas_meter,
                             traversal_context,
                             addr,

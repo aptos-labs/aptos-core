@@ -15,7 +15,7 @@ use crate::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -34,9 +34,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{
-        ambassador_impl_DependencyGasMeter, DependencyGasMeter, NativeGasMeter, UnmeteredGasMeter,
+        ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter,
+        UnmeteredGasMeter,
     },
-    loaded_data::runtime_types::{StructType, Type},
+    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     resolver::ResourceResolver,
     values::{AbstractFunction, Value},

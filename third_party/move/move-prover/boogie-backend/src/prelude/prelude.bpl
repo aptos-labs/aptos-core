@@ -406,8 +406,6 @@ function {:inline} $ResourceCopy<T>(m: $Memory T, s: $Memory T, a: int): $Memory
             m->contents[a := s->contents[a]])
 }
 
-
-
 // ============================================================================================
 // Abort Handling
 

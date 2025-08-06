@@ -18,7 +18,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter, NativeGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -99,7 +99,7 @@ where
     G: AptosGasMeter,
 {
     delegate_mut! {
-        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
+        fn charge_dependency(&mut self, kind: DependencyKind, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 }
 

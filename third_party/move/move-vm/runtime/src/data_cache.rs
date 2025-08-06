@@ -23,7 +23,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{DependencyGasMeter, GasMeter},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter},
     loaded_data::runtime_types::Type,
     resolver::{ResourceResolver, ResourceSizeInfo},
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -96,7 +96,7 @@ pub enum DataCacheGasMeterWrapper<'a, T: GasMeter> {
 impl<'a, T: GasMeter> DependencyGasMeter for DataCacheGasMeterWrapper<'a, T> {
     fn charge_dependency(
         &mut self,
-        is_new: bool,
+        is_new: DependencyKind,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
