@@ -621,6 +621,7 @@ impl PipelineBuilder {
         } else {
             if block.is_encrypted() {
                 assert!(maybe_decrypted_txns.is_some());
+                panic!("round {}, block {}", block.round(), block.id());
             }
             Arc::new(maybe_decrypted_txns.unwrap_or_default())
         };
@@ -634,19 +635,23 @@ impl PipelineBuilder {
         let num_encrypted_txns = input_txns.as_ref().iter().filter(|t| t.is_encrypted()).count();
         if num_encrypted_txns != decrypted_txns.as_ref().len() {
             info!(
-                "[error] num_encrypted_txns {} != decrypted_txns {}",
+                "[error] num_encrypted_txns {} != decrypted_txns {}, round {}, block {}",
                 num_encrypted_txns,
-                decrypted_txns.as_ref().len()
+                decrypted_txns.as_ref().len(),
+                block.round(),
+                block.id()
             );
         }
 
         // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
         if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
             info!(
-                "[error] non_encrypted_txns {} + decrypted_txns {} != input_txns {}",
+                "[error] non_encrypted_txns {} + decrypted_txns {} != input_txns {}, round {}, block {}",
                 non_encrypted_txns.len(),
                 decrypted_txns.as_ref().len(),
-                input_txns.as_ref().len()
+                input_txns.as_ref().len(),
+                block.round(),
+                block.id()
             );
         }
 
@@ -757,6 +762,7 @@ impl PipelineBuilder {
         // let _ = encryption_key.verify_decryption_key(&decryption_key.metadata.digest, &decryption_key.key)?;
 
         let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
+        let num_encrypted_txns = encrypted_txns.len();
         let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
 
         let plaintexts: Vec<Vec<u8>> = <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &ciphertexts, &proofs, &DECRYPTION_POOL)?;
@@ -817,6 +823,7 @@ impl PipelineBuilder {
             let signed_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator);
             decrypted_txns.push(signed_txn);
         }
+        assert!(decrypted_txns.len() == num_encrypted_txns, "round {}, block {}", block.round(), block.id());
 
         Ok(Arc::new(decrypted_txns))
     }
