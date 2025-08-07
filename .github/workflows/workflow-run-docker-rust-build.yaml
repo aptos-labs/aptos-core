@@ -30,17 +30,17 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      RELEASE_DEFAULT:
+      RELEASE_DEFAULT_CHECK:
         required: false
         type: boolean
         description: If true, wait for the release default images to be available
         default: false
-      PERF:
+      PERF_CHECK:
         required: false
         type: boolean
         description: If true, wait for the performance images to be available
         default: false
-      FAILPOINTS:
+      FAILPOINTS_CHECK:
         required: false
         type: boolean
         description: If true, wait for the failpoints images to be available
@@ -76,17 +76,17 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      RELEASE_DEFAULT:
+      RELEASE_DEFAULT_CHECK:
         required: false
         type: boolean
         description: If true, wait for the release default images to be available
         default: false
-      PERF:
+      PERF_CHECK:
         required: false
         type: boolean
         description: If true, wait for the performance images to be available
         default: false
-      FAILPOINTS:
+      FAILPOINTS_CHECK:
         required: false
         type: boolean
         description: If true, wait for the failpoints images to be available
@@ -146,15 +146,15 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/verify-and-build-images-for-workflows #TODO: revert
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
-          RELEASE_DEFAULT: ${{ inputs.RELEASE_DEFAULT }}
-          PERF: ${{ inputs.PERF }}
-          FAILPOINTS: ${{ inputs.FAILPOINTS }}
+          RELEASE_DEFAULT: ${{ inputs.RELEASE_DEFAULT_CHECK }}
+          PERF: ${{ inputs.PERF_CHECK }}
+          FAILPOINTS: ${{ inputs.FAILPOINTS_CHECK }}
 
       - name: Authenticate to Google Cloud
         id: auth
