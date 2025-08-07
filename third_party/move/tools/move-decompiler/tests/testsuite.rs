@@ -3,7 +3,7 @@
 
 //! Test framework for the Move decompiler, allowing different compilation, decompilation, and testing configurations.
 
-use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use codespan_reporting::term::termcolor::Buffer;
 use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::{logging, run_move_compiler_for_analysis, Experiment};
 use move_decompiler::Decompiler;
@@ -272,21 +272,8 @@ fn run_compile_decompile_test_workflow(path: &Path, config: &TestConfig) -> anyh
         }
     }
 
-    output += &decompiler.decompile_package(modules, source_maps);
+    output += &decompiler.decompile_package(modules, source_maps)?;
     output += "\n";
-
-    if decompiler
-        .env()
-        .check_diag(&mut error_writer, Severity::Warning, "decompilation")
-        .is_err()
-    {
-        // Early exit if decompilation fails
-        output.push_str(&format!(
-            "--- decompilation errors:\n{}\n",
-            String::from_utf8_lossy(&error_writer.into_inner())
-        ));
-        return Ok(output);
-    }
 
     if config.test_level == TestLevel::Decompile {
         // If we only want to test decompilation, return the output here.
