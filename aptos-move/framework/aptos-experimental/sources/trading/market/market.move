@@ -830,7 +830,7 @@ module aptos_experimental::market {
                 order_id,
                 client_order_id,
                 orig_size,
-                0, // 0 because order was never placed
+                orig_size,
                 vector[],
                 0, // match_count
                 is_bid,
