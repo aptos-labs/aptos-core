@@ -626,7 +626,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     module.serialize_for_version(Some(VERSION_MAX), &mut pseudo_source_bytes)?;
                     let empty_source_map =
                         decompiler.empty_source_map("cross-compile", &pseudo_source_bytes);
-                    decompiler.decompile_module(module.clone(), empty_source_map)
+                    decompiler.decompile_module(module.clone(), empty_source_map)?
                 },
                 SyntaxChoice::ASM => {
                     let mut out = String::new();
@@ -660,7 +660,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     script.serialize_for_version(Some(VERSION_MAX), &mut pseudo_source_bytes)?;
                     let empty_source_map =
                         decompiler.empty_source_map("cross-compile", &pseudo_source_bytes);
-                    decompiler.decompile_script(script.clone(), empty_source_map)
+                    decompiler.decompile_script(script.clone(), empty_source_map)?
                 },
                 SyntaxChoice::ASM => {
                     let mut out = String::new();
