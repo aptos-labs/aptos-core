@@ -263,8 +263,8 @@ fn matches_account_authenticator_address(
             .public_keys()
             .iter()
             .any(|any_public_key| matches_any_public_key_address(any_public_key, address)),
-        AccountAuthenticator::Abstraction { function_info, .. } => {
-            function_info.module_address == *address
+        AccountAuthenticator::Abstract { authenticator } => {
+            authenticator.function_info().module_address == *address
         },
     }
 }
@@ -276,7 +276,7 @@ fn matches_account_authenticator_public_key(
 ) -> bool {
     // Match all variants explicitly to ensure future enum changes are caught during compilation
     match account_authenticator {
-        AccountAuthenticator::NoAccountAuthenticator | AccountAuthenticator::Abstraction { .. } => {
+        AccountAuthenticator::NoAccountAuthenticator | AccountAuthenticator::Abstract { .. } => {
             false
         },
         AccountAuthenticator::Ed25519 { public_key, .. } => {

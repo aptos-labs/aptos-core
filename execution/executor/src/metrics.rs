@@ -418,7 +418,7 @@ pub fn update_counters_for_processed_chunk<T>(
                                 .with_label_values(&[process_type, "NoAccountAuthenticator"])
                                 .inc();
                         },
-                        AccountAuthenticator::Abstraction { .. } => {
+                        AccountAuthenticator::Abstract { .. } => {
                             PROCESSED_TXNS_AUTHENTICATOR
                                 .with_label_values(&[process_type, "AbstractionAuthenticator"])
                                 .inc();

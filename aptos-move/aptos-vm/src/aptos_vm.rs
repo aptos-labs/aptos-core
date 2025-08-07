@@ -71,7 +71,7 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
-        authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
+        authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
         AuxiliaryInfo, AuxiliaryInfoTrait, BlockOutput, EntryFunction, ExecutionError,
@@ -1729,15 +1729,15 @@ impl AptosVM {
         // Add fee payer.
         let fee_payer_signer = if let Some(fee_payer) = transaction_data.fee_payer {
             Some(match &transaction_data.fee_payer_authentication_proof {
-                Some(AuthenticationProof::Abstraction {
+                Some(AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 }) => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -1769,15 +1769,15 @@ impl AptosVM {
         };
         let sender_signers = itertools::zip_eq(senders, proofs)
             .map(|(sender, proof)| match proof {
-                AuthenticationProof::Abstraction {
+                AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 } => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -3206,7 +3206,7 @@ fn dispatchable_authenticate(
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     function_info: FunctionInfo,
-    auth_data: &AbstractionAuthData,
+    auth_data: &AbstractAuthenticationData,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<u8>> {
