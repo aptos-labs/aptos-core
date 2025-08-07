@@ -23,7 +23,7 @@ on:
       DRY_RUN: 
         required: false
         type: boolean
-        description: If true, the workflow will not run replay verify.
+        description: If true, the workflow will not run replay verify nor build images.
         default: false
   pull_request:
     paths:

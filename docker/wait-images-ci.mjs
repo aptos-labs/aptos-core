@@ -4,7 +4,7 @@
 // These images are typically built on push to the main branch or on a PR, from the "docker-build-test.yaml" workflow.
 
 // Try it out:
-// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) RELEASE_DEFAULT_ONLY=true ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600
+// GCP_DOCKER_ARTIFACT_REPO=us-docker.pkg.dev/aptos-registry/docker GIT_SHA=$(git fetch && git rev-parse origin/main) ./docker/wait-images-ci.mjs --wait-for-image-seconds=3600
 import {
   assertExecutingInRepoRoot,
   CargoBuildFeatures,
@@ -21,14 +21,19 @@ import {
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
-  const BOOLEAN_ARGS = ["RELEASE_DEFAULT_ONLY"];
+  const BOOLEAN_ARGS = ["RELEASE_DEFAULT", "PERF", "FAILPOINTS"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
+
+  // if none are set, check all images
+  if (!parsedArgs.RELEASE_DEFAULT && !parsedArgs.PERF && !parsedArgs.FAILPOINTS) {
+    parsedArgs.RELEASE_DEFAULT = parsedArgs.PERF = parsedArgs.FAILPOINTS = true;
+  }
 
   await assertExecutingInRepoRoot();
   await installCrane();
 
-  const imagesToWaitFor = getImagesToWaitFor(parsedArgs.RELEASE_DEFAULT_ONLY);
+  const imagesToWaitFor = getImagesToWaitFor(parsedArgs);
   
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
