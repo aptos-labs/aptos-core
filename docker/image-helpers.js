@@ -122,25 +122,31 @@ export const CargoBuildProfiles = {
   Performance: "performance",
 }
 
-export function getImagesToWaitFor(releaseDefaultOnly) {
+export function getImagesToWaitFor(args) {
   const perfImages = ["validator", "validator-testing"];
   const images = ["forge", "tools", "indexer-grpc"];
   const imagesToWaitFor = {};
   for (const image of [...perfImages, ...images]) {
-    imagesToWaitFor[image] = {
-      [CargoBuildProfiles.Release]: releaseDefaultOnly || !perfImages.includes(image) ? [
-        CargoBuildFeatures.Default,
-      ] : [
-        CargoBuildFeatures.Default,
-        CargoBuildFeatures.Failpoints,
-      ],
-    };
+    const imageConfig = {};
 
-    if (!releaseDefaultOnly && perfImages.includes(image)) {
-      imagesToWaitFor[image][CargoBuildProfiles.Performance] = [
-        CargoBuildFeatures.Default,
-      ];
+    if (args.RELEASE_DEFAULT) {
+      imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Default];
     }
+
+    if (perfImages.includes(image)) {
+      if (args.PERF) {
+        imageConfig[CargoBuildProfiles.Performance] = [CargoBuildFeatures.Default];
+      }
+
+      if (args.FAILPOINTS) {
+        if (imageConfig[CargoBuildProfiles.Release] !== undefined) {
+          imageConfig[CargoBuildProfiles.Release].push(CargoBuildFeatures.Failpoints);
+        } else {
+          imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Failpoints];
+        }
+      }
+    }
+    imagesToWaitFor[image] = imageConfig;
   }
   return imagesToWaitFor;
 }
