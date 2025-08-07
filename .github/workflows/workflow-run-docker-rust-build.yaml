@@ -30,6 +30,26 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      RELEASE_DEFAULT_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the release default images to be available
+        default: false
+      PERF_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the performance images to be available
+        default: false
+      FAILPOINTS_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the failpoints images to be available
+        default: false
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
   workflow_dispatch:
     inputs:
@@ -56,6 +76,26 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      RELEASE_DEFAULT_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the release default images to be available
+        default: false
+      PERF_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the performance images to be available
+        default: false
+      FAILPOINTS_CHECK:
+        required: false
+        type: boolean
+        description: If true, wait for the failpoints images to be available
+        default: false
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -106,12 +146,15 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/verify-and-build-images-for-workflows #TODO: revert
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
+          RELEASE_DEFAULT: ${{ inputs.RELEASE_DEFAULT_CHECK }}
+          PERF: ${{ inputs.PERF_CHECK }}
+          FAILPOINTS: ${{ inputs.FAILPOINTS_CHECK }}
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -121,6 +164,7 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
       
       - name: Lock Check and Creation
+        id: lock
         run: |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
@@ -133,12 +177,13 @@ jobs:
             exit 1
           else
             echo "Lock file does not exist"
-            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${GIT_SHA}.txt
-            gcloud storage cp ${GIT_SHA}.txt gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${GIT_SHA}.txt
+            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${{ env.GIT_SHA }}.txt
+            gcloud storage cp ${{ env.GIT_SHA }}.txt gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
             echo "Docker Build locked"
           fi
 
       - name: Build and Push Rust images
+        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
@@ -155,7 +200,7 @@ jobs:
           fi
       
       - name: Post-run Lock Cleanup 
-        if: always()
+        if: ${{ always() && steps.lock.outcome == 'success' }}
         run: | 
           gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
           echo "Docker Build unlocked"
