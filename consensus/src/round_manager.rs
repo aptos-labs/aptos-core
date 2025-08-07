@@ -1362,6 +1362,11 @@ impl RoundManager {
             );
             self.network.broadcast_order_vote(order_vote_msg).await;
             ORDER_VOTE_BROADCASTED.inc();
+            if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
+                tx.order_vote_tx
+                    .take()
+                    .map(|tx| tx.send(()));
+            }
         }
         Ok(())
     }

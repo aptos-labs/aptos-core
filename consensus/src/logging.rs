@@ -67,6 +67,7 @@ pub enum LogEvent {
     ReceiveProactiveDecShare,
     ReceiveReactiveDecShare,
     ReceiveFastDecShare,
+    AggregatedDecKey,
 }
 
 impl LogSchema {
