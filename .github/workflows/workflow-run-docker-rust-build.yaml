@@ -162,6 +162,7 @@ jobs:
 
       - name: Build and Push Rust images
         # if: ${{ inputs.DRY_RUN == false }} TODO: re-enable this after testing
+        if: ${{ steps.check-images.outcome == 'failure' }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
