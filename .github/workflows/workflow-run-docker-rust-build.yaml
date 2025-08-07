@@ -30,10 +30,20 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      RELEASE_DEFAULT_ONLY:
+      RELEASE_DEFAULT:
         required: false
         type: boolean
-        description: If true, only wait for the release default images to be available
+        description: If true, wait for the release default images to be available
+        default: false
+      PERF:
+        required: false
+        type: boolean
+        description: If true, wait for the performance images to be available
+        default: false
+      FAILPOINTS:
+        required: false
+        type: boolean
+        description: If true, wait for the failpoints images to be available
         default: false
       DRY_RUN: 
         required: false
@@ -66,10 +76,20 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      RELEASE_DEFAULT_ONLY:
+      RELEASE_DEFAULT:
         required: false
         type: boolean
-        description: If true, only wait for the release default images to be available
+        description: If true, wait for the release default images to be available
+        default: false
+      PERF:
+        required: false
+        type: boolean
+        description: If true, wait for the performance images to be available
+        default: false
+      FAILPOINTS:
+        required: false
+        type: boolean
+        description: If true, wait for the failpoints images to be available
         default: false
       DRY_RUN: 
         required: false
@@ -132,7 +152,9 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
-          RELEASE_DEFAULT_ONLY: ${{ inputs.RELEASE_DEFAULT_ONLY }}
+          RELEASE_DEFAULT: ${{ inputs.RELEASE_DEFAULT }}
+          PERF: ${{ inputs.PERF }}
+          FAILPOINTS: ${{ inputs.FAILPOINTS }}
 
       - name: Authenticate to Google Cloud
         id: auth
