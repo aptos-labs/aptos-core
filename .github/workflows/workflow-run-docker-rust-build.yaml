@@ -183,7 +183,7 @@ jobs:
           fi
 
       - name: Build and Push Rust images
-        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' }} #&& inputs.DRY_RUN == false }} TODO: revert
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
