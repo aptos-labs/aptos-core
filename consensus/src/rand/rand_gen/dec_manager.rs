@@ -17,7 +17,6 @@ use crate::{
         types::{PathType, RequestDecShare},
     },
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
@@ -28,7 +27,7 @@ use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    decryption::{DecConfig, DecKey, DecMetadata, DecShare, FastDecShare, MasterSecretKeyShare}, epoch_state::EpochState, validator_signer::ValidatorSigner
+    decryption::{DecConfig, DecKey, DecMetadata, DecShare, FastDecShare}, epoch_state::EpochState, validator_signer::ValidatorSigner
 };
 use bytes::Bytes;
 use fail::fail_point;
@@ -136,14 +135,7 @@ impl DecManager {
             .iter()
             .filter(|block| block.num_encrypted_txns() > 0)
         {
-            let dec_share = self.derive_self_share(block, PathType::Slow).await;
-            let maybe_fast_share = if self.fast_config.is_some() {
-                let fast_share = self.derive_self_share(block, PathType::Fast).await;
-                Some(FastDecShare::new(fast_share))
-            } else {
-                None
-            };
-            let handle = self.process_incoming_block(block, dec_share, maybe_fast_share);
+            let handle = self.process_incoming_block(block).await;
             broadcast_handles.push(handle);
         }
 
@@ -151,41 +143,69 @@ impl DecManager {
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_block(&self, block: &PipelinedBlock, dec_share: DecShare, maybe_fast_share: Option<FastDecShare>) -> DropGuard {
+    async fn process_incoming_block(&self, block: &PipelinedBlock) -> DropGuard {
+        let dec_share = self.derive_self_dec_share(block).await;
+
         info!(LogSchema::new(LogEvent::BroadcastDecShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
             .round(block.round()));
 
-        let mut dec_store = self.dec_store.lock();
-        dec_store.update_highest_known_round(block.round());
-        dec_store.add_share(dec_share.clone(), PathType::Slow)
-            .expect("Add self dec share should succeed");
+        let maybe_fast_share = if self.fast_config.is_some() {
+            Some(self.derive_self_fast_dec_share(block).await)
+        } else {
+            None
+        };
 
-        if let Some(fast_share) = maybe_fast_share {
-            dec_store
-                .add_share(fast_share.share(), PathType::Fast)
-                .expect("Add self fast dec share should succeed");
+        // Now acquire lock and update store
+        {
+            let mut dec_store = self.dec_store.lock();
+            dec_store.update_highest_known_round(block.round());
+            dec_store.add_share(dec_share.clone(), PathType::Slow)
+                .expect("Add self dec share should succeed");
+
+            if let Some(fast_share) = maybe_fast_share {
+                dec_store
+                    .add_share(fast_share.share(), PathType::Fast)
+                    .expect("Add self fast dec share should succeed");
+            }
+
+            dec_store.add_dec_metadata(dec_share.metadata().clone());
         }
-
-        dec_store.add_dec_metadata(dec_share.metadata().clone());
 
         self.network_sender
             .broadcast_without_self(DecMessage::DecShare(dec_share.clone()).into_network_message());
         self.spawn_aggregate_shares_task(dec_share.metadata().clone())
     }
 
-    async fn derive_self_share(&self, block: &PipelinedBlock, path_type: PathType) -> DecShare {
-        let digest = block.block().digest().unwrap();
-        let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id(), digest.clone());
-        let msk_share = match path_type {
-            PathType::Slow => self.config.msk_share(),
-            PathType::Fast => self.fast_config.as_ref().unwrap().msk_share(),
+    async fn derive_self_dec_share(&self, block: &PipelinedBlock) -> DecShare {
+        let futures = block.pipeline_futs().unwrap();
+        let dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
+            let (share, _) = fut.clone().await.expect("Decryption share computation failed");
+            share
+        } else {
+            panic!(
+                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
+                block.block().id()
+            );
         };
 
-        let share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest).unwrap();
+        dec_share
+    }
 
-        DecShare::new(self.author, dec_metadata, share)
+    async fn derive_self_fast_dec_share(&self, block: &PipelinedBlock) -> FastDecShare {
+        let futures = block.pipeline_futs().unwrap();
+        let fast_dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
+            let (_, fast_share) = fut.clone().await.expect("Decryption share computation failed");
+            fast_share
+        } else {
+            panic!(
+                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
+                block.block().id()
+            );
+        };
+
+        fast_dec_share
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -376,7 +396,7 @@ impl DecManager {
                                 Ok(maybe_share) => {
                                     // if the block is available
                                     if let Some(block) = self.block_queue.get_block_for_round(request.dec_metadata().round) {
-                                        let dec_share = self.derive_self_share(block, PathType::Slow).await;
+                                        let dec_share = self.derive_self_dec_share(block).await;
                                         self.dec_store.lock().add_share(dec_share.clone(), PathType::Slow).expect("Add self dec share should succeed");
                                         self.process_response(protocol, response_sender, DecMessage::DecShare(dec_share));
                                     } else {

@@ -38,7 +38,8 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
-    account_address::AccountAddress, decryption::DigestKey, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier
+    account_address::AccountAddress, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
 };
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
@@ -151,7 +152,6 @@ pub struct InnerBuilder {
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
     consensus_key: Arc<PrivateKey>,
-    digest_key: Option<DigestKey>,
 }
 
 impl InnerBuilder {
@@ -171,7 +171,6 @@ impl InnerBuilder {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
         consensus_key: Arc<PrivateKey>,
-        digest_key: Option<DigestKey>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -227,7 +226,6 @@ impl InnerBuilder {
             batch_reader: None,
             broadcast_proofs,
             consensus_key,
-            digest_key,
         }
     }
 
@@ -374,7 +372,6 @@ impl InnerBuilder {
             self.config.allow_batches_without_pos_in_proposal,
             self.config.enable_payload_v2,
             self.config.batch_expiry_gap_when_init_usecs,
-            self.digest_key,
         );
         spawn_named!(
             "proof_manager",

@@ -12,7 +12,17 @@ use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
-    account_address::AccountAddress, block_info::BlockInfo, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, decryption::Digest, epoch_state::EpochState, ledger_info::LedgerInfo, randomness::Randomness, transaction::{SignedTransaction, Transaction, Version}, validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction, validator_verifier::ValidatorVerifier
+    account_address::AccountAddress,
+    block_info::BlockInfo,
+    block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfo,
+    randomness::Randomness,
+    transaction::{SignedTransaction, Transaction, Version},
+    validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
+    validator_verifier::ValidatorVerifier,
 };
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -102,10 +112,6 @@ impl Block {
 
     pub fn encrypted_payload_size(&self) -> usize {
         self.payload().map_or(0, |payload| payload.ct_ids().len())
-    }
-
-    pub fn digest(&self) -> Option<Digest> {
-        self.payload().and_then(|payload| payload.digest())
     }
 
     // daniel todo

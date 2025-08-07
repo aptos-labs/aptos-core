@@ -82,7 +82,7 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    decryption::{DecConfig, DigestKey},
+    decryption::DecConfig,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -716,7 +716,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
         consensus_key: Arc<PrivateKey>,
-        digest_key: Option<DigestKey>,
     ) -> (
         Arc<dyn TPayloadManager>,
         QuorumStoreClient,
@@ -749,7 +748,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled(),
                 consensus_key,
-                digest_key,
             ))
         } else {
             info!("Building DirectMempool");
@@ -1284,7 +1282,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &epoch_state,
                 &consensus_config,
                 loaded_consensus_key.clone(),
-                Some(dec_config_slow_path.as_ref().unwrap().digest_key().clone()),
             )
             .await;
 
@@ -1349,7 +1346,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
         consensus_key: Arc<PrivateKey>,
-        digest_key: Option<DigestKey>,
     ) -> (
         NetworkSender,
         Arc<dyn PayloadClient>,
@@ -1364,7 +1360,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender.clone(),
                 consensus_config,
                 consensus_key,
-                digest_key,
             )
             .await;
         let effective_vtxn_config = consensus_config.effective_validator_txn_config();
