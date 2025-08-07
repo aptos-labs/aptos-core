@@ -449,7 +449,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            enable_transaction_data_v2: false, // TODO: flip this once V2 data is enabled
+            enable_transaction_data_v2: true,
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             ignore_low_score_peers: true,
