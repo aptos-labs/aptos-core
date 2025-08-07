@@ -381,6 +381,10 @@ impl LedgerDb {
         &self.persisted_auxiliary_info_db
     }
 
+    pub(crate) fn persisted_auxiliary_info_db_raw(&self) -> &DB {
+        self.persisted_auxiliary_info_db.db()
+    }
+
     pub(crate) fn transaction_accumulator_db(&self) -> &TransactionAccumulatorDb {
         &self.transaction_accumulator_db
     }
