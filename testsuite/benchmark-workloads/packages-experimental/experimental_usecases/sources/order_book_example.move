@@ -4,14 +4,11 @@ module 0xABCD::order_book_example {
     use std::option;
     use std::vector;
     use std::table::{Self, Table};
+    use aptos_experimental::retail_order_book;
 
-<<<<<<< HEAD
-    use aptos_experimental::order_book::{Self, OrderBook};
-    use aptos_experimental::order_book_types::{Self, OrderIdType, good_till_cancelled};
-=======
-    use aptos_experimental::retail_order_book::{Self, RetailOrderBook};
-    use aptos_experimental::retail_order_types::{Self, OrderIdType};
->>>>>>> a3611a7b11 ([Orderbook] Create a unified orderbook to route orders to retail and bulk orderbook)
+    use aptos_experimental::retail_order_types::{Self, OrderIdType, good_till_cancelled};
+    use aptos_experimental::unified_order_book;
+    use aptos_experimental::unified_order_book::UnifiedOrderBook;
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist
@@ -20,7 +17,7 @@ module 0xABCD::order_book_example {
     struct Empty has store, copy, drop {}
 
     struct Dex has key {
-        order_books: Table<u32, RetailOrderBook<Empty>>,
+        order_books: Table<u32, UnifiedOrderBook<Empty>>,
     }
 
     // Create the global `Dex`.
@@ -33,7 +30,7 @@ module 0xABCD::order_book_example {
 
         let order_books = table::new();
         for (i in 0..10) {
-            order_books.add(i, retail_order_book::new_retail_order_book());
+            order_books.add(i, unified_order_book::new_unified_order_book());
         };
 
         move_to(
@@ -43,12 +40,12 @@ module 0xABCD::order_book_example {
     }
 
 
-    inline fun borrow_order_book_mut(market_id: u32): &mut RetailOrderBook<Empty> acquires Dex {
+    inline fun borrow_order_book_mut(market_id: u32): &mut UnifiedOrderBook<Empty> acquires Dex {
         assert!(exists<Dex>(@publisher_address), error::invalid_argument(EDEX_RESOURCE_NOT_PRESENT));
         let dex = borrow_global_mut<Dex>(@publisher_address);
 
         if (!dex.order_books.contains(market_id)) {
-            let order_book = retail_order_book::new_retail_order_book();
+            let order_book = unified_order_book::new_unified_order_book();
             dex.order_books.add(market_id, order_book);
         };
 
@@ -75,7 +72,7 @@ module 0xABCD::order_book_example {
 
     // Copied from order_book, as it's test_only and not part of public API there.
     fun place_order_and_get_matches(
-        order_book: &mut RetailOrderBook<Empty>,
+        order_book: &mut UnifiedOrderBook<Empty>,
         account: address,
         order_id: OrderIdType,
         price: u64,
