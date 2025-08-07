@@ -4,9 +4,10 @@ module 0xABCD::order_book_example {
     use std::option;
     use std::vector;
     use std::table::{Self, Table};
-
-    use aptos_experimental::order_book::{Self, OrderBook};
-    use aptos_experimental::order_book_types::{Self, OrderIdType, good_till_cancelled};
+    use aptos_experimental::single_order_types::{Self};
+    use aptos_experimental::order_book_types::{OrderIdType, good_till_cancelled};
+    use aptos_experimental::order_book;
+    use aptos_experimental::order_book::OrderBook;
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist
@@ -55,7 +56,7 @@ module 0xABCD::order_book_example {
         place_order_and_get_matches(
             order_book,
             sender, // account
-            order_book_types::new_order_id_type(order_id as u128),
+            aptos_experimental::order_book_types::new_order_id_type(order_id as u128),
             bid_price,
             volume,
             volume,
@@ -65,7 +66,7 @@ module 0xABCD::order_book_example {
 
     public entry fun cancel_order(market_id: u32, order_id: u64) acquires Dex {
         let order_book = borrow_order_book_mut(market_id);
-        order_book.cancel_order(@publisher_address, order_book_types::new_order_id_type(order_id as u128));
+        order_book.cancel_order(@publisher_address, aptos_experimental::order_book_types::new_order_id_type(order_id as u128));
     }
 
     // Copied from order_book, as it's test_only and not part of public API there.
@@ -77,7 +78,7 @@ module 0xABCD::order_book_example {
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
-    ): vector<order_book_types::SingleOrderMatch<Empty>> {
+    ): vector<single_order_types::SingleOrderMatch<Empty>> {
         let trigger_condition = option::none();
         let match_results = vector::empty();
         while (remaining_size > 0) {

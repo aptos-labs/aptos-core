@@ -6,11 +6,11 @@ module aptos_experimental::pending_order_book_index {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         UniqueIdxType,
-        TriggerCondition,
         new_default_big_ordered_map
     };
+    use aptos_experimental::order_book_types::TriggerCondition;
 
-    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
 
     struct PendingOrderKey has store, copy, drop {
         price: u64,
