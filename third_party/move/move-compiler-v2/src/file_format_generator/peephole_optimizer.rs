@@ -49,7 +49,7 @@ impl BasicBlockOptimizerPipeline {
         let mut code_chunk = TransformedCodeChunk::make_from(code);
         let mut cfg = VMControlFlowGraph::new(&code_chunk.code);
         loop {
-            let optimized_blocks = self.get_optimized_blocks(&code_chunk.code, &cfg);
+            let optimized_blocks = self.get_optimized_blocks(&code_chunk, &cfg);
             let optimized_code_chunk = Self::flatten_blocks(optimized_blocks);
             let optimized_cfg = VMControlFlowGraph::new(&optimized_code_chunk.code);
             if optimized_cfg.num_blocks() == cfg.num_blocks() {
@@ -71,14 +71,14 @@ impl BasicBlockOptimizerPipeline {
     /// basic blocks.
     fn get_optimized_blocks(
         &self,
-        code: &[Bytecode],
+        original_block: &TransformedCodeChunk,
         cfg: &VMControlFlowGraph,
     ) -> BTreeMap<CodeOffset, TransformedCodeChunk> {
         let mut optimized_blocks = BTreeMap::new();
         for block_id in cfg.blocks() {
             let start = cfg.block_start(block_id);
             let end = cfg.block_end(block_id); // `end` is inclusive
-            let mut block = TransformedCodeChunk::make_from(&code[start as usize..=end as usize]);
+            let mut block = original_block.extract(start, end);
             for bb_optimizer in self.optimizers.iter() {
                 block = bb_optimizer
                     .optimize(&block.code)
@@ -97,7 +97,7 @@ impl BasicBlockOptimizerPipeline {
         let mut block_mapping = BTreeMap::new();
         for (offset, block) in optimized_blocks {
             block_mapping.insert(offset, optimized_code.code.len() as CodeOffset);
-            optimized_code.extend(block, offset);
+            optimized_code.extend(block, 0);
         }
         Self::remap_branch_targets(&mut optimized_code.code, &block_mapping);
         optimized_code
