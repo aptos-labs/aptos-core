@@ -632,7 +632,9 @@ impl PipelineBuilder {
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
         let non_encrypted_txns = input_txns.as_ref().clone().into_iter().filter(|t| !t.is_encrypted()).collect::<Vec<_>>();
 
-        // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
+        if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
+            warn!("non_encrypted_txns {} + decrypted_txns {} != input_txns {}", non_encrypted_txns.len(), decrypted_txns.as_ref().len(), input_txns.as_ref().len());
+        }
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = non_encrypted_txns.len();
