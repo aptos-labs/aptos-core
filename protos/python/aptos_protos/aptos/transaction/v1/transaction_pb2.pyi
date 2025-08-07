@@ -1374,7 +1374,7 @@ class MultiKeySignature(_message.Message):
         signatures_required: _Optional[int] = ...,
     ) -> None: ...
 
-class AbstractionSignature(_message.Message):
+class AbstractSignature(_message.Message):
     __slots__ = ["function_info", "signature"]
     FUNCTION_INFO_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -1427,7 +1427,7 @@ class AccountSignature(_message.Message):
     multi_ed25519: MultiEd25519Signature
     single_key_signature: SingleKeySignature
     multi_key_signature: MultiKeySignature
-    abstraction: AbstractionSignature
+    abstraction: AbstractSignature
     def __init__(
         self,
         type: _Optional[_Union[AccountSignature.Type, str]] = ...,
@@ -1435,7 +1435,7 @@ class AccountSignature(_message.Message):
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
         multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
-        abstraction: _Optional[_Union[AbstractionSignature, _Mapping]] = ...,
+        abstraction: _Optional[_Union[AbstractSignature, _Mapping]] = ...,
     ) -> None: ...
 
 class TransactionSizeInfo(_message.Message):

@@ -4,13 +4,7 @@
 // @generated
 /// Generated client implementations.
 pub mod raw_data_client {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
@@ -33,8 +27,8 @@ pub mod raw_data_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -59,7 +53,7 @@ pub mod raw_data_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             RawDataClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -107,7 +101,8 @@ pub mod raw_data_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -124,22 +119,16 @@ pub mod raw_data_client {
 }
 /// Generated server implementations.
 pub mod raw_data_server {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with RawDataServer.
     #[async_trait]
-    pub trait RawData: std::marker::Send + std::marker::Sync + 'static {
+    pub trait RawData: Send + Sync + 'static {
         /// Server streaming response type for the GetTransactions method.
         type GetTransactionsStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::TransactionsResponse, tonic::Status>,
             >
-            + std::marker::Send
+            + Send
             + 'static;
         /** Get transactions batch without any filtering from starting version and end if transaction count is present.
 */
@@ -153,14 +142,14 @@ pub mod raw_data_server {
     }
     ///
     #[derive(Debug)]
-    pub struct RawDataServer<T> {
+    pub struct RawDataServer<T: RawData> {
         inner: Arc<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
         max_decoding_message_size: Option<usize>,
         max_encoding_message_size: Option<usize>,
     }
-    impl<T> RawDataServer<T> {
+    impl<T: RawData> RawDataServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -214,8 +203,8 @@ pub mod raw_data_server {
     impl<T, B> tonic::codegen::Service<http::Request<B>> for RawDataServer<T>
     where
         T: RawData,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
+        B: Body + Send + 'static,
+        B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
@@ -277,25 +266,23 @@ pub mod raw_data_server {
                 }
                 _ => {
                     Box::pin(async move {
-                        let mut response = http::Response::new(empty_body());
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", tonic::Code::Unimplemented as i32)
+                                .header(
+                                    http::header::CONTENT_TYPE,
+                                    tonic::metadata::GRPC_CONTENT_TYPE,
+                                )
+                                .body(empty_body())
+                                .unwrap(),
+                        )
                     })
                 }
             }
         }
     }
-    impl<T> Clone for RawDataServer<T> {
+    impl<T: RawData> Clone for RawDataServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -307,21 +294,13 @@ pub mod raw_data_server {
             }
         }
     }
-    /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.RawData";
-    impl<T> tonic::server::NamedService for RawDataServer<T> {
-        const NAME: &'static str = SERVICE_NAME;
+    impl<T: RawData> tonic::server::NamedService for RawDataServer<T> {
+        const NAME: &'static str = "aptos.indexer.v1.RawData";
     }
 }
 /// Generated client implementations.
 pub mod grpc_manager_client {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
@@ -344,8 +323,8 @@ pub mod grpc_manager_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -370,7 +349,7 @@ pub mod grpc_manager_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             GrpcManagerClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -417,7 +396,8 @@ pub mod grpc_manager_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -442,7 +422,8 @@ pub mod grpc_manager_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -469,7 +450,8 @@ pub mod grpc_manager_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -491,17 +473,11 @@ pub mod grpc_manager_client {
 }
 /// Generated server implementations.
 pub mod grpc_manager_server {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with GrpcManagerServer.
     #[async_trait]
-    pub trait GrpcManager: std::marker::Send + std::marker::Sync + 'static {
+    pub trait GrpcManager: Send + Sync + 'static {
         ///
         async fn heartbeat(
             &self,
@@ -529,14 +505,14 @@ pub mod grpc_manager_server {
     }
     ///
     #[derive(Debug)]
-    pub struct GrpcManagerServer<T> {
+    pub struct GrpcManagerServer<T: GrpcManager> {
         inner: Arc<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
         max_decoding_message_size: Option<usize>,
         max_encoding_message_size: Option<usize>,
     }
-    impl<T> GrpcManagerServer<T> {
+    impl<T: GrpcManager> GrpcManagerServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -590,8 +566,8 @@ pub mod grpc_manager_server {
     impl<T, B> tonic::codegen::Service<http::Request<B>> for GrpcManagerServer<T>
     where
         T: GrpcManager,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
+        B: Body + Send + 'static,
+        B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
@@ -747,25 +723,23 @@ pub mod grpc_manager_server {
                 }
                 _ => {
                     Box::pin(async move {
-                        let mut response = http::Response::new(empty_body());
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", tonic::Code::Unimplemented as i32)
+                                .header(
+                                    http::header::CONTENT_TYPE,
+                                    tonic::metadata::GRPC_CONTENT_TYPE,
+                                )
+                                .body(empty_body())
+                                .unwrap(),
+                        )
                     })
                 }
             }
         }
     }
-    impl<T> Clone for GrpcManagerServer<T> {
+    impl<T: GrpcManager> Clone for GrpcManagerServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -777,21 +751,13 @@ pub mod grpc_manager_server {
             }
         }
     }
-    /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.GrpcManager";
-    impl<T> tonic::server::NamedService for GrpcManagerServer<T> {
-        const NAME: &'static str = SERVICE_NAME;
+    impl<T: GrpcManager> tonic::server::NamedService for GrpcManagerServer<T> {
+        const NAME: &'static str = "aptos.indexer.v1.GrpcManager";
     }
 }
 /// Generated client implementations.
 pub mod data_service_client {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
@@ -814,8 +780,8 @@ pub mod data_service_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -840,7 +806,7 @@ pub mod data_service_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             DataServiceClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -887,7 +853,8 @@ pub mod data_service_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -912,7 +879,8 @@ pub mod data_service_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::unknown(
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -931,17 +899,11 @@ pub mod data_service_client {
 }
 /// Generated server implementations.
 pub mod data_service_server {
-    #![allow(
-        unused_variables,
-        dead_code,
-        missing_docs,
-        clippy::wildcard_imports,
-        clippy::let_unit_value,
-    )]
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with DataServiceServer.
     #[async_trait]
-    pub trait DataService: std::marker::Send + std::marker::Sync + 'static {
+    pub trait DataService: Send + Sync + 'static {
         ///
         async fn ping(
             &self,
@@ -954,7 +916,7 @@ pub mod data_service_server {
         type GetTransactionsStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::TransactionsResponse, tonic::Status>,
             >
-            + std::marker::Send
+            + Send
             + 'static;
         ///
         async fn get_transactions(
@@ -967,14 +929,14 @@ pub mod data_service_server {
     }
     ///
     #[derive(Debug)]
-    pub struct DataServiceServer<T> {
+    pub struct DataServiceServer<T: DataService> {
         inner: Arc<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
         max_decoding_message_size: Option<usize>,
         max_encoding_message_size: Option<usize>,
     }
-    impl<T> DataServiceServer<T> {
+    impl<T: DataService> DataServiceServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -1028,8 +990,8 @@ pub mod data_service_server {
     impl<T, B> tonic::codegen::Service<http::Request<B>> for DataServiceServer<T>
     where
         T: DataService,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
+        B: Body + Send + 'static,
+        B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
@@ -1136,25 +1098,23 @@ pub mod data_service_server {
                 }
                 _ => {
                     Box::pin(async move {
-                        let mut response = http::Response::new(empty_body());
-                        let headers = response.headers_mut();
-                        headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
-                        headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
-                        Ok(response)
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", tonic::Code::Unimplemented as i32)
+                                .header(
+                                    http::header::CONTENT_TYPE,
+                                    tonic::metadata::GRPC_CONTENT_TYPE,
+                                )
+                                .body(empty_body())
+                                .unwrap(),
+                        )
                     })
                 }
             }
         }
     }
-    impl<T> Clone for DataServiceServer<T> {
+    impl<T: DataService> Clone for DataServiceServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -1166,9 +1126,7 @@ pub mod data_service_server {
             }
         }
     }
-    /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "aptos.indexer.v1.DataService";
-    impl<T> tonic::server::NamedService for DataServiceServer<T> {
-        const NAME: &'static str = SERVICE_NAME;
+    impl<T: DataService> tonic::server::NamedService for DataServiceServer<T> {
+        const NAME: &'static str = "aptos.indexer.v1.DataService";
     }
 }

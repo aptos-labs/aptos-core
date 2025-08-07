@@ -13,7 +13,7 @@ AbortLocation:
           TYPENAME: ModuleId
     1:
       Script: UNIT
-AbstractionAuthData:
+AbstractAuthenticationData:
   ENUM:
     0:
       V1:
@@ -26,6 +26,12 @@ AbstractionAuthData:
           - signing_message_digest: BYTES
           - abstract_signature: BYTES
           - abstract_public_key: BYTES
+AbstractAuthenticator:
+  STRUCT:
+    - function_info:
+        TYPENAME: FunctionInfo
+    - auth_data:
+        TYPENAME: AbstractAuthenticationData
 AccessPath:
   STRUCT:
     - address:
@@ -65,12 +71,10 @@ AccountAuthenticator:
     4:
       NoAccountAuthenticator: UNIT
     5:
-      Abstraction:
+      Abstract:
         STRUCT:
-          - function_info:
-              TYPENAME: FunctionInfo
-          - auth_data:
-              TYPENAME: AbstractionAuthData
+          - authenticator:
+              TYPENAME: AbstractAuthenticator
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
