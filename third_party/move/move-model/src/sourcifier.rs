@@ -18,6 +18,7 @@ use crate::{
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
 };
 use itertools::Itertools;
+use move_binary_format::access::ModuleAccess;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 //
@@ -66,20 +67,45 @@ impl<'a> Sourcifier<'a> {
             emitln!(self.writer, "module {} {{", module_env.get_full_name_str());
         }
         self.writer.indent();
-        for use_ in module_env.get_used_modules(false) {
-            emitln!(
-                self.writer,
-                "use {};",
-                self.env().get_module(use_).get_full_name_str()
-            )
+
+        // If the compiled module is attached, get `use` and `friend` declarations from it.
+        // Why: some modules may not have been loaded into the `GlobalEnv` yet, so information in
+        // `ModuleEnv` may be incomplete.
+        if let Some(module) = &module_env.data.compiled_module {
+            for use_ in module.immediate_dependencies() {
+                emitln!(
+                    self.writer,
+                    "use 0x{}::{};",
+                    use_.address().short_str_lossless(),
+                    use_.name()
+                )
+            }
+            for friend in &module.friend_decls {
+                let friend_id = module.module_id_for_handle(friend);
+                emitln!(
+                    self.writer,
+                    "friend 0x{}::{};",
+                    friend_id.address().short_str_lossless(),
+                    friend_id.name()
+                )
+            }
+        } else {
+            for use_ in module_env.get_used_modules(false) {
+                emitln!(
+                    self.writer,
+                    "use {};",
+                    self.env().get_module(use_).get_full_name_str()
+                )
+            }
+            for friend in module_env.get_friend_modules() {
+                emitln!(
+                    self.writer,
+                    "friend {};",
+                    self.env().get_module(friend).get_full_name_str()
+                )
+            }
         }
-        for friend in module_env.get_friend_modules() {
-            emitln!(
-                self.writer,
-                "friend {};",
-                self.env().get_module(friend).get_full_name_str()
-            )
-        }
+
         if module_env.get_struct_count() > 0 {
             for struct_env in module_env.get_structs() {
                 self.print_struct(struct_env.get_qualified_id())

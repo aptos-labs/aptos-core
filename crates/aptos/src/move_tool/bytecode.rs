@@ -14,7 +14,7 @@ use crate::{
 use anyhow::Context;
 use aptos_types::vm::module_metadata::prelude::*;
 use async_trait::async_trait;
-use clap::{Args, Parser};
+use clap::{Args, Parser, ValueEnum};
 use itertools::Itertools;
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::CompiledScript, file_format_common,
@@ -25,6 +25,7 @@ use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_coverage::coverage_map::CoverageMap;
+use move_decompiler::{Decompiler, Options as DecompilerOptions};
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
@@ -61,6 +62,22 @@ pub struct Disassemble {
 pub struct Decompile {
     #[clap(flatten)]
     pub command: BytecodeCommand,
+    /// (Optional) Decompiler version to use
+    #[arg(long, value_enum, default_value = "v1")]
+    pub decompiler_version: DecompilerVersion,
+}
+
+pub enum BinaryCommandVersion {
+    DecompilerVersion(DecompilerVersion),
+    DisassemblerVersion,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
+pub enum DecompilerVersion {
+    /// Use the Revela decompiler
+    V1,
+    /// Use the new Aptos decompiler
+    V2,
 }
 
 #[derive(Debug, Args)]
@@ -123,7 +140,12 @@ impl CliCommand<String> for Disassemble {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command.execute(BytecodeCommandType::Disassemble).await
+        self.command
+            .execute(
+                BytecodeCommandType::Disassemble,
+                BinaryCommandVersion::DisassemblerVersion,
+            )
+            .await
     }
 }
 
@@ -134,7 +156,12 @@ impl CliCommand<String> for Decompile {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command.execute(BytecodeCommandType::Decompile).await
+        self.command
+            .execute(
+                BytecodeCommandType::Decompile,
+                BinaryCommandVersion::DecompilerVersion(self.decompiler_version),
+            )
+            .await
     }
 }
 
@@ -146,7 +173,11 @@ struct BytecodeMetadata {
 }
 
 impl BytecodeCommand {
-    async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
+    async fn execute(
+        self,
+        command_type: BytecodeCommandType,
+        version: BinaryCommandVersion,
+    ) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
             vec![path]
         } else if let Some(path) = self.input.package_path.clone() {
@@ -181,8 +212,15 @@ impl BytecodeCommand {
                 BytecodeCommandType::Disassemble => {
                     (self.disassemble(bytecode_path)?, DISASSEMBLER_EXTENSION)
                 },
-                BytecodeCommandType::Decompile => {
-                    (self.decompile(bytecode_path)?, DECOMPILER_EXTENSION)
+                BytecodeCommandType::Decompile => match version {
+                    BinaryCommandVersion::DecompilerVersion(v) => {
+                        (self.decompile(bytecode_path, v)?, DECOMPILER_EXTENSION)
+                    },
+                    _ => {
+                        return Err(CliError::UnexpectedError(
+                            "No decompiler version provided".to_string(),
+                        ));
+                    },
                 },
             };
 
@@ -348,7 +386,18 @@ impl BytecodeCommand {
             .map_err(|err| CliError::UnexpectedError(format!("Unable to disassemble: {}", err)))
     }
 
-    fn decompile(&self, bytecode_path: &Path) -> Result<String, CliError> {
+    fn decompile(
+        &self,
+        bytecode_path: &Path,
+        version: DecompilerVersion,
+    ) -> Result<String, CliError> {
+        match version {
+            DecompilerVersion::V1 => self.decompile_v1(bytecode_path),
+            DecompilerVersion::V2 => self.decompile_v2(bytecode_path),
+        }
+    }
+
+    fn decompile_v1(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let exe = get_revela_path()?;
         let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
         let mut cmd = Command::new(exe.as_path());
@@ -378,6 +427,23 @@ impl BytecodeCommand {
                 String::from_utf8(out.stderr).unwrap_or_default()
             )))
         }
+    }
+
+    fn decompile_v2(&self, bytecode_path: &Path) -> Result<String, CliError> {
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+        let mut decompiler = Decompiler::new(DecompilerOptions::default());
+        let source_map =
+            decompiler.empty_source_map(&bytecode_path.to_string_lossy(), &bytecode_bytes);
+        let res = if self.is_script {
+            let script = CompiledScript::deserialize(&bytecode_bytes)
+                .context("Script blob can't be deserialized")?;
+            decompiler.decompile_script(script, source_map)?
+        } else {
+            let module = CompiledModule::deserialize(&bytecode_bytes)
+                .context("Module blob can't be deserialized")?;
+            decompiler.decompile_module(module, source_map)?
+        };
+        Ok(res)
     }
 
     fn downgrade_to_v6(&self, file_path: &Path) -> Result<Option<NamedTempFile>, CliError> {
