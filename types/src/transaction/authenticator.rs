@@ -45,22 +45,22 @@ pub enum AuthenticationError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthenticationProof {
     Key(Vec<u8>),
-    Abstraction {
+    Abstract {
         function_info: FunctionInfo,
-        auth_data: AbstractionAuthData,
+        auth_data: AbstractAuthenticationData,
     },
     None,
 }
 
 impl AuthenticationProof {
     pub fn is_abstracted(&self) -> bool {
-        matches!(self, Self::Abstraction { .. })
+        matches!(self, Self::Abstract { .. })
     }
 
     pub fn optional_auth_key(&self) -> Option<Vec<u8>> {
         match self {
             Self::Key(data) => Some(data.clone()),
-            Self::Abstraction { .. } => None,
+            Self::Abstract { .. } => None,
             Self::None => None,
         }
     }
@@ -389,7 +389,7 @@ impl TransactionAuthenticator {
                 AccountAuthenticator::NoAccountAuthenticator => {
                     //  This case adds no single key authenticators to the vector.
                 },
-                AccountAuthenticator::Abstraction { .. } => {},
+                AccountAuthenticator::Abstract { .. } => {},
             };
         }
         Ok(single_key_authenticators)
@@ -541,14 +541,60 @@ pub enum AccountAuthenticator {
         authenticator: MultiKeyAuthenticator,
     },
     NoAccountAuthenticator,
-    Abstraction {
-        function_info: FunctionInfo,
-        auth_data: AbstractionAuthData,
+    Abstract {
+        authenticator: AbstractAuthenticator,
     }, // ... add more schemes here
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub enum AbstractionAuthData {
+pub struct AbstractAuthenticator {
+    /// An abstract `authenticator` should be verifiable by the function in `function_info` over the signing_message_digest = sha3_256(signing_message(AASigningData(original_signing_message, function_info))))
+    /// For example, consider the following authentication function:
+    ///
+    ///   fun verify(owner: signer, authenticator: vector<u8>, signing_message_digest: vector<u8>) -> signer
+    ///
+    /// It might operate by, for example:
+    ///  1. Looking up the public key of `owner` in some table
+    ///  2. Parsing the `authenticator` as an RSA signature
+    ///  2. Verifying this RSA signature over the `signing_message_digest` under this public key
+    ///
+    /// Note: Abstract authenticators don't exactly follow the `AccountAuthenticator` paradigm, where an "authenticator" typically consists of a public key and a signature.
+    function_info: FunctionInfo,
+    auth_data: AbstractAuthenticationData,
+}
+
+impl AbstractAuthenticator {
+    pub fn new(function_info: FunctionInfo, auth_data: AbstractAuthenticationData) -> Self {
+        Self {
+            function_info,
+            auth_data,
+        }
+    }
+
+    pub fn function_info(&self) -> &FunctionInfo {
+        &self.function_info
+    }
+
+    pub fn auth_data(&self) -> &AbstractAuthenticationData {
+        &self.auth_data
+    }
+
+    pub fn signing_message_digest(&self) -> &Vec<u8> {
+        match &self.auth_data {
+            AbstractAuthenticationData::V1 {
+                signing_message_digest,
+                ..
+            } => signing_message_digest,
+            AbstractAuthenticationData::DerivableV1 {
+                signing_message_digest,
+                ..
+            } => signing_message_digest,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub enum AbstractAuthenticationData {
     V1 {
         #[serde(with = "serde_bytes")]
         signing_message_digest: Vec<u8>,
@@ -565,9 +611,9 @@ pub enum AbstractionAuthData {
     },
 }
 
-impl AbstractionAuthData {
+impl AbstractAuthenticationData {
     pub fn signing_message_digest(&self) -> &Vec<u8> {
-        match self {
+        match &self {
             Self::V1 {
                 signing_message_digest,
                 ..
@@ -576,6 +622,27 @@ impl AbstractionAuthData {
                 signing_message_digest,
                 ..
             } => signing_message_digest,
+        }
+    }
+
+    pub fn abstract_signature(&self) -> &Vec<u8> {
+        match &self {
+            Self::V1 {
+                abstract_signature, ..
+            }
+            | Self::DerivableV1 {
+                abstract_signature, ..
+            } => abstract_signature,
+        }
+    }
+
+    pub fn abstract_public_key(&self) -> Option<&Vec<u8>> {
+        match &self {
+            Self::V1 { .. } => None,
+            Self::DerivableV1 {
+                abstract_public_key,
+                ..
+            } => Some(abstract_public_key),
         }
     }
 }
@@ -622,7 +689,7 @@ impl AccountAuthenticator {
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
             Self::NoAccountAuthenticator => Scheme::NoScheme,
-            Self::Abstraction { .. } => Scheme::Abstraction,
+            Self::Abstract { .. } => Scheme::Abstraction,
         }
     }
 
@@ -661,12 +728,14 @@ impl AccountAuthenticator {
         signing_message_digest: Vec<u8>,
         abstract_signature: Vec<u8>,
     ) -> Self {
-        Self::Abstraction {
-            function_info,
-            auth_data: AbstractionAuthData::V1 {
-                signing_message_digest,
-                abstract_signature,
-            },
+        Self::Abstract {
+            authenticator: AbstractAuthenticator::new(
+                function_info,
+                AbstractAuthenticationData::V1 {
+                    signing_message_digest,
+                    abstract_signature,
+                },
+            ),
         }
     }
 
@@ -677,18 +746,20 @@ impl AccountAuthenticator {
         abstract_signature: Vec<u8>,
         abstract_public_key: Vec<u8>,
     ) -> Self {
-        Self::Abstraction {
-            function_info,
-            auth_data: AbstractionAuthData::DerivableV1 {
-                signing_message_digest,
-                abstract_signature,
-                abstract_public_key,
-            },
+        Self::Abstract {
+            authenticator: AbstractAuthenticator::new(
+                function_info,
+                AbstractAuthenticationData::DerivableV1 {
+                    signing_message_digest,
+                    abstract_signature,
+                    abstract_public_key,
+                },
+            ),
         }
     }
 
     pub fn is_abstracted(&self) -> bool {
-        matches!(self, Self::Abstraction { .. })
+        matches!(self, Self::Abstract { .. })
     }
 
     /// Return Ok if the authenticator's public key matches its signature, Err otherwise
@@ -706,12 +777,16 @@ impl AccountAuthenticator {
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
             // Abstraction delayed the authentication after prologue.
-            Self::Abstraction {
-                auth_data,
-                function_info,
-            } => {
+            Self::Abstract { authenticator } => {
                 let original_signing_message = signing_message(message)?;
-                ensure!(auth_data.signing_message_digest() == &AASigningData::signing_message_digest(original_signing_message, function_info.clone())?, "The signing message digest provided in Abstraction Authenticator is not expected");
+                ensure!(
+                    authenticator.signing_message_digest()
+                        == &AASigningData::signing_message_digest(
+                            original_signing_message,
+                            authenticator.function_info().clone()
+                        )?,
+                    "The signing message digest provided in Abstract Authenticator is not expected"
+                );
                 Ok(())
             },
         }
@@ -725,7 +800,7 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.public_key_bytes(),
             Self::MultiKey { authenticator } => authenticator.public_key_bytes(),
             Self::NoAccountAuthenticator => vec![],
-            Self::Abstraction { .. } => vec![],
+            Self::Abstract { .. } => vec![],
         }
     }
 
@@ -737,7 +812,9 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.signature_bytes(),
             Self::MultiKey { authenticator } => authenticator.signature_bytes(),
             Self::NoAccountAuthenticator => vec![],
-            Self::Abstraction { .. } => vec![],
+            Self::Abstract { authenticator } => {
+                authenticator.auth_data().abstract_signature().clone()
+            },
         }
     }
 
@@ -745,12 +822,9 @@ impl AccountAuthenticator {
     pub fn authentication_proof(&self) -> AuthenticationProof {
         match self {
             Self::NoAccountAuthenticator => AuthenticationProof::None,
-            Self::Abstraction {
-                function_info,
-                auth_data,
-            } => AuthenticationProof::Abstraction {
-                function_info: function_info.clone(),
-                auth_data: auth_data.clone(),
+            Self::Abstract { authenticator } => AuthenticationProof::Abstract {
+                function_info: authenticator.function_info().clone(),
+                auth_data: authenticator.auth_data().clone(),
             },
             Self::Ed25519 { .. }
             | Self::MultiEd25519 { .. }
@@ -769,7 +843,7 @@ impl AccountAuthenticator {
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
             Self::NoAccountAuthenticator => 0,
-            Self::Abstraction { .. } => 0,
+            Self::Abstract { .. } => 0,
         }
     }
 }

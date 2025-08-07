@@ -5,7 +5,7 @@
 use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_api_types::{
-    AbstractionSignature as APIAbstractionSignature, AccountSignature as APIAccountSignature,
+    AbstractSignature as APIAbstractSignature, AccountSignature as APIAccountSignature,
     Ed25519Signature as APIEd25519Signature, FeePayerSignature as APIFeePayerSignature,
     MultiAgentSignature as APIMultiAgentSignature,
     MultiEd25519Signature as APIMultiEd25519Signature, MultiKeySignature as APIMultiKeySignature,
@@ -314,7 +314,7 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             )],
-            APIAccountSignature::AbstractionSignature(sig) => {
+            APIAccountSignature::AbstractSignature(sig) => {
                 vec![Self::parse_abstraction_signature(
                     sig,
                     sender,
@@ -404,7 +404,7 @@ impl Signature {
     }
 
     fn parse_abstraction_signature(
-        _s: &APIAbstractionSignature,
+        _s: &APIAbstractSignature,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,
