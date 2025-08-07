@@ -423,7 +423,7 @@ impl PipelineBuilder {
             let encryption_key: EncryptionKey = self.dec_config.as_ref().unwrap().encryption_key().clone();
 
             let compute_digest_fut = spawn_shared_fut(
-                Self::compute_digest(block.clone(), digest_key.clone()),
+                Self::compute_digest(prepare_fut.clone(), block.clone(), digest_key.clone()),
                 Some(&mut abort_handles),
             );
             let compute_decryption_share_fut = spawn_shared_fut(
@@ -688,16 +688,17 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the digest of the encrypted payload
-    async fn compute_digest(block: Arc<Block>, digest_key: DigestKey) -> TaskResult<DigestResult> {
+    async fn compute_digest(prepare_fut: TaskFuture<PrepareResult>, block: Arc<Block>, digest_key: DigestKey) -> TaskResult<DigestResult> {
         let mut tracker = Tracker::start_waiting("compute_digest", &block);
         tracker.start_working();
 
+        let (input_txns, _) = prepare_fut.await?;
+
         // daniel todo: hack before having a large setup
         let encryption_round = 0;
-        let ct_ids = block.payload().unwrap().ct_ids();
+        let ct_ids: Vec<Id> = input_txns.as_ref().iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ct_id().unwrap()).collect::<Vec<_>>();
 
         let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
-        assert!(digest == block.digest().unwrap());
 
         Ok((digest, proofs_promise))
     }
