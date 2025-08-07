@@ -370,6 +370,7 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-coverage",
+ "move-decompiler",
  "move-disassembler",
  "move-ir-types",
  "move-linter",
