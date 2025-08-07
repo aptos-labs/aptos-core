@@ -49,7 +49,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_batch_encryption::{schemes::fptx::{self, FPTX}, shared::digest, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -351,7 +351,6 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
-            maybe_compute_decryption_share_fut: None,
             maybe_compute_decryption_fut: None,
             maybe_broadcast_fast_decryption_share_fut: None,
         }
@@ -413,7 +412,7 @@ impl PipelineBuilder {
         // In validators, the pipelined_block here does not have decrypted txns so
         // they will decrypt them, but in fullnodes it has the decrypted txns from the
         // validator when receiving the ordered blocks.
-        let (maybe_compute_decryption_share_fut, maybe_compute_decryption_fut, maybe_broadcast_fast_decryption_share_fut) = if pipelined_block.block().is_encrypted() && !pipelined_block.dec_txns_is_set() {
+        let (maybe_compute_decryption_fut, maybe_broadcast_fast_decryption_share_fut) = if pipelined_block.block().is_encrypted() && !pipelined_block.dec_txns_is_set() {
             assert!(self.dec_config.is_some());
             assert!(self.fast_dec_config.is_some());
             let author = self.signer.author();
@@ -442,9 +441,9 @@ impl PipelineBuilder {
                 Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut, block.clone(), encryption_key.clone()),
                 Some(&mut abort_handles),
             );
-            (Some(compute_decryption_share_fut), Some(compute_decryption_fut), Some(broadcast_fast_decryption_share_fut))
+            (Some(compute_decryption_fut), Some(broadcast_fast_decryption_share_fut))
         } else {
-            (None, None, None)
+            (None, None)
         };
 
         let verify_txn_sigs_fut = spawn_shared_fut(
@@ -555,7 +554,6 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
-            maybe_compute_decryption_share_fut,
             maybe_compute_decryption_fut,
             maybe_broadcast_fast_decryption_share_fut,
         };
@@ -634,7 +632,15 @@ impl PipelineBuilder {
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
         let non_encrypted_txns = input_txns.as_ref().clone().into_iter().filter(|t| !t.is_encrypted()).collect::<Vec<_>>();
 
-        assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
+        // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
+        if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
+            info!(
+                "non_encrypted_txns {} + decrypted_txns {} != input_txns {}",
+                non_encrypted_txns.len(),
+                decrypted_txns.as_ref().len(),
+                input_txns.as_ref().len()
+            );
+        }
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = non_encrypted_txns.len();
@@ -645,17 +651,17 @@ impl PipelineBuilder {
                 .collect::<Vec<_>>()
         });
 
-        // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
-        let mut all_sig_verified_txns = Vec::new();
-        for txn in input_txns.as_ref() {
-            if txn.is_encrypted() {
-                all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
-            } else {
-                all_sig_verified_txns.push(sig_verified_txns.remove(0));
-            }
-        }
+        // // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
+        // let mut all_sig_verified_txns = Vec::new();
+        // for txn in input_txns.as_ref() {
+        //     if txn.is_encrypted() {
+        //         all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
+        //     } else {
+        //         all_sig_verified_txns.push(sig_verified_txns.remove(0));
+        //     }
+        // }
 
-        // let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
+        let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
 
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
@@ -672,6 +678,7 @@ impl PipelineBuilder {
         let encryption_round = 0;
         let ct_ids = block.payload().unwrap().ct_ids();
 
+        // daniel todo: skip decryption when digest is inconsistent
         let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
 
         Ok((digest, proofs_promise))
@@ -1154,7 +1161,6 @@ impl PipelineBuilder {
             notify_state_sync_fut: _,
             commit_ledger_fut,
             post_commit_fut: _,
-            maybe_compute_decryption_share_fut,
             maybe_compute_decryption_fut,
             maybe_broadcast_fast_decryption_share_fut,
         } = all_futs;
@@ -1175,13 +1181,7 @@ impl PipelineBuilder {
             format!("{epoch} {round} {block_id} commit ledger"),
         )
         .await;
-        if let Some(compute_decryption_share_fut) = maybe_compute_decryption_share_fut {
-            wait_and_log_error(
-                compute_decryption_share_fut,
-                format!("{epoch} {round} {block_id} decryption"),
-            )
-            .await;
-        }
+
         if let Some(compute_decryption_fut) = maybe_compute_decryption_fut {
             wait_and_log_error(
                 compute_decryption_fut,

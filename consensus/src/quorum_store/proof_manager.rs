@@ -14,10 +14,12 @@ use aptos_consensus_types::{
     utils::PayloadTxnsSize,
 };
 use aptos_logger::prelude::*;
-use aptos_types::PeerId;
+use aptos_types::{decryption::{Id, DECRYPTION_POOL, DigestKey}, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
 use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -35,6 +37,7 @@ pub struct ProofManager {
     remaining_total_proof_num: u64,
     allow_batches_without_pos_in_proposal: bool,
     enable_payload_v2: bool,
+    digest_key: Option<DigestKey>,
 }
 
 impl ProofManager {
@@ -46,6 +49,7 @@ impl ProofManager {
         allow_batches_without_pos_in_proposal: bool,
         enable_payload_v2: bool,
         batch_expiry_gap_when_init_usecs: u64,
+        digest_key: Option<DigestKey>,
     ) -> Self {
         Self {
             batch_proof_queue: BatchProofQueue::new(
@@ -59,6 +63,7 @@ impl ProofManager {
             remaining_total_proof_num: 0,
             allow_batches_without_pos_in_proposal,
             enable_payload_v2,
+            digest_key,
         }
     }
 
@@ -186,12 +191,34 @@ impl ProofManager {
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
 
         let response = if request.maybe_optqs_payload_pull_params.is_some() {
+            let mut ct_ids: Vec<Id> = vec![];
+            for (batch, _) in inline_block.iter() {
+                ct_ids.extend(batch.ct_ids());
+            }
+            for batch in opt_batches.iter() {
+                ct_ids.extend(batch.ct_ids());
+            }
+            for proof in proof_block.iter() {
+                ct_ids.extend(proof.info().ct_ids());
+            }
+            // daniel todo: hack before having a large setup
+            let encryption_round = 0;
+            let digest_key = self.digest_key.clone().unwrap();
+
+            let digest = if ct_ids.len() > 0 {
+                Some(<FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL).unwrap().0)
+            } else {
+                None
+            };
+
+
             let inline_batches = inline_block.into();
             Payload::OptQuorumStore(OptQuorumStorePayload::new(
                 inline_batches,
                 opt_batches.into(),
                 proof_block.into(),
                 PayloadExecutionLimit::None,
+                digest,
             ))
         } else if proof_block.is_empty() && inline_block.is_empty() {
             Payload::empty(true, self.allow_batches_without_pos_in_proposal)

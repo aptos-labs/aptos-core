@@ -14,11 +14,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress,
-    transaction::{ReplayProtector, SignedTransaction},
-    validator_verifier::ValidatorVerifier,
-    vm_status::DiscardedVMStatus,
-    PeerId,
+    account_address::AccountAddress, decryption::Digest, transaction::{ReplayProtector, SignedTransaction}, validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId
 };
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
@@ -498,6 +494,13 @@ impl Payload {
         match self {
             Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.ct_ids(),
             _ => Vec::new(),
+        }
+    }
+
+    pub fn digest(&self) -> Option<Digest> {
+        match self {
+            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.digest(),
+            _ => None,
         }
     }
 

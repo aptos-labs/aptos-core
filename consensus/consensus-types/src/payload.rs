@@ -3,7 +3,7 @@
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use anyhow::ensure;
-use aptos_types::{decryption::{Ciphertext, DecryptionKey, EvalProofs, Id, Round}, transaction::SignedTransaction, PeerId};
+use aptos_types::{decryption::{Ciphertext, DecryptionKey, Digest, EvalProofs, Id, Round}, transaction::SignedTransaction, PeerId};
 use bcs;
 use core::fmt;
 use serde::{Deserialize, Serialize};
@@ -284,6 +284,7 @@ pub struct OptQuorumStorePayloadV1 {
     opt_batches: OptBatches,
     proofs: ProofBatches,
     execution_limits: PayloadExecutionLimit,
+    digest: Option<Digest>,
 }
 
 impl OptQuorumStorePayloadV1 {
@@ -293,6 +294,7 @@ impl OptQuorumStorePayloadV1 {
             opt_batches,
             proofs,
             execution_limits: _,
+            digest: _,
         } = self;
         inline_batches
             .0
@@ -339,12 +341,14 @@ impl OptQuorumStorePayload {
         opt_batches: OptBatches,
         proofs: ProofBatches,
         execution_limits: PayloadExecutionLimit,
+        digest: Option<Digest>,
     ) -> Self {
         Self::V1(OptQuorumStorePayloadV1 {
             inline_batches,
             opt_batches,
             proofs,
             execution_limits,
+            digest,
         })
     }
 
@@ -406,6 +410,12 @@ impl OptQuorumStorePayload {
                 }
                 ct_ids
             }
+        }
+    }
+
+    pub fn digest(&self) -> Option<Digest> {
+        match self {
+            OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload.digest.clone(),
         }
     }
 }
