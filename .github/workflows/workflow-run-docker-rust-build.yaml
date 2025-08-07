@@ -126,7 +126,7 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/verify-and-build-images-for-workflows # TODO: change back to main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
@@ -161,8 +161,7 @@ jobs:
           fi
 
       - name: Build and Push Rust images
-        # if: ${{ inputs.DRY_RUN == false }} TODO: re-enable this after testing
-        if: ${{ steps.check-images.outcome == 'failure' }}
+        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
