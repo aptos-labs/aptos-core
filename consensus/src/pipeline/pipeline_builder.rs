@@ -353,6 +353,7 @@ impl PipelineBuilder {
             post_commit_fut,
             maybe_compute_decryption_share_fut: None,
             maybe_compute_decryption_fut: None,
+            maybe_broadcast_fast_decryption_share_fut: None,
         }
     }
 
@@ -412,7 +413,7 @@ impl PipelineBuilder {
         // In validators, the pipelined_block here does not have decrypted txns so
         // they will decrypt them, but in fullnodes it has the decrypted txns from the
         // validator when receiving the ordered blocks.
-        let (maybe_compute_decryption_share_fut, maybe_compute_decryption_fut) = if pipelined_block.block().is_encrypted() && !pipelined_block.dec_txns_is_set() {
+        let (maybe_compute_decryption_share_fut, maybe_compute_decryption_fut, maybe_broadcast_fast_decryption_share_fut) = if pipelined_block.block().is_encrypted() && !pipelined_block.dec_txns_is_set() {
             assert!(self.dec_config.is_some());
             assert!(self.fast_dec_config.is_some());
             let author = self.signer.author();
@@ -433,7 +434,7 @@ impl PipelineBuilder {
                 Self::compute_eval_proofs(compute_digest_fut, digest_key, block.clone()),
                 Some(&mut abort_handles),
             );
-            let _ = spawn_shared_fut(
+            let broadcast_fast_decryption_share_fut = spawn_shared_fut(
                 Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
                 Some(&mut abort_handles),
             );
@@ -441,9 +442,9 @@ impl PipelineBuilder {
                 Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut, block.clone(), encryption_key.clone()),
                 Some(&mut abort_handles),
             );
-            (Some(compute_decryption_share_fut), Some(compute_decryption_fut))
+            (Some(compute_decryption_share_fut), Some(compute_decryption_fut), Some(broadcast_fast_decryption_share_fut))
         } else {
-            (None, None)
+            (None, None, None)
         };
 
         let verify_txn_sigs_fut = spawn_shared_fut(
@@ -556,6 +557,7 @@ impl PipelineBuilder {
             post_commit_fut,
             maybe_compute_decryption_share_fut,
             maybe_compute_decryption_fut,
+            maybe_broadcast_fast_decryption_share_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -1154,6 +1156,7 @@ impl PipelineBuilder {
             post_commit_fut: _,
             maybe_compute_decryption_share_fut,
             maybe_compute_decryption_fut,
+            maybe_broadcast_fast_decryption_share_fut,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;
@@ -1183,6 +1186,13 @@ impl PipelineBuilder {
             wait_and_log_error(
                 compute_decryption_fut,
                 format!("{epoch} {round} {block_id} decryption"),
+            )
+            .await;
+        }
+        if let Some(broadcast_fast_decryption_share_fut) = maybe_broadcast_fast_decryption_share_fut {
+            wait_and_log_error(
+                broadcast_fast_decryption_share_fut,
+                format!("{epoch} {round} {block_id} broadcast fast decryption share"),
             )
             .await;
         }

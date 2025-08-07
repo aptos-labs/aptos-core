@@ -410,7 +410,7 @@ impl DecManager {
                             }
                         }
                         DecMessage::DecShare(share) => {
-                            trace!(LogSchema::new(LogEvent::ReceiveProactiveDecShare)
+                            info!(LogSchema::new(LogEvent::ReceiveProactiveDecShare)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.metadata().round)
@@ -421,7 +421,7 @@ impl DecManager {
                             }
                         }
                         DecMessage::FastDecShare(share) => {
-                            trace!(LogSchema::new(LogEvent::ReceiveFastDecShare)
+                            info!(LogSchema::new(LogEvent::ReceiveFastDecShare)
                                 .author(self.author)
                                 .epoch(share.epoch())
                                 .round(share.round())

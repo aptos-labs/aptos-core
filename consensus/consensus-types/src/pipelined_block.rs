@@ -100,6 +100,7 @@ pub struct PipelineFutures {
     pub post_commit_fut: TaskFuture<PostCommitResult>,
     pub maybe_compute_decryption_share_fut: Option<TaskFuture<DecryptionShareResult>>,
     pub maybe_compute_decryption_fut: Option<TaskFuture<DecryptionResult>>,
+    pub maybe_broadcast_fast_decryption_share_fut: Option<TaskFuture<BroadcastDecryptionShareResult>>,
 }
 
 impl PipelineFutures {
