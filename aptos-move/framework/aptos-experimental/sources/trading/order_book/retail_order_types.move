@@ -1,12 +1,13 @@
 /// (work in progress)
-module aptos_experimental::order_book_types {
+module aptos_experimental::retail_order_types {
     use std::option;
     use std::option::Option;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
-    friend aptos_experimental::active_order_book;
-    friend aptos_experimental::order_book;
+    friend aptos_experimental::price_time_index;
+    friend aptos_experimental::retail_order_book;
     friend aptos_experimental::pending_order_book_index;
     friend aptos_experimental::market;
+    friend aptos_experimental::unified_order_book;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 

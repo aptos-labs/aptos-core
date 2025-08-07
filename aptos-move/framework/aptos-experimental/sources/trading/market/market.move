@@ -61,11 +61,14 @@ module aptos_experimental::market {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::unified_order_book::{UnifiedOrderBook, new_unified_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
         pre_cancel_order_for_tracker, is_pre_cancelled
     };
-    use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
-    use aptos_experimental::order_book_types::{
+    use aptos_experimental::retail_order_book::{RetailOrderBook,
+        new_retail_order_book, new_order_request, new_price_time_index};
+    use aptos_experimental::price_time_index::PriceTimeIndex;
+    use aptos_experimental::retail_order_types::{
         new_order_id_type,
         new_ascending_id_generator,
         AscendingIdGenerator,
@@ -107,7 +110,7 @@ module aptos_experimental::market {
             // Incremental fill id for matched orders
             next_fill_id: u64,
             config: MarketConfig,
-            order_book: OrderBook<M>,
+            order_book: UnifiedOrderBook<M>,
             /// Pre cancellation tracker for the market, it is wrapped inside a table
             /// as otherwise any insertion/deletion from the tracker would cause conflict
             /// with the order book.
@@ -244,7 +247,7 @@ module aptos_experimental::market {
             order_id_generator: new_ascending_id_generator(),
             next_fill_id: 0,
             config,
-            order_book: new_order_book(),
+            order_book: new_unified_order_book(),
             pre_cancellation_tracker,
         }
     }
@@ -253,13 +256,13 @@ module aptos_experimental::market {
         self.market
     }
 
-    public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
+    public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &UnifiedOrderBook<M> {
         &self.order_book
     }
 
     public fun get_order_book_mut<M: store + copy + drop>(
         self: &mut Market<M>
-    ): &mut OrderBook<M> {
+    ): &mut UnifiedOrderBook<M> {
         &mut self.order_book
     }
 
@@ -1077,7 +1080,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
-        let order = self.order_book.cancel_order(account, order_id);
+        let order = self.order_book.cancel_order( account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
         self.cancel_order_helper(order, callbacks);
     }
@@ -1240,7 +1243,7 @@ module aptos_experimental::market {
         let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _ } = config;
         destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
         pre_cancellation_tracker.drop_unchecked();
-        order_book.destroy_order_book()
+        order_book.destroy_unified_order_book()
     }
 
     #[test_only]

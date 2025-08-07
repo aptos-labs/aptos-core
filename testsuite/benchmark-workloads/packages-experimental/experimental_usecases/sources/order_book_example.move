@@ -5,8 +5,13 @@ module 0xABCD::order_book_example {
     use std::vector;
     use std::table::{Self, Table};
 
+<<<<<<< HEAD
     use aptos_experimental::order_book::{Self, OrderBook};
     use aptos_experimental::order_book_types::{Self, OrderIdType, good_till_cancelled};
+=======
+    use aptos_experimental::retail_order_book::{Self, RetailOrderBook};
+    use aptos_experimental::retail_order_types::{Self, OrderIdType};
+>>>>>>> a3611a7b11 ([Orderbook] Create a unified orderbook to route orders to retail and bulk orderbook)
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist
@@ -15,7 +20,7 @@ module 0xABCD::order_book_example {
     struct Empty has store, copy, drop {}
 
     struct Dex has key {
-        order_books: Table<u32, OrderBook<Empty>>,
+        order_books: Table<u32, RetailOrderBook<Empty>>,
     }
 
     // Create the global `Dex`.
@@ -28,7 +33,7 @@ module 0xABCD::order_book_example {
 
         let order_books = table::new();
         for (i in 0..10) {
-            order_books.add(i, order_book::new_order_book());
+            order_books.add(i, retail_order_book::new_retail_order_book());
         };
 
         move_to(
@@ -38,12 +43,12 @@ module 0xABCD::order_book_example {
     }
 
 
-    inline fun borrow_order_book_mut(market_id: u32): &mut OrderBook<Empty> acquires Dex {
+    inline fun borrow_order_book_mut(market_id: u32): &mut RetailOrderBook<Empty> acquires Dex {
         assert!(exists<Dex>(@publisher_address), error::invalid_argument(EDEX_RESOURCE_NOT_PRESENT));
         let dex = borrow_global_mut<Dex>(@publisher_address);
 
         if (!dex.order_books.contains(market_id)) {
-            let order_book = order_book::new_order_book();
+            let order_book = retail_order_book::new_retail_order_book();
             dex.order_books.add(market_id, order_book);
         };
 
@@ -55,7 +60,7 @@ module 0xABCD::order_book_example {
         place_order_and_get_matches(
             order_book,
             sender, // account
-            order_book_types::new_order_id_type(order_id as u128),
+            retail_order_types::new_order_id_type(order_id as u128),
             bid_price,
             volume,
             volume,
@@ -65,25 +70,25 @@ module 0xABCD::order_book_example {
 
     public entry fun cancel_order(market_id: u32, order_id: u64) acquires Dex {
         let order_book = borrow_order_book_mut(market_id);
-        order_book.cancel_order(@publisher_address, order_book_types::new_order_id_type(order_id as u128));
+        order_book.cancel_order(@publisher_address, retail_order_types::new_order_id_type(order_id as u128));
     }
 
     // Copied from order_book, as it's test_only and not part of public API there.
     fun place_order_and_get_matches(
-        order_book: &mut OrderBook<Empty>,
+        order_book: &mut RetailOrderBook<Empty>,
         account: address,
         order_id: OrderIdType,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
-    ): vector<order_book_types::SingleOrderMatch<Empty>> {
+    ): vector<retail_order_types::SingleOrderMatch<Empty>> {
         let trigger_condition = option::none();
         let match_results = vector::empty();
         while (remaining_size > 0) {
             if (!order_book.is_taker_order(price, is_bid, trigger_condition)) {
                 order_book.place_maker_order(
-                    order_book::new_order_request(
+                    retail_order_book::new_order_request(
                         account,
                         order_id,
                         option::none(),

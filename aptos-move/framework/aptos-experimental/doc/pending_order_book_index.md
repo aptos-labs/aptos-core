@@ -18,7 +18,7 @@
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/doc/timestamp.md#0x1_timestamp">0x1::timestamp</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
+<b>use</b> <a href="retail_order_types.md#0x7_retail_order_types">0x7::retail_order_types</a>;
 </code></pre>
 
 
@@ -46,7 +46,7 @@
 
 </dd>
 <dt>
-<code>tie_breaker: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+<code>tie_breaker: <a href="retail_order_types.md#0x7_retail_order_types_UniqueIdxType">retail_order_types::UniqueIdxType</a></code>
 </dt>
 <dd>
 
@@ -81,19 +81,19 @@
 
 <dl>
 <dt>
-<code>price_move_down_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderKey">pending_order_book_index::PendingOrderKey</a>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;</code>
+<code>price_move_down_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderKey">pending_order_book_index::PendingOrderKey</a>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>price_move_up_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderKey">pending_order_book_index::PendingOrderKey</a>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;</code>
+<code>price_move_up_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderKey">pending_order_book_index::PendingOrderKey</a>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>time_based_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;u64, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;</code>
+<code>time_based_index: <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;u64, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>&gt;</code>
 </dt>
 <dd>
 
@@ -141,7 +141,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_cancel_pending_order">cancel_pending_order</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, trigger_condition: <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_cancel_pending_order">cancel_pending_order</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, trigger_condition: <a href="retail_order_types.md#0x7_retail_order_types_TriggerCondition">retail_order_types::TriggerCondition</a>, unique_priority_idx: <a href="retail_order_types.md#0x7_retail_order_types_UniqueIdxType">retail_order_types::UniqueIdxType</a>)
 </code></pre>
 
 
@@ -189,7 +189,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_place_pending_maker_order">place_pending_maker_order</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, trigger_condition: <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_place_pending_maker_order">place_pending_maker_order</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, trigger_condition: <a href="retail_order_types.md#0x7_retail_order_types_TriggerCondition">retail_order_types::TriggerCondition</a>, unique_priority_idx: <a href="retail_order_types.md#0x7_retail_order_types_UniqueIdxType">retail_order_types::UniqueIdxType</a>)
 </code></pre>
 
 
@@ -239,7 +239,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_based_orders">take_ready_price_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, current_price: u64, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_ready_price_based_orders">take_ready_price_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, current_price: u64, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>&gt;
 </code></pre>
 
 
@@ -284,7 +284,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_time_time_based_orders">take_time_time_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_take_time_time_based_orders">take_time_time_based_orders</a>(self: &<b>mut</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index_PendingOrderBookIndex">pending_order_book_index::PendingOrderBookIndex</a>, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>&gt;
 </code></pre>
 
 
