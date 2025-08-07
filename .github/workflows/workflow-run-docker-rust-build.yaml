@@ -165,6 +165,7 @@ jobs:
       
       - name: Lock Check and Creation
         id: lock
+        if: ${{ steps.check-images.outcome == 'failure' }} #&& inputs.DRY_RUN == false }} TODO: revert
         run: |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
