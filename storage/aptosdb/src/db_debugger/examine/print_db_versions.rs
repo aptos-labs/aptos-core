@@ -74,12 +74,70 @@ impl Cmd {
         );
 
         println!(
+            "-- Event: {:?}",
+            ledger_db
+                .event_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::EventPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
+            "-- PersistedAuxiliaryInfo: {:?}",
+            ledger_db
+                .persisted_auxiliary_info_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::PersistedAuxiliaryInfoPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
+            "-- Transaction: {:?}",
+            ledger_db
+                .transaction_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::TransactionPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
+            "-- TransactionAccumulator: {:?}",
+            ledger_db
+                .transaction_accumulator_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::TransactionAccumulatorPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
+            "-- TransactionInfo: {:?}",
+            ledger_db
+                .transaction_info_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::TransactionInfoPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
+            "-- WriteSet: {:?}",
+            ledger_db
+                .write_set_db_raw()
+                .get::<DbMetadataSchema>(&DbMetadataKey::WriteSetPrunerProgress)?
+                .map(|v| v.expect_version())
+        );
+
+        println!(
             "StateKvPruner Progress: {:?}",
             state_kv_db
                 .metadata_db()
                 .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
                 .map_or(0, |v| v.expect_version())
         );
+
+        for shard_id in 0..16 {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                state_kv_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(&DbMetadataKey::StateKvShardPrunerProgress(shard_id))?
+                    .map(|v| v.expect_version())
+            );
+        }
 
         println!(
             "StateMerklePruner Progress: {:?}",
@@ -89,6 +147,18 @@ impl Cmd {
                 .map_or(0, |v| v.expect_version())
         );
 
+        for shard_id in 0..16 {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                state_merkle_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(&DbMetadataKey::StateMerkleShardPrunerProgress(
+                        shard_id
+                    ))?
+                    .map(|v| v.expect_version())
+            );
+        }
+
         println!(
             "EpochEndingStateMerkle Pruner Progress: {:?}",
             state_merkle_db
@@ -96,6 +166,18 @@ impl Cmd {
                 .get::<DbMetadataSchema>(&DbMetadataKey::EpochEndingStateMerklePrunerProgress)?
                 .map_or(0, |v| v.expect_version())
         );
+
+        for shard_id in 0..16 {
+            println!(
+                "-- Shard {shard_id}: {:?}",
+                state_merkle_db
+                    .db_shard(shard_id)
+                    .get::<DbMetadataSchema>(
+                        &DbMetadataKey::EpochEndingStateMerkleShardPrunerProgress(shard_id)
+                    )?
+                    .map(|v| v.expect_version())
+            );
+        }
 
         println!(
             "Current ledger info: {:?}",
