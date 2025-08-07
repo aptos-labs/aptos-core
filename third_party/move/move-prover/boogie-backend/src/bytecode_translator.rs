@@ -595,13 +595,12 @@ impl<'env> BoogieTranslator<'env> {
                 .map(|pos| format!("fun->p{}", pos))
                 .chain((0..params.len()).map(|pos| format!("p{}", pos)))
                 .join(", ");
-            emitln!(
-                self.writer,
-                "call {} := {}({});",
-                result_str,
-                fun_name,
-                args
-            );
+            let call_prefix = if result_str.is_empty() {
+                String::new()
+            } else {
+                format!("{result_str} := ")
+            };
+            emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
             self.writer.unindent();
             emitln!(self.writer, "} else ");
         }
@@ -2149,7 +2148,12 @@ impl FunctionTranslator<'_> {
                             )
                             .join(",");
                         let apply_fun = boogie_fun_apply_name(env, &fun_type);
-                        emitln!(writer, "call {} := {}({});", dest_str, apply_fun, args_str);
+                        let call_prefix = if dest_str.is_empty() {
+                            String::new()
+                        } else {
+                            format!("{dest_str} := ")
+                        };
+                        emitln!(writer, "call {}{}({});", call_prefix, apply_fun, args_str);
                     },
                     Pack(mid, sid, inst) => {
                         let inst = &self.inst_slice(inst);
