@@ -33,7 +33,7 @@ pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
 pub type Author = AccountAddress;
 
 pub const PROTOTYPE_SETUP_SEED: u64 = 233;
-pub const PROTOTYPE_BATCH_SIZE: usize = 128;
+pub const PROTOTYPE_BATCH_SIZE: usize = 256;
 pub const PROTOTYPE_NUMBER_OF_ROUNDS: usize = 1;
 pub const PROTOTYPE_NUMBER_OF_VALIDATORS: usize = 4;
 pub const PROTOTYPE_THRESHOLD_FAST_PATH: usize = 3;
