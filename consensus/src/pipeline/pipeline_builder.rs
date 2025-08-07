@@ -632,6 +632,8 @@ impl PipelineBuilder {
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
         let non_encrypted_txns = input_txns.as_ref().clone().into_iter().filter(|t| !t.is_encrypted()).collect::<Vec<_>>();
 
+        // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
+
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = non_encrypted_txns.len();
             non_encrypted_txns
@@ -641,15 +643,17 @@ impl PipelineBuilder {
                 .collect::<Vec<_>>()
         });
 
-        // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
-        let mut all_sig_verified_txns = Vec::new();
-        for txn in input_txns.as_ref() {
-            if txn.is_encrypted() {
-                all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
-            } else {
-                all_sig_verified_txns.push(sig_verified_txns.remove(0));
-            }
-        }
+        // // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
+        // let mut all_sig_verified_txns = Vec::new();
+        // for txn in input_txns.as_ref() {
+        //     if txn.is_encrypted() {
+        //         all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
+        //     } else {
+        //         all_sig_verified_txns.push(sig_verified_txns.remove(0));
+        //     }
+        // }
+
+        let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
 
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
