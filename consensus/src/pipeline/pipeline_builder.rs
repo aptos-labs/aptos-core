@@ -628,19 +628,30 @@ impl PipelineBuilder {
         tracker.start_working();
 
         let sig_verification_start = Instant::now();
-        // daniel todo: skip verifying encrypted txns for now
-        let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
+
         let non_encrypted_txns = input_txns.as_ref().clone().into_iter().filter(|t| !t.is_encrypted()).collect::<Vec<_>>();
+
+        let num_encrypted_txns = input_txns.as_ref().iter().filter(|t| t.is_encrypted()).count();
+        if num_encrypted_txns != decrypted_txns.as_ref().len() {
+            info!(
+                "[error] num_encrypted_txns {} != decrypted_txns {}",
+                num_encrypted_txns,
+                decrypted_txns.as_ref().len()
+            );
+        }
 
         // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
         if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
             info!(
-                "non_encrypted_txns {} + decrypted_txns {} != input_txns {}",
+                "[error] non_encrypted_txns {} + decrypted_txns {} != input_txns {}",
                 non_encrypted_txns.len(),
                 decrypted_txns.as_ref().len(),
                 input_txns.as_ref().len()
             );
         }
+
+        // daniel todo: skip verifying encrypted txns for now
+        let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = non_encrypted_txns.len();
@@ -680,6 +691,7 @@ impl PipelineBuilder {
 
         // daniel todo: skip decryption when digest is inconsistent
         let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
+        assert!(digest == block.digest().unwrap());
 
         Ok((digest, proofs_promise))
     }
