@@ -127,6 +127,7 @@ async fn test_subscribe_transactions_or_outputs_different_network() {
                     0,
                     Some(peer_network_1),
                     use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
                 )
                 .await;
 
@@ -142,6 +143,7 @@ async fn test_subscribe_transactions_or_outputs_different_network() {
                     0,
                     Some(peer_network_2),
                     use_request_v2,
+                    storage_config.max_network_chunk_bytes_v2,
                 )
                 .await;
 
@@ -226,6 +228,7 @@ async fn test_subscribe_transactions_or_outputs_disable_v2() {
         0,
         0,
         true, // Use transaction v2
+        0,
     )
     .await;
 
@@ -318,6 +321,7 @@ async fn test_subscribe_transactions_or_outputs_epoch_change() {
                 utils::get_random_u64(),
                 0,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -436,6 +440,7 @@ async fn test_subscribe_transactions_or_outputs_max_chunk() {
                 utils::get_random_u64(),
                 0,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -589,6 +594,7 @@ async fn test_subscribe_transaction_or_outputs_streaming() {
                     peer_version,
                     highest_epoch,
                     use_request_v2,
+                    storage_service_config.max_network_chunk_bytes_v2,
                 )
                 .await;
 
@@ -758,6 +764,7 @@ async fn test_subscribe_transactions_or_outputs_streaming_epoch_change() {
                 peer_version,
                 peer_epoch,
                 use_request_v2,
+                storage_service_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -924,6 +931,7 @@ async fn test_subscribe_transaction_or_outputs_streaming_loop() {
                 peer_version,
                 highest_epoch,
                 use_request_v2,
+                storage_service_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -993,6 +1001,7 @@ async fn send_transaction_or_output_subscription_request_batch(
     peer_version: u64,
     peer_epoch: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> HashMap<u64, Receiver<Result<Bytes, RpcError>>> {
     // Shuffle the stream request indices to emulate out of order requests
     let stream_request_indices =
@@ -1012,6 +1021,7 @@ async fn send_transaction_or_output_subscription_request_batch(
             stream_request_index,
             Some(peer_network_id),
             use_request_v2,
+            max_response_bytes_v2,
         )
         .await;
 

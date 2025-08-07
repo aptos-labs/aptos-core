@@ -777,6 +777,7 @@ async fn test_subscription_max_pending_requests() {
             peer_version,
             highest_epoch,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -800,6 +801,7 @@ async fn test_subscription_max_pending_requests() {
                 stream_request_index,
                 Some(peer_network_id),
                 use_request_v2,
+                storage_service_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -852,6 +854,7 @@ async fn test_subscription_max_pending_requests() {
             peer_version,
             highest_epoch,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -877,6 +880,7 @@ async fn test_subscription_max_pending_requests() {
                 stream_request_index,
                 Some(peer_network_id),
                 use_request_v2,
+                storage_service_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -967,6 +971,7 @@ async fn test_subscription_overwrite_streams() {
             peer_version,
             highest_epoch,
             use_request_v2,
+            storage_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -1011,6 +1016,7 @@ async fn test_subscription_overwrite_streams() {
             0,
             Some(peer_network_id),
             use_request_v2,
+            storage_config.max_network_chunk_bytes_v2,
         )
         .await;
 

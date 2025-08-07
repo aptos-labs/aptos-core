@@ -70,7 +70,7 @@ use rayon::ThreadPool;
 use scopeguard::defer;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -320,6 +320,7 @@ where
     }
 
     fn execute_v2(
+        worker_id: u32,
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         signature_verified_block: &TP,
@@ -441,7 +442,24 @@ where
             resource_write_set,
         );
 
-        scheduler.finish_execution(abort_manager)?;
+        // It is important to call finish_execution after recording the input/output.
+        if let Some(module_validation_requirements) = scheduler.finish_execution(abort_manager)? {
+            Self::module_validation_v2(
+                idx_to_execute,
+                incarnation,
+                scheduler,
+                &module_validation_requirements,
+                last_input_output,
+                global_module_cache,
+                versioned_cache,
+            )?;
+            scheduler.finish_cold_validation_requirement(
+                worker_id,
+                idx_to_execute,
+                incarnation,
+                true,
+            )?;
+        }
         Ok(())
     }
 
@@ -609,6 +627,62 @@ where
         Ok(needs_suffix_validation)
     }
 
+    fn module_validation_v2(
+        idx_to_validate: TxnIndex,
+        incarnation_to_validate: Incarnation,
+        scheduler: &SchedulerV2,
+        updated_module_keys: &BTreeSet<ModuleId>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    ) -> Result<bool, PanicError> {
+        // The previous read-set must be recorded because:
+        // 1. The transaction has finished at least one execution in order for it
+        // to be eligible for module validation (status must have been executed).
+        // 2. The only possible time to take the read-set from txn_last_input_output
+        // is in prepare_and_queue_commit_ready_txn (applying module publishing output).
+        // However, required module validation necessarily occurs before the commit.
+        let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+            code_invariant_error(format!(
+                "Prior read-set of txn {} incarnation {} not recorded for module verification",
+                idx_to_validate, incarnation_to_validate
+            ))
+        })?;
+        // Perform invariant checks or return early based on read set's incarnation.
+        let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
+            code_invariant_error(
+                "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
+            )
+        })?;
+        if blockstm_v2_incarnation < incarnation_to_validate {
+            return Err(code_invariant_error(format!(
+                "For txn_idx {}, read set incarnation {} < incarnation to validate {}",
+                idx_to_validate, blockstm_v2_incarnation, incarnation_to_validate
+            )));
+        }
+        if blockstm_v2_incarnation > incarnation_to_validate {
+            // No need to validate as a newer incarnation has already been executed
+            // and recorded its output.
+            return Ok(true);
+        }
+
+        if !read_set.validate_module_reads(
+            global_module_cache,
+            versioned_cache.module_cache(),
+            Some(updated_module_keys),
+        ) {
+            scheduler.direct_abort(idx_to_validate, incarnation_to_validate, false)?;
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -641,8 +715,11 @@ where
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
             && (skip_module_reads_validation
-                || read_set
-                    .validate_module_reads(global_module_cache, versioned_cache.module_cache()))
+                || read_set.validate_module_reads(
+                    global_module_cache,
+                    versioned_cache.module_cache(),
+                    None,
+                ))
     }
 
     fn update_transaction_on_abort(
@@ -757,7 +834,7 @@ where
     /// overhead. On the other hand, materialization that happens after commit (& after this method)
     /// is concurrent and deals with logic such as patching delayed fields / resource groups
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
-    /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
+    /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flat-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
     /// TODO(BlockSTMv2): Change the signature to use shared_sync_params.
     #[allow(clippy::too_many_arguments)]
@@ -796,6 +873,7 @@ where
         )? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
+            counters::SPECULATIVE_ABORT_COUNT.inc();
 
             let parallel_state = ParallelState::new(
                 versioned_cache,
@@ -825,9 +903,10 @@ where
                         parallel_state,
                     )?;
                 },
-                Some(scheduler) => {
-                    scheduler.direct_abort(txn_idx, incarnation, false)?;
+                Some((scheduler, worker_id)) => {
+                    scheduler.direct_abort(txn_idx, incarnation, true)?;
                     Self::execute_v2(
+                        worker_id,
                         txn_idx,
                         incarnation + 1,
                         block,
@@ -860,10 +939,18 @@ where
         }
 
         let module_write_set = last_input_output.module_write_set(txn_idx);
+        let mut module_ids_for_v2 = BTreeSet::new();
         // Publish modules before we decrease validation index (in V1) so that validations observe
         // the new module writes as well.
         if !module_write_set.is_empty() {
             side_effect_at_commit = true;
+
+            if scheduler.is_v2() {
+                module_ids_for_v2 = module_write_set
+                    .iter()
+                    .map(|write| write.module_id().clone())
+                    .collect();
+            }
 
             Self::publish_module_writes(
                 txn_idx,
@@ -873,7 +960,8 @@ where
                 runtime_environment,
             )?;
 
-            scheduler.set_module_read_validation();
+            // Record validation requirements after the modules are published.
+            scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
 
         if side_effect_at_commit {
@@ -1444,8 +1532,7 @@ where
         &self,
         block: &TP,
         environment: &AptosEnvironment,
-        // TODO: use worker id.
-        _worker_id: u32,
+        worker_id: u32,
         num_workers: u32,
         shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
         start_delayed_field_id_counter: u32,
@@ -1467,7 +1554,7 @@ where
         let versioned_cache = shared_sync_params.versioned_cache;
         let global_module_cache = shared_sync_params.global_module_cache;
         let delayed_field_id_counter = shared_sync_params.delayed_field_id_counter;
-        let scheduler_wrapper = SchedulerWrapper::V2(scheduler);
+        let scheduler_wrapper = SchedulerWrapper::V2(scheduler, worker_id);
 
         loop {
             while scheduler.commit_hooks_try_lock() {
@@ -1496,8 +1583,8 @@ where
                 scheduler.commit_hooks_unlock();
             }
 
-            // TODO(BlockSTMv2): pass worker_id to next_task.
-            match scheduler.next_task()? {
+            let next_task = scheduler.next_task(worker_id);
+            match next_task? {
                 TaskKind::Execute(txn_idx, incarnation) => {
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
@@ -1508,6 +1595,7 @@ where
                     }
 
                     Self::execute_v2(
+                        worker_id,
                         txn_idx,
                         incarnation,
                         block,
@@ -1545,6 +1633,23 @@ where
                 },
                 TaskKind::NextTask => {
                     // TODO: Anything intelligent to do here?.
+                },
+                TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
+                    Self::module_validation_v2(
+                        txn_idx,
+                        incarnation,
+                        scheduler,
+                        modules_to_validate,
+                        last_input_output,
+                        global_module_cache,
+                        versioned_cache,
+                    )?;
+                    scheduler.finish_cold_validation_requirement(
+                        worker_id,
+                        txn_idx,
+                        incarnation,
+                        false, // Was not deferred (obtained as a task).
+                    )?;
                 },
                 TaskKind::Done => {
                     break;

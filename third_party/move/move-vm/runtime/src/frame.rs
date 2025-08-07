@@ -5,9 +5,11 @@ use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
     loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
+    module_traversal::TraversalContext,
     reentrancy_checker::CallType,
     runtime_type_checks::RuntimeTypeCheck,
-    LoadedFunction, ModuleStorage,
+    storage::loader::traits::FunctionDefinitionLoader,
+    LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -65,7 +67,9 @@ macro_rules! build_loaded_function {
     ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
         pub(crate) fn $function_name(
             &self,
-            module_storage: &impl ModuleStorage,
+            loader: &impl FunctionDefinitionLoader,
+            gas_meter: &mut impl GasMeter,
+            traversal_context: &mut TraversalContext,
             idx: $idx_ty,
             verified_ty_args: Vec<Type>,
         ) -> PartialVMResult<LoadedFunction> {
@@ -82,7 +86,9 @@ macro_rules! build_loaded_function {
                         },
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
-                                module_storage,
+                                loader,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
@@ -98,7 +104,9 @@ macro_rules! build_loaded_function {
                         .with_message("Scripts never have local functions".to_string())),
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
-                                module_storage,
+                                loader,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
@@ -484,22 +492,16 @@ impl Frame {
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
-        module_storage: &impl ModuleStorage,
+        loader: &impl FunctionDefinitionLoader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,
     ) -> PartialVMResult<LoadedFunction> {
-        let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|_| {
-                // Note: legacy loader implementation used this error, so we need to remap.
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Module or function do not exist for {}::{}::{}",
-                    module_id.address(),
-                    module_id.name(),
-                    function_name
-                ))
-            })?;
+        let (module, function) = loader
+            .load_function_definition(gas_meter, traversal_context, module_id, function_name)
+            .map_err(|err| err.to_partial())?;
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,

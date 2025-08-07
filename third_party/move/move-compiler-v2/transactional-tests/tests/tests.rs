@@ -158,7 +158,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
 }
 
 fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let p = path.to_str().unwrap_or_default();
     let exp_suffix = if SEPARATE_BASELINE.iter().any(|s| p.contains(s)) {
         Some(format!("{}.exp", config.name))

@@ -196,7 +196,6 @@ members = [
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
-    "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
@@ -289,7 +288,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.80.1"
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crate dependencies.
