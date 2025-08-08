@@ -493,6 +493,23 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_auxiliary_data_iterator(
+        &self,
+        start_version: Version,
+        limit: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_>> {
+        gauged_api("get_auxiliary_data_iterator", || {
+            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+            self.error_if_ledger_pruned("Transaction", start_version)?;
+
+            let iter = self
+                .ledger_db
+                .transaction_auxiliary_data_db()
+                .get_transaction_auxiliary_data_iter(start_version, limit as usize)?;
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_>)
+        })
+    }
+
     fn get_transaction_accumulator_range_proof(
         &self,
         first_version: Version,
@@ -514,6 +531,28 @@ impl DbReader for AptosDB {
             self.ledger_db
                 .metadata_db()
                 .get_epoch_ending_ledger_info(version)
+        })
+    }
+
+    fn get_epoch_ending_ledger_info_iterator(
+        &self,
+        start_epoch: u64,
+        end_epoch: u64,
+    ) -> Result<Box<dyn Iterator<Item = Result<LedgerInfoWithSignatures>> + '_>> {
+        gauged_api("get_epoch_ending_ledger_info_iterator", || {
+            self.check_epoch_ending_ledger_infos_request(start_epoch, end_epoch)?;
+            let limit = std::cmp::min(
+                end_epoch - start_epoch,
+                MAX_NUM_EPOCH_ENDING_LEDGER_INFO as u64
+            );
+            let end_epoch = start_epoch + limit;
+
+            let iter = self
+                .ledger_db
+                .metadata_db()
+                .get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?;
+
+            Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<LedgerInfoWithSignatures>> + '_>)
         })
     }
 
@@ -803,6 +842,34 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_chunk_iter(
+        &self,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
+        gauged_api("get_state_value_chunk_iter", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            let state_value_chunk_iter = self
+                .state_store
+                .get_value_chunk_iter(version, first_index, chunk_size)?;
+            Ok(Box::new(state_value_chunk_iter) as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+        })
+    }
+
+    fn get_state_value_chunk_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        state_key_values: Vec<(StateKey, StateValue)>,
+    ) -> Result<StateValueChunkWithProof> {
+        gauged_api("get_state_value_chunk_proof", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            self.state_store
+                .get_value_chunk_proof(version, first_index, state_key_values)
+        })
+    }
+
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
         gauged_api("is_state_merkle_pruner_enabled", || {
             Ok(self
@@ -886,12 +953,11 @@ impl AptosDB {
         )
     }
 
-    fn get_epoch_ending_ledger_infos_impl(
+    fn check_epoch_ending_ledger_infos_request(
         &self,
         start_epoch: u64,
         end_epoch: u64,
-        limit: usize,
-    ) -> Result<(Vec<LedgerInfoWithSignatures>, bool)> {
+    ) -> Result<()> {
         ensure!(
             start_epoch <= end_epoch,
             "Bad epoch range [{}, {})",
@@ -913,6 +979,16 @@ impl AptosDB {
             end_epoch,
             latest_epoch - 1,  // okay to -1 because genesis LedgerInfo has .next_block_epoch() == 1
         );
+        Ok(())
+    }
+
+    fn get_epoch_ending_ledger_infos_impl(
+        &self,
+        start_epoch: u64,
+        end_epoch: u64,
+        limit: usize,
+    ) -> Result<(Vec<LedgerInfoWithSignatures>, bool)> {
+        self.check_epoch_ending_ledger_infos_request(start_epoch, end_epoch)?;
 
         let (paging_epoch, more) = if end_epoch - start_epoch > limit as u64 {
             (start_epoch + limit as u64, true)
