@@ -2,7 +2,7 @@ module aptos_experimental::market_types {
     use std::option::Option;
     use std::string::String;
 
-    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce};
+    use aptos_experimental::retail_order_types::{OrderIdType, TimeInForce};
 
     friend aptos_experimental::market;
 

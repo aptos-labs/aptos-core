@@ -7,7 +7,7 @@ module aptos_experimental::clearinghouse_test {
     use std::vector;
     use aptos_std::table;
     use aptos_std::table::Table;
-    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::retail_order_types::OrderIdType;
     use aptos_experimental::market_types::{
         SettleTradeResult,
         new_settle_trade_result,

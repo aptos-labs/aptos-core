@@ -9,7 +9,7 @@ module aptos_experimental::pre_cancellation_tracker {
     use std::signer;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
-    use aptos_experimental::order_book_types::{
+    use aptos_experimental::retail_order_types::{
         AccountClientOrderId,
         new_account_client_order_id
     };

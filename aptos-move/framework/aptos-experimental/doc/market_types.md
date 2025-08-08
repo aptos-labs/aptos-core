@@ -29,7 +29,7 @@
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
+<b>use</b> <a href="retail_order_types.md#0x7_retail_order_types">0x7::retail_order_types</a>;
 </code></pre>
 
 
@@ -207,31 +207,35 @@
 
 <dl>
 <dt>
-<code>settle_trade_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop</code>
+<code>settle_trade_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, <b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
  settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
 </dd>
 <dt>
+<<<<<<< HEAD
 <code>validate_order_placement_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, bool, u64, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, u64, M)|bool <b>has</b> <b>copy</b> + drop</code>
+=======
+<code>validate_order_placement_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, bool, u64, <a href="market_types.md#0x7_market_types_TimeInForce">market_types::TimeInForce</a>, u64, M)|bool <b>has</b> <b>copy</b> + drop</code>
+>>>>>>> a3611a7b11 ([Orderbook] Create a unified orderbook to route orders to retail and bulk orderbook)
 </dt>
 <dd>
  validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
 </dd>
 <dt>
-<code>place_maker_order_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop</code>
+<code>place_maker_order_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
  place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
 </dd>
 <dt>
-<code>cleanup_order_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64)| <b>has</b> <b>copy</b> + drop</code>
+<code>cleanup_order_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64)| <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
  cleanup_order_f arguments: account, order_id, is_bid, remaining_size
 </dd>
 <dt>
-<code>decrease_order_size_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64, u64)| <b>has</b> <b>copy</b> + drop</code>
+<code>decrease_order_size_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64, u64)| <b>has</b> <b>copy</b> + drop</code>
 </dt>
 <dd>
  decrease_order_size_f arguments: account, order_id, is_bid, price, size
@@ -441,7 +445,11 @@
 
 
 
+<<<<<<< HEAD
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, bool, u64, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, bool, u64, u64)| <b>has</b> <b>copy</b> + drop, get_order_metadata_bytes: |M|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
+=======
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_new_market_clearinghouse_callbacks">new_market_clearinghouse_callbacks</a>&lt;M: <b>copy</b>, drop, store&gt;(settle_trade_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, <b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, u64, bool, u64, u64, M, M)|<a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a> <b>has</b> <b>copy</b> + drop, validate_order_placement_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, bool, u64, <a href="market_types.md#0x7_market_types_TimeInForce">market_types::TimeInForce</a>, u64, M)|bool <b>has</b> <b>copy</b> + drop, place_maker_order_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64, u64, M)| <b>has</b> <b>copy</b> + drop, cleanup_order_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64)| <b>has</b> <b>copy</b> + drop, decrease_order_size_f: |(<b>address</b>, <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, bool, u64, u64)| <b>has</b> <b>copy</b> + drop, get_order_metadata_bytes: |M|<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>has</b> <b>copy</b> + drop): <a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;
+>>>>>>> a3611a7b11 ([Orderbook] Create a unified orderbook to route orders to retail and bulk orderbook)
 </code></pre>
 
 
@@ -557,7 +565,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_settle_trade">settle_trade</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, taker: <b>address</b>, taker_order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, maker: <b>address</b>, maker_order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, fill_id: u64, is_taker_long: bool, price: u64, size: u64, taker_metadata: M, maker_metadata: M): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_settle_trade">settle_trade</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, taker: <b>address</b>, taker_order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, maker: <b>address</b>, maker_order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, fill_id: u64, is_taker_long: bool, price: u64, size: u64, taker_metadata: M, maker_metadata: M): <a href="market_types.md#0x7_market_types_SettleTradeResult">market_types::SettleTradeResult</a>
 </code></pre>
 
 
@@ -592,7 +600,11 @@
 
 
 
+<<<<<<< HEAD
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_validate_order_placement">validate_order_placement</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, is_taker: bool, is_bid: bool, price: u64, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, size: u64, order_metadata: M): bool
+=======
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_validate_order_placement">validate_order_placement</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, is_taker: bool, is_bid: bool, price: u64, time_in_force: <a href="market_types.md#0x7_market_types_TimeInForce">market_types::TimeInForce</a>, size: u64, order_metadata: M): bool
+>>>>>>> a3611a7b11 ([Orderbook] Create a unified orderbook to route orders to retail and bulk orderbook)
 </code></pre>
 
 
@@ -625,7 +637,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, is_bid: bool, price: u64, size: u64, order_metadata: M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, is_bid: bool, price: u64, size: u64, order_metadata: M)
 </code></pre>
 
 
@@ -656,7 +668,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_cleanup_order">cleanup_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, is_bid: bool, remaining_size: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_cleanup_order">cleanup_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, is_bid: bool, remaining_size: u64)
 </code></pre>
 
 
@@ -685,7 +697,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, is_bid: bool, price: u64, size: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_decrease_order_size">decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="retail_order_types.md#0x7_retail_order_types_OrderIdType">retail_order_types::OrderIdType</a>, is_bid: bool, price: u64, size: u64)
 </code></pre>
 
 

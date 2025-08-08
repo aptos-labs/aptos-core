@@ -2,7 +2,7 @@
 module aptos_experimental::pre_cancellation_tests {
     use std::option;
     use aptos_framework::timestamp;
-    use aptos_experimental::order_book_types::good_till_cancelled;
+    use aptos_experimental::retail_order_types::good_till_cancelled;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
