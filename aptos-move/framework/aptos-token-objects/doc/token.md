@@ -1470,7 +1470,7 @@ Extracts the tokens address from a BurnRef.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="token.md#0x4_token_borrow">borrow</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: &Object&lt;T&gt;): &<a href="token.md#0x4_token_Token">Token</a> <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code>inline <b>fun</b> <a href="token.md#0x4_token_borrow">borrow</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: &Object&lt;T&gt;): &<a href="token.md#0x4_token_Token">Token</a> {
     <b>let</b> token_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="token.md#0x4_token">token</a>);
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(token_address),
@@ -1723,7 +1723,7 @@ as that would prohibit transactions to be executed in parallel.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="token.md#0x4_token_borrow_mut">borrow_mut</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>): &<b>mut</b> <a href="token.md#0x4_token_Token">Token</a> <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+<pre><code>inline <b>fun</b> <a href="token.md#0x4_token_borrow_mut">borrow_mut</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>): &<b>mut</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(mutator_ref.self),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x4_token_ETOKEN_DOES_NOT_EXIST">ETOKEN_DOES_NOT_EXIST</a>),
