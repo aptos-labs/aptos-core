@@ -507,6 +507,7 @@ impl BlockStore {
                 })?,
                 callback,
             );
+            observe_block(pipelined_block.timestamp_usecs(), BlockStage::PIPELINE_INSERTED);
         }
 
         // ensure local time past the block time

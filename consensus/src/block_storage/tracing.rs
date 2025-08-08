@@ -15,6 +15,7 @@ impl BlockStage {
     pub const EPOCH_MANAGER_VERIFIED: &'static str = "epoch_manager_verified";
     pub const EXECUTED: &'static str = "executed";
     pub const EXECUTION_PIPELINE_INSERTED: &'static str = "execution_pipeline_inserted";
+    pub const PIPELINE_INSERTED: &'static str = "pipeline_inserted";
     pub const NETWORK_RECEIVED: &'static str = "network_received";
     pub const OC_ADDED: &'static str = "ordered_cert_created";
     pub const ORDERED: &'static str = "ordered";
@@ -25,6 +26,8 @@ impl BlockStage {
     pub const DEC_ADD_DECISION: &'static str = "dec_add_decision";
     pub const RAND_ADD_ENOUGH_SHARE_FAST: &'static str = "rand_add_enough_share_fast";
     pub const RAND_ADD_ENOUGH_SHARE_SLOW: &'static str = "rand_add_enough_share_slow";
+    pub const DEC_ADD_ENOUGH_SHARE_FAST: &'static str = "dec_add_enough_share_fast";
+    pub const DEC_ADD_ENOUGH_SHARE_SLOW: &'static str = "dec_add_enough_share_slow";
     pub const RAND_ENTER: &'static str = "rand_enter";
     pub const RAND_READY: &'static str = "rand_ready";
     pub const DEC_READY: &'static str = "dec_ready";

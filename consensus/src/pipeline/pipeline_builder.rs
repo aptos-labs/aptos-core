@@ -17,14 +17,10 @@ use anyhow::anyhow;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block,
-    common::{Round, Author},
+    common::{Author, Round},
     pipeline::commit_vote::CommitVote,
 pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
-        NotifyStateSyncResult, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
-        PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, TaskError,
-        TaskFuture, TaskResult, DigestResult, DecryptionShareResult, EvalProofsResult,
-        BroadcastDecryptionShareResult, DecryptionResult, VerifyTxnSigsResult,
+        BroadcastDecryptionShareResult, CommitLedgerResult, CommitVoteResult, DecryptionResult, DecryptionShareResult, DigestResult, DummyResult, EvalProofsResult, ExecuteResult, LedgerUpdateResult, NotifyStateSyncResult, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult, VerifyTxnSigsResult
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -347,6 +343,7 @@ impl PipelineBuilder {
         let compute_decryption_fut = spawn_ready_fut(None);
         let broadcast_fast_decryption_share_fut = spawn_ready_fut(());
         let verify_txn_sigs_fut = spawn_ready_fut((Arc::new(vec![]), None));
+        let dummy_fut = spawn_ready_fut(());
         PipelineFutures {
             prepare_fut,
             verify_txn_sigs_fut,
@@ -363,6 +360,7 @@ impl PipelineBuilder {
             compute_decryption_share_fut,
             broadcast_fast_decryption_share_fut,
             compute_decryption_fut,
+            dummy_fut,
         }
     }
 
@@ -444,6 +442,11 @@ impl PipelineBuilder {
         );
         let compute_decryption_fut = spawn_shared_fut(
             Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut.clone(), block.clone(), encryption_key.clone()),
+            Some(&mut abort_handles),
+        );
+        // for measure the ordering time
+        let dummy_fut = spawn_shared_fut(
+            Self::dummy_task(order_proof_fut.clone(), block.clone()),
             Some(&mut abort_handles),
         );
 
@@ -560,6 +563,7 @@ impl PipelineBuilder {
             broadcast_fast_decryption_share_fut,
             compute_eval_proofs_fut,
             compute_decryption_fut,
+            dummy_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -693,9 +697,9 @@ impl PipelineBuilder {
     /// What it does: Compute the digest of the encrypted payload
     async fn compute_digest(prepare_fut: TaskFuture<PrepareResult>, block: Arc<Block>, digest_key: DigestKey) -> TaskResult<DigestResult> {
         let mut tracker = Tracker::start_waiting("compute_digest", &block);
-        tracker.start_working();
-
         let (input_txns, _) = prepare_fut.await?;
+
+        tracker.start_working();
 
         // daniel todo: hack before having a large setup
         let encryption_round = 0;
@@ -741,9 +745,10 @@ impl PipelineBuilder {
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the decryption aux info for the block
     async fn compute_eval_proofs(digest_fut: TaskFuture<DigestResult>, digest_key: DigestKey, block: Arc<Block>) -> TaskResult<EvalProofsResult> {
+        let mut tracker = Tracker::start_waiting("compute_eval_proofs", &block);
+
         let digest_result = digest_fut.await?;
 
-        let mut tracker = Tracker::start_waiting("compute_eval_proofs", &block);
         tracker.start_working();
 
         if let Some((_, proofs_promise)) = digest_result {
@@ -770,6 +775,16 @@ impl PipelineBuilder {
             );
             network.broadcast_fast_decryption_share(fast_dec_share).await;
         }
+        Ok(())
+    }
+
+    async fn dummy_task(
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+        block: Arc<Block>,
+    ) -> TaskResult<DummyResult> {
+        let mut tracker = Tracker::start_waiting("dummy_task", &block);
+        let _ = order_proof_fut.await?;
+        tracker.start_working();
         Ok(())
     }
 
@@ -1231,6 +1246,7 @@ impl PipelineBuilder {
             broadcast_fast_decryption_share_fut,
             compute_eval_proofs_fut,
             compute_decryption_fut,
+            dummy_fut,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(verify_txn_sigs_fut, format!("{epoch} {round} {block_id} verify txn sigs")).await;
@@ -1273,6 +1289,11 @@ impl PipelineBuilder {
         wait_and_log_error(
             compute_decryption_fut,
             format!("{epoch} {round} {block_id} compute decryption"),
+        )
+        .await;
+        wait_and_log_error(
+            dummy_fut,
+            format!("{epoch} {round} {block_id} dummy task"),
         )
         .await;
     }

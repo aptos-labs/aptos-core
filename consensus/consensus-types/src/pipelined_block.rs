@@ -80,6 +80,7 @@ pub type PreCommitResult = StateComputeResult;
 pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
+pub type DummyResult = ();
 
 pub type DigestResult = Option<(Digest, EvalProofsPromise)>;
 pub type DecryptionShareResult = Option<(DecShare, FastDecShare)>;
@@ -104,6 +105,7 @@ pub struct PipelineFutures {
     pub broadcast_fast_decryption_share_fut: TaskFuture<BroadcastDecryptionShareResult>,
     pub compute_eval_proofs_fut: TaskFuture<EvalProofsResult>,
     pub compute_decryption_fut: TaskFuture<DecryptionResult>,
+    pub dummy_fut: TaskFuture<DummyResult>,
 }
 
 impl PipelineFutures {

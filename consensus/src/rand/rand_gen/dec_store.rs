@@ -51,13 +51,13 @@ impl DecShareAggregator {
             PathType::Fast => {
                 observe_block(
                     metadata.timestamp,
-                    BlockStage::RAND_ADD_ENOUGH_SHARE_FAST,
+                    BlockStage::DEC_ADD_ENOUGH_SHARE_FAST,
                 );
             },
             PathType::Slow => {
                 observe_block(
                     metadata.timestamp,
-                    BlockStage::RAND_ADD_ENOUGH_SHARE_SLOW,
+                    BlockStage::DEC_ADD_ENOUGH_SHARE_SLOW,
                 );
             },
         }
