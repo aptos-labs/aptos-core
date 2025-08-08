@@ -25,7 +25,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
@@ -321,6 +321,12 @@ impl RuntimeEnvironment {
     /// changed.
     pub fn flush_verified_module_cache() {
         VERIFIED_MODULES_CACHE.flush();
+    }
+
+    /// Logs the size of the verified module cache.
+    pub fn log_verified_cache_size() {
+        let size = VERIFIED_MODULES_CACHE.size();
+        VERIFIED_MODULE_CACHE_SIZE.set(size as i64);
     }
 
     /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.

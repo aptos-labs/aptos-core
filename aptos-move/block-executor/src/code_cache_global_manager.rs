@@ -123,6 +123,7 @@ where
 
         let environment = self.environment.as_ref().expect("Environment must be set");
         let runtime_environment = environment.runtime_environment();
+        RuntimeEnvironment::log_verified_cache_size();
 
         let struct_name_index_map_size = runtime_environment
             .struct_name_index_map_size()

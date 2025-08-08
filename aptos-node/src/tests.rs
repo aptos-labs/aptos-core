@@ -114,3 +114,26 @@ fn test_create_single_node_test_config() {
             .bootstrapping_mode
     );
 }
+
+#[test]
+fn test_verifier_cache_enabled_for_aptos_node() {
+    use std::process::{Command, Stdio};
+    // Run the shell command `cargo tree -p aptos-node -e features`
+    let output = Command::new("cargo")
+        .arg("tree")
+        .arg("-p")
+        .arg("aptos-node")
+        .arg("-e")
+        .arg("features")
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute `cargo tree -p aptos-node -e features`");
+    let output = String::from_utf8_lossy(&output.stdout);
+
+    let feature = "disable_verifier_cache";
+    assert!(
+        !output.contains(feature),
+        "Feature `{}` should not be enabled for aptos-node",
+        feature
+    );
+}
