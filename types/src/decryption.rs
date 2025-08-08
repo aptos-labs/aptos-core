@@ -95,8 +95,10 @@ impl DecShare {
         config: &DecConfig,
         pool: &rayon::ThreadPool
     ) -> anyhow::Result<DecryptionKey> {
+        let threshold = config.threshold();
         let shares: Vec<DecryptionKeyShare> = dec_shares
             .map(|dec_share| dec_share.share.clone())
+            .take(threshold as usize)
             .collect();
         let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config, pool)?;
         Ok(decryption_key)
