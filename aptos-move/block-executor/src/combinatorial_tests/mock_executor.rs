@@ -201,7 +201,10 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
     ) -> Result<&mut Self, ExecutionStatus<MockOutput<K, E>, usize>> {
         for module_id in module_ids {
             let metadata = try_with_status!(
-                view.get_module_state_value_metadata(module_id.address(), module_id.name()),
+                view.unmetered_get_module_state_value_metadata(
+                    module_id.address(),
+                    module_id.name()
+                ),
                 "Failed to fetch module metadata"
             );
             self.output.module_read_results.push(metadata);

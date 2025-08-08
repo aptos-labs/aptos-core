@@ -123,6 +123,7 @@ where
 
         let environment = self.environment.as_ref().expect("Environment must be set");
         let runtime_environment = environment.runtime_environment();
+        RuntimeEnvironment::log_verified_cache_size();
 
         let struct_name_index_map_size = runtime_environment
             .struct_name_index_map_size()
@@ -299,17 +300,20 @@ fn prefetch_aptos_framework(
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
+    // INVARIANT:
+    //   If framework code exists in storage, the transitive closure will be verified and cached to
+    //   avoid cold starts. From metering perspective, all modules are at special addresses, so we
+    //   do not need to meter anything.
     cfg_if! {
         if #[cfg(fuzzing)] {
-            let maybe_loaded = code_storage.fetch_module_skip_verification(
-                &AccountAddress::ONE,
-                ident_str!("transaction_validation"),
-            ).map_err(|err| {
-                PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-            })?;
+            let maybe_loaded = code_storage
+                .unmetered_get_module_skip_verification(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .map_err(|err| {
+                    PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+                })?;
         } else {
             let maybe_loaded = code_storage
-                .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .unmetered_get_eagerly_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
                 .map_err(|err| {
                     PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
                 })?;

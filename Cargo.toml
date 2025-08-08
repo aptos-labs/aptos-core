@@ -196,7 +196,6 @@ members = [
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
-    "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",

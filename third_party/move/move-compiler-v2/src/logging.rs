@@ -44,51 +44,76 @@
 //! if DEBUG { debug!(..) }
 //! ```
 
+use colored::Colorize;
 use flexi_logger::{DeferredNow, FileSpec, LogSpecification, Logger};
-use log::Record;
+use log::{Level, LevelFilter, Record};
 use std::env;
 
 const MVC_LOG_VAR: &str = "MVC_LOG";
 
 /// Configures logging for applications.
-pub fn setup_logging() {
+pub fn setup_logging(level: Option<LevelFilter>) {
     // Currently no different to testing
-    setup_logging_for_testing()
+    setup_logging_for_testing(level)
 }
 
 /// Configures logging for testing. Can be called multiple times.
-pub fn setup_logging_for_testing() {
-    if let Some(logger) = configure_logger() {
+pub fn setup_logging_for_testing(level: Option<LevelFilter>) {
+    if let Some(logger) = configure_logger(level) {
         // Will produce error if a logger is already installed, which we ignore. Its either this same logger
         // already installed, or some outer code overriding the logger.
         let _ = logger.start();
     }
 }
 
-fn configure_logger() -> Option<Logger> {
-    let var = env::var(MVC_LOG_VAR).ok()?;
-    let mut parts = var.rsplitn(2, '@').collect::<Vec<_>>();
-    parts.reverse();
-    let spec = if parts[0].trim().is_empty() {
-        // Show everything
-        LogSpecification::trace()
+#[allow(clippy::unnecessary_unwrap)]
+fn configure_logger(level: Option<LevelFilter>) -> Option<Logger> {
+    let var = env::var(MVC_LOG_VAR);
+    let (spec, fname) = if var.is_err() && level.is_some() {
+        (
+            match level.unwrap() {
+                LevelFilter::Error => LogSpecification::error(),
+                LevelFilter::Warn => LogSpecification::warn(),
+                LevelFilter::Info => LogSpecification::info(),
+                LevelFilter::Debug => LogSpecification::debug(),
+                LevelFilter::Trace => LogSpecification::trace(),
+                LevelFilter::Off => LogSpecification::off(),
+            },
+            None,
+        )
     } else {
-        LogSpecification::parse(parts[0]).expect("log spec")
-    };
-    let mut logger = Logger::with(spec).format(format_record);
-    if parts.len() > 1 {
-        let fname = if !parts[1].contains('/') {
-            // Flex logger somehow does not like relative file names, help them.
-            format!("./{}", parts[1])
+        let var = var.ok()?;
+        let mut parts = var.rsplitn(2, '@').collect::<Vec<_>>();
+        parts.reverse();
+        let spec = if parts[0].trim().is_empty() {
+            // Show everything
+            LogSpecification::trace()
         } else {
-            parts[1].to_string()
+            LogSpecification::parse(parts[0]).expect("log spec")
         };
-        logger = logger.log_to_file(FileSpec::try_from(fname).expect("file name"))
-    }
-    Some(logger)
+        if parts.len() > 1 {
+            if !parts[1].contains('/') {
+                // Flex logger somehow does not like relative file names, help them.
+                (spec, Some(format!("./{}", parts[1])))
+            } else {
+                (spec, Some(parts[1].to_string()))
+            }
+        } else {
+            (spec, None)
+        }
+    };
+    Some(
+        if let Some(fname) = fname {
+            Logger::with(spec)
+                .format(format_record_file)
+                .log_to_file(FileSpec::try_from(fname).expect("file name"))
+        } else {
+            Logger::with(spec).format(format_record_colored)
+        },
+    )
 }
 
-fn format_record(
+fn format_record_file(
     w: &mut dyn std::io::Write,
     _now: &mut DeferredNow,
     record: &Record,
@@ -100,4 +125,19 @@ fn format_record(
         record.module_path().unwrap_or_default(),
         &record.args()
     )
+}
+
+fn format_record_colored(
+    w: &mut dyn std::io::Write,
+    _now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let level_color = match record.level() {
+        Level::Error => "ERROR".red().bold(),
+        Level::Warn => "WARN".yellow().bold(),
+        Level::Info => "INFO".green().bold(),
+        Level::Debug => "DEBUG".cyan().bold(),
+        Level::Trace => "TRACE".normal(),
+    };
+    write!(w, "[{}] {}", level_color, &record.args())
 }

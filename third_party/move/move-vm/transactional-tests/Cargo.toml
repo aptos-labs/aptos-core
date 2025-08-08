@@ -13,7 +13,7 @@ libtest-mimic = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-model = { workspace = true }
 move-transactional-test-runner = { workspace = true }
-move-vm-runtime = { workspace = true }
+move-vm-runtime = { workspace = true, features = ["disable_verifier_cache"] }
 once_cell = { workspace = true }
 walkdir = { workspace = true }
 

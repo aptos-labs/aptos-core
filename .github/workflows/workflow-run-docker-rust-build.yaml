@@ -30,21 +30,6 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      WAIT_FOR_RELEASE_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the release default images to be available
-        default: false
-      WAIT_FOR_PERF_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the performance images to be available
-        default: false
-      WAIT_FOR_FAILPOINTS_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the failpoints images to be available
-        default: false
       DRY_RUN: 
         required: false
         type: boolean
@@ -76,21 +61,6 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
-      WAIT_FOR_RELEASE_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the release default images to be available
-        default: false
-      WAIT_FOR_PERF_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the performance images to be available
-        default: false
-      WAIT_FOR_FAILPOINTS_IMAGES:
-        required: false
-        type: boolean
-        description: If true, wait for the failpoints images to be available
-        default: false
       DRY_RUN: 
         required: false
         type: boolean
@@ -107,6 +77,9 @@ env:
   GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
   TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
   GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
+  RELEASE_DEFAULT: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
+  PERF: ${{ inputs.PROFILE == 'performance' }}
+  FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
 
 permissions:
   contents: read
@@ -152,9 +125,9 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
-          RELEASE_DEFAULT: ${{ inputs.WAIT_FOR_RELEASE_IMAGES }}
-          PERF: ${{ inputs.WAIT_FOR_PERF_IMAGES }}
-          FAILPOINTS: ${{ inputs.WAIT_FOR_FAILPOINTS_IMAGES }}
+          RELEASE_DEFAULT: ${{ env.RELEASE_DEFAULT }}
+          PERF: ${{ env.PERF }}
+          FAILPOINTS: ${{ env.FAILPOINTS }}
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -172,9 +145,9 @@ jobs:
           result=$?
           set -e
           if [ $result -eq 0 ]; then
-            echo "Lock file exists: Current workflow building: "
-            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
-            echo "Rerun again when the image is finished building"
+            echo "Lock file exists: Current workflow building: " >> $GITHUB_STEP_SUMMARY
+            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt >> $GITHUB_STEP_SUMMARY
+            echo "Rerun again when the image is finished building" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "Lock file does not exist"
@@ -201,7 +174,7 @@ jobs:
           fi
       
       - name: Post-run Lock Cleanup 
-        if: ${{ always() && steps.lock.outcome == 'success' }}
+        if: ${{ always() }}
         run: | 
           gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
           echo "Docker Build unlocked"

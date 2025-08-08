@@ -79,6 +79,7 @@ async fn test_subscribe_transaction_outputs_different_networks() {
                 0,
                 Some(peer_network_1),
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -92,6 +93,7 @@ async fn test_subscribe_transaction_outputs_different_networks() {
                 0,
                 Some(peer_network_2),
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -150,6 +152,7 @@ async fn test_subscribe_transaction_outputs_disable_v2() {
         0,
         0,
         true, // Use transaction v2
+        0,
     )
     .await;
 
@@ -218,6 +221,7 @@ async fn test_subscribe_transaction_outputs_epoch_change() {
             utils::get_random_u64(),
             0,
             use_request_v2,
+            storage_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -296,6 +300,7 @@ async fn test_subscribe_transaction_outputs_max_chunk() {
             utils::get_random_u64(),
             0,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -398,6 +403,7 @@ async fn test_subscribe_transaction_outputs_streaming() {
                 peer_version,
                 highest_epoch,
                 use_request_v2,
+                storage_service_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -531,6 +537,7 @@ async fn test_subscribe_transaction_outputs_streaming_epoch_change() {
             peer_version,
             peer_epoch,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -645,6 +652,7 @@ async fn test_subscribe_transaction_outputs_streaming_loop() {
             peer_version,
             highest_epoch,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 

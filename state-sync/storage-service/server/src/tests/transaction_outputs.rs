@@ -11,6 +11,7 @@ use aptos_storage_service_types::{
 use aptos_types::transaction::TransactionOutputListWithProofV2;
 use claims::assert_matches;
 use mockall::{predicate::eq, Sequence};
+use std::cmp::min;
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
@@ -58,6 +59,7 @@ async fn test_get_transaction_outputs_with_proof() {
                 end_version,
                 true,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await
             .unwrap();
@@ -113,6 +115,7 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
             end_version,
             true,
             use_request_v2,
+            storage_config.max_network_chunk_bytes_v2,
         )
         .await
         .unwrap();
@@ -141,6 +144,7 @@ async fn test_get_transaction_outputs_with_proof_disable_v2() {
         10,
         true,
         true, // Use transaction v2
+        storage_config.max_network_chunk_bytes_v2,
     )
     .await
     .unwrap();
@@ -167,6 +171,7 @@ async fn test_get_transaction_outputs_with_proof_invalid() {
                 end_version,
                 true,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await
             .unwrap_err();
@@ -179,9 +184,48 @@ async fn test_get_transaction_outputs_with_proof_invalid() {
 async fn test_get_transaction_outputs_with_proof_network_limit() {
     // Test both v1 and v2 data requests
     for use_request_v2 in [false, true] {
+        // Test different byte limits (the client and server limits match)
+        for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+            get_outputs_with_proof_network_limit(
+                max_specified_bytes,
+                max_specified_bytes,
+                use_request_v2,
+            )
+            .await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_network_limit_client_bounded() {
+    // Test both v1 and v2 data requests
+    for use_request_v2 in [false, true] {
         // Test different byte limits
-        for network_limit_bytes in [1, 5 * 1024, 50 * 1024] {
-            get_outputs_with_proof_network_limit(network_limit_bytes, use_request_v2).await;
+        for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+            let max_server_specified_bytes = max_specified_bytes * 10; // The server limit is 10x the client limit
+            get_outputs_with_proof_network_limit(
+                max_specified_bytes,
+                max_server_specified_bytes,
+                use_request_v2,
+            )
+            .await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof_network_limit_server_bounded() {
+    // Test both v1 and v2 data requests
+    for use_request_v2 in [false, true] {
+        // Test different byte limits
+        for max_specified_bytes in [1, 5 * 1024, 50 * 1024] {
+            let max_client_specified_bytes = max_specified_bytes * 10; // The client limit is 10x the server limit
+            get_outputs_with_proof_network_limit(
+                max_client_specified_bytes,
+                max_specified_bytes,
+                use_request_v2,
+            )
+            .await;
         }
     }
 }
@@ -216,6 +260,7 @@ async fn test_get_transaction_outputs_with_proof_not_serviceable() {
                 end_version,
                 true,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await
             .unwrap_err();
@@ -234,13 +279,14 @@ async fn get_outputs_with_proof(
     proof_version: u64,
     use_compression: bool,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = if use_request_v2 {
         DataRequest::get_transaction_output_data_with_proof(
             proof_version,
             start_version,
             end_version,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
@@ -253,8 +299,12 @@ async fn get_outputs_with_proof(
 }
 
 /// A helper method to request a transaction outputs with proof chunk using
-/// the specified network limit.
-async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_request_v2: bool) {
+/// the specified network limits (client and server).
+async fn get_outputs_with_proof_network_limit(
+    max_client_specified_bytes: u64,
+    max_server_specified_bytes: u64,
+    use_request_v2: bool,
+) {
     for use_compression in [true, false] {
         // Create test data
         let max_output_chunk_size =
@@ -287,7 +337,8 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
 
         // Create a storage config with the specified max network byte limit
         let storage_config = StorageServiceConfig {
-            max_network_chunk_bytes: network_limit_bytes,
+            max_network_chunk_bytes: max_server_specified_bytes,
+            max_network_chunk_bytes_v2: max_server_specified_bytes,
             enable_transaction_data_v2: use_request_v2,
             ..Default::default()
         };
@@ -306,6 +357,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
             proof_version,
             use_compression,
             use_request_v2,
+            max_client_specified_bytes,
         )
         .await
         .unwrap();
@@ -324,11 +376,19 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64, use_requ
             },
             _ => panic!("Expected outputs with proof but got: {:?}", response),
         };
-        if num_response_bytes > network_limit_bytes {
+        if num_response_bytes > max_server_specified_bytes {
             assert_eq!(num_outputs, 1); // Data cannot be reduced more than a single item
         } else {
-            let max_outputs = network_limit_bytes / min_bytes_per_output;
-            assert!(num_outputs <= max_outputs); // Verify data fits correctly into the limit
+            // Determine the max specified bytes
+            let max_specified_bytes = if use_request_v2 {
+                min(max_client_specified_bytes, max_server_specified_bytes)
+            } else {
+                max_server_specified_bytes
+            };
+
+            // Verify the number of outputs fits within the specified byte limit
+            let max_outputs = max_specified_bytes / min_bytes_per_output;
+            assert!(num_outputs <= max_outputs);
         }
     }
 }

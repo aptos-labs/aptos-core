@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }

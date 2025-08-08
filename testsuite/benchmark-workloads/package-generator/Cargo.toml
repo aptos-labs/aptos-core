@@ -14,8 +14,5 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-framework = { workspace = true }
-aptos-transaction-workloads-lib = { workspace = true }
-bcs = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
 clap = { workspace = true }
-move-package = { workspace = true }

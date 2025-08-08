@@ -28,6 +28,7 @@ alias mvp=cargo run -p move-prover -- --config=<my_config.toml>
 The file at the path to `<my_config.toml>` should contain (at least) the following content:
 
 ```toml
+language_version = "2.2"  # Or any other options
 move_deps = [
   "/Users/<you>/aptos-core/third_party/move/move-stdlib/sources"
 ]
@@ -37,13 +38,13 @@ move_named_address_values = [
 ]
 ```
 
-The prover dumps debug information to the `debug!` channel of the `log` crate. In order to see it and save it to a file, use e.g.
+The prover dumps debug information to the `debug!` channel of the `log` crate. It shares the logging configuration with the Move compiler as described [here](../../move-compiler-v2/src/logging.rs). One uses the MVC_LOG environment variable to configure the logging. E.g., `MVC_LOG=debug` sends active debug prints to stderr, and `MVC_LOG=debug@my.log` to the given file. While the env var controls the level of logging, `mvp` (above alias) still need to be told to create `debug!` via the verbose flag. The below command line shows how to let `mvp` dump stackless bytecode of all prover phases except compiler; this is useful for targeted debugging of the prover:
 
 ```shell
-mvp --verbose debug --dump-bytecode enum_invariants.move 2>&1 1>prover.log
+MVC_LOG="move_compiler_v2=info,debug@prover.log" \
+  mvp --verbose debug --dump-bytecode enum_invariants.move 
 ```
 
-This will dump the stackless bytecode of the steps in the transformation pipeline to `prover.log`.
 
 ## Running Tests: Quick Guide
 

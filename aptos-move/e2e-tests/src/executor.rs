@@ -75,7 +75,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -83,10 +82,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1079,13 +1075,17 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-        iterations: u64,
+        num_measured_iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> Measurement {
+        // First few runs will not be recorded: this ensures modules used for execution are cached.
+        const NUM_WARM_UP_RUNS: u64 = 1;
+
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
-            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
+            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..num_measured_iterations
+                + NUM_WARM_UP_RUNS)
                 .map(|_| *self.new_account_at(AccountAddress::random()).address())
                 .collect::<Vec<_>>(),
             _ => vec![],
@@ -1094,28 +1094,16 @@ impl FakeExecutor {
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
-
-        // Create module storage, and ensure the module for the function we want to execute is
-        // cached.
         let module_storage = self.state_store.as_aptos_code_storage(&env);
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
-        // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
         let mut measurements = Vec::new();
-        while i < iterations {
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
-            // load function name into cache to ensure cache is hot
-            let _ = module_storage.load_function(
-                module,
-                &Self::name(function_name),
-                &type_params.clone(),
-            );
+        while i < num_measured_iterations + NUM_WARM_UP_RUNS {
+            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
-            let ty = type_params.clone();
             let mut arg = args.clone();
             match &dynamic_args {
                 ExecFuncTimerDynamicArgs::DistinctSigners => {
@@ -1156,25 +1144,26 @@ impl FakeExecutor {
             };
 
             let start = Instant::now();
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
             // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
             let result = match gas_meter_type {
                 GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
                     module,
                     &fun_name,
-                    ty,
+                    type_params.clone(),
                     arg,
                     regular.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
+                    &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
                     &fun_name,
-                    ty,
+                    type_params.clone(),
                     arg,
                     unmetered.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
+                    &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
                 ),
             };
@@ -1187,15 +1176,18 @@ impl FakeExecutor {
                     );
                 }
             }
-            measurements.push(Measurement {
-                elapsed,
-                execution_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
-                io_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
-            });
+
+            if i > NUM_WARM_UP_RUNS {
+                measurements.push(Measurement {
+                    elapsed,
+                    execution_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                    io_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+                });
+            }
             i += 1;
         }
 

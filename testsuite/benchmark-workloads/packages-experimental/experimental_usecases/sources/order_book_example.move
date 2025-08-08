@@ -6,7 +6,7 @@ module 0xABCD::order_book_example {
     use std::table::{Self, Table};
 
     use aptos_experimental::order_book::{Self, OrderBook};
-    use aptos_experimental::order_book_types::{Self, OrderIdType};
+    use aptos_experimental::order_book_types::{Self, OrderIdType, good_till_cancelled};
 
     const ENOT_AUTHORIZED: u64 = 1;
     // Resource being modified doesn't exist
@@ -92,6 +92,7 @@ module 0xABCD::order_book_example {
                         remaining_size,
                         is_bid,
                         trigger_condition, // trigger_condition
+                        good_till_cancelled(),
                         Empty {}, // metadata
                     )
                 );

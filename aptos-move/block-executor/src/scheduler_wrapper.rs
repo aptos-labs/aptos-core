@@ -7,7 +7,11 @@ use crate::{
 };
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::PanicError;
-use std::sync::atomic::{AtomicBool, Ordering};
+use move_core_types::language_storage::ModuleId;
+use std::{
+    collections::BTreeSet,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 #[derive(Copy, Clone)]
 pub(crate) enum SchedulerWrapper<'a> {
@@ -18,19 +22,21 @@ pub(crate) enum SchedulerWrapper<'a> {
     // stored in SchedulerWrapper only for a write (it's never read), to simplify
     // the implementation in executor.rs and avoid passing atomic booleans.
     V1(&'a Scheduler, &'a AtomicBool),
-    V2(&'a SchedulerV2),
+    // For V2, the usize is the worker ID which is obtained from the scheduler
+    // while committing a txn.
+    V2(&'a SchedulerV2, u32),
 }
 
 impl SchedulerWrapper<'_> {
-    pub(crate) fn as_v2(&self) -> Option<&SchedulerV2> {
+    pub(crate) fn as_v2(&self) -> Option<(&SchedulerV2, u32)> {
         match self {
             SchedulerWrapper::V1(_, _) => None,
-            SchedulerWrapper::V2(scheduler) => Some(scheduler),
+            SchedulerWrapper::V2(scheduler, worker_id) => Some((scheduler, *worker_id)),
         }
     }
 
     pub(crate) fn is_v2(&self) -> bool {
-        matches!(self, SchedulerWrapper::V2(_))
+        matches!(self, SchedulerWrapper::V2(_, _))
     }
 
     pub(crate) fn wake_dependencies_and_decrease_validation_idx(
@@ -41,14 +47,14 @@ impl SchedulerWrapper<'_> {
             SchedulerWrapper::V1(scheduler, _) => {
                 scheduler.wake_dependencies_and_decrease_validation_idx(txn_idx)
             },
-            SchedulerWrapper::V2(_) => Ok(()),
+            SchedulerWrapper::V2(_, _) => Ok(()),
         }
     }
 
     pub(crate) fn halt(&self) -> bool {
         match self {
             SchedulerWrapper::V1(scheduler, _) => scheduler.halt(),
-            SchedulerWrapper::V2(scheduler) => scheduler.halt(),
+            SchedulerWrapper::V2(scheduler, _) => scheduler.halt(),
         }
     }
 
@@ -58,26 +64,35 @@ impl SchedulerWrapper<'_> {
                 scheduler.add_to_commit_queue(txn_idx);
                 Ok(())
             },
-            SchedulerWrapper::V2(scheduler) => scheduler.end_commit(txn_idx),
+            SchedulerWrapper::V2(scheduler, _) => scheduler.end_commit(txn_idx),
         }
     }
 
-    pub(crate) fn set_module_read_validation(&self) {
+    pub(crate) fn record_validation_requirements(
+        &self,
+        txn_idx: TxnIndex,
+        module_ids: BTreeSet<ModuleId>,
+    ) -> Result<(), PanicError> {
         match self {
             SchedulerWrapper::V1(_, skip_module_reads_validation) => {
                 // Relaxed suffices as syncronization (reducing validation index) occurs after
                 // setting the module read validation flag.
                 skip_module_reads_validation.store(false, Ordering::Relaxed);
             },
-            SchedulerWrapper::V2(_) => {},
+            SchedulerWrapper::V2(scheduler, worker_id) => {
+                scheduler.record_validation_requirements(*worker_id, txn_idx, module_ids)?;
+            },
         }
+        Ok(())
     }
 
     #[inline]
     pub(crate) fn interrupt_requested(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> bool {
         match self {
             SchedulerWrapper::V1(scheduler, _) => scheduler.has_halted(),
-            SchedulerWrapper::V2(scheduler) => scheduler.is_halted_or_aborted(txn_idx, incarnation),
+            SchedulerWrapper::V2(scheduler, _) => {
+                scheduler.is_halted_or_aborted(txn_idx, incarnation)
+            },
         }
     }
 }
@@ -92,7 +107,7 @@ impl TWaitForDependency for SchedulerWrapper<'_> {
             SchedulerWrapper::V1(scheduler, _) => {
                 scheduler.wait_for_dependency(txn_idx, dep_txn_idx)
             },
-            SchedulerWrapper::V2(_) => {
+            SchedulerWrapper::V2(_, _) => {
                 unreachable!("SchedulerV2 does not use TWaitForDependency trait")
             },
         }

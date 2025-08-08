@@ -395,6 +395,7 @@ pub fn configure_network_chunk_limit(
     StorageServiceConfig {
         max_network_chunk_bytes,
         enable_transaction_data_v2,
+        max_network_chunk_bytes_v2: max_network_chunk_bytes, // Use the same limit for v2
         ..Default::default()
     }
 }
@@ -586,6 +587,7 @@ pub async fn get_transactions_with_proof(
     include_events: bool,
     use_compression: bool,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = if use_request_v2 {
         DataRequest::get_transaction_data_with_proof(
@@ -593,7 +595,7 @@ pub async fn get_transactions_with_proof(
             start_version,
             end_version,
             include_events,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
@@ -625,6 +627,7 @@ pub async fn send_output_subscription_request_batch(
     peer_version: u64,
     peer_epoch: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> HashMap<u64, Receiver<Result<Bytes, RpcError>>> {
     // Shuffle the stream request indices to emulate out of order requests
     let stream_request_indices =
@@ -642,6 +645,7 @@ pub async fn send_output_subscription_request_batch(
             stream_request_index,
             Some(peer_network_id),
             use_request_v2,
+            max_response_bytes_v2,
         )
         .await;
 
@@ -672,6 +676,7 @@ pub async fn subscribe_to_transactions_or_outputs(
     stream_id: u64,
     stream_index: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     subscribe_to_transactions_or_outputs_for_peer(
         mock_client,
@@ -683,6 +688,7 @@ pub async fn subscribe_to_transactions_or_outputs(
         stream_index,
         None,
         use_request_v2,
+        max_response_bytes_v2,
     )
     .await
 }
@@ -698,6 +704,7 @@ pub async fn subscribe_to_transactions_or_outputs_for_peer(
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -710,7 +717,7 @@ pub async fn subscribe_to_transactions_or_outputs_for_peer(
             subscription_stream_metadata,
             subscription_stream_index,
             include_events,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::SubscribeTransactionsOrOutputsWithProof(
@@ -739,6 +746,7 @@ pub async fn subscribe_to_transaction_outputs(
     stream_id: u64,
     stream_index: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<Bytes, RpcError>> {
     subscribe_to_transaction_outputs_for_peer(
         mock_client,
@@ -748,6 +756,7 @@ pub async fn subscribe_to_transaction_outputs(
         stream_index,
         None,
         use_request_v2,
+        max_response_bytes_v2,
     )
     .await
 }
@@ -761,6 +770,7 @@ pub async fn subscribe_to_transaction_outputs_for_peer(
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -772,7 +782,7 @@ pub async fn subscribe_to_transaction_outputs_for_peer(
         DataRequest::subscribe_transaction_output_data_with_proof(
             subscription_stream_metadata,
             subscription_stream_index,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::SubscribeTransactionOutputsWithProof(
@@ -800,6 +810,7 @@ pub async fn subscribe_to_transactions(
     stream_id: u64,
     stream_index: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<Bytes, RpcError>> {
     subscribe_to_transactions_for_peer(
         mock_client,
@@ -810,6 +821,7 @@ pub async fn subscribe_to_transactions(
         stream_index,
         None,
         use_request_v2,
+        max_response_bytes_v2,
     )
     .await
 }
@@ -824,6 +836,7 @@ pub async fn subscribe_to_transactions_for_peer(
     subscription_stream_index: u64,
     peer_network_id: Option<PeerNetworkId>,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<Bytes, RpcError>> {
     // Create the data request
     let subscription_stream_metadata = SubscriptionStreamMetadata {
@@ -836,7 +849,7 @@ pub async fn subscribe_to_transactions_for_peer(
             subscription_stream_metadata,
             subscription_stream_index,
             include_events,
-            0,
+            max_response_bytes_v2,
         )
     } else {
         DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {

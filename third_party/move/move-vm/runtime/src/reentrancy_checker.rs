@@ -30,8 +30,9 @@ pub(crate) struct ReentrancyChecker {
     /// A multiset (bag) of active modules. This is not a set because the same
     /// module can be entered multiple times on closure dispatch.
     active_modules: BTreeMap<ModuleId, usize>,
-    /// Whether we are in module lock mode. This happens if we enter a function via
-    /// `NativeDynamicDispatch`.
+    /// Whether we are in module lock mode. This happens if we enter a function which is locking:
+    ///   - call via [CallType::NativeDynamicDispatch],
+    ///   - function has `#[module_lock]` attribute.
     module_lock_count: usize,
 }
 
@@ -46,6 +47,18 @@ pub(crate) enum CallType {
     ClosureDynamicDispatch,
 }
 
+impl CallType {
+    /// Returns true of the call to callee needs to lock the module. This is the case if:
+    ///   1. we are dispatching via native,
+    ///   2. the callee has `#[module_lock]` attribute.
+    fn is_locking(&self, callee: &LoadedFunction) -> bool {
+        match self {
+            Self::NativeDynamicDispatch => true,
+            Self::Regular | Self::ClosureDynamicDispatch => callee.function.has_module_lock(),
+        }
+    }
+}
+
 impl ReentrancyChecker {
     pub fn enter_function(
         &mut self,
@@ -53,13 +66,10 @@ impl ReentrancyChecker {
         callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
-        if call_type == CallType::NativeDynamicDispatch
-            || callee.function.has_module_reentrancy_lock
-        {
-            // If we enter a native dispatch function, or a function which has marked for locking,
-            // also enter module locking mode
-            self.enter_module_lock()
+        if call_type.is_locking(callee) {
+            self.enter_module_lock();
         }
+
         let callee_module = callee.module_or_script_id();
         if Some(callee_module) != caller_module {
             // Cross module call.
@@ -123,9 +133,9 @@ impl ReentrancyChecker {
                 },
             }
         }
-        if call_type == CallType::NativeDynamicDispatch || callee.function.has_module_lock() {
-            // If this is native dispatch, exit module lock.
-            self.exit_module_lock()?
+
+        if call_type.is_locking(callee) {
+            self.exit_module_lock()?;
         }
         Ok(())
     }

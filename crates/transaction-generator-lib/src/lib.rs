@@ -54,7 +54,10 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
-pub use publishing::{entry_point_trait, prebuild_packages::create_prebuilt_packages_rs_file};
+pub use publishing::{
+    entry_point_trait,
+    prebuild_packages::{create_prebuilt_packages_bundle, PrebuiltPackageConfig},
+};
 
 pub const SEND_AMOUNT: u64 = 1;
 
