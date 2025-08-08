@@ -710,7 +710,6 @@ impl PipelineBuilder {
             })
             .collect();
         if !ct_ids.is_empty() {
-            info!("[daniel] computing digest round {}, block {}, txn len {}, ids len {}, ids: {:?}", block.round(), block.id(), input_txns.len(), ct_ids.len(), ct_ids);
             let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
             Ok(Some((digest, proofs_promise)))
         } else {
@@ -779,8 +778,8 @@ impl PipelineBuilder {
     async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<Option<DecKey>>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("compute_decryption", &block);
         let (input_txns, _) = prepare_fut.await?;
-        let maybe_decryption_key = decryption_key_fut.await?;
         let proofs = proofs_fut.await?;
+        let maybe_decryption_key = decryption_key_fut.await?;
 
         tracker.start_working();
 

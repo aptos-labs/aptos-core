@@ -84,9 +84,9 @@ impl QueueItem {
         }
     }
 
-    pub fn set_dec_key(&mut self, round: Round, dec_key: DecKey) -> bool {
+    pub fn set_dec_key(&mut self, round: Round, dec_key: DecKey) {
         let offset = self.offset(round);
-        if !self.set_undecrypted_blocks.contains(&round) {
+        if self.set_undecrypted_blocks.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),
                 BlockStage::DEC_ADD_DECISION,
@@ -97,11 +97,7 @@ impl QueueItem {
                     .take()
                     .map(|tx| tx.send(Some(dec_key)));
             }
-
             self.set_undecrypted_blocks.remove(&round);
-            true
-        } else {
-            false
         }
     }
 

@@ -214,10 +214,6 @@ impl DecManager {
     }
 
     fn process_dec_key(&mut self, dec_key: DecKey) {
-        info!(LogSchema::new(LogEvent::AggregatedDecKey)
-            .author(self.author)
-            .epoch(dec_key.metadata.epoch)
-            .round(dec_key.metadata.round));
         if let Some(item) = self.block_queue.item_mut(dec_key.metadata.round) {
             item.set_dec_key(dec_key.metadata.round, dec_key);
         }
