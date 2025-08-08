@@ -119,7 +119,7 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/verify-and-build-images-for-workflows # TODO: revert
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
@@ -138,16 +138,16 @@ jobs:
       
       - name: Lock Check and Creation
         id: lock
-        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' }} #&& inputs.DRY_RUN == false }} TODO: revert
         run: |
           set +e
           gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
           result=$?
           set -e
           if [ $result -eq 0 ]; then
-            echo "Lock file exists: Current workflow building: " >> $GITHUB_STEP_SUMMARY
-            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt >> $GITHUB_STEP_SUMMARY
-            echo "Rerun again when the image is finished building" >> $GITHUB_STEP_SUMMARY
+            echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
+            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt | tee -a $GITHUB_STEP_SUMMARY
+            echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "Lock file does not exist"
@@ -157,7 +157,7 @@ jobs:
           fi
 
       - name: Build and Push Rust images
-        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' }} #&& inputs.DRY_RUN == false }} TODO: revert
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
