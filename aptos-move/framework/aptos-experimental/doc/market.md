@@ -1867,7 +1867,7 @@ of fill limit violation  in the previous transaction and the order is just a con
             order_id,
             client_order_id,
             orig_size,
-            0, // 0 because order was never placed
+            remaining_size,
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
             0, // match_count
             is_bid,
