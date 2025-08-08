@@ -455,7 +455,6 @@ impl Mempool {
             if exclude_transactions.contains_key(&txn_ptr) {
                 continue;
             }
-
             let txn_replay_protector = txn.replay_protector;
             match txn_replay_protector {
                 ReplayProtector::SequenceNumber(txn_seq) => {

@@ -81,15 +81,16 @@ pub type NotifyStateSyncResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 
-pub type DigestResult = (Digest, EvalProofsPromise);
-pub type DecryptionShareResult = (DecShare, FastDecShare);
-pub type EvalProofsResult = EvalProofs;
+pub type DigestResult = Option<(Digest, EvalProofsPromise)>;
+pub type DecryptionShareResult = Option<(DecShare, FastDecShare)>;
+pub type EvalProofsResult = Option<EvalProofs>;
 pub type BroadcastDecryptionShareResult = ();
-pub type DecryptionResult = Arc<Vec<SignedTransaction>>;
+pub type DecryptionResult = Option<Arc<Vec<SignedTransaction>>>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub verify_txn_sigs_fut: TaskFuture<VerifyTxnSigsResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
@@ -98,9 +99,11 @@ pub struct PipelineFutures {
     pub notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
-    pub maybe_compute_decryption_share_fut: Option<TaskFuture<DecryptionShareResult>>,
-    pub maybe_compute_decryption_fut: Option<TaskFuture<DecryptionResult>>,
-    pub maybe_broadcast_fast_decryption_share_fut: Option<TaskFuture<BroadcastDecryptionShareResult>>,
+    pub compute_digest_fut: TaskFuture<DigestResult>,
+    pub compute_decryption_share_fut: TaskFuture<DecryptionShareResult>,
+    pub broadcast_fast_decryption_share_fut: TaskFuture<BroadcastDecryptionShareResult>,
+    pub compute_eval_proofs_fut: TaskFuture<EvalProofsResult>,
+    pub compute_decryption_fut: TaskFuture<DecryptionResult>,
 }
 
 impl PipelineFutures {
@@ -123,7 +126,7 @@ pub struct PipelineInputTx {
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
-    pub decryption_key_tx: Option<oneshot::Sender<DecKey>>,
+    pub decryption_key_tx: Option<oneshot::Sender<Option<DecKey>>>,
 }
 
 pub struct PipelineInputRx {
@@ -132,7 +135,7 @@ pub struct PipelineInputRx {
     pub order_vote_fut: TaskFuture<()>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
-    pub decryption_key_fut: TaskFuture<DecKey>,
+    pub decryption_key_fut: TaskFuture<Option<DecKey>>,
 }
 
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
@@ -226,10 +229,6 @@ pub struct PipelinedBlock {
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
     #[derivative(PartialEq = "ignore")]
     block_qc: Arc<Mutex<Option<Arc<QuorumCert>>>>,
-    // decryption related fields
-    dec_digest: Arc<OnceCell<Digest>>,
-    dec_key: Arc<OnceCell<DecKey>>,
-    dec_txns: Arc<OnceCell<Vec<SignedTransaction>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -243,18 +242,12 @@ impl Serialize for PipelinedBlock {
             block: &'a Block,
             input_transactions: &'a Vec<SignedTransaction>,
             randomness: Option<&'a Randomness>,
-            dec_digest: Option<&'a Digest>,
-            dec_key: Option<&'a DecKey>,
-            dec_txns: Option<&'a Vec<SignedTransaction>>,
         }
 
         let serialized = SerializedBlock {
             block: &self.block,
             input_transactions: &self.input_transactions,
             randomness: self.randomness.get(),
-            dec_digest: self.dec_digest.get(),
-            dec_key: self.dec_key.get(),
-            dec_txns: self.dec_txns.get(),
         };
         serialized.serialize(serializer)
     }
@@ -271,31 +264,16 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             block: Block,
             input_transactions: Vec<SignedTransaction>,
             randomness: Option<Randomness>,
-            dec_digest: Option<Digest>,
-            dec_key: Option<DecKey>,
-            dec_txns: Option<Vec<SignedTransaction>>,
         }
 
         let SerializedBlock {
             block,
             input_transactions,
             randomness,
-            dec_digest,
-            dec_key,
-            dec_txns,
         } = SerializedBlock::deserialize(deserializer)?;
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
-        }
-        if let Some(dec_digest) = dec_digest {
-            block.set_dec_digest(dec_digest);
-        }
-        if let Some(dec_key) = dec_key {
-            block.set_dec_key(dec_key);
-        }
-        if let Some(dec_txns) = dec_txns {
-            block.set_dec_txns(dec_txns);
         }
         Ok(block)
     }
@@ -437,9 +415,6 @@ impl PipelinedBlock {
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
             block_qc: Arc::new(Mutex::new(None)),
-            dec_digest: Arc::new(OnceCell::new()),
-            dec_key: Arc::new(OnceCell::new()),
-            dec_txns: Arc::new(OnceCell::new()),
         }
     }
 
@@ -506,14 +481,6 @@ impl PipelinedBlock {
 
     pub fn has_randomness(&self) -> bool {
         self.randomness.get().is_some()
-    }
-
-    pub fn num_encrypted_txns(&self) -> usize {
-        self.payload().map_or(0, |payload| payload.num_encrypted_txns())
-    }
-
-    pub fn num_decrypted_txns(&self) -> usize {
-        self.dec_txns.get().map(|txns| txns.len()).unwrap_or(0)
     }
 
     pub fn block_info(&self) -> BlockInfo {
@@ -636,45 +603,6 @@ impl PipelinedBlock {
             // this may be cancelled
             let _ = fut.commit_ledger_fut.await;
         }
-    }
-}
-
-/// Decryption related functions
-impl PipelinedBlock {
-    pub fn set_dec_digest(&self, digest: Digest) {
-        assert!(self.dec_digest.set(digest).is_ok());
-    }
-
-    pub fn set_dec_key(&self, key: DecKey) {
-        assert!(self.dec_key.set(key).is_ok());
-    }
-
-    pub fn set_dec_txns(&self, txns: Vec<SignedTransaction>) {
-        assert!(self.dec_txns.set(txns).is_ok());
-    }
-
-    pub fn dec_digest(&self) -> Option<Digest> {
-        self.dec_digest.get().cloned()
-    }
-
-    pub fn dec_key(&self) -> Option<DecKey> {
-        self.dec_key.get().cloned()
-    }
-
-    pub fn dec_txns(&self) -> Option<Vec<SignedTransaction>> {
-        self.dec_txns.get().cloned()
-    }
-
-    pub fn dec_digest_is_set(&self) -> bool {
-        self.dec_digest.get().is_some()
-    }
-
-    pub fn dec_key_is_set(&self) -> bool {
-        self.dec_key.get().is_some()
-    }
-
-    pub fn dec_txns_is_set(&self) -> bool {
-        self.dec_txns.get().is_some()
     }
 }
 

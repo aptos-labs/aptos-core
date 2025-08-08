@@ -270,7 +270,6 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
-    next_encryption_round: Arc<Mutex<Round>>,
 }
 
 impl RoundManager {
@@ -291,7 +290,6 @@ impl RoundManager {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
-        next_encryption_round: Arc<Mutex<Round>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -323,7 +321,6 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
-            next_encryption_round,
         }
     }
 
@@ -888,11 +885,6 @@ impl RoundManager {
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
     async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        let enc = if proposal.encrypted_payload_size() > 0 { "non-empty" } else { "empty" };
-        let all = if proposal.payload_size() > 0 { "non-empty" } else { "empty" };
-        info!("[daniel] process_proposal round {} has {} encrypted txns: {}, {} all txns: {}", proposal.round(), enc, proposal.encrypted_payload_size(), all, proposal.payload_size());
-
-
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
@@ -1022,13 +1014,6 @@ impl RoundManager {
             .insert_block(proposal.clone())
             .await
             .context("[RoundManager] Failed to insert the block into BlockStore")?;
-
-        if proposal.payload().map_or(false, |payload| payload.num_encrypted_txns() > 0) {
-            // daniel todo: should be encryption round
-            let last_round = proposal.round();
-            let mut next_encryption_round = self.next_encryption_round.lock();
-            *next_encryption_round = last_round + 1;
-        }
 
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {

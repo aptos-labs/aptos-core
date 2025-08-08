@@ -390,24 +390,6 @@ impl OptQuorumStorePayload {
     pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
         self.execution_limits = execution_limits;
     }
-
-    pub fn ct_ids(&self) -> Vec<Id> {
-        match self {
-            OptQuorumStorePayload::V1(opt_qs_payload) => {
-                let mut ct_ids = Vec::new();
-                for batch in opt_qs_payload.inline_batches.iter() {
-                    ct_ids.extend(batch.info().ct_ids());
-                }
-                for batch in opt_qs_payload.opt_batches.iter() {
-                    ct_ids.extend(batch.ct_ids());
-                }
-                for proof in opt_qs_payload.proofs.iter() {
-                    ct_ids.extend(proof.info().ct_ids());
-                }
-                ct_ids
-            }
-        }
-    }
 }
 
 impl Deref for OptQuorumStorePayload {

@@ -64,7 +64,6 @@ impl QuorumStoreClient {
         exclude_payloads: PayloadFilter,
         block_timestamp: Duration,
         max_inline_encrypted_txns: PayloadTxnsSize,
-        encryption_round: Round,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
         let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
@@ -93,31 +92,7 @@ impl QuorumStoreClient {
                 Err(anyhow::anyhow!("[consensus] did not receive GetBlockResponse on time").into())
             },
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
-                GetPayloadResponse::GetPayloadResponse(mut payload) => {
-                    // // Pull encrypted transactions if needed
-                    // let mut encrypted_txns_to_add = vec![];
-                    // if max_inline_encrypted_txns.count() > 0 && max_inline_encrypted_txns.size_in_bytes() > 0 {
-                    //     let excluded_encrypted_txns = match exclude_payloads {
-                    //         PayloadFilter::DirectMempool(excluded_txns) => excluded_txns,
-                    //         PayloadFilter::InQuorumStore(_, excluded_txns) => excluded_txns,
-                    //         _ => vec![],
-                    //     };
-                    //     // Note: TransactionInProgress is not used when pulling transactions, so we use a dummy value
-                    //     let excluded_txns: BTreeMap<TransactionSummary, TransactionInProgress> = excluded_encrypted_txns.into_iter().map(|txn| (txn.clone(), TransactionInProgress::new(0))).collect();
-
-                    //     if let Ok(encrypted_txns) = self.pull_inline_encrypted_txns(
-                    //         max_inline_encrypted_txns.count(),
-                    //         max_inline_encrypted_txns.size_in_bytes(),
-                    //         excluded_txns,
-                    //     ).await {
-                    //         if !encrypted_txns.is_empty() {
-                    //             encrypted_txns_to_add = encrypted_txns;
-                    //         }
-                    //     }
-                    // }
-                    // payload.add_encrypted_txns(encrypted_txns_to_add, encryption_round);
-                    Ok(payload)
-                },
+                GetPayloadResponse::GetPayloadResponse(payload) => Ok(payload),
             },
         }
     }
@@ -158,7 +133,6 @@ impl UserPayloadClient for QuorumStoreClient {
                     params.user_txn_filter.clone(),
                     params.block_timestamp,
                     params.max_inline_encrypted_txns,
-                    params.encryption_round,
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
@@ -177,7 +151,6 @@ impl UserPayloadClient for QuorumStoreClient {
             return_empty = return_empty,
             return_non_full = return_non_full,
             duration_ms = start_time.elapsed().as_millis() as u64,
-            encrypted_txns_len = payload.num_encrypted_txns(),
             "Pull payloads from QuorumStore: proposal"
         );
 

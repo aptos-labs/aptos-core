@@ -220,8 +220,8 @@ pub struct DecStore {
     author: Author,
     dec_config: DecConfig,
     dec_map: HashMap<Round, DecItem>,
-    fast_dec_config: Option<DecConfig>,
-    fast_dec_map: Option<HashMap<Round, DecItem>>,
+    fast_dec_config: DecConfig,
+    fast_dec_map: HashMap<Round, DecItem>,
     highest_known_round: u64,
     decision_tx: Sender<DecKey>,
 }
@@ -231,7 +231,7 @@ impl DecStore {
         epoch: u64,
         author: Author,
         dec_config: DecConfig,
-        fast_dec_config: Option<DecConfig>,
+        fast_dec_config: DecConfig,
         decision_tx: Sender<DecKey>,
     ) -> Self {
         Self {
@@ -239,8 +239,8 @@ impl DecStore {
             author,
             dec_config,
             dec_map: HashMap::new(),
-            fast_dec_config: fast_dec_config.clone(),
-            fast_dec_map: fast_dec_config.map(|_| HashMap::new()),
+            fast_dec_config,
+            fast_dec_map: HashMap::new(),
             highest_known_round: 0,
             decision_tx,
         }
@@ -258,15 +258,12 @@ impl DecStore {
         dec_item.add_metadata(&self.dec_config, metadata.clone());
         dec_item.try_aggregate(&self.dec_config, self.decision_tx.clone());
         // fast path
-        if let (Some(fast_dec_map), Some(fast_dec_config)) =
-            (self.fast_dec_map.as_mut(), self.fast_dec_config.as_ref())
-        {
-            let fast_dec_item = fast_dec_map
-                .entry(metadata.round)
-                .or_insert_with(|| DecItem::new(self.author, PathType::Fast));
-            fast_dec_item.add_metadata(fast_dec_config, metadata.clone());
-            fast_dec_item.try_aggregate(fast_dec_config, self.decision_tx.clone());
-        }
+        let fast_dec_item = self
+            .fast_dec_map
+            .entry(metadata.round)
+            .or_insert_with(|| DecItem::new(self.author, PathType::Fast));
+        fast_dec_item.add_metadata(&self.fast_dec_config, metadata.clone());
+        fast_dec_item.try_aggregate(&self.fast_dec_config, self.decision_tx.clone());
     }
 
     pub fn add_share(&mut self, share: DecShare, path: PathType) -> anyhow::Result<bool> {
@@ -281,15 +278,7 @@ impl DecStore {
         let metadata = share.metadata.clone();
 
         let (dec_config, dec_item) = if path == PathType::Fast {
-            match (self.fast_dec_config.as_ref(), self.fast_dec_map.as_mut()) {
-                (Some(fast_dec_config), Some(fast_dec_map)) => (
-                    fast_dec_config,
-                    fast_dec_map
-                        .entry(metadata.round)
-                        .or_insert_with(|| DecItem::new(self.author, path)),
-                ),
-                _ => anyhow::bail!("Fast path not enabled"),
-            }
+            (&self.fast_dec_config, self.fast_dec_map.entry(metadata.round).or_insert_with(|| DecItem::new(self.author, path)))
         } else {
             (
                 &self.dec_config,

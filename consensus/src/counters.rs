@@ -1289,7 +1289,6 @@ pub fn update_counters_for_block(block: &Block) {
         COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
     }
     quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
-    NUM_ENCRYPTED_TXNS_PER_BLOCK.observe(block.encrypted_payload_size() as f64);
 }
 
 pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {

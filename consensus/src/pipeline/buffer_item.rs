@@ -257,12 +257,6 @@ impl BufferItem {
                     ..
                 } = *signed_item;
 
-                let block_ids: Vec<HashValue> = executed_blocks.iter().map(|b| b.id()).collect();
-                let num_encrypted_txns: Vec<usize> = executed_blocks.iter().map(|b| b.num_encrypted_txns()).collect();
-                let num_decrypted_txns: Vec<usize> = executed_blocks.iter().map(|b| b.num_decrypted_txns()).collect();
-                let rounds: Vec<u64> = executed_blocks.iter().map(|b| b.round()).collect();
-                info!("[daniel] Block {:?}, num_encrypted_txns: {:?}, num_decrypted_txns: {:?}, rounds: {:?}", block_ids, num_encrypted_txns, num_decrypted_txns, rounds);
-
                 if local_commit_proof.data().commit_info() != commit_proof.commit_info() {
                     error!("Local result doesn't match commit decision.");
                     for block in &executed_blocks {

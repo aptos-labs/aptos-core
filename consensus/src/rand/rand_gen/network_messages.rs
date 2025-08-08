@@ -140,7 +140,7 @@ impl DecMessage {
         &self,
         epoch_state: &EpochState,
         dec_config: &DecConfig,
-        fast_dec_config: &Option<DecConfig>,
+        fast_dec_config: &DecConfig,
     ) -> anyhow::Result<()> {
         ensure!(self.epoch() == epoch_state.epoch);
         match self {
@@ -149,13 +149,9 @@ impl DecMessage {
                 dec_share.verify(dec_config)
             },
             DecMessage::FastDecShare(fast_dec_share) => {
-                if let Some(fast_dec_config) = fast_dec_config {
-                    fast_dec_share
-                        .share
-                        .verify(fast_dec_config)
-                } else {
-                    bail!("[DecMessage] fast_dec_config not found")
-                }
+                fast_dec_share
+                    .share
+                    .verify(fast_dec_config)
             },
             _ => bail!("[DecMessage] unexpected message type"),
         }

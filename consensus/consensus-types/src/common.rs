@@ -490,17 +490,6 @@ impl Payload {
         !matches!(self, Payload::DirectMempool(_))
     }
 
-    pub fn num_encrypted_txns(&self) -> usize {
-        self.ct_ids().len()
-    }
-
-    pub fn ct_ids(&self) -> Vec<Id> {
-        match self {
-            Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.ct_ids(),
-            _ => Vec::new(),
-        }
-    }
-
     /// This is potentially computationally expensive
     pub fn size(&self) -> usize {
         match self {

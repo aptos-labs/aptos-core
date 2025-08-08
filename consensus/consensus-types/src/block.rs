@@ -106,19 +106,6 @@ impl Block {
         self.block_data.payload()
     }
 
-    pub fn is_encrypted(&self) -> bool {
-        self.payload().map_or(false, |payload| payload.ct_ids().len() > 0)
-    }
-
-    pub fn encrypted_payload_size(&self) -> usize {
-        self.payload().map_or(0, |payload| payload.ct_ids().len())
-    }
-
-    // daniel todo
-    // pub fn encryption_round(&self) -> Option<Round> {
-    //     self.payload().map(|payload| payload.encryption_round())
-    // }
-
     pub fn payload_size(&self) -> usize {
         match self.block_data.payload() {
             None => 0,

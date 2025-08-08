@@ -42,7 +42,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -138,7 +138,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .map(|block| FullRandMetadata::from(block.block()))
             .map(|metadata| self.process_incoming_metadata(metadata))
             .collect();
-        let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
+        let queue_item = QueueItem::new(blocks, Some(broadcast_handles), HashSet::new());
         self.block_queue.push_back(queue_item);
     }
 

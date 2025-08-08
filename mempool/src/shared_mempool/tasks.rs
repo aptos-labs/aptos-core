@@ -125,13 +125,12 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
-        smp.network_interface.is_validator() && (!smp.broadcast_within_validator_network() || !transaction.is_encrypted());
+        smp.network_interface.is_validator() && (!smp.broadcast_within_validator_network());
     let timeline_state = if ineligible_for_broadcast {
         TimelineState::NonQualified
     } else {
         TimelineState::NotReady
     };
-    let is_encrypted = transaction.is_encrypted();
     let statuses: Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))> =
         process_incoming_transactions(
             &smp,
@@ -698,9 +697,7 @@ pub(crate) async fn process_config_update<V, P>(
     match consensus_config {
         Ok(consensus_config) => {
             *broadcast_within_validator_network.write() =
-                // !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
-                // daniel todo: revisit if we inline encrypted txns or use QS
-                true
+                !consensus_config.quorum_store_enabled() && !consensus_config.is_dag_enabled()
         },
         Err(e) => {
             error!(

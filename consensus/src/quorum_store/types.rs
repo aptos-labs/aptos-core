@@ -140,7 +140,6 @@ impl Batch {
         batch_author: PeerId,
         gas_bucket_start: u64,
     ) -> Self {
-        let ct_ids = payload.iter().filter_map(|txn| txn.ct_id()).collect::<Vec<Id>>();
         let payload = BatchPayload::new(batch_author, payload);
         let batch_info = BatchInfo::new(
             batch_author,
@@ -151,7 +150,6 @@ impl Batch {
             payload.num_txns() as u64,
             payload.num_bytes() as u64,
             gas_bucket_start,
-            ct_ids,
         );
         Self {
             batch_info,

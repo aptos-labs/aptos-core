@@ -918,7 +918,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             failures_tracker.clone(),
         ));
 
-        let next_encryption_round = Arc::new(Mutex::new(0));
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
@@ -952,7 +951,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
-            next_encryption_round.clone(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
@@ -987,7 +985,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_jwk_consensus_config,
             fast_rand_config,
             failures_tracker,
-            next_encryption_round,
         );
 
         round_manager.init(last_vote).await;
@@ -1261,9 +1258,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
         let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
 
-        info!("[daniel] start setup for testing");
         let (encryption_key, digest_key, verification_keys_fast_path, msk_shares_fast_path, verification_keys_slow_path, msk_shares_slow_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
-        info!("[daniel] setup for testing done");
 
         let self_index = epoch_state.verifier.address_to_validator_index().get(&self.author).expect("self should be in the index");
         let self_msk_share_slow_path = msk_shares_slow_path[*self_index].clone();

@@ -39,7 +39,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 use futures::future::join_all;
 
@@ -63,7 +63,7 @@ pub struct DecManager {
     block_queue: BlockQueue,
 
     // for decryption fast path
-    fast_config: Option<DecConfig>,
+    fast_config: DecConfig,
 }
 
 impl DecManager {
@@ -72,7 +72,7 @@ impl DecManager {
         epoch_state: Arc<EpochState>,
         _signer: Arc<ValidatorSigner>,
         config: DecConfig,
-        fast_config: Option<DecConfig>,
+        fast_config: DecConfig,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         bounded_executor: BoundedExecutor,
@@ -130,82 +130,60 @@ impl DecManager {
         //     .collect();
 
         let mut broadcast_handles = Vec::new();
+        let mut encrypted_blocks_rounds = HashSet::new();
         for block in blocks
             .ordered_blocks
             .iter()
-            .filter(|block| block.num_encrypted_txns() > 0)
         {
-            let handle = self.process_incoming_block(block).await;
-            broadcast_handles.push(handle);
+            if let Some(handle) = self.process_incoming_block(block).await {
+                broadcast_handles.push(handle);
+                encrypted_blocks_rounds.insert(block.round());
+            } else if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                tx.decryption_key_tx.take().map(|tx| tx.send(None));
+            } else {
+                panic!("[DecManager] pipeline tx is not set for block {}", block.round());
+            }
         }
 
-        let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
+        let queue_item = QueueItem::new(blocks, Some(broadcast_handles), encrypted_blocks_rounds);
         self.block_queue.push_back(queue_item);
     }
 
-    async fn process_incoming_block(&self, block: &PipelinedBlock) -> DropGuard {
-        let dec_share = self.derive_self_dec_share(block).await;
-
-        info!(LogSchema::new(LogEvent::BroadcastDecShare)
-            .epoch(self.epoch_state.epoch)
-            .author(self.author)
-            .round(block.round()));
-
-        let maybe_fast_share = if self.fast_config.is_some() {
-            Some(self.derive_self_fast_dec_share(block).await)
-        } else {
-            None
-        };
-
+    async fn process_incoming_block(&self, block: &PipelinedBlock) -> Option<DropGuard> {
+        let self_shares = self.derive_self_shares(block).await;
         // Now acquire lock and update store
         {
             let mut dec_store = self.dec_store.lock();
             dec_store.update_highest_known_round(block.round());
-            dec_store.add_share(dec_share.clone(), PathType::Slow)
-                .expect("Add self dec share should succeed");
 
-            if let Some(fast_share) = maybe_fast_share {
-                dec_store
-                    .add_share(fast_share.share(), PathType::Fast)
-                    .expect("Add self fast dec share should succeed");
+            if let Some((dec_share, fast_dec_share)) = self_shares.clone() {
+                dec_store.add_share(dec_share.clone(), PathType::Slow).expect("Add self dec share should succeed");
+                dec_store.add_share(fast_dec_share.share(), PathType::Fast).expect("Add self fast dec share should succeed");
+                dec_store.add_dec_metadata(dec_share.metadata().clone());
             }
-
-            dec_store.add_dec_metadata(dec_share.metadata().clone());
         }
 
-        self.network_sender
-            .broadcast_without_self(DecMessage::DecShare(dec_share.clone()).into_network_message());
-        self.spawn_aggregate_shares_task(dec_share.metadata().clone())
+        if let Some((dec_share, _)) = self_shares {
+            info!(LogSchema::new(LogEvent::BroadcastDecShare)
+                .epoch(self.epoch_state.epoch)
+                .author(self.author)
+                .round(block.round()));
+            self.network_sender
+                .broadcast_without_self(DecMessage::DecShare(dec_share.clone()).into_network_message());
+            Some(self.spawn_aggregate_shares_task(dec_share.metadata().clone()))
+        } else {
+            None
+        }
     }
 
-    async fn derive_self_dec_share(&self, block: &PipelinedBlock) -> DecShare {
+    async fn derive_self_shares(&self, block: &PipelinedBlock) -> Option<(DecShare, FastDecShare)> {
         let futures = block.pipeline_futs().unwrap();
-        let dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
-            let (share, _) = fut.clone().await.expect("Decryption share computation failed");
-            share
+        let share_result = futures.compute_decryption_share_fut.clone().await.expect("Decryption share computation failed");
+        if let Some((dec_share, fast_dec_share)) = share_result {
+            Some((dec_share, fast_dec_share))
         } else {
-            panic!(
-                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
-                block.block().id()
-            );
-        };
-
-        dec_share
-    }
-
-    async fn derive_self_fast_dec_share(&self, block: &PipelinedBlock) -> FastDecShare {
-        let futures = block.pipeline_futs().unwrap();
-        let fast_dec_share = if let Some(fut) = futures.maybe_compute_decryption_share_fut.as_ref() {
-            let (_, fast_share) = fut.clone().await.expect("Decryption share computation failed");
-            fast_share
-        } else {
-            panic!(
-                "Block {} is encrypted but maybe_compute_decryption_fut is not set",
-                block.block().id()
-            );
-        };
-
-        fast_dec_share
+            None
+        }
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -263,7 +241,7 @@ impl DecManager {
         mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingDecRequest>,
         verified_msg_tx: UnboundedSender<RpcRequestDecShare>,
         dec_config: DecConfig,
-        fast_dec_config: Option<DecConfig>,
+        fast_dec_config: DecConfig,
         bounded_executor: BoundedExecutor,
     ) {
         while let Some(dec_msg) = incoming_rpc_request.next().await {
@@ -396,9 +374,13 @@ impl DecManager {
                                 Ok(maybe_share) => {
                                     // if the block is available
                                     if let Some(block) = self.block_queue.get_block_for_round(request.dec_metadata().round) {
-                                        let dec_share = self.derive_self_dec_share(block).await;
-                                        self.dec_store.lock().add_share(dec_share.clone(), PathType::Slow).expect("Add self dec share should succeed");
-                                        self.process_response(protocol, response_sender, DecMessage::DecShare(dec_share));
+                                        let self_shares = self.derive_self_shares(block).await;
+                                        if let Some((dec_share, _)) = self_shares {
+                                            self.dec_store.lock().add_share(dec_share.clone(), PathType::Slow).expect("Add self dec share should succeed");
+                                            self.process_response(protocol, response_sender, DecMessage::DecShare(dec_share));
+                                        } else {
+                                            warn!("[DecManager] Requesting dec share for round {} but block is not encrypted", request.dec_metadata().round);
+                                        }
                                     } else {
                                         warn!("[DecManager] Block for round {} not found", request.dec_metadata().round);
                                     }

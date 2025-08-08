@@ -71,10 +71,6 @@ impl MempoolTransaction {
     pub(crate) fn get_estimated_bytes(&self) -> usize {
         self.txn.raw_txn_bytes_len() + TXN_FIXED_ESTIMATED_BYTES + TXN_INDEX_ESTIMATED_BYTES
     }
-
-    pub(crate) fn is_encrypted(&self) -> bool {
-        self.txn.is_encrypted()
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Hash, Serialize)]

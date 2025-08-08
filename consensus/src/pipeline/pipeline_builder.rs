@@ -341,8 +341,15 @@ impl PipelineBuilder {
         let post_ledger_update_fut = spawn_ready_fut(());
         let notify_state_sync_fut = spawn_ready_fut(());
         let post_commit_fut = spawn_ready_fut(());
+        let compute_digest_fut = spawn_ready_fut(None);
+        let compute_eval_proofs_fut = spawn_ready_fut(None);
+        let compute_decryption_share_fut = spawn_ready_fut(None);
+        let compute_decryption_fut = spawn_ready_fut(None);
+        let broadcast_fast_decryption_share_fut = spawn_ready_fut(());
+        let verify_txn_sigs_fut = spawn_ready_fut((Arc::new(vec![]), None));
         PipelineFutures {
             prepare_fut,
+            verify_txn_sigs_fut,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut,
@@ -351,9 +358,11 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
-            maybe_compute_decryption_share_fut: None,
-            maybe_compute_decryption_fut: None,
-            maybe_broadcast_fast_decryption_share_fut: None,
+            compute_digest_fut,
+            compute_eval_proofs_fut,
+            compute_decryption_share_fut,
+            broadcast_fast_decryption_share_fut,
+            compute_decryption_fut,
         }
     }
 
@@ -384,7 +393,6 @@ impl PipelineBuilder {
         >,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let block = Arc::new(pipelined_block.block().clone());
-        let maybe_decrypted_txns = pipelined_block.dec_txns();
 
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
@@ -400,8 +408,6 @@ impl PipelineBuilder {
         info!(LogSchema::new(LogEvent::BuiltPipeline)
             .epoch(pipelined_block.block().epoch())
             .round(pipelined_block.block().round())
-            .num_encrypted_txns(pipelined_block.num_encrypted_txns())
-            .num_decrypted_txns(pipelined_block.num_decrypted_txns())
         );
 
 
@@ -413,46 +419,39 @@ impl PipelineBuilder {
         // In validators, the pipelined_block here does not have decrypted txns so
         // they will decrypt them, but in fullnodes it has the decrypted txns from the
         // validator when receiving the ordered blocks.
-        let (maybe_compute_decryption_share_fut, maybe_compute_decryption_fut, maybe_broadcast_fast_decryption_share_fut) = if pipelined_block.block().is_encrypted() && !pipelined_block.dec_txns_is_set() {
-            assert!(self.dec_config.is_some());
-            assert!(self.fast_dec_config.is_some());
-            let author = self.signer.author();
-            let digest_key: DigestKey = self.dec_config.as_ref().unwrap().digest_key().clone();
-            let msk_share: MasterSecretKeyShare = self.dec_config.as_ref().unwrap().msk_share().clone();
-            let fast_msk_share: MasterSecretKeyShare = self.fast_dec_config.as_ref().unwrap().msk_share().clone();
-            let encryption_key: EncryptionKey = self.dec_config.as_ref().unwrap().encryption_key().clone();
 
-            let compute_digest_fut = spawn_shared_fut(
-                Self::compute_digest(prepare_fut.clone(), block.clone(), digest_key.clone()),
-                Some(&mut abort_handles),
-            );
-            let compute_decryption_share_fut = spawn_shared_fut(
-                Self::compute_decryption_share(compute_digest_fut.clone(), block.clone(), author, msk_share, fast_msk_share),
-                Some(&mut abort_handles),
-            );
-            let compute_eval_proofs_fut = spawn_shared_fut(
-                Self::compute_eval_proofs(compute_digest_fut, digest_key, block.clone()),
-                Some(&mut abort_handles),
-            );
-            let broadcast_fast_decryption_share_fut = spawn_shared_fut(
-                Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
-                Some(&mut abort_handles),
-            );
-            let compute_decryption_fut = spawn_shared_fut(
-                Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut, block.clone(), encryption_key.clone()),
-                Some(&mut abort_handles),
-            );
-            (Some(compute_decryption_share_fut), Some(compute_decryption_fut), Some(broadcast_fast_decryption_share_fut))
-        } else {
-            (None, None, None)
-        };
+        let author = self.signer.author();
+        let digest_key: DigestKey = self.dec_config.as_ref().unwrap().digest_key().clone();
+        let msk_share: MasterSecretKeyShare = self.dec_config.as_ref().unwrap().msk_share().clone();
+        let fast_msk_share: MasterSecretKeyShare = self.fast_dec_config.as_ref().unwrap().msk_share().clone();
+        let encryption_key: EncryptionKey = self.dec_config.as_ref().unwrap().encryption_key().clone();
+
+        let compute_digest_fut = spawn_shared_fut(
+            Self::compute_digest(prepare_fut.clone(), block.clone(), digest_key.clone()),
+            Some(&mut abort_handles),
+        );
+        let compute_decryption_share_fut = spawn_shared_fut(
+            Self::compute_decryption_share(compute_digest_fut.clone(), block.clone(), author, msk_share, fast_msk_share),
+            Some(&mut abort_handles),
+        );
+        let compute_eval_proofs_fut = spawn_shared_fut(
+            Self::compute_eval_proofs(compute_digest_fut.clone(), digest_key, block.clone()),
+            Some(&mut abort_handles),
+        );
+        let broadcast_fast_decryption_share_fut = spawn_shared_fut(
+            Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
+            Some(&mut abort_handles),
+        );
+        let compute_decryption_fut = spawn_shared_fut(
+            Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut.clone(), block.clone(), encryption_key.clone()),
+            Some(&mut abort_handles),
+        );
 
         let verify_txn_sigs_fut = spawn_shared_fut(
             Self::verify_txn_sigs(
                 prepare_fut.clone(),
                 block.clone(),
-                maybe_compute_decryption_fut.clone(),
-                maybe_decrypted_txns,
+                compute_decryption_fut.clone(),
             ),
             Some(&mut abort_handles),
         );
@@ -547,6 +546,7 @@ impl PipelineBuilder {
         );
         let all_fut = PipelineFutures {
             prepare_fut,
+            verify_txn_sigs_fut,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut,
@@ -555,9 +555,11 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
-            maybe_compute_decryption_share_fut,
-            maybe_compute_decryption_fut,
-            maybe_broadcast_fast_decryption_share_fut,
+            compute_digest_fut,
+            compute_decryption_share_fut,
+            broadcast_fast_decryption_share_fut,
+            compute_eval_proofs_fut,
+            compute_decryption_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -610,76 +612,77 @@ impl PipelineBuilder {
     async fn verify_txn_sigs(
         prepare_fut: TaskFuture<PrepareResult>,
         block: Arc<Block>,
-        maybe_compute_decryption_fut: Option<TaskFuture<DecryptionResult>>,
-        maybe_decrypted_txns: Option<Vec<SignedTransaction>>,
+        compute_decryption_fut: TaskFuture<DecryptionResult>,
     ) -> TaskResult<VerifyTxnSigsResult> {
         let mut tracker = Tracker::start_waiting("verify_txn_sigs", &block);
 
         let (input_txns, block_gas_limit) = prepare_fut.await?;
+        let decryption_result = compute_decryption_fut.await?;
 
-        let decrypted_txns: Arc<Vec<SignedTransaction>> = if let Some(decryption_fut) = maybe_compute_decryption_fut {
-            assert!(block.is_encrypted());
-            decryption_fut.await?
-        } else {
-            if block.is_encrypted() {
-                assert!(maybe_decrypted_txns.is_some());
-                panic!("round {}, block {}", block.round(), block.id());
-            }
-            Arc::new(maybe_decrypted_txns.unwrap_or_default())
-        };
+        let decrypted_txns: Arc<Vec<SignedTransaction>> = decryption_result.unwrap_or_default();
 
         tracker.start_working();
 
         let sig_verification_start = Instant::now();
 
         let non_encrypted_txns = input_txns.as_ref().clone().into_iter().filter(|t| !t.is_encrypted()).collect::<Vec<_>>();
+        let non_encrypted_txns_len = non_encrypted_txns.len();
+        let encrypted_txns_len = input_txns.as_ref().clone().into_iter().filter(|t| t.is_encrypted()).count();
+        assert!(non_encrypted_txns_len + decrypted_txns.as_ref().len() == input_txns.as_ref().len(), "round {}, block {} non_encrypted_txns_len {}, decrypted_txns len {}, input_txns len {}", block.round(), block.id(), non_encrypted_txns_len, decrypted_txns.as_ref().len(), input_txns.as_ref().len());
+        assert!(encrypted_txns_len == decrypted_txns.as_ref().len(), "round {}, block {} encrypted_txns_len {}, decrypted_txns len {}", block.round(), block.id(), encrypted_txns_len, decrypted_txns.as_ref().len());
 
-        let num_encrypted_txns = input_txns.as_ref().iter().filter(|t| t.is_encrypted()).count();
-        if num_encrypted_txns != decrypted_txns.as_ref().len() {
-            info!(
-                "[error] num_encrypted_txns {} != decrypted_txns {}, round {}, block {}",
-                num_encrypted_txns,
-                decrypted_txns.as_ref().len(),
-                block.round(),
-                block.id()
-            );
-        }
+        // let num_encrypted_txns = input_txns.as_ref().iter().filter(|t| t.is_encrypted()).count();
+        // if num_encrypted_txns != decrypted_txns.as_ref().len() {
+        //     info!(
+        //         "[error] num_encrypted_txns {} != decrypted_txns {}, round {}, block {}",
+        //         num_encrypted_txns,
+        //         decrypted_txns.as_ref().len(),
+        //         block.round(),
+        //         block.id()
+        //     );
+        // }
 
         // assert!(non_encrypted_txns.len() + decrypted_txns.as_ref().len() == input_txns.as_ref().len());
-        if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
-            info!(
-                "[error] non_encrypted_txns {} + decrypted_txns {} != input_txns {}, round {}, block {}",
-                non_encrypted_txns.len(),
-                decrypted_txns.as_ref().len(),
-                input_txns.as_ref().len(),
-                block.round(),
-                block.id()
-            );
-        }
+        // if non_encrypted_txns.len() + decrypted_txns.as_ref().len() != input_txns.as_ref().len() {
+        //     info!(
+        //         "[error] non_encrypted_txns {} + decrypted_txns {} != input_txns {}, round {}, block {}",
+        //         non_encrypted_txns.len(),
+        //         decrypted_txns.as_ref().len(),
+        //         input_txns.as_ref().len(),
+        //         block.round(),
+        //         block.id()
+        //     );
+        // }
 
         // daniel todo: skip verifying encrypted txns for now
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
-            let num_txns = non_encrypted_txns.len();
             non_encrypted_txns
                 .into_par_iter()
-                .with_min_len(optimal_min_len(num_txns, 32))
+                .with_min_len(optimal_min_len(non_encrypted_txns_len, 32))
                 .map(|t| Transaction::UserTransaction(t).into())
                 .collect::<Vec<_>>()
         });
 
-        // // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
-        // let mut all_sig_verified_txns = Vec::new();
-        // for txn in input_txns.as_ref() {
-        //     if txn.is_encrypted() {
-        //         all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
-        //     } else {
-        //         all_sig_verified_txns.push(sig_verified_txns.remove(0));
-        //     }
-        // }
+        assert!(sig_verified_decrypted_txns.len() == decrypted_txns.as_ref().len(), "round {}, block {} sig_verified_decrypted_txns len {}, decrypted_txns len {}", block.round(), block.id(), sig_verified_decrypted_txns.len(), decrypted_txns.as_ref().len());
+        assert!(sig_verified_txns.len() == non_encrypted_txns_len, "round {}, block {} sig_verified_txns len {}, non_encrypted_txns_len {}", block.round(), block.id(), sig_verified_txns.len(), non_encrypted_txns_len);
 
-        let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
+        if sig_verified_decrypted_txns.len() > 0 {
+            info!("[daniel] sig_verified_decrypted_txns round {}, block {}, len {}", block.round(), block.id(), sig_verified_decrypted_txns.len());
+        }
+
+        // swap encrypted txns in input_txns with sig_verified_decrypted_txns, and non-encrypted txns with sig_verified_txns
+        let mut all_sig_verified_txns = Vec::new();
+        for txn in input_txns.as_ref() {
+            if txn.is_encrypted() {
+                all_sig_verified_txns.push(sig_verified_decrypted_txns.remove(0));
+            } else {
+                all_sig_verified_txns.push(sig_verified_txns.remove(0));
+            }
+        }
+
+        // let all_sig_verified_txns = [sig_verified_decrypted_txns, sig_verified_txns].concat();
 
         counters::PREPARE_BLOCK_SIG_VERIFICATION_TIME
             .observe_duration(sig_verification_start.elapsed());
@@ -696,40 +699,60 @@ impl PipelineBuilder {
 
         // daniel todo: hack before having a large setup
         let encryption_round = 0;
-        let ct_ids: Vec<Id> = input_txns.as_ref().iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ct_id().unwrap()).collect::<Vec<_>>();
-
-        let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
-
-        Ok((digest, proofs_promise))
+        let ct_ids: Vec<Id> = input_txns
+            .iter()
+            .filter_map(|txn| {
+                if txn.is_encrypted() {
+                    txn.ct_id()
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !ct_ids.is_empty() {
+            info!("[daniel] computing digest round {}, block {}, txn len {}, ids len {}, ids: {:?}", block.round(), block.id(), input_txns.len(), ct_ids.len(), ct_ids);
+            let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
+            Ok(Some((digest, proofs_promise)))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Precondition: compute_digest finishes
     /// What it does: Compute the decryption share for the block
     async fn compute_decryption_share(digest_fut: TaskFuture<DigestResult>, block: Arc<Block>, author: Author, msk_share: MasterSecretKeyShare, fast_msk_share: MasterSecretKeyShare) -> TaskResult<DecryptionShareResult> {
         let mut tracker = Tracker::start_waiting("compute_decryption_share", &block);
-        let (digest, proofs_promise) = digest_fut.await?;
+        let digest_result = digest_fut.await?;
         tracker.start_working();
-        let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id(), digest.clone());
+        if let Some((digest, _)) = digest_result {
+            let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id(), digest.clone());
 
-        let share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest)?;
-        let fast_share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&fast_msk_share, &digest)?;
+            let share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest)?;
+            let fast_share = <FPTX as BatchThresholdEncryption>::derive_decryption_key_share(&fast_msk_share, &digest)?;
 
-        let dec_share = DecShare::new(author, dec_metadata.clone(), share);
-        let fast_dec_share = FastDecShare::new(DecShare::new(author, dec_metadata, fast_share));
+            let dec_share = DecShare::new(author, dec_metadata.clone(), share);
+            let fast_dec_share = FastDecShare::new(DecShare::new(author, dec_metadata, fast_share));
 
-        Ok((dec_share, fast_dec_share))
+            Ok(Some((dec_share, fast_dec_share)))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Compute the decryption aux info for the block
     async fn compute_eval_proofs(digest_fut: TaskFuture<DigestResult>, digest_key: DigestKey, block: Arc<Block>) -> TaskResult<EvalProofsResult> {
-        let (_digest, proofs_promise) = digest_fut.await?;
+        let digest_result = digest_fut.await?;
+
         let mut tracker = Tracker::start_waiting("compute_eval_proofs", &block);
         tracker.start_working();
 
-        let proofs = <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key, &DECRYPTION_POOL);
-
-        Ok(proofs)
+        if let Some((_, proofs_promise)) = digest_result {
+            let proofs = <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key, &DECRYPTION_POOL);
+            Ok(Some(proofs))
+        } else {
+            Ok(None)
+        }
     }
 
 
@@ -737,98 +760,118 @@ impl PipelineBuilder {
     /// What it does: Broadcast the fast decryption share to the network
     async fn broadcast_fast_decryption_share(decryption_share_fut: TaskFuture<DecryptionShareResult>, order_vote_fut: TaskFuture<()>, block: Arc<Block>, network: Arc<NetworkSender>) -> TaskResult<BroadcastDecryptionShareResult> {
         let mut tracker = Tracker::start_waiting("broadcast_decryption_share", &block);
-        let (_, fast_dec_share) = decryption_share_fut.await?;
+        let decryption_share_result = decryption_share_fut.await?;
         let _ = order_vote_fut.await?;
         tracker.start_working();
 
-        info!(LogSchema::new(LogEvent::BroadcastFastDecShare)
-            .epoch(block.epoch())
-            .round(block.round())
-        );
-
-        network.broadcast_fast_decryption_share(fast_dec_share).await;
-
+        if let Some((_, fast_dec_share)) = decryption_share_result {
+            info!(LogSchema::new(LogEvent::BroadcastFastDecShare)
+                .epoch(block.epoch())
+                .round(block.round())
+            );
+            network.broadcast_fast_decryption_share(fast_dec_share).await;
+        }
         Ok(())
     }
 
     /// Precondition: 1. decryption_key is available, 2. decryption_aux_info is available
     /// What it does: Compute the decryption for the block
-    async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<DecKey>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
+    async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<Option<DecKey>>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("compute_decryption", &block);
         let (input_txns, _) = prepare_fut.await?;
-        let decryption_key = decryption_key_fut.await?;
+        let maybe_decryption_key = decryption_key_fut.await?;
         let proofs = proofs_fut.await?;
 
         tracker.start_working();
 
         // let _ = encryption_key.verify_decryption_key(&decryption_key.metadata.digest, &decryption_key.key)?;
 
-        let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
-        let num_encrypted_txns = encrypted_txns.len();
-        let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
-
-        let plaintexts: Vec<Vec<u8>> = <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &ciphertexts, &proofs, &DECRYPTION_POOL)?;
-
-        // Reconstruct SignedTransaction objects from the decrypted plaintexts
-        let mut decrypted_txns = Vec::new();
-
-        for (i, (original_txn, plaintext_bytes)) in encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
-            // Try to deserialize the plaintext as the inner content that was actually encrypted
-            // The encryption process only serializes the inner Script or EntryFunction, not the full enum
-            let decrypted_executable = if let Ok(script) = bcs::from_bytes::<aptos_types::transaction::Script>(&plaintext_bytes) {
-                aptos_types::transaction::TransactionExecutable::Script(script)
-            } else if let Ok(entry_function) = bcs::from_bytes::<aptos_types::transaction::EntryFunction>(&plaintext_bytes) {
-                aptos_types::transaction::TransactionExecutable::EntryFunction(entry_function)
-            } else {
-                return Err(TaskError::from(anyhow::anyhow!(
-                    "Failed to deserialize decrypted executable at index {}: neither Script nor EntryFunction could be deserialized",
-                    i
-                )));
-            };
-
-            // Create a new RawTransaction with the decrypted executable
-            let raw_txn = original_txn.clone().into_raw_transaction();
-            let mut payload = raw_txn.into_payload();
-
-            // Replace the payload's executable with the decrypted one
-            match payload {
-                aptos_types::transaction::TransactionPayload::Payload(inner) => {
-                    match inner {
-                        aptos_types::transaction::TransactionPayloadInner::V1 { executable, extra_config } => {
-                            let new_payload = aptos_types::transaction::TransactionPayload::Payload(
-                                aptos_types::transaction::TransactionPayloadInner::V1 {
-                                    executable: decrypted_executable,
-                                    extra_config: extra_config,
-                                }
-                            );
-                            payload = new_payload;
-                        }
-                        _ => {
-                            return Err(TaskError::from(anyhow::anyhow!(
-                                "Unsupported payload type for decryption at index {}",
-                                i
-                            )));
-                        }
-                    }
+        let ct_ids: Vec<Id> = input_txns
+            .iter()
+            .filter_map(|txn| {
+                if txn.is_encrypted() {
+                    txn.ct_id()
+                } else {
+                    None
                 }
-                _ => {
-                        return Err(TaskError::from(anyhow::anyhow!(
-                        "Unsupported payload type for decryption at index {}",
+            })
+            .collect();
+
+        if !ct_ids.is_empty() {
+            info!("[daniel] computing decryption round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
+
+            let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
+            let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
+
+            let decryption_key = maybe_decryption_key.expect("decryption key should be available");
+            let plaintexts: Vec<Vec<u8>> = <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &ciphertexts, &proofs.unwrap(), &DECRYPTION_POOL)?;
+
+            assert!(ct_ids.len() == encrypted_txns.len(), "round {}, block {} ct_ids len {}, encrypted_txns len {}", block.round(), block.id(), ct_ids.len(), encrypted_txns.len());
+            assert!(encrypted_txns.len() == plaintexts.len(), "round {}, block {} encrypted_txns len {}, plaintexts len {}", block.round(), block.id(), encrypted_txns.len(), plaintexts.len());
+
+            // Reconstruct SignedTransaction objects from the decrypted plaintexts
+            let mut decrypted_txns = Vec::new();
+
+            for (i, (original_txn, plaintext_bytes)) in encrypted_txns.into_iter().zip(plaintexts.into_iter()).enumerate() {
+                // Try to deserialize the plaintext as the inner content that was actually encrypted
+                // The encryption process only serializes the inner Script or EntryFunction, not the full enum
+                let decrypted_executable = if let Ok(script) = bcs::from_bytes::<aptos_types::transaction::Script>(&plaintext_bytes) {
+                    aptos_types::transaction::TransactionExecutable::Script(script)
+                } else if let Ok(entry_function) = bcs::from_bytes::<aptos_types::transaction::EntryFunction>(&plaintext_bytes) {
+                    aptos_types::transaction::TransactionExecutable::EntryFunction(entry_function)
+                } else {
+                    return Err(TaskError::from(anyhow::anyhow!(
+                        "Failed to deserialize decrypted executable at index {}: neither Script nor EntryFunction could be deserialized",
                         i
                     )));
+                };
+
+                // Create a new RawTransaction with the decrypted executable
+                let raw_txn = original_txn.clone().into_raw_transaction();
+                let mut payload = raw_txn.into_payload();
+
+                // Replace the payload's executable with the decrypted one
+                match payload {
+                    aptos_types::transaction::TransactionPayload::Payload(inner) => {
+                        match inner {
+                            aptos_types::transaction::TransactionPayloadInner::V1 { executable, extra_config } => {
+                                let new_payload = aptos_types::transaction::TransactionPayload::Payload(
+                                    aptos_types::transaction::TransactionPayloadInner::V1 {
+                                        executable: decrypted_executable,
+                                        extra_config: extra_config,
+                                    }
+                                );
+                                payload = new_payload;
+                            }
+                            _ => {
+                                return Err(TaskError::from(anyhow::anyhow!(
+                                    "Unsupported payload type for decryption at index {}",
+                                    i
+                                )));
+                            }
+                        }
+                    }
+                    _ => {
+                            return Err(TaskError::from(anyhow::anyhow!(
+                            "Unsupported payload type for decryption at index {}",
+                            i
+                        )));
+                    }
                 }
+
+                let authenticator = original_txn.authenticator().clone();
+                let mut raw_txn = original_txn.clone().into_raw_transaction();
+                raw_txn.update_payload(payload.clone());
+                let signed_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator);
+                decrypted_txns.push(signed_txn);
             }
 
-            let authenticator = original_txn.authenticator().clone();
-            let mut raw_txn = original_txn.clone().into_raw_transaction();
-            raw_txn.update_payload(payload.clone());
-            let signed_txn = SignedTransaction::new_signed_transaction(raw_txn, authenticator);
-            decrypted_txns.push(signed_txn);
-        }
-        assert!(decrypted_txns.len() == num_encrypted_txns, "round {}, block {}", block.round(), block.id());
-        info!("round {}, block {} decrypted_txns len: {}", block.round(), block.id(), decrypted_txns.len());
+            assert!(decrypted_txns.len() == ct_ids.len(), "round {}, block {} decrypted_txns len {}, ct_ids len {}", block.round(), block.id(), decrypted_txns.len(), ct_ids.len());
 
-        Ok(Arc::new(decrypted_txns))
+            Ok(Some(Arc::new(decrypted_txns)))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available 4. decryption is available
@@ -1175,6 +1218,7 @@ impl PipelineBuilder {
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
             prepare_fut,
+            verify_txn_sigs_fut,
             execute_fut,
             ledger_update_fut,
             post_ledger_update_fut: _,
@@ -1183,11 +1227,14 @@ impl PipelineBuilder {
             notify_state_sync_fut: _,
             commit_ledger_fut,
             post_commit_fut: _,
-            maybe_compute_decryption_share_fut,
-            maybe_compute_decryption_fut,
-            maybe_broadcast_fast_decryption_share_fut,
+            compute_digest_fut,
+            compute_decryption_share_fut,
+            broadcast_fast_decryption_share_fut,
+            compute_eval_proofs_fut,
+            compute_decryption_fut,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
+        wait_and_log_error(verify_txn_sigs_fut, format!("{epoch} {round} {block_id} verify txn sigs")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;
         wait_and_log_error(
             ledger_update_fut,
@@ -1204,26 +1251,30 @@ impl PipelineBuilder {
             format!("{epoch} {round} {block_id} commit ledger"),
         )
         .await;
-        if let Some(compute_decryption_share_fut) = maybe_compute_decryption_share_fut {
-            wait_and_log_error(
-                compute_decryption_share_fut,
-                format!("{epoch} {round} {block_id} decryption"),
-            )
-            .await;
-        }
-        if let Some(compute_decryption_fut) = maybe_compute_decryption_fut {
-            wait_and_log_error(
-                compute_decryption_fut,
-                format!("{epoch} {round} {block_id} decryption"),
-            )
-            .await;
-        }
-        if let Some(broadcast_fast_decryption_share_fut) = maybe_broadcast_fast_decryption_share_fut {
-            wait_and_log_error(
-                broadcast_fast_decryption_share_fut,
-                format!("{epoch} {round} {block_id} broadcast fast decryption share"),
-            )
-            .await;
-        }
+        wait_and_log_error(
+            compute_digest_fut,
+            format!("{epoch} {round} {block_id} compute digest"),
+        )
+        .await;
+        wait_and_log_error(
+            compute_decryption_share_fut,
+            format!("{epoch} {round} {block_id} compute decryption share"),
+        )
+        .await;
+        wait_and_log_error(
+            broadcast_fast_decryption_share_fut,
+            format!("{epoch} {round} {block_id} broadcast fast decryption share"),
+        )
+        .await;
+        wait_and_log_error(
+            compute_eval_proofs_fut,
+            format!("{epoch} {round} {block_id} compute eval proofs"),
+        )
+        .await;
+        wait_and_log_error(
+            compute_decryption_fut,
+            format!("{epoch} {round} {block_id} compute decryption"),
+        )
+        .await;
     }
 }

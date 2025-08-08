@@ -209,7 +209,7 @@ impl fmt::Display for QuorumStoreRequest {
                     max_txns,
                     max_bytes,
                     return_non_full,
-                    excluded_txns.len(),
+                    excluded_txns.len()
                 )
             },
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {

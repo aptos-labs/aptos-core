@@ -8,22 +8,21 @@ use crate::{
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{decryption::DecKey, randomness::{FullRandMetadata, Randomness}};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
 pub struct QueueItem {
     ordered_blocks: OrderedBlocks,
     offsets_by_round: HashMap<Round, usize>,
     num_undecided_blocks: usize,
-    num_undecrypted_blocks: usize,
+    set_undecrypted_blocks: HashSet<Round>,
     broadcast_handle: Option<Vec<DropGuard>>,
 }
 
 impl QueueItem {
-    pub fn new(ordered_blocks: OrderedBlocks, broadcast_handle: Option<Vec<DropGuard>>) -> Self {
+    pub fn new(ordered_blocks: OrderedBlocks, broadcast_handle: Option<Vec<DropGuard>>, set_undecrypted_blocks: HashSet<Round>) -> Self {
         let len = ordered_blocks.ordered_blocks.len();
         assert!(len > 0);
-        let num_encrypted_blocks = ordered_blocks.ordered_blocks.iter().filter(|b| b.block().is_encrypted()).count();
         let offsets_by_round: HashMap<Round, usize> = ordered_blocks
             .ordered_blocks
             .iter()
@@ -34,7 +33,7 @@ impl QueueItem {
             ordered_blocks,
             offsets_by_round,
             num_undecided_blocks: len,
-            num_undecrypted_blocks: num_encrypted_blocks,
+            set_undecrypted_blocks,
             broadcast_handle,
         }
     }
@@ -60,7 +59,7 @@ impl QueueItem {
     }
 
     pub fn num_undecrypted(&self) -> usize {
-        self.num_undecrypted_blocks
+        self.set_undecrypted_blocks.len()
     }
 
     pub fn all_rand_metadata(&self) -> Vec<FullRandMetadata> {
@@ -87,20 +86,19 @@ impl QueueItem {
 
     pub fn set_dec_key(&mut self, round: Round, dec_key: DecKey) -> bool {
         let offset = self.offset(round);
-        if !self.blocks()[offset].dec_key_is_set() {
+        if !self.set_undecrypted_blocks.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),
                 BlockStage::DEC_ADD_DECISION,
             );
             let block = &self.blocks_mut()[offset];
-            block.set_dec_key(dec_key.clone());
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
                 tx.decryption_key_tx
                     .take()
-                    .map(|tx| tx.send(dec_key));
+                    .map(|tx| tx.send(Some(dec_key)));
             }
 
-            self.num_undecrypted_blocks -= 1;
+            self.set_undecrypted_blocks.remove(&round);
             true
         } else {
             false
@@ -178,11 +176,6 @@ impl BlockQueue {
                     observe_block(block.timestamp_usecs(), BlockStage::DEC_READY);
                 }
                 let QueueItem { ordered_blocks, .. } = item;
-                debug_assert!(ordered_blocks
-                    .ordered_blocks
-                    .iter()
-                    .filter(|block| block.block().is_encrypted())
-                    .all(|block| block.dec_key_is_set()));
                 dec_ready_prefix.push(ordered_blocks);
             } else {
                 break;
