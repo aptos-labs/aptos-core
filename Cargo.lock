@@ -4196,6 +4196,7 @@ dependencies = [
  "claims",
  "dashmap 7.0.0-rc2",
  "futures",
+ "itertools 0.13.0",
  "maplit",
  "mini-moka",
  "mockall 0.11.4",

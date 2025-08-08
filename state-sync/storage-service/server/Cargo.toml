@@ -30,6 +30,7 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
+itertools = { workspace = true }
 mini-moka = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }

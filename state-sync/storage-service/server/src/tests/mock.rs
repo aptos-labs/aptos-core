@@ -82,9 +82,11 @@ impl MockClient {
         state_sync_config.storage_service = storage_service_config;
 
         // Create the storage reader
+        let mock_time_service = TimeService::mock();
         let storage_reader = StorageReader::new(
             storage_service_config,
             Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
+            mock_time_service.clone(),
         );
 
         // Setup the networks and the network events
@@ -113,7 +115,6 @@ impl MockClient {
         // Create the storage service
         let peers_and_metadata = create_peers_and_metadata(network_ids);
         let executor = tokio::runtime::Handle::current();
-        let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
             state_sync_config,
             executor,
