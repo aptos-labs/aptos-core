@@ -395,10 +395,10 @@ pub(crate) fn realistic_env_max_load_test(
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
-        // .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-        //     // no epoch change.
-        //     helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
-        // }))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
         .with_success_criteria(success_criteria)
         // .with_validator_resource_override(resource_override)
         // .with_fullnode_resource_override(resource_override)
