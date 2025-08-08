@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -37,8 +40,8 @@ pub enum CTVerifyError {
 
 #[derive(Debug, Error)]
 pub enum ReconstructError {
-    #[error("Tried to reconstruct with number of shares != t")]
-    ReconstructImproperNumShares,
+    #[error("Tried to reconstruct with number of shares != t, got {0} shares, expected {1}")]
+    ReconstructImproperNumShares(usize, usize),
     #[error("Tried to reconstruct decryption key shares with mismatching digests")]
     ReconstructDigestsDontMatch,
 }

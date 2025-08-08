@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use std::collections::{HashMap, HashSet};
 
 use crate::{errors::ReconstructError, group::{Fr, G1Affine, G1Projective}, shared::algebra::{differentiate::DifferentiableFn, interpolate::vanishing_poly}};
@@ -52,9 +55,9 @@ impl ThresholdConfig {
         // step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<Fr>>());
         let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
-                                                            
+
         // step 2  (numerators): for each x in xs, divide poly eval from step 1 by (-x)
-        let numerators = 
+        let numerators =
             self.domain
             .elements()
             .collect::<Vec<Fr>>()
@@ -67,7 +70,7 @@ impl ThresholdConfig {
 
         // step 3b (denominators): FFT of poly in 3a, keep evals that correspond to the points in
         // question
-        let denominators_indexed_by_x  = 
+        let denominators_indexed_by_x  =
             derivative.evaluate_over_domain(self.domain)
             .evals
             .into_par_iter()
@@ -97,7 +100,7 @@ impl ThresholdConfig {
 
     pub fn reconstruct(&self, shares: &[ShamirShare]) -> Result<Fr> {
         if shares.len() != self.t {
-            Err(ReconstructError::ReconstructImproperNumShares)?
+            Err(ReconstructError::ReconstructImproperNumShares(shares.len(), self.t))?
         } else {
             let mut sum = Fr::zero();
 
@@ -114,7 +117,7 @@ impl ThresholdConfig {
 
     pub fn reconstruct_in_exponent(&self, shares: &[ShamirGroupShare]) -> Result<G1Affine> {
         if shares.len() != self.t {
-            Err(ReconstructError::ReconstructImproperNumShares)?
+            Err(ReconstructError::ReconstructImproperNumShares(shares.len(), self.t))?
         } else {
             let mut sum = G1Projective::zero();
 
@@ -190,7 +193,7 @@ mod tests {
                         }
 
                     }
-                        
+
 
             }
         }
@@ -221,7 +224,7 @@ mod tests {
                 let params = ThresholdConfig::new(n, t);
 
                 let shares = params.share(Fr::from(1u64), &mut rng);
-                let shares_g1 : Vec<ShamirGroupShare> = shares.iter().map( 
+                let shares_g1 : Vec<ShamirGroupShare> = shares.iter().map(
                     | ShamirShare { x, y} | ShamirGroupShare { x: *x, g_y: (G1Affine::generator() * y).into() }
                 ).collect();
 
