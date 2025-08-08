@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: inline functions cannot have the following attributes: `#[persistent]`, `#[module_lock]`
+  ┌─ tests/checking/inlining/inline_disallowed_attributes.move:3:16
+  │
+3 │     inline fun forty_two(): u64 {
+  │                ^^^^^^^^^
+
+error: inline functions cannot have the following attributes: `#[persistent]`, `#[module_lock]`
+  ┌─ tests/checking/inlining/inline_disallowed_attributes.move:8:16
+  │
+8 │     inline fun fifty_five(): u64 {
+  │                ^^^^^^^^^^

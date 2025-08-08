@@ -401,7 +401,7 @@ module aptos_framework::account {
         }
     }
 
-    inline fun ensure_resource_exists(addr: address) acquires Account{
+    inline fun ensure_resource_exists(addr: address) {
         if (features::is_default_account_resource_enabled()) {
             create_account_if_does_not_exist(addr);
         } else {
