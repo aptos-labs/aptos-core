@@ -56,7 +56,6 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
-      WAIT_FOR_RELEASE_IMAGES: true
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:

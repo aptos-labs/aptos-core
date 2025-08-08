@@ -148,7 +148,6 @@ jobs:
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-      WAIT_FOR_RELEASE_IMAGES: true
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
@@ -165,7 +164,6 @@ jobs:
       FEATURES: failpoints
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-      WAIT_FOR_FAILPOINTS_IMAGES: true
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
@@ -181,7 +179,6 @@ jobs:
       PROFILE: performance
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-      WAIT_FOR_PERF_IMAGES: true
 
   rust-images-consensus-only-perf-test:
     needs: [permission-check, determine-docker-build-metadata]
