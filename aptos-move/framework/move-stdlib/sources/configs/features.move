@@ -25,7 +25,6 @@
 module std::features {
     use std::error;
     use std::signer;
-    use std::vector;
 
     const EINVALID_FEATURE: u64 = 1;
     const EAPI_DISABLED: u64 = 2;

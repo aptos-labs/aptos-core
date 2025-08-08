@@ -72,6 +72,7 @@ spec aptos_framework::transaction_fee {
 
     /// `AptosCoinCapabilities` should be exists.
     spec burn_fee(account: address, fee: u64) {
+        use std::option;
         use aptos_std::type_info;
         use aptos_framework::optional_aggregator;
         use aptos_framework::coin;

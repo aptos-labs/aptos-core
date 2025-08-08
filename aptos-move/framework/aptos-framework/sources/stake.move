@@ -34,7 +34,7 @@ module aptos_framework::stake {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
-    use aptos_framework::staking_config::{Self, StakingConfig, StakingRewardsConfig};
+    use aptos_framework::staking_config::{Self, StakingConfig};
     use aptos_framework::chain_status;
     use aptos_framework::permissioned_signer;
 
