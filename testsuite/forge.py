@@ -1757,11 +1757,14 @@ def test(
 
         log.info(result.format(forge_context))
 
+        # Exit with error if required based on test result and mode
         if (
-            not result.succeeded()
-            and forge_blocking == "true"
+            forge_blocking == "true"
             and forge_continuous_test_mode == "false"
+            and not result.succeeded()
         ):
+            raise SystemExit(1)
+        if forge_continuous_test_mode == "true" and result.is_hard_failure():
             raise SystemExit(1)
 
     except Exception as e:
