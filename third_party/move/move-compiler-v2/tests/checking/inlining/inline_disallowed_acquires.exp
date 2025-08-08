@@ -1,0 +1,45 @@
+
+Diagnostics:
+warning: acquires and access specifiers are not applicable to inline functions and should be removed
+  ┌─ tests/checking/inlining/inline_disallowed_acquires.move:6:16
+  │
+6 │     inline fun test() acquires R {}
+  │                ^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct R {
+        x: u64,
+    }
+    private inline fun test()
+        acquires R(*)
+     {
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct R has key {
+        x: u64,
+    }
+    inline fun test()
+        acquires R
+    {
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct R {
+        x: u64,
+    }
+    private inline fun test()
+        acquires R(*)
+     {
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+============ bytecode verification succeeded ========

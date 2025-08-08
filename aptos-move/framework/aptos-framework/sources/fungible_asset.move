@@ -926,7 +926,7 @@ module aptos_framework::fungible_asset {
         owner_address: address,
         store: Object<T>,
         abort_on_dispatch: bool,
-    ) acquires FungibleStore, DispatchFunctionStore {
+    ) {
         assert!(object::owns(store, owner_address), error::permission_denied(ENOT_STORE_OWNER));
         let fa_store = borrow_store_resource(&store);
         assert!(
@@ -1183,7 +1183,7 @@ module aptos_framework::fungible_asset {
     inline fun unchecked_deposit_with_no_events_inline(
         store_addr: address,
         fa: FungibleAsset
-    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    ): u64 {
         let FungibleAsset { metadata, amount } = fa;
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
@@ -1233,7 +1233,7 @@ module aptos_framework::fungible_asset {
     inline fun unchecked_withdraw_with_no_events(
         store_addr: address,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+    ): FungibleAsset {
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
 
         let store = borrow_global_mut<FungibleStore>(store_addr);
@@ -1308,21 +1308,17 @@ module aptos_framework::fungible_asset {
         }
     }
 
-    inline fun borrow_fungible_metadata<T: key>(
-        metadata: &Object<T>
-    ): &Metadata acquires Metadata {
+    inline fun borrow_fungible_metadata<T: key>(metadata: &Object<T>): &Metadata {
         let addr = object::object_address(metadata);
         borrow_global<Metadata>(addr)
     }
 
-    inline fun borrow_fungible_metadata_mut<T: key>(
-        metadata: &Object<T>
-    ): &mut Metadata acquires Metadata {
+    inline fun borrow_fungible_metadata_mut<T: key>(metadata: &Object<T>): &mut Metadata {
         let addr = object::object_address(metadata);
         borrow_global_mut<Metadata>(addr)
     }
 
-    inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore acquires FungibleStore {
+    inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore {
         let store_addr = object::object_address(store);
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         borrow_global<FungibleStore>(store_addr)

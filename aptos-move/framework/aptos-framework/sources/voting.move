@@ -774,7 +774,7 @@ module aptos_framework::voting {
     inline fun get_proposal<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): &Proposal<ProposalType> acquires VotingForum {
+    ): &Proposal<ProposalType> {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         table::borrow(&voting_forum.proposals, proposal_id)
     }

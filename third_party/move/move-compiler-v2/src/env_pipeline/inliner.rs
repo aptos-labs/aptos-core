@@ -56,6 +56,7 @@ use move_model::{
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -155,7 +156,8 @@ pub fn run_inlining(
     }
 }
 
-/// Check that inline functions are (1) not native, (2) have a body (3) are not in a script.
+/// Check that inline functions are (1) not native, (2) have a body, (3) are not in a script,
+/// (4) do not have certain attributes, and (5) do not have access specifiers.
 /// Filter out inline functions from the targets if `Experiment::SKIP_INLINING_INLINE_FUNS` is on.
 fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets) {
     let keep_inline_functions = !env
@@ -180,12 +182,32 @@ fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets)
                         env.diag(Severity::Bug, &func_loc, &msg);
                     }
                 }
+
                 if func.module_env.is_script_module() {
                     env.error(
                         &func.get_id_loc(),
                         "inline function cannot be defined in a script",
                     );
                 }
+
+                if func.has_attribute(|attr| {
+                    let name = env.symbol_pool().string(attr.name());
+                    name.as_str() == well_known::PERSISTENT_ATTRIBUTE
+                        || name.as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+                }) {
+                    env.error(
+                        &func.get_id_loc(),
+                        "inline functions cannot have the following attributes: `#[persistent]`, `#[module_lock]`",
+                    );
+                }
+
+                if func.get_access_specifiers().is_some() {
+                    env.warning(
+                        &func.get_id_loc(),
+                        "acquires and access specifiers are not applicable to inline functions and should be removed",
+                    );
+                }
+
                 keep_inline_functions
             } else {
                 // not an inline function

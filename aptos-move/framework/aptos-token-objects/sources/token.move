@@ -622,7 +622,7 @@ module aptos_token_objects::token {
 
     // Accessors
 
-    inline fun borrow<T: key>(token: &Object<T>): &Token acquires Token {
+    inline fun borrow<T: key>(token: &Object<T>): &Token {
         let token_address = object::object_address(token);
         assert!(
             exists<Token>(token_address),
@@ -723,7 +723,7 @@ module aptos_token_objects::token {
 
     // Mutators
 
-    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Token acquires Token {
+    inline fun borrow_mut(mutator_ref: &MutatorRef): &mut Token {
         assert!(
             exists<Token>(mutator_ref.self),
             error::not_found(ETOKEN_DOES_NOT_EXIST),

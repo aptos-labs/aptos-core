@@ -319,7 +319,7 @@ Object reference should be provided when upgrading object code.
     metadata_chunk: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     code_indices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u16&gt;,
     code_chunks: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-): &<b>mut</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> <b>acquires</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
+): &<b>mut</b> <a href="large_packages.md#0x7_large_packages_StagingArea">StagingArea</a> {
     <b>assert</b>!(
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_indices) == <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&code_chunks),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="large_packages.md#0x7_large_packages_ECODE_MISMATCH">ECODE_MISMATCH</a>)
