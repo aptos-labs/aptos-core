@@ -363,3 +363,62 @@ fn test_cancel_without_execution() {
         total_cancel_buffer
     );
 }
+
+#[test]
+fn test_mod_publish_error() {
+    let (mut h, acc, current_time_ms) = setup_test_env();
+
+    // Create a scheduled transaction where the user function attempts to publish a module
+    let result = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::scheduled_txns_usage::create_and_add_module_pub_txn").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&current_time_ms).unwrap()],
+    );
+    assert_success!(result);
+
+    // Get the scheduled transactions
+    let scheduled_txns = get_scheduled_txns(&mut h, &acc);
+    assert_eq!(scheduled_txns.len(), 1);
+
+    // Execute the scheduled transaction and expect it to return abort status
+    let outputs = execute_scheduled_txns(&mut h, scheduled_txns.as_slice());
+    assert_eq!(outputs.len(), 1);
+
+    // Check that the transaction failed with the correct abort code
+    let status = outputs[0].status();
+    match status {
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code,
+            location,
+            info: _,
+        }) => {
+            // EALREADY_REQUESTED = 0x03_0000 = 196608
+            assert_eq!(
+                *code, 196608,
+                "Expected EALREADY_REQUESTED error code (0x03_0000 = 196608), got {}",
+                code
+            );
+            // Verify it's coming from the code module
+            match location {
+                AbortLocation::Module(module_id) => {
+                    assert_eq!(
+                        module_id.address(),
+                        &AccountAddress::ONE,
+                        "Expected abort from 0x1 (aptos_framework)"
+                    );
+                    assert_eq!(
+                        module_id.name().as_str(),
+                        "code",
+                        "Expected abort from code module"
+                    );
+                },
+                _ => panic!("Expected abort from a module, got {:?}", location),
+            }
+        },
+        _ => panic!(
+            "Expected transaction to abort with EALREADY_REQUESTED, got status: {:?}",
+            status
+        ),
+    }
+}
