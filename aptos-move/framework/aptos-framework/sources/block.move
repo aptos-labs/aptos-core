@@ -11,6 +11,7 @@ module aptos_framework::block {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_with_dkg;
+    use aptos_framework::scheduled_txns;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
@@ -194,6 +195,8 @@ module aptos_framework::block {
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
+
+        scheduled_txns::remove_txns(timestamp / 1000);
 
         block_metadata_ref.epoch_interval
     }

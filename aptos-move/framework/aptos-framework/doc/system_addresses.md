@@ -257,7 +257,8 @@ Return true if <code>addr</code> is 0x0 or under the on chain governance's contr
         addr == @0x7 ||
         addr == @0x8 ||
         addr == @0x9 ||
-        addr == @0xa
+        addr == @0xa ||
+        addr == @0xb
 }
 </code></pre>
 
