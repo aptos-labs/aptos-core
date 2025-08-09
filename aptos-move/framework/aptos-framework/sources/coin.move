@@ -8,7 +8,6 @@ module aptos_framework::coin {
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
-    use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::Aggregator;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
@@ -21,6 +20,9 @@ module aptos_framework::coin {
     use aptos_framework::primary_fungible_store;
     use aptos_std::type_info::{Self, TypeInfo};
     use aptos_framework::create_signer;
+
+    #[test_only]
+    use aptos_framework::aggregator_factory;
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
