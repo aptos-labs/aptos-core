@@ -17,6 +17,7 @@ module aptos_experimental::order_book_types {
     const EINVALID_TRIGGER_CONDITION: u64 = 2;
     const INVALID_MATCH_RESULT: u64 = 3;
     const EINVALID_ORDER_SIZE_DECREASE: u64 = 4;
+    const EINVALID_TIME_IN_FORCE: u64 = 5;
 
     const SLIPPAGE_PCT_PRECISION: u64 = 100; // 100 = 1%
 
@@ -58,6 +59,50 @@ module aptos_experimental::order_book_types {
         }
     }
 
+    /// Order time in force
+    enum TimeInForce has drop, copy, store {
+        /// Good till cancelled order type
+        GTC,
+        /// Post Only order type - ensures that the order is not a taker order
+        POST_ONLY,
+        /// Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
+        /// order as possible as taker order and cancel the rest.
+        IOC
+    }
+
+    public fun time_in_force_from_index(index: u8): TimeInForce {
+        if (index == 0) {
+            TimeInForce::GTC
+        } else if (index == 1) {
+            TimeInForce::POST_ONLY
+        } else if (index == 2) {
+            TimeInForce::IOC
+        } else {
+            abort EINVALID_TIME_IN_FORCE
+        }
+    }
+
+    #[test_only]
+    public fun time_in_force_to_index(self: &TimeInForce): u8 {
+        match (self) {
+            GTC => 0,
+            POST_ONLY => 1,
+            IOC => 2,
+        }
+    }
+
+    public fun good_till_cancelled(): TimeInForce {
+        TimeInForce::GTC
+    }
+
+    public fun post_only(): TimeInForce {
+        TimeInForce::POST_ONLY
+    }
+
+    public fun immediate_or_cancel(): TimeInForce {
+        TimeInForce::IOC
+    }
+
     enum Order<M: store + copy + drop> has store, copy, drop {
         V1 {
             order_id: OrderIdType,
@@ -69,6 +114,7 @@ module aptos_experimental::order_book_types {
             remaining_size: u64,
             is_bid: bool,
             trigger_condition: Option<TriggerCondition>,
+            time_in_force: TimeInForce,
             metadata: M
         }
     }
@@ -151,6 +197,7 @@ module aptos_experimental::order_book_types {
         size: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
+        time_in_force: TimeInForce,
         metadata: M
     ): Order<M> {
         Order::V1 {
@@ -161,8 +208,9 @@ module aptos_experimental::order_book_types {
             price,
             orig_size,
             remaining_size: size,
-            is_bid: is_bid,
+            is_bid,
             trigger_condition,
+            time_in_force,
             metadata
         }
     }
@@ -249,6 +297,12 @@ module aptos_experimental::order_book_types {
         self.metadata
     }
 
+    public fun get_time_in_force<M: store + copy + drop>(
+        self: &Order<M>
+    ): TimeInForce {
+        self.time_in_force
+    }
+
     public fun get_trigger_condition_from_order<M: store + copy + drop>(
         self: &Order<M>
     ): Option<TriggerCondition> {
@@ -311,7 +365,7 @@ module aptos_experimental::order_book_types {
     public fun destroy_order<M: store + copy + drop>(
         self: Order<M>
     ): (
-        address, OrderIdType, Option<u64>, u64, u64, u64, bool, Option<TriggerCondition>, M
+        address, OrderIdType, Option<u64>, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M
     ) {
         let Order::V1 {
             order_id,
@@ -323,6 +377,7 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             trigger_condition,
+            time_in_force,
             metadata
         } = self;
         (
@@ -334,6 +389,7 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             trigger_condition,
+            time_in_force,
             metadata
         )
     }

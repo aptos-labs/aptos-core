@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, LoadedFunctionOwner, Module},
+    loader::{LazyLoadedFunction, LazyLoadedFunctionState, Module},
     logging::expect_no_verification_errors,
-    LoadedFunction, WithRuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -12,21 +12,16 @@ use hashbrown::HashSet;
 #[cfg(fuzzing)]
 use move_binary_format::access::ModuleAccess;
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
-    vm_status::StatusCode,
+    account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+    identifier::IdentStr, language_storage::ModuleId, metadata::Metadata, vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
-    loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
     values::{AbstractFunction, SerializedFunctionData},
@@ -39,7 +34,9 @@ use std::sync::Arc;
 pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
-    fn check_module_exists(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -47,7 +44,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 
     /// Returns module bytes if module exists, or [None] otherwise. An error is returned if there
     /// is a storage error.
-    fn fetch_module_bytes(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -63,6 +62,19 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<usize>>;
+
+    /// Returns the size of a module in bytes, or an error if it does not exist. An error is also
+    /// returned if the there is a storage error.
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_module_size(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<usize> {
+        self.unmetered_get_module_size(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
 
     /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
     /// a storage error or the module fails deserialization.
@@ -90,7 +102,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     /// Returns the deserialized module, or [None] otherwise. An error is returned if:
     ///   1. the deserialization fails, or
     ///   2. there is an error from the underlying storage.
-    fn fetch_deserialized_module(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -100,132 +114,81 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     ///   1. the deserialization fails,
     ///   2. there is an error from the underlying storage,
     ///   3. module does not exist.
-    fn fetch_existing_deserialized_module(
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.fetch_deserialized_module(address, module_name)?
+        self.unmetered_get_deserialized_module(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
     /// either in a cached state (it is then returned) or newly constructed. The error is returned
-    /// if the storage fails to fetch the deserialized module and verify it.
-    fn fetch_verified_module(
+    /// if the storage fails to fetch the deserialized module and verify it. The verification is
+    /// eager: i.e., it addition to local module verification there are also linking checks and
+    /// verification of transitive dependencies.
+    ///
+    /// Note 1: this API is not metered!
+    /// Note 2: this API is used before lazy loading was enabled!
+    fn unmetered_get_eagerly_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
-    /// Returns the verified module. If it does not exist, a linker error is returned. All other
-    /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
-    /// fail bytecode verification.
-    fn fetch_existing_verified_module(
+    /// Returns an eagerly verified module. If it does not exist, a linker error is returned. All
+    /// other errors are mapped using [expect_no_verification_errors] - since on-chain code should
+    /// not fail bytecode verification.
+    ///
+    /// Note 1: this API is not metered!
+    /// Note 2: this API is used before lazy loading was enabled!
+    fn unmetered_get_existing_eagerly_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Arc<Module>> {
-        self.fetch_verified_module(address, module_name)
+        self.unmetered_get_eagerly_verified_module(address, module_name)
             .map_err(expect_no_verification_errors)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
-    /// Returns the module without verification, or [None] otherwise. The existing module can be
-    /// either in a cached state (it is then returned) or newly constructed. The error is returned
-    /// if the storage fails to fetch the deserialized module.
+    /// Returns the module without verification, or [None] otherwise. Also loads the transitive
+    /// closure of dependencies (also without verification).
     #[cfg(fuzzing)]
-    fn fetch_module_skip_verification(
+    fn unmetered_get_module_skip_verification(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
-    /// Returns a struct definition corresponding to the specified name. The module containing the
-    /// struct will be fetched and cached beforehand. Returns an error if the module or struct does
-    /// not exist.
+    /// Returns the verified module if it exists, or [None] otherwise. The existing module can be
+    /// either in a cached state (it is then returned) or newly constructed. The error is returned
+    /// if the storage fails to fetch the deserialized module and verify it. The verification is
+    /// lazy: i.e., it is only local to the module without any linking checks.
     ///
-    /// Note: This API is not metered.
-    fn unmetered_get_struct_definition(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        struct_name: &IdentStr,
-    ) -> PartialVMResult<Arc<StructType>> {
-        let module = self
-            .fetch_existing_verified_module(address, module_name)
-            .map_err(|err| err.to_partial())?;
-        module
-            .get_struct(struct_name)
-            .map_err(|err| err.to_partial())
-    }
-
-    /// Returns a runtime type corresponding to the specified type tag (file format type
-    /// representation). If a struct type is constructed, the module containing the struct
-    /// definition is fetched and cached.
-    fn fetch_ty(&self, ty_tag: &TypeTag) -> PartialVMResult<Type> {
-        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
-        //                  seem better fit. Here we map error to VMError to reuse existing
-        //                  type builder implementation, and then strip the location info.
-        self.runtime_environment()
-            .vm_config()
-            .ty_builder
-            .create_ty(ty_tag, |st| {
-                self.unmetered_get_struct_definition(
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|err| err.finish(Location::Undefined))
-            })
-            .map_err(|err| err.to_partial())
-    }
-
-    /// Returns the function definition corresponding to the specified name, as well as the module
-    /// where this function is defined. The returned function can contain uninstantiated generic
-    /// types and its signature. The returned module is verified.
-    fn fetch_function_definition(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        function_name: &IdentStr,
-    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.fetch_existing_verified_module(address, module_name)?;
-        let function = module.get_function(function_name)?;
-        Ok((module, function))
-    }
-
-    fn load_function(
+    /// Note 1: this API is not metered!
+    /// Note 2: this API is used after lazy loading was enabled!
+    fn unmetered_get_lazily_verified_module(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: &[TypeTag],
-    ) -> VMResult<LoadedFunction> {
-        let _timer = VM_TIMER.timer_with_label("Loader::load_function");
+    ) -> VMResult<Option<Arc<Module>>>;
 
-        let (module, function) =
-            self.fetch_function_definition(module_id.address(), module_id.name(), function_name)?;
-
-        let ty_args = ty_args
-            .iter()
-            .map(|ty_arg| self.fetch_ty(ty_arg).map_err(|e| e.finish(Location::Undefined)))
-            .collect::<VMResult<Vec<_>>>()
-            .map_err(|mut err| {
-                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
-                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
-                    err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
-                }
-                err
-            })?;
-
-        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
-
-        Ok(LoadedFunction {
-            owner: LoadedFunctionOwner::Module(module),
-            ty_args,
-            function,
-        })
+    /// Returns an eagerly verified module. If it does not exist, a linker error is returned. All
+    /// other errors are mapped using [expect_no_verification_errors] - since on-chain code should
+    /// not fail bytecode verification.
+    ///
+    /// Note 1: this API is not metered!
+    /// Note 2: this API is used after lazy loading was enabled!
+    fn unmetered_get_existing_lazily_verified_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> VMResult<Arc<Module>> {
+        self.unmetered_get_lazily_verified_module(module_id)
+            .map_err(expect_no_verification_errors)?
+            .ok_or_else(|| module_linker_error!(module_id.address(), module_id.name()))
     }
 }
 
@@ -247,7 +210,7 @@ where
     E: WithBytes + WithSize + WithHash,
     V: Clone + Default + Ord,
 {
-    fn check_module_exists(
+    fn unmetered_check_module_exists(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -256,7 +219,7 @@ where
         Ok(self.get_module_or_build_with(&id, self)?.is_some())
     }
 
-    fn fetch_module_bytes(
+    fn unmetered_get_module_bytes(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -289,7 +252,7 @@ where
             .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
-    fn fetch_deserialized_module(
+    fn unmetered_get_deserialized_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -300,7 +263,7 @@ where
             .map(|(module, _)| module.code().deserialized().clone()))
     }
 
-    fn fetch_verified_module(
+    fn unmetered_get_eagerly_verified_module(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -318,8 +281,8 @@ where
             return Ok(Some(module.code().verified().clone()));
         }
 
-        let _timer = VM_TIMER.timer_with_label("ModuleStorage::fetch_verified_module [cache miss]");
-
+        let _timer =
+            VM_TIMER.timer_with_label("unmetered_get_eagerly_verified_module [cache miss]");
         let mut visited = HashSet::new();
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_verify(
@@ -332,7 +295,7 @@ where
     }
 
     #[cfg(fuzzing)]
-    fn fetch_module_skip_verification(
+    fn unmetered_get_module_skip_verification(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -360,6 +323,42 @@ where
             &mut visited,
             self,
         )?))
+    }
+
+    fn unmetered_get_lazily_verified_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> VMResult<Option<Arc<Module>>> {
+        let (module, version) = match self.get_module_or_build_with(module_id, self)? {
+            Some(module_and_version) => module_and_version,
+            None => return Ok(None),
+        };
+
+        if module.code().is_verified() {
+            return Ok(Some(module.code().verified().clone()));
+        }
+
+        let _timer = VM_TIMER.timer_with_label("unmetered_get_lazily_verified_module [cache miss]");
+        let runtime_environment = self.runtime_environment();
+        runtime_environment.paranoid_check_module_address_and_name(
+            module.code().deserialized(),
+            module_id.address(),
+            module_id.name(),
+        )?;
+        let locally_verified_code = runtime_environment.build_locally_verified_module(
+            module.code().deserialized().clone(),
+            module.extension().size_in_bytes(),
+            module.extension().hash(),
+        )?;
+        let verified_code =
+            runtime_environment.build_verified_module_skip_linking_checks(locally_verified_code)?;
+        let verified_module = self.insert_verified_module(
+            module_id.clone(),
+            verified_code,
+            module.extension().clone(),
+            version,
+        )?;
+        Ok(Some(verified_module.code().verified().clone()))
     }
 }
 
@@ -449,8 +448,8 @@ where
         }
     }
 
-    let verified_code =
-        runtime_environment.build_verified_module(locally_verified_code, &verified_dependencies)?;
+    let verified_code = runtime_environment
+        .build_verified_module_with_linking_checks(locally_verified_code, &verified_dependencies)?;
     let module = module_cache_with_context.insert_verified_module(
         module_id,
         verified_code,

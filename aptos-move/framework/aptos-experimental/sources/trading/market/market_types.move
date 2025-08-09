@@ -2,57 +2,13 @@ module aptos_experimental::market_types {
     use std::option::Option;
     use std::string::String;
 
-    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce};
 
     friend aptos_experimental::market;
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
     const EINVALID_TIME_IN_FORCE: u64 = 3;
-
-    /// Order time in force
-    enum TimeInForce has drop, copy, store {
-        /// Good till cancelled order type
-        GTC,
-        /// Post Only order type - ensures that the order is not a taker order
-        POST_ONLY,
-        /// Immediate or Cancel order type - ensures that the order is a taker order. Try to match as much of the
-        /// order as possible as taker order and cancel the rest.
-        IOC
-    }
-
-    public fun time_in_force_from_index(index: u8): TimeInForce {
-        if (index == 0) {
-            TimeInForce::GTC
-        } else if (index == 1) {
-            TimeInForce::POST_ONLY
-        } else if (index == 2) {
-            TimeInForce::IOC
-        } else {
-            abort EINVALID_TIME_IN_FORCE
-        }
-    }
-
-    #[test_only]
-    public fun time_in_force_to_index(self: &TimeInForce): u8 {
-        match (self) {
-            GTC => 0,
-            POST_ONLY => 1,
-            IOC => 2,
-        }
-    }
-
-    public fun good_till_cancelled(): TimeInForce {
-        TimeInForce::GTC
-    }
-
-    public fun post_only(): TimeInForce {
-        TimeInForce::POST_ONLY
-    }
-
-    public fun immediate_or_cancel(): TimeInForce {
-        TimeInForce::IOC
-    }
 
     enum OrderStatus has drop, copy, store {
         /// Order has been accepted by the engine.
@@ -66,7 +22,10 @@ module aptos_experimental::market_types {
         /// 1. Insufficient margin
         /// 2. Order is reduce_only but does not reduce
         REJECTED,
-        SIZE_REDUCED
+        SIZE_REDUCED,
+        /// Order has been acknowledged by the engine. This is used when the system wants to provide an early acknowledgement
+        /// of the order placement along with order id before the order is opened.
+        ACKNOWLEDGED,
     }
 
     public fun order_status_open(): OrderStatus {
@@ -87,6 +46,10 @@ module aptos_experimental::market_types {
 
     public fun order_status_size_reduced(): OrderStatus {
         OrderStatus::SIZE_REDUCED
+    }
+
+    public fun order_status_acknowledged(): OrderStatus {
+        OrderStatus::ACKNOWLEDGED
     }
 
     enum SettleTradeResult has drop {
