@@ -623,6 +623,10 @@ pub enum RawTransactionWithData {
         secondary_signer_addresses: Vec<AccountAddress>,
         fee_payer_address: AccountAddress,
     },
+    AbstractAuthenticator {
+        raw_txn: RawTransaction,
+        function_info: FunctionInfo,
+    }
 }
 
 impl RawTransactionWithData {
@@ -645,6 +649,16 @@ impl RawTransactionWithData {
         Self::MultiAgent {
             raw_txn,
             secondary_signer_addresses,
+        }
+    }
+
+    pub fn new_abstract_authenticator(
+        raw_txn: RawTransaction,
+        function_info: FunctionInfo,
+    ) -> Self {
+        Self::AbstractAuthenticator {
+            raw_txn,
+            function_info,
         }
     }
 }
