@@ -145,9 +145,9 @@ jobs:
           result=$?
           set -e
           if [ $result -eq 0 ]; then
-            echo "Lock file exists: Current workflow building: " >> $GITHUB_STEP_SUMMARY
-            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt >> $GITHUB_STEP_SUMMARY
-            echo "Rerun again when the image is finished building" >> $GITHUB_STEP_SUMMARY
+            echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
+            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt | tee -a $GITHUB_STEP_SUMMARY
+            echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "Lock file does not exist"
