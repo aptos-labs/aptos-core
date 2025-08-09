@@ -14,6 +14,7 @@
 -  [Function `order_status_cancelled`](#0x7_market_types_order_status_cancelled)
 -  [Function `order_status_rejected`](#0x7_market_types_order_status_rejected)
 -  [Function `order_status_size_reduced`](#0x7_market_types_order_status_size_reduced)
+-  [Function `order_status_acknowledged`](#0x7_market_types_order_status_acknowledged)
 -  [Function `new_settle_trade_result`](#0x7_market_types_new_settle_trade_result)
 -  [Function `new_market_clearinghouse_callbacks`](#0x7_market_types_new_market_clearinghouse_callbacks)
 -  [Function `get_settled_size`](#0x7_market_types_get_settled_size)
@@ -115,6 +116,22 @@
 
 <details>
 <summary>SIZE_REDUCED</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>ACKNOWLEDGED</summary>
 
 
 <details>
@@ -396,6 +413,30 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_status_size_reduced">order_status_size_reduced</a>(): <a href="market_types.md#0x7_market_types_OrderStatus">OrderStatus</a> {
     OrderStatus::SIZE_REDUCED
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_order_status_acknowledged"></a>
+
+## Function `order_status_acknowledged`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_status_acknowledged">order_status_acknowledged</a>(): <a href="market_types.md#0x7_market_types_OrderStatus">market_types::OrderStatus</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_order_status_acknowledged">order_status_acknowledged</a>(): <a href="market_types.md#0x7_market_types_OrderStatus">OrderStatus</a> {
+    OrderStatus::ACKNOWLEDGED
 }
 </code></pre>
 
