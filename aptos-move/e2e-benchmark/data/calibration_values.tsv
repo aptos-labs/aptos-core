@@ -4,6 +4,7 @@ CreateObjects { num_objects: 10, object_payload_size: 0 }	9	0.982	1.012	95.5
 CreateObjects { num_objects: 10, object_payload_size: 10240 }	9	0.985	1.005	6398.4
 CreateObjects { num_objects: 100, object_payload_size: 0 }	9	0.983	1.015	905.7
 CreateObjects { num_objects: 100, object_payload_size: 10240 }	9	0.990	1.004	7618.3
+ReadEnumVariants { depth: 32, } 10	0.983	1.031	9986.8
 InitializeVectorPicture { length: 128 }	9	0.990	1.023	112.4
 VectorPicture { length: 128 }	9	0.984	1.013	31.7
 VectorPictureRead { length: 128 }	9	0.987	1.020	30.5

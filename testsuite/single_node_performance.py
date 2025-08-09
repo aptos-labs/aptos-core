@@ -261,6 +261,8 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C),
 
+    RunGroupConfig(key=RunGroupKey("read-enum-variants"), included_in=Flow.CONTINUOUS),
+
     RunGroupConfig(key=RunGroupKey("vector-trim-append-len3000-size1"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("vector-remove-insert-len3000-size1"), included_in=Flow.CONTINUOUS),
 

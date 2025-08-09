@@ -80,6 +80,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
     SimpleScript,
+    ReadEnumVariants,
     APTTransferWithPermissionedSigner,
     APTTransferWithMasterSigner,
     /// Basic market where sell and buy prices are in distinct ranges,
@@ -395,6 +396,9 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
             TransactionTypeArg::SimpleScript => call_custom_module(EntryPoints::SimpleScript),
+            TransactionTypeArg::ReadEnumVariants => {
+                call_custom_module(EntryPoints::ReadEnumVariants)
+            },
             TransactionTypeArg::APTTransferWithPermissionedSigner => {
                 call_custom_module(EntryPoints::APTTransferWithPermissionedSigner)
             },
