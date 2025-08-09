@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 1-12:  publish [module 0x42::simple_map {]
+task 1 lines 14-54:  publish [module 0x42::test_simple_map {]
+task 2 lines 56-56:  run  0x42::test_simple_map::run

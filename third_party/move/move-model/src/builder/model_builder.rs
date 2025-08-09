@@ -11,6 +11,7 @@ use crate::{
     ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
+    metadata::LanguageVersion,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
@@ -23,7 +24,10 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_binary_format::file_format::Visibility;
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The
@@ -129,6 +133,7 @@ pub(crate) struct StructEntry {
     /// always false when it is enum
     pub is_empty_struct: bool,
     pub is_native: bool,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, Clone)]
@@ -363,7 +368,20 @@ impl<'env> ModelBuilder<'env> {
         type_params: Vec<TypeParameter>,
         layout: StructLayout,
         is_native: bool,
+        visibility: Visibility,
     ) {
+        if self
+            .env
+            .language_version()
+            .is_at_least(LanguageVersion::V2_4)
+            && visibility.is_not_private()
+            && abilities.has_ability(Ability::Key)
+        {
+            self.env.error(
+                &loc,
+                &format!("structs/enums with key ability cannot have public, package or friend visibility but `{}` has key ability", name.display(self.env)),
+            );
+        }
         let entry = StructEntry {
             loc,
             attributes,
@@ -375,6 +393,7 @@ impl<'env> ModelBuilder<'env> {
             receiver_functions: BTreeMap::new(),
             is_empty_struct: false,
             is_native,
+            visibility,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
