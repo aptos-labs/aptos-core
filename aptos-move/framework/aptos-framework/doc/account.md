@@ -1562,7 +1562,7 @@ When the feature flag is disabled:
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>{
+<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
         <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(addr);
     } <b>else</b> {

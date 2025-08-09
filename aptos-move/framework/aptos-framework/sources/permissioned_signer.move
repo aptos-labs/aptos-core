@@ -311,9 +311,7 @@ module aptos_framework::permissioned_signer {
         destroy_permissions_storage_address(permissions_storage_addr);
     }
 
-    inline fun destroy_permissions_storage_address(
-        permissions_storage_addr: address
-    ) acquires PermissionStorage {
+    inline fun destroy_permissions_storage_address(permissions_storage_addr: address) {
         if (exists<PermissionStorage>(permissions_storage_addr)) {
             let PermissionStorage::V1 { perms } =
                 move_from<PermissionStorage>(permissions_storage_addr);

@@ -494,7 +494,7 @@ The semantics of supply will be governed by the function specified in DeriveSupp
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): &TransferRef <b>acquires</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a> {
+<pre><code>inline <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_borrow_transfer_ref">borrow_transfer_ref</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): &TransferRef {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(
         &<a href="fungible_asset.md#0x1_fungible_asset_store_metadata">fungible_asset::store_metadata</a>(metadata)
     );
