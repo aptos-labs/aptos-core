@@ -43,7 +43,7 @@ module sigma_protocols::homomorphism {
     use std::bcs;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, scalar_one, scalar_mul, new_scalar_uniform_from_64_bytes,
         CompressedRistretto, scalar_neg_assign, point_clone, point_identity,
-        multi_scalar_mul, point_equals, point_compress
+        multi_scalar_mul, point_equals, point_compress, point_mul, point_add
     };
     use std::error;
     use aptos_std::aptos_hash::sha2_512;
@@ -164,7 +164,13 @@ module sigma_protocols::homomorphism {
     }
 
     /// Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
-    public fun fiat_shamir(dst: vector<u8>, name: vector<u8>, stmt: &PublicStatement, _A: &vector<RistrettoPoint>, m: u64): (Scalar, vector<Scalar>) {
+    public fun fiat_shamir(
+        dst: vector<u8>,
+        name: vector<u8>,
+        stmt: &PublicStatement,
+        _A: &vector<RistrettoPoint>,
+        m: u64): (Scalar, vector<Scalar>)
+    {
         assert!(m != 0, error::invalid_argument(E_PROOF_COMMITMENT_EMPTY));
 
         // We will hash an application-specific domain separator, a protocol name and the (full) public statement,
@@ -236,17 +242,6 @@ module sigma_protocols::homomorphism {
         let m = comm.length();
         let (e, betas) = fiat_shamir(dst, name, stmt, comm, m);
 
-        // Naively, we could do:
-        // ```
-        //   vector_equals(
-        //      psi(stmt, &SecretWitness { w: proof.sigma }),
-        //      vector_add(
-        //           proof.A,
-        //           vector_scalar_mul(e, f(stmt))
-        //      );
-        //   );
-        // ```
-
         // Step 2:
         //   A + e f(stmt) - \psi(\sigma) = zero()
         //         <=>
@@ -311,11 +306,117 @@ module sigma_protocols::homomorphism {
             });
         });
 
+        // TODO(Perf): Could combine more aggresively.
         assert!(bases.length() == 3 * m, error::internal(E_INTERNAL_INVARIANT_FAILED));
         assert!(scalars.length() == 3 * m, error::internal(E_INTERNAL_INVARIANT_FAILED));
 
         // Do the MSM and check it equals the (zero) identity
         point_equals(&multi_scalar_mul(&bases, &scalars), &point_identity())
+    }
+
+    public fun vector_point_add(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): vector<RistrettoPoint> {
+        assert!(a.length() == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
+
+        let r = vector[];
+        a.enumerate_ref(|i, pt| {
+            r.push_back(point_add(pt, &b[i]));
+        });
+
+        r
+    }
+
+    public fun vector_point_equals(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): bool {
+        let m = a.length();
+        assert!(m == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
+
+        let i = 0;
+        while (i < m) {
+            if (!point_equals(&a[i], &b[i])) {
+              return false
+            };
+
+            i += 1;
+        };
+
+        true
+    }
+
+    public inline fun verify_slow(
+        dst: vector<u8>,
+        name: vector<u8>,
+        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+        f: |&PublicStatement|RepresentationVec,
+        stmt: &PublicStatement,
+        proof: &Proof,
+    ): bool {
+
+        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
+        let comm = proof.get_commitment();
+        let m = comm.length();
+        let (e, _) = fiat_shamir(dst, name, stmt, comm, m);
+
+        // Step 2:
+        //   A + e f(stmt) - \psi(\sigma) = zero()
+        //         <=>
+        //   \forall i \in[m], A[i] + e f(stmt)[i] - \psi(\sigma)[i] = 0
+        //
+        // We slowly (despacito) verify that:
+        // ```
+        //   vector_equals(
+        //      psi(stmt, &SecretWitness { w: proof.sigma }),
+        //      vector_add(
+        //           proof.A,
+        //           vector_scalar_mul(e, f(stmt))
+        //      );
+        //   );
+        // ```
+
+        // TODO(Perf): Silly, Move does not let us do anything better than cloning the response from the proof here, AFAICT.
+        let psi_sigma_repr = psi(stmt, &proof.response_to_witness());
+        let fx_repr = f(stmt);
+
+        assert!(psi_sigma_repr.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+        assert!(psi_sigma_repr.length() == fx_repr.length(), error::invalid_argument(E_TRANSFORMATION_FUNC_WRONG_LEN));
+
+        // Step 2.1: Compute the `m` entries of $e \cdot f(X)$
+        let efx = vector[];
+        fx_repr.for_each_ref(|repr| {
+            let scalars = vector[];
+            let bases = vector[];
+
+            repr.for_each(stmt,|pt, s| {
+                bases.push_back(point_clone(pt));
+                scalars.push_back(*s);
+            });
+
+            efx.push_back(point_mul(&multi_scalar_mul(&bases, &scalars), &e));
+        });
+
+        assert!(efx.length() == m, error::invalid_argument(E_INTERNAL_INVARIANT_FAILED));
+
+        // Step 2.1: Compute the `m` entries of \psi(X, w)
+        let psi_sigma = vector[];
+        psi_sigma_repr.for_each_ref(|repr| {
+            let scalars = vector[];
+            let bases = vector[];
+
+            repr.for_each(stmt,|pt, s| {
+                bases.push_back(point_clone(pt));
+                scalars.push_back(*s);
+            });
+
+            psi_sigma.push_back(multi_scalar_mul(&bases, &scalars));
+        });
+
+        assert!(psi_sigma.length() == m, error::invalid_argument(E_INTERNAL_INVARIANT_FAILED));
+
+        vector_point_equals(
+            &psi_sigma,
+            &vector_point_add(
+                comm,
+                &efx,
+            )
+        )
     }
 
     //

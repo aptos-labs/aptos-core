@@ -78,9 +78,9 @@ module sigma_protocols::homomorphism_schnorr_example {
     }
 
     public fun schnorr_verify(stmt: &PublicStatement, proof: &Proof): bool {
-        homomorphism::verify(
-            b"my_test_for_schnorr_domain_separator",
-            b"schnorr",
+        homomorphism::verify_slow(
+            DST,
+            NAME,
             |_X, w| psi(_X, w),
             |_X| f(_X),
             stmt,
