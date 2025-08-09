@@ -54,7 +54,9 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
+pub use self::block_epilogue::{
+    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
+};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -2861,12 +2863,12 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
             block_id,
-            block_end_info,
+            block_end_info: block_end_info.to_persistent(),
             fee_distribution,
         })
     }
@@ -2979,7 +2981,19 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         None
     }
 
-    fn from_txn(_txn: Transaction) -> Self {
+    fn state_checkpoint(_block_id: HashValue) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v0(_block_id: HashValue, _block_end_info: BlockEndInfo) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v1(
+        _block_id: HashValue,
+        _block_end_info: TBlockEndInfoExt<Self::Key>,
+        _fee_distribution: FeeDistribution,
+    ) -> Self {
         unimplemented!()
     }
 }
