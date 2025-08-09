@@ -132,6 +132,7 @@ impl DbWriter for AptosDB {
                 output_with_proof
                     .transactions_and_outputs
                     .into_iter()
+                    .map(|(txn, output)| (txn, output))
                     .unzip();
             let events = outputs
                 .clone()
@@ -264,7 +265,7 @@ impl AptosDB {
             s.spawn(|_| {
                 self.ledger_db
                     .persisted_auxiliary_info_db()
-                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_info)
+                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_auxiliary_infos)
                     .unwrap()
             });
             s.spawn(|_| {

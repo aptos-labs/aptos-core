@@ -40,8 +40,8 @@ use aptos_types::{
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        AuxiliaryInfoTrait, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
         TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionStatus,
         Version,
     },
@@ -184,7 +184,6 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         } = txn_output_list_with_proof;
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
-
         let chunk = ChunkToApply {
             transactions,
             transaction_outputs,

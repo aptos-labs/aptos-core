@@ -16,21 +16,21 @@ use std::{
 pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
-    pub persisted_info: Vec<PersistedAuxiliaryInfo>,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
 }
 
 impl TransactionsWithOutput {
     pub fn new(
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
-        persisted_info: Vec<PersistedAuxiliaryInfo>,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
     ) -> Self {
         assert_eq!(transactions.len(), transaction_outputs.len());
-        assert_eq!(transactions.len(), persisted_info.len());
+        assert_eq!(transactions.len(), persisted_auxiliary_infos.len());
         Self {
             transactions,
             transaction_outputs,
-            persisted_info,
+            persisted_auxiliary_infos,
         }
     }
 
@@ -42,11 +42,12 @@ impl TransactionsWithOutput {
         &mut self,
         transaction: Transaction,
         transaction_output: TransactionOutput,
-        persisted_info: PersistedAuxiliaryInfo,
+        persisted_auxiliary_info: PersistedAuxiliaryInfo,
     ) {
         self.transactions.push(transaction);
         self.transaction_outputs.push(transaction_output);
-        self.persisted_info.push(persisted_info);
+        self.persisted_auxiliary_infos
+            .push(persisted_auxiliary_info);
     }
 
     pub fn len(&self) -> usize {
@@ -63,7 +64,7 @@ impl TransactionsWithOutput {
         izip!(
             self.transactions.iter(),
             self.transaction_outputs.iter(),
-            self.persisted_info.iter()
+            self.persisted_auxiliary_infos.iter()
         )
     }
 }
@@ -112,11 +113,14 @@ impl TransactionsToKeep {
         first_version: Version,
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
-        auxiliary_info: Vec<PersistedAuxiliaryInfo>,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
         is_reconfig: bool,
     ) -> Self {
-        let txns_with_output =
-            TransactionsWithOutput::new(transactions, transaction_outputs, auxiliary_info);
+        let txns_with_output = TransactionsWithOutput::new(
+            transactions,
+            transaction_outputs,
+            persisted_auxiliary_infos,
+        );
         Self::index(first_version, txns_with_output, is_reconfig)
     }
 
@@ -126,7 +130,12 @@ impl TransactionsToKeep {
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
         let txn_outputs = vec![TransactionOutput::new_empty_success(); txns.len()];
-        Self::make(0, txns, txn_outputs, vec![], false)
+        let persisted_auxiliary_infos = (0..txns.len())
+            .map(|i| PersistedAuxiliaryInfo::V1 {
+                transaction_index: i as u32,
+            })
+            .collect();
+        Self::make(0, txns, txn_outputs, persisted_auxiliary_infos, false)
     }
 
     pub fn is_reconfig(&self) -> bool {

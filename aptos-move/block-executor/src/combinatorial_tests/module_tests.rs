@@ -16,7 +16,7 @@ use crate::{
     task::ExecutorTask,
     txn_provider::default::DefaultTxnProvider,
 };
-use aptos_types::state_store::MockStateView;
+use aptos_types::{state_store::MockStateView, transaction::AuxiliaryInfo};
 use fail::FailScenario;
 use move_core_types::language_storage::ModuleId;
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
@@ -117,7 +117,10 @@ fn execute_module_tests(
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
                     MockStateView<KeyType<[u8; 32]>>,
-                    DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+                    DefaultTxnProvider<
+                        MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                        AuxiliaryInfo,
+                    >,
                 >(
                     executor_thread_pool.clone(),
                     *maybe_block_gas_limit,
