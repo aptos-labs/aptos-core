@@ -1,9 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{errors::*, view::LatestView};
+use crate::{
+    counters, errors::*, task::ExecutorTask, txn_last_input_output::TxnLastInputOutput,
+    view::LatestView,
+};
 use aptos_logger::error;
-use aptos_mvhashmap::types::ValueWithLayout;
+use aptos_mvhashmap::{
+    types::{TxnIndex, ValueWithLayout},
+    MVHashMap,
+};
 use aptos_types::{
     contract_event::TransactionEvent,
     error::{code_invariant_error, PanicError},
@@ -11,11 +17,12 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
-use aptos_vm_logging::{alert, prelude::*};
+use aptos_vm_logging::{alert, clear_speculative_txn_logs, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -294,5 +301,45 @@ fn replace_ids_with_values<T: Transaction, S: TStateView<Key = T::Key> + Sync>(
             "Value to be exchanged doesn't have bytes: {:?}",
             value,
         )))
+    }
+}
+
+pub(crate) fn update_transaction_on_abort<T, E>(
+    txn_idx: TxnIndex,
+    last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+    versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+) where
+    T: Transaction,
+    E: ExecutorTask<Txn = T>,
+{
+    counters::SPECULATIVE_ABORT_COUNT.inc();
+
+    // Any logs from the aborted execution should be cleared and not reported.
+    clear_speculative_txn_logs(txn_idx as usize);
+
+    // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
+    if let Some(keys) = last_input_output.modified_resource_keys(txn_idx) {
+        for (k, _) in keys {
+            versioned_cache.data().mark_estimate(&k, txn_idx);
+        }
+    }
+
+    // Group metadata lives in same versioned cache as data / resources.
+    // We are not marking metadata change as estimate, but after a transaction execution
+    // changes metadata, suffix validation is guaranteed to be triggered. Estimation affecting
+    // execution behavior is left to size, which uses a heuristic approach.
+    last_input_output
+        .for_each_resource_group_key_and_tags(txn_idx, |key, tags| {
+            versioned_cache
+                .group_data()
+                .mark_estimate(key, txn_idx, tags);
+            Ok(())
+        })
+        .expect("Passed closure always returns Ok");
+
+    if let Some(keys) = last_input_output.delayed_field_keys(txn_idx) {
+        for k in keys {
+            versioned_cache.delayed_fields().mark_estimate(&k, txn_idx);
+        }
     }
 }
