@@ -70,7 +70,7 @@ use aptos_types::{
     randomness::Randomness,
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
+        authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
@@ -1730,15 +1730,15 @@ impl AptosVM {
         // Add fee payer.
         let fee_payer_signer = if let Some(fee_payer) = transaction_data.fee_payer {
             Some(match &transaction_data.fee_payer_authentication_proof {
-                Some(AuthenticationProof::Abstraction {
+                Some(AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 }) => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -1770,15 +1770,15 @@ impl AptosVM {
         };
         let sender_signers = itertools::zip_eq(senders, proofs)
             .map(|(sender, proof)| match proof {
-                AuthenticationProof::Abstraction {
+                AuthenticationProof::Abstract {
                     function_info,
                     auth_data,
                 } => {
                     let enabled = match auth_data {
-                        AbstractionAuthData::V1 { .. } => {
+                        AbstractAuthenticationData::V1 { .. } => {
                             self.features().is_account_abstraction_enabled()
                         },
-                        AbstractionAuthData::DerivableV1 { .. } => {
+                        AbstractAuthenticationData::DerivableV1 { .. } => {
                             self.features().is_derivable_account_abstraction_enabled()
                         },
                     };
@@ -1931,6 +1931,16 @@ impl AptosVM {
         let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
             .into_user_session(self, &txn_data, resolver, change_set_configs, code_storage,));
+
+        // Disallow write in prologue session for now.
+        if !self.features().is_allow_write_in_prologue_session_enabled()
+            && prologue_change_set.has_writes()
+        {
+            return (
+                VMStatus::error(StatusCode::REJECTED_WRITE_SET, None),
+                discarded_output(StatusCode::REJECTED_WRITE_SET),
+            );
+        }
 
         let should_create_account_resource_timer =
             VM_TIMER.timer_with_label("AptosVM::create_account_resource_lazily");
@@ -3182,7 +3192,7 @@ fn dispatchable_authenticate(
     gas_meter: &mut impl GasMeter,
     account: AccountAddress,
     function_info: FunctionInfo,
-    auth_data: &AbstractionAuthData,
+    auth_data: &AbstractAuthenticationData,
     traversal_context: &mut TraversalContext,
     module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<u8>> {

@@ -143,6 +143,7 @@ pub enum FeatureFlag {
 
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
+    ALLOW_WRITE_IN_PROLOGUE_SESSION = 98,
 }
 
 impl FeatureFlag {
@@ -423,6 +424,10 @@ impl Features {
 
     pub fn is_distribute_transaction_fee_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    pub fn is_allow_write_in_prologue_session_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ALLOW_WRITE_IN_PROLOGUE_SESSION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
