@@ -1,0 +1,86 @@
+
+Diagnostics:
+warning: [lint] Unconditional infinite recursion detected: m::func1_warn -> m::func1_warn
+  ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:2:5
+  │
+2 │ ╭     fun func1_warn(){
+3 │ │         func1_warn();
+4 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func2_warn -> m::func3_warn -> m::func2_warn
+   ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:11:5
+   │
+11 │ ╭     fun func2_warn(){
+12 │ │         func3_warn();
+13 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func4_warn -> m::func5_warn -> m::func6_warn -> m::func7_warn -> m::func4_warn
+   ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:29:5
+   │
+29 │ ╭     fun func4_warn(){
+30 │ │         func5_warn();
+31 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func8_warn -> m::func9_warn -> m::func8_warn
+   ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:57:5
+   │
+57 │ ╭     fun func8_warn(x: u64){
+58 │ │         if (x % 2 == 0){
+59 │ │             func9_warn(x);
+60 │ │         }else{
+61 │ │             func9_warn(x);
+62 │ │         }
+63 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func10_warn -> m::func11_warn -> m::func10_warn
+   ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:68:5
+   │
+68 │ ╭     fun func10_warn(x: u64){
+69 │ │         loop{
+70 │ │             func11_warn(x);
+71 │ │             if (x == 0){
+   · │
+75 │ │         }
+76 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func14_warn -> m::func14_warn
+   ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:94:5
+   │
+94 │ ╭     fun func14_warn<T1, T2>(){
+95 │ │         func14_warn<T1, T2>();
+96 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
+
+warning: [lint] Unconditional infinite recursion detected: m::func15_warn -> m::func15_warn
+    ┌─ tests\stackless_bytecode_lints\infinite_recursion.move:98:5
+    │
+ 98 │ ╭     fun func15_warn<T1, T2>(){
+ 99 │ │         func15_warn<T2, T1>();
+100 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(infinite_recursion)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#infinite_recursion.
