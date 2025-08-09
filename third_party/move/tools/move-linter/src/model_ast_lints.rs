@@ -6,6 +6,7 @@
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod equal_operands_in_bin_op;
 mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
@@ -27,6 +28,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
