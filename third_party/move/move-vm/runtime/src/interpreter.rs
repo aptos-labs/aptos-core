@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     config::VMConfig,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::{DataCacheGasMeterWrapper, TransactionDataCache},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -1096,38 +1096,6 @@ where
         self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
-    /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
-    /// of bytes loaded.
-    fn create_and_charge_data_cache_entry(
-        &self,
-        resource_resolver: &impl ResourceResolver,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-            self.loader,
-            self.layout_converter,
-            gas_meter,
-            traversal_context,
-            self.loader.unmetered_module_storage(),
-            resource_resolver,
-            &addr,
-            ty,
-        )?;
-        gas_meter.charge_load_resource(
-            addr,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment: self.loader.runtime_environment(),
-            },
-            entry.value().view(),
-            bytes_loaded,
-        )?;
-        Ok(entry)
-    }
-
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
         &self,
@@ -1138,17 +1106,46 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        if !data_cache.contains_resource(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
-                resource_resolver,
-                gas_meter,
+        if !data_cache.contains_resource_data(&addr, ty) {
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
+                self.loader,
+                self.layout_converter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
                 traversal_context,
-                addr,
+                self.loader.unmetered_module_storage(),
+                resource_resolver,
+                &addr,
                 ty,
+                true,
             )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
         }
         data_cache.get_resource_mut(&addr, ty)
+    }
+
+    fn load_resource_existence<'c>(
+        &self,
+        data_cache: &'c mut TransactionDataCache,
+        resource_resolver: &impl ResourceResolver,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<bool> {
+        if !data_cache.contains_resource_existence(&addr, ty) {
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
+                self.loader,
+                self.layout_converter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
+                traversal_context,
+                self.loader.unmetered_module_storage(),
+                resource_resolver,
+                &addr,
+                ty,
+                // This value will be overridden if lightweight resource existence feature is disabled
+                false,
+            )?;
+        }
+        data_cache.get_resource_existence(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1243,7 +1240,7 @@ where
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
-        let gv = self.load_resource(
+        let exists = self.load_resource_existence(
             data_cache,
             resource_resolver,
             gas_meter,
@@ -1251,7 +1248,6 @@ where
             addr,
             ty,
         )?;
-        let exists = gv.exists()?;
         gas_meter.charge_exists(
             is_generic,
             TypeWithRuntimeEnvironment {

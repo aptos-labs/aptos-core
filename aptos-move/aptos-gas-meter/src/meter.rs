@@ -205,21 +205,31 @@ where
     }
 
     #[inline]
-    fn charge_load_resource(
+    fn charge_resource_fetch(
         &mut self,
         _addr: AccountAddress,
-        _ty: impl TypeView,
-        val: Option<impl ValueView>,
+        _ty: &impl TypeView,
+        resource_exists: bool,
         bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         // TODO(Gas): check if this is correct.
-        if self.feature_version() <= 8 && val.is_none() && bytes_loaded != 0.into() {
+        if self.feature_version() <= 8 && !resource_exists && bytes_loaded != 0.into() {
             return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
         }
         let cost = self
             .io_pricing()
-            .calculate_read_gas(val.is_some(), bytes_loaded);
+            .calculate_read_gas(resource_exists, bytes_loaded);
         self.algebra.charge_io(cost)
+    }
+
+    #[inline]
+    fn charge_loaded_bytes(
+        &mut self,
+        _addr: AccountAddress,
+        _ty: &impl TypeView,
+        _val: impl ValueView,
+    ) -> PartialVMResult<()> {
+        Ok(())
     }
 
     #[inline]

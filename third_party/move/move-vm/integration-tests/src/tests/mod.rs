@@ -116,7 +116,7 @@ fn execute_function_for_test(
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut TransactionDataCache::empty(),
+            &mut TransactionDataCache::empty(true),
             &mut gas_meter,
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
@@ -138,7 +138,7 @@ fn execute_script_impl(
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-    let mut data_cache = TransactionDataCache::empty();
+    let mut data_cache = TransactionDataCache::empty(true);
 
     dispatch_loader!(&code_storage, loader, {
         let function = loader.load_script(

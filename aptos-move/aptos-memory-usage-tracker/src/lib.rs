@@ -264,26 +264,34 @@ where
     }
 
     #[inline]
-    fn charge_load_resource(
+    fn charge_resource_fetch(
         &mut self,
         addr: AccountAddress,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
+        ty: &impl TypeView,
+        resource_exists: bool,
         bytes_loaded: NumBytes,
+    ) -> PartialVMResult<()> {
+        self.base
+            .charge_resource_fetch(addr, ty, resource_exists, bytes_loaded)
+    }
+
+    #[inline]
+    fn charge_loaded_bytes(
+        &mut self,
+        addr: AccountAddress,
+        ty: &impl TypeView,
+        val: impl ValueView,
     ) -> PartialVMResult<()> {
         if self.feature_version() != 0 {
             // TODO(Gas): Rewrite this in a better way.
-            if let Some(val) = &val {
-                self.use_heap_memory(
-                    self.vm_gas_params()
-                        .misc
-                        .abs_val
-                        .abstract_heap_size(val, self.feature_version())?,
-                )?;
-            }
+            self.use_heap_memory(
+                self.vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_heap_size(&val, self.feature_version())?,
+            )?;
         }
-
-        self.base.charge_load_resource(addr, ty, val, bytes_loaded)
+        self.base.charge_loaded_bytes(addr, ty, val)
     }
 
     #[inline]

@@ -552,7 +552,8 @@ impl NativeVMExecutorTask {
         );
         let materialized_size = view
             .get_resource_state_value_size(&apt_metadata_object_state_key)
-            .map_err(hide_error)?;
+            .map_err(hide_error)?
+            .unwrap_or(0);
         let metadata = view
             .get_resource_state_value_metadata(&apt_metadata_object_state_key)
             .map_err(hide_error)?

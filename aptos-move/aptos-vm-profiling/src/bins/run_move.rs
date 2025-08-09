@@ -219,7 +219,9 @@ fn main() -> Result<()> {
             func,
             // No arguments.
             Vec::<Vec<u8>>::new(),
-            &mut TransactionDataCache::empty(),
+            &mut TransactionDataCache::empty(
+                Features::default().is_lightweight_resource_existence_enabled(),
+            ),
             &mut gas_meter,
             &mut traversal_context,
             &mut extensions,
