@@ -20,7 +20,12 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determines end version itself.
-    
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not run replay verify.
+        default: false
+
   workflow_dispatch:
     inputs:
       NETWORK:
@@ -39,10 +44,24 @@ on:
         required: false
         type: string
         description: The end version to use for the backup. If not specified, it will use the latest version.
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not run replay verify.
+        default: false
 jobs:
+  build-images:
+    secrets: inherit
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: revert
+    with:
+      GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
+      TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+      DRY_RUN: ${{ inputs.DRY_RUN }}
+
   run-replay-verify:
     runs-on: ubuntu-latest-32-core # consider moving this to a smaller machien since the compute runs on GKE
     timeout-minutes: 420 # 7 hours
+    needs: build-images
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,7 +70,7 @@ jobs:
           # get the last 10 commits to find images that have been built
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
           fetch-depth: 10
-
+      
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
@@ -93,6 +112,7 @@ jobs:
           pyproject_directory: testsuite/replay-verify
 
       - name: Schedule replay verify
+        if: ${{ inputs.DRY_RUN == false }}
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
         run: | 
@@ -115,7 +135,7 @@ jobs:
       - name: Post-run cleanup
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
-        if: ${{ always() }}  
+        if: ${{ always() && inputs.DRY_RUN == false}}  
         run: |
           cd testsuite/replay-verify
           CMD="poetry run python main.py --network ${{ inputs.NETWORK }} --cleanup"  
