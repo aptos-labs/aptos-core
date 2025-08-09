@@ -81,7 +81,7 @@ pub struct TransactionStore {
     // Index for looking up transaction by hash.
     // Transactions are stored by AccountAddress + replay protector.
     // This index stores map of transaction committed hash to (AccountAddress, replay protector) pair.
-    // Using transaction commited hash because from end user's point view, a transaction should only have
+    // Using transaction committed hash because from end user's point view, a transaction should only have
     // one valid hash.
     hash_index: HashMap<HashValue, (AccountAddress, ReplayProtector)>,
     // estimated size in bytes
@@ -778,7 +778,7 @@ impl TransactionStore {
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
         before: Option<Instant>,
-        // The priority of the receipient of the transactions
+        // The priority of the recipient of the transactions
         priority_of_receiver: BroadcastPeerPriority,
     ) -> (Vec<(SignedTransaction, u64)>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
