@@ -1,0 +1,80 @@
+module 0x8675309::M {
+    struct R has key {
+    }
+    fun t0(a: &signer) {
+        exists(0x0);
+        move_to(R{}, a);
+        borrow_global(0x0);
+        borrow_global_mut(0x0);
+        let R{} = move_from(0x0);
+    }
+    fun t1(a: &signer) {
+        exists(0x0);
+        move_to(R{}, a);
+        borrow_global(0x0);
+        borrow_global_mut(0x0);
+        let R{} = move_from(0x0);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtins.move:5:16
+  │
+5 │         exists(0x0);
+  │                ^^^
+
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ global_builtins.move:6:17
+  │
+6 │         move_to(R{}, a);
+  │                 ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtins.move:7:23
+  │
+7 │         borrow_global(0x0);
+  │                       ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtins.move:8:27
+  │
+8 │         borrow_global_mut(0x0);
+  │                           ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtins.move:9:29
+  │
+9 │         let R{} = move_from(0x0);
+  │                             ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+   ┌─ global_builtins.move:12:16
+   │
+12 │         exists(0x0);
+   │                ^^^
+
+error: cannot use `R` with an operator which expects a value of type `&signer`
+   ┌─ global_builtins.move:13:17
+   │
+13 │         move_to(R{}, a);
+   │                 ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+   ┌─ global_builtins.move:14:23
+   │
+14 │         borrow_global(0x0);
+   │                       ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+   ┌─ global_builtins.move:15:27
+   │
+15 │         borrow_global_mut(0x0);
+   │                           ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+   ┌─ global_builtins.move:16:29
+   │
+16 │         let R{} = move_from(0x0);
+   │                             ^^^

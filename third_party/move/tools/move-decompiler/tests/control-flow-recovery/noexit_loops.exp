@@ -8,8 +8,7 @@ module 0x99::noexit_loops {
         ()
     }
     fun f1() {
-        let _t0;
-        _t0 = 0;
+        let _t0 = 0;
         loop _t0 = _t0 + 1
     }
     fun f10() {
@@ -32,21 +31,18 @@ module 0x99::noexit_loops {
             if (q) loop continue};
     }
     fun f15() {
-        let _t0;
-        _t0 = 0;
+        let _t0 = 0;
         _t0 + 1;
     }
     fun f16() {
         loop continue
     }
     fun f2(): u64 {
-        let _t0;
-        _t0 = 1 + 1;
+        let _t0 = 1 + 1;
         loop _t0 = _t0 + 1
     }
     fun f3(): u64 {
-        let _t0;
-        _t0 = 1;
+        let _t0 = 1;
         loop _t0 = _t0 + foo(_t0)
     }
     fun foo(x: u64): u64 {
@@ -75,19 +71,19 @@ module 0x99::noexit_loops {
 --- unable to recompile the decompiled code:
 exiting with context checking errors
 error: cannot return nothing from a function with result type `R`
-   ┌─ noexit_loops.move:56:9
+   ┌─ noexit_loops.move:52:9
    │
-56 │         loop continue
+52 │         loop continue
    │         ^^^^^^^^^^^^^
 
 error: cannot return nothing from a function with result type `u64`
-   ┌─ noexit_loops.move:59:9
+   ┌─ noexit_loops.move:55:9
    │
-59 │         loop continue
+55 │         loop continue
    │         ^^^^^^^^^^^^^
 
 error: cannot return nothing from a function with result type `R`
-   ┌─ noexit_loops.move:65:9
+   ┌─ noexit_loops.move:61:9
    │
-65 │         loop continue
+61 │         loop continue
    │         ^^^^^^^^^^^^^

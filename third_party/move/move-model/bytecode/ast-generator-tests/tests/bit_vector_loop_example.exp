@@ -565,10 +565,9 @@ return Tuple()
 --- Var-Bound Generated AST
 {
   let _t3: u64;
-  {
-    let _t2: &mut vector<bool>;
-    if Ge(amount, Deref(select m::BitVector.length(self))) {
-      _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
+  if Ge(amount, Deref(select m::BitVector.length(self))) {
+    {
+      let _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
       _t3: u64 = 0;
       loop {
         if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
@@ -576,28 +575,28 @@ return Tuple()
         _t3: u64 = Add(_t3, 1);
         continue
       }
-    } else {
-      _t3: u64 = amount;
-      loop {
-        if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
-        if m::is_index_set(Freeze(true)(self), _t3) {
-          m::set(self, Sub(_t3, amount))
-        } else {
-          m::unset(self, Sub(_t3, amount))
-        };
-        _t3: u64 = Add(_t3, 1);
-        continue
+    }
+  } else {
+    _t3: u64 = amount;
+    loop {
+      if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+      if m::is_index_set(Freeze(true)(self), _t3) {
+        m::set(self, Sub(_t3, amount))
+      } else {
+        m::unset(self, Sub(_t3, amount))
       };
-      _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
-      loop {
-        if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
-        m::unset(self, _t3);
-        _t3: u64 = Add(_t3, 1);
-        continue
-      }
+      _t3: u64 = Add(_t3, 1);
+      continue
     };
-    return Tuple()
-  }
+    _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+    loop {
+      if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+      m::unset(self, _t3);
+      _t3: u64 = Add(_t3, 1);
+      continue
+    }
+  };
+  return Tuple()
 }
 
 
@@ -705,9 +704,8 @@ module 0x1::m {
     }
     public fun shift_left(self: &mut BitVector, amount: u64) {
         let _t3;
-        let _t2;
         if (amount >= *&self.length) {
-            _t2 = &mut self.bit_field;
+            let _t2 = &mut self.bit_field;
             _t3 = 0;
             while (_t3 < 0x1::vector::length<bool>(/*freeze*/_t2)) {
                 *0x1::vector::borrow_mut<bool>(_t2, _t3) = false;

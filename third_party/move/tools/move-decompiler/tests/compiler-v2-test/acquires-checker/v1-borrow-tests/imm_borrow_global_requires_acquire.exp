@@ -1,0 +1,16 @@
+module 0x8675309::A {
+    struct T1 has key {
+        b: bool,
+    }
+    public fun test(addr: address) {
+        borrow_global(addr);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unable to infer instantiation of type `&key` (consider providing type arguments or annotating the type)
+  ┌─ imm_borrow_global_requires_acquire.move:6:9
+  │
+6 │         borrow_global(addr);
+  │         ^^^^^^^^^^^^^^^^^^^

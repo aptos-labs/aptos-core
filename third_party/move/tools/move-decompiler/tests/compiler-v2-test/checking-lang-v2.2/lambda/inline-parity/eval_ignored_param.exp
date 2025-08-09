@@ -1,0 +1,32 @@
+module 0x42::Test {
+    fun foo(f: |(u64, u64, u64)|(u64), g: |(u64, u64, u64)|(u64), x: u64, _: u64, y: u64, z: u64): u64 {
+        x = x + 1;
+        y = y + 1;
+        z = z + 1;
+        x = x + 1;
+        y = y + 1;
+        z = z + 1;
+        f(x, y, z) + g(x, y, z) + 3 * x + 5 * y + 7 * z
+    }
+    public fun test() {
+        let _t0 = foo(|(arg0,arg1,arg2)| __lambda__1__test(arg0, arg1, arg2), |(arg0,arg1,arg2)| __lambda__2__test(arg0, arg1, arg2), 1, 10, 100, 1000);
+        if (!(_t0 == 9637)) abort _t0;
+    }
+    fun __lambda__1__test(x: u64, param$1: u64, z: u64): u64 {
+        x * z
+    }
+    fun __lambda__2__test(param$0: u64, y: u64, param$2: u64): u64 {
+        y
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+   ┌─ eval_ignored_param.move:12:24
+   │
+12 │         let _t0 = foo(|(arg0,arg1,arg2)| __lambda__1__test(arg0, arg1, arg2), |(arg0,arg1,arg2)| __lambda__2__test(arg0, arg1, arg2), 1, 10, 100, 1000);
+   │                        ^
+   │                        │
+   │                        Unexpected '('
+   │                        Expected a variable or struct or variant name

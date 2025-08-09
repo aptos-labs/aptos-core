@@ -1,0 +1,43 @@
+module 0x42::fields {
+    struct T has drop {
+        h: u64,
+    }
+    struct S has drop {
+        f: u64,
+        g: T,
+    }
+    fun read_ref(x: &S): u64 {
+        *&&x.g.h
+    }
+    fun read_val(x: S): u64 {
+        *&&(&x).g.h
+    }
+    fun write_local_direct(): S {
+        let _t0 = S{f: 0,g: T{h: 0}};
+        &mut &mut (&mut _t0).g.h = 42;
+        _t0
+    }
+    fun write_local_via_ref(): S {
+        let _t0 = S{f: 0,g: T{h: 0}};
+        &mut &mut (&mut _t0).g.h = 42;
+        _t0
+    }
+    fun write_param(x: &mut S) {
+        &mut &mut x.g.h = 42;
+    }
+    fun write_val(x: S): S {
+        &mut &mut (&mut x).g.h = 42;
+        x
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+   ┌─ fields.move:10:10
+   │
+10 │         *&&x.g.h
+   │          ^^
+   │          │
+   │          Unexpected '&&'
+   │          Expected an expression term

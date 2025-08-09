@@ -1,0 +1,22 @@
+module 0x815::m {
+    enum Positional has drop {
+        A {
+            _0: u8,
+        }
+        B {
+            _0: u8,
+        }
+    }
+    fun test_common_access(): u8 {
+        &mut (&mut Positional::A{_0: 42u8})._0 = 19u8;
+        20u8
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ bug_14300_variant_select_autoref.move:11:9
+   │
+11 │         &mut (&mut Positional::A{_0: 42u8})._0 = 19u8;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
