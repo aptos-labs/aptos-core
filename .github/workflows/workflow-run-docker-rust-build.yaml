@@ -141,14 +141,18 @@ jobs:
         if: ${{ steps.check-images.outcome == 'failure' }} #&& inputs.DRY_RUN == false }} TODO: revert
         run: |
           set +e
-          gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+          output=$(gcloud storage ls gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt)
           result=$?
           set -e
-          if [ $result -eq 0 ]; then
-            echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
-            gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt | tee -a $GITHUB_STEP_SUMMARY
-            echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
-            exit 1
+          if [[ $result -eq 0 ]]; then
+            if [[ "$output" != *"${{ github.run_id }}"* ]]; then
+              echo "Lock file for current workflow exists. Continuing ..."
+            else
+              echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
+              gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt | tee -a $GITHUB_STEP_SUMMARY
+              echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
           else
             echo "Lock file does not exist"
             echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${{ env.GIT_SHA }}.txt
