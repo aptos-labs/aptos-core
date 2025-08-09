@@ -414,6 +414,10 @@ impl IndexerStreamCoordinator {
                             info.block_height = Some(block_height_bcs);
                             info.epoch = Some(epoch_bcs);
                         },
+                        APITransaction::ScheduledTransaction(ref mut st) => {
+                            st.info.block_height = Some(block_height_bcs);
+                            st.info.epoch = Some(epoch_bcs);
+                        },
                     };
                     txn
                 });

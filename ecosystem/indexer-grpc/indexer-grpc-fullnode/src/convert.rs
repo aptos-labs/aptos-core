@@ -822,6 +822,10 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
         },
+        Transaction::ScheduledTransaction(_) => {
+            // todo: will be implemented in a subsequent PR
+            panic!("[Indexer Fullnode] ScheduledTransaction is not yet supported")
+        },
     };
 
     let txn_data = match &transaction {
@@ -892,6 +896,10 @@ pub fn convert_transaction(
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(api_validator_txn) => {
             convert_validator_transaction(api_validator_txn)
+        },
+        Transaction::ScheduledTransaction(_) => {
+            // todo: will be implemented in a subsequent PR
+            panic!("[Indexer Fullnode] ScheduledTransaction is not yet supported")
         },
     };
 

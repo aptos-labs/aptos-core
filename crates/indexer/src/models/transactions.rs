@@ -250,6 +250,20 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            APITransaction::ScheduledTransaction(scheduled_txn) => (
+                Self::from_transaction_info(
+                    &scheduled_txn.info,
+                    None,
+                    transaction.type_str().to_string(),
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+                vec![],
+            ),
         }
     }
 

@@ -16,6 +16,7 @@
 -  [Resource `ToRemoveTbl`](#0x1_scheduled_txns_ToRemoveTbl)
 -  [Enum `CancelledTxnCode`](#0x1_scheduled_txns_CancelledTxnCode)
 -  [Struct `TransactionScheduledEvent`](#0x1_scheduled_txns_TransactionScheduledEvent)
+-  [Struct `TransactionCancelledEvent`](#0x1_scheduled_txns_TransactionCancelledEvent)
 -  [Struct `TransactionFailedEvent`](#0x1_scheduled_txns_TransactionFailedEvent)
 -  [Struct `ShutdownEvent`](#0x1_scheduled_txns_ShutdownEvent)
 -  [Struct `KeyAndTxnInfo`](#0x1_scheduled_txns_KeyAndTxnInfo)
@@ -590,6 +591,46 @@ Stores module level auxiliary data
 
 </details>
 
+<a id="0x1_scheduled_txns_TransactionCancelledEvent"></a>
+
+## Struct `TransactionCancelledEvent`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionCancelledEvent">TransactionCancelledEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>scheduled_txn_time: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scheduled_txn_hash: u256</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sender_addr: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_scheduled_txns_TransactionFailedEvent"></a>
 
 ## Struct `TransactionFailedEvent`
@@ -1132,7 +1173,7 @@ We need a governance proposal to shutdown the module. Possible reasons to shutdo
 Continues shutdown process. Can only be called when module status is ShutdownInProgress.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_continue_shutdown">continue_shutdown</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, cancel_batch_size: u64)
+<pre><code>entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_continue_shutdown">continue_shutdown</a>(cancel_batch_size: u64)
 </code></pre>
 
 
@@ -1141,10 +1182,9 @@ Continues shutdown process. Can only be called when module status is ShutdownInP
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_continue_shutdown">continue_shutdown</a>(
-    framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, cancel_batch_size: u64
+<pre><code>entry <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_continue_shutdown">continue_shutdown</a>(
+    cancel_batch_size: u64
 ) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <a href="scheduled_txns.md#0x1_scheduled_txns_process_shutdown_batch">process_shutdown_batch</a>(cancel_batch_size);
 }
 </code></pre>
@@ -1583,11 +1623,21 @@ Cancel a scheduled transaction, must be called by the signer who originally sche
     <b>let</b> deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
     // verify sender
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender) == txn.sender_addr,
+        sender_addr == txn.sender_addr,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="scheduled_txns.md#0x1_scheduled_txns_EINVALID_SIGNER">EINVALID_SIGNER</a>)
     );
-    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), key, deposit_amt);
+    <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_internal">cancel_internal</a>(sender_addr, key, deposit_amt);
+
+    // emit cancel <a href="event.md#0x1_event">event</a>
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="scheduled_txns.md#0x1_scheduled_txns_TransactionCancelledEvent">TransactionCancelledEvent</a> {
+            scheduled_txn_time: key.time,
+            scheduled_txn_hash: key.txn_id,
+            sender_addr
+        }
+    );
 }
 </code></pre>
 

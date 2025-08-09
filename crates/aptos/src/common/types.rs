@@ -1615,6 +1615,19 @@ impl From<&Transaction> for TransactionSummary {
                 version: Some(txn.transaction_info().version.0),
                 vm_status: Some(txn.transaction_info().vm_status.clone()),
             },
+            Transaction::ScheduledTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                gas_used: Some(txn.info.gas_used.0),
+                gas_unit_price: Some(txn.gas_unit_price.0),
+                pending: None,
+                sender: Some(*txn.sender.inner()),
+                sequence_number: None,
+                replay_protector: None,
+                success: Some(txn.info.success),
+                timestamp_us: Some(txn.timestamp.0),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
+            },
         }
     }
 }

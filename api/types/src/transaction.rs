@@ -5,7 +5,7 @@
 use crate::{
     Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
-    MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
+    MoveValue, VerifyInput, VerifyInputWithRecursion, U256, U64,
 };
 use anyhow::{bail, Context as AnyhowContext, Result};
 use aptos_crypto::{
@@ -212,6 +212,7 @@ pub enum Transaction {
     StateCheckpointTransaction(StateCheckpointTransaction),
     BlockEpilogueTransaction(BlockEpilogueTransaction),
     ValidatorTransaction(ValidatorTransaction),
+    ScheduledTransaction(ScheduledTransaction),
 }
 
 impl Transaction {
@@ -224,6 +225,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
             Transaction::BlockEpilogueTransaction(txn) => txn.timestamp.0,
             Transaction::ValidatorTransaction(txn) => txn.timestamp().0,
+            Transaction::ScheduledTransaction(txn) => txn.timestamp.0,
         }
     }
 
@@ -236,6 +238,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
             Transaction::BlockEpilogueTransaction(txn) => Some(txn.info.version.into()),
             Transaction::ValidatorTransaction(txn) => Some(txn.transaction_info().version.into()),
+            Transaction::ScheduledTransaction(txn) => Some(txn.info.version.into()),
         }
     }
 
@@ -248,6 +251,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
             Transaction::BlockEpilogueTransaction(txn) => txn.info.success,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().success,
+            Transaction::ScheduledTransaction(txn) => txn.info.success,
         }
     }
 
@@ -264,6 +268,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::BlockEpilogueTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::ValidatorTransaction(txn) => txn.transaction_info().vm_status.clone(),
+            Transaction::ScheduledTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
 
@@ -276,6 +281,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
             Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
             Transaction::ValidatorTransaction(vt) => vt.type_str(),
+            Transaction::ScheduledTransaction(_) => "scheduled_transaction",
         }
     }
 
@@ -290,6 +296,7 @@ impl Transaction {
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
             Transaction::BlockEpilogueTransaction(txn) => &txn.info,
             Transaction::ValidatorTransaction(txn) => txn.transaction_info(),
+            Transaction::ScheduledTransaction(txn) => &txn.info,
         })
     }
 }
@@ -438,6 +445,20 @@ pub struct BlockEpilogueTransaction {
     pub info: TransactionInfo,
     pub timestamp: U64,
     pub block_end_info: Option<BlockEndInfo>,
+}
+
+/// Scheduled transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ScheduledTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub sender: Address,
+    pub max_gas_amount: U64,
+    pub gas_unit_price: U64,
+    pub schedule_time: U64,
+    pub txn_id: U256,
+    pub timestamp: U64,
 }
 
 /// A request to submit a transaction

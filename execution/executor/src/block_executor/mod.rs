@@ -148,6 +148,18 @@ where
 
         *self.inner.write() = None;
     }
+
+    fn state_view_ready_sched_txns(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
+        let inner = self.inner.read();
+        let inner_ref = inner
+            .as_ref()
+            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+        inner_ref.state_view_ready_sched_txns(block_id, parent_block_id)
+    }
 }
 
 struct BlockExecutorInner<V> {
@@ -378,5 +390,19 @@ where
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
 
         Ok(())
+    }
+
+    fn state_view_ready_sched_txns(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+    ) -> ExecutorResult<CachedStateView> {
+        let parent_block = self.block_tree.get_block(parent_block_id)?;
+        CachedStateView::new(
+            StateViewId::BlockExecution { block_id },
+            Arc::clone(&self.db.reader),
+            parent_block.output.result_state().latest().clone(),
+        )
+        .map_err(ExecutorError::from)
     }
 }

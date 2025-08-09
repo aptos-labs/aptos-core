@@ -90,6 +90,9 @@ pub enum SessionId {
     ScheduledTxnAbort {
         hash: HashValue,
     },
+    ScheduledTxnGetReadyTxns {
+        hash: HashValue,
+    },
 }
 
 impl SessionId {
@@ -203,6 +206,10 @@ impl SessionId {
         Self::ScheduledTxnAbort { hash }
     }
 
+    pub fn scheduled_txn_get_ready_txns(hash: HashValue) -> Self {
+        Self::ScheduledTxnGetReadyTxns { hash }
+    }
+
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
@@ -222,6 +229,7 @@ impl SessionId {
             | Self::ScheduledTxnPrologue { hash: _ }
             | Self::ScheduledTxnEpilogue { hash: _ }
             | Self::ScheduledTxnAbort { hash: _ }
+            | Self::ScheduledTxnGetReadyTxns { hash: _ }
             | Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void

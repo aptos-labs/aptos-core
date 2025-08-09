@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    transaction,
     transaction::{
         BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
         DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
@@ -216,10 +217,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     timestamp: timestamp.into(),
                 })
             },
-            ScheduledTransaction(_) => {
-                // todo: to be addressed in the future commit regarding APIs
-                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+            ScheduledTransaction(txn) => {
+                Transaction::ScheduledTransaction(transaction::ScheduledTransaction {
                     info,
+                    sender: txn.sender_handle.into(),
+                    max_gas_amount: txn.max_gas_amount.into(),
+                    gas_unit_price: txn.gas_unit_price.into(),
+                    schedule_time: txn.key.time.into(),
+                    txn_id: txn.key.txn_id.into(),
                     timestamp: timestamp.into(),
                 })
             },
