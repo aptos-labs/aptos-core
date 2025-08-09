@@ -10,7 +10,8 @@ use crate::{
     transaction::Version,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use derivative::Derivative;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 use StateSlot::*;
 
 /// Represents the content of a state slot, or the lack there of, along with information indicating
@@ -19,7 +20,7 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
@@ -211,5 +212,46 @@ impl THotStateSlot for StateSlot {
             HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next = next,
             _ => panic!("Should not be called on cold slots."),
         }
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for StateSlot {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        let hot_vacant = any::<Version>().prop_map(|hot_since_version| HotVacant {
+            hot_since_version,
+            lru_info: LRUEntry::uninitialized(),
+        });
+        let cold_occupied =
+            (any::<Version>(), any::<StateValue>()).prop_map(|(value_version, value)| {
+                ColdOccupied {
+                    value_version,
+                    value,
+                }
+            });
+        let hot_occupied = (any::<Version>(), any::<StateValue>())
+            .prop_flat_map(|(value_version, value)| {
+                (
+                    Just(value_version),
+                    (value_version..Version::MAX),
+                    Just(value),
+                )
+            })
+            .prop_map(|(value_version, hot_since_version, value)| HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            });
+        prop_oneof![
+            1 => Just(ColdVacant),
+            1 => hot_vacant,
+            2 => cold_occupied,
+            2 => hot_occupied,
+        ]
+        .boxed()
     }
 }
