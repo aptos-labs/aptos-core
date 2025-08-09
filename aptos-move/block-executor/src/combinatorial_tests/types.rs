@@ -4,6 +4,7 @@
 
 use crate::types::delayed_field_mock_serialization::serialize_delayed_field_tuple;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
@@ -423,6 +424,7 @@ pub(crate) enum MockTransaction<K, E> {
     SkipRest(u64),
     /// Abort the execution.
     Abort,
+    StateCheckpoint,
 }
 
 impl<K, E> MockTransaction<K, E> {
@@ -473,6 +475,9 @@ impl<K, E> MockTransaction<K, E> {
             Self::InterruptRequested => {
                 unreachable!("InterruptRequested does not contain incarnation behaviors")
             },
+            Self::StateCheckpoint => {
+                unreachable!("StateCheckpoint does not contain incarnation behaviors")
+            },
         }
     }
 }
@@ -491,15 +496,8 @@ impl<
         0
     }
 
-    fn from_txn(txn: aptos_types::transaction::Transaction) -> Self {
-        match txn {
-            aptos_types::transaction::Transaction::StateCheckpoint(_)
-            | aptos_types::transaction::Transaction::BlockEpilogue(_) => {
-                let behaivor = MockIncarnation::new(vec![], vec![], vec![], vec![], 0);
-                Self::from_behavior(behaivor)
-            },
-            _ => unreachable!(),
-        }
+    fn state_checkpoint(_block_id: HashValue) -> Self {
+        Self::StateCheckpoint
     }
 }
 

@@ -30,7 +30,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    state_store::{state_key::StateKey, StateView},
+    state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
@@ -59,7 +59,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();

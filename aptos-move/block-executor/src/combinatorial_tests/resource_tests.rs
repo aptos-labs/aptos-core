@@ -104,7 +104,7 @@ pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
     data_view: &ViewType,
     all_module_ids: Option<&[ModuleId]>,
     block_stm_v2: bool,
-) -> Result<BlockOutput<ViewType::Key, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
+) -> Result<BlockOutput<TxnType, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
     TxnType: Transaction<Key = KeyType<[u8; 32]>> + Debug + Clone + Send + Sync + 'static,
     ViewType: TStateView<Key = TxnType::Key> + Sync + 'static,
