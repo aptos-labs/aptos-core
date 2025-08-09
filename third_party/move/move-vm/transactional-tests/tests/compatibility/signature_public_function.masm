@@ -1,0 +1,32 @@
+//# publish
+module 0x66::a
+public fun foo(x: u32, y: u64): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::a
+public fun foo(a: u32, b: u64): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::a
+public fun foo(x: u32): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::a
+public fun foo(x: u32, y: u64, z: bool): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::a
+public fun foo(x: u32, y: u64)
+    ret

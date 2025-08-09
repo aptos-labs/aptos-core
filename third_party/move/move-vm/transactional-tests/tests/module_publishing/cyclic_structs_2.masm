@@ -1,0 +1,24 @@
+//# publish --verbose
+module 0x66::a
+struct A
+    x: u64
+
+
+//# publish --verbose
+module 0x66::b
+struct B
+    a: 0x66::a::A
+
+
+//# publish --verbose
+module 0x66::c
+struct C
+    b: 0x66::b::B
+
+
+//# publish --verbose
+module 0x66::a
+struct A
+    x: u64
+struct D
+    c: 0x66::c::C

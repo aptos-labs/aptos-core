@@ -8,5 +8,5 @@ Error: Script execution failed with VMError: {
     location: 0x1::Token,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [(None, FunctionDefinitionIndex(0), 0)] }),
+    exec_state: None,
 }

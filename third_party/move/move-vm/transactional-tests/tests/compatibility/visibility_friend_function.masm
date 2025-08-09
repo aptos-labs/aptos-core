@@ -1,0 +1,29 @@
+//# publish
+module 0x66::a
+friend fun foo()
+    ret
+friend fun bar()
+    ret
+
+//# publish
+module 0x66::a
+// Non-compatible visibility change, publish fails
+fun foo()
+    ret
+friend fun bar()
+    ret
+
+//# publish
+module 0x66::a
+public fun foo()
+    ret
+friend fun bar()
+    ret
+
+//# publish --skip-check-friend-linking
+module 0x66::a
+public fun foo()
+    ret
+// If friends treated as private, can change visibility
+fun bar()
+    ret

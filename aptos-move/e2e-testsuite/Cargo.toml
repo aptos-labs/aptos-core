@@ -30,6 +30,7 @@ move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
 proptest = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = [

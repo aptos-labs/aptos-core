@@ -5,12 +5,11 @@ task 2 lines 49-51:  run --verbose 0x66::app::run [/// `lib` is republished with
 task 3 lines 52-75:  publish --skip-check-struct-and-pub-function-linking [module 0x66::lib]
 task 4 lines 77-77:  run --verbose 0x66::app::run
 Error: Function execution failed with VMError: {
-    message: Unexpected verifier/deserialization error! This likely means there is code stored on chain that is unverifiable!
-Error: VMError { major_status: TYPE_MISMATCH, sub_status: None, message: Some("imported type mismatches expectation"), exec_state: None, location: Module(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("app") }), indices: [(FunctionHandle, 2)], offsets: [] },
-    major_status: UNEXPECTED_VERIFIER_ERROR,
-    sub_status: None,
-    location: 0x66::app,
-    indices: [(FunctionHandle, 2)],
+    message: Expected type |u32|u32 has copy, got |u64|u32 has copy + drop which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
     offsets: [],
     exec_state: None,
 }

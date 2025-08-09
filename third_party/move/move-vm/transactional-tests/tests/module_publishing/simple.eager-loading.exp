@@ -1,0 +1,6 @@
+processed 4 tasks
+task 0 lines 1-18:  publish --verbose [module 0x66::math]
+task 1 lines 21-30:  run --verbose [script]
+task 2 lines 32-32:  run 0x66::math::add --args 0u32 1u32 --verbose
+return values: 1
+task 3 lines 34-34:  run 0x66::math::assert_eq --args 23u32 23u32 --verbose

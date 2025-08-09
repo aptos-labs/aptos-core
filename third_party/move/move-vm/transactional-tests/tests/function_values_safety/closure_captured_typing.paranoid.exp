@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 4)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }
 task 3 lines 64-77:  run --verbose [script]
 task 4 lines 79-92:  run --verbose [script]
@@ -20,7 +20,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 4)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }
 task 5 lines 94-107:  run --verbose [script]
 Error: Script execution failed with VMError: {
@@ -30,7 +30,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }
 task 6 lines 109-122:  run --verbose [script]
 Error: Script execution failed with VMError: {
@@ -40,5 +40,5 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }
