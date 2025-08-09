@@ -1,0 +1,8 @@
+# Intentionally misnamed to test missing Move.toml
+# Do not delete this file, as it ensures the directory exists!
+
+[package]
+name = "NoMoveToml"
+version = "0.1.2"
+
+[dependencies]
