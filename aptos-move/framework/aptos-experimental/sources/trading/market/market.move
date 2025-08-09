@@ -379,7 +379,7 @@ module aptos_experimental::market {
         next_fill_id
     }
 
-    fun emit_event_for_order<M: store + copy + drop>(
+    public fun emit_event_for_order<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
