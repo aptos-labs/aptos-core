@@ -41,11 +41,11 @@ module 0x8675309::M {
     fun t1() {
         if ({
             let x = true;
-            x
+            x;
         }) ();
         if ({
             let x = false;
-            x
+            x;
         }) ()
     }
 }

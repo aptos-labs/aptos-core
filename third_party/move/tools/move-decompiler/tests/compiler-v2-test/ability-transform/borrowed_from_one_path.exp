@@ -4,15 +4,16 @@ module 0x42::m {
     }
     fun f(k: u8, d: &vector<u64>): u64 {
         let _t2;
-        if (k == 0u8) _t2 = &borrow_global(0x1).data else _t2 = d;
-        *0x1::vector::borrow<u64>(_t2, 0)
+        if (k == 0u8) {
+            let _t6 = d;
+            let _t7 = @0x1;
+            _t2 = &borrow_global<R>(_t7).data;
+        } else _t2 = d;
+        let _t10 = _t2;
+        let _t11 = 0;
+        let _t12 = 0x1::vector::borrow<u64>(_t10, _t11);
+        *_t12
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot use `integer` with an operator which expects a value of type `address`
-  ┌─ borrowed_from_one_path.move:7:44
-  │
-7 │         if (k == 0u8) _t2 = &borrow_global(0x1).data else _t2 = d;
-  │                                            ^^^
+============ recompilation succeeded ========

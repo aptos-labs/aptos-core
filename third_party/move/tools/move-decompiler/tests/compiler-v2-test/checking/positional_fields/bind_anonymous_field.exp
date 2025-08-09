@@ -17,14 +17,12 @@ module 0x42::test {
     fun match(x: E1) {
         let _t1 = &x;
         if (_t1 is V1) {
-            &_t1._0;
             let E1::V1{_0: _t9} = x;
-            let S0{_0: _t10} = _t9
+            let S0{_0: _t10} = _t9;
         } else if (_t1 is V2) {
-            &&_t1._0._1;
             let E1::V2{_0: _t17} = x;
             let S1{_0: _t18,_1: _t19} = _t17;
-            let S0{_0: _t20} = _t19
+            let S0{_0: _t20} = _t19;
         } else abort 14566554180833181697;
     }
     fun nested(x: S1) {
@@ -36,13 +34,4 @@ module 0x42::test {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: unexpected token
-   ┌─ bind_anonymous_field.move:23:9
-   │
-23 │         } else if (_t1 is V2) {
-   │         ^
-   │         │
-   │         Unexpected '}'
-   │         Expected ';'
+============ recompilation succeeded ========

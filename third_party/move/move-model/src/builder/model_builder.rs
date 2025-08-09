@@ -271,6 +271,7 @@ impl<'env> ModelBuilder<'env> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }

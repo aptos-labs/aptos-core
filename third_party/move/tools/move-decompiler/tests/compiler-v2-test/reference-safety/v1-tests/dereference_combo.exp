@@ -12,29 +12,23 @@ module 0x8675309::M {
     fun t0(cond: bool, s: &mut S, other: &S) {
         let _t3;
         if (cond) _t3 = &s.f else _t3 = &other.f;
-        *s;
-        *_t3;
-        *s;
+        let _t9 = *s;
+        let _t11 = *_t3;
+        let _t13 = *s;
     }
     fun t1(cond: bool, s: &mut S) {
         let _t2;
         if (cond) _t2 = &s.f else _t2 = &s.g;
-        *s;
-        *_t2;
-        *s;
+        let _t7 = *s;
+        let _t9 = *_t2;
+        let _t11 = *s;
     }
     fun t2(cond: bool, s: &mut S, other: &S) {
         let _t3;
-        if (cond) _t3 = /*freeze*/s else _t3 = other;
-        *s;
-        *_t3;
+        if (cond) _t3 = freeze(s) else _t3 = other;
+        let _t9 = *s;
+        let _t11 = *_t3;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot assign `&S` to left-hand side of type `&mut S` (mutability mismatch)
-   ┌─ dereference_combo.move:28:42
-   │
-28 │         if (cond) _t3 = /*freeze*/s else _t3 = other;
-   │                                          ^^^
+============ recompilation succeeded ========

@@ -3,14 +3,11 @@ module 0x8675309::M {
         f: u64,
     }
     fun t0(addr: address) {
-        &mut borrow_global_mut(addr).f = *&borrow_global_mut(addr).f;
+        let _t1 = addr;
+        let _t4 = *&borrow_global_mut<R>(_t1).f;
+        let _t5 = addr;
+        *&mut borrow_global_mut<R>(_t5).f = _t4;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-  ┌─ borrow_global_mut.move:6:9
-  │
-6 │         &mut borrow_global_mut(addr).f = *&borrow_global_mut(addr).f;
-  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

@@ -143,7 +143,7 @@ module 0x42::test {
     fun add1_new(x: u256): u256 {
         {
             let $t = 1u256;
-            x = x + $t
+            x = x + $t;
         };
         x
     }
@@ -155,7 +155,7 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = &mut self.0;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun coin_inc_new_2(self: &mut Coin) {
@@ -176,14 +176,14 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = &mut coin.0;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_new(x: &mut u256) {
         {
             let $t2 = 1u256;
             let $t1 = x;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_old(x: &mut u256) {
@@ -193,7 +193,7 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = &mut 0x1::vector::borrow_mut<Coin>(&mut x, index).0;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_vec_coin_old(x: vector<Coin>, index: u64) {
@@ -203,7 +203,7 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = 0x1::vector::borrow_mut<u256>(x, index);
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_vec_old(x: vector<u256>, index: u64) {
@@ -213,7 +213,7 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) {
@@ -223,7 +223,7 @@ module 0x42::test {
         {
             let $t2 = 1u256;
             let $t1 = &mut x.0.0;
-            *$t1 = *$t1 + $t2
+            *$t1 = *$t1 + $t2;
         };
     }
     fun inc_wrapped_coin_old(x: &mut Wrapper<Coin>) {

@@ -3,24 +3,21 @@ module 0x42::globals {
         f: u64,
     }
     fun check(a: address): bool {
-        exists(a)
+        let _t2 = exists<R>(a);
+        _t2
     }
     fun publish(s: &signer) {
-        move_to(R{f: 1}, s);
+        move_to<R>(s, R{f: 1});
     }
     fun read(a: address): u64 {
-        *&borrow_global(a).f
+        let _t1 = a;
+        *&borrow_global<R>(_t1).f
     }
     fun write(a: address): u64 {
-        &mut borrow_global_mut(a).f = 2;
+        let _t2 = a;
+        *&mut borrow_global_mut<R>(_t2).f = 2;
         9
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ globals.move:15:9
-   │
-15 │         &mut borrow_global_mut(a).f = 2;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

@@ -39,6 +39,6 @@ module 0xc0ffee::dummy2 {
         value: u64,
     }
     fun tuple_assignments(s: &signer, state: State) {
-        let () = move_to<State>(s, state);
+        let () = move_to<State>(state, s);
     }
 }

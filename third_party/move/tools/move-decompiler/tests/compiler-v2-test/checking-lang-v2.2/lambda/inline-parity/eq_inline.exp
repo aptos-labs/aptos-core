@@ -3,17 +3,11 @@ module 0x42::m {
         ()
     }
     fun g() {
-        foo(|arg0| __lambda__1__g(arg0));
+        foo(|arg0| lambda__1__g(arg0));
     }
-    fun __lambda__1__g(v: &u64) {
-        v == &1;
+    fun lambda__1__g(v: &u64) {
+        let _t5 = v == &1;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid name
-  ┌─ eq_inline.move:8:9
-  │
-8 │     fun __lambda__1__g(v: &u64) {
-  │         ^^^^^^^^^^^^^^ Invalid function name '__lambda__1__g'. Function names cannot start with '_'
+============ recompilation succeeded ========

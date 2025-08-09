@@ -2,7 +2,6 @@ module 0x2::X {
     struct R {
     }
 }
-
 module 0x2::M {
     use 0x2::X;
     fun foo(_x: u64) {
@@ -28,19 +27,19 @@ module 0x2::M {
 --- unable to recompile the decompiled code:
 exiting with context checking errors
 error: cannot return nothing from a function with result type `X::R`
-   ┌─ loop_result_type.move:12:9
+   ┌─ loop_result_type.move:11:9
    │
-12 │         loop continue
+11 │         loop continue
    │         ^^^^^^^^^^^^^
 
 error: cannot return nothing from a function with result type `u64`
-   ┌─ loop_result_type.move:15:9
+   ┌─ loop_result_type.move:14:9
    │
-15 │         loop continue
+14 │         loop continue
    │         ^^^^^^^^^^^^^
 
 error: cannot return nothing from a function with result type `X::R`
-   ┌─ loop_result_type.move:21:9
+   ┌─ loop_result_type.move:20:9
    │
-21 │         loop continue
+20 │         loop continue
    │         ^^^^^^^^^^^^^

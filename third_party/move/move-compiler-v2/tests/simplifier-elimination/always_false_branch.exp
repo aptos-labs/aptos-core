@@ -20,7 +20,7 @@ module 0xc0ffee::m {
         if (false) {
             let i = 0;
             i = i + 1;
-            return i
+            return i;
         };
         0
     }

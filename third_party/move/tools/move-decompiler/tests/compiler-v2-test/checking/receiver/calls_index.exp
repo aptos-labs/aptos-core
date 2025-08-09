@@ -12,66 +12,92 @@ module 0x42::m {
         inner: T,
     }
     fun boo(v: vector<S>, w: W) {
-        merge(&mut &mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w);
+        let _t2 = &mut v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow_mut<S>(_t2, _t3);
+        merge(&mut (&mut _t4.t).w, w);
     }
     fun merge(self: &mut W, s: W) {
         let _t3 = &mut self.x;
-        *_t3 = *_t3 + *&(&s).x;
+        let _t12 = *_t3 + *&(&s).x;
+        *_t3 = _t12;
     }
     fun boo_(v: vector<S>, w: W) {
-        merge(&mut &mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w);
+        let _t2 = &mut v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow_mut<S>(_t2, _t3);
+        merge(&mut (&mut _t4.t).w, w);
     }
     fun boo_greater(v: vector<S>, w: W): bool {
-        greater(&&0x1::vector::borrow<S>(&v, 0).t.w, w)
+        let _t2 = &v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow<S>(_t2, _t3);
+        let _t8 = greater(&(&_t4.t).w, w);
+        _t8
     }
     fun greater(self: &W, s: W): bool {
         *&self.x > *&(&s).x
     }
     fun boo_greater_(v: vector<S>, w: W): bool {
-        greater(/*freeze*/&mut &mut 0x1::vector::borrow_mut<S>(&mut v, 0).t.w, w)
+        let _t2 = &mut v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow_mut<S>(_t2, _t3);
+        let _t9 = greater(freeze(&mut (&mut _t4.t).w), w);
+        _t9
     }
     fun boo_greater_2(v: vector<W>, w: W): bool {
-        greater(0x1::vector::borrow<W>(&v, 0), w)
+        let _t2 = &v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow<W>(_t2, _t3);
+        let _t6 = greater(_t4, w);
+        _t6
     }
     fun boo_greater_2_(v: vector<W>, w: W): bool {
-        greater(0x1::vector::borrow<W>(&v, 0), w)
+        let _t2 = &v;
+        let _t3 = 0;
+        let _t4 = 0x1::vector::borrow<W>(_t2, _t3);
+        let _t6 = greater(_t4, w);
+        _t6
     }
     fun dispatch<T: copy + store>(account: address): T {
-        unwrap<T>(borrow_global<T>(account))
+        let _t1 = account;
+        let _t3 = unwrap<T>(borrow_global<Wrapper<T>>(_t1));
+        _t3
     }
     fun unwrap<T: copy>(self: &Wrapper<T>): T {
         *&self.inner
     }
     fun foo(account: address, w: W) {
-        merge(&mut &mut borrow_global_mut(account).t.w, w);
+        let _t2 = account;
+        merge(&mut (&mut borrow_global_mut<S>(_t2).t).w, w);
     }
     fun foo_(account: address, w: W) {
-        merge(&mut &mut borrow_global_mut(account).t.w, w);
+        let _t2 = account;
+        merge(&mut (&mut borrow_global_mut<S>(_t2).t).w, w);
     }
     fun foo_2(account: address, w: W) {
-        merge(borrow_global_mut(account), w);
+        let _t2 = account;
+        merge(borrow_global_mut<W>(_t2), w);
     }
     fun foo_3(account: address, w: W) {
-        merge(borrow_global_mut(account), w);
+        let _t2 = account;
+        merge(borrow_global_mut<W>(_t2), w);
     }
     fun foo_greater(account: address, w: W): bool {
-        greater(&&borrow_global(account).t.w, w)
+        let _t2 = account;
+        let _t7 = greater(&(&borrow_global<S>(_t2).t).w, w);
+        _t7
     }
     fun foo_greater_(account: address, w: W): bool {
-        greater(/*freeze*/&mut &mut borrow_global_mut(account).t.w, w)
+        let _t2 = account;
+        let _t8 = greater(freeze(&mut (&mut borrow_global_mut<S>(_t2).t).w), w);
+        _t8
     }
     fun foo_greater_2(account: address, w: W): bool {
-        greater(borrow_global(account), w)
+        let _t2 = account;
+        let _t5 = greater(borrow_global<W>(_t2), w);
+        _t5
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: unexpected token
-   ┌─ calls_index.move:25:17
-   │
-25 │         greater(&&0x1::vector::borrow<S>(&v, 0).t.w, w)
-   │                 ^^
-   │                 │
-   │                 Unexpected '&&'
-   │                 Expected an expression term
+============ recompilation succeeded ========

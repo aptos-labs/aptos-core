@@ -9,26 +9,16 @@ module 0x42::m {
         abort 0
     }
     fun owner_correct(o: Object): address {
-        *&borrow_global(*&(&o).inner).owner
+        let _t3 = *&(&o).inner;
+        *&borrow_global<ObjectCore>(_t3).owner
     }
     fun owner_read_ref_missing(o: Object): address {
-        *&borrow_global(*&(&o).inner).owner
+        let _t3 = *&(&o).inner;
+        *&borrow_global<ObjectCore>(_t3).owner
     }
     fun will_autoref(): address {
         *&(&make()).inner
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: unable to infer instantiation of type `&key + struct{owner}` (consider providing type arguments or annotating the type)
-   ┌─ escape_autoref.move:12:11
-   │
-12 │         *&borrow_global(*&(&o).inner).owner
-   │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: unable to infer instantiation of type `&key + struct{owner}` (consider providing type arguments or annotating the type)
-   ┌─ escape_autoref.move:15:11
-   │
-15 │         *&borrow_global(*&(&o).inner).owner
-   │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+============ recompilation succeeded ========

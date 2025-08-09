@@ -3,20 +3,15 @@ module 0x42::Test {
         f(x) + g(x)
     }
     public fun test() {
-        if (!(foo(|arg0| __lambda__1__test(arg0), |arg0| __lambda__2__test(arg0), 10, 100) == 13)) abort 0;
+        let _t4 = foo(|arg0| lambda__1__test(arg0), |arg0| lambda__2__test(arg0), 10, 100);
+        if (!(_t4 == 13)) abort 0;
     }
-    fun __lambda__1__test(param$0: u64): u64 {
+    fun lambda__1__test(param_0: u64): u64 {
         3
     }
-    fun __lambda__2__test(param$0: u64): u64 {
+    fun lambda__2__test(param_0: u64): u64 {
         10
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid character
-  ┌─ bug_10991_noparam2.move:8:32
-  │
-8 │     fun __lambda__1__test(param$0: u64): u64 {
-  │                                ^ Invalid character: `$`
+============ recompilation succeeded ========

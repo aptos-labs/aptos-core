@@ -16,52 +16,46 @@ module 0x8675309::M {
     fun t0(outer: &mut Outer) {
         let _t1 = &outer.s1;
         let _t2 = &_t1.f1;
-        *_t2;
-        *_t1;
-        *&_t1.f1;
-        *_t1;
-        *_t2;
+        let _t12 = *_t2;
+        let _t14 = *_t1;
+        let _t15 = *&_t1.f1;
+        let _t17 = *_t1;
+        let _t19 = *_t2;
         _t1 = &outer.s1;
         _t2 = id<u64>(&_t1.f1);
-        *_t2;
-        *_t1;
-        *&_t1.f1;
-        *_t1;
-        *_t2;
+        let _t28 = *_t2;
+        let _t30 = *_t1;
+        let _t31 = *&_t1.f1;
+        let _t33 = *_t1;
+        let _t35 = *_t2;
         let _t3 = &mut outer.s1;
         _t2 = &_t3.f1;
-        *_t2;
-        *_t3;
-        *&_t3.f1;
-        *_t3;
-        *_t2;
+        let _t41 = &_t3.f1;
+        let _t43 = *_t2;
+        let _t45 = *_t3;
+        let _t46 = *_t41;
+        let _t48 = *_t3;
+        let _t50 = *_t2;
         _t3 = &mut outer.s1;
         _t2 = id<u64>(&_t3.f1);
-        *_t2;
-        *_t3;
-        *&_t3.f1;
-        *_t3;
-        *_t2;
+        let _t57 = &_t3.f1;
+        let _t59 = *_t2;
+        let _t61 = *_t3;
+        let _t62 = *_t57;
+        let _t64 = *_t3;
+        let _t66 = *_t2;
         _t3 = &mut outer.s1;
+        let _t70 = &mut _t3.f1;
         let _t4 = &mut _t3.f1;
-        *&mut _t3.f1;
-        *_t4;
-        *_t3;
+        let _t73 = *_t70;
+        let _t75 = *_t4;
+        let _t77 = *_t3;
         _t3 = &mut outer.s1;
-        *id_mut<u64>(&mut _t3.f1);
-        *&mut _t3.f1;
-        *_t3;
+        let _t82 = id_mut<u64>(&mut _t3.f1);
+        let _t85 = *_t82;
+        let _t87 = *&mut _t3.f1;
+        let _t89 = *_t3;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with stackless-bytecode checks failed
-error: cannot borrow field `f1` of value which is already mutably borrowed
-   ┌─ borrow_field_field.move:47:15
-   │
-46 │         let _t4 = &mut _t3.f1;
-   │                   ----------- field `f1` previously mutably borrowed here
-47 │         *&mut _t3.f1;
-   │               ^^^^^^ borrow attempted here
-48 │         *_t4;
-   │         ---- conflicting reference `_t4` used here
+============ recompilation succeeded ========

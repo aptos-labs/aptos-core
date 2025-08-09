@@ -11,41 +11,47 @@ module 0x8675309::M {
         g: u64,
     }
     fun t(r1: &mut u64, r2: &mut u64, s: &mut S) {
-        /*freeze*/r1 == /*freeze*/r1;
-        /*freeze*/r1 == /*freeze*/r2;
-        /*freeze*/r2 == /*freeze*/r2;
-        /*freeze*/r2 == /*freeze*/r2;
-        /*freeze*/r1 != /*freeze*/r1;
-        /*freeze*/r1 != /*freeze*/r2;
-        /*freeze*/r2 != /*freeze*/r2;
-        /*freeze*/r2 != /*freeze*/r2;
-        /*freeze*/&mut s.f == /*freeze*/&mut s.f;
-        /*freeze*/&mut s.f == /*freeze*/&mut s.g;
-        /*freeze*/&mut s.g == /*freeze*/&mut s.f;
-        /*freeze*/&mut s.g == /*freeze*/&mut s.g;
-        /*freeze*/&mut s.f != /*freeze*/&mut s.f;
-        /*freeze*/&mut s.f != /*freeze*/&mut s.g;
-        /*freeze*/&mut s.g != /*freeze*/&mut s.f;
-        /*freeze*/&mut s.g != /*freeze*/&mut s.g;
+        let _t4 = freeze(r1);
+        let _t7 = _t4 == freeze(r1);
+        let _t12 = freeze(r1) == freeze(r2);
+        let _t14 = freeze(r2);
+        let _t17 = _t14 == freeze(r2);
+        let _t19 = freeze(r2);
+        let _t22 = _t19 == freeze(r2);
+        let _t24 = freeze(r1);
+        let _t27 = _t24 != freeze(r1);
+        let _t32 = freeze(r1) != freeze(r2);
+        let _t34 = freeze(r2);
+        let _t37 = _t34 != freeze(r2);
+        let _t39 = freeze(r2);
+        let _t42 = _t39 != freeze(r2);
+        let _t45 = freeze(&mut s.f);
+        let _t49 = _t45 == freeze(&mut s.f);
+        let _t52 = freeze(&mut s.f);
+        let _t56 = _t52 == freeze(&mut s.g);
+        let _t59 = freeze(&mut s.g);
+        let _t63 = _t59 == freeze(&mut s.f);
+        let _t66 = freeze(&mut s.g);
+        let _t70 = _t66 == freeze(&mut s.g);
+        let _t73 = freeze(&mut s.f);
+        let _t77 = _t73 != freeze(&mut s.f);
+        let _t80 = freeze(&mut s.f);
+        let _t84 = _t80 != freeze(&mut s.g);
+        let _t87 = freeze(&mut s.g);
+        let _t91 = _t87 != freeze(&mut s.f);
+        let _t94 = freeze(&mut s.g);
+        let _t98 = _t94 != freeze(&mut s.g);
     }
     fun t1(p: &mut P) {
-        &mut &mut p.b1.f = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
+        let _t3 = freeze(&mut p.b1);
+        let _t7 = _t3 == freeze(&mut p.b2);
+        *&mut (&mut p.b1).f = _t7;
     }
     fun t2(p: &mut P) {
-        &mut &mut p.b1.f = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
+        let _t3 = freeze(&mut p.b1);
+        let _t7 = _t3 != freeze(&mut p.b2);
+        *&mut (&mut p.b1).f = _t7;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ mutable_eq_and_neq.move:32:9
-   │
-32 │         &mut &mut p.b1.f = /*freeze*/&mut p.b1 == /*freeze*/&mut p.b2;
-   │         ^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
-
-error: invalid assignment
-   ┌─ mutable_eq_and_neq.move:35:9
-   │
-35 │         &mut &mut p.b1.f = /*freeze*/&mut p.b1 != /*freeze*/&mut p.b2;
-   │         ^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

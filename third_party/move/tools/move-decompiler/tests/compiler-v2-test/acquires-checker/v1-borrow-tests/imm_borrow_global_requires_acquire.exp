@@ -3,14 +3,9 @@ module 0x8675309::A {
         b: bool,
     }
     public fun test(addr: address) {
-        borrow_global(addr);
+        let _t2 = addr;
+        let _t3 = borrow_global<T1>(_t2);
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: unable to infer instantiation of type `&key` (consider providing type arguments or annotating the type)
-  ┌─ imm_borrow_global_requires_acquire.move:6:9
-  │
-6 │         borrow_global(addr);
-  │         ^^^^^^^^^^^^^^^^^^^
+============ recompilation succeeded ========

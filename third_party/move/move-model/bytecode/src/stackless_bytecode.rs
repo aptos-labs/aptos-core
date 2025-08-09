@@ -155,9 +155,7 @@ impl Constant {
             Constant::U32(x) => Value::Number((*x).into()),
             Constant::U64(x) => Value::Number((*x).into()),
             Constant::U128(x) => Value::Number((*x).into()),
-            Constant::U256(x) => {
-                Value::Number(BigInt::from_bytes_le(Sign::NoSign, &x.to_le_bytes()))
-            },
+            Constant::U256(x) => Value::Number(BigInt::from_bytes_le(Sign::Plus, &x.to_le_bytes())),
             Constant::Address(a) => Value::Address(a.clone()),
             Constant::Vector(v) => Value::Vector(v.iter().map(|x| x.to_model_value()).collect()),
             Constant::ByteArray(v) => {

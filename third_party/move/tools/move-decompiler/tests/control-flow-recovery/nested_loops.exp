@@ -4,17 +4,20 @@ module 0x99::nested_loops {
         let _t1 = 0;
         let _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            let _t8 = _t2;
+            if (_t8) _t1 = _t1 + 1 else _t2 = true;
             if (!(_t1 < 10)) break;
             _t0 = _t0 + 1;
             let _t3 = _t1;
             let _t4 = false;
             loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                let _t20 = _t4;
+                if (_t20) _t3 = _t3 + 1 else _t4 = true;
                 if (!(_t3 < 10)) continue 'l0;
-                _t0 = _t0 + 1
+                _t0 = _t0 + 1;
+                continue;
             };
-            break
+            break;
         };
     }
     fun nested_for_while_loop_loops() {
@@ -22,7 +25,8 @@ module 0x99::nested_loops {
         let _t1 = 0;
         let _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            let _t8 = _t2;
+            if (_t8) _t1 = _t1 + 1 else _t2 = true;
             if (!(_t1 < 5)) break;
             _t0 = _t0 + 1;
             let _t3 = _t1;
@@ -34,11 +38,11 @@ module 0x99::nested_loops {
                 loop {
                     _t0 = _t0 + 1;
                     if (_t4 > 10) continue 'l1;
-                    _t4 = _t4 + 1
+                    _t4 = _t4 + 1;
                 };
-                break
+                break;
             };
-            break
+            break;
         };
     }
     fun nested_for_while_loops() {
@@ -46,14 +50,15 @@ module 0x99::nested_loops {
         let _t1 = 0;
         let _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            let _t6 = _t2;
+            if (_t6) _t1 = _t1 + 1 else _t2 = true;
             if (!(_t1 < 5)) break;
             _t0 = _t0 + 1;
             loop {
                 if (!(_t0 < 5)) continue 'l0;
-                _t0 = _t0 + 10
+                _t0 = _t0 + 10;
             };
-            break
+            break;
         };
     }
     fun nested_loop_for_loops() {
@@ -66,12 +71,14 @@ module 0x99::nested_loops {
             let _t3 = 0;
             let _t4 = false;
             loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                let _t16 = _t4;
+                if (_t16) _t3 = _t3 + 1 else _t4 = true;
                 if (!(_t3 < 5)) continue 'l0;
                 _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+                _t1 = _t1 + 1;
+                continue;
             };
-            break
+            break;
         };
     }
     fun nested_loop_loops() {
@@ -84,9 +91,9 @@ module 0x99::nested_loops {
             loop {
                 _t2 = _t2 + 1;
                 _t1 = _t1 + 1;
-                if (_t2 > 7) continue 'l0
+                if (_t2 > 7) continue 'l0;
             };
-            break
+            break;
         };
     }
     fun nested_loop_while_loops() {
@@ -99,9 +106,9 @@ module 0x99::nested_loops {
             loop {
                 if (!(_t2 < 7)) continue 'l0;
                 _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+                _t1 = _t1 + 1;
             };
-            break
+            break;
         };
     }
     fun nested_while_loops() {
@@ -113,9 +120,9 @@ module 0x99::nested_loops {
             loop {
                 if (!(_t2 < 7)) continue 'l0;
                 _t2 = _t2 + 1;
-                _t1 = _t1 + 1
+                _t1 = _t1 + 1;
             };
-            break
+            break;
         };
     }
     fun three_layer_for_loops() {
@@ -123,25 +130,29 @@ module 0x99::nested_loops {
         let _t1 = 0;
         let _t2 = false;
         'l0: loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
+            let _t10 = _t2;
+            if (_t10) _t1 = _t1 + 1 else _t2 = true;
             if (!(_t1 < 10)) break;
             _t0 = _t0 + 1;
             let _t3 = _t1;
             let _t4 = false;
             'l1: loop {
-                if (_t4) _t3 = _t3 + 1 else _t4 = true;
+                let _t22 = _t4;
+                if (_t22) _t3 = _t3 + 1 else _t4 = true;
                 if (!(_t3 < 10)) continue 'l0;
                 _t0 = _t0 + 1;
                 let _t5 = _t3;
                 let _t6 = false;
                 loop {
-                    if (_t6) _t5 = _t5 + 1 else _t6 = true;
+                    let _t34 = _t6;
+                    if (_t34) _t5 = _t5 + 1 else _t6 = true;
                     if (!(_t5 < 10)) continue 'l1;
-                    _t0 = _t0 + 1
+                    _t0 = _t0 + 1;
+                    continue;
                 };
-                break
+                break;
             };
-            break
+            break;
         };
     }
     fun three_layer_loop_loops() {
@@ -160,11 +171,11 @@ module 0x99::nested_loops {
                 loop {
                     _t0 = _t0 + 1;
                     if (_t3 > 10) continue 'l1;
-                    _t3 = _t3 + 1
+                    _t3 = _t3 + 1;
                 };
-                break
+                break;
             };
-            break
+            break;
         };
     }
     fun three_layer_while_loops() {
@@ -182,11 +193,11 @@ module 0x99::nested_loops {
                 loop {
                     if (!(_t3 < 10)) continue 'l1;
                     _t0 = _t0 + 1;
-                    _t3 = _t3 + 1
+                    _t3 = _t3 + 1;
                 };
-                break
+                break;
             };
-            break
+            break;
         };
     }
 }
