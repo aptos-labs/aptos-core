@@ -140,7 +140,7 @@ jobs:
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: revert
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows #TODO: revert
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -148,10 +148,11 @@ jobs:
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
+      WAIT_FOR_RELEASE_IMAGES: true
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: revert
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows #TODO: revert
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -164,10 +165,11 @@ jobs:
       FEATURES: failpoints
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
+      WAIT_FOR_FAILPOINTS_IMAGES: true
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows # TODO: revert
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/verify-and-build-images-for-workflows #TODO: revert
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -179,6 +181,7 @@ jobs:
       PROFILE: performance
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
+      WAIT_FOR_PERF_IMAGES: true
 
   rust-images-consensus-only-perf-test:
     needs: [permission-check, determine-docker-build-metadata]
