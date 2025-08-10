@@ -2,8 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout,
+use crate::{
+    registered_dependencies::{
+        check_lowest_dependency_idx, take_dependencies, RegisteredReadDependencies,
+    },
+    types::{Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout},
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::DeltaOp;
@@ -12,16 +15,13 @@ use aptos_types::{
     error::{code_invariant_error, PanicError},
     write_set::TransactionWrite,
 };
-use claims::assert_some;
+use claims::{assert_ok, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use equivalent::Equivalent;
 use move_core_types::value::MoveTypeLayout;
 use std::{
-    collections::{
-        btree_map::{self, BTreeMap},
-        BTreeSet,
-    },
+    collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -50,13 +50,11 @@ enum EntryCell<V> {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
-    /// stored in a shared pointer (to ensure ownership and avoid clones). and
-    /// a mutex-protected set of (txn_idx, incarnation) pairs that have registered
-    /// a read of this entry.
+    /// stored in a shared pointer (to ensure ownership and avoid clones).
     ResourceWrite {
         incarnation: Incarnation,
         value_with_layout: ValueWithLayout<V>,
-        dependencies: Mutex<BTreeSet<(TxnIndex, Incarnation)>>,
+        dependencies: Mutex<RegisteredReadDependencies>,
     },
 
     /// Recorded in the shared multi-version data-structure for each delta.
@@ -80,12 +78,12 @@ pub struct VersionedData<K, V> {
 fn new_write_entry<V>(
     incarnation: Incarnation,
     value: ValueWithLayout<V>,
-    dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+    dependencies: BTreeMap<TxnIndex, Incarnation>,
 ) -> Entry<EntryCell<V>> {
     Entry::new(EntryCell::ResourceWrite {
         incarnation,
         value_with_layout: value,
-        dependencies: Mutex::new(dependencies),
+        dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
     })
 }
 
@@ -152,8 +150,8 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
         txn_idx: TxnIndex,
         new_data: &Arc<V>,
         new_maybe_layout: &Option<Arc<MoveTypeLayout>>,
-    ) -> (BTreeSet<(TxnIndex, Incarnation)>, bool) {
-        let mut affected_deps = BTreeSet::new();
+    ) -> (BTreeMap<TxnIndex, Incarnation>, bool) {
+        let mut affected_deps = BTreeMap::new();
         let mut still_valid = false;
 
         // Look at entries at or below txn_idx, which is where all the affected
@@ -173,7 +171,7 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
             } = &entry.value
             {
                 // Take dependencies above txn_idx
-                affected_deps = dependencies.lock().split_off(&(txn_idx + 1, 0));
+                affected_deps = dependencies.lock().split_off(txn_idx + 1);
                 if !affected_deps.is_empty() {
                     if let ValueWithLayout::Exchanged(
                         previous_entry_value,
@@ -201,13 +199,13 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
     fn handle_removed_dependencies<const ONLY_COMPARE_METADATA: bool>(
         &mut self,
         txn_idx: TxnIndex,
-        mut dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+        mut dependencies: BTreeMap<TxnIndex, Incarnation>,
         removed_data: &Arc<V>,
         removed_maybe_layout: &Option<Arc<MoveTypeLayout>>,
-    ) -> BTreeSet<(TxnIndex, Incarnation)> {
+    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         // If we have dependencies and a next (lower) entry exists, validate against it.
         if !dependencies.is_empty() {
-            if let Some((idx, next_entry)) = self
+            if let Some((idx, next_lower_entry)) = self
                 .versioned_map
                 .range(..=ShiftedTxnIndex::new(txn_idx))
                 .next_back()
@@ -222,8 +220,8 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                 if let EntryCell::ResourceWrite {
                     incarnation: _,
                     value_with_layout: ValueWithLayout::Exchanged(entry_value, entry_maybe_layout),
-                    dependencies: next_deps,
-                } = &next_entry.value
+                    dependencies: next_lower_deps,
+                } = &next_lower_entry.value
                 {
                     let still_valid = compare_values_and_layouts::<ONLY_COMPARE_METADATA, V>(
                         entry_value,
@@ -233,13 +231,14 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                     );
 
                     if still_valid {
-                        // If validation passed, add dependencies to next entry and clear them.
-                        next_deps.lock().extend(std::mem::take(&mut dependencies));
+                        next_lower_deps
+                            .lock()
+                            .extend_with_higher_dependencies(std::mem::take(&mut dependencies))?;
                     }
                 }
             }
         }
-        dependencies
+        Ok(dependencies)
     }
 
     // 'maybe_reader_incarnation' is None for BlockSTMv1 and always set for BlockSTMv2.
@@ -282,9 +281,10 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
                 ) => {
                     // Record the read dependency (only in V2 case, not to add contention to V1).
                     if let Some(reader_incarnation) = maybe_reader_incarnation {
-                        dependencies
+                        // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
+                        assert_ok!(dependencies
                             .lock()
-                            .insert((reader_txn_idx, reader_incarnation));
+                            .insert(reader_txn_idx, reader_incarnation));
                     }
 
                     // Resolve to the write if no deltas were applied in between.
@@ -472,7 +472,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         &self,
         key: &Q,
         txn_idx: TxnIndex,
-    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError>
+    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError>
     where
         Q: Equivalent<K> + Hash + Debug,
     {
@@ -491,33 +491,31 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 ))
             })?;
 
-        Ok(
-            if let EntryCell::ResourceWrite {
-                incarnation: _,
-                value_with_layout,
-                dependencies,
-            } = &removed_entry.value
-            {
-                match value_with_layout {
-                    ValueWithLayout::RawFromStorage(_) => {
-                        unreachable!(
-                            "Removed value written by txn {txn_idx} may not be RawFromStorage"
-                        );
-                    },
-                    ValueWithLayout::Exchanged(data, layout) => {
-                        let removed_deps = std::mem::take(&mut *dependencies.lock());
-                        v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
-                            txn_idx,
-                            removed_deps,
-                            data,
-                            layout,
-                        )
-                    },
-                }
-            } else {
-                BTreeSet::new()
-            },
-        )
+        if let EntryCell::ResourceWrite {
+            incarnation: _,
+            value_with_layout,
+            dependencies,
+        } = &removed_entry.value
+        {
+            match value_with_layout {
+                ValueWithLayout::RawFromStorage(_) => {
+                    unreachable!(
+                        "Removed value written by txn {txn_idx} may not be RawFromStorage"
+                    );
+                },
+                ValueWithLayout::Exchanged(data, layout) => {
+                    let removed_deps = take_dependencies(dependencies);
+                    v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
+                        txn_idx,
+                        removed_deps,
+                        data,
+                        layout,
+                    )
+                },
+            }
+        } else {
+            Ok(BTreeMap::new())
+        }
     }
 
     // Fetches data but does not record a read dependency. This is used for BlockSTMv1
@@ -572,7 +570,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 vacant_entry.insert(CachePadded::new(new_write_entry(
                     0,
                     base_value_with_layout,
-                    BTreeSet::new(),
+                    BTreeMap::new(),
                 )));
             },
             Occupied(mut o) => {
@@ -596,14 +594,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                             // Stored value contains more info, nothing to do.
                         },
                         (RawFromStorage(_), Exchanged(_, _)) => {
-                            let dependencies = std::mem::take(&mut *dependencies.lock());
                             // Received more info, update, but keep the same dependencies.
                             // TODO(BlockSTMv2): Once we support dependency kind, here we could check
                             // that carried over dependencies can be only size & metadata.
                             o.insert(CachePadded::new(new_write_entry(
                                 0,
                                 base_value_with_layout,
-                                dependencies,
+                                take_dependencies(dependencies),
                             )));
                         },
                         (
@@ -637,7 +634,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         txn_idx: TxnIndex,
         incarnation: Incarnation,
         value: ValueWithLayout<V>,
-        dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+        dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) {
         let prev_entry = versioned_values.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
@@ -649,9 +646,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
                 ..
-            } = entry.value
+            } = &entry.value
             {
-                prev_incarnation < incarnation
+                // For BlockSTMv1, the dependencies are always empty.
+                *prev_incarnation < incarnation
+                // TODO(BlockSTMv2): when AggregatorV1 is deprecated, we can assert that
+                // prev_dependencies is empty: they must have been drained beforehand
+                // (into dependencies) if there was an entry at the same index before.
             } else {
                 true
             }
@@ -672,7 +673,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             txn_idx,
             incarnation,
             ValueWithLayout::Exchanged(data, maybe_layout),
-            BTreeSet::new(),
+            BTreeMap::new(),
         );
     }
 
@@ -685,7 +686,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         incarnation: Incarnation,
         data: Arc<V>,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
-    ) -> BTreeSet<(TxnIndex, Incarnation)> {
+    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         let mut v = self.values.entry(key).or_default();
         let (affected_dependencies, validation_passed) = v
             .split_off_affected_read_dependencies::<ONLY_COMPARE_METADATA>(
@@ -694,12 +695,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
                 &maybe_layout,
             );
 
+        // Asserted (local, easily checkable invariant), since affected dependencies are obtained
+        // by calling split_off at txn_idx + 1.
+        assert!(check_lowest_dependency_idx(&affected_dependencies, txn_idx).is_ok());
+
         // If validation passed, keep the dependencies (pass to write_impl), o.w. return them
         // (invalidated read dependencies) to the caller.
         let (deps_to_retain, deps_to_return) = if validation_passed {
-            (affected_dependencies, BTreeSet::new())
+            (affected_dependencies, BTreeMap::new())
         } else {
-            (BTreeSet::new(), affected_dependencies)
+            (BTreeMap::new(), affected_dependencies)
         };
 
         Self::write_impl(
@@ -710,7 +715,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             deps_to_retain,
         );
 
-        deps_to_return
+        Ok(deps_to_return)
     }
 
     /// Versioned write of metadata at a given resource group key (and version). Returns true
@@ -731,7 +736,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             CachePadded::new(new_write_entry(
                 incarnation,
                 ValueWithLayout::Exchanged(arc_data.clone(), None),
-                BTreeSet::new(),
+                BTreeMap::new(),
             )),
         );
 
@@ -791,7 +796,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         &self,
         key: &K,
         shifted_txn_idx: ShiftedTxnIndex,
-    ) -> BTreeSet<(TxnIndex, Incarnation)> {
+    ) -> BTreeMap<TxnIndex, Incarnation> {
         match &self
             .values
             .get(key)
@@ -801,7 +806,9 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .expect("Entry must exist for the given txn_idx")
             .value
         {
-            EntryCell::ResourceWrite { dependencies, .. } => dependencies.lock().clone(),
+            EntryCell::ResourceWrite { dependencies, .. } => {
+                dependencies.lock().clone_dependencies_for_test()
+            },
             _ => unreachable!("Dependencies can only be recorded for resource writes"),
         }
     }
@@ -867,31 +874,31 @@ mod tests {
 
     fn get_deps_from_entry(
         entry: &Entry<EntryCell<TestValueWithMetadata>>,
-    ) -> BTreeSet<(TxnIndex, Incarnation)> {
+    ) -> BTreeMap<TxnIndex, Incarnation> {
         if let EntryCell::ResourceWrite { dependencies, .. } = &entry.value {
-            dependencies.lock().clone()
+            dependencies.lock().clone_dependencies_for_test()
         } else {
             unreachable!()
         }
     }
 
-    #[test_case(1, BTreeSet::from([(2, 0), (3, 0), (3, 1), (7, 1)]), true; "deps > 1 from idx 0 write, pass validation")]
-    #[test_case(7, BTreeSet::from([(8, 1), (9, 0), (10, 0), (10, 2)]), false; "deps > 7 from idx 7 write, fail validation")]
-    #[test_case(5, BTreeSet::from([(7, 1)]), true; "deps > 5 from write at idx 0, pass validation")]
-    #[test_case(0, BTreeSet::from([(1, 0), (2, 0), (3, 0), (3, 1), (7, 1)]), true; "all deps > 0 from idx 0 write, pass validation")]
-    #[test_case(9, BTreeSet::from([(10, 0), (10, 2)]), false; "deps > 9 from write at idx 7, fail validation")]
-    #[test_case(12, BTreeSet::from([]), false; "entries >= idx 12 - no deps, default fail validation")]
-    #[test_case(7, BTreeSet::from([(8, 1), (9, 0), (10, 0), (10, 2)]), false; "all deps from write at idx 7, fail validation")]
+    #[test_case(1, BTreeMap::from([(2, 0), (3, 1), (7, 1)]), true; "deps > 1 from idx 0 write, pass validation")]
+    #[test_case(7, BTreeMap::from([(8, 1), (9, 0), (10, 2)]), false; "deps > 7 from idx 7 write, fail validation")]
+    #[test_case(5, BTreeMap::from([(7, 1)]), true; "deps > 5 from write at idx 0, pass validation")]
+    #[test_case(0, BTreeMap::from([(1, 0), (2, 0), (3, 1), (7, 1)]), true; "all deps > 0 from idx 0 write, pass validation")]
+    #[test_case(9, BTreeMap::from([(10, 2)]), false; "deps > 9 from write at idx 7, fail validation")]
+    #[test_case(12, BTreeMap::from([]), false; "entries >= idx 12 - no deps, default fail validation")]
+    #[test_case(7, BTreeMap::from([(8, 1), (9, 0), (10, 2)]), false; "all deps from write at idx 7, fail validation")]
     fn test_split_off_affected_read_dependencies(
         idx: TxnIndex,
-        expected_deps: BTreeSet<(TxnIndex, Incarnation)>,
+        expected_deps: BTreeMap<TxnIndex, Incarnation>,
         expected_validation_result: bool,
     ) {
         let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
         // Setup: Create some writes with dependencies.
-        let deps_idx0 = BTreeSet::from([(1, 0), (2, 0)]);
-        let deps_idx7 = BTreeSet::from([(8, 1), (9, 0), (10, 2)]);
+        let deps_idx0 = BTreeMap::from([(1, 0), (2, 0)]);
+        let deps_idx7 = BTreeMap::from([(8, 1), (9, 0), (10, 1)]);
 
         v.versioned_map.insert(
             ShiftedTxnIndex::new(0),
@@ -914,9 +921,9 @@ mod tests {
         let _ = v.read(3, Some(0)); // This adds (3, 0) to latest write <= 3 (write at idx 0).
         let _ = v.read(3, Some(1)); // Add another incarnation of txn 3.
         let _ = v.read(7, Some(1)); // This adds (7, 1) to write at idx 0.
-        let _ = v.read(8, Some(1)); // This adds (8, 1) to write at idx 7 (duplicate with existing).
-        let _ = v.read(10, Some(0)); // Add lower incarnation after we'll add a higher one.
-        let _ = v.read(10, Some(2)); // Add higher incarnation first.
+                                    // TODO: when using PanicErrors, check is_ok(), and is_err() when adding duplicate or
+                                    // outdated incarnation.
+        let _ = v.read(10, Some(2)); // Only the latest added (higher) incarnations must be recorded.
 
         // Get pre-call state of dependencies.
         let mut recorded_deps_idx0 =
@@ -947,9 +954,9 @@ mod tests {
                 &None,
             );
             assert!(remaining_deps.is_empty());
-            recorded_deps_idx0.retain(|(txn_idx, _)| *txn_idx <= idx);
+            recorded_deps_idx0.retain(|txn_idx, _| *txn_idx <= idx);
         } else {
-            recorded_deps_idx7.retain(|(txn_idx, _)| *txn_idx <= idx);
+            recorded_deps_idx7.retain(|txn_idx, _| *txn_idx <= idx);
         }
 
         let final_deps_idx0 =
@@ -965,6 +972,23 @@ mod tests {
             final_deps_idx7, recorded_deps_idx7,
             "Dependencies in write at idx 7 don't match expected."
         );
+    }
+
+    #[should_panic]
+    #[test_case(0)]
+    #[test_case(1)]
+    fn test_read_panic_outdated_incarnation(outdated_incarnation: Incarnation) {
+        let mut v = VersionedValue::<TestValueWithMetadata>::default();
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(2),
+            CachePadded::new(new_write_entry(
+                0,
+                ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
+                BTreeMap::from([(5, 2)]),
+            )),
+        );
+
+        let _ = v.read(5, Some(outdated_incarnation));
     }
 
     #[test]
@@ -1001,7 +1025,7 @@ mod tests {
             &Arc::new(TestValueWithMetadata::new(10, 100)),
             &None,
         );
-        assert_eq!(deps, BTreeSet::new());
+        assert_eq!(deps, BTreeMap::new());
     }
 
     #[test]
@@ -1015,7 +1039,7 @@ mod tests {
                             let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
                             // Setup: Create a write with value 10, metadata 100 and one dependency
-                            let deps = BTreeSet::from([(1, 0)]);
+                            let deps = BTreeMap::from([(1, 0)]);
                             let layout = if no_layouts { None } else { Some(Arc::new(MoveTypeLayout::Bool)) };
                             v.versioned_map.insert(
                                 ShiftedTxnIndex::new(0),
@@ -1051,7 +1075,7 @@ mod tests {
                             );
                             assert_eq!(
                                 deps,
-                                BTreeSet::from([(1, 0)]),
+                                BTreeMap::from([(1, 0)]),
                                 "Dependencies don't match for same_value={}, same_metadata={}, only_compare_metadata={}, no_layouts={}",
                                 same_value, same_metadata, $only_compare_metadata, no_layouts
                             );
@@ -1059,17 +1083,17 @@ mod tests {
                             // Test handle_removed_dependencies
                             let remaining_deps = v.handle_removed_dependencies::<{ $only_compare_metadata }>(
                                 1,
-                                BTreeSet::from([(2, 0)]),
+                                BTreeMap::from([(2, 0)]),
                                 &Arc::new(test_value),
                                 &None,
-                            );
+                            ).unwrap();
 
                             if expected_validation {
                                 assert!(remaining_deps.is_empty());
                                 // Verify that (2,0) is recorded in 0-th entry
-                                assert_eq!(get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()), BTreeSet::from([(2, 0)]));
+                                assert_eq!(get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()), BTreeMap::from([(2, 0)]));
                             } else {
-                                assert_eq!(remaining_deps, BTreeSet::from([(2, 0)]));
+                                assert_eq!(remaining_deps, BTreeMap::from([(2, 0)]));
                                 // Verify that dependencies are empty in 0-th entry
                                 assert_eq!(get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()).len(), 0);
                             }
@@ -1089,7 +1113,7 @@ mod tests {
         let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
         // Setup: Create a write with value 10, metadata 100 and layout Some(Bool)
-        let deps = BTreeSet::from([(1, 0)]);
+        let deps = BTreeMap::from([(1, 0)]);
         let layout = Some(Arc::new(MoveTypeLayout::Bool));
         v.versioned_map.insert(
             ShiftedTxnIndex::new(0),
@@ -1120,21 +1144,23 @@ mod tests {
         );
         assert_eq!(
             deps,
-            BTreeSet::from([(1, 0)]),
+            BTreeMap::from([(1, 0)]),
             "Dependencies should be returned"
         );
 
         // Test handle_removed_dependencies
-        let remaining_deps = v.handle_removed_dependencies::<false>(
-            1,
-            BTreeSet::from([(2, 0)]),
-            &Arc::new(test_value),
-            &layout,
-        );
+        let remaining_deps = v
+            .handle_removed_dependencies::<false>(
+                1,
+                BTreeMap::from([(2, 0)]),
+                &Arc::new(test_value),
+                &layout,
+            )
+            .unwrap();
 
         assert_eq!(
             remaining_deps,
-            BTreeSet::from([(2, 0)]),
+            BTreeMap::from([(2, 0)]),
             "Dependencies should be returned when validation fails"
         );
         // Verify that dependencies are empty in 0-th entry (invalidated)
@@ -1152,7 +1178,7 @@ mod tests {
                 let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
                 // Setup: Create a write with RawFromStorage value and one dependency
-                let deps = BTreeSet::from([(1, 0)]);
+                let deps = BTreeMap::from([(1, 0)]);
                 v.versioned_map.insert(
                     ShiftedTxnIndex::new(0),
                     CachePadded::new(new_write_entry(0, ValueWithLayout::RawFromStorage(Arc::new(TestValueWithMetadata::new(10, 100))), deps)),
@@ -1167,20 +1193,20 @@ mod tests {
 
                 // Verify results - validation should fail even with same value and metadata
                 assert!(!validation_passed, "Validation should fail when comparing with RawFromStorage (only_compare_metadata={})", $only_compare_metadata);
-                assert_eq!(deps, BTreeSet::from([(1, 0)]), "Dependencies should be returned even when validation fails (only_compare_metadata={})", $only_compare_metadata);
+                assert_eq!(deps, BTreeMap::from([(1, 0)]), "Dependencies should be returned even when validation fails (only_compare_metadata={})", $only_compare_metadata);
 
                 // Test handle_removed_dependencies
                 let remaining_deps = v.handle_removed_dependencies::<{ $only_compare_metadata }>(
                     1,
-                    BTreeSet::from([(2, 0)]),
+                    BTreeMap::from([(2, 0)]),
                     &Arc::new(TestValueWithMetadata::new(10, 100)),
                     &None,
-                );
+                ).unwrap();
 
                 // Verify that dependencies are not passed and returned
                 assert_eq!(
                     remaining_deps,
-                    BTreeSet::from([(2, 0)]),
+                    BTreeMap::from([(2, 0)]),
                     "Dependencies should be returned when validation fails (only_compare_metadata={})",
                     $only_compare_metadata
                 );
@@ -1211,16 +1237,17 @@ mod tests {
             CachePadded::new(new_write_entry(
                 0,
                 ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
-                BTreeSet::new(),
+                BTreeMap::new(),
             )),
         );
 
         v.handle_removed_dependencies::<false>(
             0,
-            BTreeSet::from([(2, 0)]),
+            BTreeMap::from([(2, 0)]),
             &Arc::new(TestValueWithMetadata::new(10, 100)),
             &None,
-        );
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1233,28 +1260,30 @@ mod tests {
             CachePadded::new(new_write_entry(
                 0,
                 ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
-                BTreeSet::new(),
+                BTreeMap::new(),
             )),
         );
 
-        let dependencies = BTreeSet::from([(2, 0)]);
+        let dependency_2_0 = BTreeMap::from([(2, 0)]);
         assert_eq!(
-            dependencies,
+            dependency_2_0,
             v.handle_removed_dependencies::<true>(
                 1,
-                dependencies.clone(),
+                dependency_2_0.clone(),
                 &Arc::new(TestValueWithMetadata::new(10, 100)),
                 &None,
             )
+            .unwrap()
         );
         assert_eq!(
-            dependencies,
+            dependency_2_0,
             v.handle_removed_dependencies::<false>(
                 1,
-                dependencies.clone(),
+                dependency_2_0.clone(),
                 &Arc::new(TestValueWithMetadata::new(10, 100)),
                 &None,
             )
+            .unwrap()
         );
 
         // Now insert a new entry at index 0 that will retain the dependencies.
@@ -1263,45 +1292,62 @@ mod tests {
             CachePadded::new(new_write_entry(
                 0,
                 ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
-                BTreeSet::new(),
+                BTreeMap::new(),
             )),
         );
         assert_eq!(
             v.handle_removed_dependencies::<true>(
                 1,
-                dependencies.clone(),
+                dependency_2_0.clone(),
                 &Arc::new(TestValueWithMetadata::new(10, 100)),
                 &None,
             )
+            .unwrap()
             .len(),
             0
         );
         assert_eq!(
             get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()),
-            dependencies
+            dependency_2_0
         );
 
-        let dependencies = BTreeSet::from([(2, 1)]);
+        // Error since storage version contains a dependency for txn 2, but the call implies
+        // there was (now removed) entry at idx 1.
+        assert_err!(v.handle_removed_dependencies::<false>(
+            1,
+            dependency_2_0.clone(),
+            &Arc::new(TestValueWithMetadata::new(10, 100)),
+            &None,
+        ));
+        // Error if removed dependencies contain a smaller or equal idx than itself.
+        assert_err!(v.handle_removed_dependencies::<false>(
+            2,
+            dependency_2_0,
+            &Arc::new(TestValueWithMetadata::new(10, 100)),
+            &None,
+        ));
+
         assert_eq!(
             v.handle_removed_dependencies::<false>(
-                1,
-                dependencies.clone(),
+                2,
+                BTreeMap::from([(3, 1)]),
                 &Arc::new(TestValueWithMetadata::new(10, 100)),
                 &None,
             )
+            .unwrap()
             .len(),
             0
         );
         assert_eq!(
             get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()),
-            BTreeSet::from([(2, 0), (2, 1)])
+            BTreeMap::from([(2, 0), (3, 1)])
         );
     }
 
     fn check_versioned_data_deps(
         versioned_data: &VersionedData<(), TestValueWithMetadata>,
         shifted_txn_idx: ShiftedTxnIndex,
-        expected_deps: BTreeSet<(TxnIndex, Incarnation)>,
+        expected_deps: BTreeMap<TxnIndex, Incarnation>,
     ) {
         assert_eq!(
             get_deps_from_entry(
@@ -1344,44 +1390,49 @@ mod tests {
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::zero_idx(),
-            BTreeSet::from([(5, 1)]),
+            BTreeMap::from([(5, 1)]),
         );
 
-        versioned_data.write_v2::<true>(
-            (),
-            1,
-            1,
-            Arc::new(TestValueWithMetadata::new(10, 100)),
-            None,
-        );
+        assert!(versioned_data
+            .write_v2::<true>(
+                (),
+                1,
+                1,
+                Arc::new(TestValueWithMetadata::new(10, 100)),
+                None,
+            )
+            .unwrap()
+            .is_empty());
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::zero_idx(),
-            BTreeSet::new(),
+            BTreeMap::new(),
         );
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::new(1),
-            BTreeSet::from([(5, 1)]),
+            BTreeMap::from([(5, 1)]),
         );
 
-        versioned_data.write_v2::<true>(
-            (),
-            3,
-            0,
-            Arc::new(TestValueWithMetadata::new(10, 100)),
-            None,
-        );
+        versioned_data
+            .write_v2::<true>(
+                (),
+                3,
+                0,
+                Arc::new(TestValueWithMetadata::new(10, 100)),
+                None,
+            )
+            .unwrap();
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::zero_idx(),
-            BTreeSet::new(),
+            BTreeMap::new(),
         );
-        check_versioned_data_deps(&versioned_data, ShiftedTxnIndex::new(1), BTreeSet::new());
+        check_versioned_data_deps(&versioned_data, ShiftedTxnIndex::new(1), BTreeMap::new());
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::new(3),
-            BTreeSet::from([(5, 1)]),
+            BTreeMap::from([(5, 1)]),
         );
 
         assert_ok_eq!(
@@ -1402,7 +1453,7 @@ mod tests {
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::zero_idx(),
-            BTreeSet::from([(2, 0), (5, 1)]),
+            BTreeMap::from([(2, 0), (5, 1)]),
         );
     }
 

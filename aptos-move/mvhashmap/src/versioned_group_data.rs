@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    registered_dependencies::{take_dependencies, RegisteredReadDependencies},
     types::{
         Incarnation, MVDataError, MVDataOutput, MVGroupError, ShiftedTxnIndex, TxnIndex,
         ValueWithLayout, Version,
@@ -17,7 +18,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
-use claims::assert_some;
+use claims::{assert_ok, assert_some};
 use dashmap::DashMap;
 use equivalent::Equivalent;
 use move_core_types::value::MoveTypeLayout;
@@ -25,7 +26,7 @@ use serde::Serialize;
 use std::{
     collections::{
         btree_map::{BTreeMap, Entry::Vacant},
-        BTreeSet, HashSet,
+        HashSet,
     },
     fmt::Debug,
     hash::Hash,
@@ -34,24 +35,24 @@ use std::{
 
 struct SizeAndDependencies {
     size: ResourceGroupSize,
-    dependencies: Mutex<BTreeSet<(TxnIndex, Incarnation)>>,
+    dependencies: Mutex<RegisteredReadDependencies>,
 }
 
 impl SizeAndDependencies {
     fn from_size(size: ResourceGroupSize) -> Self {
         Self {
             size,
-            dependencies: Mutex::new(BTreeSet::new()),
+            dependencies: Mutex::new(RegisteredReadDependencies::new()),
         }
     }
 
     fn from_size_and_dependencies(
         size: ResourceGroupSize,
-        dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+        dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) -> Self {
         Self {
             size,
-            dependencies: Mutex::new(dependencies),
+            dependencies: Mutex::new(RegisteredReadDependencies::from_dependencies(dependencies)),
         }
     }
 }
@@ -265,7 +266,7 @@ impl<
         values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
         size: ResourceGroupSize,
         prev_tags: HashSet<&T>,
-    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError> {
+    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
         let (_, mut invalidated_dependencies) =
             self.data_write_impl::<true>(&group_key, txn_idx, incarnation, values, prev_tags)?;
 
@@ -289,22 +290,22 @@ impl<
         // reading an entry by a lower txn index. However, if the size has changed, then
         // those read dependencies will be added to invalidated_dependencies, and the
         // store_deps variable will be empty.
-        let mut store_deps = BTreeSet::new();
-        if let Some((_, size_entry)) = Self::get_latest_entry(
+        let store_deps: BTreeMap<TxnIndex, Incarnation> = Self::get_latest_entry(
             &group_sizes.size_entries,
             txn_idx,
             ReadPosition::AfterCurrentTxn,
-        ) {
-            let mut deps = size_entry.value.dependencies.lock();
-            let new_deps = deps.split_off(&(txn_idx + 1, 0));
+        )
+        .map_or_else(BTreeMap::new, |(_, size_entry)| {
+            let new_deps = size_entry.value.dependencies.lock().split_off(txn_idx + 1);
 
             if size_entry.value.size == size {
                 // Validation passed.
-                store_deps = new_deps;
+                new_deps
             } else {
-                invalidated_dependencies.extend(new_deps)
+                invalidated_dependencies.extend(new_deps);
+                BTreeMap::new()
             }
-        }
+        });
 
         group_sizes.size_entries.insert(
             ShiftedTxnIndex::new(txn_idx),
@@ -313,7 +314,7 @@ impl<
             )),
         );
 
-        Ok(invalidated_dependencies)
+        Ok(invalidated_dependencies.take())
     }
 
     /// Mark all entry from transaction 'txn_idx' at access path 'key' as an estimated write
@@ -340,7 +341,7 @@ impl<
             group_key,
             txn_idx,
             tags.iter().collect(),
-            &mut BTreeSet::new(),
+            &mut RegisteredReadDependencies::new(),
         )
         .expect("remove_impl with V1 never fails");
 
@@ -361,8 +362,8 @@ impl<
         group_key: &K,
         txn_idx: TxnIndex,
         tags: HashSet<&T>,
-    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError> {
-        let mut invalidated_dependencies = BTreeSet::new();
+    ) -> Result<BTreeMap<TxnIndex, Incarnation>, PanicError> {
+        let mut invalidated_dependencies = RegisteredReadDependencies::new();
         self.remove_impl::<true>(group_key, txn_idx, tags, &mut invalidated_dependencies)?;
 
         let mut group_sizes = self.group_sizes.get_mut(group_key).ok_or_else(|| {
@@ -382,9 +383,8 @@ impl<
             })?;
 
         // Handle dependencies for the removed size entry.
-        let mut removed_size_deps: BTreeSet<(TxnIndex, Incarnation)> =
-            std::mem::take(&mut removed_size_entry.value.dependencies.lock());
-        if let Some((_, entry_after_removed)) = Self::get_latest_entry(
+        let mut removed_size_deps = take_dependencies(&removed_size_entry.value.dependencies);
+        if let Some((_, next_lower_entry)) = Self::get_latest_entry(
             &group_sizes.size_entries,
             txn_idx,
             ReadPosition::BeforeCurrentTxn,
@@ -392,19 +392,19 @@ impl<
             // If the entry that will be read after removal contains the same size,
             // then the dependencies on size can be registered there and not invalidated.
             // In this case, removed_size_deps gets drained.
-            if entry_after_removed.value.size == removed_size_entry.value.size {
-                entry_after_removed
+            if next_lower_entry.value.size == removed_size_entry.value.size {
+                next_lower_entry
                     .value
                     .dependencies
                     .lock()
-                    .extend(std::mem::take(&mut removed_size_deps));
+                    .extend_with_higher_dependencies(std::mem::take(&mut removed_size_deps))?;
             }
         }
 
-        // If removed_size_deps was not drained, then those dependencies also
-        // need to be invalidated.
+        // If removed_size_deps was not drained (into the preceding entry's dependencies),
+        // then those dependencies also need to be invalidated.
         invalidated_dependencies.extend(removed_size_deps);
-        Ok(invalidated_dependencies)
+        Ok(invalidated_dependencies.take())
     }
 
     /// Read the latest value corresponding to a tag at a given group (identified by key).
@@ -492,10 +492,8 @@ impl<
             Some(g) => {
                 Self::get_latest_entry(&g.size_entries, txn_idx, ReadPosition::BeforeCurrentTxn)
                     .map_or(Err(MVGroupError::Uninitialized), |(_, size)| {
-                        size.value
-                            .dependencies
-                            .lock()
-                            .insert((txn_idx, incarnation));
+                        // TODO(BlockSTMv2): convert to PanicErrors after MVHashMap refactoring.
+                        assert_ok!(size.value.dependencies.lock().insert(txn_idx, incarnation));
                         Ok(size.value.size)
                     })
             },
@@ -600,12 +598,13 @@ impl<
             .next_back()
     }
 
+    // Modifies invalidated dependencies in place via interior mutability.
     fn remove_impl<const V2: bool>(
         &self,
         group_key: &K,
         txn_idx: TxnIndex,
         tags: HashSet<&T>,
-        invalidated_deps: &mut BTreeSet<(TxnIndex, Incarnation)>,
+        invalidated_deps: &mut RegisteredReadDependencies,
     ) -> Result<(), PanicError> {
         for tag in tags {
             let key_ref = GroupKeyRef { group_key, tag };
@@ -631,9 +630,10 @@ impl<
         incarnation: Incarnation,
         values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
         mut prev_tags: HashSet<&T>,
-    ) -> Result<(bool, BTreeSet<(TxnIndex, Incarnation)>), PanicError> {
+    ) -> Result<(bool, RegisteredReadDependencies), PanicError> {
         let mut ret_v1 = false;
-        let mut ret_v2 = BTreeSet::new();
+        // Creating a RegisteredReadDependencies wrapper in order to do proper extending.
+        let mut ret_v2 = RegisteredReadDependencies::new();
         let mut tags_to_write = vec![];
 
         {
@@ -656,7 +656,7 @@ impl<
                         incarnation,
                         Arc::new(value),
                         layout,
-                    ));
+                    )?);
                 } else {
                     self.values.write(
                         (group_key.clone(), tag),
@@ -779,14 +779,13 @@ mod test {
 
         // Define indices for dependencies
         let dependency_indices = [
-            // > high_idx
-            15, 20, // (mid_idx, high_idx]
-            6, 10, // ..=mid_idx
-            2, 5,
+            15, 20, // > high_idx
+            6, 10, // (mid_idx, high_idx]
+            2, 5, // ..=mid_idx
         ];
 
-        let mut all_value_deps = BTreeSet::new();
-        let mut all_size_deps = BTreeSet::new();
+        let mut all_value_deps = BTreeMap::new();
+        let mut all_size_deps = BTreeMap::new();
         for idx in dependency_indices {
             if test_value_or_size {
                 // Create value dependency
@@ -809,12 +808,12 @@ mod test {
                         ValueWithLayout::RawFromStorage(Arc::new(base_value.clone()))
                     }
                 );
-                all_value_deps.insert((idx, inc_1));
+                all_value_deps.insert(idx, inc_1);
             } else {
                 // Create size dependency
                 // Create size dependency
                 assert_ok!(group_data.get_group_size_and_record_dependency(&group_key, idx, inc_1));
-                all_size_deps.insert((idx, inc_1));
+                all_size_deps.insert(idx, inc_1);
             }
         }
 
@@ -847,68 +846,68 @@ mod test {
             )
             .unwrap();
         let expected_invalidated = all_value_deps
-            .iter()
-            .filter(|(idx, _)| *idx > mid_idx && *idx <= high_idx && !mid_value_matches_low)
+            .clone()
+            .into_iter()
+            .filter(|&(idx, _)| idx > mid_idx && idx <= high_idx && !mid_value_matches_low)
             .chain(
                 all_size_deps
-                    .iter()
-                    .filter(|(idx, _)| *idx > mid_idx && *idx <= high_idx && !mid_size_matches_low),
+                    .clone()
+                    .into_iter()
+                    .filter(|&(idx, _)| idx > mid_idx && idx <= high_idx && !mid_size_matches_low),
             )
-            .cloned()
-            .collect::<BTreeSet<_>>();
+            .collect::<BTreeMap<_, _>>();
         assert_eq!(write_invalidated_deps, expected_invalidated);
         // Remove the high index entry and check dependency handling
         let remove_invalidated_deps = group_data
             .remove_v2(&group_key, high_idx, HashSet::from([&tag]))
             .unwrap();
         let expected_invalidated = all_value_deps
-            .iter()
+            .into_iter()
             // matching low value means not matching high in the test
-            .filter(|(idx, _)| *idx > high_idx && mid_value_matches_low)
+            .filter(|&(idx, _)| idx > high_idx && mid_value_matches_low)
             .chain(
                 all_size_deps
-                    .iter()
-                    .filter(|(idx, _)| *idx > high_idx && mid_size_matches_low),
+                    .clone()
+                    .into_iter()
+                    .filter(|&(idx, _)| idx > high_idx && mid_size_matches_low),
             )
-            .cloned()
-            .collect::<BTreeSet<_>>();
+            .collect::<BTreeMap<_, _>>();
         assert_eq!(remove_invalidated_deps, expected_invalidated);
 
         // Verify stored size dependencies in the data structure
         let group_sizes = group_data.group_sizes.get(&group_key).unwrap();
         {
-            let mid_deps = group_sizes
+            let mid_deps = &group_sizes
                 .size_entries
                 .get(&ShiftedTxnIndex::new(mid_idx))
                 .unwrap()
                 .value
-                .dependencies
-                .lock();
+                .dependencies;
             assert_eq!(
-                mid_deps.iter().collect::<BTreeSet<_>>(),
+                take_dependencies(mid_deps),
                 all_size_deps
-                    .iter()
+                    .clone()
+                    .into_iter()
                     .filter(
-                        |(idx, _)| (*idx > mid_idx && *idx <= high_idx && mid_size_matches_low)
-                            || (*idx > high_idx && !mid_size_matches_low)
+                        |&(idx, _)| (idx > mid_idx && idx <= high_idx && mid_size_matches_low)
+                            || (idx > high_idx && !mid_size_matches_low)
                     )
-                    .collect::<BTreeSet<_>>()
+                    .collect::<BTreeMap<_, _>>()
             );
         }
         {
-            let base_deps: std::sync::MutexGuard<'_, BTreeSet<(u32, u32)>> = group_sizes
+            let base_deps = &group_sizes
                 .size_entries
                 .get(&ShiftedTxnIndex::zero_idx())
                 .unwrap()
                 .value
-                .dependencies
-                .lock();
+                .dependencies;
             assert_eq!(
-                base_deps.iter().collect::<BTreeSet<_>>(),
+                take_dependencies(base_deps),
                 all_size_deps
-                    .iter()
-                    .filter(|(idx, _)| *idx <= mid_idx)
-                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .filter(|&(idx, _)| idx <= mid_idx)
+                    .collect::<BTreeMap<_, _>>()
             );
         }
 
@@ -988,9 +987,9 @@ mod test {
         assert_eq!(
             invalidated_deps,
             if raw_storage_layout {
-                BTreeSet::from([(5, 2)])
+                BTreeMap::from([(5, 2)])
             } else {
-                BTreeSet::new()
+                BTreeMap::new()
             }
         );
     }
@@ -1120,15 +1119,15 @@ mod test {
         let expected_invalidated = if different_values {
             if case_a_b {
                 // If writing (A, B), depA1 should be invalidated (incarnation = tag)
-                BTreeSet::from([(8, 1)])
+                BTreeMap::from([(8, 1)])
             } else {
                 // If writing (B, A), depA0 should be invalidated
-                BTreeSet::from([(8, 0)])
+                BTreeMap::from([(8, 0)])
             }
         } else {
             // When different_values=false, both A and B are the same value with layouts set,
             // so validation fails for both and both dependencies should be invalidated
-            BTreeSet::from([(8, 0), (8, 1)])
+            BTreeMap::from([(8, 0), (8, 1)])
         };
         assert_eq!(write_invalidated, expected_invalidated);
 
@@ -1138,14 +1137,14 @@ mod test {
             .unwrap();
         let expected_invalidated = if different_values {
             if case_a_b {
-                BTreeSet::from([(10, 0)])
+                BTreeMap::from([(10, 0)])
             } else {
-                BTreeSet::from([(10, 1)])
+                BTreeMap::from([(10, 1)])
             }
         } else {
             // When different_values=false, both A and B are the same value with layouts set,
             // so validation fails for both and both dependencies should be invalidated
-            BTreeSet::from([(10, 0), (10, 1)])
+            BTreeMap::from([(10, 0), (10, 1)])
         };
         assert_eq!(remove_invalidated, expected_invalidated);
     }
