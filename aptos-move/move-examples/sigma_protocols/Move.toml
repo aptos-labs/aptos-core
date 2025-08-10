@@ -10,6 +10,5 @@ AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdi
 [addresses]
 std = "0x1"
 aptos_std = "0x1"
-#aptos_framework = "0x1"
-#sigma_protocols = "0x43"
 sigma_protocols = "_"
+#sigma_protocols = "0x43"

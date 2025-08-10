@@ -29,7 +29,7 @@
 ///
 ///                                                                  4. Assert $A \in \mathbb{G}^m$
 ///                                                                  5. Pick random challenge $e$
-///                                                                     (via Fiat-Shamir on $X$ and a domain-separator)
+///                                                                     (via Fiat-Shamir on $(X, A)$ and a domain-separator)
 ///                                  6. send challenge $e$
 ///                            <-------------------------------
 ///
@@ -42,18 +42,23 @@
 module sigma_protocols::homomorphism {
     use std::bcs;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, scalar_one, scalar_mul, new_scalar_uniform_from_64_bytes,
-        CompressedRistretto, scalar_neg_assign, point_clone, point_identity,
-        multi_scalar_mul, point_equals, point_compress, point_mul, point_add
+        CompressedRistretto, point_identity,
+        multi_scalar_mul, point_equals
     };
     use std::error;
     use aptos_std::aptos_hash::sha2_512;
+    use sigma_protocols::proof::Proof;
+    use sigma_protocols::secret_witness::SecretWitness;
     use sigma_protocols::public_statement::PublicStatement;
     use sigma_protocols::representation_vec::RepresentationVec;
+    use sigma_protocols::utils::{compress_points, points_clone, neg_scalars};
 
     #[test_only]
-    use std::vector::range;
+    use sigma_protocols::proof::{new_proof, empty_proof};
     #[test_only]
-    use aptos_std::ristretto255::{random_scalar, scalar_add};
+    use sigma_protocols::secret_witness::random_witness;
+    #[test_only]
+    use sigma_protocols::utils::{add_vec_points, add_vec_scalars, equal_vec_points, mul_points, mul_scalars};
 
     //
     // Error codes
@@ -61,126 +66,53 @@ module sigma_protocols::homomorphism {
 
     /// The length of the `A` field in `Proof` did NOT match the homomorphism's output length
     const E_PROOF_COMMITMENT_WRONG_LEN: u64 = 1;
-
-    /// The length of the output of the transformation function  did NOT match the homomorphism's output length
-    const E_TRANSFORMATION_FUNC_WRONG_LEN: u64 = 2;
-
-    /// The length of the `sigma` field in `Proof` did NOT match the homomorphism's domain length
-    // const E_PROOF_RESPONSE_WRONG_LEN: u64 = 3;
-
     /// The length of the `A` field in `Proof` should NOT be zero
-    const E_PROOF_COMMITMENT_EMPTY: u64 = 4;
-
+    const E_PROOF_COMMITMENT_EMPTY: u64 = 2;
     /// One of our internal invariants was broken. There is likely a logical error in the code.
-    const E_INTERNAL_INVARIANT_FAILED: u64 = 5;
+    const E_INTERNAL_INVARIANT_FAILED: u64 = 3;
 
     //
-    // Structs and their methods
+    // Test-only error codes
     //
-
-    /// A *secret witness* consists of a vector $w$ of $k$ scalars
-    struct SecretWitness has drop {
-        w: vector<Scalar>,
-    }
-
-    public fun new_secret_witness(w: vector<Scalar>): SecretWitness {
-        SecretWitness {
-            w
-        }
-    }
-
-    public fun length(self: &SecretWitness): u64 {
-        self.w.length()
-    }
-
-    public fun get_scalar(self: &SecretWitness, idx: u64): &Scalar {
-        &self.w[idx]
-    }
 
     #[test_only]
-    /// Returns a size-$m$ random witness, used when creating a ZKP during testing.
-    public fun random_witness(m: u64): SecretWitness {
-        let w = vector[];
-
-        range(0, m).for_each(|_|
-            w.push_back(random_scalar())
-        );
-
-        new_secret_witness(
-            w
-        )
-    }
-
-    /// A sigma protocol *proof* always consists of:
-    /// 1. a *commitment* $A \in \mathbb{G}^m$
-    /// 2. a *response* $\sigma \in \mathbb{F}^k$
-    struct Proof has drop {
-        A: vector<RistrettoPoint>,
-        sigma: vector<Scalar>,
-    }
-
-    public fun new_proof(_A: vector<RistrettoPoint>, sigma: vector<Scalar>): Proof {
-        Proof {
-            A: _A,
-            sigma,
-        }
-    }
-
-    /// Converts the proof's response $\sigma$ into a `SecretWitness` by setting the `w` field to $\sigma$.
-    /// This is needed during proof verification, when calling the homomorphism on the `Proof`'s $\sigma$, but the
-    /// homomorphism expects a `SecretWitness`.
-    public fun response_to_witness(self: &Proof): SecretWitness {
-        SecretWitness { w: self.sigma }
-    }
-
-    /// Returns the commitment component of the proof (i.e., $A$)
-    public fun get_commitment(self: &Proof): &vector<RistrettoPoint> {
-        &self.A
-    }
+    /// The slow verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
+    const E_SLOW_VERIFICATION_FAILED: u64 = 4;
+    #[test_only]
+    /// The fast verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
+    const E_FAST_VERIFICATION_FAILED: u64 = 5;
 
     /// Unfortunately, we cannot directly use the `PublicStatement` struct here because its `vector<RistrettoPoint>`
     /// will not serialize correctly via `bcs::to_bytes`, since a `RistrettoPoint` stores a Move VM "handle" rather than
     /// an actual point.
     struct FiatShamirInputs has drop {
         dst: vector<u8>,
-        name: vector<u8>,
+        k: u64,
         stmt_X: vector<CompressedRistretto>,
         stmt_x: vector<Scalar>,
         A: vector<CompressedRistretto>,
     }
 
-    /// Needed for Fiat-Shamir hashing
-    fun compress_ristretto_points(points: &vector<RistrettoPoint>): vector<CompressedRistretto> {
-        let compressed = vector[];
-
-        let i = 0;
-        let len = points.length();
-        while (i < len) {
-            compressed.push_back(point_compress(&points[i]));
-            i += 1;
-        };
-
-        compressed
-    }
-
     /// Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
     public fun fiat_shamir(
         dst: vector<u8>,
-        name: vector<u8>,
         stmt: &PublicStatement,
         _A: &vector<RistrettoPoint>,
-        m: u64): (Scalar, vector<Scalar>)
+        k: u64): (Scalar, vector<Scalar>)
     {
+        let m = _A.length();
         assert!(m != 0, error::invalid_argument(E_PROOF_COMMITMENT_EMPTY));
 
-        // We will hash an application-specific domain separator, a protocol name and the (full) public statement,
+        // We will hash an application-specific domain separator and the (full) public statement,
         // which will include any public parameters like group generators $G$, $H$.
+
+        // Note: A hardcodes $m$, the statement hardcodes $n_1$ and $n_2$, and $k$ is specified manually!
         let bytes = bcs::to_bytes(&FiatShamirInputs {
             dst,
-            name,
-            stmt_X: compress_ristretto_points(stmt.get_points()),
+            k,
+            stmt_X: compress_points(stmt.get_points()),
             stmt_x: *stmt.get_scalars(),
-            A: compress_ristretto_points(_A)
+            A: compress_points(_A)
         });
 
         // TODO(Security): A bit ad-hoc.
@@ -204,231 +136,35 @@ module sigma_protocols::homomorphism {
             i += 1;
         };
 
+        // This will only fail when our logic above for generating the `\beta_i`'s is broken
         assert!(betas.length() == m, error::internal(E_INTERNAL_INVARIANT_FAILED));
 
         (e, betas)
     }
 
-    /// Verifies a ZK `proof` that the prover knows a witness $w$ such that $f(X) = \psi(w)$ where $X$ is the
-    /// statement in `stmt`.
-    ///
-    /// @param  dst  application-specific domain separator (e.g., "Aptos confidential assets protocol v2025.06")
-    ///
-    /// @param  name the name of the protocol being proved (e.g., "public withdrawal NP relation")
-    ///
-    /// @param  psi  a homomorphism mapping a vector of scalars to a vector of $m$ group elements, except each group
-    /// element is returned as a `Representation` so that, later on, the main $\psi(\sigma) = A + e f(X)$ can be done
-    /// efficiently in one MSM.
-    ///
-    /// @param f     transformation function takes takes in the public statement and outputs $m$ group elements, also
-    /// returned as a `RepresentationVec`.
-    ///
-    /// @param stmt  the public statement $X$ that satisfies $f(X) = \psi(w)$ for some secret witness $w$
-    ///
-    /// @param proof the ZKP proving that the prover knows a $w$ s.t. $f(X) = \psi(w)$
-    ///
-    /// Returns true if it succeeds and false otherwise.
-    public inline fun verify(
-        dst: vector<u8>,
-        name: vector<u8>,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
-        stmt: &PublicStatement,
-        proof: &Proof,
-    ): bool {
+    /// Returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X$ and the secret witness $w$.
+    public inline fun evaluate_homomorphism(psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+                                            stmt: &PublicStatement,
+                                            witn: &SecretWitness): vector<RistrettoPoint> {
+        let evals = vector[];
 
-        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
-        let comm = proof.get_commitment();
-        let m = comm.length();
-        let (e, betas) = fiat_shamir(dst, name, stmt, comm, m);
-
-        // Step 2:
-        //   A + e f(stmt) - \psi(\sigma) = zero()
-        //         <=>
-        //   \forall i \in[m], A[i] + e f(stmt)[i] - \psi(\sigma)[i] = 0
-        //         <=>
-        //   \sum_{i \in [m]} \beta[i] A[i] + \beta[i] ( e f(stmt)[i] ) - \beta[i] ( \psi(\sigma)[i] ) = 0,
-        //                             ^                   ^                        ^
-        //                             |                   |                        |
-        //                        \mathbb{G}         representation            representation
-        //   for random \beta[i]'s (picked via on-chain randomness or more Fiat-Shamir)
-        //
-        // TODO(Perf): Silly, Move does not let us do anything better than cloning the response from the proof here, AFAICT.
-        let psi_sigma = psi(stmt, &proof.response_to_witness());
-        let efx = f(stmt);
-
-        assert!(psi_sigma.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
-        assert!(psi_sigma.length() == efx.length(), error::invalid_argument(E_TRANSFORMATION_FUNC_WRONG_LEN));
-
-        // "Scale" all the representations in `f(stmt)` by `e`. (Implicit assumption here is that `f` is homomorphic:
-        // i.e., `e f(X) = f(eX)`, which holds because our `f`'s are a `RepresentationVec`.)
-        efx.scale_all(&e);
-
-        // "Scale" the `i`th reprentation in `efx` by `\beta[i]`
-        efx.scale_each(&betas);
-
-        // Negate all the beta[i]'s
-        let neg_betas = betas;
-        neg_betas.for_each_mut(|beta| {
-            scalar_neg_assign(beta);
+        psi(stmt, witn).for_each_ref(|repr| {
+            evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
         });
 
-        // "Scale" the `i`th reprentation in `\psi` by `-\beta[i]`
-        // TODO(Perf): I think could be sub-optimal: we will redo the same \beta[i] \sigma[j] multiplication several times
-        //   when a `RepresentationVec`'s row reuses \sigma[j].
-        psi_sigma.scale_each(&neg_betas);
-
-        // We start with an empty MSM: \sum_{i \in m} 0
-        // ...and extend it to: \sum_{i \in [m]} A[i]^{\beta[i]}
-        //                                          ^^^^^^^^^^^^^^^
-        let scalars = betas;
-        let bases = vector[];
-        comm.for_each_ref(|p| {
-            // TODO(Perf): Annoying limitation of our Ristretto255 module. (Should we "fix" it as per `crypto_algebra`?)
-            bases.push_back(point_clone(p));
-        });
-
-        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] )
-        //                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-        efx.for_each_ref(|repr| {
-            repr.for_each(stmt,|pt, s| {
-                bases.push_back(point_clone(pt));
-                scalars.push_back(*s);
-            });
-        });
-
-        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] ) - \beta[i] (\psi(\sigma)[i])
-        //                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-        psi_sigma.for_each_ref(|repr| {
-            repr.for_each(stmt,|pt, s| {
-                bases.push_back(point_clone(pt));
-                scalars.push_back(*s);
-            });
-        });
-
-        // TODO(Perf): Could combine more aggresively.
-        assert!(bases.length() == 3 * m, error::internal(E_INTERNAL_INVARIANT_FAILED));
-        assert!(scalars.length() == 3 * m, error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        // Do the MSM and check it equals the (zero) identity
-        point_equals(&multi_scalar_mul(&bases, &scalars), &point_identity())
+        evals
     }
 
-    public fun vector_point_add(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): vector<RistrettoPoint> {
-        assert!(a.length() == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
+    /// Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
+    public inline fun evaluate_f(f: |&PublicStatement|RepresentationVec,
+                                 stmt: &PublicStatement): vector<RistrettoPoint> {
+        let evals = vector[];
 
-        let r = vector[];
-        a.enumerate_ref(|i, pt| {
-            r.push_back(point_add(pt, &b[i]));
+        f(stmt).for_each_ref(|repr| {
+            evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
         });
 
-        r
-    }
-
-    public fun vector_point_equals(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): bool {
-        let m = a.length();
-        assert!(m == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        let i = 0;
-        while (i < m) {
-            if (!point_equals(&a[i], &b[i])) {
-              return false
-            };
-
-            i += 1;
-        };
-
-        true
-    }
-
-    public inline fun verify_slow(
-        dst: vector<u8>,
-        name: vector<u8>,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
-        stmt: &PublicStatement,
-        proof: &Proof,
-    ): bool {
-
-        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
-        let comm = proof.get_commitment();
-        let m = comm.length();
-        let (e, _) = fiat_shamir(dst, name, stmt, comm, m);
-
-        // Step 2:
-        //   A + e f(stmt) - \psi(\sigma) = zero()
-        //         <=>
-        //   \forall i \in[m], A[i] + e f(stmt)[i] - \psi(\sigma)[i] = 0
-        //
-        // We slowly (despacito) verify that:
-        // ```
-        //   vector_equals(
-        //      psi(stmt, &SecretWitness { w: proof.sigma }),
-        //      vector_add(
-        //           proof.A,
-        //           vector_scalar_mul(e, f(stmt))
-        //      );
-        //   );
-        // ```
-
-        // TODO(Perf): Silly, Move does not let us do anything better than cloning the response from the proof here, AFAICT.
-        let psi_sigma_repr = psi(stmt, &proof.response_to_witness());
-        let fx_repr = f(stmt);
-
-        assert!(psi_sigma_repr.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
-        assert!(psi_sigma_repr.length() == fx_repr.length(), error::invalid_argument(E_TRANSFORMATION_FUNC_WRONG_LEN));
-
-        // Step 2.1: Compute the `m` entries of $e \cdot f(X)$
-        let efx = vector[];
-        fx_repr.for_each_ref(|repr| {
-            let scalars = vector[];
-            let bases = vector[];
-
-            repr.for_each(stmt,|pt, s| {
-                bases.push_back(point_clone(pt));
-                scalars.push_back(*s);
-            });
-
-            efx.push_back(point_mul(&multi_scalar_mul(&bases, &scalars), &e));
-        });
-
-        assert!(efx.length() == m, error::invalid_argument(E_INTERNAL_INVARIANT_FAILED));
-
-        // Step 2.1: Compute the `m` entries of \psi(X, w)
-        let psi_sigma = vector[];
-        psi_sigma_repr.for_each_ref(|repr| {
-            let scalars = vector[];
-            let bases = vector[];
-
-            repr.for_each(stmt,|pt, s| {
-                bases.push_back(point_clone(pt));
-                scalars.push_back(*s);
-            });
-
-            psi_sigma.push_back(multi_scalar_mul(&bases, &scalars));
-        });
-
-        assert!(psi_sigma.length() == m, error::invalid_argument(E_INTERNAL_INVARIANT_FAILED));
-
-        vector_point_equals(
-            &psi_sigma,
-            &vector_point_add(
-                comm,
-                &efx,
-            )
-        )
-    }
-
-    //
-    // Test only
-    //
-
-    #[test_only]
-    public fun empty_proof(): Proof {
-        Proof {
-            A: vector[],
-            sigma: vector[]
-        }
+        evals
     }
 
     #[test_only]
@@ -436,7 +172,6 @@ module sigma_protocols::homomorphism {
     /// create the sigma protocol commitment $A = \psi(\alpha) \in \mathbb{G}^m$.
     public inline fun prove(
         dst: vector<u8>,
-        name: vector<u8>,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         stmt: &PublicStatement,
         witn: &SecretWitness,
@@ -445,34 +180,235 @@ module sigma_protocols::homomorphism {
 
         // Step 1: Pick a random \alpha \in \F^k
         let alpha = random_witness(k);
+        // debug::print(&string_utils::format1(&b"len(alpha) = k = {}", k));
 
         // Step 2: A <- \psi(\alpha) \in \Gr^m
-        let _A = vector[];
-        psi(stmt, &alpha).for_each_ref(|repr| {
-            let bases = vector[];
-            let scalars = vector[];
-
-            repr.for_each(stmt, |pt, s| {
-                bases.push_back(point_clone(pt));
-                scalars.push_back(*s);
-            });
-
-            _A.push_back(multi_scalar_mul(&bases, &scalars));
-        });
+        let _A = evaluate_homomorphism(|_X, w| psi(_X, w), stmt, &alpha);
 
         // Step 3: Derive a random-challenge `e` via Fiat-Shamir
-        let m = _A.length();
-        let (e, _) = fiat_shamir(dst, name, stmt, &_A, m);
+        let (e, _) = fiat_shamir(dst, stmt, &_A, k);
+        // debug::print(&string_utils::format1(&b"len(A) = m = {}", m));
 
         // Step 4: \sigma <- \alpha + e w
-        let sigma = vector[];
-        range(0, m).for_each(|i| {
-            sigma.push_back(scalar_add(
-                alpha.get_scalar(i),
-                &scalar_mul(&e, witn.get_scalar(i))
-            ));
-        });
+        let sigma = add_vec_scalars(
+            alpha.get_scalars(),
+            &mul_scalars(witn.get_scalars(), &e)
+        );
+
+        assert!(sigma.length() == k, error::internal(E_INTERNAL_INVARIANT_FAILED));
 
         (new_proof(_A, sigma), alpha)
+    }
+
+    #[test_only]
+    /// This is implemented both as a "warm-up" *and* to test the faster `verify` implementation against it.
+    ///
+    /// Recall that, given a statement `stmt`, proof $(A, \sigma)$ and Fiat-Shamir challenge $e$, the verifier checks:
+    ///   A + e f(stmt) = \psi(\sigma)
+    ///         <=>
+    ///   A + e f(stmt) - \psi(\sigma) = zero()
+    ///         <=>
+    ///   \forall i \in[m], A[i] + e f(stmt)[i] - \psi(\sigma)[i] = 0
+    ///
+    /// At a high level, this functions verifies the proof via:
+    /// ```
+    ///   vector_equals(
+    ///      psi(stmt, &SecretWitness { w: proof.sigma }),
+    ///      vector_add(
+    ///           proof.A,
+    ///           vector_scalar_mul(e, f(stmt))
+    ///      );
+    ///   );
+    /// ```
+    public inline fun verify_slow(
+        dst: vector<u8>,
+        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+        f: |&PublicStatement|RepresentationVec,
+        stmt: &PublicStatement,
+        proof: &Proof,
+    ): bool {
+
+        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
+        let _A = proof.get_commitment();
+        let m = _A.length();
+        let sigma = proof.response_to_witness();
+        let k = sigma.length();
+        let (e, _) = fiat_shamir(dst, stmt, _A, k);
+
+        // Step 3: Compute the `m` entries of `f(X)`
+        let fx = evaluate_f(|_X| f(_X), stmt);
+        assert!(fx.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+
+        // Step 4: Compute the `m` entries of \psi(X, w)
+        let psi_sigma = evaluate_homomorphism(|_X, w| psi(_X, w), stmt, &sigma);
+        assert!(psi_sigma.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+
+        equal_vec_points(
+            &psi_sigma,
+            &add_vec_points(
+                _A,
+                &mul_points(
+                    &fx,
+                    &e
+                ),
+            )
+        )
+    }
+
+    /// Verifies a ZK `proof` that the prover knows a witness $w$ such that $f(X) = \psi(w)$ where $X$ is the
+    /// statement in `stmt`.
+    ///
+    /// Optimized to perform a faster batched verification:
+    ///   A + e f(X) - \psi(\sigma) = zero()
+    ///         <=>
+    ///   \forall i \in[m], A[i] + e f(X)[i] - \psi(\sigma)[i] = 0
+    ///         <=>
+    ///   \sum_{i \in [m]} \beta[i] A[i] + \beta[i] ( e f(X)[i] ) - \beta[i] ( \psi(\sigma)[i] ) = 0,
+    ///   for random \beta[i]'s (picked via Fiat-Shamir)
+    ///
+    /// Note: I don't think picking $\beta_i$'s via on-chain randomness will save that much gas. Plus, we do not want to
+    /// premise the security of confidential assets on the unpredictability of on-chain randomness.
+    ///
+    /// @param  dst    application-specific domain separator
+    ///                (e.g., "Aptos confidential assets protocol v2025.06 :: public withdrawal NP relation")
+    ///
+    /// @param  psi    a homomorphism mapping a vector of scalars to a vector of $m$ group elements, except each group
+    ///                element is returned as a `Representation` so that, later on, the main $\psi(\sigma) = A + e f(X)$
+    ///                can be done efficiently in one MSM.
+    ///
+    /// @param  f      transformation function takes takes in the public statement and outputs $m$ group elements, also
+    ///                returned as a `RepresentationVec`.
+    ///
+    /// @param  stmt   the public statement $X$ that satisfies $f(X) = \psi(w)$ for some secret witness $w$
+    ///
+    /// @param  proof  the ZKP proving that the prover knows a $w$ s.t. $f(X) = \psi(w)$
+    ///
+    /// Returns true if it succeeds and false otherwise.
+    public inline fun verify(
+        dst: vector<u8>,
+        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+        f: |&PublicStatement|RepresentationVec,
+        stmt: &PublicStatement,
+        proof: &Proof,
+    ): bool {
+        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
+        let _A = proof.get_commitment();
+        let m = _A.length();
+        let (e, betas) = fiat_shamir(dst, stmt, _A, proof.get_response_length());
+
+        // Step 2:
+        let psi_sigma = psi(stmt, &proof.response_to_witness());
+        let efx = f(stmt);
+
+        assert!(m == psi_sigma.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+        assert!(m == efx.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+
+        // "Scale" all the representations in `f(stmt)` by `e`. (Implicit assumption here is that `f` is homomorphic:
+        // i.e., `e f(X) = f(eX)`, which holds because our `f`'s are a `RepresentationVec`.)
+        efx.scale_all(&e);
+
+        // "Scale" the `i`th reprentation in `efx` by `\beta[i]`
+        efx.scale_each(&betas);
+
+        // "Scale" the `i`th reprentation in `\psi` by `-\beta[i]`
+        // TODO(Perf): I think this could be sub-optimal: we will redo the same \beta[i] \sigma[j] multiplication several times
+        //   when a `RepresentationVec`'s row reuses \sigma[j].
+        psi_sigma.scale_each(&neg_scalars(&betas));
+
+        // We start with an empty MSM: \sum_{i \in m} 0
+        // ...and extend it to: \sum_{i \in [m]} A[i]^{\beta[i]}
+        //                                          ^^^^^^^^^^^^^^^
+        let bases = points_clone(_A);
+        let scalars = betas;
+
+        // These asserts will only fail when we have mis-implemented the cloning of `A` above
+        assert!(bases.length() == m, error::internal(E_INTERNAL_INVARIANT_FAILED));
+        assert!(scalars.length() == m, error::internal(E_INTERNAL_INVARIANT_FAILED));
+
+        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] )
+        //                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+        efx.for_each_ref(|repr| {
+            bases.append(repr.to_points(stmt));
+            scalars.append(*repr.get_scalars());
+        });
+
+        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] ) - \beta[i] (\psi(\sigma)[i])
+        //                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        psi_sigma.for_each_ref(|repr| {
+            bases.append(repr.to_points(stmt));
+            scalars.append(*repr.get_scalars());
+        });
+
+        // TODO(Perf): Could combine exponents for shared bases more aggresively? Or does the MSM code do it implicitly?
+
+        // Do the MSM and check it equals the (zero) identity
+        point_equals(&multi_scalar_mul(&bases, &scalars), &point_identity())
+    }
+
+    #[test_only]
+    /// A generic correctness test that takes the DST, the public statement, the secret witness, and the $\psi$ and $f$
+    /// lambdas.
+    public inline fun assert_correctly_computed_proof_verifies(
+        dst: vector<u8>, stmt: PublicStatement, witn: SecretWitness,
+        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+        f: |&PublicStatement|RepresentationVec,
+    ): (Proof, SecretWitness) {
+        let (proof, alpha) = prove(
+            dst,
+            |_X, w| psi(_X, w),
+            &stmt,
+            &witn
+        );
+
+        // Make sure the sigma protocol proof verifies (slowly)
+        assert!(
+            verify_slow(
+                dst,
+                |_X, w| psi(_X, w),
+                |_X| f(_X),
+                &stmt,
+                &proof
+            ), error::invalid_argument(E_SLOW_VERIFICATION_FAILED));
+
+        // Make sure the sigma protocol proof verifies (quickly)
+        assert!(
+            verify(
+                dst,
+                |_X, w| psi(_X, w),
+                |_X| f(_X),
+                &stmt,
+                &proof
+            ), error::invalid_argument(E_FAST_VERIFICATION_FAILED));
+
+        (proof, alpha)
+    }
+
+    #[test_only]
+    /// Returns `true` if the empty proof does not verify for the specific statement. Otherwise, returns `false`.
+    public inline fun empty_proof_verifies(
+        dst: vector<u8>,
+        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
+        f: |&PublicStatement|RepresentationVec,
+        stmt: PublicStatement,
+    ): bool {
+        let proof = empty_proof();
+
+        let r1 = !verify_slow(
+            dst,
+            |_X, w| psi(_X, w),
+            |_X| f(_X),
+            &stmt,
+            &proof
+        );
+
+        let r2 = !verify(
+            dst,
+            |_X, w| psi(_X, w),
+            |_X| f(_X),
+            &stmt,
+            &proof
+        );
+
+        r1 && r2
     }
 }
