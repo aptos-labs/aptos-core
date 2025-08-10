@@ -8,7 +8,7 @@ use std::{
     fmt::{self, Debug},
 };
 
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Ord, PartialOrd, Debug)]
 pub enum InputOutputKey<K, T> {
     Resource(K),
     Group(K, T),

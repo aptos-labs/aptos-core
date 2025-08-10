@@ -14,6 +14,7 @@ use crate::{
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
+    hot_state_op_accumulator::BlockHotStateOpAccumulator,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
@@ -22,7 +23,7 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
-    types::ReadWriteSummary,
+    types::{InputOutputKey, ReadWriteSummary},
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
@@ -2157,6 +2158,7 @@ where
             self.config.onchain.block_gas_limit_override(),
             num_txns,
         );
+        let mut hot_op_accumulator = BlockHotStateOpAccumulator::new(base_view);
 
         let mut block_epilogue_txn = None;
         let mut idx = 0;
@@ -2417,6 +2419,11 @@ where
                             code_invariant_error("Incorrect use in sequential execution").into(),
                         );
                     }
+
+                    hot_op_accumulator.add_transaction(
+                        output.get_storage_keys_written(),
+                        sequential_reads.get_storage_key_read(),
+                    );
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_transaction_committed(idx as TxnIndex, &output);
