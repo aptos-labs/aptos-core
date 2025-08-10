@@ -1931,16 +1931,6 @@ impl AptosVM {
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
             .into_user_session(self, &txn_data, resolver, change_set_configs, code_storage,));
 
-        // Disallow write in prologue session for now.
-        if !self.features().is_allow_write_in_prologue_session_enabled()
-            && prologue_change_set.has_writes()
-        {
-            return (
-                VMStatus::error(StatusCode::REJECTED_WRITE_SET, None),
-                discarded_output(StatusCode::REJECTED_WRITE_SET),
-            );
-        }
-
         let should_create_account_resource_timer =
             VM_TIMER.timer_with_label("AptosVM::create_account_resource_lazily");
         let should_create_account_resource = unwrap_or_discard!(should_create_account_resource(

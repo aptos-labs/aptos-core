@@ -81,10 +81,6 @@ impl SystemSessionChangeSet {
         Ok(system_session_change_set)
     }
 
-    pub(crate) fn has_writes(&self) -> bool {
-        self.change_set != VMChangeSet::empty()
-    }
-
     pub(crate) fn empty() -> Self {
         Self {
             change_set: VMChangeSet::empty(),

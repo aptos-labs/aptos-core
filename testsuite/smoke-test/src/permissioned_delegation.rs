@@ -10,7 +10,6 @@ use aptos_types::function_info::FunctionInfo;
 use move_core_types::account_address::AccountAddress;
 use std::{str::FromStr, sync::Arc};
 
-#[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_permissioned_delegation() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
