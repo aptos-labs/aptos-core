@@ -36,10 +36,7 @@ use aptos_vm::{
 };
 use move_core_types::language_storage::TypeTag;
 use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -215,7 +212,6 @@ impl VMBlockExecutor for MockVM {
         Ok(BlockOutput::new(
             outputs,
             block_epilogue_txn.map(Into::into),
-            BTreeMap::new(),
         ))
     }
 

@@ -41,10 +41,7 @@ use aptos_vm::{
     AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
-use std::{
-    collections::BTreeMap,
-    sync::{mpsc::channel, Arc},
-};
+use std::sync::{mpsc::channel, Arc};
 
 pub struct PtxBlockExecutor;
 
@@ -109,7 +106,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(BlockOutput::new(ret, None, BTreeMap::new()))
+        Ok(BlockOutput::new(ret, None))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
