@@ -4,7 +4,7 @@ task 0 lines 1-19:  publish --print-bytecode --verbose [module 0x66::test]
 == BEGIN Bytecode ==
 // Bytecode version v7
 module 0x66::test
-struct S<T0>
+struct S<T0> has drop + key
   x: T0
 
 // Function definition at index 0
@@ -16,7 +16,7 @@ fun move_to(l0: &signer)
     ret
 
 // Function definition at index 1
-fun borrow(l0: address): u64
+fun borrow(l0: address): u64 acquires S
     move_loc l0
     borrow_global S<u64>
     borrow_field S<u64>, x

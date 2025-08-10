@@ -1,0 +1,5 @@
+//**** Cross-compiled for `masm` syntax from `tests/vm_test_harness/single_publish.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::N

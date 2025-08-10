@@ -12,7 +12,7 @@ fun f<T0>(l0: T0): T0
 // Function definition at index 1
 fun g(): u64
     ld_u64 10
-    call test::f<u64>
+    call f<u64>
     ret
 
 
