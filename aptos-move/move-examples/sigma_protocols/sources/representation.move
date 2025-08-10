@@ -19,6 +19,7 @@ module sigma_protocols::representation {
     /// `PublicStatement` points and the `SecretWitness` scalars).
     struct Representation has copy, drop {
         points: vector<u64>,
+        // TODO(Perf): It may make sense to use indices here too, to avoid all the cloning?
         scalars: vector<Scalar>,
     }
 
