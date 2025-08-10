@@ -1,0 +1,25 @@
+//**** Cross-compiled for `masm` syntax from `tests/assembler/struct_use.masm`
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::test1
+struct S has copy + drop
+  _1: u64
+  _2: u8
+
+
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::test2
+use 0x66::test1
+struct T has drop
+  _1: test1::S
+
+// Function definition at index 0
+fun get(l0: T): test1::S
+    borrow_loc l0
+    borrow_field T, _1
+    read_ref
+    ret
+

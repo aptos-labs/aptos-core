@@ -4,7 +4,7 @@ task 0 lines 1-26:  publish --print-bytecode [module 0x66::test]
 == BEGIN Bytecode ==
 // Bytecode version v7
 module 0x66::test
-struct S
+struct S has drop
   _1: u64
   _2: u8
 
@@ -13,11 +13,11 @@ fun pack_and_select(): u8
     ld_u64 3
     ld_u8 2
     pack S
-    call test::select
+    call select
     ret
 
 // Function definition at index 1
-fun select(l0: test::S): u8
+fun select(l0: S): u8
     borrow_loc l0
     borrow_field S, _2
     read_ref
