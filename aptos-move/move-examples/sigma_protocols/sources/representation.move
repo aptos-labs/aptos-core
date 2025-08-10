@@ -1,9 +1,7 @@
 module sigma_protocols::representation {
     use std::error;
-    use std::vector::range;
-    use aptos_std::ristretto255::{Scalar, scalar_mul_assign, RistrettoPoint};
+    use aptos_std::ristretto255::{Scalar, scalar_mul_assign, RistrettoPoint, point_clone};
     use sigma_protocols::public_statement::PublicStatement;
-
 
     /// The number of points and scalars in a Representation needs to be the same.
     const E_MISMATCHED_LENGTHS: u64 = 1;
@@ -19,7 +17,6 @@ module sigma_protocols::representation {
     /// `PublicStatement` points and the `SecretWitness` scalars).
     struct Representation has copy, drop {
         points: vector<u64>,
-        // TODO(Perf): It may make sense to use indices here too, to avoid all the cloning?
         scalars: vector<Scalar>,
     }
 
@@ -30,16 +27,18 @@ module sigma_protocols::representation {
         }
     }
 
-    public fun length(self: &Representation): u64 {
-        self.points.length()
+    public fun to_points(self: &Representation, stmt: &PublicStatement): vector<RistrettoPoint> {
+        let bases = vector[];
+
+        self.points.for_each(|idx| {
+            bases.push_back(point_clone(stmt.get_point(idx)));
+        });
+
+        bases
     }
 
-    public fun get_point_idx(self: &Representation, i: u64): u64 {
-        self.points[i]
-    }
-
-    public fun get_scalar(self: &Representation, i: u64): &Scalar {
-        &self.scalars[i]
+    public fun get_scalars(self: &Representation): &vector<Scalar> {
+        &self.scalars
     }
 
     /// Multiplies all the scalars in the representation by $e$.
@@ -48,18 +47,33 @@ module sigma_protocols::representation {
             scalar_mul_assign(scalar, e);
         });
     }
-
-    /// Iterates through each Ristretto255 point and its scalar in the `Representation`. Recall that a `Representation`
-    /// only stores the index of the Ristretto255 points w.r.t. the `PublicStatement::points` vector, which is given as
-    /// input here.
-    public inline fun for_each(self: &Representation, stmt: &PublicStatement, lambda: |&RistrettoPoint, &Scalar|) {
-        let len = self.length();
-        range(0, len).for_each(|i| {
-            lambda(
-                stmt.get_point(self.get_point_idx(i)),
-                self.get_scalar(i)
-            )
-        });
-    }
-
 }
+
+// Prize-winning stuff!
+
+    // public fun length(self: &Representation): u64 {
+    //     self.points.length()
+    // }
+
+    // public fun get_scalar(self: &Representation, i: u64): &Scalar {
+    //     &self.scalars[i]
+    // }
+
+    // public fun get_point_idx(self: &Representation, i: u64): u64 {
+    //     self.points[i]
+    // }
+
+    // Iterates through each Ristretto255 point and its scalar in the `Representation`. Recall that a `Representation`
+    // only stores the index of the Ristretto255 points w.r.t. the `PublicStatement::points` vector, which is given as
+    // input here.
+    // public inline fun for_each(self: &Representation, stmt: &PublicStatement, lambda: |&RistrettoPoint, &Scalar|) {
+    //     let len = self.length();
+    //     range(0, len).for_each(|i| {
+    //         lambda(
+    //             stmt.get_point(self.get_point_idx(i)),
+    //             self.get_scalar(i)
+    //         )
+    //     });
+    // }
+
+//}

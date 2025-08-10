@@ -18,11 +18,15 @@ module sigma_protocols::public_statement {
         &self.points[i]
     }
 
+    /// Returns all the scalars in the statement.
+    /// (Needed to feed in the statement in the Fiat-Shamir transform.)
     public fun get_scalars(self: &PublicStatement): &vector<Scalar> {
         &self.scalars
     }
 
-    public(friend) fun get_points(self: &PublicStatement): &vector<RistrettoPoint> {
+    /// Returns all the elliptic curve points in the statement.
+    /// (Needed to feed in the statement in the Fiat-Shamir transform.)
+    public fun get_points(self: &PublicStatement): &vector<RistrettoPoint> {
         &self.points
     }
 }
