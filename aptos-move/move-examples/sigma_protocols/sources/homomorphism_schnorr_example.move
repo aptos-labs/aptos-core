@@ -1,24 +1,25 @@
-/// The Schnorr relation is:
+/// A Schnorr ZKPoK of $x$ such that $Y = x G$.
+///
+/// The Schnorr NP relation is:
 ///
 ///     R(G, Y; x) =?= 1   <=>   Y =?= x G
 ///
 /// This can be framed as a homomorphism check:
 ///
-///     \psi(w)   =?=    f(G, Y)
+///     \psi(x)   =?=    f(G, Y)
 ///
 /// where:
 ///
-///   1. The transformation function $f$ is:
+///   1. The homomorphism $\psi$ is
 ///
-///     f(G, Y) := Y
+///     \psi(x) := [ x G ]
+///
+///   2. The transformation function $f$ is:
+///
+///     f(G, Y) := [ Y ]
 ///       ^^^^
 ///        |
 ///      stmt.points
-///
-///   2. The homomorphism $\psi$ is
-///
-///     \psi(w) := w G
-///
 ///
 module sigma_protocols::homomorphism_schnorr_example {
     use aptos_std::ristretto255::{RistrettoPoint, Scalar};
