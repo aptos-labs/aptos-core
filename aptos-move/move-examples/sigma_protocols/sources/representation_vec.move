@@ -15,6 +15,7 @@ module sigma_protocols::representation_vec {
     }
 
     /// Returns all the underlying `Representation`'s stored in this vector
+    /// (Public due to forced inlining for functions that take lambda arguments.)
     public fun get_representations(self: &RepresentationVec): &vector<Representation> {
         &self.v
     }
@@ -25,6 +26,7 @@ module sigma_protocols::representation_vec {
     }
 
     /// Iterates through every representation in the vector.
+    /// (Forced inlining for functions that take lambda arguments.)
     public inline fun for_each_ref(self: &RepresentationVec, lambda: |&Representation|) {
         self.get_representations().for_each_ref(|repr| lambda(repr))
     }
@@ -44,6 +46,7 @@ module sigma_protocols::representation_vec {
     }
 
     #[test_only]
+    /// Returns an empty representation vector. Used for testing.
     public fun empty_representation_vec(): RepresentationVec {
         new_representation_vec(vector[])
     }
