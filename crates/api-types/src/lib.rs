@@ -42,6 +42,7 @@ pub struct ExternalBlockMeta {
     pub epoch: u64,
     pub randomness: Option<Random>,
     pub block_hash: Option<ComputeRes>,
+    pub proposer: Option<ExternalAccountAddress>,
 }
 
 #[derive(Debug, Clone)]
