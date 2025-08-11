@@ -3,12 +3,19 @@ module aptos_framework::transaction_context {
     use std::features;
     use std::option::Option;
     use std::string::String;
+    use std::timestamp;
 
     /// Transaction context is only available in the user transaction prologue, execution, or epilogue phases.
     const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
 
     /// The transaction context extension feature is not enabled.
     const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
+
+    /// The monotonically increasing counter is not enabled.
+    const EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED: u64 = 3;
+
+    /// The monotonically increasing counter has overflowed (too many calls in a single session).
+    const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 4;
 
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
@@ -181,6 +188,18 @@ module aptos_framework::transaction_context {
         assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.entry_function_payload
     }
+
+    /// Returns a monotonically increasing counter value that combines timestamp, transaction index,
+    /// session counter, and local counter into a 128-bit value.
+    /// Format: `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session_counter (8 bits) || local_counter (16 bits)`
+    /// The function aborts if the local counter overflows (after 65535 calls in a single session).
+    public fun monotonically_increasing_counter(): u128 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        assert!(features::is_monotonically_increasing_counter_enabled(), error::invalid_state(EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED));
+        let timestamp_us = timestamp::now_microseconds();
+        monotonically_increasing_counter_internal(timestamp_us)
+    }
+    native fun monotonically_increasing_counter_internal(timestamp_us: u64): u128;
 
     #[test_only]
     public fun new_entry_function_payload(

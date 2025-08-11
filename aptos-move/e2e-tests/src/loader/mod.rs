@@ -11,7 +11,7 @@ use aptos_gas_algebra::GasQuantity;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{
-    EntryFunction, ExecutionStatus, SignedTransaction, TransactionStatus,
+    AuxiliaryInfo, EntryFunction, ExecutionStatus, SignedTransaction, TransactionStatus,
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
 use petgraph::{algo::toposort, graph::NodeIndex, Direction, Graph};
@@ -352,9 +352,17 @@ impl DependencyGraph {
             executor.apply_write_set(output.write_set());
         }
         self.caculate_dependency_sizes();
-        for account_idx in accounts.iter() {
+        for (txn_index, account_idx) in accounts.iter().enumerate() {
             let txn = self.invoke_at(account_idx);
-            let (output, log) = executor.execute_transaction_with_gas_profiler(txn).unwrap();
+            let auxiliary_info = AuxiliaryInfo::new(
+                aptos_types::transaction::PersistedAuxiliaryInfo::V1 {
+                    transaction_index: txn_index as u32,
+                },
+                None,
+            );
+            let (output, log) = executor
+                .execute_transaction_with_gas_profiler(txn, &auxiliary_info)
+                .unwrap();
             assert_eq!(
                 output.status(),
                 &TransactionStatus::Keep(ExecutionStatus::Success)

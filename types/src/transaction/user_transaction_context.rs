@@ -13,6 +13,8 @@ pub struct UserTransactionContext {
     chain_id: u8,
     entry_function_payload: Option<EntryFunctionPayload>,
     multisig_payload: Option<MultisigPayload>,
+    // The index of the transaction in the block.
+    transaction_index: u32,
 }
 
 impl UserTransactionContext {
@@ -25,6 +27,7 @@ impl UserTransactionContext {
         chain_id: u8,
         entry_function_payload: Option<EntryFunctionPayload>,
         multisig_payload: Option<MultisigPayload>,
+        transaction_index: u32,
     ) -> Self {
         Self {
             sender,
@@ -35,6 +38,7 @@ impl UserTransactionContext {
             chain_id,
             entry_function_payload,
             multisig_payload,
+            transaction_index,
         }
     }
 
@@ -68,6 +72,10 @@ impl UserTransactionContext {
 
     pub fn multisig_payload(&self) -> Option<MultisigPayload> {
         self.multisig_payload.clone()
+    }
+
+    pub fn transaction_index(&self) -> u32 {
+        self.transaction_index
     }
 }
 

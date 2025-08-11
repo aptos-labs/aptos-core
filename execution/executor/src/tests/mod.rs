@@ -514,7 +514,18 @@ fn apply_transaction_by_writeset(
         ledger_summary.state.latest().clone(),
     )
     .unwrap();
-    let aux_info = txns.iter().map(|_| AuxiliaryInfo::new_empty()).collect();
+    let aux_info = txns
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            AuxiliaryInfo::new(
+                PersistedAuxiliaryInfo::V1 {
+                    transaction_index: i as u32,
+                },
+                None,
+            )
+        })
+        .collect();
     let chunk_output = DoGetExecutionOutput::by_transaction_output(
         txns,
         txn_outs,
@@ -709,7 +720,7 @@ fn run_transactions_naive(
     let executor = TestExecutor::new();
     let db = &executor.db;
 
-    for txn in transactions {
+    for (i, txn) in transactions.iter().enumerate() {
         let ledger_summary = db.reader.get_pre_committed_ledger_summary().unwrap();
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
@@ -719,8 +730,13 @@ fn run_transactions_naive(
         .unwrap();
         let out = DoGetExecutionOutput::by_transaction_execution(
             &MockVM::new(),
-            vec![txn].into(),
-            vec![AuxiliaryInfo::new_empty()],
+            vec![txn.clone()].into(),
+            vec![AuxiliaryInfo::new(
+                PersistedAuxiliaryInfo::V1 {
+                    transaction_index: i as u32,
+                },
+                None,
+            )],
             &ledger_summary.state,
             state_view,
             block_executor_onchain_config.clone(),
