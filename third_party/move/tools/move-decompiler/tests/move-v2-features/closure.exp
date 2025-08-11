@@ -1,0 +1,195 @@
+module 0x99::basic_enum {
+    enum FV<T> has key {
+        V1 {
+            v1: |&mut T|(T) has copy + store,
+        }
+    }
+    fun increment_by_one(x: &mut u64): u64 {
+        *x = *x + 1;
+        *x
+    }
+    fun test_fun_vec(s: &signer) {
+        move_to<u64>(FV::V1<u64>{v1: |arg0| increment_by_one(arg0)}, s);
+    }
+}
+
+module 0x99::basic_struct {
+    struct Wrapper<T> has key {
+        fv: T,
+    }
+    fun add_resource_with_struct(acc: &signer, f: |&||(u64)|(u64) has copy + drop + store) {
+        move_to<|&||(u64)|(u64) has copy + drop + store>(Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f}, acc);
+    }
+    fun test(f: &||(u64)): u64 {
+        let _t1;
+        if (f == f) _t1 = 1 else _t1 = 2;
+        _t1
+    }
+    public fun test_driver(acc: &signer) {
+        add_resource_with_struct(acc, |arg0| test(arg0));
+    }
+}
+
+module 0x99::lambda_arg {
+    public fun test(): u64 {
+        foo(|arg0| __lambda__1__test(arg0), 10)
+    }
+    fun __lambda__1__test(param$0: u64): u64 {
+        3
+    }
+    fun foo(f: |u64|(u64), x: u64): u64 {
+        f(x)
+    }
+    public fun main() {
+        if (!(test() == 3)) abort 5;
+    }
+}
+
+module 0x99::lambda_basic {
+    fun map(x: u64, f: |u64|(u64) has drop): u64 {
+        f(x)
+    }
+    fun no_name_clash(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__no_name_clash(c, arg0))
+    }
+    fun __lambda__1__no_name_clash(c: u64, y: u64): u64 {
+        y + c
+    }
+    fun with_name_clash1(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash1(c, arg0))
+    }
+    fun __lambda__1__with_name_clash1(c: u64, x: u64): u64 {
+        x + c
+    }
+    fun with_name_clash2(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash2(c, arg0))
+    }
+    fun __lambda__1__with_name_clash2(c: u64, x: u64): u64 {
+        c + 1 + x
+    }
+}
+
+module 0x99::lambda_fun_wrapper {
+    struct Work has drop {
+        _0: |u64|(u64) has drop,
+    }
+    fun t1(): bool {
+        Work{_0: |arg0| __lambda__1__t1(arg0)} == Work{_0: |arg0| __lambda__2__t1(arg0)}
+    }
+    fun __lambda__1__t1(x: u64): u64 {
+        x + 1
+    }
+    fun __lambda__2__t1(x: u64): u64 {
+        x + 2
+    }
+    fun t2() {
+        take_work(Work{_0: |arg0| __lambda__1__t2(arg0)});
+    }
+    fun __lambda__1__t2(x: u64): u64 {
+        x + 1
+    }
+    fun take_work(_work: Work) {
+        ()
+    }
+}
+
+module 0x99::lambda_generics {
+    struct S<T> has drop {
+        x: T,
+    }
+    fun id<T>(self: S<T>): S<T> {
+        self
+    }
+    fun inlined<T: drop>(f: |S<T>|(S<T>), s: S<T>) {
+        f(s);
+    }
+    fun test_receiver_inference(s: S<u64>) {
+        inlined<u64>(|arg0| id(arg0), s);
+    }
+}
+
+module 0x99::lambda_inline {
+    fun g() {
+        ()
+    }
+}
+
+module 0x99::lambda_inline1 {
+    public fun test() {
+        let _t1;
+        let _t0;
+        let _t2;
+        _t2 = 1 + 1;
+        _t0 = 1000 + 1;
+        _t1 = 100 + 1;
+        _t2 = _t2 + 1;
+        _t1 = _t1 + 1;
+        _t2 = _t2 * _t0 + _t1 + 3 * _t2 + 5 * _t1 + 7 * (_t0 + 1);
+        if (!(_t2 == 9637)) abort _t2;
+    }
+}
+
+module 0x99::lambda_no_param {
+    public fun test() {
+        ()
+    }
+}
+
+module 0x99::lambda_no_param1 {
+    public fun test() {
+        if (!(foo(|(arg0,arg1)| __lambda__1__test(arg0, arg1), |(arg0,arg1)| __lambda__2__test(arg0, arg1), 10, 100) == 110)) abort 0;
+    }
+    fun __lambda__1__test(x: u64, param$1: u64): u64 {
+        x
+    }
+    fun foo(f: |(u64, u64)|(u64), g: |(u64, u64)|(u64), x: u64, _y: u64): u64 {
+        f(x, _y) + g(x, _y)
+    }
+    fun __lambda__2__test(param$0: u64, y: u64): u64 {
+        y
+    }
+}
+
+module 0x99::lambda_pattern {
+    struct S<T> {
+        x: T,
+    }
+    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|(T)): T {
+        f(s, x)
+    }
+    fun pattern(s: S<u64>, x: u64): u64 {
+        consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
+    }
+    fun __lambda__1__pattern(param$0: S<u64>, _y: u64): u64 {
+        let _t4;
+        S<u64>{x: _t4} = param$0;
+        _y = _t4;
+        _y + _y
+    }
+}
+
+module 0x99::nested_lambda {
+    fun map1(x: u64, f: |u64|(u64)): u64 {
+        f(x)
+    }
+    fun map2(x: u8, f: |u8|(u8)): u8 {
+        f(x)
+    }
+    fun nested(x: u64, c: u64): u64 {
+        map1(x, |arg0| __lambda__2__nested(c, arg0))
+    }
+    fun __lambda__2__nested(c: u64, y: u64): u64 {
+        map2(y - c as u8, |arg0| __lambda__1__nested(c, arg0)) as u64
+    }
+    fun __lambda__1__nested(c: u64, y: u8): u8 {
+        y + (c as u8)
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid character
+   ┌─ closure.move:37:32
+   │
+37 │     fun __lambda__1__test(param$0: u64): u64 {
+   │                                ^ Invalid character: `$`

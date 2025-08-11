@@ -5,7 +5,7 @@ use crate::{config::VMConfig, RuntimeEnvironment};
 use hashbrown::{hash_map::Entry, HashMap};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    language_storage::{FunctionTag, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
@@ -91,7 +91,7 @@ impl<'a> hashbrown::Equivalent<StructKeyRef<'a>> for StructKey {
     }
 }
 
-impl<'a> hashbrown::Equivalent<StructKey> for StructKeyRef<'a> {
+impl hashbrown::Equivalent<StructKey> for StructKeyRef<'_> {
     fn equivalent(&self, other: &StructKey) -> bool {
         self.idx == &other.idx && self.ty_args == other.ty_args.as_slice()
     }
@@ -106,7 +106,7 @@ impl Hash for StructKey {
 }
 
 // Ensure hash is the same as for StructKey.
-impl<'a> Hash for StructKeyRef<'a> {
+impl Hash for StructKeyRef<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.idx.hash(state);
         self.ty_args.hash(state);
@@ -282,7 +282,8 @@ impl<'a> TypeTagConverter<'a> {
                 TypeTag::Struct(Box::new(struct_tag))
             },
 
-            // Functions: recurse
+            // Functions: recursively construct tags for argument and return types. Note that these
+            // can be references, unlike regular tags.
             Type::Function {
                 args,
                 results,
@@ -290,9 +291,23 @@ impl<'a> TypeTagConverter<'a> {
             } => {
                 let to_vec = |ts: &[Type],
                               gas_ctx: &mut PseudoGasContext|
-                 -> PartialVMResult<Vec<TypeTag>> {
+                 -> PartialVMResult<Vec<FunctionParamOrReturnTag>> {
                     ts.iter()
-                        .map(|t| self.ty_to_ty_tag_impl(t, gas_ctx))
+                        .map(|t| {
+                            Ok(match t {
+                                Type::Reference(t) => FunctionParamOrReturnTag::Reference(
+                                    self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                ),
+                                Type::MutableReference(t) => {
+                                    FunctionParamOrReturnTag::MutableReference(
+                                        self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                    )
+                                },
+                                t => FunctionParamOrReturnTag::Value(
+                                    self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                ),
+                            })
+                        })
                         .collect()
                 };
                 TypeTag::Function(Box::new(FunctionTag {

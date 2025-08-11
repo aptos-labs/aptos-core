@@ -1,6 +1,6 @@
 processed 6 tasks
-
-task 1 'publish'. lines 7-15:
+task 0 lines 1-5:  publish [module 0x1.M1 {]
+task 1 lines 7-15:  publish [module 0x1.M2 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -8,8 +8,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 1)],
     offsets: [],
 }
-
-task 2 'publish'. lines 17-34:
+task 2 lines 17-34:  publish [module 0x1.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -17,8 +16,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 5)],
     offsets: [],
 }
-
-task 3 'publish'. lines 36-46:
+task 3 lines 36-46:  publish [module 0x1.M4 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M4'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -26,8 +24,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(Signature, 1)],
     offsets: [],
 }
-
-task 5 'publish'. lines 60-75:
+task 4 lines 49-58:  publish [module 0x1.M3Valid {]
+task 5 lines 60-75:  publish [module 0x1.M5 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M5'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

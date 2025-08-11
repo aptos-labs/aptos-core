@@ -8,12 +8,12 @@ use aptos_forge::{
     FORGE_KEY_SEED,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::info;
 use aptos_release_builder::ReleaseConfig;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
+use log::info;
 use std::{ops::DerefMut, path::Path};
 use tokio::{fs, time::Duration};
 
@@ -133,13 +133,14 @@ impl NetworkTest for FrameworkUpgrade {
             framework_git_rev: None,
         };
 
-        network_info.mint_to_validator().await?;
+        network_info.mint_to_validator(None).await?;
 
         let release_config = aptos_release_builder::current_release_config();
 
         aptos_release_builder::validate::validate_config(
             release_config.clone(),
             network_info.clone(),
+            None,
         )
         .await?;
 
@@ -153,6 +154,7 @@ impl NetworkTest for FrameworkUpgrade {
                 aptos_release_builder::validate::validate_config(
                     release_config.clone(),
                     network_info.clone(),
+                    None,
                 )
                 .await?;
             }

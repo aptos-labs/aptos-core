@@ -1,6 +1,5 @@
 processed 8 tasks
-
-task 1 'run'. lines 6-8:
+task 1 lines 6-8:  run --signers Alice --args x"6170746f735f70756e6b73" x"" x"" 100 x"000000" --show-events -- 0x3::token::create_collection_script [// Mint "geek_token" for collection "aptos_punks"]
 Events:
 {
     type:    0x3::token::CreateCollection
@@ -8,11 +7,10 @@ Events:
 }
 {
     type:    0x1::transaction_fee::FeeStatement
-    data:    "65000000000000000400000000000000030000000000000028720100000000000000000000000000"
+    data:    "96000000000000000400000000000000020000000000000030320200000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
-
-task 2 'run'. lines 9-9:
+task 2 lines 9-9:  run --signers Alice --args x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" x"" 10 100 x"" @Alice 1 0 x"0000000000" x"" x"" x"" --show-events -- 0x3::token::create_token_script
 Events:
 {
     type:    0x3::token::TokenDataCreation
@@ -31,8 +29,7 @@ Events:
     data:    "9c0000000000000006000000000000000400000000000000c83a0200000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
-
-task 3 'view'. lines 11-11:
+task 3 lines 11-11:  view --address Alice  --resource 0x3::token::Collections
 key 0x3::token::Collections {
     collection_data: store 0x1::table::Table<0x1::string::String, 0x3::token::CollectionData> {
         handle: 5adf7712b6186bb577ebd9e2067ef3d46014f5bb5fa1c457f51a334295affe9a
@@ -68,11 +65,9 @@ key 0x3::token::Collections {
         }
     }
 }
-
-task 4 'view_table'. lines 13-15:
+task 4 lines 13-15:  view_table --table_handle 0x5adf7712b6186bb577ebd9e2067ef3d46014f5bb5fa1c457f51a334295affe9a --key_type 0x1::string::String --value_type 0x3::token::CollectionData --key_value "aptos_punks" [// Alice offers tokens to Bob]
 {"description":"","maximum":"100","mutability_config":{"description":false,"maximum":false,"uri":false},"name":"aptos_punks","supply":"1","uri":""}
-
-task 5 'run'. lines 16-18:
+task 5 lines 16-18:  run --signers Alice --args @Bob @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 1 --show-events -- 0x3::token_transfers::offer_script [// Bob accepts tokens from Alice]
 Events:
 {
     type:    0x3::token::TokenWithdraw
@@ -84,11 +79,10 @@ Events:
 }
 {
     type:    0x1::transaction_fee::FeeStatement
-    data:    "6c000000000000000500000000000000040000000000000018820100000000000000000000000000"
+    data:    "6c000000000000000600000000000000040000000000000018820100000000000000000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
-
-task 6 'run'. lines 19-19:
+task 6 lines 19-19:  run --signers Bob --args @Alice @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 --show-events -- 0x3::token_transfers::claim_script
 Events:
 {
     type:    0x3::token::TokenDeposit
@@ -100,9 +94,8 @@ Events:
 }
 {
     type:    0x1::transaction_fee::FeeStatement
-    data:    "6c0000000000000005000000000000000400000000000000b88201000000000058bb000000000000"
+    data:    "9d0000000000000006000000000000000300000000000000c04202000000000058bb000000000000"
 }mutable inputs after call: local#0: 0
 return values: 0
-
-task 7 'view_table'. lines 21-21:
+task 7 lines 21-21:  view_table --table_handle 0x630c3a2b1a1f2a5a9d112eb98bfe1b35265a16f1482e6224950abd8ad4c76d52 --key_type 0x3::token::TokenDataId --value_type 0x3::token::TokenData --key_value {"creator":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","collection":"aptos_punks","name":"geek_token"}
 {"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"1","royalty_points_numerator":"0"},"supply":"10","uri":""}

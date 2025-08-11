@@ -14,11 +14,15 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
-    pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
+    pipeline::{
+        execution_client::TExecutionClient,
+        pipeline_builder::{PipelineBuilder, PreCommitStatus},
+    },
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -26,7 +30,6 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -55,6 +58,12 @@ pub mod sync_manager;
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
         observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+        if block.block().is_opt_block() {
+            observe_block(
+                block.block().timestamp_usecs(),
+                BlockStage::ORDERED_OPT_BLOCK,
+            );
+        }
     }
 }
 
@@ -92,6 +101,7 @@ pub struct BlockStore {
     window_size: Option<u64>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
+    pre_commit_status: Option<Arc<Mutex<PreCommitStatus>>>,
 }
 
 impl BlockStore {
@@ -226,11 +236,17 @@ impl BlockStore {
             },
         };
 
-        if let Some(pipeline_builder) = &pipeline_builder {
+        let pre_commit_status = if let Some(pipeline_builder) = &pipeline_builder {
             let pipeline_fut =
                 pipeline_builder.build_root(result, root_commit_cert.ledger_info().clone());
             window_root.set_pipeline_futs(pipeline_fut);
-        }
+
+            let status = pipeline_builder.pre_commit_status();
+            status.lock().update_round(root_block_round);
+            Some(status)
+        } else {
+            None
+        };
 
         let tree = BlockTree::new(
             root_block_id,
@@ -261,6 +277,7 @@ impl BlockStore {
             pending_blocks,
             pipeline_builder,
             window_size,
+            pre_commit_status,
         };
 
         for block in blocks {
@@ -314,8 +331,6 @@ impl BlockStore {
 
         assert!(!blocks_to_commit.is_empty());
 
-        let block_tree = self.inner.clone();
-        let storage = self.storage.clone();
         let finality_proof_clone = finality_proof.clone();
         self.pending_blocks
             .lock()
@@ -327,25 +342,8 @@ impl BlockStore {
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
-        let window_size = self.window_size;
-        // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
-            .finalize_order(
-                &blocks_to_commit,
-                finality_proof.ledger_info().clone(),
-                Box::new(
-                    move |committed_blocks: &[Arc<PipelinedBlock>],
-                          commit_decision: LedgerInfoWithSignatures| {
-                        block_tree.write().commit_callback_deprecated(
-                            storage,
-                            committed_blocks,
-                            finality_proof,
-                            commit_decision,
-                            window_size,
-                        );
-                    },
-                ),
-            )
+            .finalize_order(blocks_to_commit, finality_proof.clone())
             .await
             .expect("Failed to persist commit");
 
@@ -475,17 +473,21 @@ impl BlockStore {
             let id = pipelined_block.id();
             let round = pipelined_block.round();
             let window_size = self.window_size;
-            let callback = Box::new(move |commit_decision: LedgerInfoWithSignatures| {
-                if let Some(tree) = block_tree.upgrade() {
-                    tree.write().commit_callback(
-                        storage,
-                        id,
-                        round,
-                        WrappedLedgerInfo::new(VoteData::dummy(), commit_decision),
-                        window_size,
-                    );
-                }
-            });
+            let callback = Box::new(
+                move |finality_proof: WrappedLedgerInfo,
+                      commit_decision: LedgerInfoWithSignatures| {
+                    if let Some(tree) = block_tree.upgrade() {
+                        tree.write().commit_callback(
+                            storage,
+                            id,
+                            round,
+                            finality_proof,
+                            commit_decision,
+                            window_size,
+                        );
+                    }
+                },
+            );
             pipeline_builder.build(
                 &pipelined_block,
                 parent_block.pipeline_futs().ok_or_else(|| {
@@ -537,6 +539,12 @@ impl BlockStore {
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
+                if pipelined_block.block().is_opt_block() {
+                    observe_block(
+                        pipelined_block.block().timestamp_usecs(),
+                        BlockStage::QC_ADDED_OPT_BLOCK,
+                    );
+                }
                 pipelined_block.set_qc(Arc::new(qc.clone()));
             },
             None => bail!("Insert {} without having the block in store first", qc),
@@ -586,12 +594,25 @@ impl BlockStore {
         Ok(())
     }
 
+    pub fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        self.payload_manager
+            .check_denied_inline_transactions(block, block_txn_filter_config)
+    }
+
     pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
     }
 
     pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
         self.inner.read().get_block_for_round(round)
+    }
+
+    pub fn pre_commit_status(&self) -> Option<Arc<Mutex<PreCommitStatus>>> {
+        self.pre_commit_status.clone()
     }
 }
 
@@ -883,7 +904,8 @@ impl BlockStore {
             self.storage.clone(),
             block_id,
             block_round,
-            commit_proof,
+            commit_proof.clone(),
+            commit_proof.ledger_info().clone(),
             window_size.or(self.window_size),
         )
     }

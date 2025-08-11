@@ -10,7 +10,7 @@ use crate::{
 };
 use core::fmt;
 use itertools::{Either, Itertools};
-use log::{debug, info};
+use log::debug;
 use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
 use std::{
@@ -142,7 +142,7 @@ pub struct ProcessorResultDisplay<'a> {
     pub processor: &'a dyn FunctionTargetProcessor,
 }
 
-impl<'a> fmt::Display for ProcessorResultDisplay<'a> {
+impl fmt::Display for ProcessorResultDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.processor.dump_result(f, self.env, self.targets)
     }
@@ -424,7 +424,7 @@ impl FunctionTargetPipeline {
         AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder) -> bool,
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
-        info!("transforming bytecode");
+        debug!("transforming bytecode");
         hook_before_pipeline(targets);
         for (step_count, processor) in self.processors.iter().enumerate() {
             if processor.is_single_run() {
@@ -573,7 +573,7 @@ impl FunctionTargetPipeline {
     }
 
     fn debug_dump(base_name: &str, step_count: usize, suffix: &str, content: &str) {
-        let name = format!("bytecode of {}_{}_{}", base_name, step_count, suffix);
+        let name = format!("bytecode of {}#step{}_{}", base_name, step_count, suffix);
         debug!("{}:\n{}\n", name, content.trim())
     }
 

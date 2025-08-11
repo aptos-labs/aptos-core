@@ -18,7 +18,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter as MoveGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -94,7 +94,34 @@ macro_rules! delegate_mut {
     };
 }
 
-impl<G> MoveGasMeter for MemoryTrackedGasMeter<G>
+impl<G> DependencyGasMeter for MemoryTrackedGasMeter<G>
+where
+    G: AptosGasMeter,
+{
+    delegate_mut! {
+        fn charge_dependency(&mut self, kind: DependencyKind, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
+    }
+}
+
+impl<G> NativeGasMeter for MemoryTrackedGasMeter<G>
+where
+    G: AptosGasMeter,
+{
+    delegate! {
+        fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
+    }
+
+    delegate_mut! {
+        fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+    }
+
+    #[inline]
+    fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.use_heap_memory(amount.into())
+    }
+}
+
+impl<G> GasMeter for MemoryTrackedGasMeter<G>
 where
     G: AptosGasMeter,
 {
@@ -164,8 +191,6 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
-
-        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -201,13 +226,17 @@ where
     ) -> PartialVMResult<()> {
         // TODO(Gas): https://github.com/aptos-labs/aptos-core/issues/5485
         if !self.should_leak_memory_for_native {
-            self.release_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
-                acc + self
-                    .vm_gas_params()
-                    .misc
-                    .abs_val
-                    .abstract_heap_size(val, self.feature_version())
-            }));
+            self.release_heap_memory(args.clone().try_fold(
+                AbstractValueSize::zero(),
+                |acc, val| {
+                    let heap_size = self
+                        .vm_gas_params()
+                        .misc
+                        .abs_val
+                        .abstract_heap_size(val, self.feature_version())?;
+                    Ok::<_, PartialVMError>(acc + heap_size)
+                },
+            )?);
         }
 
         self.base
@@ -220,14 +249,15 @@ where
         amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
-        if let Some(ret_vals) = ret_vals.clone() {
-            self.use_heap_memory(ret_vals.fold(AbstractValueSize::zero(), |acc, val| {
-                acc + self
+        if let Some(mut ret_vals) = ret_vals.clone() {
+            self.use_heap_memory(ret_vals.try_fold(AbstractValueSize::zero(), |acc, val| {
+                let heap_size = self
                     .vm_gas_params()
                     .misc
                     .abs_val
-                    .abstract_heap_size(val, self.feature_version())
-            }))?;
+                    .abstract_heap_size(val, self.feature_version())?;
+                Ok::<_, PartialVMError>(acc + heap_size)
+            })?)?;
         }
 
         self.base.charge_native_function(amount, ret_vals)
@@ -236,7 +266,7 @@ where
     #[inline]
     fn charge_load_resource(
         &mut self,
-        addr: move_core_types::account_address::AccountAddress,
+        addr: AccountAddress,
         ty: impl TypeView,
         val: Option<impl ValueView>,
         bytes_loaded: NumBytes,
@@ -248,7 +278,7 @@ where
                     self.vm_gas_params()
                         .misc
                         .abs_val
-                        .abstract_heap_size(val, self.feature_version()),
+                        .abstract_heap_size(val, self.feature_version())?,
                 )?;
             }
         }
@@ -262,7 +292,7 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&popped_val, self.feature_version()),
+                .abstract_heap_size(&popped_val, self.feature_version())?,
         );
 
         self.base.charge_pop(popped_val)
@@ -277,7 +307,7 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&val, self.feature_version()),
+                .abstract_heap_size(&val, self.feature_version())?,
         )?;
 
         self.base.charge_ld_const_after_deserialization(val)
@@ -289,7 +319,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_heap_size(&val, self.feature_version());
+            .abstract_heap_size(&val, self.feature_version())?;
 
         self.use_heap_memory(heap_size)?;
 
@@ -302,13 +332,17 @@ where
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_stack_size(val, self.feature_version())
-        }))?;
+        self.use_heap_memory(
+            args.clone()
+                .try_fold(AbstractValueSize::zero(), |acc, val| {
+                    let stack_size = self
+                        .vm_gas_params()
+                        .misc
+                        .abs_val
+                        .abstract_stack_size(val, self.feature_version())?;
+                    Ok::<_, PartialVMError>(acc + stack_size)
+                })?,
+        )?;
 
         self.base.charge_pack(is_generic, args)
     }
@@ -319,15 +353,40 @@ where
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_stack_size(val, self.feature_version())
-        }));
+        self.release_heap_memory(args.clone().try_fold(
+            AbstractValueSize::zero(),
+            |acc, val| {
+                let stack_size = self
+                    .vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_stack_size(val, self.feature_version())?;
+                Ok::<_, PartialVMError>(acc + stack_size)
+            },
+        )?);
 
         self.base.charge_unpack(is_generic, args)
+    }
+
+    #[inline]
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> PartialVMResult<()> {
+        self.use_heap_memory(
+            args.clone()
+                .try_fold(AbstractValueSize::zero(), |acc, val| {
+                    let stack_size = self
+                        .vm_gas_params()
+                        .misc
+                        .abs_val
+                        .abstract_stack_size(val, self.feature_version())?;
+                    Ok::<_, PartialVMError>(acc + stack_size)
+                })?,
+        )?;
+
+        self.base.charge_pack_closure(is_generic, args)
     }
 
     #[inline]
@@ -336,7 +395,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_heap_size(&val, self.feature_version());
+            .abstract_heap_size(&val, self.feature_version())?;
 
         self.use_heap_memory(heap_size)?;
 
@@ -353,7 +412,7 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&old_val, self.feature_version()),
+                .abstract_heap_size(&old_val, self.feature_version())?,
         );
 
         self.base.charge_write_ref(new_val, old_val)
@@ -365,13 +424,13 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&lhs, self.feature_version()),
+                .abstract_heap_size(&lhs, self.feature_version())?,
         );
         self.release_heap_memory(
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&rhs, self.feature_version()),
+                .abstract_heap_size(&rhs, self.feature_version())?,
         );
 
         self.base.charge_eq(lhs, rhs)
@@ -383,13 +442,13 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&lhs, self.feature_version()),
+                .abstract_heap_size(&lhs, self.feature_version())?,
         );
         self.release_heap_memory(
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&rhs, self.feature_version()),
+                .abstract_heap_size(&rhs, self.feature_version())?,
         );
 
         self.base.charge_neq(lhs, rhs)
@@ -401,9 +460,18 @@ where
         ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.vm_gas_params().misc.abs_val.abstract_packed_size(val)
-        }))?;
+        self.use_heap_memory(
+            args.clone()
+                .try_fold(AbstractValueSize::zero(), |acc, val| {
+                    Ok::<_, PartialVMError>(
+                        acc + self
+                            .vm_gas_params()
+                            .misc
+                            .abs_val
+                            .abstract_packed_size(val)?,
+                    )
+                })?,
+        )?;
 
         self.base.charge_vec_pack(ty, args)
     }
@@ -415,9 +483,18 @@ where
         expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(elems.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.vm_gas_params().misc.abs_val.abstract_packed_size(val)
-        }));
+        self.release_heap_memory(elems.clone().try_fold(
+            AbstractValueSize::zero(),
+            |acc, val| {
+                Ok::<_, PartialVMError>(
+                    acc + self
+                        .vm_gas_params()
+                        .misc
+                        .abs_val
+                        .abstract_packed_size(val)?,
+                )
+            },
+        )?);
 
         self.base.charge_vec_unpack(ty, expect_num_elements, elems)
     }
@@ -428,7 +505,12 @@ where
         ty: impl TypeView,
         val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(self.vm_gas_params().misc.abs_val.abstract_packed_size(&val))?;
+        self.use_heap_memory(
+            self.vm_gas_params()
+                .misc
+                .abs_val
+                .abstract_packed_size(&val)?,
+        )?;
 
         self.base.charge_vec_push_back(ty, val)
     }
@@ -440,7 +522,12 @@ where
         val: Option<impl ValueView>,
     ) -> PartialVMResult<()> {
         if let Some(val) = &val {
-            self.release_heap_memory(self.vm_gas_params().misc.abs_val.abstract_packed_size(val));
+            self.release_heap_memory(
+                self.vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_packed_size(val)?,
+            );
         }
 
         self.base.charge_vec_pop_back(ty, val)
@@ -451,20 +538,19 @@ where
         &mut self,
         locals: impl Iterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(locals.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_heap_size(val, self.feature_version())
-        }));
+        self.release_heap_memory(locals.clone().try_fold(
+            AbstractValueSize::zero(),
+            |acc, val| {
+                let heap_size = self
+                    .vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_heap_size(val, self.feature_version())?;
+                Ok::<_, PartialVMError>(acc + heap_size)
+            },
+        )?);
 
         self.base.charge_drop_frame(locals)
-    }
-
-    #[inline]
-    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
-        self.use_heap_memory(amount.into())
     }
 }
 

@@ -192,7 +192,7 @@ module aptos_framework::account_abstraction {
         );
     }
 
-    entry fun initialize(aptos_framework: &signer) {
+    public entry fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(
             aptos_framework,

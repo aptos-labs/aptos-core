@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: function types cannot have `key` ability
+   ┌─ tests/ability-check/fv_as_keys/store_fv.move:12:45
+   │
+12 │   fun add_resource_with_fv(acc: &signer, f: | &||u64 |u64 has store+drop+key) {
+   │                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/ability-check/fv_as_keys/store_fv.move:13:13
+   │
+13 │     move_to<| &||u64 |u64 has store+drop+key>(acc, f);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/ability-check/fv_as_keys/store_fv.move:18:12
+   │
+18 │     let f: | &||u64 |u64 has store+drop+key = test;
+   │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

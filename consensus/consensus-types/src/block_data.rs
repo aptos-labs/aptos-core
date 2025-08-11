@@ -4,13 +4,17 @@
 
 use crate::{
     common::{Author, Payload, Round},
-    proposal_ext::ProposalExt,
+    opt_block_data::OptBlockData,
+    proposal_ext::{OptBlockBody, ProposalExt},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
 use aptos_bitvec::BitVec;
-use aptos_crypto::hash::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto::{
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
+};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -49,6 +53,9 @@ pub enum BlockType {
     /// Proposal with extensions (e.g. system transactions).
     ProposalExt(ProposalExt),
 
+    /// Optimistic proposal.
+    OptimisticProposal(OptBlockBody),
+
     /// A virtual block that's constructed by nodes from DAG, this is purely a local thing so
     /// we hide it from serde
     #[serde(skip_deserializing)]
@@ -63,7 +70,7 @@ pub enum BlockType {
     },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
 /// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
 pub struct BlockData {
@@ -96,6 +103,37 @@ pub struct BlockData {
     block_type: BlockType,
 }
 
+impl CryptoHash for BlockData {
+    type Hasher = BlockDataHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        if self.is_opt_block() {
+            #[derive(Serialize)]
+            struct OptBlockDataForHash<'a> {
+                epoch: u64,
+                round: Round,
+                timestamp_usecs: u64,
+                quorum_cert_vote_data: &'a VoteData,
+                block_type: &'a BlockType,
+            }
+
+            let opt_block_data_for_hash = OptBlockDataForHash {
+                epoch: self.epoch,
+                round: self.round,
+                timestamp_usecs: self.timestamp_usecs,
+                quorum_cert_vote_data: self.quorum_cert.vote_data(),
+                block_type: &self.block_type,
+            };
+            bcs::serialize_into(&mut state, &opt_block_data_for_hash)
+                .expect("OptBlockDataForHash must be serializable");
+        } else {
+            bcs::serialize_into(&mut state, &self).expect("BlockData must be serializable");
+        }
+        state.finish()
+    }
+}
+
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
@@ -103,6 +141,7 @@ impl BlockData {
                 Some(*author)
             },
             BlockType::ProposalExt(p) => Some(*p.author()),
+            BlockType::OptimisticProposal(p) => Some(*p.author()),
             _ => None,
         }
     }
@@ -132,13 +171,15 @@ impl BlockData {
                 Some(payload)
             },
             BlockType::ProposalExt(p) => p.payload(),
+            BlockType::OptimisticProposal(p) => Some(p.payload()),
             _ => None,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match &self.block_type {
-            BlockType::ProposalExt(proposal_ext) => proposal_ext.validator_txns(),
+            BlockType::ProposalExt(p) => p.validator_txns(),
+            BlockType::OptimisticProposal(p) => p.validator_txns(),
             BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
             BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
         }
@@ -176,6 +217,10 @@ impl BlockData {
         matches!(self.block_type, BlockType::NilBlock { .. })
     }
 
+    pub fn is_opt_block(&self) -> bool {
+        matches!(self.block_type, BlockType::OptimisticProposal { .. })
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
@@ -184,7 +229,7 @@ impl BlockData {
             | BlockType::NilBlock { failed_authors, .. }
             | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
-            BlockType::Genesis => None,
+            BlockType::OptimisticProposal(_) | BlockType::Genesis => None,
         }
     }
 
@@ -244,8 +289,9 @@ impl BlockData {
         )
     }
 
+    #[allow(unexpected_cfgs)]
     pub fn new_genesis(timestamp_usecs: u64, quorum_cert: QuorumCert) -> Self {
-        assume!(quorum_cert.certified_block().epoch() < u64::max_value()); // unlikely to be false in this universe
+        assume!(quorum_cert.certified_block().epoch() < u64::MAX); // unlikely to be false in this universe
         Self {
             epoch: quorum_cert.certified_block().epoch() + 1,
             round: 0,
@@ -255,6 +301,7 @@ impl BlockData {
         }
     }
 
+    #[allow(unexpected_cfgs)]
     pub fn new_nil(
         round: Round,
         quorum_cert: QuorumCert,
@@ -262,7 +309,7 @@ impl BlockData {
     ) -> Self {
         // We want all the NIL blocks to agree on the timestamps even though they're generated
         // independently by different validators, hence we're using the timestamp of a parent + 1.
-        assume!(quorum_cert.certified_block().timestamp_usecs() < u64::max_value()); // unlikely to be false in this universe
+        assume!(quorum_cert.certified_block().timestamp_usecs() < u64::MAX); // unlikely to be false in this universe
         let timestamp_usecs = quorum_cert.certified_block().timestamp_usecs();
 
         Self {
@@ -350,6 +397,25 @@ impl BlockData {
                 author,
                 failed_authors,
             }),
+        }
+    }
+
+    /// Returns an instance of BlockData by converting the OptBlockData to BlockData
+    /// and adding QC and failed_authors
+    pub fn new_from_opt(opt_block_data: OptBlockData, quorum_cert: QuorumCert) -> Self {
+        let OptBlockData {
+            epoch,
+            round,
+            timestamp_usecs,
+            block_body: proposal_body,
+            ..
+        } = opt_block_data;
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::OptimisticProposal(proposal_body),
         }
     }
 

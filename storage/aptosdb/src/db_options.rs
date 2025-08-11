@@ -22,13 +22,15 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_VERSION_CF_NAME,
         EVENT_CF_NAME,
         LEDGER_INFO_CF_NAME,
+        PERSISTED_AUXILIARY_INFO_CF_NAME,
         STALE_STATE_VALUE_INDEX_CF_NAME,
         STATE_VALUE_CF_NAME,
         TRANSACTION_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
         TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
         TRANSACTION_AUXILIARY_DATA_CF_NAME,
-        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
         TRANSACTION_INFO_CF_NAME,
         VERSION_DATA_CF_NAME,
@@ -45,6 +47,14 @@ pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_KEY_CF_NAME,
         EVENT_BY_VERSION_CF_NAME,
         EVENT_CF_NAME,
+    ]
+}
+
+pub(super) fn persisted_auxiliary_info_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        PERSISTED_AUXILIARY_INFO_CF_NAME,
     ]
 }
 
@@ -70,7 +80,8 @@ pub(super) fn transaction_db_column_families() -> Vec<ColumnFamilyName> {
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         TRANSACTION_CF_NAME,
-        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
     ]
 }
@@ -137,6 +148,13 @@ pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
+    ]
+}
+
 fn gen_cfds<F>(
     rocksdb_config: &RocksdbConfig,
     cfs: Vec<ColumnFamilyName>,
@@ -155,6 +173,7 @@ where
         let mut cf_opts = Options::default();
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);
+        cf_opts.add_compact_on_deletion_collector_factory(0, 0, 0.4);
         cf_opts_post_processor(cf_name, &mut cf_opts);
         cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
     }
@@ -162,15 +181,29 @@ where
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_CF_NAME || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME {
+    if cf_name == STATE_VALUE_CF_NAME
+        || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
         cf_opts.set_prefix_extractor(prefix_extractor);
     }
 }
 
+fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
+    &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
+}
+
 pub(super) fn gen_event_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
     let cfs = event_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_persisted_auxiliary_info_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = persisted_auxiliary_info_db_column_families();
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
@@ -228,6 +261,9 @@ pub(super) fn gen_state_kv_shard_cfds(
     gen_cfds(rocksdb_config, cfs, with_state_key_extractor_processor)
 }
 
-fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
-    &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
+pub(super) fn gen_hot_state_kv_shard_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = hot_state_kv_db_column_families();
+    gen_cfds(rocksdb_config, cfs, with_state_key_extractor_processor)
 }

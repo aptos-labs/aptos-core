@@ -1,34 +1,48 @@
-apiVersion: v1  
-kind: Pod  
-metadata:  
+apiVersion: v1
+kind: Pod
+metadata:
   name: worker-pod-9
   labels:
     run: some-label
-  annotations: {}
-spec:  
-  serviceAccountName: default  
-  restartPolicy: Never  # Pod restarts only if it fails  
-  containers:  
-    - name: replay-verify-worker  
-      image: us-docker.pkg.dev/aptos-registry/docker/tools:nightly  
-      volumeMounts:  
-        - mountPath: /mnt/archive  
-          name: archive  
-          readOnly: true  # Mount the volume as read-only  
-      command: ["/bin/sh", "-c", "ls -al /mnt/archive && sleep 3600"]
-      env:  
-        #- name: PUSH_METRICS_ENDPOINT  
+  annotations: { }
+spec:
+  serviceAccountName: default
+  restartPolicy: Never # Pod restarts only if it fails
+  containers:
+    - name: replay-verify-worker
+      image: us-docker.pkg.dev/aptos-registry/docker/tools:nightly
+      volumeMounts:
+        - mountPath: /mnt/archive
+          name: archive
+          readOnly: false # Mount the volume as read-only
+      command: [ "/bin/sh", "-c", "ls -al /mnt/archive && sleep 3600" ]
+      env:
+        #- name: PUSH_METRICS_ENDPOINT
         #  value: "http://localhost:9091"
-        - name: RUST_LOG  
+        - name: RUST_LOG
           value: "info"
-      resources:  
-        requests:  
-          memory: "90Gi"  
-          cpu: "30"  
-        limits:  
-          memory: "90Gi"  
-          cpu: "30"  
-  volumes:  
+      resources:
+        requests:
+          memory: "100Gi"
+          cpu: "28"
+  volumes:
     - name: archive
-      persistentVolumeClaim:  
+      persistentVolumeClaim:
         claimName: testnet-archive-9
+  tolerations:
+  - key: aptos-workload
+    operator: Equal
+    value: "replay-verify"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: cloud.google.com/machine-family
+              operator: In
+              values:
+              - "c3d"
+            - key: node-restriction.kubernetes.io/aptos-workload
+              operator: In
+              values:
+              - "replay-verify"

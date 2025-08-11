@@ -6,7 +6,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
-    validator_txn::ValidatorTransaction,
+    transaction::ReplayProtector, validator_txn::ValidatorTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -50,14 +50,50 @@ pub enum SessionId {
     ValidatorTxn {
         script_hash: Vec<u8>,
     },
+    OrderlessTxn {
+        sender: AccountAddress,
+        nonce: u64,
+        expiration_time: u64,
+        script_hash: Vec<u8>,
+    },
+    OrderlessTxnProlouge {
+        sender: AccountAddress,
+        nonce: u64,
+        expiration_time: u64,
+        script_hash: Vec<u8>,
+    },
+    OrderlessTxnEpilogue {
+        sender: AccountAddress,
+        nonce: u64,
+        expiration_time: u64,
+        script_hash: Vec<u8>,
+    },
+    OrderlessRunOnAbort {
+        sender: AccountAddress,
+        nonce: u64,
+        expiration_time: u64,
+        script_hash: Vec<u8>,
+    },
+    BlockEpilogue {
+        // block id
+        id: HashValue,
+    },
 }
 
 impl SessionId {
     pub fn txn_meta(txn_metadata: &TransactionMetadata) -> Self {
-        Self::Txn {
-            sender: txn_metadata.sender,
-            sequence_number: txn_metadata.sequence_number,
-            script_hash: txn_metadata.script_hash.clone(),
+        match txn_metadata.replay_protector() {
+            ReplayProtector::SequenceNumber(sequence_number) => Self::Txn {
+                sender: txn_metadata.sender,
+                sequence_number,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
+            ReplayProtector::Nonce(nonce) => Self::OrderlessTxn {
+                sender: txn_metadata.sender,
+                nonce,
+                expiration_time: txn_metadata.expiration_timestamp_secs,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
         }
     }
 
@@ -77,27 +113,55 @@ impl SessionId {
         }
     }
 
+    pub fn block_epilogue(id: HashValue) -> Self {
+        Self::BlockEpilogue { id }
+    }
+
     pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
-        Self::Prologue {
-            sender: txn_metadata.sender,
-            sequence_number: txn_metadata.sequence_number,
-            script_hash: txn_metadata.script_hash.clone(),
+        match txn_metadata.replay_protector() {
+            ReplayProtector::SequenceNumber(sequence_number) => Self::Prologue {
+                sender: txn_metadata.sender,
+                sequence_number,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
+            ReplayProtector::Nonce(nonce) => Self::OrderlessTxnProlouge {
+                sender: txn_metadata.sender,
+                nonce,
+                expiration_time: txn_metadata.expiration_timestamp_secs,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
         }
     }
 
     pub fn run_on_abort(txn_metadata: &TransactionMetadata) -> Self {
-        Self::RunOnAbort {
-            sender: txn_metadata.sender,
-            sequence_number: txn_metadata.sequence_number,
-            script_hash: txn_metadata.script_hash.clone(),
+        match txn_metadata.replay_protector() {
+            ReplayProtector::SequenceNumber(sequence_number) => Self::RunOnAbort {
+                sender: txn_metadata.sender,
+                sequence_number,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
+            ReplayProtector::Nonce(nonce) => Self::OrderlessRunOnAbort {
+                sender: txn_metadata.sender,
+                nonce,
+                expiration_time: txn_metadata.expiration_timestamp_secs,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
         }
     }
 
     pub fn epilogue_meta(txn_metadata: &TransactionMetadata) -> Self {
-        Self::Epilogue {
-            sender: txn_metadata.sender,
-            sequence_number: txn_metadata.sequence_number,
-            script_hash: txn_metadata.script_hash.clone(),
+        match txn_metadata.replay_protector() {
+            ReplayProtector::SequenceNumber(sequence_number) => Self::Epilogue {
+                sender: txn_metadata.sender,
+                sequence_number,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
+            ReplayProtector::Nonce(nonce) => Self::OrderlessTxnEpilogue {
+                sender: txn_metadata.sender,
+                nonce,
+                expiration_time: txn_metadata.expiration_timestamp_secs,
+                script_hash: txn_metadata.script_hash.clone(),
+            },
         }
     }
 
@@ -117,30 +181,19 @@ impl SessionId {
 
     pub(crate) fn into_script_hash(self) -> Vec<u8> {
         match self {
-            Self::Txn {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | Self::Prologue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | Self::Epilogue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | Self::RunOnAbort {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | Self::ValidatorTxn { script_hash } => script_hash,
+            Self::Txn { script_hash, .. }
+            | Self::Prologue { script_hash, .. }
+            | Self::Epilogue { script_hash, .. }
+            | Self::RunOnAbort { script_hash, .. }
+            | Self::ValidatorTxn { script_hash }
+            | Self::OrderlessTxn { script_hash, .. }
+            | Self::OrderlessTxnProlouge { script_hash, .. }
+            | Self::OrderlessTxnEpilogue { script_hash, .. }
+            | Self::OrderlessRunOnAbort { script_hash, .. } => script_hash,
             Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
+            | Self::BlockEpilogue { id: _ }
             | Self::BlockMetaExt { id: _ } => vec![],
         }
     }

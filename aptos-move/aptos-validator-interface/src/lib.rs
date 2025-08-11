@@ -20,6 +20,7 @@ use lru::LruCache;
 use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
+    num::NonZeroUsize,
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -93,7 +94,7 @@ pub struct DebuggerStateView {
     version: Version,
 }
 
-async fn handler_thread<'a>(
+async fn handler_thread(
     db: Arc<dyn AptosValidatorInterface + Send>,
     mut thread_receiver: UnboundedReceiver<(
         StateKey,
@@ -101,7 +102,7 @@ async fn handler_thread<'a>(
         std::sync::mpsc::Sender<Result<Option<StateValue>>>,
     )>,
 ) {
-    const M: usize = 1024 * 1024;
+    const M: NonZeroUsize = NonZeroUsize::new(1024 * 1024).unwrap();
     let cache = Arc::new(Mutex::new(LruCache::<
         (StateKey, Version),
         Option<StateValue>,
@@ -149,8 +150,9 @@ impl DebuggerStateView {
         version: Version,
     ) -> Result<Option<StateValue>> {
         let (tx, rx) = std::sync::mpsc::channel();
-        let query_handler_locked = self.query_sender.lock().unwrap();
-        query_handler_locked
+        self.query_sender
+            .lock()
+            .unwrap()
             .send((state_key.clone(), version, tx))
             .unwrap();
         rx.recv()?
@@ -171,5 +173,9 @@ impl TStateView for DebuggerStateView {
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!()
+    }
+
+    fn next_version(&self) -> Version {
+        self.version + 1
     }
 }

@@ -1,6 +1,8 @@
 processed 4 tasks
-
-task 3 'publish'. lines 147-197:
+task 0 lines 1-62:  publish [module 0xc0ffee::m {]
+task 1 lines 65-94:  publish [module 0xc0ffee::n {]
+task 2 lines 97-145:  publish [module 0xc0ffee::o {]
+task 3 lines 147-197:  publish [module 0xc0ffee::o_fail {]
 Error: compilation errors:
  error: unreachable pattern
     ┌─ TEMPFILE3:168:13

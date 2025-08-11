@@ -29,7 +29,7 @@ futures = { workspace = true }
 hex = { workspace = true }
 ipnet = { workspace = true }
 iprange = "0.6.7"
-lru = "0.9.0"
+lru = { workspace = true }
 once_cell = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }

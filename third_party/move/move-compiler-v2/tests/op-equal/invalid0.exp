@@ -6,13 +6,13 @@ error: cannot mutably borrow from an immutable ref
 8 │         self.0 += 1;
   │         ^^^^^^
 
-error: expected `&mut` but `&` was provided
+error: expected `&mut vector<u256>` but found a value of type `&vector<u256>` (mutability mismatch)
    ┌─ tests/op-equal/invalid0.move:12:3
    │
 12 │         x[index] += 1;
    │         ^
 
-error: expected `&mut` but `&` was provided
+error: expected `&mut vector<Wrapper<Coin>>` but found a value of type `&vector<Wrapper<Coin>>` (mutability mismatch)
    ┌─ tests/op-equal/invalid0.move:16:3
    │
 16 │         x[index].0.0 += 1;

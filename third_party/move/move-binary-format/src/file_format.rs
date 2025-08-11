@@ -49,7 +49,7 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, fmt::Formatter};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -380,6 +380,15 @@ impl FunctionAttribute {
             with.contains(&FunctionAttribute::Persistent)
         } else {
             true
+        }
+    }
+}
+
+impl fmt::Display for FunctionAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            FunctionAttribute::Persistent => write!(f, "persistent"),
+            FunctionAttribute::ModuleLock => write!(f, "module_lock"),
         }
     }
 }
@@ -1152,7 +1161,8 @@ impl SignatureToken {
     /// Returns true if this type can have assigned a value of the source type.
     /// For function types, this is true if the argument and result types
     /// are equal, and if this function type's ability set is a subset of the other
-    /// one. For all other types, they must be equal
+    /// one. For immutable references, this is true if the inner types are assignable.
+    /// For all other types, this is true if the two types are equal.
     pub fn is_assignable_from(&self, source: &SignatureToken) -> bool {
         match (self, source) {
             (
@@ -1160,9 +1170,6 @@ impl SignatureToken {
                 SignatureToken::Function(args2, results2, abs2),
             ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
             (SignatureToken::Reference(ty1), SignatureToken::Reference(ty2)) => {
-                ty1.is_assignable_from(ty2)
-            },
-            (SignatureToken::MutableReference(ty1), SignatureToken::MutableReference(ty2)) => {
                 ty1.is_assignable_from(ty2)
             },
             _ => self == source,
@@ -2700,7 +2707,7 @@ pub enum Bytecode {
 
     #[group = "closure"]
     #[description = r#"
-        `CallClosure(|t1..tn|r has a)` evalutes a closure of the given function type,
+        `CallClosure(|t1..tn|r has a)` evaluates a closure of the given function type,
         taking the captured arguments and mixing in the provided ones on the stack.
 
         On top of the stack is the closure being evaluated, underneath the arguments:
@@ -2961,6 +2968,108 @@ impl Bytecode {
 
         v
     }
+
+    /// Returns a signature index for instruction, if it exists. Signature index is used by:
+    ///   - Vector instructions (for vector element),
+    ///   - Calling a closure (for function signature).
+    pub fn get_signature_idx(&self) -> Option<SignatureIndex> {
+        use Bytecode::*;
+        match self {
+            // Instructions with single signature index.
+            VecPack(idx, _)
+            | VecLen(idx)
+            | VecImmBorrow(idx)
+            | VecMutBorrow(idx)
+            | VecPushBack(idx)
+            | VecPopBack(idx)
+            | VecUnpack(idx, _)
+            | VecSwap(idx)
+            | CallClosure(idx) => Some(*idx),
+
+            // Instructions without single signature index.
+            Pop
+            | Ret
+            | BrTrue(_)
+            | BrFalse(_)
+            | Branch(_)
+            | LdU8(_)
+            | LdU16(_)
+            | LdU32(_)
+            | LdU64(_)
+            | LdU128(_)
+            | LdU256(_)
+            | CastU8
+            | CastU16
+            | CastU32
+            | CastU64
+            | CastU128
+            | CastU256
+            | LdConst(_)
+            | LdTrue
+            | LdFalse
+            | CopyLoc(_)
+            | MoveLoc(_)
+            | StLoc(_)
+            | MutBorrowLoc(_)
+            | ImmBorrowLoc(_)
+            | MutBorrowField(_)
+            | ImmBorrowField(_)
+            | MutBorrowFieldGeneric(_)
+            | ImmBorrowFieldGeneric(_)
+            | Call(_)
+            | CallGeneric(_)
+            | Pack(_)
+            | PackGeneric(_)
+            | Unpack(_)
+            | UnpackGeneric(_)
+            | Exists(_)
+            | ExistsGeneric(_)
+            | MutBorrowGlobal(_)
+            | ImmBorrowGlobal(_)
+            | MutBorrowGlobalGeneric(_)
+            | ImmBorrowGlobalGeneric(_)
+            | MoveFrom(_)
+            | MoveFromGeneric(_)
+            | MoveTo(_)
+            | MoveToGeneric(_)
+            | FreezeRef
+            | ReadRef
+            | WriteRef
+            | Add
+            | Sub
+            | Mul
+            | Mod
+            | Div
+            | BitOr
+            | BitAnd
+            | Xor
+            | Shl
+            | Shr
+            | Or
+            | And
+            | Not
+            | Eq
+            | Neq
+            | Lt
+            | Gt
+            | Le
+            | Ge
+            | Abort
+            | Nop
+            | ImmBorrowVariantField(_)
+            | ImmBorrowVariantFieldGeneric(_)
+            | MutBorrowVariantField(_)
+            | MutBorrowVariantFieldGeneric(_)
+            | PackVariant(_)
+            | PackVariantGeneric(_)
+            | UnpackVariant(_)
+            | UnpackVariantGeneric(_)
+            | TestVariant(_)
+            | TestVariantGeneric(_)
+            | PackClosure(_, _)
+            | PackClosureGeneric(_, _) => None,
+        }
+    }
 }
 
 /// Contains the main function to execute and its dependencies.
@@ -3001,6 +3110,8 @@ pub struct CompiledScript {
     pub type_parameters: Vec<AbilitySet>,
 
     pub parameters: SignatureIndex,
+
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
 }
 
 impl CompiledScript {
@@ -3121,6 +3232,8 @@ impl Arbitrary for CompiledScript {
                         metadata: vec![],
                         type_parameters,
                         parameters,
+                        // TODO(#16278): access specifiers
+                        access_specifiers: None,
                         code,
                     }
                 },
@@ -3361,14 +3474,29 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     dependencies: impl IntoIterator<Item = &'a str>,
     friends: impl IntoIterator<Item = &'a str>,
 ) -> CompiledModule {
-    // Rename this empty module.
+    empty_module_with_dependencies_and_friends_at_addr(
+        AccountAddress::ZERO,
+        module_name,
+        dependencies,
+        friends,
+    )
+}
+
+/// Creates an empty compiled module with specified dependencies and friends. All
+/// modules (including itself) are stored at the specified address.
+pub fn empty_module_with_dependencies_and_friends_at_addr<'a>(
+    address: AccountAddress,
+    module_name: &'a str,
+    dependencies: impl IntoIterator<Item = &'a str>,
+    friends: impl IntoIterator<Item = &'a str>,
+) -> CompiledModule {
     let mut module = empty_module();
+    module.address_identifiers[0] = address;
     module.identifiers[0] = Identifier::new(module_name).unwrap();
 
     for name in dependencies {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.module_handles.push(ModuleHandle {
-            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });
@@ -3376,7 +3504,6 @@ pub fn empty_module_with_dependencies_and_friends<'a>(
     for name in friends {
         module.identifiers.push(Identifier::new(name).unwrap());
         module.friend_decls.push(ModuleHandle {
-            // Empty module sets up this index to 0x0.
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex((module.identifiers.len() - 1) as TableIndex),
         });
@@ -3403,6 +3530,7 @@ pub fn empty_script() -> CompiledScript {
 
         type_parameters: vec![],
         parameters: SignatureIndex(0),
+        access_specifiers: None,
         code: CodeUnit {
             locals: SignatureIndex(0),
             code: vec![Bytecode::Ret],

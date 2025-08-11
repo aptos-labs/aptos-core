@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, build_package, MoveHarness};
+use crate::{assert_success, assert_vm_status, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::BuildOptions;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{FeatureFlag, OnChainConfig},
+    on_chain_config::OnChainConfig,
     transaction::{Script, TransactionPayload, TransactionStatus},
     vm::module_metadata::{
         RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY, APTOS_METADATA_KEY_V1,
@@ -15,10 +15,8 @@ use aptos_types::{
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::CORE_CODE_ADDRESS,
-    metadata::Metadata,
-    vm_status::{StatusCode, StatusCode::CONSTRAINT_NOT_SATISFIED},
+    account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS, metadata::Metadata,
+    vm_status::StatusCode,
 };
 use move_model::metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY};
 use std::collections::BTreeMap;
@@ -119,7 +117,7 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
         .expect("building package must succeed");
     let origin_code = package.extract_code();
     let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();
@@ -177,7 +175,7 @@ fn test_compilation_metadata_with_changes(
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })
@@ -204,14 +202,8 @@ fn test_compilation_metadata_with_changes(
 fn test_compilation_metadata_internal(
     mainnet_flag: bool,
     unstable_flag: bool,
-    feature_enabled: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
-    if feature_enabled {
-        h.enable_features(vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE], vec![]);
-    } else {
-        h.enable_features(vec![], vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE]);
-    }
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -230,7 +222,7 @@ fn test_compilation_metadata_internal(
     } else {
         CompilerVersion::latest_stable()
     };
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })
@@ -267,19 +259,8 @@ fn test_compilation_metadata_internal(
 fn test_compilation_metadata_script_internal(
     mainnet_flag: bool,
     unstable_flag: bool,
-    feature_enabled: bool,
 ) -> TransactionStatus {
     let mut h = MoveHarness::new();
-    if feature_enabled {
-        h.enable_features(
-            vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT],
-            vec![],
-        );
-    } else {
-        h.enable_features(vec![], vec![
-            FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
-        ]);
-    }
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -297,7 +278,7 @@ fn test_compilation_metadata_script_internal(
     } else {
         CompilerVersion::latest_stable()
     };
-    let package = build_package(path.path().to_path_buf(), BuildOptions {
+    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions {
         compiler_version: Some(compiler_version),
         ..BuildOptions::default()
     })
@@ -321,110 +302,30 @@ fn test_compilation_metadata_script_internal(
 
 #[test]
 fn test_compilation_metadata_for_script() {
-    let mut enable_check = true;
     // run unstable compiler code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_script_internal(true, true, enable_check),
+        test_compilation_metadata_script_internal(true, true),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // run stable compiler code to mainnet
-    assert_success!(test_compilation_metadata_script_internal(
-        true,
-        false,
-        enable_check
-    ));
+    assert_success!(test_compilation_metadata_script_internal(true, false,));
     // run unstable compiler code to test
-    assert_success!(test_compilation_metadata_script_internal(
-        false,
-        true,
-        enable_check
-    ));
+    assert_success!(test_compilation_metadata_script_internal(false, true,));
     // run stable compiler code to test
-    assert_success!(test_compilation_metadata_script_internal(
-        false,
-        false,
-        enable_check
-    ));
-
-    enable_check = false;
-    // run unstable compiler code to mainnet
-    // success because the feature flag is turned off
-    assert_success!(test_compilation_metadata_script_internal(
-        true,
-        true,
-        enable_check
-    ),);
-    // run stable compiler code to mainnet
-    assert_success!(test_compilation_metadata_script_internal(
-        true,
-        false,
-        enable_check
-    ));
-    // run unstable compiler code to test
-    // success because the feature flag is turned off
-    assert_success!(test_compilation_metadata_script_internal(
-        false,
-        true,
-        enable_check
-    ),);
-    // run stable compiler code to test
-    assert_success!(test_compilation_metadata_script_internal(
-        false,
-        false,
-        enable_check
-    ));
+    assert_success!(test_compilation_metadata_script_internal(false, false,));
 }
 
 #[test]
 fn test_compilation_metadata() {
-    let mut enable_check = true;
     // publish unstable compiler code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
+        test_compilation_metadata_internal(true, true),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // publish stable compiler code to mainnet
-    assert_success!(test_compilation_metadata_internal(
-        true,
-        false,
-        enable_check
-    ));
+    assert_success!(test_compilation_metadata_internal(true, false,));
     // publish unstable compiler code to test
-    assert_success!(test_compilation_metadata_internal(
-        false,
-        true,
-        enable_check
-    ));
+    assert_success!(test_compilation_metadata_internal(false, true,));
     // publish stable compiler code to test
-    assert_success!(test_compilation_metadata_internal(
-        false,
-        false,
-        enable_check
-    ));
-
-    enable_check = false;
-    // publish unstable compiler code to mainnet
-    // failed because the metadata cannot be recognized
-    assert_vm_status!(
-        test_compilation_metadata_internal(true, true, enable_check),
-        CONSTRAINT_NOT_SATISFIED
-    );
-    // publish stable compiler code to mainnet
-    // failed because the metadata cannot be recognized
-    assert_vm_status!(
-        test_compilation_metadata_internal(true, false, enable_check),
-        CONSTRAINT_NOT_SATISFIED
-    );
-    // publish unstable compiler code to test
-    // failed because the metadata cannot be recognized
-    assert_vm_status!(
-        test_compilation_metadata_internal(false, true, enable_check),
-        CONSTRAINT_NOT_SATISFIED
-    );
-    // publish stable compiler code to test
-    // failed because the metadata cannot be recognized
-    assert_vm_status!(
-        test_compilation_metadata_internal(false, false, enable_check),
-        CONSTRAINT_NOT_SATISFIED
-    );
+    assert_success!(test_compilation_metadata_internal(false, false,));
 }

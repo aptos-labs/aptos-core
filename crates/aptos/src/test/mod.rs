@@ -17,10 +17,10 @@ use crate::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
             AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
             EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
-            MoveManifestAccountWrapper, MovePackageOptions, OptionalPoolAddressArgs,
-            OverrideSizeCheckOption, PoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
-            PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, ScriptFunctionArguments,
-            TransactionOptions, TransactionSummary, TypeArgVec,
+            LargePackagesModuleOption, MoveManifestAccountWrapper, MovePackageOptions,
+            OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
+            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
+            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -53,7 +53,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
-use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
+use aptos_framework::chunked_publish::CHUNK_SIZE_IN_BYTES;
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -152,13 +152,6 @@ impl CliTestFramework {
         self.account_addresses.clone()
     }
 
-    async fn check_account_exists(&self, index: usize) -> bool {
-        // Create account if it doesn't exist (and there's a faucet)
-        let client = aptos_rest_client::Client::new(self.endpoint.clone());
-        let address = self.account_id(index);
-        client.get_account(address).await.is_ok()
-    }
-
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
         let address = account_address_from_public_key(&private_key.public_key());
         self.account_addresses.push(address);
@@ -187,11 +180,6 @@ impl CliTestFramework {
         sender_index: usize,
     ) -> CliTypedResult<usize> {
         let index = self.add_account_to_cli(private_key);
-        if self.check_account_exists(index).await {
-            return Err(CliError::UnexpectedError(
-                "Account already exists".to_string(),
-            ));
-        }
         CreateAccount {
             txn_options: self.transaction_options(sender_index, None),
             account: self.account_id(index),
@@ -208,12 +196,6 @@ impl CliTestFramework {
         amount: Option<u64>,
     ) -> CliTypedResult<usize> {
         let index = self.add_account_to_cli(private_key);
-        if self.check_account_exists(index).await {
-            return Err(CliError::UnexpectedError(
-                "Account already exists".to_string(),
-            ));
-        }
-
         self.fund_account(index, amount).await?;
         warn!(
             "Funded account {:?} with {:?} OCTA",
@@ -899,10 +881,9 @@ impl CliTestFramework {
             },
             chunked_publish_option: ChunkedPublishOption {
                 chunked_publish: false,
-                large_packages_module_address: AccountAddress::from_str(
-                    LARGE_PACKAGES_MODULE_ADDRESS,
-                )
-                .unwrap(),
+                large_packages_module: LargePackagesModuleOption {
+                    large_packages_module_address: None,
+                },
                 chunk_size: CHUNK_SIZE_IN_BYTES,
             },
         }

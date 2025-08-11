@@ -1,32 +1,25 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::duplicated_attributes)]
+
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
     storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
-    Function, LoadedFunction, ModuleStorage,
+    ModuleStorage,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
-use move_binary_format::{
-    errors::{PartialVMResult, VMResult},
-    CompiledModule,
-};
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
 use move_vm_types::{
     code::{
         ambassador_impl_ModuleCache, ModuleBytesStorage, ModuleCache, ModuleCode,
         ModuleCodeBuilder, UnsyncModuleCache, WithBytes, WithHash,
-    },
-    loaded_data::{
-        runtime_types::{StructType, Type},
-        struct_name_indexing::StructNameIndex,
     },
     sha3_256,
 };
@@ -40,7 +33,7 @@ pub enum BorrowedOrOwned<'a, T> {
     Owned(T),
 }
 
-impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
+impl<T> Deref for BorrowedOrOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -119,7 +112,7 @@ where
     }
 }
 
-impl<'ctx, Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'ctx, Ctx>
+impl<Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {
@@ -128,7 +121,7 @@ where
     }
 }
 
-impl<'ctx, Ctx> ModuleCodeBuilder for UnsyncModuleStorageImpl<'ctx, Ctx>
+impl<Ctx> ModuleCodeBuilder for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {

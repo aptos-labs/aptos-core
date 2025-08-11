@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0xcafe::m {
     private fun map1(x: u64,f: |u64|u64): u64 {
         (f)(x)
@@ -17,7 +17,7 @@ module 0xcafe::m {
     }
 } // end 0xcafe::m
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0xcafe::m {
     fun map1(x: u64, f: |u64|u64): u64 {
         f(x)

@@ -518,10 +518,10 @@ impl ContinuousTransactionStreamEngine {
         // Check the number of received versions
         let num_received_versions = match &client_response_payload {
             ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             _ => invalid_response_type!(client_response_payload),
         };
@@ -1429,6 +1429,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
 #[derive(Clone, Debug)]
 pub struct EpochEndingStreamEngine {
     // The original epoch ending ledger infos request made by the client
+    #[allow(dead_code)]
     pub request: GetAllEpochEndingLedgerInfosRequest,
 
     // The last epoch ending ledger info that this stream will send to the client
@@ -1673,10 +1674,10 @@ impl TransactionStreamEngine {
         // Check the number of received versions
         let num_received_versions = match client_response_payload {
             ResponsePayload::TransactionsWithProof(transactions_with_proof) => {
-                transactions_with_proof.transactions.len()
+                transactions_with_proof.get_num_transactions()
             },
             ResponsePayload::TransactionOutputsWithProof(outputs_with_proof) => {
-                outputs_with_proof.transactions_and_outputs.len()
+                outputs_with_proof.get_num_outputs()
             },
             _ => invalid_response_type!(client_response_payload),
         };
@@ -2185,7 +2186,7 @@ fn create_data_notification(
             StreamEngine::ContinuousTransactionStreamEngine(_) => {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     target_ledger_info,
-                    transactions_output_chunk,
+                    transactions_output_chunk.clone(),
                 )
             },
             _ => invalid_response_type!(client_response_type),
@@ -2242,14 +2243,14 @@ fn extract_new_versions_and_target(
             transactions_with_proof,
             target_ledger_info,
         )) => (
-            transactions_with_proof.transactions.len(),
+            transactions_with_proof.get_num_transactions(),
             target_ledger_info.clone(),
         ),
         ResponsePayload::NewTransactionOutputsWithProof((
             outputs_with_proof,
             target_ledger_info,
         )) => (
-            outputs_with_proof.transactions_and_outputs.len(),
+            outputs_with_proof.get_num_outputs(),
             target_ledger_info.clone(),
         ),
         response_payload => {

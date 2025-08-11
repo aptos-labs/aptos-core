@@ -57,8 +57,7 @@ use aptos_storage_interface::{
             hot_state_view::HotStateView,
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        versioned_state_value::{DbStateUpdate, MemorizedStateRead, StateUpdateRef},
-        NUM_STATE_SHARDS,
+        versioned_state_value::StateUpdateRef,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -66,11 +65,13 @@ use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
+        state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
         state_value::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -535,6 +536,7 @@ impl StateStore {
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
         let state = StateWithSummary::new_at_version(
             latest_snapshot_version,
+            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
             usage,
         );
@@ -587,7 +589,7 @@ impl StateStore {
                 .into_iter()
                 .enumerate()
                 .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
-                .last()
+                .next_back()
                 .map(|(idx, _)| idx);
 
             let state_update_refs = StateUpdateRefs::index_write_sets(
@@ -743,19 +745,27 @@ impl StateStore {
             .par_iter_mut()
             .zip_eq(state_update_refs.shards.par_iter())
             .try_for_each(|(batch, updates)| {
-                updates.iter().try_for_each(|(key, update)| {
-                    if self.state_kv_db.enabled_sharding() {
-                        batch.put::<StateValueByKeyHashSchema>(
-                            &(CryptoHash::hash(*key), update.version),
-                            &update.value.cloned(),
-                        )
-                    } else {
-                        batch.put::<StateValueSchema>(
-                            &((*key).clone(), update.version),
-                            &update.value.cloned(),
-                        )
-                    }
-                })
+                updates
+                    .iter()
+                    .filter_map(|(key, update)| {
+                        update
+                            .state_op
+                            .as_write_op_opt()
+                            .map(|write_op| (key, update.version, write_op))
+                    })
+                    .try_for_each(|(key, version, write_op)| {
+                        if self.state_kv_db.enabled_sharding() {
+                            batch.put::<StateValueByKeyHashSchema>(
+                                &(CryptoHash::hash(*key), version),
+                                &write_op.as_state_value_opt().cloned(),
+                            )
+                        } else {
+                            batch.put::<StateValueSchema>(
+                                &((*key).clone(), version),
+                                &write_op.as_state_value_opt().cloned(),
+                            )
+                        }
+                    })
             })
     }
 
@@ -856,41 +866,41 @@ impl StateStore {
 
         let mut iter = updates.iter();
         for version in first_version..first_version + num_versions as Version {
-            let ver_iter = iter.take_while_ref(|(_k, u)| u.version == version);
+            let ver_iter = iter
+                .take_while_ref(|(_k, u)| u.version == version)
+                // ignore hot state only ops
+                // TODO(HotState): revisit
+                .filter(|(_key, update)| update.state_op.is_value_write_op());
 
-            for (key, update) in ver_iter {
-                if update.value.is_none() {
-                    // This is a tome stone, can be pruned once this `version` goes out of
+            for (key, update_to_cold) in ver_iter {
+                if update_to_cold.state_op.expect_as_write_op().is_delete() {
+                    // This is a tombstone, can be pruned once this `version` goes out of
                     // the pruning window.
                     Self::put_state_kv_index(batch, enable_sharding, version, version, key);
                 }
 
                 // TODO(aldenhu): cache changes here, should consume it.
                 let old_entry = cache
-                    .insert(
-                        (*key).clone(),
-                        // TODO(aldenhu): Updates should carry DbStateValue directly which
-                        //     includes hot state eviction, access time refresh, etc.
-                        MemorizedStateRead::dummy_from_state_update_ref(update),
-                    )
+                    // TODO(HotState): Revisit: assuming every write op results in a hot slot
+                    .insert((*key).clone(), update_to_cold.to_result_slot())
                     .unwrap_or_else(|| {
                         // n.b. all updated state items must be read and recorded in the state cache,
                         // otherwise we can't calculate the correct usage. The is_untracked() hack
                         // is to allow some db tests without real execution layer to pass.
                         assert!(ignore_state_cache_miss, "Must cache read.");
-                        MemorizedStateRead::NonExistent
+                        StateSlot::ColdVacant
                     });
 
-                if let MemorizedStateRead::StateUpdate(DbStateUpdate {
-                    version: old_version,
-                    value: old_value_opt,
-                }) = old_entry
-                {
-                    if old_value_opt.map_or(false, |old_val| !old_val.is_hot_non_existent()) {
-                        // The value at `old_version` can be pruned once the pruning window hits
-                        // this `version`.
-                        Self::put_state_kv_index(batch, enable_sharding, version, old_version, key)
-                    }
+                if old_entry.is_occupied() {
+                    // The value at the old version can be pruned once the pruning window hits
+                    // this `version`.
+                    Self::put_state_kv_index(
+                        batch,
+                        enable_sharding,
+                        version,
+                        old_entry.expect_value_version(),
+                        key,
+                    )
                 }
             }
         }
@@ -948,7 +958,7 @@ impl StateStore {
         enable_sharding: bool,
     ) -> Result<()> {
         values.iter().for_each(|((key, version), value)| {
-            let shard_id = key.get_shard_id() as usize;
+            let shard_id = key.get_shard_id();
             assert!(
                 shard_id < NUM_STATE_SHARDS,
                 "Invalid shard id: {}",
@@ -986,7 +996,7 @@ impl StateStore {
             version,
             start_idx,
         )?
-        .map(|it| it.map_err(Into::into))
+        .map(|it| it)
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1007,7 +1017,7 @@ impl StateStore {
             first_index,
         )?
         .take(chunk_size)
-        .map(|it| it.map_err(Into::into));
+        .map(|it| it);
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {
@@ -1062,7 +1072,6 @@ impl StateStore {
     ) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
         aptos_jellyfish_merkle::JellyfishMerkleTree::new(self.state_merkle_db.as_ref())
             .get_all_nodes_referenced(version)
-            .map_err(Into::into)
     }
 
     #[cfg(test)]
@@ -1079,7 +1088,7 @@ impl StateStore {
         let mut keys: Vec<aptos_jellyfish_merkle::node_type::NodeKey> =
             all_rows.into_iter().map(|(k, _v)| k).collect();
         if self.state_merkle_db.sharding_enabled() {
-            for i in 0..NUM_STATE_SHARDS as u8 {
+            for i in 0..NUM_STATE_SHARDS {
                 let mut iter =
                     self.state_merkle_db
                         .db_shard(i)
@@ -1103,10 +1112,14 @@ impl StateStore {
     }
 
     pub fn set_state_ignoring_summary(&self, ledger_state: LedgerState) {
+        let hot_smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
         let smt = SparseMerkleTree::new(*CORRUPTION_SENTINEL);
-        let last_checkpoint_summary =
-            StateSummary::new_at_version(ledger_state.last_checkpoint().version(), smt.clone());
-        let summary = StateSummary::new_at_version(ledger_state.version(), smt.clone());
+        let last_checkpoint_summary = StateSummary::new_at_version(
+            ledger_state.last_checkpoint().version(),
+            hot_smt.clone(),
+            smt.clone(),
+        );
+        let summary = StateSummary::new_at_version(ledger_state.version(), hot_smt, smt);
 
         let last_checkpoint = StateWithSummary::new(
             ledger_state.last_checkpoint().clone(),
@@ -1262,6 +1275,7 @@ mod test_only {
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
         transaction::Version,
+        write_set::{BaseStateOp, WriteOp},
     };
     use itertools::Itertools;
 
@@ -1269,6 +1283,32 @@ mod test_only {
         /// assumes state checkpoint at the last version
         pub fn commit_block_for_test<
             UpdateIter: IntoIterator<Item = (StateKey, Option<StateValue>)>,
+            VersionIter: IntoIterator<Item = UpdateIter>,
+        >(
+            &self,
+            first_version: Version,
+            updates_by_version: VersionIter,
+        ) -> HashValue {
+            self.commit_block_for_test_impl(
+                first_version,
+                updates_by_version.into_iter().map(|updates| {
+                    updates.into_iter().map(|(key, val_opt)| {
+                        (
+                            key,
+                            val_opt
+                                .map_or_else(
+                                    WriteOp::legacy_deletion,
+                                    WriteOp::modification_to_value,
+                                )
+                                .into_base_op(),
+                        )
+                    })
+                }),
+            )
+        }
+
+        fn commit_block_for_test_impl<
+            UpdateIter: IntoIterator<Item = (StateKey, BaseStateOp)>,
             VersionIter: IntoIterator<Item = UpdateIter>,
         >(
             &self,
@@ -1289,7 +1329,7 @@ mod test_only {
                 first_version,
                 updates_by_version
                     .iter()
-                    .map(|updates| updates.iter().map(|(k, v)| (k, v.as_ref()))),
+                    .map(|updates| updates.iter().map(|(k, op)| (k, op))),
                 num_versions,
                 Some(num_versions - 1),
             );

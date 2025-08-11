@@ -1,0 +1,9 @@
+[package]
+name = "pack_function_values"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+
+[addresses]
+account = "_"

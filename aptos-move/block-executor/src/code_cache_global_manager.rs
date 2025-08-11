@@ -8,6 +8,7 @@ use crate::{
         STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorModuleCacheLocalConfig,
@@ -20,6 +21,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::alert;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use cfg_if::cfg_if;
 use move_binary_format::{
     errors::{Location, VMError},
     CompiledModule,
@@ -27,7 +29,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::VMStatus,
 };
-use move_vm_runtime::{Module, ModuleStorage, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
@@ -102,17 +104,26 @@ where
 
         // Next, check the environment. If the current environment has not been set, or is
         // different, we reset it to the new one, and flush the module cache.
-        let environment_requires_update = self
-            .environment
-            .as_ref()
-            .map_or(true, |environment| environment != &storage_environment);
+        let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
+            if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
+                let flush_verifier_cache = self.environment.as_ref().map_or(true, |e| {
+                    e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
+                });
+                if flush_verifier_cache {
+                    // Additionally, if the verifier config changes, we flush static verifier cache
+                    // as well.
+                    RuntimeEnvironment::flush_verified_module_cache();
+                }
+            }
+
             self.environment = Some(storage_environment);
             self.module_cache.flush();
         }
 
         let environment = self.environment.as_ref().expect("Environment must be set");
         let runtime_environment = environment.runtime_environment();
+        RuntimeEnvironment::log_verified_cache_size();
 
         let struct_name_index_map_size = runtime_environment
             .struct_name_index_map_size()
@@ -226,7 +237,7 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     },
 }
 
-impl<'a> AptosModuleCacheManagerGuard<'a> {
+impl AptosModuleCacheManagerGuard<'_> {
     /// Returns the references to the environment. If environment is not set, panics.
     pub fn environment(&self) -> &AptosEnvironment {
         use AptosModuleCacheManagerGuard::*;
@@ -289,14 +300,25 @@ fn prefetch_aptos_framework(
 ) -> Result<(), PanicError> {
     let code_storage = state_view.as_aptos_code_storage(guard.environment());
 
-    // If framework code exists in storage, the transitive closure will be verified and cached.
-    let maybe_loaded = code_storage
-        .fetch_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
-        .map_err(|err| {
-            // There should be no errors when pre-fetching the framework, if there are, we
-            // better return an error here.
-            PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
-        })?;
+    // INVARIANT:
+    //   If framework code exists in storage, the transitive closure will be verified and cached to
+    //   avoid cold starts. From metering perspective, all modules are at special addresses, so we
+    //   do not need to meter anything.
+    cfg_if! {
+        if #[cfg(fuzzing)] {
+            let maybe_loaded = code_storage
+                .unmetered_get_module_skip_verification(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .map_err(|err| {
+                    PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+                })?;
+        } else {
+            let maybe_loaded = code_storage
+                .unmetered_get_eagerly_verified_module(&AccountAddress::ONE, ident_str!("transaction_validation"))
+                .map_err(|err| {
+                    PanicError::CodeInvariantError(format!("Unable to fetch Aptos framework: {:?}", err))
+                })?;
+        }
+    }
 
     if maybe_loaded.is_some() {
         // Framework must have been loaded. Drain verified modules from local cache into

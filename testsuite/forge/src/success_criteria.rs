@@ -3,17 +3,25 @@
 
 use crate::{
     prometheus_metrics::{
-        fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
-        SystemMetrics,
+        fetch_fullnode_failures, fetch_system_metrics, fetch_validator_error_metrics,
+        LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
     },
+    result::TestResult,
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
 use aptos::node::analyze::{analyze_validators::AnalyzeValidators, fetch_metadata::FetchMetadata};
-use aptos_logger::info;
+use aptos_logger::info as aptos_logger_info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
+use log::info;
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use serde_json::json;
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Formatter},
+    sync::Arc,
+    time::Duration,
+};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
@@ -169,6 +177,7 @@ pub struct SuccessCriteria {
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     check_no_errors: bool,
+    check_no_fullnode_failures: bool,
     max_expired_tps: Option<f64>,
     max_failed_submission_tps: Option<f64>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
@@ -189,6 +198,7 @@ impl SuccessCriteria {
             latency_breakdown_thresholds: None,
             check_no_restarts: false,
             check_no_errors: true,
+            check_no_fullnode_failures: false,
             max_expired_tps: None,
             max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
@@ -204,6 +214,11 @@ impl SuccessCriteria {
 
     pub fn add_no_restarts(mut self) -> Self {
         self.check_no_restarts = true;
+        self
+    }
+
+    pub fn add_no_fullnode_failures(mut self) -> Self {
+        self.check_no_fullnode_failures = true;
         self
     }
 
@@ -244,6 +259,121 @@ impl SuccessCriteria {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CheckType {
+    Hard,
+    Soft,
+}
+
+#[derive(Debug)]
+struct CheckError {
+    name: String,
+    check_type: CheckType,
+    error: anyhow::Error,
+}
+
+impl CheckError {
+    pub fn new(name: String, check_type: CheckType, error: anyhow::Error) -> Self {
+        Self {
+            name,
+            check_type,
+            error,
+        }
+    }
+}
+
+impl std::ops::Deref for CheckError {
+    type Target = anyhow::Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SuccessCriteriaErrors {
+    errors: Vec<CheckError>,
+}
+
+impl SuccessCriteriaErrors {
+    fn push(&mut self, check_error: CheckError) {
+        self.errors.push(check_error);
+    }
+
+    fn extend(&mut self, errors: SuccessCriteriaErrors) {
+        self.errors.extend(errors.errors);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl std::fmt::Display for SuccessCriteriaErrors {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut errors_json = Vec::new();
+
+        for error in self.errors.iter() {
+            let causes: Vec<String> = error.chain().map(|c| c.to_string()).collect();
+            errors_json.push(json!({
+                "name": error.name,
+                "error": error.to_string(),
+                "causes": causes
+            }));
+        }
+        write!(f, "{}", json!({ "errors": errors_json }))?;
+        Ok(())
+    }
+}
+
+impl std::error::Error for SuccessCriteriaErrors {}
+
+impl From<SuccessCriteriaErrors> for TestResult {
+    fn from(errors: SuccessCriteriaErrors) -> Self {
+        if errors.is_empty() {
+            Self::Successful
+        } else {
+            let is_hard_failure = errors
+                .errors
+                .iter()
+                .any(|e| e.check_type == CheckType::Hard);
+            if is_hard_failure {
+                Self::HardFailure(errors.to_string())
+            } else {
+                Self::SoftFailure(errors.to_string())
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct SuccessCriteriaResults {
+    check_errors: SuccessCriteriaErrors,
+}
+
+impl SuccessCriteriaResults {
+    fn add_result(&mut self, name: &str, check_type: CheckType, result: anyhow::Result<()>) {
+        if let Err(e) = result {
+            self.check_errors
+                .push(CheckError::new(name.to_string(), check_type, e))
+        }
+    }
+
+    fn extend(&mut self, result: anyhow::Result<(), SuccessCriteriaErrors>) {
+        if let Err(e) = result {
+            self.check_errors.extend(e)
+        }
+    }
+
+    fn evaluate(self) -> Result<(), SuccessCriteriaErrors> {
+        if self.check_errors.is_empty() {
+            Ok(())
+        } else {
+            Err(self.check_errors)
+        }
+    }
+}
+
 pub struct SuccessCriteriaChecker {}
 
 impl SuccessCriteriaChecker {
@@ -257,22 +387,35 @@ impl SuccessCriteriaChecker {
         let traffic_name_addition = traffic_name
             .map(|n| format!(" for {}", n))
             .unwrap_or_default();
-        Self::check_throughput(
+
+        let mut results = SuccessCriteriaResults::default();
+
+        results.extend(Self::check_throughput(
             success_criteria.min_avg_tps,
             success_criteria.max_expired_tps,
             success_criteria.max_failed_submission_tps,
             stats_rate,
             &traffic_name_addition,
-        )?;
-        Self::check_latency(
-            &success_criteria.latency_thresholds,
-            stats_rate,
-            &traffic_name_addition,
-        )?;
-        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds
-                .ensure_threshold(latency_breakdown.unwrap(), &traffic_name_addition)?;
-        }
+        ));
+        results.add_result("Check Latency", CheckType::Soft, {
+            Self::check_latency(
+                &success_criteria.latency_thresholds,
+                stats_rate,
+                &traffic_name_addition,
+            )
+        });
+        results.add_result("Check Latency Breakdown", CheckType::Soft, {
+            if let Some(latency_breakdown_thresholds) =
+                &success_criteria.latency_breakdown_thresholds
+            {
+                latency_breakdown_thresholds
+                    .ensure_threshold(latency_breakdown.unwrap(), &traffic_name_addition)
+            } else {
+                Ok(())
+            }
+        });
+
+        results.evaluate()?;
         Ok(())
     }
 
@@ -296,72 +439,98 @@ impl SuccessCriteriaChecker {
         let stats_rate = stats.rate();
 
         let no_traffic_name_addition = "".to_string();
-        Self::check_throughput(
+
+        let mut results = SuccessCriteriaResults::default();
+
+        results.extend(Self::check_throughput(
             success_criteria.min_avg_tps,
             success_criteria.max_expired_tps,
             success_criteria.max_failed_submission_tps,
             &stats_rate,
             &no_traffic_name_addition,
-        )?;
-
-        Self::check_latency(
-            &success_criteria.latency_thresholds,
-            &stats_rate,
-            &no_traffic_name_addition,
-        )?;
-
+        ));
+        results.add_result(
+            "Check Latency",
+            CheckType::Soft,
+            Self::check_latency(
+                &success_criteria.latency_thresholds,
+                &stats_rate,
+                &no_traffic_name_addition,
+            ),
+        );
         if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
-            latency_breakdown_thresholds
-                .ensure_threshold(latency_breakdown, &no_traffic_name_addition)?;
+            results.add_result(
+                "Check Latency Breakdown",
+                CheckType::Soft,
+                latency_breakdown_thresholds
+                    .ensure_threshold(latency_breakdown, &no_traffic_name_addition),
+            );
         }
-
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
-            swarm
-                .read()
-                .await
-                .wait_for_all_nodes_to_catchup_to_next(timeout)
-                .await
-                .context("Failed waiting for all nodes to catchup to next version")?;
+            results.add_result("Check nodes catchup", CheckType::Hard, {
+                swarm
+                    .read()
+                    .await
+                    .wait_for_all_nodes_to_catchup_to_next(timeout)
+                    .await
+                    .context("Failed waiting for all nodes to catchup to next version")
+            });
         }
-
         if success_criteria.check_no_restarts {
-            let swarm_read = swarm.read().await;
-            swarm_read
-                .ensure_no_validator_restart()
-                .await
-                .context("Failed ensuring no validator restarted")?;
-            swarm_read
-                .ensure_no_fullnode_restart()
-                .await
-                .context("Failed ensuring no fullnode restarted")?;
+            results.add_result("Check no validator restart", CheckType::Hard, {
+                let swarm_read = swarm.read().await;
+                swarm_read
+                    .ensure_no_validator_restart()
+                    .await
+                    .context("Failed ensuring no validator restarted")
+            });
+
+            results.add_result("Check no fullnode restart", CheckType::Hard, {
+                let swarm_read = swarm.read().await;
+                swarm_read
+                    .ensure_no_fullnode_restart()
+                    .await
+                    .context("Failed ensuring no fullnode restarted")
+            });
         }
 
         if success_criteria.check_no_errors {
-            Self::check_no_errors(swarm.clone()).await?;
+            results.add_result("Check no error", CheckType::Hard, {
+                Self::check_no_errors(swarm.clone()).await
+            });
         }
-
+        if success_criteria.check_no_fullnode_failures {
+            results.add_result("Check no fullnode failures", CheckType::Hard, {
+                Self::check_no_fullnode_failures(swarm.clone()).await
+            });
+        }
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            Self::check_system_metrics(
-                swarm.clone(),
-                start_time,
-                end_time,
-                system_metrics_threshold,
-            )
-            .await?;
+            results.add_result("Check system metrics", CheckType::Hard, {
+                Self::check_system_metrics(
+                    swarm.clone(),
+                    start_time,
+                    end_time,
+                    system_metrics_threshold,
+                )
+                .await
+            });
         }
 
         if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
-            Self::check_chain_progress(
-                swarm.clone(),
-                report,
-                chain_progress_threshold,
-                start_version,
-                end_version,
-            )
-            .await
-            .context("Failed check chain progress")?;
+            results.add_result("Check chain progress", CheckType::Hard, {
+                Self::check_chain_progress(
+                    swarm.clone(),
+                    report,
+                    chain_progress_threshold,
+                    start_version,
+                    end_version,
+                )
+                .await
+                .context("Failed check chain progress")
+            });
         }
 
+        results.evaluate()?;
         Ok(())
     }
 
@@ -409,7 +578,7 @@ impl SuccessCriteriaChecker {
             chain_progress_threshold.max_epoch_no_progress_secs,
         );
 
-        info!(
+        aptos_logger_info!(
             max_non_epoch_round_gap = gap_info.non_epoch_round_gap.max_gap,
             max_epoch_round_gap = gap_info.epoch_round_gap.max_gap,
             max_non_epoch_time_gap = gap_info.non_epoch_time_gap.max_gap,
@@ -505,23 +674,37 @@ impl SuccessCriteriaChecker {
         max_failed_submission_config: Option<f64>,
         stats_rate: &TxnStatsRate,
         traffic_name_addition: &String,
-    ) -> anyhow::Result<()> {
-        Self::check_tps(min_avg_tps, stats_rate, traffic_name_addition)?;
-        Self::check_max_value(
-            max_expired_config,
-            stats_rate,
-            stats_rate.expired,
-            "expired",
-            traffic_name_addition,
-        )?;
-        Self::check_max_value(
-            max_failed_submission_config,
-            stats_rate,
-            stats_rate.failed_submission,
-            "submission",
-            traffic_name_addition,
-        )?;
-        Ok(())
+    ) -> anyhow::Result<(), SuccessCriteriaErrors> {
+        let mut runner = SuccessCriteriaResults::default();
+
+        runner.add_result(
+            "Min avg tps",
+            CheckType::Soft,
+            Self::check_tps(min_avg_tps, stats_rate, traffic_name_addition),
+        );
+        runner.add_result(
+            "Max expired tps",
+            CheckType::Hard,
+            Self::check_max_value(
+                max_expired_config,
+                stats_rate,
+                stats_rate.expired,
+                "expired",
+                traffic_name_addition,
+            ),
+        );
+        runner.add_result(
+            "Max failed submission",
+            CheckType::Soft,
+            Self::check_max_value(
+                max_failed_submission_config,
+                stats_rate,
+                stats_rate.failed_submission,
+                "submission",
+                traffic_name_addition,
+            ),
+        );
+        runner.evaluate()
     }
 
     pub fn check_latency(
@@ -567,10 +750,27 @@ impl SuccessCriteriaChecker {
         }
     }
 
+    /// Checks if there are any fullnode failures. Note: this currently
+    /// only checks if consensus observer falls back to state sync.
+    async fn check_no_fullnode_failures(
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+    ) -> anyhow::Result<()> {
+        let fullnode_failures = fetch_fullnode_failures(swarm).await?;
+        if fullnode_failures > 0 {
+            bail!(
+                "Error! The number of fullnode failures was > 0 ({}), but must be 0!",
+                fullnode_failures
+            );
+        } else {
+            info!("No fullnode failures detected.");
+            Ok(())
+        }
+    }
+
     async fn check_no_errors(
         swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> anyhow::Result<()> {
-        let error_count = fetch_error_metrics(swarm).await?;
+        let error_count = fetch_validator_error_metrics(swarm).await?;
         if error_count > 0 {
             bail!(
                 "error!() count in validator logs was {}, and must be 0",

@@ -1,4 +1,26 @@
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: &u64
+     var $t2: &u64
+     var $t3: &u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+  0: $t0 := 5
+  1: $t1 := borrow_local($t0)
+  2: $t2 := infer($t1)
+  3: $t3 := borrow_local($t0)
+  4: $t1 := infer($t3)
+  5: $t5 := read_ref($t1)
+  6: $t6 := 5
+  7: $t4 := ==($t5, $t6)
+  8: return ()
+}
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun m::test() {

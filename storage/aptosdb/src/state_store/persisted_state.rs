@@ -9,6 +9,9 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::state_store::hot_state::{
+    HOT_STATE_MAX_BYTES_PER_SHARD, HOT_STATE_MAX_ITEMS_PER_SHARD, HOT_STATE_MAX_SINGLE_VALUE_BYTES,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -18,23 +21,27 @@ pub struct PersistedState {
 }
 
 impl PersistedState {
-    const HOT_STATE_MAX_ITEMS: usize = 1_000_000;
-    const HOT_STATE_MAX_VALUE_BYTES: usize = 4096;
     const MAX_PENDING_DROPS: usize = 8;
 
     pub fn new_empty() -> Self {
-        Self::new_empty_with_config(Self::HOT_STATE_MAX_ITEMS, Self::HOT_STATE_MAX_VALUE_BYTES)
+        Self::new_empty_with_config(
+            HOT_STATE_MAX_ITEMS_PER_SHARD,
+            HOT_STATE_MAX_BYTES_PER_SHARD,
+            HOT_STATE_MAX_SINGLE_VALUE_BYTES,
+        )
     }
 
     pub fn new_empty_with_config(
-        hot_state_capacity: usize,
-        hot_state_max_value_bytes: usize,
+        hot_state_max_items_per_shard: usize,
+        hot_state_max_bytes_per_shard: usize,
+        hot_state_max_single_value_bytes: usize,
     ) -> Self {
         let state = State::new_empty();
         let hot_state = Arc::new(HotState::new(
             state,
-            hot_state_capacity,
-            hot_state_max_value_bytes,
+            hot_state_max_items_per_shard,
+            hot_state_max_bytes_per_shard,
+            hot_state_max_single_value_bytes,
         ));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty()));
         Self { hot_state, summary }

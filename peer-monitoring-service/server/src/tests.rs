@@ -55,8 +55,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -633,7 +633,7 @@ mod database_mock {
                 batch_size: u64,
                 ledger_version: Version,
                 fetch_events: bool,
-            ) -> Result<TransactionListWithProof>;
+            ) -> Result<TransactionListWithProofV2>;
 
             fn get_transaction_by_hash(
                 &self,
@@ -658,7 +658,7 @@ mod database_mock {
                 start_version: Version,
                 limit: u64,
                 ledger_version: Version,
-            ) -> Result<TransactionOutputListWithProof>;
+            ) -> Result<TransactionOutputListWithProofV2>;
 
             fn get_events(
                 &self,
@@ -687,7 +687,7 @@ mod database_mock {
 
             fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
-            fn get_account_transaction(
+            fn get_account_ordered_transaction(
                 &self,
                 address: AccountAddress,
                 seq_num: u64,
@@ -695,14 +695,14 @@ mod database_mock {
                 ledger_version: Version,
             ) -> Result<Option<TransactionWithProof>>;
 
-            fn get_account_transactions(
+            fn get_account_ordered_transactions(
                 &self,
                 address: AccountAddress,
                 seq_num: u64,
                 limit: u64,
                 include_events: bool,
                 ledger_version: Version,
-            ) -> Result<AccountTransactionsWithProof>;
+            ) -> Result<AccountOrderedTransactionsWithProof>;
 
             fn get_state_proof_with_ledger_info(
                 &self,

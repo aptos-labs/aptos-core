@@ -2,20 +2,25 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unexpected_cfgs)]
+
 use super::DEFEAULT_MAX_BATCH_TXNS;
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
+    config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+    node_config_loader::NodeType, Error, NodeConfig, QuorumStoreConfig, ReliableBroadcastConfig,
+    SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;
-const MAX_SENDING_BLOCK_TXNS: u64 = 7000;
+const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
+const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1000;
+const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // stop reducing size at this point, so 1MB transactions can still go through
@@ -30,6 +35,7 @@ pub struct ConsensusConfig {
     pub max_network_channel_size: usize,
     pub max_sending_block_txns: u64,
     pub max_sending_block_txns_after_filtering: u64,
+    pub max_sending_opt_block_txns_after_filtering: u64,
     pub max_sending_block_bytes: u64,
     pub max_sending_inline_txns: u64,
     pub max_sending_inline_bytes: u64,
@@ -93,7 +99,8 @@ pub struct ConsensusConfig {
     pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification: bool,
     pub enable_round_timeout_msg: bool,
-    pub enable_pipeline: bool,
+    pub enable_optimistic_proposal_rx: bool,
+    pub enable_optimistic_proposal_tx: bool,
 }
 
 /// Deprecated
@@ -140,6 +147,21 @@ pub struct ExecutionBackpressureTxnLimitConfig {
     pub min_calibrated_txns_per_block: u64,
 }
 
+impl Default for ExecutionBackpressureTxnLimitConfig {
+    fn default() -> Self {
+        Self {
+            lookback_config: ExecutionBackpressureLookbackConfig {
+                num_blocks_to_look_at: 18,
+                min_block_time_ms_to_activate: 50,
+                min_blocks_to_activate: 4,
+                metric: ExecutionBackpressureMetric::Percentile(0.5),
+                target_block_time_ms: 90,
+            },
+            min_calibrated_txns_per_block: 8,
+        }
+    }
+}
+
 /// Execution backpressure which handles gas/s variance,
 /// and adjusts gas limit to "recalibrate it" to wanted range.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -147,6 +169,22 @@ pub struct ExecutionBackpressureGasLimitConfig {
     pub lookback_config: ExecutionBackpressureLookbackConfig,
     pub block_execution_overhead_ms: u64,
     pub min_calibrated_block_gas_limit: u64,
+}
+
+impl Default for ExecutionBackpressureGasLimitConfig {
+    fn default() -> Self {
+        Self {
+            lookback_config: ExecutionBackpressureLookbackConfig {
+                num_blocks_to_look_at: 30,
+                min_block_time_ms_to_activate: 10,
+                min_blocks_to_activate: 4,
+                metric: ExecutionBackpressureMetric::Mean,
+                target_block_time_ms: 90,
+            },
+            block_execution_overhead_ms: 10,
+            min_calibrated_block_gas_limit: 2000,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -185,6 +223,7 @@ impl Default for ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
             max_sending_block_txns_after_filtering: MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            max_sending_opt_block_txns_after_filtering: MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
@@ -193,7 +232,7 @@ impl Default for ConsensusConfig {
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
-            round_initial_timeout_ms: 1500,
+            round_initial_timeout_ms: 1000,
             // 1.2^6 ~= 3
             // Timeout goes from initial_timeout to initial_timeout*3 in 6 steps
             round_timeout_backoff_exponent_base: 1.2,
@@ -215,30 +254,11 @@ impl Default for ConsensusConfig {
             // increase uncontrollably, and we know when to go to state sync.
             // Considering block gas limit and pipeline backpressure should keep number of blocks
             // in the pipline very low, we can keep this limit pretty low, too.
-            vote_back_pressure_limit: 7,
+            vote_back_pressure_limit: 12,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
-                txn_limit: Some(ExecutionBackpressureTxnLimitConfig {
-                    lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 12,
-                        min_block_time_ms_to_activate: 100,
-                        min_blocks_to_activate: 4,
-                        metric: ExecutionBackpressureMetric::Percentile(0.5),
-                        target_block_time_ms: 200,
-                    },
-                    min_calibrated_txns_per_block: 8,
-                }),
-                gas_limit: Some(ExecutionBackpressureGasLimitConfig {
-                    lookback_config: ExecutionBackpressureLookbackConfig {
-                        num_blocks_to_look_at: 20,
-                        min_block_time_ms_to_activate: 10,
-                        min_blocks_to_activate: 4,
-                        metric: ExecutionBackpressureMetric::Mean,
-                        target_block_time_ms: 200,
-                    },
-                    block_execution_overhead_ms: 10,
-                    min_calibrated_block_gas_limit: 2000,
-                }),
+                txn_limit: Some(ExecutionBackpressureTxnLimitConfig::default()),
+                gas_limit: Some(ExecutionBackpressureGasLimitConfig::default()),
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
@@ -361,7 +381,8 @@ impl Default for ConsensusConfig {
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
-            enable_pipeline: false,
+            enable_optimistic_proposal_rx: true,
+            enable_optimistic_proposal_tx: false,
         }
     }
 }
@@ -508,6 +529,29 @@ impl ConfigSanitizer for ConsensusConfig {
         Self::sanitize_batch_block_limits(&sanitizer_name, &node_config.consensus)?;
 
         Ok(())
+    }
+}
+
+// TODO: Re-enable pre-commit for VFNs and PFNs once the feature supports
+// a rollback mechanism (to tolerate execution divergence in fullnodes).
+impl ConfigOptimizer for ConsensusConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        node_type: NodeType,
+        _chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        let consensus_config = &mut node_config.consensus;
+        let local_consensus_config_yaml = &local_config_yaml["consensus"];
+
+        // Disable pre-commit for VFNs and PFNs (if they are not manually set)
+        let mut modified_config = false;
+        if local_consensus_config_yaml["enable_pre_commit"].is_null() && !node_type.is_validator() {
+            consensus_config.enable_pre_commit = false;
+            modified_config = true;
+        }
+
+        Ok(modified_config)
     }
 }
 
@@ -770,5 +814,73 @@ mod test {
         let error =
             ConsensusConfig::sanitize(&node_config, NodeType::ValidatorFullnode, None).unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_optimize_pre_commit() {
+        // Create a node config with pre-commit enabled
+        let mut node_config = create_config_with_pre_commit_enabled();
+
+        // Optimize the config for a validator
+        let modified_config = ConsensusConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            None,
+        )
+        .unwrap();
+
+        // Verify that the config was not modified, and that pre-commit is still enabled
+        assert!(!modified_config);
+        assert!(node_config.consensus.enable_pre_commit);
+
+        // Next, optimize the config for a validator fullnode
+        let modified_config = ConsensusConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::ValidatorFullnode,
+            None,
+        )
+        .unwrap();
+
+        // Verify that the config was modified, and that pre-commit is disabled
+        assert!(modified_config);
+        assert!(!node_config.consensus.enable_pre_commit);
+
+        // Create a node config with pre-commit enabled
+        let mut node_config = create_config_with_pre_commit_enabled();
+
+        // Create a local config with pre-commit manually enabled
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            consensus:
+                enable_pre_commit: false
+            "#,
+        )
+        .unwrap();
+
+        // Optimize the config for a public fullnode (using the local config)
+        let modified_config = ConsensusConfig::optimize(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::PublicFullnode,
+            None,
+        )
+        .unwrap();
+
+        // Verify that the config was not modified, and that pre-commit is still enabled
+        assert!(!modified_config);
+        assert!(node_config.consensus.enable_pre_commit);
+    }
+
+    /// Creates a node config with pre-commit enabled
+    fn create_config_with_pre_commit_enabled() -> NodeConfig {
+        NodeConfig {
+            consensus: ConsensusConfig {
+                enable_pre_commit: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 }

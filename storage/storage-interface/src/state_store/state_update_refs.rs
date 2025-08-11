@@ -1,31 +1,34 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    metrics::TIMER,
-    state_store::{versioned_state_value::StateUpdateRef, NUM_STATE_SHARDS},
-};
+use crate::{metrics::TIMER, state_store::versioned_state_value::StateUpdateRef};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
-    write_set::WriteSet,
+    write_set::{BaseStateOp, WriteSet},
 };
 use arr_macro::arr;
 use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::collections::HashMap;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::Duration,
+};
 
+#[derive(Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
     pub first_version: Version,
     pub num_versions: usize,
     /// Converting to Vec to Box<[]> to release over-allocated memory during construction
+    /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
     pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
 }
 
 impl<'kv> PerVersionStateUpdateRefs<'kv> {
     pub fn index<
-        UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
+        UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
     >(
         first_version: Version,
@@ -42,8 +45,11 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             let version = first_version + versions_seen as Version;
             versions_seen += 1;
 
-            for (key, value) in update_iter.into_iter() {
-                shards[key.get_shard_id() as usize].push((key, StateUpdateRef { version, value }));
+            for (key, write_op) in update_iter.into_iter() {
+                shards[key.get_shard_id()].push((key, StateUpdateRef {
+                    version,
+                    state_op: write_op,
+                }));
             }
         }
         assert_eq!(versions_seen, num_versions);
@@ -63,7 +69,7 @@ pub struct BatchedStateUpdateRefs<'kv> {
     pub shards: [HashMap<&'kv StateKey, StateUpdateRef<'kv>>; NUM_STATE_SHARDS],
 }
 
-impl<'kv> BatchedStateUpdateRefs<'kv> {
+impl BatchedStateUpdateRefs<'_> {
     pub fn new_empty(first_version: Version, num_versions: usize) -> Self {
         Self {
             first_version,
@@ -93,6 +99,7 @@ impl<'kv> BatchedStateUpdateRefs<'kv> {
     }
 }
 
+#[derive(Debug)]
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
     /// Batched updates (updates for the same keys are merged) from the
@@ -114,14 +121,14 @@ impl<'kv> StateUpdateRefs<'kv> {
             first_version,
             write_sets
                 .into_iter()
-                .map(|write_set| write_set.state_update_refs()),
+                .map(|write_set| write_set.base_op_iter()),
             num_write_sets,
             last_checkpoint_index,
         )
     }
 
     pub fn index<
-        UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
+        UpdateIter: IntoIterator<Item = (&'kv StateKey, &'kv BaseStateOp)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
     >(
         first_version: Version,
@@ -203,11 +210,43 @@ impl<'kv> StateUpdateRefs<'kv> {
             .par_iter_mut()
             .zip_eq(ret.shards.par_iter_mut())
             .for_each(|(shard_iter, dedupped)| {
-                dedupped.extend(
-                    shard_iter
-                        // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                        .take_while_ref(|(_k, u)| u.version < end_version),
-                )
+                // n.b. take_while_ref so that in the next step we can process the rest of the
+                // entries from the iters.
+                for (k, u) in shard_iter.take_while_ref(|(_k, u)| u.version < end_version) {
+                    // If it's a value write op (Creation/Modification/Deletion), just insert and
+                    // overwrite the previous op.
+                    if u.state_op.is_value_write_op() {
+                        dedupped.insert(k, u);
+                        continue;
+                    }
+
+                    // If we see a hotness op, we check if there is a value write op with the same
+                    // key before. This is unlikely, but if it does happen (e.g. if the write
+                    // summary used to compute MakeHot is missing keys), we must discard the
+                    // hotness op to avoid overwriting the value write op.
+                    // TODO(HotState): also double check this logic for state sync later. For now
+                    // we do not output hotness ops for state sync.
+                    match dedupped.entry(k) {
+                        Entry::Occupied(mut entry) => {
+                            let prev_op = &entry.get().state_op;
+                            sample!(
+                                SampleRate::Duration(Duration::from_secs(10)),
+                                warn!(
+                                    "Key: {:?}. Previous write op: {}. Current write op: {}",
+                                    k,
+                                    prev_op.as_ref(),
+                                    u.state_op.as_ref()
+                                )
+                            );
+                            if !prev_op.is_value_write_op() {
+                                entry.insert(u);
+                            }
+                        },
+                        Entry::Vacant(entry) => {
+                            entry.insert(u);
+                        },
+                    }
+                }
             });
         ret
     }

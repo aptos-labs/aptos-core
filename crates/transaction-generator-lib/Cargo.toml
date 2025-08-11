@@ -20,7 +20,9 @@ aptos-logger = { workspace = true }
 aptos-sdk = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
+log = { workspace = true }
 move-binary-format = { workspace = true }
+move-package = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

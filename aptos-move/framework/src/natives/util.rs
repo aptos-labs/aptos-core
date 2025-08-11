@@ -42,9 +42,12 @@ fn native_from_bytes(
     context.charge(
         UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
     )?;
-    let val = match ValueSerDeContext::new()
+
+    let function_value_extension = context.function_value_extension();
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let val = match ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
-        .with_func_args_deserialization(context.function_value_extension())
+        .with_func_args_deserialization(&function_value_extension)
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,

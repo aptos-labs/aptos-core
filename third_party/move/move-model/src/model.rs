@@ -52,7 +52,6 @@ pub use move_binary_format::file_format::Visibility;
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     file_format::{
         Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
         FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
@@ -61,7 +60,7 @@ use move_binary_format::{
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
-use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
@@ -72,7 +71,6 @@ use move_core_types::{
     language_storage,
     value::MoveValue,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -607,6 +605,8 @@ pub struct GlobalEnv {
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
+    /// A set of types that are instantiated in cmp module.
+    pub cmp_types: RefCell<BTreeSet<Type>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -668,6 +668,7 @@ impl GlobalEnv {
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
             generated_by_v2: false,
+            cmp_types: RefCell::new(Default::default()),
         }
     }
 
@@ -890,6 +891,37 @@ impl GlobalEnv {
             }
         }
         target_modules
+    }
+
+    /// Find all target modules and their transitive closures and return in a vector
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+        let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
+        for module_env in self.get_modules() {
+            if module_env.is_target() {
+                todo_modules.insert(module_env.get_id());
+            }
+        }
+        while let Some(module_id) = todo_modules.pop_first() {
+            if !target_and_transitive_modules.contains(&module_id) {
+                target_and_transitive_modules.insert(module_id);
+            }
+            let module_env = self.get_module(module_id);
+            for func_env in module_env.get_functions() {
+                let used_functions = func_env
+                    .get_used_functions()
+                    .expect("used functions available");
+                for used_function in used_functions {
+                    if !target_and_transitive_modules.contains(&used_function.module_id) {
+                        todo_modules.insert(used_function.module_id);
+                    }
+                }
+            }
+        }
+        target_and_transitive_modules
+            .iter()
+            .map(|id| self.get_module(*id))
+            .collect_vec()
     }
 
     /// Find all primary target modules and return in a vector
@@ -1250,25 +1282,18 @@ impl GlobalEnv {
     // Comparison of Diagnostic values that tries to match program ordering so we
     // can display them to the user in a more natural order.
     fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
-        let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
-        if Ordering::Equal == labels_ordering {
-            let sev_ordering = diag1
+        GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels).then_with(|| {
+            diag1
                 .severity
                 .partial_cmp(&diag2.severity)
-                .expect("Severity provides a total ordering for valid severity enum values");
-            if Ordering::Equal == sev_ordering {
-                let message_ordering = diag1.message.cmp(&diag2.message);
-                if Ordering::Equal == message_ordering {
-                    diag1.code.cmp(&diag2.code)
-                } else {
-                    message_ordering
-                }
-            } else {
-                sev_ordering
-            }
-        } else {
-            labels_ordering
-        }
+                .expect("Severity provides a total ordering for valid severity enum values")
+                .then_with(|| {
+                    diag1
+                        .message
+                        .cmp(&diag2.message)
+                        .then_with(|| diag1.code.cmp(&diag2.code))
+                })
+        })
     }
 
     // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
@@ -1276,25 +1301,13 @@ impl GlobalEnv {
     // marking nested regions, we want the innermost region, so we order first by end of labelled
     // code region, then in reverse by start of region.
     fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
-        let file_ordering = label1.file_id.cmp(&label2.file_id);
-        if Ordering::Equal == file_ordering {
-            // First order by end of region.
-            let end1 = label1.range.end;
-            let end2 = label2.range.end;
-            let end_ordering = end1.cmp(&end2);
-            if Ordering::Equal == end_ordering {
-                let start1 = label1.range.start;
-                let start2 = label2.range.start;
-
-                // For nested regions with same end, show inner-most region first.
-                // Swap 1 and 2 in comparing starts.
-                start2.cmp(&start1)
-            } else {
-                end_ordering
-            }
-        } else {
-            file_ordering
-        }
+        label1.file_id.cmp(&label2.file_id).then_with(|| {
+            label1
+                .range
+                .end
+                .cmp(&label2.range.end)
+                .then_with(|| label2.range.start.cmp(&label1.range.start))
+        })
     }
 
     // Label comparison within a list of labels for a given diagnostic, which orders by priority
@@ -1315,12 +1328,14 @@ impl GlobalEnv {
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
         let mut sorted_labels1 = labels1.iter().collect_vec();
         sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels1_len = sorted_labels1.len();
         let mut sorted_labels2 = labels2.iter().collect_vec();
         sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels2_len = sorted_labels2.len();
         std::iter::zip(sorted_labels1, sorted_labels2)
             .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
-            .find(|r| Ordering::Equal != *r)
-            .unwrap_or(Ordering::Equal)
+            .fold(Ordering::Equal, Ordering::then)
+            .then_with(|| sorted_labels1_len.cmp(&sorted_labels2_len))
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
@@ -1331,12 +1346,8 @@ impl GlobalEnv {
     {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
-            let reported_ordering = a.1.cmp(&b.1);
-            if Ordering::Equal == reported_ordering {
-                GlobalEnv::cmp_diagnostic(&a.0, &b.0)
-            } else {
-                reported_ordering
-            }
+            a.1.cmp(&b.1)
+                .then_with(|| GlobalEnv::cmp_diagnostic(&a.0, &b.0))
         });
         for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
             !reported
@@ -1665,7 +1676,7 @@ impl GlobalEnv {
             };
 
             // While releasing any mutation, compute the used/called functions if needed.
-            let fun_data = &self.module_data[module_id.0 as usize]
+            let fun_data = &self.module_data[module_id.to_usize()]
                 .function_data
                 .get(&fun_id)
                 .unwrap();
@@ -1982,6 +1993,7 @@ impl GlobalEnv {
         params: Vec<Parameter>,
         result_type: Type,
         def: Exp,
+        spec_opt: Option<Spec>,
     ) {
         let used_funs = def.used_funs();
         let called_funs = def.called_funs();
@@ -2004,7 +2016,7 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             acquired_structs: None,
-            spec: RefCell::new(Default::default()),
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
             calling_funs: RefCell::new(None),
@@ -2012,6 +2024,7 @@ impl GlobalEnv {
             used_funs: Some(used_funs),
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2020,6 +2033,65 @@ impl GlobalEnv {
             .function_data
             .insert(FunId::new(name), data)
             .is_none())
+    }
+
+    /// Adds a new function definition from data
+    pub fn add_function_def_from_data(&mut self, module_id: ModuleId, data: FunctionData) -> FunId {
+        let new_id = FunId::new(data.name);
+        assert!(self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .expect("module defined")
+            .function_data
+            .insert(FunId::new(data.name), data)
+            .is_none());
+        new_id
+    }
+
+    /// Constructs function data
+    pub fn construct_function_data(
+        &self,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        has_package_visibility: bool,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+        spec_opt: Option<Spec>,
+    ) -> FunctionData {
+        let used_funs = def.used_funs();
+        let called_funs = def.called_funs();
+        FunctionData {
+            name,
+            loc: FunctionLoc {
+                full: loc.clone(),
+                id_loc: loc.clone(),
+                result_type_loc: loc,
+            },
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            has_package_visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            acquired_structs: None,
+            spec: RefCell::new(spec_opt.unwrap_or_default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+            used_funs: Some(used_funs),
+            using_funs: RefCell::new(None),
+            transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
+        }
     }
 
     /// Returns a reference to the declaration of a spec fun.
@@ -2076,6 +2148,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block
@@ -2102,6 +2175,7 @@ impl GlobalEnv {
                 .unwrap()
                 .spec
                 .borrow_mut(),
+            SpecFunction(mid, fid) => self.get_spec_fun(mid.qualified(*fid)).spec.borrow_mut(),
             FunctionCode(..) | Schema(_, _, _) | Inline => {
                 // Schemas are expanded, inline spec blocks are part of the AST,
                 // and function code is nested inside of a function spec block
@@ -3039,7 +3113,8 @@ impl<'env> ModuleEnv<'env> {
             return deps;
         }
         for fun_env in self.get_functions() {
-            for used_fun in fun_env.get_used_functions().expect("used functions") {
+            // We need to traverse transitive inline functions because they will be expanded during inlining.
+            for used_fun in fun_env.get_used_functions_with_transitive_inline() {
                 let used_mod_id = used_fun.module_id;
                 if self.get_id() == used_mod_id {
                     // no need to friend self
@@ -3439,20 +3514,10 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = self.data.source_map.as_ref().expect("source map").clone();
-        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
-            only_externally_visible: false,
-            print_code: true,
-            print_basic_blocks: true,
-            print_locals: true,
-            print_bytecode_stats: false,
-        });
+        let module = self.get_verified_module()?;
         Some(
-            disas
-                .disassemble()
-                // Failure here is fatal and should not happen
-                .expect("Failed to disassemble a verified module"),
+            move_asm::disassembler::disassemble_module(String::new(), module)
+                .expect("disassemble succeeds"),
         )
     }
 
@@ -3507,8 +3572,13 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_table(&self) -> bool {
         self.is_module_in_std("table")
             || self.is_module_in_std("table_with_length")
+            || self.is_module_in_std("smart_table")
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
+    }
+
+    pub fn is_cmp(&self) -> bool {
+        self.is_module_in_std("cmp")
     }
 }
 
@@ -3952,7 +4022,7 @@ pub struct FieldEnv<'env> {
     data: &'env FieldData,
 }
 
-impl<'env> FieldEnv<'env> {
+impl FieldEnv<'_> {
     /// Gets the name of this field.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4057,7 +4127,7 @@ pub struct NamedConstantEnv<'env> {
     data: &'env NamedConstantData,
 }
 
-impl<'env> NamedConstantEnv<'env> {
+impl NamedConstantEnv<'_> {
     /// Returns the name of this constant
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4301,6 +4371,9 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the used functions.
     pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used functions including ones obtained by transitively traversing used inline functions.
+    pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 impl FunctionData {
@@ -4328,6 +4401,7 @@ impl FunctionData {
             used_funs: None,
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
+            used_functions_with_transitive_inline: RefCell::new(None),
         }
     }
 }
@@ -4426,7 +4500,7 @@ impl<'env> FunctionEnv<'env> {
         self.data.loc.id_loc.clone()
     }
 
-    /// Returns the location of the function identifier.
+    /// Returns the location of the function's return type.
     pub fn get_result_type_loc(&self) -> Loc {
         self.data.loc.result_type_loc.clone()
     }
@@ -4872,12 +4946,12 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.data.spec.borrow()
     }
 
     /// Returns associated mutable reference to specification.
-    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+    pub fn get_mut_spec(&'env self) -> RefMut<'env, Spec> {
         self.data.spec.borrow_mut()
     }
 
@@ -5007,6 +5081,29 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used functions including ones obtained by transitively traversing used inline functions
+    pub fn get_used_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        if let Some(trans_used) = &*self.data.used_functions_with_transitive_inline.borrow() {
+            return trans_used.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) && f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
         set
     }
 
@@ -5202,7 +5299,7 @@ impl Loc {
     }
 }
 
-impl<'env> fmt::Display for LocDisplay<'env> {
+impl fmt::Display for LocDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             match &self.mode {
@@ -5269,7 +5366,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5278,7 +5375,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedInstId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedInstId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5298,13 +5395,13 @@ where
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+impl fmt::Display for EnvDisplay<'_, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+impl fmt::Display for EnvDisplay<'_, Parameter> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.val;
         write!(

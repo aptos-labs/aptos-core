@@ -1,7 +1,6 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-10:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+task 0 lines 1-10:  publish --print-bytecode [module 0x42::m {]
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
   ┌─ TEMPFILE:3:20
   │
 3 │     public fun foo(x: u64): u64 {
@@ -9,27 +8,25 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
 
 
 == BEGIN Bytecode ==
-// Move bytecode v8
-module 42.m {
+// Bytecode version v8
+module 0x42::m
+// Function definition at index 0
+#[persistent] public fun bar()
+    ld_u64 3
+    call m::foo
+    ld_u64 2
+    eq
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 1
+    abort
+
+// Function definition at index 1
+#[persistent] public fun foo(l0: u64): u64
+    ld_u64 2
+    ret
 
 
-public bar() /* def_idx: 0 */ {
-B0:
-	0: LdU64(3)
-	1: Call foo(u64): u64
-	2: LdU64(2)
-	3: Eq
-	4: BrFalse(6)
-B1:
-	5: Ret
-B2:
-	6: LdU64(1)
-	7: Abort
-}
-public foo(Arg0: u64): u64 /* def_idx: 1 */ {
-B0:
-	0: LdU64(2)
-	1: Ret
-}
-}
 == END Bytecode ==
+task 1 lines 12-12:  run 0x42::m::bar

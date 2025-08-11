@@ -15,7 +15,6 @@ use crate::{
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
-use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
@@ -28,6 +27,7 @@ use kube::{
     config::{KubeConfigOptions, Kubeconfig},
     Config, Error as KubeError, ResourceExt,
 };
+use log::info;
 use rand::Rng;
 use serde::de::DeserializeOwned;
 use std::{
@@ -405,8 +405,8 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
 
 pub fn generate_new_era() -> String {
     let mut rng = rand::thread_rng();
-    let r: u8 = rng.gen();
-    format!("forge{}", r)
+    let r: u32 = rng.gen();
+    format!("forge{:08x}", r)
 }
 
 fn get_node_default_helm_path() -> String {
@@ -608,18 +608,21 @@ pub async fn install_testnet_resources(
         enable_haproxy,
     )?;
 
-    info!("aptos_node_helm_values: {:?}", aptos_node_helm_values);
     info!(
-        "aptos_node_helm_values_override: {:?}",
-        aptos_node_helm_values_override
+        "aptos_node_helm_values: {}",
+        serde_yaml::to_string(&aptos_node_helm_values).unwrap()
+    );
+    info!(
+        "aptos_node_helm_values_override: {}",
+        serde_yaml::to_string(&aptos_node_helm_values_override).unwrap()
     );
 
     merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
     merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
 
     info!(
-        "aptos_node_helm_values after override: {:?}",
-        aptos_node_helm_values
+        "aptos_node_helm_values after override: {}",
+        serde_yaml::to_string(&aptos_node_helm_values).unwrap(),
     );
 
     // disable uploading genesis to blob storage since indexer requires it in the cluster

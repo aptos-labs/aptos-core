@@ -19,6 +19,7 @@ pub enum OnChainExecutionConfig {
     // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
     V4(ExecutionConfigV4),
     V5(ExecutionConfigV5),
+    V6(ExecutionConfigV6),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -32,6 +33,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -48,6 +50,7 @@ impl OnChainExecutionConfig {
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
             OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
             OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.block_gas_limit_type.clone(),
         }
     }
 
@@ -59,6 +62,19 @@ impl OnChainExecutionConfig {
             | OnChainExecutionConfig::V3(_)
             | OnChainExecutionConfig::V4(_) => false,
             OnChainExecutionConfig::V5(config) => config.enable_per_block_gas_limit,
+            OnChainExecutionConfig::V6(config) => config.enable_per_block_gas_limit,
+        }
+    }
+
+    pub fn gas_price_to_burn(&self) -> Option<u64> {
+        match self {
+            OnChainExecutionConfig::Missing
+            | OnChainExecutionConfig::V1(_)
+            | OnChainExecutionConfig::V2(_)
+            | OnChainExecutionConfig::V3(_)
+            | OnChainExecutionConfig::V4(_)
+            | OnChainExecutionConfig::V5(_) => None,
+            OnChainExecutionConfig::V6(config) => Some(config.gas_price_to_burn),
         }
     }
 
@@ -66,6 +82,7 @@ impl OnChainExecutionConfig {
         BlockExecutorConfigFromOnchain::new(
             self.block_gas_limit_type(),
             self.enable_per_block_gas_limit(),
+            self.gas_price_to_burn(),
         )
     }
 
@@ -79,17 +96,19 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V6(config) => config.transaction_deduper_type.clone(),
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V5(ExecutionConfigV5 {
+        OnChainExecutionConfig::V6(ExecutionConfigV6 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+            gas_price_to_burn: 90,
         })
     }
 
@@ -103,13 +122,13 @@ impl OnChainExecutionConfig {
 impl BlockGasLimitType {
     pub fn default_for_genesis() -> Self {
         BlockGasLimitType::ComplexLimitV1 {
-            effective_block_gas_limit: 30000,
+            effective_block_gas_limit: 20000,
             execution_gas_effective_multiplier: 1,
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 9,
             use_granular_resource_group_conflicts: false,
             use_module_publishing_block_conflict: true,
-            block_output_limit: Some(5 * 1024 * 1024),
+            block_output_limit: Some(4 * 1024 * 1024),
             include_user_txn_size_in_block_output: true,
             add_block_limit_outcome_onchain: true,
         }
@@ -165,6 +184,15 @@ pub struct ExecutionConfigV5 {
     pub block_gas_limit_type: BlockGasLimitType,
     pub enable_per_block_gas_limit: bool,
     pub transaction_deduper_type: TransactionDeduperType,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV6 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub enable_per_block_gas_limit: bool,
+    pub transaction_deduper_type: TransactionDeduperType,
+    pub gas_price_to_burn: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -4,10 +4,13 @@
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
-    proof_of_store::{BatchId, BatchInfo},
+    proof_of_store::BatchInfo,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, quorum_store::BatchId, transaction::SignedTransaction,
+    PeerId,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -65,7 +68,7 @@ impl PersistedValue {
                 .map(|txn| {
                     TxnSummaryWithExpiration::new(
                         txn.sender(),
-                        txn.sequence_number(),
+                        txn.replay_protector(),
                         txn.expiration_timestamp_secs(),
                         txn.committed_hash(),
                     )
@@ -191,6 +194,10 @@ impl Batch {
 
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
         self.payload.into_transactions()
+    }
+
+    pub fn txns(&self) -> &[SignedTransaction] {
+        self.payload.txns()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {

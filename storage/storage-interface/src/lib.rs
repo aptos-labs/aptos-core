@@ -25,9 +25,9 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
-        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -100,7 +100,7 @@ impl From<aptos_secure_net::Error> for Error {
 macro_rules! delegate_read {
     ($(
         $(#[$($attr:meta)*])*
-        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+        fn $name:ident(&self $(, $arg: ident : $ty: ty)* $(,)?) -> $return_type:ty;
     )+) => {
         $(
             $(#[$($attr)*])*
@@ -139,7 +139,7 @@ pub trait DbReader: Send + Sync {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProofV2>;
 
         /// See [AptosDB::get_transaction_by_hash].
         ///
@@ -166,6 +166,15 @@ pub trait DbReader: Send + Sync {
             version: Version,
         ) -> Result<Option<TransactionAuxiliaryData>>;
 
+        /// See [AptosDB::get_persisted_auxiliary_info_iterator].
+        ///
+        /// [AptosDB::get_persisted_auxiliary_info_iterator]: ../aptosdb/struct.AptosDB.html#method.get_persisted_auxiliary_info_iterator
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>>;
+
         /// See [AptosDB::get_first_txn_version].
         ///
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
@@ -189,7 +198,7 @@ pub trait DbReader: Send + Sync {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProofV2>;
 
         /// Returns events by given event key
         fn get_events(
@@ -297,9 +306,9 @@ pub trait DbReader: Send + Sync {
             next_version: Version,
         ) -> Result<Option<(Version, HashValue)>>;
 
-        /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
-        /// the transaction with given `seq_num` doesn't exist, returns `None`.
-        fn get_account_transaction(
+        /// Returns a transaction that is the `sequence_number`-th one associated with the given account. If
+        /// the transaction with given `sequence_number` doesn't exist, returns `None`.
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -307,18 +316,35 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        /// Returns the list of transactions sent by an account with `address` starting
+        /// Returns the list of ordered transactions (transactions that include a sequence number)
+        /// sent by an account with `address` starting
         /// at sequence number `seq_num`. Will return no more than `limit` transactions.
         /// Will ignore transactions with `txn.version > ledger_version`. Optionally
         /// fetch events for each transaction when `fetch_events` is `true`.
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountOrderedTransactionsWithProof>;
+
+        /// Returns the list of summaries of transactions committed by an account.
+        /// Each transaction summary contains the sender address, transaction hash, version, replay protector
+        /// of the committed transaction.
+        /// If `start_version` is provided, the returned list contains transactions starting from `start_version`.
+        /// Or else if `end_version` is provided, the returned list contains transactions ending at `end_version`.
+        /// The returned list contains at most `limit` transactions.
+        /// The returned list is always sorted by version in ascending order.
+        fn get_account_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_version: Option<u64>,
+            end_version: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         /// Returns proof of new state for a given ledger info with signatures relative to version known
         /// to client
@@ -533,7 +559,7 @@ pub trait DbWriter: Send + Sync {
     fn finalize_state_snapshot(
         &self,
         version: Version,
-        output_with_proof: TransactionOutputListWithProof,
+        output_with_proof: TransactionOutputListWithProofV2,
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         unimplemented!()

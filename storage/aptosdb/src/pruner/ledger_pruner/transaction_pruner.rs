@@ -10,6 +10,7 @@ use crate::{
     },
     transaction_store::TransactionStore,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey as IndexerMetadataKey, MetadataValue as IndexerMetadataValue},
@@ -39,12 +40,17 @@ impl DBSubPruner for TransactionPruner {
             self.get_pruning_candidate_transactions(current_progress, target_version)?;
         self.ledger_db
             .transaction_db()
-            .prune_transaction_by_hash_indices(&candidate_transactions, &mut batch)?;
+            .prune_transaction_by_hash_indices(
+                candidate_transactions.iter().map(|(_, txn)| txn.hash()),
+                &mut batch,
+            )?;
         self.ledger_db.transaction_db().prune_transactions(
             current_progress,
             target_version,
             &mut batch,
         )?;
+        self.transaction_store
+            .prune_transaction_summaries_by_account(&candidate_transactions, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionPrunerProgress,
             &DbMetadataValue::Version(target_version),
@@ -101,7 +107,7 @@ impl TransactionPruner {
         &self,
         start: Version,
         end: Version,
-    ) -> Result<Vec<Transaction>> {
+    ) -> Result<Vec<(Version, Transaction)>> {
         ensure!(end >= start, "{} must be >= {}", end, start);
 
         let mut iter = self
@@ -118,7 +124,7 @@ impl TransactionPruner {
             if version >= end {
                 break;
             }
-            txns.push(txn);
+            txns.push((version, txn));
         }
 
         Ok(txns)

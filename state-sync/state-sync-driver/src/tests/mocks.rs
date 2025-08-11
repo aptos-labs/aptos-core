@@ -36,8 +36,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
 };
 use async_trait::async_trait;
@@ -139,28 +139,28 @@ mock! {
     impl ChunkExecutorTrait for ChunkExecutor {
         fn execute_chunk<'a>(
             &self,
-            txn_list_with_proof: TransactionListWithProof,
+            txn_list_with_proof: TransactionListWithProofV2,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> AnyhowResult<()>;
 
         fn apply_chunk<'a>(
             &self,
-            txn_output_list_with_proof: TransactionOutputListWithProof,
+            txn_output_list_with_proof: TransactionOutputListWithProofV2,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> AnyhowResult<()>;
 
         fn enqueue_chunk_by_execution<'a>(
             &self,
-            txn_list_with_proof: TransactionListWithProof,
+            txn_list_with_proof: TransactionListWithProofV2,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> AnyhowResult<()>;
 
         fn enqueue_chunk_by_transaction_outputs<'a>(
             &self,
-            txn_output_list_with_proof: TransactionOutputListWithProof,
+            txn_output_list_with_proof: TransactionOutputListWithProofV2,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> AnyhowResult<()>;
@@ -191,7 +191,7 @@ mock! {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> Result<TransactionListWithProof>;
+        ) -> Result<TransactionListWithProofV2>;
 
         fn get_transaction_by_hash(
             &self,
@@ -212,7 +212,7 @@ mock! {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> Result<TransactionOutputListWithProof>;
+        ) -> Result<TransactionOutputListWithProofV2>;
 
         fn get_events(
             &self,
@@ -245,7 +245,7 @@ mock! {
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
 
-        fn get_account_transaction(
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -253,14 +253,14 @@ mock! {
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> Result<AccountTransactionsWithProof>;
+        ) -> Result<AccountOrderedTransactionsWithProof>;
 
         fn get_state_proof_with_ledger_info(
             &self,
@@ -319,7 +319,7 @@ mock! {
         fn finalize_state_snapshot(
             &self,
             version: Version,
-            output_with_proof: TransactionOutputListWithProof,
+            output_with_proof: TransactionOutputListWithProofV2,
             ledger_infos: &[LedgerInfoWithSignatures],
         ) -> Result<()>;
 
@@ -454,7 +454,7 @@ mock! {
         async fn apply_transaction_outputs(
             &mut self,
             notification_metadata: NotificationMetadata,
-            output_list_with_proof: TransactionOutputListWithProof,
+            output_list_with_proof: TransactionOutputListWithProofV2,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<(), crate::error::Error>;
@@ -462,7 +462,7 @@ mock! {
         async fn execute_transactions(
             &mut self,
             notification_metadata: NotificationMetadata,
-            transaction_list_with_proof: TransactionListWithProof,
+            transaction_list_with_proof: TransactionListWithProofV2,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> AnyhowResult<(), crate::error::Error>;
@@ -471,7 +471,7 @@ mock! {
             &mut self,
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
-            target_output_with_proof: TransactionOutputListWithProof,
+            target_output_with_proof: TransactionOutputListWithProofV2,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;

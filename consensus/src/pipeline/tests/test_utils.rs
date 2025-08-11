@@ -46,7 +46,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage);
+    let safety_rules_manager = SafetyRulesManager::new_serializer(safety_storage);
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();
 
@@ -63,7 +63,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     init_qc: Option<QuorumCert>,
     init_round: Round,
 ) -> (
-    Vec<PipelinedBlock>,
+    Vec<Arc<PipelinedBlock>>,
     LedgerInfoWithSignatures,
     Vec<VoteProposal>,
 ) {
@@ -109,10 +109,14 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
     let li_sig = generate_ledger_info_with_sig(&[signer.clone()], li);
 
-    let executed_blocks: Vec<PipelinedBlock> = proposals
+    let executed_blocks: Vec<Arc<PipelinedBlock>> = proposals
         .iter()
         .map(|proposal| {
-            PipelinedBlock::new(proposal.block().clone(), vec![], compute_result.clone())
+            Arc::new(PipelinedBlock::new(
+                proposal.block().clone(),
+                vec![],
+                compute_result.clone(),
+            ))
         })
         .collect();
 
@@ -121,7 +125,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
 pub fn prepare_executed_blocks_with_executed_ledger_info(
     signer: &ValidatorSigner,
-) -> (Vec<PipelinedBlock>, LedgerInfoWithSignatures) {
+) -> (Vec<Arc<PipelinedBlock>>, LedgerInfoWithSignatures) {
     let genesis_qc = certificate_for_genesis();
     let (executed_blocks, li_sig, _) = prepare_executed_blocks_with_ledger_info(
         signer,
@@ -137,7 +141,7 @@ pub fn prepare_executed_blocks_with_executed_ledger_info(
 
 pub fn prepare_executed_blocks_with_ordered_ledger_info(
     signer: &ValidatorSigner,
-) -> (Vec<PipelinedBlock>, LedgerInfoWithSignatures) {
+) -> (Vec<Arc<PipelinedBlock>>, LedgerInfoWithSignatures) {
     let genesis_qc = certificate_for_genesis();
     let (executed_blocks, li_sig, _) = prepare_executed_blocks_with_ledger_info(
         signer,

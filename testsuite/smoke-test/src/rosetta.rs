@@ -66,7 +66,13 @@ async fn setup_simple_test(
     JoinHandle<anyhow::Result<()>>,
     RosettaClient,
 ) {
-    setup_test(num_accounts, Arc::new(|_, _, _| {})).await
+    setup_test(
+        num_accounts,
+        Arc::new(|_, config, _| {
+            config.indexer_db_config.enable_transaction = true;
+        }),
+    )
+    .await
 }
 
 async fn setup_test(
@@ -349,7 +355,7 @@ async fn test_account_balance() {
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
     let txns = rest_client
-        .get_account_transactions(account_1, None, None)
+        .get_account_ordered_transactions(account_1, None, None)
         .await
         .unwrap()
         .into_inner();
@@ -1865,7 +1871,7 @@ async fn test_invalid_transaction_gas_charged() {
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
     let txns = rest_client
-        .get_account_transactions(sender, None, None)
+        .get_account_ordered_transactions(sender, None, None)
         .await
         .unwrap()
         .into_inner();
@@ -2698,6 +2704,7 @@ async fn test_delegation_pool_operations() {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ErrorWrapper {
     BeforeSubmission(anyhow::Error),

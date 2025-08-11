@@ -1,16 +1,16 @@
-warning: Unused parameter `account`. Consider removing or prefixing with an underscore: `_account`
+warning: Unused value of parameter `account`. Consider removing the parameter, or prefixing with an underscore (e.g., `_account`), or binding to `_`
    ┌─ tests/sources/script_fun_in_module.move:26:57
    │
 26 │     public entry fun this_is_script_fun_with_signer_ref(account: &signer, _another_arg: u64) { }
    │                                                         ^^^^^^^
 
-warning: Unused parameter `account`. Consider removing or prefixing with an underscore: `_account`
+warning: Unused value of parameter `account`. Consider removing the parameter, or prefixing with an underscore (e.g., `_account`), or binding to `_`
    ┌─ tests/sources/script_fun_in_module.move:29:53
    │
 29 │     public entry fun this_is_script_fun_with_signer(account: signer, _another_arg: u64) { }
    │                                                     ^^^^^^^
 
-warning: Unused parameter `account`. Consider removing or prefixing with an underscore: `_account`
+warning: Unused value of parameter `account`. Consider removing the parameter, or prefixing with an underscore (e.g., `_account`), or binding to `_`
    ┌─ tests/sources/script_fun_in_module.move:32:58
    │
 32 │     public entry fun this_is_script_fun_with_string_args(account: &signer, _val: String) { }

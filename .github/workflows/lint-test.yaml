@@ -56,7 +56,7 @@ jobs:
   # Run the crypto hasher domain separation checks
   rust-cryptohasher-domain-separation-check:
     needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
   # Run all rust lints. This is a PR required job.
   rust-lints:
     needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -101,7 +101,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null
       )
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - name: Run rust doc tests
@@ -120,7 +120,7 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -139,7 +139,7 @@ jobs:
         !contains(github.event.pull_request.base.ref, '-release-')
       )
     needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -157,7 +157,7 @@ jobs:
         !contains(github.event.pull_request.base.ref, '-release-')
       )
     needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -182,9 +182,13 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests') ||
         contains(github.event.pull_request.base.ref, '-release-')
       )
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+      # Install Move Prover tools
+      - name: Run dev_setup.sh
+        run: |
+          scripts/dev_setup.sh -b -y
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         with:
@@ -201,7 +205,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null
       )
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -213,7 +217,7 @@ jobs:
 
   # Run the consensus only unit tests
   rust-consensus-only-unit-test:
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4
@@ -223,7 +227,7 @@ jobs:
 
   # Run the consensus only smoke test
   rust-consensus-only-smoke-test:
-    runs-on: runs-on,cpu=64,family=c7,hdd=500,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v4

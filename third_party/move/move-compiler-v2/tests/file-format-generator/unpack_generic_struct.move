@@ -19,7 +19,7 @@ module 0x42::m {
         key: Key,
     }
 
-    public inline fun h<Key: store + drop>(x: E<Key>, v: |Key| E<Key>): E<Key> {
+    inline fun h<Key: store + drop>(x: E<Key>, v: |Key| E<Key>): E<Key> {
         let E { key } = x;
         v(key)
     }

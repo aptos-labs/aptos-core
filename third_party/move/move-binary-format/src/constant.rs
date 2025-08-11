@@ -40,7 +40,7 @@ fn construct_ty_for_constant(layout: &MoveTypeLayout) -> Option<SignatureToken> 
             construct_ty_for_constant(l.as_ref())?,
         ))),
         MoveTypeLayout::Struct(_) => None,
-        MoveTypeLayout::Function(_) => None,
+        MoveTypeLayout::Function => None,
         MoveTypeLayout::Bool => Some(SignatureToken::Bool),
 
         // It is not possible to have native layout for constant values.

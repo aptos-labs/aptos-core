@@ -102,8 +102,11 @@ return _t1
 if test_variants m::Entity::Person(self) {
   _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
 } else {
-  if (Not(test_variants m::Entity::Institution(self))) Abort(14566554180833181697);
-  _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+  if test_variants m::Entity::Institution(self) {
+    _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+  } else {
+    Abort(14566554180833181697)
+  }
 };
 return _t1
 
@@ -113,8 +116,11 @@ return _t1
   if test_variants m::Entity::Person(self) {
     _t1: u64 = Deref(select_variants m::Entity.Person.id(self))
   } else {
-    if (Not(test_variants m::Entity::Institution(self))) Abort(14566554180833181697);
-    _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+    if test_variants m::Entity::Institution(self) {
+      _t1: u64 = Deref(select_variants m::Entity.Institution.id(self))
+    } else {
+      Abort(14566554180833181697)
+    }
   };
   return _t1
 }
@@ -305,10 +311,7 @@ module 0x815::m {
     }
     fun id(self: &Entity): u64 {
         let _t1;
-        if (self is Person) _t1 = *&self.id else {
-            if (!(self is Institution)) abort 14566554180833181697;
-            _t1 = *&self.id
-        };
+        if (self is Person) _t1 = *&self.id else if (self is Institution) _t1 = *&self.id else abort 14566554180833181697;
         _t1
     }
     fun id2(self: Entity): u64 {

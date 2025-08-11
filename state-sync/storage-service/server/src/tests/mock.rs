@@ -42,8 +42,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -240,7 +240,7 @@ mock! {
             batch_size: u64,
             ledger_version: Version,
             fetch_events: bool,
-        ) -> aptos_storage_interface::Result<TransactionListWithProof>;
+        ) -> aptos_storage_interface::Result<TransactionListWithProofV2>;
 
         fn get_transaction_by_hash(
             &self,
@@ -265,7 +265,7 @@ mock! {
             start_version: Version,
             limit: u64,
             ledger_version: Version,
-        ) -> aptos_storage_interface::Result<TransactionOutputListWithProof>;
+        ) -> aptos_storage_interface::Result<TransactionOutputListWithProofV2>;
 
         fn get_events(
             &self,
@@ -294,7 +294,7 @@ mock! {
 
         fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)>;
 
-        fn get_account_transaction(
+        fn get_account_ordered_transaction(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -302,14 +302,14 @@ mock! {
             ledger_version: Version,
         ) -> aptos_storage_interface::Result<Option<TransactionWithProof>>;
 
-        fn get_account_transactions(
+        fn get_account_ordered_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
             limit: u64,
             include_events: bool,
             ledger_version: Version,
-        ) -> aptos_storage_interface::Result<AccountTransactionsWithProof>;
+        ) -> aptos_storage_interface::Result<AccountOrderedTransactionsWithProof>;
 
         fn get_state_proof_with_ledger_info(
             &self,
@@ -354,6 +354,12 @@ mock! {
         fn get_epoch_snapshot_prune_window(&self) -> aptos_storage_interface::Result<usize>;
 
         fn is_state_merkle_pruner_enabled(&self) -> aptos_storage_interface::Result<bool>;
+
+        fn get_persisted_auxiliary_info_iterator(
+            &self,
+            start_version: Version,
+            num_persisted_auxiliary_info: usize,
+        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<PersistedAuxiliaryInfo>>>>;
     }
 }
 

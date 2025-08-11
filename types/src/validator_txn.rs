@@ -3,7 +3,8 @@
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
-use crate::{dkg::DKGTranscript, jwks};
+use crate::{dkg::DKGTranscript, jwks, validator_verifier::ValidatorVerifier};
+use anyhow::Context;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use move_core_types::account_address::AccountAddress;
@@ -32,21 +33,21 @@ impl ValidatorTransaction {
         bcs::serialized_size(self).unwrap()
     }
 
-    pub fn topic(&self) -> Topic {
-        match self {
-            ValidatorTransaction::DKGResult(_) => Topic::DKG,
-            ValidatorTransaction::ObservedJWKUpdate(update) => {
-                Topic::JWK_CONSENSUS(update.update.issuer.clone())
-            },
-        }
-    }
-
     pub fn type_name(&self) -> &'static str {
         match self {
             ValidatorTransaction::DKGResult(_) => "validator_transaction__dkg_result",
             ValidatorTransaction::ObservedJWKUpdate(_) => {
                 "validator_transaction__observed_jwk_update"
             },
+        }
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            ValidatorTransaction::DKGResult(dkg_result) => dkg_result
+                .verify(verifier)
+                .context("DKGResult verification failed"),
+            ValidatorTransaction::ObservedJWKUpdate(_) => Ok(()),
         }
     }
 }
@@ -56,4 +57,8 @@ impl ValidatorTransaction {
 pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
+    JWK_CONSENSUS_PER_KEY_MODE {
+        issuer: jwks::Issuer,
+        kid: jwks::KID,
+    },
 }

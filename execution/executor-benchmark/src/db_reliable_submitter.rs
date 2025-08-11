@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::db_access::DbAccessUtil;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
 };
@@ -36,10 +36,13 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
 
     async fn query_sequence_number(&self, address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
-        AccountResource::fetch_move_resource(&db_state_view, &address)
-            .unwrap()
-            .map(|account| account.sequence_number())
-            .context("account doesn't exist")
+        Ok(
+            AccountResource::fetch_move_resource(&db_state_view, &address)
+                .unwrap()
+                .map(|account| account.sequence_number())
+                .unwrap_or(0),
+        )
+        //.context("account doesn't exist")
     }
 
     async fn execute_transactions_with_counter(

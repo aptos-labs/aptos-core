@@ -1,3 +1,76 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    private fun t1(): u8 {
+        0
+    }
+    private fun t2(): u64 {
+        0
+    }
+    private fun t3(): u128 {
+        0
+    }
+    private fun t4(): bool {
+        false
+    }
+    private fun t5(): address {
+        0x0
+    }
+    private fun t6(): vector<u8> {
+        [1, 35]
+    }
+    private fun t7(): vector<u8> {
+        [97, 98, 99, 100]
+    }
+} // end 0x42::M
+module <SELF>_0 {
+    private fun t() {
+        0;
+        0;
+        0;
+        false;
+        0x0;
+        [1, 35];
+        [97, 98, 99, 100];
+        Tuple()
+    }
+} // end <SELF>_0
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    fun t1(): u8 {
+        0u8
+    }
+    fun t2(): u64 {
+        0
+    }
+    fun t3(): u128 {
+        0u128
+    }
+    fun t4(): bool {
+        false
+    }
+    fun t5(): address {
+        0x0
+    }
+    fun t6(): vector<u8> {
+        vector[1u8, 35u8]
+    }
+    fun t7(): vector<u8> {
+        vector[97u8, 98u8, 99u8, 100u8]
+    }
+}
+script {
+    fun t() {
+        0u8;
+        0;
+        0u128;
+        false;
+        0x0;
+        vector[1u8, 35u8];
+        vector[97u8, 98u8, 99u8, 100u8];
+    }
+}
+
 
 Diagnostics:
 warning: Expression value unused and side-effect free, so eliminated as dead code
@@ -42,7 +115,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 37 │         (C7: vector<u8>);
    │          ^^
 
-// -- Model dump before bytecode pipeline
+// -- Model dump before second bytecode pipeline
 module 0x42::M {
     private fun t1(): u8 {
         0
@@ -71,35 +144,6 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::M {
-    fun t1(): u8 {
-        0u8
-    }
-    fun t2(): u64 {
-        0
-    }
-    fun t3(): u128 {
-        0u128
-    }
-    fun t4(): bool {
-        false
-    }
-    fun t5(): address {
-        0x0
-    }
-    fun t6(): vector<u8> {
-        vector[1u8, 35u8]
-    }
-    fun t7(): vector<u8> {
-        vector[97u8, 98u8, 99u8, 100u8]
-    }
-}
-script {
-    fun t() {
-    }
-}
 
 
 ============ bytecode verification succeeded ========

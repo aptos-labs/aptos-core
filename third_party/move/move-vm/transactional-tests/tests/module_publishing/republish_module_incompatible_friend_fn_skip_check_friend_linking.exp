@@ -1,6 +1,9 @@
 processed 5 tasks
-
-task 4 'run'. lines 39-39:
+task 0 lines 1-7:  publish [module 0x42.N {]
+task 1 lines 9-16:  publish [module 0x42.M {]
+task 2 lines 18-26:  publish [module 0x42.N {]
+task 3 lines 28-38:  publish --skip-check-friend-linking [module 0x42.M {]
+task 4 lines 39-39:  run 0x42::N::foo
 Error: Function execution failed with VMError: {
     major_status: UNEXPECTED_VERIFIER_ERROR,
     sub_status: None,

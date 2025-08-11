@@ -166,7 +166,7 @@ impl<'de> Deserialize<'de> for GasScheduleLocator {
     {
         struct GasScheduleLocatorVisitor;
 
-        impl<'de> Visitor<'de> for GasScheduleLocatorVisitor {
+        impl Visitor<'_> for GasScheduleLocatorVisitor {
             type Value = GasScheduleLocator;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -693,6 +693,7 @@ impl ReleaseConfig {
 
             let mut metadata_path = base_path.to_path_buf();
             metadata_path.push("metadata");
+            metadata_path.push(&self.name);
             metadata_path.push(proposal.name.as_str());
             metadata_path.set_extension("json");
 

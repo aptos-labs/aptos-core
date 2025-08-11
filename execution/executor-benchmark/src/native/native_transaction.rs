@@ -35,6 +35,7 @@ pub enum NativeTransaction {
         fail_on_recipient_account_existing: bool,
         fail_on_recipient_account_missing: bool,
     },
+    BlockEpilogue,
 }
 
 impl NativeTransaction {
@@ -115,6 +116,7 @@ impl NativeTransaction {
                     _ => unimplemented!(),
                 }
             },
+            aptos_types::transaction::Transaction::BlockEpilogue(_) => Self::BlockEpilogue,
             _ => unimplemented!(),
         }
     }

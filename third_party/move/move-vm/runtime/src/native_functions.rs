@@ -3,27 +3,41 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
+    data_cache::{DataCacheEntry, TransactionDataCache},
+    dispatch_loader,
     interpreter::InterpreterDebugInterface,
-    loader::{Function, Resolver},
+    loader::{LazyLoadedFunction, LazyLoadedFunctionState},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
-    storage::ty_tag_converter::TypeTagConverter,
+    storage::{
+        loader::traits::NativeModuleLoader,
+        module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
+    },
+    Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{
-    ExecutionState, Location, PartialVMError, PartialVMResult, VMResult,
+use ambassador::delegate_to_methods;
+use bytes::Bytes;
+use move_binary_format::{
+    errors::{ExecutionState, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult,
-    value_serde::FunctionValueExtension, values::Value,
+    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
+    resolver::ResourceResolver,
+    values::{AbstractFunction, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -97,96 +111,141 @@ impl NativeFunctions {
     }
 }
 
-pub struct NativeContext<'a, 'b> {
-    interpreter: &'a mut dyn InterpreterDebugInterface,
+pub struct NativeContext<'a, 'b, 'c> {
+    interpreter: &'a dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache,
-    resolver: &'a Resolver<'a>,
+    resource_resolver: &'a dyn ResourceResolver,
+    module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
-    gas_balance: InternalGas,
-    traversal_context: &'a TraversalContext<'a>,
-
-    /// Counter used to record the (conceptual) heap memory usage by a native functions,
-    /// measured in abstract memory unit.
-    ///
-    /// This is a hack to emulate memory usage tracking, before we could refactor native functions
-    /// and allow them to access the gas meter directly.
-    heap_memory_usage: u64,
+    gas_meter: &'a mut dyn NativeGasMeter,
+    traversal_context: &'a mut TraversalContext<'c>,
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut dyn InterpreterDebugInterface,
+        interpreter: &'a dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache,
-        resolver: &'a Resolver<'a>,
+        resource_resolver: &'a dyn ResourceResolver,
+        module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
-        gas_balance: InternalGas,
-        traversal_context: &'a TraversalContext<'a>,
+        gas_meter: &'a mut dyn NativeGasMeter,
+        traversal_context: &'a mut TraversalContext<'c>,
     ) -> Self {
         Self {
             interpreter,
             data_store,
-            resolver,
+            resource_resolver,
+            module_storage,
             extensions,
-            gas_balance,
+            gas_meter,
             traversal_context,
-
-            heap_memory_usage: 0,
         }
     }
 }
 
-impl<'a, 'b> NativeContext<'a, 'b> {
+impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
-        self.interpreter.debug_print_stack_trace(buf, self.resolver)
+        self.interpreter
+            .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
     }
 
     pub fn exists_at(
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> VMResult<(bool, Option<NumBytes>)> {
-        // TODO(Rati, George): propagate exists call the way to resolver, because we
-        //                     can implement the check more efficiently, without the
-        //                     need to actually load bytes.
-        let (value, num_bytes) = self
-            .data_store
-            .load_resource(
-                self.resolver.module_storage(),
-                self.resolver.resource_resolver(),
-                address,
-                ty,
-            )
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let exists = value
-            .exists()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        Ok((exists, num_bytes))
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        // TODO(#16516):
+        //   Propagate exists call all the way to resolver, because we can implement the check more
+        //   efficiently, without the need to actually load bytes, deserialize the value and cache
+        //   it in the data cache.
+        Ok(if !self.data_store.contains_resource(&address, ty) {
+            let (entry, bytes_loaded) =
+                self.loader_context().create_data_cache_entry(address, ty)?;
+            let exists = entry.value().exists()?;
+            self.data_store
+                .insert_resource(address, ty.clone(), entry)?;
+            (exists, Some(bytes_loaded))
+        } else {
+            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
+            (exists, None)
+        })
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        let ty_tag_builder =
-            TypeTagConverter::new(self.resolver.module_storage().runtime_environment());
-        ty_tag_builder.ty_to_ty_tag(ty)
+        self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.resolver.type_to_type_layout(ty)
+    /// Returns the runtime layout of a type that can be used to (de)serialize the value.
+    ///
+    /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
+    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        let layout = self
+            .loader_context()
+            .type_to_type_layout_with_delayed_fields(ty)?
+            .unpack()
+            .0;
+        Ok(layout)
     }
 
-    pub fn type_to_type_layout_with_identifier_mappings(
-        &self,
+    /// Returns the runtime layout of a type that can be used to (de)serialize the value. Also,
+    /// information whether there are any delayed fields in layouts is returned.
+    pub fn type_to_type_layout_with_delayed_fields(
+        &mut self,
         ty: &Type,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        self.resolver
-            .type_to_type_layout_with_identifier_mappings(ty)
+    ) -> PartialVMResult<LayoutWithDelayedFields> {
+        self.loader_context()
+            .type_to_type_layout_with_delayed_fields(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-        self.resolver.type_to_fully_annotated_layout(ty)
+    /// Returns the runtime layout of a type that can be used to (de)serialize the value. The
+    /// layout does not contain delayed fields (otherwise, invariant violation is returned).
+    pub fn type_to_type_layout_check_no_delayed_fields(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<MoveTypeLayout> {
+        let layout = self
+            .loader_context()
+            .type_to_type_layout_with_delayed_fields(ty)?;
+        layout
+            .into_layout_when_has_no_delayed_fields()
+            .ok_or_else(|| {
+                PartialVMError::new_invariant_violation("Layout should not contain delayed fields")
+            })
+    }
+
+    /// Returns the annotated layout of a type. If type contains delayed fields, returns [None].
+    /// An error is returned when a layout cannot be constructed (e.g., some limits on number of
+    /// nodes are reached, or an internal invariant violation is raised).
+    pub fn type_to_fully_annotated_layout(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+        self.loader_context().type_to_fully_annotated_layout(ty)
+    }
+
+    pub fn module_storage(&self) -> &dyn ModuleStorage {
+        self.module_storage
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {
         self.extensions
+    }
+
+    /// Returns native extensions and loader context (storing mutable gas meter and traversal
+    /// context). Native functions can use this method to query extensions while holding mutable
+    /// reference to loader's context.
+    pub fn extensions_with_loader_context(
+        &mut self,
+    ) -> (&NativeContextExtensions<'b>, LoaderContext<'_, 'c>) {
+        (
+            self.extensions,
+            LoaderContext::new(
+                self.resource_resolver,
+                self.module_storage,
+                self.gas_meter,
+                self.traversal_context,
+            ),
+        )
     }
 
     pub fn extensions_mut(&mut self) -> &mut NativeContextExtensions<'b> {
@@ -199,42 +258,189 @@ impl<'a, 'b> NativeContext<'a, 'b> {
         self.interpreter.get_stack_frames(count)
     }
 
-    pub fn gas_balance(&self) -> InternalGas {
-        self.gas_balance
+    pub fn legacy_gas_budget(&self) -> InternalGas {
+        self.gas_meter.legacy_gas_budget_in_native_context()
     }
 
-    pub fn use_heap_memory(&mut self, amount: u64) {
-        self.heap_memory_usage = self.heap_memory_usage.saturating_add(amount);
+    /// Returns the gas meter used for execution. Even if native functions cannot use it to
+    /// charge gas (feature-gating), gas meter can be used to query gas meter's balance.
+    pub fn gas_meter(&mut self) -> &mut dyn NativeGasMeter {
+        self.gas_meter
     }
 
-    pub fn heap_memory_usage(&self) -> u64 {
-        self.heap_memory_usage
+    /// Returns the loader context used by the natives.
+    pub fn loader_context(&mut self) -> LoaderContext<'_, 'c> {
+        LoaderContext::new(
+            self.resource_resolver,
+            self.module_storage,
+            self.gas_meter,
+            self.traversal_context,
+        )
     }
 
-    pub fn traversal_context(&self) -> &TraversalContext {
+    pub fn traversal_context(&self) -> &TraversalContext<'c> {
         self.traversal_context
     }
 
-    pub fn function_value_extension(&self) -> &dyn FunctionValueExtension {
-        self.resolver
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        }
+    }
+}
+
+/// Helper struct that can be returned together with extensions so that layouts can be constructed
+/// while there is a live mutable reference to context extensions.
+pub struct LoaderContext<'a, 'b> {
+    resource_resolver: &'a dyn ResourceResolver,
+    module_storage: ModuleStorageWrapper<'a>,
+    gas_meter: DependencyGasMeterWrapper<'a>,
+    traversal_context: &'a mut TraversalContext<'b>,
+}
+
+impl<'a, 'b> LoaderContext<'a, 'b> {
+    /// Returns a vector of layouts for captured arguments. Used to format captured arguments as
+    /// strings. Returns [Ok(None)] in case layouts contain delayed fields (i.e., the values cannot
+    /// be formatted as strings).
+    pub fn get_captured_layouts_for_string_utils(
+        &mut self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
+        Ok(
+            match &*LazyLoadedFunction::expect_this_impl(fun)?.state.borrow() {
+                LazyLoadedFunctionState::Unresolved { data, .. } => {
+                    Some(data.captured_layouts.clone())
+                },
+                LazyLoadedFunctionState::Resolved {
+                    fun,
+                    mask,
+                    captured_layouts,
+                    ..
+                } => match captured_layouts.as_ref() {
+                    Some(captured_layouts) => Some(captured_layouts.clone()),
+                    None => dispatch_loader!(&self.module_storage, loader, {
+                        LazyLoadedFunction::construct_captured_layouts(
+                            &LayoutConverter::new(&loader),
+                            &mut self.gas_meter,
+                            self.traversal_context,
+                            fun,
+                            *mask,
+                        )
+                    })?,
+                },
+            },
+        )
     }
 
-    pub fn load_function(
+    /// Charges gas for module dependencies for native dynamic dispatch.
+    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> PartialVMResult<()> {
+        dispatch_loader!(&self.module_storage, loader, {
+            loader.charge_native_result_load_module(
+                &mut self.gas_meter,
+                self.traversal_context,
+                &module_id,
+            )
+        })
+    }
+
+    /// Returns function value extension that can be used for (de)serializing function values.
+    pub fn function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        FunctionValueExtensionAdapter {
+            module_storage: self.module_storage.module_storage,
+        }
+    }
+
+    /// Converts a runtime type into layout for (de)serialization.
+    pub fn type_to_type_layout_with_delayed_fields(
         &mut self,
-        module_id: &ModuleId,
-        function_name: &Identifier,
-    ) -> PartialVMResult<Arc<Function>> {
-        let (_, function) = self
-            .resolver
-            .module_storage()
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            // TODO(#16077):
-            //   Keeping this consistent with loader V1 implementation which returned that
-            //   error. Check if we can avoid remapping by replaying transactions.
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!("Module {} doesn't exist", module_id))
-            })?;
-        Ok(function)
+        ty: &Type,
+    ) -> PartialVMResult<LayoutWithDelayedFields> {
+        dispatch_loader!(&self.module_storage, loader, {
+            LayoutConverter::new(&loader).type_to_type_layout_with_delayed_fields(
+                &mut self.gas_meter,
+                self.traversal_context,
+                ty,
+            )
+        })
+    }
+}
+
+// Private interfaces.
+impl<'a, 'b> LoaderContext<'a, 'b> {
+    /// Creates a new loader context.
+    fn new(
+        resource_resolver: &'a dyn ResourceResolver,
+        module_storage: &'a dyn ModuleStorage,
+        gas_meter: &'a mut dyn DependencyGasMeter,
+        traversal_context: &'a mut TraversalContext<'b>,
+    ) -> Self {
+        Self {
+            resource_resolver,
+            module_storage: ModuleStorageWrapper { module_storage },
+            gas_meter: DependencyGasMeterWrapper { gas_meter },
+            traversal_context,
+        }
+    }
+
+    /// Creates a new [DataCacheEntry], loading its layout, deserializing it and recording its
+    /// size in bytes.
+    fn create_data_cache_entry(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        dispatch_loader!(&self.module_storage, loader, {
+            TransactionDataCache::create_data_cache_entry(
+                &loader,
+                &LayoutConverter::new(&loader),
+                &mut self.gas_meter,
+                self.traversal_context,
+                &self.module_storage,
+                self.resource_resolver,
+                &address,
+                ty,
+            )
+        })
+    }
+
+    /// Converts a runtime type into decorated layout for pretty-printing.
+    fn type_to_fully_annotated_layout(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+        let layout = dispatch_loader!(&self.module_storage, loader, {
+            LayoutConverter::new(&loader).type_to_annotated_type_layout_with_delayed_fields(
+                &mut self.gas_meter,
+                self.traversal_context,
+                ty,
+            )
+        })?;
+        Ok(layout.into_layout_when_has_no_delayed_fields())
+    }
+}
+
+// Wrappers to use trait objects where static dispatch is expected.
+struct ModuleStorageWrapper<'a> {
+    module_storage: &'a dyn ModuleStorage,
+}
+
+#[delegate_to_methods]
+#[delegate(WithRuntimeEnvironment, target_ref = "inner")]
+#[delegate(ModuleStorage, target_ref = "inner")]
+impl<'a> ModuleStorageWrapper<'a> {
+    fn inner(&self) -> &dyn ModuleStorage {
+        self.module_storage
+    }
+}
+
+struct DependencyGasMeterWrapper<'a> {
+    gas_meter: &'a mut dyn DependencyGasMeter,
+}
+
+#[delegate_to_methods]
+#[delegate(DependencyGasMeter, target_mut = "inner_mut")]
+impl<'a> DependencyGasMeterWrapper<'a> {
+    fn inner_mut(&mut self) -> &mut dyn DependencyGasMeter {
+        self.gas_meter
     }
 }

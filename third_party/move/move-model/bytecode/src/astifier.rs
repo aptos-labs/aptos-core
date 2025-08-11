@@ -94,6 +94,7 @@ use move_model::{
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
+    vec,
 };
 use topological_sort::TopologicalSort;
 use try_match::match_ok;
@@ -247,6 +248,9 @@ impl<'a> Context<'a> {
     ///    here to simplify the viewpoint on the resulting CFG.
     /// 3. There must not be stub blocks which just forward a jump, as in
     ///    `label L1; goto L2`. In this case, we substitute `L1` by `L2`.
+    ///     Given a dead loop like `loop continue`, the substitutions will
+    ///     form a cycle like L1->L2->L3--->L1. In this case, all labels will be
+    ///     substituted with the last one, L3.
     fn clean_bytecode(self) -> Vec<Bytecode> {
         // Compute # of incoming edges for each block.
         let mut incoming_count = BTreeMap::<BlockId, usize>::new();
@@ -257,22 +261,28 @@ impl<'a> Context<'a> {
         }
         // Build a label substitution for stubs.
         let mut label_subst = BTreeMap::new();
+
         for blk_id in self.forward_cfg.blocks() {
             let block_code = self.code_for_block(blk_id);
             if block_code.len() == 2 {
                 if let (Bytecode::Label(_, label1), Bytecode::Jump(_, label2)) =
                     (&block_code[0], &block_code[1])
                 {
-                    label_subst.insert(*label1, *label2);
+                    // When only a substitution does not create a cycle, we add it.
+                    if !Self::cyclic_label_subst_detected(*label1, *label2, &label_subst) {
+                        label_subst.insert(*label1, *label2);
+                    }
                 }
             }
         }
         let substitute_label = |mut label: Label| {
             let mut visited = BTreeSet::new();
             while let Some(s) = label_subst.get(&label) {
+                // This assert should always hold as we have prevented cycles
+                // when building the label_subst map.
                 assert!(
                     visited.insert(label),
-                    "unexpected cyclic label substitution"
+                    "label_subst is acyclic by construction"
                 );
                 label = *s;
             }
@@ -344,6 +354,27 @@ impl<'a> Context<'a> {
             }
         }
         result
+    }
+
+    /// Helper function to detect if a label substitution creates a cycle.
+    fn cyclic_label_subst_detected(
+        label1: Label,
+        label2: Label,
+        label_subst: &BTreeMap<Label, Label>,
+    ) -> bool {
+        if label1 == label2 {
+            return true;
+        }
+        // starting from `label2`, recursively replace the label and see if we go back to `label1`.
+        // why no endless iteration: label_subst has no cycles!
+        let mut target = label2;
+        while let Some(s) = label_subst.get(&target) {
+            if *s == label1 {
+                return true;
+            }
+            target = *s;
+        }
+        false
     }
 
     /// Helper to compute information about loops.
@@ -526,10 +557,21 @@ impl Generator {
         for header in &ctx.loop_headers {
             for after_loop_label in &ctx.after_loop_labels[header] {
                 for loop_block_label in &ctx.loop_labels[header] {
-                    top_sort.add_dependency(
-                        ctx.block_of_label(*loop_block_label),
-                        ctx.block_of_label(*after_loop_label),
-                    )
+                    // Only when the new virtual edge does not bring a loop back (without considering the back edges),
+                    // we add it!
+                    let source_block = ctx.block_of_label(*loop_block_label);
+                    let dest_block = ctx.block_of_label(*after_loop_label);
+                    let edge_filter = |from: BlockId, to: BlockId| !ctx.is_back_edge(from, to);
+                    if !ctx
+                        .forward_cfg
+                        .reachable_blocks(dest_block, edge_filter)
+                        .contains(&source_block)
+                    {
+                        top_sort.add_dependency(
+                            ctx.block_of_label(*loop_block_label),
+                            ctx.block_of_label(*after_loop_label),
+                        )
+                    }
                 }
             }
         }
@@ -757,11 +799,15 @@ impl Generator {
                 },
                 if_false,
             );
+            // We need to break out from all the inner loops!
+            let nest = self
+                .find_break_nest(ctx, if_false)
+                .expect("the newly added block must exist");
             self.used_labels.insert(if_false);
-            self.add_stm(
-                ctx.builder
-                    .if_(negated_cond, ctx.builder.break_(&self.current_loc(ctx), 0)),
-            );
+            self.add_stm(ctx.builder.if_(
+                negated_cond,
+                ctx.builder.break_(&self.current_loc(ctx), nest),
+            ));
             self.gen_jump(ctx, next_block_label, if_true)
         }
     }
@@ -818,7 +864,10 @@ impl Generator {
         }) {
             // Insert nested in the other block.
             self.block_stack
-                .insert(self.block_stack.len() - idx, block_info)
+                .insert(self.block_stack.len() - idx, block_info);
+            // This block can become a new loop between an inner `LoopCont` and its target `Loop`.
+            // We need to increase the `LoopCont`'s nest depth to account for the new loop.
+            self.adjust_loop_nest_depth(idx)
         } else {
             // Insert at top-level, beneath the virtual root block
             self.block_stack.insert(1, block_info)
@@ -830,6 +879,58 @@ impl Generator {
     fn label_comes_after(&self, ctx: &Context, label: Label, other_label: Label) -> bool {
         self.block_order[&ctx.block_of_label(label)]
             > self.block_order[&ctx.block_of_label(other_label)]
+    }
+
+    /// Adjust the nest depth of `LoopCont` statements that are affected by a newly inserted block (which is expected to be a loop)
+    /// Given the following pattern
+    /// ```Move
+    /// Loop_n {
+    ///     ...
+    ///   Loop_1 {
+    ///     Loop_0 {
+    ///       LoopCont[x]
+    ///     }
+    ///   }
+    /// }
+    /// and assuming we insert a new block `Loop_t`
+    /// - 0 <= `t` <= n, and is represented by the function argument `idx` below.
+    /// - If `t` <= `x`, we rewrite ` LoopCont[x]` to `LoopCont[x + 1]`.
+    ///     - Why: the pattern above means the new block is inserted between the `LoopCont` and its target loop,
+    ///       so we must increase the loop nest depth of `LoopCont` to make sure it refers to the right loop.
+    ///
+    fn adjust_loop_nest_depth(&mut self, idx: usize) {
+        for (i, inner) in self.block_stack.iter_mut().rev().enumerate() {
+            // We only need to worry about the `LoopCont` statements nested inside the newly added block.
+            if i < idx {
+                // Iterate over all statements in an inner loop
+                for val in inner.stms.iter_mut() {
+                    // A customized loop nest rewrite function where
+                    // - `nest - loop_depth` represents `x` in the pattern above
+                    // - `delta` represents `t` in the pattern above
+                    let rewrite = |exp: Exp,
+                                   loop_depth: usize,
+                                   nest: usize,
+                                   cont: bool,
+                                   delta: isize|
+                     -> Exp {
+                        let x = (nest - loop_depth) as isize;
+                        let increase = x - delta;
+
+                        if increase >= 0 {
+                            ExpData::LoopCont(exp.node_id(), nest + 1, cont).into_exp()
+                        } else {
+                            exp.clone()
+                        }
+                    };
+
+                    // Rewrite a statement where `idx - i` tells the distance between the target `LoopCont` and the newly added block,
+                    //   representing `delta`.
+                    *val = val
+                        .clone()
+                        .customizable_rewrite_loop_nest((idx - i) as isize, rewrite)
+                }
+            }
+        }
     }
 
     fn find_continue_nest(&self, _ctx: &Context, label: Label) -> Option<usize> {
@@ -953,10 +1054,14 @@ impl Generator {
                 Operation::MoveFunction(*mid, *fid),
                 srcs,
             ),
-            Closure(..) | Invoke => {
-                // TODO(#15664): implement closure opcodes for astifier
-                panic!("closure operations not supported: {:?}", oper)
-            },
+            Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
+                ctx,
+                Some(inst),
+                dests,
+                Operation::Closure(*mid, *fid, *closure_mask),
+                srcs,
+            ),
+            Invoke => self.gen_invoke(ctx, dests, srcs),
             Pack(mid, sid, inst) => {
                 self.gen_call_stm(
                     ctx,
@@ -1134,6 +1239,24 @@ impl Generator {
             self.gen_assign(ctx, dests, call)
         } else {
             self.add_stm(call)
+        }
+    }
+
+    fn gen_invoke(&mut self, ctx: &Context, dests: &[TempIndex], srcs: &[TempIndex]) {
+        let ty = Type::tuple(
+            dests
+                .iter()
+                .map(|d| ctx.target.get_local_type(*d).clone())
+                .collect(),
+        );
+        let invoke_id = self.new_node_id(ctx, ty);
+        let mut temps = self.make_temps(ctx, srcs.iter().copied());
+        let closure = temps.pop().expect("closure must be present for invoke");
+        let invoke = ExpData::Invoke(invoke_id, closure, temps);
+        if !dests.is_empty() {
+            self.gen_assign(ctx, dests, invoke)
+        } else {
+            self.add_stm(invoke)
         }
     }
 
@@ -1360,124 +1483,549 @@ struct IfElseTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
-impl<'a> ExpRewriterFunctions for IfElseTransformer<'a> {
+impl ExpRewriterFunctions for IfElseTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
-        if let Some(result) = self.try_make_if_else(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else if let Some(result) = self.try_make_if(exp.clone()) {
-            self.rewrite_exp_descent(result)
-        } else {
-            self.rewrite_exp_descent(exp)
+        // Please maintain the order of the transformers as their results clear hurdles for the next one.
+        let transformers: [fn(&Self, Exp) -> Option<Exp>; 4] = [
+            Self::try_remove_redundant_loop,
+            Self::try_make_if,
+            Self::try_make_if_else,
+            Self::try_remove_redundant_exp,
+        ];
+        let mut old_exp = exp;
+        // Recursively apply the transformers until a fixed point is reached.
+        // Each iteration, if any transformer is applied, will eliminate one or more loops or remove some expressions
+        // - this guarantees the fixed point to be reached
+        // - new transformers should follow the same principle
+        loop {
+            let mut new_exp = None;
+            for transformer in transformers {
+                if let Some(result) = transformer(self, old_exp.clone()) {
+                    new_exp = Some(self.rewrite_exp_descent(result));
+                    break;
+                }
+            }
+            let new_exp = new_exp.unwrap_or_else(|| self.rewrite_exp_descent(old_exp.clone()));
+            if new_exp == old_exp {
+                return old_exp;
+            }
+            old_exp = new_exp;
         }
     }
 }
 
-impl<'a> IfElseTransformer<'a> {
-    /// Attempts to create an if-then-else from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator. Here, with 'does not branch out of a loop' we mean
-    /// that an expressions does not contain any unbound break or
-    /// continue statements which point outside the given loop:
+impl IfElseTransformer<'_> {
+    /// Attempts to remove redundant loops introduced during control flow structuring and optimization
     ///
-    /// ```move
-    /// loop {
-    ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <else-branch> // no reference to inner loop
-    ///     break[1]
-    ///   }
-    ///   <then-branch>
-    /// }
-    /// ==>
-    /// if (c1 || .. || cn) {
-    ///   loop {
-    ///     <then-branch>
-    ///   }
-    /// else {
-    ///   loop {
-    ///     <else-branch> where loop_nest -= 1
-    ///   }
-    /// }
-    /// ```
-    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
-        let outer_body = match_ok!(exp.as_ref(), ExpData::Loop(_, _0))?;
-        let (outer_first, then_branch) = self.builder.extract_first(outer_body.clone());
-        let (inner_id, inner_body) = match_ok!(outer_first.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, inner_rest) = self.builder.match_if_break_list(inner_body.clone())?;
-        // When getting the else branch, do not match exits as there are better treated with
-        // if without else.
-        let else_branch = self.builder.extract_terminated_prefix(
-            &default_loc,
-            inner_rest,
-            1,
-            /*allow_exit*/ false,
-        )?;
-
-        // Check whether the inner 'loop' is not a loop header
-        self.check_no_loop_header(*inner_id)?;
-
-        // Check whether else-branch is not referencing the inner loop
-        if else_branch.branches_to(0..1) {
-            return None;
-        }
-        // Create result
-        let else_branch = else_branch.rewrite_loop_nest(-1);
-        let then_branch = self.builder.seq(&default_loc, then_branch);
-        Some(self.builder.if_else(
-            cond.clone(),
-            self.builder.push_loop_block_into(then_branch),
-            self.builder.push_loop_block_into(else_branch),
-        ))
-    }
-
-    /// Attempts to create an if-then (without else) from the given expression.
-    /// This recognizes the pattern below, as produced by the AST
-    /// generator:
-    ///
+    /// It identifies and transforms the following patterns (Pattern 1):
     /// ```move
     ///   loop { // no loop header
-    ///     ( if (c_i) break; )+
-    ///     <then-branch> // does not reference loop
-    ///     break|abort|return|continue
-    ///   }
-    ///
-    /// ==>
-    ///
-    ///   if (!(c1 || .. || cn)) {
-    ///     <then-branch> where loop_nest -= 1
+    ///     stms // no reference to current loop (via `break` or `continue`)
+    ///     break[*]|abort|return|continue[>0]
     ///   }
     /// ```
-    fn try_make_if(&self, exp: Exp) -> Option<Exp> {
-        let node_id = exp.node_id();
-        let default_loc = self.builder.env().get_node_loc(node_id);
-
-        // Match the pattern as described above
+    /// ===>
+    /// ```move
+    ///    stms where loop_nest -= 1
+    ///    break[*]|abort|return|continue[>0] where loop_nest -= 1 (in case of break[0], remove it)
+    ///   }
+    /// ```
+    /// Why the transformation is valid:
+    ///   - The loop can iterate at most once, so it is equivalent to the body of the loop.
+    ///   - If the loop body exits to an outer loop, the `loop_nest -= 1` will maintain the exit to the outer loop.
+    ///
+    ///
+    /// If the above pattern does not match, it also checks for and transforms the following pattern (Pattern 2):
+    /// ```move
+    ///   'outer loop { // no loop header
+    ///     loop {
+    ///       stms // no `continue[1]` (i.e., does not continue to the 'outer loop)
+    ///     }
+    ///     break[0]
+    ///   }
+    /// ```
+    /// ===>
+    /// ```move
+    ///   loop {
+    ///     stms where loop_nest -= 1
+    ///   }
+    /// ```
+    /// why the transformation is valid: similar to Pattern 1
+    ///
+    fn try_remove_redundant_loop(&self, exp: Exp) -> Option<Exp> {
         let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
-        let (cond, rest) = self.builder.match_if_break_list(body.clone())?;
-        let then_branch = self.builder.extract_terminated_prefix(
+        // Make sure this loop does not continue itself
+        // Otherwise, it is a loop in the original code and we should not remove it.
+        self.check_no_loop_header(*loop_id)?;
+        let default_loc = self.builder.env().get_node_loc(*loop_id);
+
+        // Make sure this loop terminates (always exits)
+        // and extract the terminating prefix
+        let terminated_body = self.builder.extract_terminated_prefix(
             &default_loc,
-            rest,
+            body.clone(),
             0,
             /*allow_exit*/ true,
         )?;
 
-        // Check conditions
+        // match Pattern 1 (see doc above)
+        let branch_cond_1 = |loop_nest: usize, nest: usize, _: bool| nest == loop_nest;
+        if !terminated_body.customizable_branches_to(branch_cond_1) {
+            return Some(terminated_body.rewrite_loop_nest(-1));
+        }
+
+        // match Pattern 2 (see doc above)
+        let branch_cond_2 = |loop_nest: usize, nest: usize, cont: bool| cont && nest == loop_nest;
+        if matches!(terminated_body.as_ref(), ExpData::Loop(_, _))
+            && !terminated_body.customizable_branches_to(branch_cond_2)
+        {
+            return Some(terminated_body.rewrite_loop_nest(-1));
+        }
+        None
+    }
+
+    /// Attempts to create `if-then` from the given expression.
+    /// This transforms the pattern below
+    ///
+    /// ```move
+    ///   loop { // no loop header
+    ///     <begin_stmts> // no reference to current loop
+    ///     [ if (c_i) {
+    ///         break[*]|abort|return|continue[>0];
+    ///     }
+    ///     <then_branch_i> // no reference to current loop ]+
+    ///     <end_branch> // no reference to current loop
+    ///     break[*]|abort|return|continue[>0];
+    ///   } // end of loop
+    /// ==>
+    ///   <begin_stmts>
+    ///   if (!c_1) {
+    ///      <then_branch_1> where loop_nest -= 1
+    ///      if (!c_2){
+    ///         <then_branch_2> where loop_nest -= 1
+    ///         ...
+    ///         if (!c_n) {
+    ///            <end_branch> where loop_nest -= 1
+    ///         }
+    ///      }
+    ///   }
+    /// ```
+    /// Why the transformation is valid:
+    ///  - The loop can iterate once at most, so it is equivalent to the body of the loop.
+    ///  - `then_branch_i` is only reached when `c_i` is false, so the `if-break-then` is equivalent to `if(!c_i) { <then_branch_i> }`
+    ///  - If the loop body exits to an outer loop, the `loop_nest -= 1` operation will maintain the exit to the outer loop.
+    ///
+    fn try_make_if(&self, exp: Exp) -> Option<Exp> {
+        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
         self.check_no_loop_header(*loop_id)?;
-        if then_branch.branches_to(0..1) {
+        let default_loc = self.builder.env().get_node_loc(*loop_id);
+
+        // Transform `if-else` where applicable (see doc of the function)
+        let body = self.try_unify_if_else(body.clone());
+
+        // Find the transformable pattern (see doc above)
+        // `if_cond_then_list` ALWAYS follows the format of [<begin_stmts>, c_1, <then_branch_1>, c_2, <then_branch_2>, ..., c_n, <end_branch>],
+        let mut if_cond_then_list = self.builder.match_if_break_else_list(body.clone(), 0)?;
+        let end_branch = if_cond_then_list
+            .pop()
+            .expect("end branch should always be present");
+
+        // Make sure the <end_branch> always exits the loop
+        let end_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            end_branch.clone(),
+            0,
+            /*allow_exit*/ true,
+        )?;
+        // Make sure the <end_branch> does not refer to the current loop
+        let branch_cond = |loop_nest: usize, nest: usize, _: bool| loop_nest == nest;
+        if end_branch.customizable_branches_to(branch_cond) {
             return None;
         }
 
-        // Construct result
-        let then_branch = then_branch.rewrite_loop_nest(-1);
-        Some(self.builder.if_else(
-            self.builder.not(cond),
-            then_branch,
-            self.builder.nop(&default_loc),
-        ))
+        // Recursively assemble a nested-if expression
+        //   - start from the <end_branch>
+        //     - put the <end_branch> as the true branch of `if(!c_n)`, forming `if(!c_n) { <end_branch> }`
+        //     - put the new `if` expression as the `new_body`
+        //   - continue with an upper-level branch, say `branch[n-1]`
+        //     - put the `branch[n-1]` together with the previous `new_body` as the true branch of `if(!c[n-1])`, forming `if(!c[n-1]) { <branch[n-1]>; new_body }`
+        //     - put the new `if` expression as the `new_body`
+        //   - repeat until we reach the <begin_stmts>
+        let mut cur_branch = end_branch.rewrite_loop_nest(-1);
+        let mut new_body = self.builder.nop(&default_loc);
+        while if_cond_then_list.len() > 1 {
+            let cond = if_cond_then_list.pop().expect("condition is expected");
+            new_body = self.builder.if_else(
+                self.builder.not(cond),
+                self.builder.seq(&default_loc, vec![cur_branch, new_body]),
+                self.builder.nop(&default_loc),
+            );
+            cur_branch = if_cond_then_list
+                .pop()
+                .expect("branch before if is expected");
+
+            // get the terminated prefix of `cur_branch` or fallback to the original
+            cur_branch = self
+                .builder
+                .extract_terminated_prefix(
+                    &default_loc,
+                    cur_branch.clone(),
+                    0,
+                    /*allow_exit*/ true,
+                )
+                .unwrap_or(cur_branch);
+
+            // Make sure the `cur-branch` does not refer to the current loop
+            if cur_branch.customizable_branches_to(branch_cond) {
+                return None;
+            }
+            cur_branch = cur_branch.rewrite_loop_nest(-1);
+        }
+        // Add the `begin_stmts` before the nested `if` expression
+        Some(self.builder.seq(&default_loc, vec![cur_branch, new_body]))
+    }
+
+    /// Attempts to create `if-then-else` from the given expression.
+    /// This transforms the pattern below
+    ///
+    /// ```move
+    ///   loop { // no loop header
+    ///    <begin_stmts> // no reference to current loop
+    ///     [ if (c_i) {
+    ///         then_branch_i // no reference to current loop
+    ///         break[*]|abort|return|continue[>0];
+    ///     }
+    ///     else_branch_i // no reference to current loop ]+
+    ///     break|abort|return|continue
+    /// ==>
+    ///   <begin_stmts>
+    ///   if (c_1) {
+    ///      <then_branch_1> where abort|return maintained and loop_nest -= 1
+    ///   } else {
+    ///       <else_branch_1> where abort|return maintained and loop_nest -= 1
+    ///       if (c_2) {
+    ///           <then_branch_2> where abort|return maintained and loop_nest -= 1
+    ///       } else {
+    ///           <else_branch_2> where abort|return maintained and loop_nest -= 1
+    ///           ...
+    ///           if (c_n) {
+    ///              then_branch_n where abort|return maintained and loop_nest -= 1
+    ///           } else {
+    ///              <else_branch_n> where abort|return maintained and loop_nest -= 1
+    ///           }
+    ///       }
+    ///   }
+    /// ```
+    /// Why the transformation is valid: similar to `try_make_if`
+    ///
+    fn try_make_if_else(&self, exp: Exp) -> Option<Exp> {
+        let (loop_id, body) = match_ok!(exp.as_ref(), ExpData::Loop(_0, _1))?;
+        self.check_no_loop_header(*loop_id)?;
+        let default_loc = self.builder.env().get_node_loc(*loop_id);
+
+        // Transform `if-else` where applicable (see doc of the function)
+        let body = self.try_unify_if_else(body.clone());
+
+        // Find the transformable pattern (see doc above)
+        // `if_else_list` ALWAYS follows the format of
+        //   <[seq(begin_stmts), c_1, seq(then_branch_1), seq(else_branch_1), c_2, seq(then_branch_2), seq(else_branch_2), ... c_n, seq(then_branch_n), seq(else_branch_n)]>
+        let mut if_else_list = self
+            .builder
+            .match_if_branch_break_branch_list(body.clone())?;
+        let end_branch = if_else_list
+            .pop()
+            .expect("end branch should always be present");
+
+        // Make sure the <end_branch> always exits the loop
+        let end_branch = self.builder.extract_terminated_prefix(
+            &default_loc,
+            end_branch.clone(),
+            0,
+            /*allow_exit*/ true,
+        )?;
+        // Make sure the <end_branch> does not refer to the current loop
+        let branch_cond = |loop_nest: usize, nest: usize, _: bool| nest == loop_nest;
+        if end_branch.customizable_branches_to(branch_cond) {
+            return None;
+        }
+
+        // recursively assemble a nested `if-else` expression
+        //   - start from the <end_branch>
+        //     - put the <end_branch> as the false branch of `if(c_n)` and <then_branch_n> as the true branch,
+        //       forming `if(c_n) { <then_branch_n> } else { <end_branch> }`
+        //     - put the new `if-else` expression as the `new_body`
+        //   - continue with an upper-level branch, say <then_branch_n-1> and <else_branch_n-1>
+        //     - put the <then_branch_n-1> as the true branch of `if(c_n-1)`
+        //            and <else_branch_n-1> together with `new_body` as the false branch,
+        //            forming `if(c_n-1) { <then_branch_n-1> } else { <else_branch_n-1>; new_body }`
+        //     - put the new `if-else` expression as the `new_body`
+        //   - repeat until we reach the <begin_stmts>
+        let mut else_branch = end_branch.rewrite_loop_nest(-1);
+        let mut new_body = self.builder.nop(&default_loc);
+
+        while if_else_list.len() > 2 {
+            let mut then_branch = if_else_list.pop().expect("then branch is expected");
+            // Make sure the <then_branch> always exits the loop
+            then_branch = self
+                .builder
+                .extract_terminated_prefix(
+                    &default_loc,
+                    then_branch.clone(),
+                    0,
+                    /*allow_exit*/ true,
+                )
+                .expect("then_branch must be terminated");
+
+            // Make sure the <then_branch> does not refer to the current loop
+            if then_branch.customizable_branches_to(branch_cond) {
+                return None;
+            }
+            then_branch = then_branch.rewrite_loop_nest(-1);
+            let cond = if_else_list.pop().expect("condition is expected");
+            new_body = self.builder.if_else(
+                cond,
+                then_branch,
+                self.builder.seq(&default_loc, vec![else_branch, new_body]),
+            );
+
+            else_branch = if_else_list.pop()?;
+            // get the terminated prefix of <else_branch> or fallback to the original
+            else_branch = self
+                .builder
+                .extract_terminated_prefix(
+                    &default_loc,
+                    else_branch.clone(),
+                    0,
+                    /*allow_exit*/ true,
+                )
+                .unwrap_or(else_branch);
+
+            // make sure the <else_branch> does not refer to the current loop
+            if else_branch.customizable_branches_to(branch_cond) {
+                return None;
+            }
+            // in case the <else_branch> branches to an outer loop
+            else_branch = else_branch.rewrite_loop_nest(-1);
+        }
+
+        // Add the <begin_stmts> to the top of the expression
+        Some(self.builder.seq(&default_loc, vec![else_branch, new_body]))
+    }
+
+    /// Attempts to remove redundant expressions generated during control flow transformations.
+    fn try_remove_redundant_exp(&self, mut exp: Exp) -> Option<Exp> {
+        let removers: [fn(&Self, Exp) -> Option<Exp>; 2] = [
+            Self::try_flatten_sequence,
+            Self::try_remove_unreachable_code,
+        ];
+
+        let mut changed = false;
+        for remover in removers {
+            if let Some(new_exp) = remover(self, exp.clone()) {
+                exp = new_exp;
+                changed = true;
+            }
+        }
+
+        if changed {
+            Some(exp)
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to remove dangling `seq` expressions produced by control flow transformations.
+    ///
+    /// It converts the following pattern
+    /// ```move
+    ///   seq {
+    ///     stmt1
+    ///     stmt2
+    ///     seq_1 {
+    ///       stmt3
+    ///       stmt4
+    ///     }
+    ///     seq_2 {
+    ///       stmt5
+    ///       stmt6
+    ///     }
+    ///     ...
+    ///   }
+    /// ==>
+    ///   seq {
+    ///     stmt1
+    ///     stmt2
+    ///     stmt3
+    ///     stmt4
+    ///     stmt5
+    ///     stmt6
+    ///     ...
+    ///   }
+    /// ```
+    fn try_flatten_sequence(&self, exp: Exp) -> Option<Exp> {
+        let mut new_stms = vec![];
+        let mut changed = false;
+        let (seq_id, stmts) = match_ok!(exp.as_ref(), ExpData::Sequence(_0, _1))?;
+        stmts.iter().for_each(|stmt| {
+            if let Some(inner_stmts) = match_ok!(stmt.as_ref(), ExpData::Sequence(_, _0)) {
+                new_stms.extend(inner_stmts.clone());
+                changed = true;
+            } else {
+                new_stms.push(stmt.clone());
+            }
+        });
+
+        if changed {
+            let default_loc = self.builder.env().get_node_loc(*seq_id);
+            Some(self.builder.seq(&default_loc, new_stms))
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to remove redundant code produced by control flow transformations.
+    ///
+    /// It converts the following pattern
+    /// ```move
+    ///   seq {
+    ///     stmt1
+    ///     stmt2
+    ///     break|continue|return|abort
+    ///     ...
+    ///   }
+    /// ==>
+    ///   seq {
+    ///     stmt1
+    ///     stmt2
+    ///     break|continue|return|abort
+    ///   }
+    /// ```
+    fn try_remove_unreachable_code(&self, exp: Exp) -> Option<Exp> {
+        let (seq_id, stmts) = match_ok!(exp.as_ref(), ExpData::Sequence(_0, _1))?;
+
+        let terminating_prefix_idx = stmts
+            .iter()
+            .position(|stmt| {
+                matches!(
+                    stmt.as_ref(),
+                    ExpData::LoopCont(..)
+                        | ExpData::Return(..)
+                        | ExpData::Call(_, Operation::Abort, _)
+                )
+            })
+            .unwrap_or(stmts.len());
+
+        // We only return the prefix when the seq terminates early
+        if terminating_prefix_idx + 1 < stmts.len() {
+            let default_loc = self.builder.env().get_node_loc(*seq_id);
+            Some(
+                self.builder
+                    .seq(&default_loc, stmts[..=terminating_prefix_idx].to_vec()),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to unify 3 patterns of an `if-else` Exp or `if-else`s embedded in a Sequence Exp.
+    ///
+    /// Pattern 1
+    /// ```move
+    ///  if(c) {
+    ///     <then_branch>
+    ///   } else {
+    ///     <else_branch>
+    ///     break
+    ///   }
+    /// ```
+    ///  ==>
+    /// ```move
+    ///   if(!c) {
+    ///     <else_branch>
+    ///     break
+    ///   }
+    ///   <then_branch>
+    /// ```
+    ///
+    /// Pattern 2
+    /// ```move
+    ///  if(c) {
+    ///     <then_branch>
+    ///     break
+    ///   } else {
+    ///     <else_branch>
+    ///   }
+    /// ```
+    ///  ==>
+    /// ```move
+    ///   if(c) {
+    ///     <then_branch>
+    ///     break
+    ///   }
+    ///    <else_branch>
+    /// ```
+    ///
+    /// Pattern 3
+    /// ```move
+    ///  if(c_1) {
+    ///     if (c_2) {
+    ///       ...
+    ///       if (c_n) {
+    ///         stmts
+    ///         break
+    ///       }
+    ///     }
+    ///   }
+    /// ```
+    ///  ==>
+    /// ```move
+    ///   if(c_1 && c_2 && ... && c_n) {
+    ///     stmts
+    ///     break
+    ///   }
+    /// ```
+    fn try_unify_if_else(&self, mut exp: Exp) -> Exp {
+        let node_id = exp.node_id();
+        let default_loc = self.builder.env().get_node_loc(node_id);
+
+        let mut new_exp = vec![];
+        loop {
+            let (first, rest) = self.builder.extract_first(exp.clone());
+            if let Some((c, if_true, if_false)) = self.builder.match_if_else_break(first.clone()) {
+                // Pattern 1
+                let new_if = self.builder.if_else(
+                    self.builder.not(c),
+                    if_false,
+                    self.builder.nop(&default_loc),
+                );
+                new_exp.push(new_if);
+                new_exp.push(if_true);
+            } else if let Some((c, if_true, if_false)) =
+                self.builder.match_if_break_else(first.clone())
+            {
+                // Pattern 2
+                let new_if = self
+                    .builder
+                    .if_else(c, if_true, self.builder.nop(&default_loc));
+                new_exp.push(new_if);
+                new_exp.push(if_false);
+            } else if let Some((c, if_true)) = self.builder.match_nested_if_break(first.clone()) {
+                // Pattern 3
+                let new_if = self
+                    .builder
+                    .if_else(c, if_true, self.builder.nop(&default_loc));
+                new_exp.push(new_if);
+            } else {
+                // Not an if-branch, so we add it to the current sequence
+                new_exp.push(first);
+            };
+            // No more exps to process
+            if rest.is_empty() {
+                break;
+            }
+            exp = self.builder.seq(&default_loc, rest);
+        }
+        self.builder.seq(&default_loc, new_exp)
     }
 
     fn check_no_loop_header(&self, node_id: NodeId) -> Option<()> {
@@ -1526,6 +2074,30 @@ struct AssignTransformer<'a> {
     builder: ExpBuilder<'a>,
 }
 
+impl AssignTransformer<'_> {
+    /// Check if an expression is safe to eliminate, assuming its result is never used.
+    /// [TODO]: Refine the list for better optimization
+    fn safe_to_eliminate(&self, exp: &Exp) -> bool {
+        let mut is_safe = true;
+        exp.visit_post_order(&mut |e| {
+            use ExpData::*;
+            use Operation::*;
+            match e {
+                LocalVar(..)
+                | Value(..)
+                | Temporary(..)
+                | Call(_, Freeze(..), _)
+                | Call(_, Borrow(ReferenceKind::Immutable), _) => {},
+                _ => {
+                    is_safe = false;
+                },
+            }
+            is_safe // stop if already not safe
+        });
+        is_safe // return the final safe status
+    }
+}
+
 #[allow(unused)]
 struct FreeVariableBinder<'a> {
     /// Usage information about variables in the expression
@@ -1536,7 +2108,7 @@ struct FreeVariableBinder<'a> {
     bound_vars: Vec<BTreeSet<Symbol>>,
 }
 
-impl<'a> ExpRewriterFunctions for AssignTransformer<'a> {
+impl ExpRewriterFunctions for AssignTransformer<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         if let ExpData::Sequence(id, stms) = exp.as_ref() {
             // If this is a sequence, simplify.
@@ -1547,7 +2119,7 @@ impl<'a> ExpRewriterFunctions for AssignTransformer<'a> {
     }
 }
 
-impl<'a> AssignTransformer<'a> {
+impl AssignTransformer<'_> {
     fn simplify_seq(&mut self, seq_id: NodeId, stms: &[Exp]) -> Vec<Exp> {
         let Some(last) = stms.last() else {
             return vec![];
@@ -1587,6 +2159,12 @@ impl<'a> AssignTransformer<'a> {
                         substitution.insert(
                             *var,
                             self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+
+                        // Check if the RHS of an assignment to a non-used var is safe to eliminate
+                        // We must substitute the variable in the RHS before checking it, as those variables will get eliminated together with the RHS!
+                        if stm_usage.read_count(*var) == 0 && !self.safe_to_eliminate(&self.builder.unfold(&substitution, rhs.clone())) {
+                            new_stms.push(self.rewrite_exp(self.builder.unfold(&substitution, rhs.clone())));
+                        }
                     },
                 // Check whether an assignment can be transformed into a let
                 // TODO: refine to the correct implementation, the below doesn't work
@@ -1603,6 +2181,8 @@ impl<'a> AssignTransformer<'a> {
                 }
                  */
                 _ => {
+                    // [TODO #17119]: this is not absolutely safe to do, because the result of `rhs` could change between the assignment and the usage.
+                    // Extra checks are needed to ensure safety.
                     new_stms.push(self.rewrite_exp(
                         self.builder.unfold(&substitution, stm.clone())))
                 },
@@ -1621,7 +2201,7 @@ impl<'a> AssignTransformer<'a> {
     }
 }
 
-impl<'a> ExpRewriterFunctions for FreeVariableBinder<'a> {
+impl ExpRewriterFunctions for FreeVariableBinder<'_> {
     fn rewrite_exp(&mut self, mut exp: Exp) -> Exp {
         // TODO: this currently just adds lets on outermost level.
         //   Refine this to push lets down to leafs.

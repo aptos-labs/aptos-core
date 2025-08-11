@@ -8,6 +8,7 @@ use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{chain_id::ChainId, write_set::WriteSet};
 use aptos_vm::AptosVM;
+use fuzzer::{ExecVariant, RunnableState};
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -19,7 +20,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
-use utils::vm::{publish_group, sort_by_deps, ExecVariant, RunnableState};
+use utils::vm::{publish_group, sort_by_deps};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -52,9 +53,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     }
 
     if let ExecVariant::Script {
-        script: s,
-        type_args: _,
-        args: _,
+        _script: s,
+        _type_args: _,
+        _args: _,
     } = &input.exec_variant
     {
         // reject bad scripts fast lite

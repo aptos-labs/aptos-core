@@ -47,7 +47,10 @@ impl StorageFees {
 
         for event in &self.events {
             // TODO: Handle discounts.
-            lines.push(format!("events;{}", event.ty), event.cost)
+            lines.push(
+                format!("events;{}", event.ty.to_canonical_string()),
+                event.cost,
+            )
         }
 
         lines.into_inner()
@@ -112,16 +115,12 @@ impl ExecutionAndIOCosts {
 
         for dep in &self.dependencies {
             lines.push(
-                format!(
-                    "dependencies;{}{}",
-                    Render(&dep.id),
-                    if dep.is_new { "(new)" } else { "" }
-                ),
+                format!("dependencies;{}", dep.render().trim_start(),),
                 dep.cost,
             )
         }
 
-        impl<'a> Rec<'a> {
+        impl Rec<'_> {
             fn visit(&mut self, frame: &CallFrame) {
                 self.path.push(format!("{}", frame.name));
 
@@ -148,7 +147,12 @@ impl ExecutionAndIOCosts {
                             *cost,
                         ),
                         LoadResource { addr, ty, cost } => self.lines.push(
-                            format!("{};load<{}::{}>", self.path(), Render(addr), ty),
+                            format!(
+                                "{};load<{}::{}>",
+                                self.path(),
+                                Render(addr),
+                                ty.to_canonical_string()
+                            ),
                             *cost,
                         ),
                     }

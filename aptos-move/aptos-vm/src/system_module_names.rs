@@ -38,6 +38,7 @@ pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
+pub const BLOCK_EPILOGUE: &IdentStr = ident_str!("block_epilogue");
 
 pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

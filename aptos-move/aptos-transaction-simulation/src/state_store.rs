@@ -7,9 +7,10 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        StateViewId, StateViewResult, TStateView,
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewId, StateViewResult, TStateView,
     },
+    transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
 use bytes::Bytes;
@@ -20,7 +21,6 @@ use move_core_types::{
 use parking_lot::RwLock;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-
 /***************************************************************************************************
  * Traits
  *
@@ -160,16 +160,20 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         Ok(Some(m))
     }
 
-    /// Sets the `ChainId` resource that is used to identify the blockchain network.
-    fn set_chain_id(&self, chain_id: ChainId) -> Result<()> {
-        let bytes = bcs::to_bytes(&chain_id)?;
-
-        self.set_state_value(
-            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
-            StateValue::new_legacy(bytes.into()),
-        )
+    /// Gets the [`ChainId`] resource that is used to identify the blockchain network.
+    fn get_chain_id(&self) -> Result<ChainId>
+    where
+        Self: Sized,
+    {
+        self.get_on_chain_config()
     }
 
+    /// Sets the [`ChainId`] resource that is used to identify the blockchain network.
+    fn set_chain_id(&self, chain_id: ChainId) -> Result<()> {
+        self.set_on_chain_config(&chain_id)
+    }
+
+    /// Gets the on-chain feature flags.
     fn get_features(&self) -> Result<Features>
     where
         Self: Sized,
@@ -245,6 +249,10 @@ impl TStateView for EmptyStateView {
     fn contains_state_value(&self, _state_key: &Self::Key) -> StateViewResult<bool> {
         Ok(false)
     }
+
+    fn next_version(&self) -> Version {
+        0
+    }
 }
 
 /***************************************************************************************************
@@ -269,6 +277,13 @@ where
         match self {
             Self::Left(l) => l.id(),
             Self::Right(r) => r.id(),
+        }
+    }
+
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        match self {
+            Self::Left(l) => l.get_state_slot(state_key),
+            Self::Right(r) => r.get_state_slot(state_key),
         }
     }
 
@@ -299,6 +314,13 @@ where
             Self::Right(r) => r.contains_state_value(state_key),
         }
     }
+
+    fn next_version(&self) -> Version {
+        match self {
+            Self::Left(l) => l.next_version(),
+            Self::Right(r) => r.next_version(),
+        }
+    }
 }
 
 /***************************************************************************************************
@@ -320,6 +342,11 @@ where
 {
     type Key = StateKey;
 
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        let value_opt = self.get_state_value(state_key)?.map(|value| (0, value));
+        Ok(StateSlot::from_db_get(value_opt))
+    }
+
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         if let Some(res) = self.states.read().get(state_key) {
             return Ok(res.clone());
@@ -339,6 +366,10 @@ where
         }
 
         self.base.contains_state_value(state_key)
+    }
+
+    fn next_version(&self) -> Version {
+        self.base.next_version()
     }
 }
 
@@ -367,7 +398,7 @@ where
     fn apply_write_set(&self, write_set: &WriteSet) -> Result<()> {
         let mut states = self.states.write();
 
-        for (state_key, write_op) in write_set {
+        for (state_key, write_op) in write_set.write_op_iter() {
             match write_op.as_state_value() {
                 None => match states.get_mut(state_key) {
                     Some(val) => *val = None,

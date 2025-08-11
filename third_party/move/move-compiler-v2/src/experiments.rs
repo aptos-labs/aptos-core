@@ -97,6 +97,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::CMP_REWRITE.to_string(),
+            description: "Rewrite comparison operations".to_string(),
+            default: Given(true),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -148,11 +153,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
-            name: Experiment::COPY_PROPAGATION.to_string(),
-            description: "Whether copy propagation is run".to_string(),
-            default: Given(false),
-        },
-        Experiment {
             name: Experiment::DEAD_CODE_ELIMINATION.to_string(),
             description: "Whether to run dead store and unreachable code elimination".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -192,6 +192,17 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(true),
         },
         Experiment {
+            name: Experiment::LIFT_INLINE_FUNS.to_string(),
+            description: "Whether to lift lambda expressions passed to inline functions"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::SKIP_INLINING_INLINE_FUNS.to_string(),
+            description: "Whether to skip inlining the (standalone) inline functions".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::AST_SIMPLIFY.to_string(),
             description: "Whether to run the ast simplifier".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -201,13 +212,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
             default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
-        },
-        Experiment {
-            name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
-            description: "Whether to generate access specifiers in the file format if \
-            language version supports them."
-                .to_string(),
-            default: Given(true),
         },
         Experiment {
             name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
@@ -260,6 +264,18 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Fail compilation if there is a warning".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS.to_string(),
+            description: "Skip errors originating from extended checks, for testing only"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string(),
+            description: "Treat all package functions with same address as visible (currently necessary for prover in filter mode)"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -277,16 +293,16 @@ impl Experiment {
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
-    pub const COPY_PROPAGATION: &'static str = "copy-propagation";
+    pub const CMP_REWRITE: &'static str = "cmp-rewrite";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
-    pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
+    pub const LIFT_INLINE_FUNS: &'static str = "lift-inline-funs";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";
@@ -298,6 +314,8 @@ impl Experiment {
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
+    pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
+    pub const SKIP_INLINING_INLINE_FUNS: &'static str = "skip-inlining-inline-funs";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
@@ -306,6 +324,7 @@ impl Experiment {
     pub const STOP_BEFORE_FILE_FORMAT: &'static str = "stop-before-file-format";
     pub const STOP_BEFORE_STACKLESS_BYTECODE: &'static str = "stop-before-stackless-bytecode";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNSAFE_PACKAGE_VISIBILITY: &'static str = "unsafe-package-visibility";
     pub const UNUSED_ASSIGNMENT_CHECK: &'static str = "unused-assignment-check";
     pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";

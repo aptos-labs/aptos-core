@@ -115,6 +115,11 @@ impl AptosEnvironment {
         #[allow(deprecated)]
         self.0.inject_create_signer_for_gov_sim
     }
+
+    /// Returns bytes corresponding to the verifier config in this environment.
+    pub fn verifier_config_bytes(&self) -> &Vec<u8> {
+        &self.0.verifier_bytes
+    }
 }
 
 impl Clone for AptosEnvironment {
@@ -165,6 +170,10 @@ struct Environment {
 
     /// Hash of configs used in this environment. Used to be able to compare environments.
     hash: [u8; 32],
+    /// Bytes of serialized verifier config. Used to detect any changes in verification configs.
+    /// We stored bytes instead of hash because config is expected to be smaller than the crypto
+    /// hash itself.
+    verifier_bytes: Vec<u8>,
 }
 
 impl Environment {
@@ -232,7 +241,10 @@ impl Environment {
             gas_hook,
         );
         let natives = aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim);
-        let vm_config = aptos_prod_vm_config(&features, &timed_features, ty_builder);
+        let vm_config =
+            aptos_prod_vm_config(gas_feature_version, &features, &timed_features, ty_builder);
+        let verifier_bytes =
+            bcs::to_bytes(&vm_config.verifier_config).expect("Verifier config is serializable");
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
         let hash = sha3_256.finalize().into();
@@ -248,6 +260,7 @@ impl Environment {
             runtime_environment,
             inject_create_signer_for_gov_sim,
             hash,
+            verifier_bytes,
         }
     }
 
@@ -329,8 +342,8 @@ pub mod tests {
         non_default_configuration.set_last_reconfiguration_time_for_test(1);
 
         let mut non_default_features = Features::default();
-        assert!(non_default_features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
-        non_default_features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+        assert!(non_default_features.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT));
+        non_default_features.disable(FeatureFlag::EMIT_FEE_STATEMENT);
 
         let state_views = [
             MockStateView::empty(),

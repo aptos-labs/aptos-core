@@ -55,7 +55,7 @@
   "sequence_number": "0",
   "max_gas_amount": "100000000",
   "gas_unit_price": "0",
-  "expiration_timestamp_secs": "18446744073709551615",
+  "expiration_timestamp_secs": "60",
   "payload": {
     "code": {
       "bytecode": "0xa11ceb0b030000",
@@ -67,9 +67,10 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x236b781174b798468499e339c4f0da5a93ed0ac5570d0b1d7d81f36438a571406e1d8c1d68832208efa680ae60165e80a5f11f7fc516cac2331a71c03722980c",
+    "signature": "0x8e73997d04f84f10d5554e9fa7425dddee00ce0d21d0c46e5c800fc2a1aa59f9f98825ad3b363528dec8ab2d914e7937be922448645904269ac0f22a8ba31602",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "events": [
     {
       "guid": {

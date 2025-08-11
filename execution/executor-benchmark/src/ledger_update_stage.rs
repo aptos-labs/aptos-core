@@ -5,8 +5,13 @@
 use crate::pipeline::{CommitBlockMessage, LedgerUpdateMessage};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_infallible::Mutex;
 use aptos_vm::VMBlockExecutor;
-use std::sync::{mpsc, Arc};
+use move_core_types::language_storage::StructTag;
+use std::{
+    collections::BTreeMap,
+    sync::{mpsc, Arc},
+};
 
 pub enum CommitProcessing {
     SendToQueue(mpsc::SyncSender<CommitBlockMessage>),
@@ -21,6 +26,7 @@ pub struct LedgerUpdateStage<V> {
     allow_aborts: bool,
     allow_discards: bool,
     allow_retries: bool,
+    event_summary: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
 }
 
 impl<V> LedgerUpdateStage<V>
@@ -33,6 +39,7 @@ where
         allow_aborts: bool,
         allow_discards: bool,
         allow_retries: bool,
+        event_summary: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
     ) -> Self {
         Self {
             executor,
@@ -40,6 +47,7 @@ where
             allow_aborts,
             allow_discards,
             allow_retries,
+            event_summary,
         }
     }
 
@@ -53,6 +61,7 @@ where
             block_id,
             parent_block_id,
             num_input_txns,
+            stage,
         } = ledger_update_message;
 
         let output = self
@@ -64,8 +73,18 @@ where
             self.allow_discards,
             self.allow_retries,
         );
-        if !self.allow_retries {
+        if !self.allow_retries && num_input_txns != 0 {
             assert_eq!(output.num_transactions_to_commit(), num_input_txns + 1);
+        }
+
+        let mut event_summary = self.event_summary.lock();
+        for output in &output.execution_output.to_commit.transaction_outputs {
+            for event in output.events() {
+                let count = event_summary
+                    .entry((stage, event.type_tag().struct_tag().unwrap().clone()))
+                    .or_insert(0);
+                *count += 1;
+            }
         }
 
         match &self.commit_processing {

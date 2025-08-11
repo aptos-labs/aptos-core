@@ -290,11 +290,11 @@ impl CompiledModule {
         let mut ser = ModuleSerializer::new(version);
         let mut temp = BinaryData::new();
         ser.serialize_tables(&mut temp, self)?;
-        if temp.len() > u32::max_value() as usize {
+        if temp.len() > u32::MAX as usize {
             bail!(
                 "table content size ({}) cannot exceed ({})",
                 temp.len(),
-                u32::max_value()
+                u32::MAX
             );
         }
         ser.common.serialize_header(&mut binary_data)?;
@@ -358,11 +358,11 @@ struct ScriptSerializer {
 // Helpers
 //
 fn check_index_in_binary(index: usize) -> Result<u32> {
-    if index > u32::max_value() as usize {
+    if index > u32::MAX as usize {
         bail!(
             "Compilation unit too big ({}) cannot exceed {}",
             index,
-            u32::max_value()
+            u32::MAX
         )
     }
     Ok(index as u32)
@@ -1670,6 +1670,14 @@ impl ScriptSerializer {
     fn serialize_main(&mut self, binary: &mut BinaryData, script: &CompiledScript) -> Result<()> {
         serialize_ability_sets(binary, &script.type_parameters)?;
         serialize_signature_index(binary, &script.parameters)?;
+        if self.common.major_version >= VERSION_8 {
+            serialize_access_specifiers(binary, &script.access_specifiers)?
+        } else if script.access_specifiers.is_some() {
+            return Err(anyhow!(
+                "Access specifiers on scripts not supported in bytecode version {}",
+                self.common.major_version
+            ));
+        }
         serialize_code_unit(self.common.major_version(), binary, &script.code)?;
         Ok(())
     }

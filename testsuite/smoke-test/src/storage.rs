@@ -134,13 +134,7 @@ async fn test_db_restore() {
 
     info!("---------- 3. stopped node 0, gonna restore DB.");
     // restore db from backup
-    db_restore(
-        backup_path.path(),
-        db_dir.as_path(),
-        &[],
-        node0_config.storage.rocksdb_configs.enable_storage_sharding,
-        None,
-    );
+    db_restore(backup_path.path(), db_dir.as_path(), &[], None);
 
     expected_balance_0 -= 3;
     expected_balance_1 += 3;
@@ -325,6 +319,7 @@ fn get_backup_storage_state(
     std::str::from_utf8(&output)?.parse()
 }
 
+#[allow(clippy::zombie_processes)]
 pub(crate) fn db_backup(
     backup_service_port: u16,
     target_epoch: u64,
@@ -419,7 +414,6 @@ pub(crate) fn db_restore(
     backup_path: &Path,
     db_path: &Path,
     trusted_waypoints: &[Waypoint],
-    enable_storage_sharding: bool,
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
@@ -435,10 +429,8 @@ pub(crate) fn db_restore(
         cmd.arg(&w.to_string());
     });
 
-    if enable_storage_sharding {
-        cmd.arg("--enable_storage_sharding");
-        cmd.arg("--enable-state-indices");
-    }
+    cmd.arg("--enable-storage-sharding");
+    cmd.arg("--enable-state-indices");
     if let Some(version) = target_verion {
         cmd.arg("--target-version");
         cmd.arg(&version.to_string());

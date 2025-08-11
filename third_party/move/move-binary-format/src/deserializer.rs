@@ -77,10 +77,10 @@ impl CompiledModule {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct DeserializerConfig {
-    max_binary_format_version: u32,
-    max_identifier_size: u64,
+    pub max_binary_format_version: u32,
+    pub max_identifier_size: u64,
 }
 
 impl DeserializerConfig {
@@ -435,15 +435,21 @@ fn deserialize_compiled_script(
         &mut table_contents_buffer,
         content_len as usize,
     )?;
-
+    let type_parameters =
+        load_ability_sets(&mut cursor, AbilitySetPosition::FunctionTypeParameters)?;
+    let parameters = load_signature_index(&mut cursor)?;
+    let access_specifiers = if cursor.version() >= VERSION_8 {
+        load_access_specifiers(&mut cursor)?
+    } else {
+        None
+    };
+    let code = load_code_unit(&mut cursor)?;
     let mut script = CompiledScript {
         version: cursor.version(),
-        type_parameters: load_ability_sets(
-            &mut cursor,
-            AbilitySetPosition::FunctionTypeParameters,
-        )?,
-        parameters: load_signature_index(&mut cursor)?,
-        code: load_code_unit(&mut cursor)?,
+        type_parameters,
+        parameters,
+        access_specifiers,
+        code,
         ..Default::default()
     };
 

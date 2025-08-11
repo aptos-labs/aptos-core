@@ -6,6 +6,7 @@ use crate::{
     common::{
         init::Network,
         local_simulation,
+        transactions::ReplayProtectionType,
         utils::{
             check_if_file_exists, create_dir_if_not_exist, deserialize_address_str,
             deserialize_material_with_prefix, dir_default_to_current, get_account_with_state,
@@ -26,7 +27,9 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
+use aptos_framework::chunked_publish::{
+    default_large_packages_module_address, CHUNK_SIZE_IN_BYTES,
+};
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -43,8 +46,9 @@ use aptos_sdk::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
-        SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
+        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload,
+        ReplayProtector, Script, SignedTransaction, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -65,6 +69,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
+    cmp::max,
     collections::BTreeMap,
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
@@ -1175,7 +1180,7 @@ impl FromStr for OptimizationLevel {
             "" | "default" => Ok(Self::Default),
             "extra" => Ok(Self::Extra),
             _ => bail!(
-                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `aggressive`)",
+                "unrecognized optimization level `{}` (supported versions: `none`, `default`, `extra`)",
                 s
             ),
         }
@@ -1494,6 +1499,8 @@ pub struct TransactionSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sequence_number: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_protector: Option<ReplayProtector>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub success: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_us: Option<u64>,
@@ -1515,7 +1522,11 @@ impl From<&Transaction> for TransactionSummary {
                 transaction_hash: txn.hash,
                 pending: Some(true),
                 sender: Some(*txn.request.sender.inner()),
-                sequence_number: Some(txn.request.sequence_number.0),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
+                replay_protector: Some(txn.request.replay_protector()),
                 gas_used: None,
                 gas_unit_price: None,
                 success: None,
@@ -1531,7 +1542,11 @@ impl From<&Transaction> for TransactionSummary {
                 success: Some(txn.info.success),
                 version: Some(txn.info.version.0),
                 vm_status: Some(txn.info.vm_status.clone()),
-                sequence_number: Some(txn.request.sequence_number.0),
+                sequence_number: match txn.request.replay_protector() {
+                    ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                    _ => None,
+                },
+                replay_protector: Some(txn.request.replay_protector()),
                 timestamp_us: Some(txn.timestamp.0),
                 pending: None,
             },
@@ -1545,6 +1560,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
                 timestamp_us: None,
             },
             Transaction::BlockMetadataTransaction(txn) => TransactionSummary {
@@ -1558,6 +1574,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::StateCheckpointTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1570,6 +1587,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::BlockEpilogueTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.info.hash,
@@ -1582,6 +1600,7 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+                replay_protector: None,
             },
             Transaction::ValidatorTransaction(txn) => TransactionSummary {
                 transaction_hash: txn.transaction_info().hash,
@@ -1590,6 +1609,7 @@ impl From<&Transaction> for TransactionSummary {
                 pending: None,
                 sender: None,
                 sequence_number: None,
+                replay_protector: None,
                 success: Some(txn.transaction_info().success),
                 timestamp_us: Some(txn.timestamp().0),
                 version: Some(txn.transaction_info().version.0),
@@ -1778,11 +1798,19 @@ pub struct TransactionOptions {
     /// flamegraphs that reflect the gas usage.
     #[clap(long)]
     pub(crate) profile_gas: bool,
+
+    /// Replay protection mechanism to use when generating the transaction.
+    ///
+    /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
+    ///
+    /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
+    #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
+    pub(crate) replay_protection_type: ReplayProtectionType,
 }
 
 impl TransactionOptions {
     /// Builds a rest client
-    fn rest_client(&self) -> CliTypedResult<Client> {
+    pub fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options)
     }
 
@@ -1912,12 +1940,19 @@ impl TransactionOptions {
             let transaction_factory =
                 TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
 
-            let unsigned_transaction = transaction_factory
+            let txn_builder = transaction_factory
                 .payload(payload.clone())
                 .sender(sender_address)
                 .sequence_number(sequence_number)
-                .expiration_timestamp_secs(expiration_time_secs)
-                .build();
+                .expiration_timestamp_secs(expiration_time_secs);
+
+            let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Nonce
+            {
+                let mut rng = rand::thread_rng();
+                txn_builder.upgrade_payload(&mut rng, true, true).build()
+            } else {
+                txn_builder.build()
+            };
 
             let signed_transaction = SignedTransaction::new(
                 unsigned_transaction,
@@ -1940,8 +1975,10 @@ impl TransactionOptions {
 
             // Take the gas used and use a headroom factor on it
             let gas_used = simulated_txn.info.gas_used.0;
+            // TODO: remove the hardcoded 530 as it's the minumum gas units required for the transaction that will
+            // automatically create an account for stateless account.
             let adjusted_max_gas =
-                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
+                adjust_gas_headroom(gas_used, max(simulated_txn.request.max_gas_amount.0, 530));
 
             // Ask if you want to accept the estimate amount
             let upper_cost_bound = adjusted_max_gas * gas_unit_price;
@@ -1967,7 +2004,12 @@ impl TransactionOptions {
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
-                sender_account.sign_with_transaction_builder(transaction_factory.payload(payload))
+                let mut txn_builder = transaction_factory.payload(payload);
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload(&mut rng, true, true);
+                };
+                sender_account.sign_with_transaction_builder(txn_builder)
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1980,8 +2022,12 @@ impl TransactionOptions {
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
-                sender_account
-                    .sign_with_transaction_builder(transaction_factory.payload(payload))?
+                let mut txn_builder = transaction_factory.payload(payload);
+                if self.replay_protection_type == ReplayProtectionType::Nonce {
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload(&mut rng, true, true);
+                };
+                sender_account.sign_with_transaction_builder(txn_builder)?
             },
             Err(err) => return Err(err),
         };
@@ -2095,7 +2141,8 @@ impl TransactionOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
-            sequence_number: None, // The transaction is not comitted so there is no new sequence number.
+            sequence_number: None,
+            replay_protector: None, // The transaction is not comitted so there is no new sequence number.
             success,
             timestamp_us: None,
             version: Some(version), // The transaction is not comitted so there is no new version.
@@ -2491,6 +2538,37 @@ pub struct OverrideSizeCheckOption {
 }
 
 #[derive(Parser)]
+pub struct LargePackagesModuleOption {
+    /// Address of the `large_packages` move module for chunked publishing
+    ///
+    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet, and `0x7` on localnest/devnet.
+    /// On any custom network where neither is used, you will need to first publish it from the framework
+    /// under move-examples/large_packages.
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) large_packages_module_address: Option<AccountAddress>,
+}
+
+impl LargePackagesModuleOption {
+    pub(crate) async fn large_packages_module_address(
+        &self,
+        client: &Client,
+    ) -> Result<AccountAddress, CliError> {
+        if let Some(address) = self.large_packages_module_address {
+            Ok(address)
+        } else {
+            let chain_id = ChainId::new(client.get_ledger_information().await?.inner().chain_id);
+            Ok(
+                AccountAddress::from_str_strict(default_large_packages_module_address(&chain_id))
+                    .map_err(|err| {
+                    CliError::UnableToParse("Default Large Package Module Address", err.to_string())
+                })?,
+            )
+        }
+    }
+}
+
+#[derive(Parser)]
 pub struct ChunkedPublishOption {
     /// Whether to publish a package in a chunked mode. This may require more than one transaction
     /// for publishing the Move package.
@@ -2499,13 +2577,8 @@ pub struct ChunkedPublishOption {
     #[clap(long)]
     pub(crate) chunked_publish: bool,
 
-    /// Address of the `large_packages` move module for chunked publishing
-    ///
-    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet. On any other network, you will need to first publish it from the framework
-    /// under move-examples/large_packages.
-    #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
-    pub(crate) large_packages_module_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) large_packages_module: LargePackagesModuleOption,
 
     /// Size of the code chunk in bytes for splitting bytecode and metadata of large packages
     ///

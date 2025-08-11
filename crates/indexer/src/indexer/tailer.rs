@@ -370,7 +370,7 @@ mod test {
         }
     }
 
-    pub fn setup_indexer() -> Result<(PgDbPool, Tailer)> {
+    pub async fn setup_indexer() -> Result<(PgDbPool, Tailer)> {
         let database_url = std::env::var("INDEXER_DATABASE_URL")
             .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
         let conn_pool = new_db_pool(database_url.as_str())?;
@@ -397,7 +397,7 @@ mod test {
         if crate::should_skip_pg_tests() {
             return;
         }
-        let (conn_pool, tailer) = setup_indexer().unwrap();
+        let (conn_pool, tailer) = setup_indexer().await.unwrap();
         // An abridged genesis transaction
         let genesis_txn: Transaction = serde_json::from_value(json!(
             {
@@ -908,7 +908,7 @@ mod test {
             .await
             .unwrap();
 
-        let (_conn_pool, tailer) = setup_indexer().unwrap();
+        let (_conn_pool, tailer) = setup_indexer().await.unwrap();
         tailer.set_fetcher_version(4).await;
         assert!(tailer.check_or_update_chain_id().await.is_ok());
         assert!(tailer.check_or_update_chain_id().await.is_ok());

@@ -1,0 +1,9 @@
+//# publish --print-bytecode
+module 0x66::test
+#[module_lock] public fun f(): u8
+    ld_u8 255
+    ret
+
+#[persistent] fun g(): u8
+    ld_u8 255
+    ret

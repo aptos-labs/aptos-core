@@ -20,6 +20,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `block_prologue_common`](#0x1_block_block_prologue_common)
 -  [Function `block_prologue`](#0x1_block_block_prologue)
 -  [Function `block_prologue_ext`](#0x1_block_block_prologue_ext)
+-  [Function `block_epilogue`](#0x1_block_block_epilogue)
 -  [Function `get_current_block_height`](#0x1_block_get_current_block_height)
 -  [Function `emit_new_block_event`](#0x1_block_emit_new_block_event)
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
@@ -706,6 +707,34 @@ The runtime always runs this before executing the transactions in a block.
 
 </details>
 
+<a id="0x1_block_block_epilogue"></a>
+
+## Function `block_epilogue`
+
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_epilogue">block_epilogue</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fee_distribution_validator_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, fee_amounts_octa: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_epilogue">block_epilogue</a>(
+    vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    fee_distribution_validator_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    fee_amounts_octa: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+) {
+    <a href="stake.md#0x1_stake_record_fee">stake::record_fee</a>(vm, fee_distribution_validator_indices, fee_amounts_octa);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_block_get_current_block_height"></a>
 
 ## Function `get_current_block_height`
@@ -928,7 +957,8 @@ new block event for WriteSetPayload.
 ### Module-level Specification
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
 </code></pre>
 

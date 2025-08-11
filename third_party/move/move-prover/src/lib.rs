@@ -10,6 +10,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use log::{log_enabled, Level};
 use move_abigen::Abigen;
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
@@ -36,21 +37,23 @@ pub mod cli;
 
 pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    run_move_prover_v2(&mut error_writer, options)
+    run_move_prover_v2(&mut error_writer, options, vec![])
 }
 
 pub fn run_move_prover_v2<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
+    experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    let mut env = create_move_prover_v2_model(error_writer, options.clone())?;
+    let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     run_move_prover_with_model_v2(&mut env, error_writer, options, now)
 }
 
 pub fn create_move_prover_v2_model<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
+    experiments: Vec<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let compiler_options = move_compiler_v2::Options {
         dependencies: options.move_deps,
@@ -61,7 +64,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: options.backend.stable_test_output,
-        experiments: vec![],
+        experiments,
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
@@ -271,8 +274,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         }
         if options.prover.dump_bytecode {
             if let Some(out) = module_env.disassemble() {
-                let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
-                fs::write(dump_file, out).expect("dumping disassembled module");
+                debug!("disassembled bytecode:\n{}", out);
             }
         }
         for func_env in module_env.get_functions() {
@@ -287,7 +289,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         pipeline_factory::default_pipeline_with_options(&options.prover)
     };
 
-    if options.prover.dump_bytecode {
+    if log_enabled!(Level::Debug) && options.prover.dump_bytecode {
         let dump_file_base = output_dir
             .join(output_prefix)
             .into_os_string()

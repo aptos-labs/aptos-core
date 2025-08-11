@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'publish'. lines 6-10:
+task 0 lines 1-4:  publish [module 0x42.Duplicate {]
+task 1 lines 6-10:  publish --verbose [module 0x42.Duplicate {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Duplicate'. Got VMError: {
     message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000042::Duplicate`: changed layout of struct `T`,
     major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,

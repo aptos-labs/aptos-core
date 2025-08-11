@@ -290,7 +290,7 @@ fn test_validate_invalid_auth_key() {
     let program = aptos_stdlib::aptos_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
-        1,
+        0,
         &other_private_key,
         other_private_key.public_key(),
         Some(program),
@@ -317,10 +317,7 @@ fn test_validate_account_doesnt_exist() {
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(
-        ret.status().unwrap(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
-    );
+    assert_eq!(ret.status().unwrap(), StatusCode::INVALID_AUTH_KEY);
 }
 
 #[test]

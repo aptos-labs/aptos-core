@@ -7,22 +7,21 @@ use crate::{
         state_delta::StateDelta,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::{
-            cached_state_view::{
-                CachedStateView, HotStateShardRefreshes, ShardedStateCache, StateCacheShard,
-            },
+            cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
             hot_state_view::HotStateView,
         },
-        versioned_state_value::{DbStateUpdate, StateUpdateRef},
-        NUM_STATE_SHARDS,
+        versioned_state_value::StateUpdateRef,
     },
     DbReader,
 };
 use anyhow::Result;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
-use aptos_infallible::duration_since_epoch;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage, StateViewId},
+    state_store::{
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        StateViewId, NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use arr_macro::arr;
@@ -31,6 +30,23 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 
+#[derive(Clone, Debug)]
+pub struct HotStateMetadata {
+    latest: Option<StateKey>,
+    oldest: Option<StateKey>,
+    num_items: usize,
+}
+
+impl HotStateMetadata {
+    fn new() -> Self {
+        Self {
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
+
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
 #[derive(Clone, Debug)]
@@ -38,10 +54,11 @@ pub struct State {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
     /// The updates made to the state at the current version.
-    ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
+    ///  N.b. this is not directly iterable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
-    shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
+    shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -49,12 +66,14 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
-        shards: Arc<[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS]>,
+        shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_metadata,
             usage,
         }
     }
@@ -62,7 +81,8 @@ impl State {
     pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
         Self::new_with_updates(
             version,
-            Arc::new(arr_macro::arr![MapLayer::new_family("state"); 16]),
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
+            arr![HotStateMetadata::new(); 16],
             usage,
         )
     }
@@ -83,7 +103,7 @@ impl State {
         self.usage
     }
 
-    pub fn shards(&self) -> &[MapLayer<StateKey, DbStateUpdate>; NUM_STATE_SHARDS] {
+    pub fn shards(&self) -> &[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS] {
         &self.shards
     }
 
@@ -104,12 +124,23 @@ impl State {
         self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
+    pub(crate) fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].latest.clone()
+    }
+
+    pub(crate) fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].oldest.clone()
+    }
+
+    pub(crate) fn num_hot_items(&self, shard_id: usize) -> usize {
+        self.hot_state_metadata[shard_id].num_items
+    }
+
     pub fn update(
         &self,
         persisted: &State,
         updates: &BatchedStateUpdateRefs,
         state_cache: &ShardedStateCache,
-        hot_state_refreshes: &mut [Option<&HotStateShardRefreshes>; NUM_STATE_SHARDS],
     ) -> Self {
         let _timer = TIMER.timer_with(&["state__update"]);
 
@@ -129,29 +160,17 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let access_time_secs = duration_since_epoch().as_secs() as u32;
         let (shards, usage_delta_per_shard): (Vec<_>, Vec<_>) = (
             state_cache.shards.as_slice(),
-            hot_state_refreshes.as_slice(),
             overlay.shards.as_slice(),
             updates.shards.as_slice(),
         )
             .into_par_iter()
-            .map(|(cache, hot_state_refreshes, overlay, updates)| {
-                let mut new_items = hot_state_refreshes
-                    .as_ref()
-                    .map(|refreshes| {
-                        refreshes
-                            .iter()
-                            .map(|kv| (kv.key().clone(), kv.value().clone()))
-                            .collect_vec()
-                    })
-                    .unwrap_or(vec![]);
-                new_items.extend(
-                    updates
-                        .iter()
-                        .map(|(k, u)| ((*k).clone(), u.to_db_state_update(access_time_secs))),
-                );
+            .map(|(cache, overlay, updates)| {
+                let new_items = updates
+                    .iter()
+                    .map(|(k, u)| ((*k).clone(), u.to_result_slot()))
+                    .collect_vec();
 
                 (
                     // TODO(aldenhu): change interface to take iter of ref
@@ -163,10 +182,9 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        // Consume hot_state_refreshes, so for each chunk it's taken into account only once.
-        *hot_state_refreshes = arr![None; 16];
-
-        State::new_with_updates(updates.last_version(), shards, usage)
+        // TODO(HotState): compute new hot state metadata.
+        let hot_state_metadata = arr![HotStateMetadata::new(); 16];
+        State::new_with_updates(updates.last_version(), shards, hot_state_metadata, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -183,14 +201,14 @@ impl State {
 
     fn usage_delta_for_shard<'kv>(
         cache: &StateCacheShard,
-        overlay: &LayeredMap<StateKey, DbStateUpdate>,
+        overlay: &LayeredMap<StateKey, StateSlot>,
         updates: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
     ) -> (i64, i64) {
         let mut items_delta: i64 = 0;
         let mut bytes_delta: i64 = 0;
         for (k, v) in updates {
             let key_size = k.size();
-            if let Some(value) = v.value {
+            if let Some(value) = v.state_op.as_state_value_opt() {
                 items_delta += 1;
                 bytes_delta += (key_size + value.size()) as i64;
             }
@@ -198,18 +216,13 @@ impl State {
             // TODO(aldenhu): avoid cloning the state value (by not using DashMap)
             // n.b. all updated state items must be read and recorded in the state cache,
             // otherwise we can't calculate the correct usage.
-            let old_value = overlay
+            let old_slot = overlay
                 .get(k)
-                .map(|update| {
-                    update
-                        .value
-                        .and_then(|db_val| db_val.into_state_value_opt())
-                })
-                .or_else(|| cache.get(k).map(|entry| entry.value().to_state_value_opt()))
+                .or_else(|| cache.get(*k).map(|entry| entry.value().clone()))
                 .expect("Must cache read");
-            if let Some(old_v) = old_value {
+            if old_slot.is_occupied() {
                 items_delta -= 1;
-                bytes_delta -= (key_size + old_v.size()) as i64;
+                bytes_delta -= (key_size + old_slot.size()) as i64;
             }
         }
         (items_delta, bytes_delta)
@@ -261,12 +274,8 @@ impl LedgerState {
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let mut iter = reads.hot_state_refreshes.iter();
-        let mut cache_refreshes = arr![Some(iter.next().expect("Known to be 16 shards")); 16];
-
         let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
-            self.latest()
-                .update(persisted_snapshot, updates, reads, &mut cache_refreshes)
+            self.latest().update(persisted_snapshot, updates, reads)
         } else {
             self.last_checkpoint.clone()
         };
@@ -277,7 +286,7 @@ impl LedgerState {
             &last_checkpoint
         };
         let latest = if let Some(updates) = &updates.for_latest {
-            base_of_latest.update(persisted_snapshot, updates, reads, &mut cache_refreshes)
+            base_of_latest.update(persisted_snapshot, updates, reads)
         } else {
             base_of_latest.clone()
         };

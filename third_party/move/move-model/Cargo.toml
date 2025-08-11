@@ -15,11 +15,11 @@ internment = { workspace = true, features = ["arc"] }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 log = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
-move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-symbol-pool = { workspace = true }
 num = { workspace = true }

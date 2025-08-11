@@ -1,0 +1,40 @@
+processed 17 tasks
+task 0 lines 1-86:  publish [module 0x42::print_values {]
+task 1 lines 88-88:  run 0x42::print_values::return_bool
+return values: true
+task 2 lines 90-90:  run 0x42::print_values::return_u8
+return values: 0
+task 3 lines 92-92:  run 0x42::print_values::return_u16
+return values: 1
+task 4 lines 94-94:  run 0x42::print_values::return_u32
+return values: 2
+task 5 lines 96-96:  run 0x42::print_values::return_u64
+return values: 3
+task 6 lines 98-98:  run 0x42::print_values::return_u128
+return values: 4
+task 7 lines 100-100:  run 0x42::print_values::return_addr
+return values: 0000000000000000000000000000000000000000000000000000000000000006
+task 8 lines 102-102:  run 0x42::print_values::return_vector
+return values: [1, 2]
+task 9 lines 104-104:  run 0x42::print_values::return_signer --signers 0x42
+return values: { 0, 0000000000000000000000000000000000000000000000000000000000000042 }
+task 10 lines 106-106:  run 0x42::print_values::return_struct
+return values: { { 1, 23 }, [1, 2, 3] }
+task 11 lines 108-108:  run 0x42::print_values::return_anonymous
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 12 lines 110-110:  run 0x42::print_values::return_add
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(..)
+task 13 lines 112-112:  run 0x42::print_values::return_add_first --args 5
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(U64(5), ..)
+task 14 lines 114-114:  run 0x42::print_values::return_add_last --args 10
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(_, U64(10), ..)
+task 15 lines 116-116:  run 0x42::print_values::return_add_two_and_one
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(U64(2), U64(1), ..)
+task 16 lines 118-118:  run 0x42::print_values::return_closure_capture_struct
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::return_struct(..)

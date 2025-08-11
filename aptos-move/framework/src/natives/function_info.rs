@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -18,7 +19,7 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-// Extract Identifer from a move value of type &String
+// Extract Identifier from a move value of type &String
 fn identifier_from_ref(v: Value) -> SafeNativeResult<Identifier> {
     let bytes = v
         .value_as::<StructRef>()
@@ -83,25 +84,24 @@ fn native_check_dispatch_type_compatibility_impl(
 
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
-        let is_err = if context.get_feature_flags().is_account_abstraction_enabled()
-            || context
-                .get_feature_flags()
-                .is_derivable_account_abstraction_enabled()
-        {
-            !module.address().is_special()
-                && !context
+
+        let check_visited = |a, n| {
+            let special_addresses_considered_visited =
+                context.get_feature_flags().is_account_abstraction_enabled()
+                    || context
+                        .get_feature_flags()
+                        .is_derivable_account_abstraction_enabled();
+            if special_addresses_considered_visited {
+                context
                     .traversal_context()
-                    .visited
-                    .contains_key(&(module.address(), module.name()))
-        } else {
-            !context
-                .traversal_context()
-                .visited
-                .contains_key(&(module.address(), module.name()))
+                    .check_is_special_or_visited(a, n)
+            } else {
+                context.traversal_context().legacy_check_visited(a, n)
+            }
         };
-        if is_err {
-            return Err(SafeNativeError::Abort { abort_code: 2 });
-        }
+        check_visited(module.address(), module.name())
+            .map_err(|_| SafeNativeError::Abort { abort_code: 2 })?;
+
         (
             context
                 .load_function(&module, &func)
@@ -127,11 +127,8 @@ fn native_check_dispatch_type_compatibility_impl(
         rhs.ty_param_abilities() == lhs.ty_param_abilities()
             && rhs.return_tys() == lhs.return_tys()
             && &lhs.param_tys()[0..lhs.param_count() - 1] == rhs.param_tys()
-            && !rhs.is_friend_or_private()
-            && (!context
-                .get_feature_flags()
-                .is_enabled(aptos_types::on_chain_config::FeatureFlag::DISALLOW_USER_NATIVES)
-                || !rhs.is_native())
+            && rhs.is_public()
+            && !rhs.is_native()
             && lhs_id != rhs_id
     )])
 }
@@ -185,7 +182,13 @@ fn native_load_function_impl(
     context.charge(FUNCTION_INFO_LOAD_FUNCTION_BASE)?;
     let (module_name, _) = extract_function_info(&mut arguments)?;
 
-    Err(SafeNativeError::LoadModule { module_name })
+    if context.has_direct_gas_meter_access_in_native_context() {
+        context.charge_gas_for_dependencies(module_name)?;
+        Ok(smallvec![])
+    } else {
+        // Legacy flow, VM will charge gas for module loading.
+        Err(SafeNativeError::LoadModule { module_name })
+    }
 }
 
 /***************************************************************************************************

@@ -11,8 +11,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-framework = { workspace = true, optional = true }
 clap = { workspace = true, features = ["derive"] }
+either = { workspace = true }
 legacy-move-compiler = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true, features = ["testing"] }
 move-bytecode-source-map = { workspace = true }
 move-bytecode-verifier = { workspace = true }
@@ -26,13 +29,19 @@ move-model = { workspace = true }
 move-resource-viewer = { workspace = true }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { workspace = true }
-move-vm-runtime = { workspace = true, features = ["testing"] }
+move-vm-runtime = { workspace = true, features = ["disable_verifier_cache"] }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
+tera = { workspace = true }
 termcolor = { workspace = true }
+
+# Optional dependencies for fuzzing
+arbitrary = { workspace = true, optional = true }
+bcs = { workspace = true, optional = true }
+dearbitrary = { workspace = true, optional = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
@@ -44,3 +53,4 @@ harness = false
 
 [features]
 failpoints = ['move-vm-runtime/failpoints']
+fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]

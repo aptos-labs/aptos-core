@@ -8247,8 +8247,9 @@ paths:
       - Transactions
       summary: Get account transactions
       description: |-
-        Retrieves on-chain committed transactions from an account. If the start
-        version is too far in the past, a 410 will be returned.
+        Retrieves on-chain committed sequence-number based transactions from an account.
+        Does not retrieve orderless transactions sent from the account.
+        If the start version is too far in the past, a 410 will be returned.
 
         If no start version is given, it will start at version 0.
 
@@ -8695,6 +8696,480 @@ paths:
                 type: integer
                 format: uint64
       operationId: get_account_transactions
+  /accounts/{address}/transaction_summaries:
+    get:
+      tags:
+      - Transactions
+      summary: Get account transaction summaries
+      description: |-
+        Retrieves summaries of on-chain committed transactions (both sequence number based
+        and orderless transactions) from an account.
+        Each transaction summary contains the sender addresss, transaction hash, version, and replay protector.
+
+        If start_version is provided, the output consists of transaction summaries starting form that version.
+
+        If start_version is not provided but the end_version is provided, the output consists of transaction summaries
+        ending at the end_version.
+
+        If both start_version and end_version are not provided, the output consists of the summaries of
+        most recent committed transaction from the account.
+
+        The output always consists of transaction summaries ordered in ascending order by version.
+
+        To retrieve a pending transaction, use /transactions/by_hash.
+      parameters:
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        description: Address of account with or without a `0x` prefix
+        required: true
+        deprecated: false
+        explode: true
+      - name: start_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        description: |-
+          Transaction version to start list of transactions
+
+          If not provided, defaults to showing the latest transactions
+        required: false
+        deprecated: false
+        explode: true
+      - name: end_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        description: |-
+          Transaction version to end list of transactions
+
+          If not provided, defaults to showing the latest transactions
+        required: false
+        deprecated: false
+        explode: true
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        description: |-
+          Max number of transactions to retrieve.
+
+          If not provided, defaults to default page size
+        required: false
+        deprecated: false
+        explode: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionSummary'
+            application/x-bcs:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: uint8
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-CURSOR:
+              description: |-
+                Cursor to be used for endpoints that support cursor-based
+                pagination. Pass this to the `start` field of the endpoint
+                on the next call to get the next page of results.
+              deprecated: false
+              schema:
+                type: string
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '403':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '500':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '503':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              description: Chain ID of the current chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              description: Current ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              description: Oldest non-pruned ledger version of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              description: Current timestamp of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              description: Current epoch of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              description: Current block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              description: Oldest non-pruned block height of the chain
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-GAS-USED:
+              description: The cost of the call in terms of gas
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+      operationId: get_account_transaction_summaries
   /transactions/batch:
     post:
       tags:
@@ -11018,7 +11493,7 @@ components:
         shortened by stripping leading 0s, and adding a 0x.
 
         For example, address 0x0000000000000000000000000000000000000000000000000000000000000001 is represented as 0x1.
-      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     AptosError:
       type: object
       description: |-
@@ -11058,6 +11533,7 @@ components:
       - invalid_transaction_update
       - sequence_number_too_old
       - vm_error
+      - rejected_by_filter
       - health_check_failed
       - mempool_is_full
       - internal_error
@@ -11479,6 +11955,8 @@ components:
           $ref: '#/components/schemas/U64'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
+        replay_protection_nonce:
+          $ref: '#/components/schemas/U64'
         secondary_signers:
           type: array
           description: Secondary signer accounts of the request for Multi-agent
@@ -11741,7 +12219,7 @@ components:
         two hex digits per byte.
 
         Unlike the `Address` type, HexEncodedBytes will not trim any zeros.
-      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     IdentifierWrapper:
       type: string
     IndexResponse:
@@ -12296,6 +12774,8 @@ components:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
           $ref: '#/components/schemas/TransactionSignature'
+        replay_protection_nonce:
+          $ref: '#/components/schemas/U64'
     PublicKey:
       type: object
       oneOf:
@@ -12402,6 +12882,28 @@ components:
       properties:
         key:
           $ref: '#/components/schemas/HexEncodedBytes'
+    ReplayProtector:
+      type: object
+      oneOf:
+      - $ref: '#/components/schemas/ReplayProtector_string(U64)'
+      - $ref: '#/components/schemas/ReplayProtector_string(U64)'
+      discriminator:
+        propertyName: type
+        mapping:
+          nonce: '#/components/schemas/ReplayProtector_string(U64)'
+          sequence_number: '#/components/schemas/ReplayProtector_string(U64)'
+    ReplayProtector_string(U64):
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - sequence_number
+            example: sequence_number
+      - $ref: '#/components/schemas/U64'
     RoleType:
       type: string
       enum:
@@ -12597,6 +13099,8 @@ components:
           $ref: '#/components/schemas/U64'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
+        replay_protection_nonce:
+          $ref: '#/components/schemas/U64'
         signature:
           $ref: '#/components/schemas/TransactionSignature'
     TableItemRequest:
@@ -12788,6 +13292,22 @@ components:
             - no_account_signature
             example: no_account_signature
       - $ref: '#/components/schemas/NoAccountSignature'
+    TransactionSummary:
+      type: object
+      required:
+      - sender
+      - version
+      - transaction_hash
+      - replay_protector
+      properties:
+        sender:
+          $ref: '#/components/schemas/Address'
+        version:
+          $ref: '#/components/schemas/U64'
+        transaction_hash:
+          $ref: '#/components/schemas/HashValue'
+        replay_protector:
+          $ref: '#/components/schemas/ReplayProtector'
     Transaction_BlockEpilogueTransaction:
       allOf:
       - type: object
@@ -13006,6 +13526,8 @@ components:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
           $ref: '#/components/schemas/TransactionSignature'
+        replay_protection_nonce:
+          $ref: '#/components/schemas/U64'
         events:
           type: array
           description: Events generated by the transaction

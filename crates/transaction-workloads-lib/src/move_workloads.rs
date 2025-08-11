@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-pub use super::raw_module_data::PreBuiltPackagesImpl;
+pub use super::prebuilt_packages::PreBuiltPackagesImpl;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -29,7 +29,10 @@ use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BCSStream {
@@ -54,11 +57,24 @@ pub enum MapType {
     },
 }
 
+#[derive(Debug)]
+pub struct OrderBookState {
+    order_idx: AtomicU64,
+}
+
+impl OrderBookState {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            order_idx: AtomicU64::new(0),
+        })
+    }
+}
+
 //
 // List of entry points to expose
 //
 // More info in the Simple.move
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum EntryPoints {
     /// Republish the module
     Republish,
@@ -236,6 +252,21 @@ pub enum EntryPoints {
     APTTransferWithPermissionedSigner,
     /// Transfer APT using vanilla master signer to compare the performance.
     APTTransferWithMasterSigner,
+
+    OrderBook {
+        state: Arc<OrderBookState>,
+        /// Number of markets to use.
+        num_markets: u32,
+        /// Buy and sell price is picked randomly from their respective ranges.
+        ///  `overlap_ratio` defines what portion of the range they overlap on.
+        overlap_ratio: f64,
+        /// Portion of orders that are buys (rest are sells). 0.5 means equal for both.
+        buy_frequency: f64,
+        /// Sell size is picked randomly from [1, max_sell_size] range
+        max_sell_size: u64,
+        /// Buy size is picked randomly from [1, max_buy_size] range
+        max_buy_size: u64,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -291,6 +322,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
+            EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -371,6 +403,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::DeserializeU256 => "bcs_stream",
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
+            EntryPoints::OrderBook { .. } => "order_book_example",
         }
     }
 
@@ -803,6 +836,41 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&1u64).unwrap(),
                 ])
             },
+            EntryPoints::OrderBook {
+                state,
+                num_markets,
+                overlap_ratio,
+                buy_frequency,
+                max_buy_size,
+                max_sell_size,
+            } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+
+                let market_id = rng.gen_range(0, *num_markets);
+                let price_range = 1000000;
+                let is_bid = rng.gen_bool(*buy_frequency);
+                let size = rng.gen_range(1, 1 + if is_bid { max_buy_size } else { max_sell_size });
+                let price = if is_bid {
+                    0
+                } else {
+                    (price_range as f64 * (1.0 - *overlap_ratio)) as u64
+                } + rng.gen_range(0, price_range);
+
+                // (account_order_id: u64, bid_price: u64, volume: u64, is_bid: bool)
+                get_payload(module_id, ident_str!("place_order").to_owned(), vec![
+                    bcs::to_bytes(&market_id).unwrap(),
+                    bcs::to_bytes(&AccountAddress::random()).unwrap(),
+                    bcs::to_bytes(
+                        &state
+                            .order_idx
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                    )
+                    .unwrap(),
+                    bcs::to_bytes(&price).unwrap(),  // bid_price
+                    bcs::to_bytes(&size).unwrap(),   // volume
+                    bcs::to_bytes(&is_bid).unwrap(), // is_bid
+                ])
+            },
         }
     }
 
@@ -923,6 +991,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
+            EntryPoints::OrderBook { .. } => AutomaticArgs::None,
         }
     }
 }
@@ -967,11 +1036,7 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
 }
 
 fn rand_string(rng: &mut StdRng, len: usize) -> String {
-    let res = rng
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect();
+    let res = rng.sample_iter(&Alphanumeric).take(len).collect();
     assert_eq!(
         bcs::serialized_size(&res).unwrap(),
         bcs_size_of_byte_array(len)
