@@ -267,6 +267,44 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+    /// A chain-graph with 8 nodes. Depth specifies number of executed dependencies.
+    DependencyChain8 {
+        depth: u64,
+    },
+    /// A chain-graph with 64 nodes. Depth specifies number of executed dependencies.
+    DependencyChain64 {
+        depth: u64,
+    },
+    /// A chain-graph with 256 nodes. Depth specifies number of executed dependencies.
+    DependencyChain256 {
+        depth: u64,
+    },
+    /// A chain-graph with 512 nodes. Depth specifies number of executed dependencies.
+    DependencyChain512 {
+        depth: u64,
+    },
+    /// A tree with 81 nodes in total. Each leaf has 3 children.
+    DependencyTree81With3ChildrenPerLeaf,
+    /// A tree with 585 nodes in total. Each leaf has 8 children.
+    DependencyTree585With8ChildrenPerLeaf,
+    /// A module with 32 dependencies forming a star. The width is the number of modules accessed
+    /// at runtime (as opposed to loading).
+    DependencyStar32 {
+        width: u64,
+    },
+    /// A module with 512 dependencies forming a star. The width is the number of modules accessed
+    /// at runtime (as opposed to loading).
+    DependencyStar512 {
+        width: u64,
+    },
+    /// A sparse DAG on 64 nodes.
+    DependencyDag64Sparse,
+    /// A quasi-clique (acyclic) on 64 nodes.
+    DependencyDag64Dense,
+    /// A sparse DAG on 256 nodes.
+    DependencyDag256Sparse,
+    /// A quasi-clique (acyclic) on 256 nodes.
+    DependencyDag256Dense,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -336,6 +374,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::DependencyChain8 { .. } => "chain_8",
+            EntryPoints::DependencyChain64 { .. } => "chain_64",
+            EntryPoints::DependencyChain256 { .. } => "chain_256",
+            EntryPoints::DependencyChain512 { .. } => "chain_512",
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf => "tree_81_3",
+            EntryPoints::DependencyTree585With8ChildrenPerLeaf => "tree_585_8",
+            EntryPoints::DependencyStar32 { .. } => "star_32",
+            EntryPoints::DependencyStar512 { .. } => "star_512",
+            EntryPoints::DependencyDag64Sparse => "dag_64_sparse",
+            EntryPoints::DependencyDag64Dense => "dag_64_dense",
+            EntryPoints::DependencyDag256Sparse => "dag_256_sparse",
+            EntryPoints::DependencyDag256Dense => "dag_256_dense",
         }
     }
 
@@ -404,6 +454,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::DependencyChain8 { .. } => "chain_8_0",
+            EntryPoints::DependencyChain64 { .. } => "chain_64_0",
+            EntryPoints::DependencyChain256 { .. } => "chain_256_0",
+            EntryPoints::DependencyChain512 { .. } => "chain_512_0",
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf => "tree_81_3_0",
+            EntryPoints::DependencyTree585With8ChildrenPerLeaf => "tree_585_8_0",
+            EntryPoints::DependencyStar32 { .. } => "star_32_0",
+            EntryPoints::DependencyStar512 { .. } => "star_512_0",
+            EntryPoints::DependencyDag64Sparse => "dag_64_sparse_0",
+            EntryPoints::DependencyDag64Dense => "dag_64_dense_0",
+            EntryPoints::DependencyDag256Sparse => "dag_256_sparse_0",
+            EntryPoints::DependencyDag256Dense => "dag_256_dense_0",
         }
     }
 
@@ -871,6 +933,29 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::DependencyChain8 { depth }
+            | EntryPoints::DependencyChain64 { depth }
+            | EntryPoints::DependencyChain256 { depth }
+            | EntryPoints::DependencyChain512 { depth } => {
+                get_payload(module_id, ident_str!("call").to_owned(), vec![
+                    bcs::to_bytes(depth).unwrap(),
+                ])
+            },
+            EntryPoints::DependencyTree81With3ChildrenPerLeaf
+            | EntryPoints::DependencyTree585With8ChildrenPerLeaf => {
+                get_payload_void(module_id, ident_str!("call").to_owned())
+            },
+            EntryPoints::DependencyStar32 { width } | EntryPoints::DependencyStar512 { width } => {
+                get_payload(module_id, ident_str!("call").to_owned(), vec![
+                    bcs::to_bytes(width).unwrap(),
+                ])
+            },
+            EntryPoints::DependencyDag64Sparse
+            | EntryPoints::DependencyDag64Dense
+            | EntryPoints::DependencyDag256Sparse
+            | EntryPoints::DependencyDag256Dense => {
+                get_payload_void(module_id, ident_str!("call").to_owned())
+            },
         }
     }
 
@@ -992,6 +1077,18 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::DependencyChain8 { .. }
+            | EntryPoints::DependencyChain64 { .. }
+            | EntryPoints::DependencyChain256 { .. }
+            | EntryPoints::DependencyChain512 { .. }
+            | EntryPoints::DependencyTree81With3ChildrenPerLeaf
+            | EntryPoints::DependencyTree585With8ChildrenPerLeaf
+            | EntryPoints::DependencyStar32 { .. }
+            | EntryPoints::DependencyStar512 { .. }
+            | EntryPoints::DependencyDag64Sparse
+            | EntryPoints::DependencyDag64Dense
+            | EntryPoints::DependencyDag256Sparse
+            | EntryPoints::DependencyDag256Dense => AutomaticArgs::Signer,
         }
     }
 }
