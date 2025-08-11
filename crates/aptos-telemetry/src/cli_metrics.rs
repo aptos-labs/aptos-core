@@ -37,9 +37,13 @@ pub async fn send_cli_telemetry_event(
 
     // Send the event (we block on the join handle to ensure the
     // event is processed before terminating the cli command).
-    let join_handle =
-        service::send_telemetry_event_with_ip(user_id, "NO_CHAIN".into(), None, telemetry_event)
-            .await;
+    let join_handle = service::prepare_and_send_telemetry_event(
+        user_id,
+        "NO_CHAIN".into(),
+        None,
+        telemetry_event,
+    )
+    .await;
     if let Err(error) = join_handle.await {
         debug!(
             "Failed to send telemetry event with join error: {:?}",
