@@ -390,7 +390,7 @@ impl GasMeter for GasStatus {
         )
     }
 
-    fn charge_resource_fetch(
+    fn charge_load_resource_bytes(
         &mut self,
         _addr: AccountAddress,
         _ty: &impl TypeView,
@@ -400,7 +400,7 @@ impl GasMeter for GasStatus {
         Ok(())
     }
 
-    fn charge_loaded_bytes(
+    fn charge_deserialize_resource(
         &mut self,
         _addr: AccountAddress,
         _ty: &impl TypeView,

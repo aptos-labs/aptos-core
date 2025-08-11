@@ -1015,8 +1015,8 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
-            EntryPoints::ExistenceModificationConflicts { .. } => AutomaticArgs::None,
-            EntryPoints::CheckExistsAndModify => AutomaticArgs::None,
+            EntryPoints::ExistenceModificationConflicts { .. }
+            | EntryPoints::CheckExistsAndModify => AutomaticArgs::None,
         }
     }
 }

@@ -139,12 +139,14 @@ fn main() -> Result<()> {
         bail!("Wrong number of arguments.")
     }
 
+    let features = Features::default();
+
     let mut builder = SafeNativeBuilder::new(
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         TimedFeaturesBuilder::enable_all().build(),
-        Features::default(),
+        features.clone(),
         None,
     );
 
@@ -219,9 +221,7 @@ fn main() -> Result<()> {
             func,
             // No arguments.
             Vec::<Vec<u8>>::new(),
-            &mut TransactionDataCache::empty(
-                Features::default().is_lightweight_resource_existence_enabled(),
-            ),
+            &mut TransactionDataCache::empty(features.is_lightweight_resource_existence_enabled()),
             &mut gas_meter,
             &mut traversal_context,
             &mut extensions,

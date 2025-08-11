@@ -3,56 +3,47 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
+use aptos_transaction_simulation::Account;
 use aptos_types::{
     account_address::AccountAddress, move_utils::MemberId, on_chain_config::FeatureFlag,
     transaction::TransactionOutput,
 };
 use std::{path::Path, str::FromStr};
 
-fn run_transactions(
+fn make_harness_and_account(
+    path: &Path,
     enabled_features: Vec<FeatureFlag>,
     disabled_features: Vec<FeatureFlag>,
-    path: &Path,
-    function_names: &[&str],
-) -> Vec<TransactionOutput> {
-    println!("Running with features: {:?}", enabled_features);
-    let mut h = MoveHarness::new_with_features(enabled_features, disabled_features);
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
-    assert_success!(h.publish_package(&acc, path));
-
-    h.run_entry_function(
+) -> (MoveHarness, Account) {
+    let mut harness = MoveHarness::new_with_features(enabled_features, disabled_features);
+    let acc = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
+    assert_success!(harness.publish_package(&acc, path));
+    harness.run_entry_function(
         &acc,
         MemberId::from_str("0x123::test::init").unwrap(),
         vec![],
         vec![],
     );
-    let mut txns = vec![];
-    for name in function_names.iter() {
-        txns.push(h.create_entry_function(
-            &acc,
-            MemberId::from_str(format!("0x123::test::{name}").as_str()).unwrap(),
-            vec![],
-            vec![],
-        ));
-    }
-    h.run_block_get_output(txns)
+    (harness, acc)
 }
 
-fn check_for_transactions(path: &Path, function_names: &[&str]) {
-    assert_eq!(
-        run_transactions(
-            vec![],
-            vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE],
-            path,
-            function_names
-        ),
-        run_transactions(
-            vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE],
-            vec![],
-            path,
-            function_names
-        ),
-    );
+fn run_transactions(
+    harness: &mut MoveHarness,
+    acc: &mut Account,
+    function_names: &[&str],
+) -> Vec<TransactionOutput> {
+    let txns = function_names
+        .iter()
+        .map(|name| {
+            harness.create_entry_function(
+                acc,
+                MemberId::from_str(format!("0x123::test::{name}").as_str()).unwrap(),
+                vec![],
+                vec![],
+            )
+        })
+        .collect();
+    harness.run_block_get_output(txns)
 }
 
 #[test]
@@ -98,11 +89,28 @@ fn test_lightweight_resource_existence() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    check_for_transactions(path.path(), &["check"]);
-    check_for_transactions(path.path(), &["modify"]);
-    check_for_transactions(path.path(), &["check", "modify"]);
-    check_for_transactions(path.path(), &["check", "check", "modify"]);
-    check_for_transactions(path.path(), &["check", "modify", "check", "modify"]);
-    check_for_transactions(path.path(), &["read"]);
-    check_for_transactions(path.path(), &["check", "read"]);
+    let (mut harness_no_feat, mut acc_no_feat) =
+        make_harness_and_account(path.path(), vec![], vec![
+            FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE,
+        ]);
+    let (mut harness_with_feat, mut acc_with_feat) = make_harness_and_account(
+        path.path(),
+        vec![FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE],
+        vec![],
+    );
+
+    let mut check_for_transactions = |function_names| {
+        assert_eq!(
+            run_transactions(&mut harness_no_feat, &mut acc_no_feat, function_names),
+            run_transactions(&mut harness_with_feat, &mut acc_with_feat, function_names),
+        );
+    };
+
+    check_for_transactions(&["check"]);
+    check_for_transactions(&["modify"]);
+    check_for_transactions(&["check", "modify"]);
+    check_for_transactions(&["check", "check", "modify"]);
+    check_for_transactions(&["check", "modify", "check", "modify"]);
+    check_for_transactions(&["read"]);
+    check_for_transactions(&["check", "read"]);
 }

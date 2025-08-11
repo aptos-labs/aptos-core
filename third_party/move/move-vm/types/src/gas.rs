@@ -340,7 +340,7 @@ pub trait GasMeter: NativeGasMeter {
 
     /// Charge for fetching resource without the actual bytes
     /// Used when loading the resource size without deserializing it
-    fn charge_resource_fetch(
+    fn charge_load_resource_bytes(
         &mut self,
         addr: AccountAddress,
         ty: &impl TypeView,
@@ -349,33 +349,12 @@ pub trait GasMeter: NativeGasMeter {
     ) -> PartialVMResult<()>;
 
     /// Charge for deserialized bytes of a loaded resource
-    fn charge_loaded_bytes(
+    fn charge_deserialize_resource(
         &mut self,
         addr: AccountAddress,
         ty: &impl TypeView,
         val: impl ValueView,
     ) -> PartialVMResult<()>;
-
-    /// Charges for loading a resource from storage. This is only called when the resource is not
-    /// cached.
-    ///
-    /// WARNING: This can be dangerous if you execute multiple user transactions in the same
-    /// session -- identical transactions can have different gas costs. Use at your own risk.
-    ///
-    /// This function charges for both fetching the resource metadata and its bytes
-    fn charge_load_resource(
-        &mut self,
-        addr: AccountAddress,
-        ty: &impl TypeView,
-        val: Option<impl ValueView>,
-        bytes_loaded: NumBytes,
-    ) -> PartialVMResult<()> {
-        self.charge_resource_fetch(addr, ty, val.is_some(), bytes_loaded)?;
-        if let Some(val) = val {
-            self.charge_loaded_bytes(addr, ty, val)?;
-        }
-        Ok(())
-    }
 
     /// Charge for executing a native function.
     /// The cost is calculated returned by the native function implementation.
@@ -634,7 +613,7 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_resource_fetch(
+    fn charge_load_resource_bytes(
         &mut self,
         _addr: AccountAddress,
         _ty: &impl TypeView,
@@ -644,7 +623,7 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_loaded_bytes(
+    fn charge_deserialize_resource(
         &mut self,
         _addr: AccountAddress,
         _ty: &impl TypeView,

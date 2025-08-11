@@ -191,6 +191,14 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+        fn charge_load_resource_bytes(
+            &mut self,
+            addr: AccountAddress,
+            ty: &impl TypeView,
+            resource_exists: bool,
+            bytes_loaded: NumBytes,
+        ) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -264,19 +272,7 @@ where
     }
 
     #[inline]
-    fn charge_resource_fetch(
-        &mut self,
-        addr: AccountAddress,
-        ty: &impl TypeView,
-        resource_exists: bool,
-        bytes_loaded: NumBytes,
-    ) -> PartialVMResult<()> {
-        self.base
-            .charge_resource_fetch(addr, ty, resource_exists, bytes_loaded)
-    }
-
-    #[inline]
-    fn charge_loaded_bytes(
+    fn charge_deserialize_resource(
         &mut self,
         addr: AccountAddress,
         ty: &impl TypeView,
@@ -291,7 +287,7 @@ where
                     .abstract_heap_size(&val, self.feature_version())?,
             )?;
         }
-        self.base.charge_loaded_bytes(addr, ty, val)
+        self.base.charge_deserialize_resource(addr, ty, val)
     }
 
     #[inline]
