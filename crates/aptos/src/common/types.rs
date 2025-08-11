@@ -1948,7 +1948,8 @@ impl TransactionOptions {
 
             let unsigned_transaction = if self.replay_protection_type == ReplayProtectionType::Nonce
             {
-                txn_builder.upgrade_payload(true, true).build()
+                let mut rng = rand::thread_rng();
+                txn_builder.upgrade_payload(&mut rng, true, true).build()
             } else {
                 txn_builder.build()
             };
@@ -2005,7 +2006,8 @@ impl TransactionOptions {
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
                 let mut txn_builder = transaction_factory.payload(payload);
                 if self.replay_protection_type == ReplayProtectionType::Nonce {
-                    txn_builder = txn_builder.upgrade_payload(true, true);
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload(&mut rng, true, true);
                 };
                 sender_account.sign_with_transaction_builder(txn_builder)
             },
@@ -2022,7 +2024,8 @@ impl TransactionOptions {
                 );
                 let mut txn_builder = transaction_factory.payload(payload);
                 if self.replay_protection_type == ReplayProtectionType::Nonce {
-                    txn_builder = txn_builder.upgrade_payload(true, true);
+                    let mut rng = rand::thread_rng();
+                    txn_builder = txn_builder.upgrade_payload(&mut rng, true, true);
                 };
                 sender_account.sign_with_transaction_builder(txn_builder)?
             },

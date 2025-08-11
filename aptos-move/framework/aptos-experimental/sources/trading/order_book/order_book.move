@@ -30,7 +30,7 @@ module aptos_experimental::order_book {
         Order,
         AscendingIdGenerator,
         AccountClientOrderId,
-        new_account_client_order_id
+        new_account_client_order_id, TimeInForce
     };
     use aptos_experimental::active_order_book::{ActiveOrderBook, new_active_order_book};
     use aptos_experimental::pending_order_book_index::{
@@ -38,10 +38,12 @@ module aptos_experimental::order_book {
         new_pending_order_book_index
     };
     #[test_only]
+    use aptos_std::crypto_algebra::order;
+    #[test_only]
     use aptos_experimental::order_book_types::{
         new_order_id_type,
         price_move_up_condition,
-        UniqueIdxType, price_move_down_condition
+        UniqueIdxType, price_move_down_condition, good_till_cancelled
     };
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
@@ -63,6 +65,7 @@ module aptos_experimental::order_book {
             remaining_size: u64,
             is_bid: bool,
             trigger_condition: Option<TriggerCondition>,
+            time_in_force: TimeInForce,
             metadata: M
         }
     }
@@ -92,6 +95,7 @@ module aptos_experimental::order_book {
         remaining_size: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
+        time_in_force: TimeInForce,
         metadata: M
     ): OrderRequest<M> {
         OrderRequest::V1 {
@@ -103,6 +107,7 @@ module aptos_experimental::order_book {
             remaining_size,
             is_bid,
             trigger_condition,
+            time_in_force,
             metadata
         }
     }
@@ -140,6 +145,7 @@ module aptos_experimental::order_book {
                 _size,
                 is_bid,
                 _,
+                _,
                 _
             ) = order.destroy_order();
             self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
@@ -159,6 +165,7 @@ module aptos_experimental::order_book {
                 _size,
                 _is_bid,
                 trigger_condition,
+                _,
                 _
             ) = order.destroy_order();
             self.pending_orders.cancel_pending_order(
@@ -198,7 +205,7 @@ module aptos_experimental::order_book {
     /// Checks if the order is a taker order i.e., matched immediatedly with the active order book.
     public fun is_taker_order<M: store + copy + drop>(
         self: &OrderBook<M>,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
@@ -236,6 +243,7 @@ module aptos_experimental::order_book {
                 order_req.remaining_size,
                 order_req.is_bid,
                 order_req.trigger_condition,
+                order_req.time_in_force,
                 order_req.metadata
             );
         self.orders.add(order_req.order_id, new_order_with_state(order, true));
@@ -347,6 +355,7 @@ module aptos_experimental::order_book {
                 order_req.remaining_size,
                 order_req.is_bid,
                 order_req.trigger_condition,
+                order_req.time_in_force,
                 order_req.metadata
             );
 
@@ -363,7 +372,7 @@ module aptos_experimental::order_book {
     /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
     public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut OrderBook<M>,
-        price: Option<u64>,
+        price: u64,
         size: u64,
         is_bid: bool
     ): SingleOrderMatch<M> {
@@ -484,10 +493,10 @@ module aptos_experimental::order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut OrderBook<M>, current_price: u64
+        self: &mut OrderBook<M>, current_price: u64, order_limit: u64
     ): vector<Order<M>> {
         let self_orders = &mut self.orders;
-        let order_ids = self.pending_orders.take_ready_price_based_orders(current_price);
+        let order_ids = self.pending_orders.take_ready_price_based_orders(current_price, order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
@@ -514,10 +523,10 @@ module aptos_experimental::order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the time condition.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut OrderBook<M>
+        self: &mut OrderBook<M>, order_limit: u64
     ): vector<Order<M>> {
         let self_orders = &mut self.orders;
-        let order_ids = self.pending_orders.take_time_time_based_orders();
+        let order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
@@ -563,7 +572,7 @@ module aptos_experimental::order_book {
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
             if (!self.is_taker_order(
-                option::some(order_req.price), order_req.is_bid, order_req.trigger_condition
+                order_req.price, order_req.is_bid, order_req.trigger_condition
             )) {
                 self.place_maker_order(
                     OrderRequest::V1 {
@@ -575,6 +584,7 @@ module aptos_experimental::order_book {
                         remaining_size,
                         is_bid: order_req.is_bid,
                         trigger_condition: order_req.trigger_condition,
+                        time_in_force: order_req.time_in_force,
                         metadata: order_req.metadata
                     }
                 );
@@ -582,7 +592,7 @@ module aptos_experimental::order_book {
             };
             let match_result =
                 self.get_single_match_for_taker(
-                    option::some(order_req.price), remaining_size, order_req.is_bid
+                    order_req.price, remaining_size, order_req.is_bid
                 );
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
@@ -607,6 +617,7 @@ module aptos_experimental::order_book {
             remaining_size: order_req.remaining_size,
             is_bid: order_req.is_bid,
             trigger_condition: order_req.trigger_condition,
+            time_in_force: order_req.time_in_force,
             metadata: order_req.metadata
         };
         self.place_order_and_get_matches(order_req)
@@ -616,7 +627,7 @@ module aptos_experimental::order_book {
     public fun trigger_pending_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>, oracle_price: u64
     ): vector<SingleOrderMatch<M>> {
-        let ready_orders = self.take_ready_price_based_orders(oracle_price);
+        let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
         let all_matches = vector::empty();
         let i = 0;
         while (i < ready_orders.length()) {
@@ -630,6 +641,7 @@ module aptos_experimental::order_book {
                 remaining_size,
                 is_bid,
                 _,
+                time_in_force,
                 metadata
             ) = order.destroy_order();
             let order_req = OrderRequest::V1 {
@@ -641,6 +653,7 @@ module aptos_experimental::order_book {
                 remaining_size,
                 is_bid,
                 trigger_condition: option::none(),
+                time_in_force,
                 metadata
             };
             let match_results = self.place_order_and_get_matches(order_req);
@@ -685,6 +698,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         let match_results = order_book.place_order_and_get_matches(order_req);
@@ -694,7 +708,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, client_order_id, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, client_order_id, price, orig_size, size, is_bid, _, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -715,6 +729,7 @@ module aptos_experimental::order_book {
                     remaining_size: 400,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -735,7 +750,7 @@ module aptos_experimental::order_book {
         // Verify original order still exists but with reduced size
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_, _, client_order_id, price, orig_size, size, is_bid, _, _) =
+        let (_, _, client_order_id, price, orig_size, size, is_bid, _, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -770,6 +785,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -786,6 +802,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -803,6 +820,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -837,6 +855,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         let match_result = order_book.place_order_and_get_matches(order_req);
@@ -854,6 +873,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -871,6 +891,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -908,6 +929,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -924,6 +946,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -941,6 +964,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -965,6 +989,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -982,6 +1007,7 @@ module aptos_experimental::order_book {
                     remaining_size: 400,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1011,6 +1037,7 @@ module aptos_experimental::order_book {
                     remaining_size: 300,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1033,7 +1060,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -1060,6 +1087,7 @@ module aptos_experimental::order_book {
                     remaining_size: 500,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1078,6 +1106,7 @@ module aptos_experimental::order_book {
                     remaining_size: 800,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1103,7 +1132,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(2);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -1130,6 +1159,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: false,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1149,6 +1179,7 @@ module aptos_experimental::order_book {
                     remaining_size: 400,
                     is_bid: true,
                     trigger_condition: option::some(price_move_down_condition(90)),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1193,6 +1224,7 @@ module aptos_experimental::order_book {
                     remaining_size: 1000,
                     is_bid: true,
                     trigger_condition: option::none(),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1212,6 +1244,7 @@ module aptos_experimental::order_book {
                     remaining_size: 400,
                     is_bid: false,
                     trigger_condition: option::some(price_move_up_condition(110)),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1251,6 +1284,7 @@ module aptos_experimental::order_book {
                     remaining_size: 300,
                     is_bid: false,
                     trigger_condition: option::some(price_move_up_condition(120)),
+                    time_in_force: good_till_cancelled(),
                     metadata: TestMetadata {}
                 }
             );
@@ -1284,7 +1318,7 @@ module aptos_experimental::order_book {
         let order_id = new_order_id_type(1);
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _) =
+        let (_account, _order_id, _, price, orig_size, size, is_bid, _, _, _) =
             order.destroy_order();
         assert!(is_active == true);
         assert!(price == 100);
@@ -1308,6 +1342,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
@@ -1325,6 +1360,7 @@ module aptos_experimental::order_book {
             remaining_size: 100,
             is_bid: true,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
 
@@ -1343,6 +1379,7 @@ module aptos_experimental::order_book {
             _remaining_size,
             is_bid,
             _trigger_condition,
+            _time_in_force,
             metadata
         ) = matched_order.destroy_order();
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
@@ -1355,6 +1392,7 @@ module aptos_experimental::order_book {
             remaining_size: 50,
             is_bid,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata
         };
         order_book.reinsert_maker_order(order_req, matched_order);
@@ -1378,6 +1416,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
@@ -1393,6 +1432,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: true,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
 
@@ -1413,6 +1453,7 @@ module aptos_experimental::order_book {
             _remaining_size,
             is_bid,
             _trigger_condition,
+            _time_in_force,
             metadata
         ) = matched_order.destroy_order();
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
@@ -1425,6 +1466,7 @@ module aptos_experimental::order_book {
             remaining_size: 500,
             is_bid,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata
         };
         order_book.reinsert_maker_order(order_req, matched_order);
@@ -1448,6 +1490,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
@@ -1466,6 +1509,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::some(price_move_up_condition(90)),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadata {}
         };
         order_book.place_maker_order(order_req);
@@ -1491,6 +1535,7 @@ module aptos_experimental::order_book {
             remaining_size: 1000,
             is_bid: false,
             trigger_condition: option::none(),
+            time_in_force: good_till_cancelled(),
             metadata: TestMetadataWithId {id: 1}
         };
         order_book.place_maker_order(order_req);

@@ -2,7 +2,7 @@
 module aptos_experimental::order_book_client_order_id {
     use std::option;
     use std::signer;
-    use aptos_experimental::order_book_types::new_order_id_type;
+    use aptos_experimental::order_book_types::{new_order_id_type, good_till_cancelled};
     use aptos_experimental::order_book::{new_order_book, new_order_request};
 
     #[test(user1 = @0x456)]
@@ -26,6 +26,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -84,6 +85,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -125,6 +127,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(order_req_1);
@@ -140,6 +143,7 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 43 // metadata
             );
         order_book.place_maker_order(order_req_2);
@@ -155,6 +159,7 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 44 // metadata
             );
         order_book.place_maker_order(order_req_3);
@@ -219,6 +224,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -254,6 +260,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -275,17 +282,18 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req2);
 
         // Verify this is a taker order
-        let is_taker = order_book.is_taker_order(option::some(1000), false, option::none());
+        let is_taker = order_book.is_taker_order(1000, false, option::none());
         assert!(is_taker);
 
         // Execute the match - this should fully fill the maker order
         let single_match =
-            order_book.get_single_match_for_taker(option::some(1000), 100, false);
+            order_book.get_single_match_for_taker(1000, 100, false);
 
         // Verify the match
         let matched_size = single_match.get_matched_size();
@@ -320,17 +328,18 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
 
         // Verify this is a taker order
-        let is_taker = order_book.is_taker_order(option::some(1000), false, option::none());
+        let is_taker = order_book.is_taker_order(1000, false, option::none());
         assert!(is_taker);
 
         // Execute the match - this should partially fill the maker order
         let single_match =
-            order_book.get_single_match_for_taker(option::some(1000), 100, false);
+            order_book.get_single_match_for_taker(1000, 100, false);
 
         // Verify the match
         let matched_size = single_match.get_matched_size();
@@ -388,6 +397,7 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
@@ -425,6 +435,7 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -432,7 +443,7 @@ module aptos_experimental::order_book_client_order_id {
         // First partial match
         let single_match1 =
             order_book.get_single_match_for_taker(
-                option::some(1000), 100, // Match 100 out of 300
+                1000, 100, // Match 100 out of 300
                 false
             );
         assert!(single_match1.get_matched_size() == 100, 0);
@@ -484,6 +495,7 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
@@ -493,7 +505,7 @@ module aptos_experimental::order_book_client_order_id {
         // Fully match the first order
         let single_match1 =
             order_book.get_single_match_for_taker(
-                option::some(1002), // Match against the highest price (order 3)
+                1002, // Match against the highest price (order 3)
                 100, false
             );
         assert!(single_match1.get_matched_size() == 100);

@@ -133,6 +133,12 @@ types of pending orders are supported.
 
 </dd>
 <dt>
+<code>time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>metadata: M</code>
 </dt>
 <dd>
@@ -412,7 +418,7 @@ types of pending orders are supported.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_new_order_request">new_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="order_book.md#0x7_order_book_OrderRequest">order_book::OrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -430,6 +436,7 @@ types of pending orders are supported.
     remaining_size: u64,
     is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;,
+    time_in_force: TimeInForce,
     metadata: M
 ): <a href="order_book.md#0x7_order_book_OrderRequest">OrderRequest</a>&lt;M&gt; {
     OrderRequest::V1 {
@@ -441,6 +448,7 @@ types of pending orders are supported.
         remaining_size,
         is_bid,
         trigger_condition,
+        time_in_force,
         metadata
     }
 }
@@ -518,6 +526,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _size,
             is_bid,
             _,
+            _,
             _
         ) = order.destroy_order();
         self.active_orders.cancel_active_order(bid_price, unique_priority_idx, is_bid);
@@ -537,6 +546,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
             _size,
             _is_bid,
             trigger_condition,
+            _,
             _
         ) = order.destroy_order();
         self.pending_orders.cancel_pending_order(
@@ -625,7 +635,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 Checks if the order is a taker order i.e., matched immediatedly with the active order book.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;): bool
 </code></pre>
 
 
@@ -636,7 +646,7 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_is_taker_order">is_taker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    price: Option&lt;u64&gt;,
+    price: u64,
     is_bid: bool,
     trigger_condition: Option&lt;TriggerCondition&gt;
 ): bool {
@@ -694,6 +704,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.remaining_size,
             order_req.is_bid,
             order_req.trigger_condition,
+            order_req.time_in_force,
             order_req.metadata
         );
     self.orders.add(order_req.order_id, new_order_with_state(order, <b>true</b>));
@@ -903,6 +914,7 @@ it is added to the order book, if it exists, it's size is updated.
             order_req.remaining_size,
             order_req.is_bid,
             order_req.trigger_condition,
+            order_req.time_in_force,
             order_req.metadata
         );
 
@@ -928,7 +940,7 @@ Returns a single match for a taker order. It is responsibility of the caller to 
 API to ensure that the order is a taker order before calling this API, otherwise it will abort.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, price: u64, size: u64, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_SingleOrderMatch">order_book_types::SingleOrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -939,7 +951,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;,
-    price: Option&lt;u64&gt;,
+    price: u64,
     size: u64,
     is_bid: bool
 ): SingleOrderMatch&lt;M&gt; {
@@ -1210,7 +1222,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 Removes and returns the orders that are ready to be executed based on the current price.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, current_price: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, current_price: u64, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
 </code></pre>
 
 
@@ -1220,10 +1232,10 @@ Removes and returns the orders that are ready to be executed based on the curren
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, current_price: u64
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, current_price: u64, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Order&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
-    <b>let</b> order_ids = self.pending_orders.<a href="order_book.md#0x7_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>(current_price);
+    <b>let</b> order_ids = self.pending_orders.<a href="order_book.md#0x7_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>(current_price, order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {
@@ -1320,7 +1332,7 @@ Removes and returns the orders that are ready to be executed based on the curren
 Removes and returns the orders that are ready to be executed based on the time condition.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;, order_limit: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="order_book_types.md#0x7_order_book_types_Order">order_book_types::Order</a>&lt;M&gt;&gt;
 </code></pre>
 
 
@@ -1330,10 +1342,10 @@ Removes and returns the orders that are ready to be executed based on the time c
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Order&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
-    <b>let</b> order_ids = self.pending_orders.take_time_time_based_orders();
+    <b>let</b> order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {
