@@ -1,0 +1,25 @@
+module 0x1::m {
+    struct R has drop, key {
+        value: bool,
+    }
+    fun f1() {
+        &mut borrow_global_mut(0x1).value = false;
+        if (!(*&borrow_global(0x1).value == false)) abort 1;
+        &mut borrow_global_mut(0x1).value = true;
+        if (!(*&borrow_global(0x1).value == true)) abort 2;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+  ┌─ examples_book.move:6:9
+  │
+6 │         &mut borrow_global_mut(0x1).value = false;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+  ┌─ examples_book.move:8:9
+  │
+8 │         &mut borrow_global_mut(0x1).value = true;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

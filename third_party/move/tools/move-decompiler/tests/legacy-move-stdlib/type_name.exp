@@ -1,0 +1,15 @@
+module 0x1::type_name {
+    use 0x1::ascii;
+    struct TypeName has copy, drop, store {
+        name: ascii::String,
+    }
+    public fun borrow_string(self: &TypeName): &ascii::String {
+        &self.name
+    }
+    public native fun get<T>(): TypeName;
+    public fun into_string(self: TypeName): ascii::String {
+        *&(&self).name
+    }
+}
+
+============ recompilation succeeded ========
