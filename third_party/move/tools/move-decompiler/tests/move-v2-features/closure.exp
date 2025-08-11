@@ -116,12 +116,9 @@ module 0x99::lambda_inline {
 
 module 0x99::lambda_inline1 {
     public fun test() {
-        let _t1;
-        let _t0;
-        let _t2;
-        _t2 = 1 + 1;
-        _t0 = 1000 + 1;
-        _t1 = 100 + 1;
+        let _t2 = 1 + 1;
+        let _t0 = 1000 + 1;
+        let _t1 = 100 + 1;
         _t2 = _t2 + 1;
         _t1 = _t1 + 1;
         _t2 = _t2 * _t0 + _t1 + 3 * _t2 + 5 * _t1 + 7 * (_t0 + 1);
@@ -161,8 +158,7 @@ module 0x99::lambda_pattern {
         consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
     }
     fun __lambda__1__pattern(param$0: S<u64>, _y: u64): u64 {
-        let _t4;
-        S<u64>{x: _t4} = param$0;
+        let S<u64>{x: _t4} = param$0;
         _y = _t4;
         _y + _y
     }

@@ -1,0 +1,26 @@
+module 0x42::constant {
+    fun test_constans() {
+        u<bool>(true);
+        u<bool>(false);
+        u<u8>(1u8);
+        u<u16>(7086u16);
+        u<u32>(14593408u32);
+        u<u64>(51966);
+        u<u128>(3735928559u128);
+        u<u256>(0u256);
+        u<address>(0x42);
+        u<vector<u64>>(vector[1, 2, 3]);
+        u<vector<u8>>(vector[72u8, 101u8, 108u8, 108u8, 111u8, 33u8, 10u8]);
+    }
+    fun u<T>(x: T): T {
+        x
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot pass `integer` to a function which expects argument of type `address`
+   ┌─ const.move:11:20
+   │
+11 │         u<address>(0x42);
+   │                    ^^^^

@@ -1,0 +1,40 @@
+module 0x8675309::M {
+    struct X has copy, drop {
+        f: Y,
+    }
+    struct Y has copy, drop {
+        g: u64,
+        h: u64,
+    }
+    fun foo(_a: &mut u64, _b: &mut u64) {
+        ()
+    }
+    fun t1() {
+        let _t0 = X{f: Y{g: 0,h: 0}};
+        let _t1 = &mut &mut (&mut _t0).f.g;
+        let _t2 = &mut &mut (&mut _t0).f.h;
+        *_t1 = *_t2;
+        *_t2 = *_t1;
+        foo(_t1, _t2);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot borrow from a reference
+   ┌─ factor_valid_1.move:14:19
+   │
+14 │         let _t1 = &mut &mut (&mut _t0).f.g;
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot borrow from a reference
+   ┌─ factor_valid_1.move:15:19
+   │
+15 │         let _t2 = &mut &mut (&mut _t0).f.h;
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot pass `&mut &mut u64` to a function which expects argument of type `&mut u64`
+   ┌─ factor_valid_1.move:18:13
+   │
+18 │         foo(_t1, _t2);
+   │             ^^^
