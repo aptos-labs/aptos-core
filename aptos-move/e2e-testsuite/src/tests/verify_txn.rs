@@ -14,8 +14,11 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config,
     chain_id::ChainId,
+    function_info::FunctionInfo,
     test_helpers::transaction_test_helpers,
-    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    transaction::{
+        Auth, ExecutionStatus, RawTransaction, Script, TransactionArgument, TransactionStatus,
+    },
     vm_status::StatusCode,
 };
 use move_binary_format::file_format::CompiledModule;
@@ -25,6 +28,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use move_ir_compiler::Compiler;
+use std::sync::Arc;
 
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
@@ -48,6 +52,106 @@ fn verify_signature() {
         executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
+    );
+}
+
+#[test]
+fn verify_account_abstraction_cannot_write() {
+    // Setup executor and accounts
+    let mut executor = FakeExecutor::from_head_genesis();
+    let sender = executor.create_raw_account_data(1_000_000, 0);
+    let receiver = executor.create_raw_account_data(0, 0);
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    // Compile and publish a minimal AA authenticator module under the sender's address.
+    // The function simply returns the signer and does not perform signature checks; it has the
+    // correct signature required by the AA framework.
+    let module_code = format!(
+        r#"
+module 0x{addr}.AATest {{
+    import 0x1.auth_data;
+    struct SomethingToWrite has key {{ v: u64 }}
+
+    public authenticate(account: signer, _data: auth_data.AbstractionAuthData): signer {{
+    label b0:
+        move_to<SomethingToWrite>(&account, SomethingToWrite {{ v: 1 }});
+        return move(account);
+    }}
+}}
+"#,
+        addr = sender.address().to_hex()
+    );
+
+    let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
+    let compiler = Compiler {
+        deps: framework_modules.iter().collect(),
+    };
+    let module = compiler
+        .into_compiled_module(module_code.as_str())
+        .expect("Failed to compile AA test module");
+    let mut module_bytes = vec![];
+    module.serialize(&mut module_bytes).unwrap();
+    move_bytecode_verifier::verify_module(&module).expect("Module must verify");
+    executor.add_module(&module.self_id(), module_bytes);
+
+    // Register the authenticator function for the sender account.
+    let add_auth_txn = sender
+        .account()
+        .transaction()
+        .payload(
+            aptos_stdlib::account_abstraction_add_authentication_function(
+                *sender.address(),
+                b"AATest".to_vec(),
+                b"authenticate".to_vec(),
+            ),
+        )
+        .sequence_number(0)
+        .max_gas_amount(200_000)
+        .gas_unit_price(1)
+        .sign();
+
+    assert_eq!(
+        executor.validate_transaction(add_auth_txn.clone()).status(),
+        None
+    );
+    let status = executor.execute_and_apply(add_auth_txn);
+    assert!(matches!(
+        status.status(),
+        TransactionStatus::Keep(ExecutionStatus::Success)
+    ));
+
+    // Build an AA-signed transfer from sender to receiver for 10 coins.
+    let raw_txn = RawTransaction::new(
+        *sender.address(),
+        1, // next sequence number after the add_auth txn
+        aptos_stdlib::aptos_account_transfer(*receiver.address(), 10),
+        200_000,
+        1,
+        u64::MAX,
+        ChainId::test(),
+    );
+
+    let function_info = FunctionInfo::new(
+        *sender.address(),
+        "AATest".to_string(),
+        "authenticate".to_string(),
+    );
+    let sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync> = Arc::new(|_| b"sig".to_vec());
+
+    let signed = raw_txn
+        .sign_aa_transaction(
+            Auth::Abstraction(function_info, sign_func),
+            vec![],
+            vec![],
+            None,
+        )
+        .expect("AA signing failed")
+        .into_inner();
+
+    assert_eq!(
+        executor.execute_transaction(signed.clone()).status(),
+        &TransactionStatus::Discard(StatusCode::REJECTED_WRITE_SET)
     );
 }
 

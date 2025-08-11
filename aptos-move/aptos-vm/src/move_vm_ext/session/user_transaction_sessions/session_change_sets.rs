@@ -81,6 +81,13 @@ impl SystemSessionChangeSet {
         Ok(system_session_change_set)
     }
 
+    pub(crate) fn has_writes(&self) -> bool {
+        self.change_set.num_write_ops()
+            + self.change_set.aggregator_v1_delta_set().len()
+            + self.change_set.delayed_field_change_set().len()
+            > 0
+    }
+
     pub(crate) fn empty() -> Self {
         Self {
             change_set: VMChangeSet::empty(),

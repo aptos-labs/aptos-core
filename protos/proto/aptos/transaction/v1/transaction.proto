@@ -592,7 +592,7 @@ message MultiKeySignature {
   uint32 signatures_required = 3;
 }
 
-message AbstractionSignature {
+message AbstractSignature {
   string function_info = 1;
   bytes signature = 2;
 }
@@ -620,7 +620,7 @@ message AccountSignature {
     // 4 is reserved.
     SingleKeySignature single_key_signature = 5;
     MultiKeySignature multi_key_signature = 6;
-    AbstractionSignature abstraction = 7;
+    AbstractSignature abstraction = 7;
   }
 }
 

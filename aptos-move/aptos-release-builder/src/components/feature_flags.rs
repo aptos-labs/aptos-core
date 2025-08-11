@@ -149,6 +149,7 @@ pub enum FeatureFlag {
     EnableLazyLoading,
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
+    AllowWriteInPrologueSession,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -395,6 +396,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
             },
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::AllowWriteInPrologueSession => {
+                AptosFeatureFlag::ALLOW_WRITE_IN_PROLOGUE_SESSION
+            },
         }
     }
 }
@@ -568,6 +572,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CalculateTransactionFeeForDistribution
             },
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
+            AptosFeatureFlag::ALLOW_WRITE_IN_PROLOGUE_SESSION => {
+                FeatureFlag::AllowWriteInPrologueSession
+            },
         }
     }
 }
