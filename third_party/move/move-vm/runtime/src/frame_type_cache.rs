@@ -66,7 +66,7 @@ pub(crate) struct FrameTypeCache {
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
     /// Recursive frame cache for a function that is called from the
-    /// current frame. It is indexed by FunctionInstantiationindex or
+    /// current frame. It is indexed by FunctionInstantiationIndex or
     /// FunctionHandleIndex for non-generic functions. Note that
     /// whenever a function with the same `index` is called, the
     /// structures stored in that function's frame cache do not change.
