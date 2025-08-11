@@ -3,13 +3,15 @@ module voting::test_helpers {
     use aptos_framework::account;
     use aptos_framework::timestamp;
     use aptos_std::math128;
+    use voting::governance;
     use voting::ve_token;
     use voting::vote_token;
-
     public fun setup() {
         timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@aptos_framework));
-        vote_token::init_for_test(deployer());
-        ve_token::init_for_test(deployer());
+        let deployer = deployer();
+        vote_token::init_for_test(deployer);
+        ve_token::init_for_test(deployer);
+        governance::init_for_test(deployer);
     }
 
     public fun expected_voting_power(locked_amount: u64, num_epochs_locked: u64): u128 {

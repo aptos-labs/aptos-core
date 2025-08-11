@@ -7,7 +7,7 @@ module voting::governance {
     use aptos_framework::voting;
     use aptos_std::simple_map;
     use aptos_std::table::{Self, Table};
-    use std::option;
+    use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
     use voting::ve_token;
@@ -123,6 +123,16 @@ module voting::governance {
     #[view]
     public fun upgrader_address(): address acquires GovernanceParameters {
         signer::address_of(upgrader_signer())
+    }
+
+    #[view]
+    public fun proposal_data(proposal_id: u64): (u64, vector<u8>, u128, Option<u128>, u128, u128) {
+        let expiration_secs = voting::get_proposal_expiration_secs<GovernanceProposal>(@voting, proposal_id);
+        let execution_hash = voting::get_execution_hash<GovernanceProposal>(@voting, proposal_id);
+        let min_vote_threshold = voting::get_min_vote_threshold<GovernanceProposal>(@voting, proposal_id);
+        let early_resolution_vote_threshold = voting::get_early_resolution_vote_threshold<GovernanceProposal>(@voting, proposal_id);
+        let (yes_votes, no_votes) = voting::get_votes<GovernanceProposal>(@voting, proposal_id);
+        (expiration_secs, execution_hash, min_vote_threshold, early_resolution_vote_threshold, yes_votes, no_votes)
     }
 
     public fun type(self: &ResourceRequest): u64 {
@@ -295,5 +305,15 @@ module voting::governance {
 
     inline fun upgrader_signer(): &signer {
         &object::generate_signer_for_extending(&GovernanceParameters[@voting].upgrader)
+    }
+
+    #[test_only]
+    public fun init_for_test(voting_signer: &signer) {
+        init_module(voting_signer);
+    }
+
+    #[test_only]
+    public fun create_resource_request(resource_type: u64,): ResourceRequest {
+        ResourceRequest { type: resource_type }
     }
 }
