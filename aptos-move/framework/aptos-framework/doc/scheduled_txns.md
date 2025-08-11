@@ -1750,7 +1750,21 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
     <b>let</b> <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduledTransactionInfoWithKey">ScheduledTransactionInfoWithKey</a>&gt;();
     <b>let</b> count = 0;
 
-    <b>let</b> iter = queue.schedule_map.new_begin_iter();
+    // Seek directly <b>to</b> the first non-expired transaction instead of iterating from the beginning
+    <b>let</b> expiry_cutoff_time =
+        <b>if</b> (block_timestamp_ms &gt; aux_data.expiry_delta) {
+            block_timestamp_ms - aux_data.expiry_delta
+        } <b>else</b> { 0 };
+
+    // Create a key <b>to</b> seek <b>to</b> the first non-expired transaction
+    // We <b>use</b> minimum values for gas_priority and txn_id <b>to</b> get the earliest transaction at this time
+    <b>let</b> seek_key = <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a> {
+        time: expiry_cutoff_time,
+        gas_priority: 0, // minimum gas_priority (highest actual gas price)
+        txn_id: 0 // minimum txn_id
+    };
+
+    <b>let</b> iter = queue.schedule_map.lower_bound(&seek_key);
     <b>while</b> ((count &lt; limit) && !iter.iter_is_end(&queue.schedule_map)) {
         <b>let</b> key = iter.iter_borrow_key();
         <b>if</b> (key.time &gt; block_timestamp_ms) {
@@ -1766,13 +1780,7 @@ Gets txns due to be run; also expire txns that could not be run for a while (mos
                 key: *key
             };
 
-        <b>if</b> ((block_timestamp_ms &gt; key.time)
-            && ((block_timestamp_ms - key.time) &gt; aux_data.expiry_delta)) {
-            <b>continue</b>;
-        } <b>else</b> {
-            <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a>.push_back(scheduled_txn_info_with_key);
-        };
-        // we do not want an unbounded size of ready or expirable txns; hence we increment either way
+        <a href="scheduled_txns.md#0x1_scheduled_txns">scheduled_txns</a>.push_back(scheduled_txn_info_with_key);
         count = count + 1;
         iter = iter.iter_next(&queue.schedule_map);
     };
@@ -1793,7 +1801,7 @@ Increment after every scheduled transaction is run
 IMP: Make sure this does not affect parallel execution of txns
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_mark_txn_to_remove">mark_txn_to_remove</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>)
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_mark_txn_to_remove">mark_txn_to_remove</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">scheduled_txns::ScheduleMapKey</a>)
 </code></pre>
 
 
@@ -1802,7 +1810,7 @@ IMP: Make sure this does not affect parallel execution of txns
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_mark_txn_to_remove">mark_txn_to_remove</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
+<pre><code><b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_mark_txn_to_remove">mark_txn_to_remove</a>(key: <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleMapKey">ScheduleMapKey</a>) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a> {
     // Calculate <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> index using <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
     <b>let</b> tbl_idx = ((<a href="scheduled_txns.md#0x1_scheduled_txns_truncate_to_u64">truncate_to_u64</a>(key.txn_id) % <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) <b>as</b> u16);
     <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
@@ -1843,8 +1851,7 @@ IMP: Make sure this does not affect parallel execution of txns
     <b>while</b> (!iter.iter_is_end(&queue.schedule_map)
         && expire_count &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_EXPIRE_TRANSACTIONS_LIMIT">EXPIRE_TRANSACTIONS_LIMIT</a>) {
         <b>let</b> key = iter.iter_borrow_key();
-        <b>if</b> ((block_timestamp_ms &lt; key.time)
-            || ((block_timestamp_ms - key.time) &lt;= aux_data.expiry_delta)) {
+        <b>if</b> (block_timestamp_ms &lt;= (aux_data.expiry_delta + key.time)) {
             <b>break</b>;
         };
 
@@ -1899,28 +1906,26 @@ Remove the txns that are run
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="scheduled_txns.md#0x1_scheduled_txns_remove_txns">remove_txns</a>(
     block_timestamp_ms: u64
 ) <b>acquires</b> <a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>, <a href="scheduled_txns.md#0x1_scheduled_txns_AuxiliaryData">AuxiliaryData</a> {
-    {
-        <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
-        <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
-        <b>let</b> tbl_idx: u16 = 0;
+    <b>let</b> to_remove = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ToRemoveTbl">ToRemoveTbl</a>&gt;(@aptos_framework);
+    <b>let</b> queue = <b>borrow_global_mut</b>&lt;<a href="scheduled_txns.md#0x1_scheduled_txns_ScheduleQueue">ScheduleQueue</a>&gt;(@aptos_framework);
+    <b>let</b> tbl_idx: u16 = 0;
 
-        <b>while</b> ((tbl_idx <b>as</b> u64) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) {
-            <b>if</b> (to_remove.remove_tbl.contains(tbl_idx)) {
-                <b>let</b> keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
+    <b>while</b> ((tbl_idx <b>as</b> u64) &lt; <a href="scheduled_txns.md#0x1_scheduled_txns_TO_REMOVE_PARALLELISM">TO_REMOVE_PARALLELISM</a>) {
+        <b>if</b> (to_remove.remove_tbl.contains(tbl_idx)) {
+            <b>let</b> keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
-                <b>while</b> (!keys.is_empty()) {
-                    <b>let</b> key = keys.pop_back();
-                    <b>if</b> (queue.schedule_map.contains(&key)) {
-                        // Remove transaction from schedule_map and txn_table
-                        <b>if</b> (queue.txn_table.contains(key.txn_id)) {
-                            queue.txn_table.remove(key.txn_id);
-                        };
-                        queue.schedule_map.remove(&key);
+            <b>while</b> (!keys.is_empty()) {
+                <b>let</b> key = keys.pop_back();
+                <b>if</b> (queue.schedule_map.contains(&key)) {
+                    // Remove transaction from schedule_map and txn_table
+                    <b>if</b> (queue.txn_table.contains(key.txn_id)) {
+                        queue.txn_table.remove(key.txn_id);
                     };
+                    queue.schedule_map.remove(&key);
                 };
             };
-            tbl_idx = tbl_idx + 1;
         };
+        tbl_idx = tbl_idx + 1;
     };
     <a href="scheduled_txns.md#0x1_scheduled_txns_cancel_and_remove_expired_txns">cancel_and_remove_expired_txns</a>(block_timestamp_ms);
 }

@@ -4,7 +4,7 @@ module aptos_framework::test_scheduled_txns {
     use std::signer;
     use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::scheduled_txns::{Self, ScheduleMapKey, mark_txn_to_remove};
+    use aptos_framework::scheduled_txns::{Self, ScheduleMapKey, mark_txn_to_remove_test};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_validation;
 
@@ -20,7 +20,7 @@ module aptos_framework::test_scheduled_txns {
         let f = scheduled_txns::get_func_from_txn_key(key);
         f(some<signer>(signer));
         // Finish execution
-        mark_txn_to_remove(key);
+        mark_txn_to_remove_test(key);
     }
 
     #[persistent]
@@ -133,7 +133,7 @@ module aptos_framework::test_scheduled_txns {
         );
         assert!(ready_txns.length() == 2, ready_txns.length());
 
-        mark_txn_to_remove(txn1_key);
+        mark_txn_to_remove_test(txn1_key);
         // Execute and verify transaction epilogue
         let txn1_storage_fee_refund = 10;
         transaction_validation::scheduled_txn_epilogue_test_helper(

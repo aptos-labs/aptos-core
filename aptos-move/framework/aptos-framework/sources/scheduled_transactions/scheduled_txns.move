@@ -624,7 +624,21 @@ module aptos_framework::scheduled_txns {
         let scheduled_txns = vector::empty<ScheduledTransactionInfoWithKey>();
         let count = 0;
 
-        let iter = queue.schedule_map.new_begin_iter();
+        // Seek directly to the first non-expired transaction instead of iterating from the beginning
+        let expiry_cutoff_time =
+            if (block_timestamp_ms > aux_data.expiry_delta) {
+                block_timestamp_ms - aux_data.expiry_delta
+            } else { 0 };
+
+        // Create a key to seek to the first non-expired transaction
+        // We use minimum values for gas_priority and txn_id to get the earliest transaction at this time
+        let seek_key = ScheduleMapKey {
+            time: expiry_cutoff_time,
+            gas_priority: 0, // minimum gas_priority (highest actual gas price)
+            txn_id: 0 // minimum txn_id
+        };
+
+        let iter = queue.schedule_map.lower_bound(&seek_key);
         while ((count < limit) && !iter.iter_is_end(&queue.schedule_map)) {
             let key = iter.iter_borrow_key();
             if (key.time > block_timestamp_ms) {
@@ -640,13 +654,7 @@ module aptos_framework::scheduled_txns {
                     key: *key
                 };
 
-            if ((block_timestamp_ms > key.time)
-                && ((block_timestamp_ms - key.time) > aux_data.expiry_delta)) {
-                continue;
-            } else {
-                scheduled_txns.push_back(scheduled_txn_info_with_key);
-            };
-            // we do not want an unbounded size of ready or expirable txns; hence we increment either way
+            scheduled_txns.push_back(scheduled_txn_info_with_key);
             count = count + 1;
             iter = iter.iter_next(&queue.schedule_map);
         };
@@ -656,7 +664,7 @@ module aptos_framework::scheduled_txns {
 
     /// Increment after every scheduled transaction is run
     /// IMP: Make sure this does not affect parallel execution of txns
-    public(friend) fun mark_txn_to_remove(key: ScheduleMapKey) acquires ToRemoveTbl {
+    fun mark_txn_to_remove(key: ScheduleMapKey) acquires ToRemoveTbl {
         // Calculate table index using hash
         let tbl_idx = ((truncate_to_u64(key.txn_id) % TO_REMOVE_PARALLELISM) as u16);
         let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
@@ -677,8 +685,7 @@ module aptos_framework::scheduled_txns {
         while (!iter.iter_is_end(&queue.schedule_map)
             && expire_count < EXPIRE_TRANSACTIONS_LIMIT) {
             let key = iter.iter_borrow_key();
-            if ((block_timestamp_ms < key.time)
-                || ((block_timestamp_ms - key.time) <= aux_data.expiry_delta)) {
+            if (block_timestamp_ms <= (aux_data.expiry_delta + key.time)) {
                 break;
             };
 
@@ -713,28 +720,26 @@ module aptos_framework::scheduled_txns {
     public(friend) fun remove_txns(
         block_timestamp_ms: u64
     ) acquires ToRemoveTbl, ScheduleQueue, AuxiliaryData {
-        {
-            let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
-            let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
-            let tbl_idx: u16 = 0;
+        let to_remove = borrow_global_mut<ToRemoveTbl>(@aptos_framework);
+        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+        let tbl_idx: u16 = 0;
 
-            while ((tbl_idx as u64) < TO_REMOVE_PARALLELISM) {
-                if (to_remove.remove_tbl.contains(tbl_idx)) {
-                    let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
+        while ((tbl_idx as u64) < TO_REMOVE_PARALLELISM) {
+            if (to_remove.remove_tbl.contains(tbl_idx)) {
+                let keys = to_remove.remove_tbl.borrow_mut(tbl_idx);
 
-                    while (!keys.is_empty()) {
-                        let key = keys.pop_back();
-                        if (queue.schedule_map.contains(&key)) {
-                            // Remove transaction from schedule_map and txn_table
-                            if (queue.txn_table.contains(key.txn_id)) {
-                                queue.txn_table.remove(key.txn_id);
-                            };
-                            queue.schedule_map.remove(&key);
+                while (!keys.is_empty()) {
+                    let key = keys.pop_back();
+                    if (queue.schedule_map.contains(&key)) {
+                        // Remove transaction from schedule_map and txn_table
+                        if (queue.txn_table.contains(key.txn_id)) {
+                            queue.txn_table.remove(key.txn_id);
                         };
+                        queue.schedule_map.remove(&key);
                     };
                 };
-                tbl_idx = tbl_idx + 1;
             };
+            tbl_idx = tbl_idx + 1;
         };
         cancel_and_remove_expired_txns(block_timestamp_ms);
     }
@@ -845,6 +850,11 @@ module aptos_framework::scheduled_txns {
 
         coin::destroy_burn_cap(burn);
         coin::destroy_mint_cap(mint);
+    }
+
+    #[test_only]
+    public fun mark_txn_to_remove_test(key: ScheduleMapKey) acquires ToRemoveTbl {
+        mark_txn_to_remove(key);
     }
 
     #[test_only]

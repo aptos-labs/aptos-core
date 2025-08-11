@@ -196,6 +196,7 @@ module aptos_framework::block {
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
 
+        // remove_txns expects the timestamp in milli seconds, so we divide by 1000.
         scheduled_txns::remove_txns(timestamp / 1000);
 
         block_metadata_ref.epoch_interval
