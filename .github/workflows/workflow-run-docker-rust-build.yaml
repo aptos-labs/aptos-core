@@ -77,9 +77,9 @@ env:
   GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
   TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
   GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
-  RELEASE_DEFAULT: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
-  PERF: ${{ inputs.PROFILE == 'performance' }}
-  FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
+  PROFILE_RELEASE: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
+  PROFILE_PERF: ${{ inputs.PROFILE == 'performance' }}
+  FEATURE_FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
 
 permissions:
   contents: read
@@ -125,9 +125,9 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
           WAIT_FOR_IMAGE_SECONDS: 1
-          RELEASE_DEFAULT: ${{ env.RELEASE_DEFAULT }}
-          PERF: ${{ env.PERF }}
-          FAILPOINTS: ${{ env.FAILPOINTS }}
+          PROFILE_RELEASE : ${{ env.PROFILE_RELEASE }}
+          PROFILE_PERF: ${{ env.PROFILE_PERF }}
+          FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
 
       - name: Authenticate to Google Cloud
         id: auth

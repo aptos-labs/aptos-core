@@ -129,16 +129,16 @@ export function getImagesToWaitFor(args) {
   for (const image of [...perfImages, ...images]) {
     const imageConfig = {};
 
-    if (args.RELEASE_DEFAULT) {
+    if (args.PROFILE_RELEASE) {
       imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Default];
     }
 
     if (perfImages.includes(image)) {
-      if (args.PERF) {
+      if (args.PROFILE_PERF) {
         imageConfig[CargoBuildProfiles.Performance] = [CargoBuildFeatures.Default];
       }
 
-      if (args.FAILPOINTS) {
+      if (args.FEATURE_FAILPOINTS) {
         if (imageConfig[CargoBuildProfiles.Release] !== undefined) {
           imageConfig[CargoBuildProfiles.Release].push(CargoBuildFeatures.Failpoints);
         } else {
