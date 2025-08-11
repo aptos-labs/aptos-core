@@ -19,7 +19,7 @@ inputs:
     description: "If true, wait for the performance images to be available."
     required: false
     default: false
-  FEATURES_FAILPOINTS:
+  FEATURE_FAILPOINTS:
     description: "If true, wait for the failpoints images to be available."
     required: false
     default: false
