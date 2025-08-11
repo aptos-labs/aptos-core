@@ -178,7 +178,7 @@ jobs:
           fi
       
       - name: Post-run Lock Cleanup 
-        if: ${{ always() }}
+        if: ${{ always() && steps.lock.outcome == 'success' }}
         run: | 
           gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
           echo "Docker Build unlocked"
