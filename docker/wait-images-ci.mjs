@@ -21,13 +21,13 @@ import {
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
-  const BOOLEAN_ARGS = ["RELEASE_DEFAULT", "PERF", "FAILPOINTS"];
+  const BOOLEAN_ARGS = ["PROFILE_RELEASE", "PROFILE_PERF", "FEATURES_FAILPOINTS"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
   // if none are set, check all images
-  if (!parsedArgs.RELEASE_DEFAULT && !parsedArgs.PERF && !parsedArgs.FAILPOINTS) {
-    parsedArgs.RELEASE_DEFAULT = parsedArgs.PERF = parsedArgs.FAILPOINTS = true;
+  if (!parsedArgs.PROFILE_RELEASE && !parsedArgs.PROFILE_PERF && !parsedArgs.FEATURES_FAILPOINTS) {
+    parsedArgs.PROFILE_RELEASE = parsedArgs.PROFILE_PERF = parsedArgs.FEATURES_FAILPOINTS = true;
   }
 
   await assertExecutingInRepoRoot();
