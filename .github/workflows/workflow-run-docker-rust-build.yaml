@@ -79,7 +79,7 @@ env:
   GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
   PROFILE_RELEASE: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
   PROFILE_PERF: ${{ inputs.PROFILE == 'performance' }}
-  FEATURE_FAILPOINTS: ${{ inputs.FEATURE == 'failpoints' }}
+  FEATURE_FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
 
 permissions:
   contents: read
