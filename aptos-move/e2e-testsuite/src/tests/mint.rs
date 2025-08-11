@@ -5,9 +5,10 @@
 use aptos_cached_packages::aptos_stdlib;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+use rstest::rstest;
 
-#[test]
-fn mint_to_new_account() {
+#[rstest(stateless_account, case(true), case(false))]
+fn mint_to_new_account(stateless_account: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
     let mut root = Account::new_aptos_root();
     let (private_key, public_key) = aptos_vm_genesis::GENESIS_KEYPAIR.clone();
@@ -15,7 +16,8 @@ fn mint_to_new_account() {
 
     // Create and publish a sender with TXN_RESERVED coins, also note how
     // many were there before.
-    let new_account = executor.create_raw_account_data(0, 0);
+    let new_account =
+        executor.create_raw_account_data(0, if stateless_account { None } else { Some(0) });
     executor.add_account_data(&new_account);
     let supply_before = executor.read_coin_supply().unwrap();
 
