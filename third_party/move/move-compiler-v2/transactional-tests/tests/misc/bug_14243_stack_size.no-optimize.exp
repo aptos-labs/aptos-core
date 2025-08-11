@@ -17,7 +17,7 @@ fun t0()
     st_loc l1
     copy_loc l1
     // @5
-    call m::id_mut<u64>
+    call id_mut<u64>
     read_ref
     move_loc l1
     read_ref

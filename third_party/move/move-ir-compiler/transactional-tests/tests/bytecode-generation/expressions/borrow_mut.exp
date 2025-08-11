@@ -24,7 +24,7 @@ struct FooCoin
   value: u64
 
 // Function definition at index 0
-public fun borrow_mut_field(l0: &mut Foobar::FooCoin)
+public fun borrow_mut_field(l0: &mut FooCoin)
     local l1: &mut u64
     move_loc l0
     mut_borrow_field FooCoin, value
@@ -42,7 +42,7 @@ struct FooCoin<T0>
   value: u64
 
 // Function definition at index 0
-public fun borrow_mut_field(l0: &mut Foobar::FooCoin<address>)
+public fun borrow_mut_field(l0: &mut FooCoin<address>)
     local l1: &mut u64
     move_loc l0
     mut_borrow_field FooCoin<address>, value
