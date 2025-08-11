@@ -13,25 +13,21 @@ module 0x1::simple_map {
         vector::length<Element<Key, Value>>(&self.data)
     }
     public fun borrow<Key: store, Value: store>(self: &SimpleMap<Key, Value>, key: &Key): &Value {
-        let _t2;
-        _t2 = find<Key,Value>(self, key);
+        let _t2 = find<Key,Value>(self, key);
         if (!option::is_some<u64>(&_t2)) abort error::invalid_argument(2);
         &vector::borrow<Element<Key, Value>>(&self.data, option::extract<u64>(&mut _t2)).value
     }
     public fun borrow_mut<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: &Key): &mut Value {
-        let _t2;
-        _t2 = find<Key,Value>(/*freeze*/self, key);
+        let _t2 = find<Key,Value>(/*freeze*/self, key);
         if (!option::is_some<u64>(&_t2)) abort error::invalid_argument(2);
         &mut vector::borrow_mut<Element<Key, Value>>(&mut self.data, option::extract<u64>(&mut _t2)).value
     }
     public fun destroy_empty<Key: store, Value: store>(self: SimpleMap<Key, Value>) {
-        let _t2;
-        SimpleMap<Key,Value>{data: _t2} = self;
+        let SimpleMap<Key,Value>{data: _t2} = self;
         vector::destroy_empty<Element<Key, Value>>(_t2);
     }
     fun find<Key: store, Value: store>(self: &SimpleMap<Key, Value>, key: &Key): option::Option<u64> {
-        let _t3;
-        _t3 = 0;
+        let _t3 = 0;
         'l0: loop {
             loop {
                 if (!(_t3 < vector::length<Element<Key, Value>>(&self.data))) break 'l0;
@@ -43,12 +39,9 @@ module 0x1::simple_map {
         option::none<u64>()
     }
     public fun remove<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: &Key): (Key, Value) {
-        let _t19;
-        let _t18;
-        let _t2;
-        _t2 = find<Key,Value>(/*freeze*/self, key);
+        let _t2 = find<Key,Value>(/*freeze*/self, key);
         if (!option::is_some<u64>(&_t2)) abort error::invalid_argument(2);
-        Element<Key,Value>{key: _t18,value: _t19} = vector::swap_remove<Element<Key, Value>>(&mut self.data, option::extract<u64>(&mut _t2));
+        let Element<Key,Value>{key: _t18,value: _t19} = vector::swap_remove<Element<Key, Value>>(&mut self.data, option::extract<u64>(&mut _t2));
         (_t18, _t19)
     }
     public fun add<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: Key, value: Value) {
@@ -56,18 +49,13 @@ module 0x1::simple_map {
         vector::push_back<Element<Key, Value>>(&mut self.data, Element<Key,Value>{key: key,value: value});
     }
     public fun add_all<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, keys: vector<Key>, values: vector<Value>) {
-        let _t7;
-        let _t6;
-        let _t5;
-        let _t4;
-        let _t3;
-        _t3 = keys;
-        _t4 = values;
+        let _t3 = keys;
+        let _t4 = values;
         vector::reverse<Key>(&mut _t3);
         vector::reverse<Value>(&mut _t4);
-        _t5 = _t3;
-        _t6 = _t4;
-        _t7 = vector::length<Key>(&_t5);
+        let _t5 = _t3;
+        let _t6 = _t4;
+        let _t7 = vector::length<Key>(&_t5);
         if (!(_t7 == vector::length<Value>(&_t6))) abort 131074;
         while (_t7 > 0) {
             add<Key,Value>(self, vector::pop_back<Key>(&mut _t5), vector::pop_back<Value>(&mut _t6));
@@ -77,12 +65,9 @@ module 0x1::simple_map {
         vector::destroy_empty<Value>(_t6);
     }
     public fun keys<Key: copy, Value>(self: &SimpleMap<Key, Value>): vector<Key> {
-        let _t3;
-        let _t2;
-        let _t1;
-        _t1 = &self.data;
-        _t2 = vector::empty<Key>();
-        _t3 = 0;
+        let _t1 = &self.data;
+        let _t2 = vector::empty<Key>();
+        let _t3 = 0;
         while (_t3 < vector::length<Element<Key, Value>>(_t1)) {
             vector::push_back<Key>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).key);
             _t3 = _t3 + 1
@@ -90,12 +75,9 @@ module 0x1::simple_map {
         _t2
     }
     public fun values<Key, Value: copy>(self: &SimpleMap<Key, Value>): vector<Value> {
-        let _t3;
-        let _t2;
-        let _t1;
-        _t1 = &self.data;
-        _t2 = vector::empty<Value>();
-        _t3 = 0;
+        let _t1 = &self.data;
+        let _t2 = vector::empty<Value>();
+        let _t3 = 0;
         while (_t3 < vector::length<Element<Key, Value>>(_t1)) {
             vector::push_back<Value>(&mut _t2, *&vector::borrow<Element<Key, Value>>(_t1, _t3).value);
             _t3 = _t3 + 1
@@ -112,45 +94,32 @@ module 0x1::simple_map {
         SimpleMap<Key,Value>{data: vector::empty<Element<Key, Value>>()}
     }
     public fun new_from<Key: store, Value: store>(keys: vector<Key>, values: vector<Value>): SimpleMap<Key, Value> {
-        let _t2;
-        _t2 = new<Key,Value>();
+        let _t2 = new<Key,Value>();
         add_all<Key,Value>(&mut _t2, keys, values);
         _t2
     }
     public fun to_vec_pair<Key: store, Value: store>(self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
-        let _t22;
-        let _t21;
-        let _t5;
-        let _t4;
-        let _t3;
-        let _t11;
-        let _t2;
-        let _t1;
-        _t1 = vector::empty<Key>();
-        _t2 = vector::empty<Value>();
-        SimpleMap<Key,Value>{data: _t11} = self;
-        _t3 = _t11;
+        let _t1 = vector::empty<Key>();
+        let _t2 = vector::empty<Value>();
+        let SimpleMap<Key,Value>{data: _t11} = self;
+        let _t3 = _t11;
         vector::reverse<Element<Key, Value>>(&mut _t3);
-        _t4 = _t3;
-        _t5 = vector::length<Element<Key, Value>>(&_t4);
+        let _t4 = _t3;
+        let _t5 = vector::length<Element<Key, Value>>(&_t4);
         while (_t5 > 0) {
-            Element<Key,Value>{key: _t21,value: _t22} = vector::pop_back<Element<Key, Value>>(&mut _t4);
+            let Element<Key,Value>{key: _t21,value: _t22} = vector::pop_back<Element<Key, Value>>(&mut _t4);
             vector::push_back<Key>(&mut _t1, _t21);
             vector::push_back<Value>(&mut _t2, _t22);
-            _t5 = _t5 - 1
+            _t5 = _t5 - 1;
+            continue
         };
         vector::destroy_empty<Element<Key, Value>>(_t4);
         (_t1, _t2)
     }
     public fun upsert<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: Key, value: Value): (option::Option<Key>, option::Option<Value>) {
-        let _t35;
-        let _t34;
-        let _t5;
-        let _t4;
-        let _t3;
-        _t3 = &mut self.data;
-        _t4 = vector::length<Element<Key, Value>>(/*freeze*/_t3);
-        _t5 = 0;
+        let _t3 = &mut self.data;
+        let _t4 = vector::length<Element<Key, Value>>(/*freeze*/_t3);
+        let _t5 = 0;
         'l0: loop {
             loop {
                 if (!(_t5 < _t4)) break 'l0;
@@ -159,7 +128,7 @@ module 0x1::simple_map {
             };
             vector::push_back<Element<Key, Value>>(_t3, Element<Key,Value>{key: key,value: value});
             vector::swap<Element<Key, Value>>(_t3, _t5, _t4);
-            Element<Key,Value>{key: _t34,value: _t35} = vector::pop_back<Element<Key, Value>>(_t3);
+            let Element<Key,Value>{key: _t34,value: _t35} = vector::pop_back<Element<Key, Value>>(_t3);
             return (option::some<Key>(_t34), option::some<Value>(_t35))
         };
         vector::push_back<Element<Key, Value>>(&mut self.data, Element<Key,Value>{key: key,value: value});

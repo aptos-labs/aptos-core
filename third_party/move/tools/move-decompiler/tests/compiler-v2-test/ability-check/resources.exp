@@ -1,0 +1,23 @@
+module 0x42::M {
+    struct R has key {
+        f: u64,
+    }
+    public fun test_resource(s: &signer) {
+        move_to(R{f: 1}, s);
+        if (!(*&borrow_global(0x42).f == 1)) abort 1;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ resources.move:6:17
+  │
+6 │         move_to(R{f: 1}, s);
+  │                 ^^^^^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ resources.move:7:31
+  │
+7 │         if (!(*&borrow_global(0x42).f == 1)) abort 1;
+  │                               ^^^^

@@ -1,0 +1,16 @@
+module 0x8675309::M {
+    struct R has key {
+        f: u64,
+    }
+    fun t0(addr: address) {
+        &mut borrow_global_mut(addr).f = *&borrow_global_mut(addr).f;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+  ┌─ borrow_global_mut.move:6:9
+  │
+6 │         &mut borrow_global_mut(addr).f = *&borrow_global_mut(addr).f;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

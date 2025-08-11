@@ -1,0 +1,61 @@
+module 0x8675309::M {
+    struct R has key {
+        f: bool,
+    }
+    fun t0(s: &signer, r: R) {
+        move_to(r, s);
+        move_to(R{f: false}, s);
+    }
+}
+
+module 0x8675309::N {
+    struct R<T> has key {
+        f: T,
+    }
+    fun t0<T: store>(s: &signer, r: R<T>) {
+        move_to<T>(r, s);
+        move_to<bool>(R<bool>{f: false}, s);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ move_to_valid.move:6:17
+  │
+6 │         move_to(r, s);
+  │                 ^
+
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ move_to_valid.move:7:17
+  │
+7 │         move_to(R{f: false}, s);
+  │                 ^^^^^^^^^^^
+
+error: type `T` is missing required ability `key`
+   ┌─ move_to_valid.move:16:17
+   │
+16 │         move_to<T>(r, s);
+   │                 ^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: cannot use `R<T>` with an operator which expects a value of type `&signer`
+   ┌─ move_to_valid.move:16:20
+   │
+16 │         move_to<T>(r, s);
+   │                    ^
+
+error: type `bool` is missing required ability `key`
+   ┌─ move_to_valid.move:17:17
+   │
+17 │         move_to<bool>(R<bool>{f: false}, s);
+   │                 ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: cannot use `R<bool>` with an operator which expects a value of type `&signer`
+   ┌─ move_to_valid.move:17:23
+   │
+17 │         move_to<bool>(R<bool>{f: false}, s);
+   │                       ^^^^^^^^^^^^^^^^^
