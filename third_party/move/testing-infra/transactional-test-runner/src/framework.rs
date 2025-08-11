@@ -1228,7 +1228,8 @@ fn handle_expected_output(
         .replace('\r', "\n");
     if output != expected_output {
         let msg = format!(
-            "Expected errors differ from actual errors:\n{}",
+            "Expected errors differ from actual errors (for `{}`):\n{}",
+            test_path.display(),
             format_diff(expected_output, output),
         );
         anyhow::bail!(add_update_baseline_fix(msg))

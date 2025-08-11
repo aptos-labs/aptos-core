@@ -25,8 +25,7 @@ module 0x42::N {
         move_to<u64>(R<u64>{v: 0}, p0);
     }
     public fun take(p0: &signer): u64 {
-        let _t4;
-        R<u64>{v: _t4} = move_from<u64>(signer::address_of(p0));
+        let R<u64>{v: _t4} = move_from<u64>(signer::address_of(p0));
         _t4
     }
 }
@@ -49,7 +48,7 @@ script {
 script {
     use 0x42::N;
     entry fun main(p0: signer) {
-        ()
+        N::take(&p0);
     }
 }
 
