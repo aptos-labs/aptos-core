@@ -138,7 +138,7 @@ export function getImagesToWaitFor(args) {
         imageConfig[CargoBuildProfiles.Performance] = [CargoBuildFeatures.Default];
       }
 
-      if (args.FEATURES_FAILPOINTS) {
+      if (args.FEATURE_FAILPOINTS) {
         if (imageConfig[CargoBuildProfiles.Release] !== undefined) {
           imageConfig[CargoBuildProfiles.Release].push(CargoBuildFeatures.Failpoints);
         } else {
