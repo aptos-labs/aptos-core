@@ -145,7 +145,7 @@ jobs:
           result=$?
           set -e
           if [[ $result -eq 0 ]]; then
-            if [[ "$output" != *"${{ github.run_id }}"* ]]; then
+            if [[ "$output" == *"${{ github.run_id }}"* ]]; then
               echo "Lock file for current workflow exists. Continuing ..."
             else
               echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
