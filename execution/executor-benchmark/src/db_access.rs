@@ -5,8 +5,9 @@ use anyhow::Result;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        AccountResource, CoinInfoResource, CoinStoreResource, ConcurrentSupplyResource,
-        FungibleStoreResource, ObjectCoreResource, ObjectGroupResource, TypeInfoResource,
+        primary_apt_store, AccountResource, CoinInfoResource, CoinStoreResource,
+        ConcurrentSupplyResource, FungibleStoreResource, ObjectCoreResource, ObjectGroupResource,
+        TypeInfoResource,
     },
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
@@ -110,11 +111,25 @@ impl DbAccessUtil {
         Self::get_value(account_key, state_view)
     }
 
-    pub fn get_fa_store(
-        store_key: &StateKey,
+    pub fn get_fungible_store(
+        account: &AccountAddress,
         state_view: &impl StateView,
-    ) -> Result<Option<FungibleStoreResource>> {
-        Self::get_value(store_key, state_view)
+    ) -> Result<FungibleStoreResource> {
+        let rg: Option<ObjectGroupResource> = Self::get_value(
+            &StateKey::resource_group(
+                &primary_apt_store(*account),
+                &ObjectGroupResource::struct_tag(),
+            ),
+            state_view,
+        )?;
+        Ok(if let Some(rg) = rg {
+            rg.group
+                .get(&FungibleStoreResource::struct_tag())
+                .map(|bytes| bcs::from_bytes(bytes).unwrap())
+                .unwrap()
+        } else {
+            FungibleStoreResource::new(AccountAddress::TEN, 0, false)
+        })
     }
 
     pub fn get_apt_coin_store(
@@ -185,7 +200,7 @@ impl DbAccessUtil {
                         struct_tag
                             .type_args
                             .iter()
-                            .map(|v| v.to_string())
+                            .map(|v| v.to_canonical_string())
                             .join(", ")
                     )
                     .to_string()

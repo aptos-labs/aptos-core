@@ -1,0 +1,106 @@
+//# publish
+module 0x2.a {
+    // Empty module for 0x2::b to link against when declaring as a friend.
+}
+
+//# publish
+module 0x2.b {
+    friend 0x2.a;
+
+    private_function<T>() {
+    label b0:
+        return;
+    }
+
+    public(friend) friend_function<T>() {
+    label b0:
+        return;
+    }
+
+    public public_function<T>() {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x2.a {
+    import 0x2.b;
+
+    public call_private_function() {
+    label b0:
+        b.private_function<u8>();
+        return;
+    }
+
+    public call_friend_function() {
+    label b0:
+        b.friend_function<u64>();
+        return;
+    }
+
+    public call_public_function() {
+    label b0:
+        b.public_function<u128>();
+        return;
+    }
+}
+
+//# publish
+module 0x2.c {
+    import 0x2.b;
+
+    public call_private_function() {
+    label b0:
+        b.private_function<u8>();
+        return;
+    }
+
+    public call_friend_function() {
+    label b0:
+        b.friend_function<u64>();
+        return;
+    }
+
+    public call_public_function() {
+    label b0:
+        b.public_function<u128>();
+        return;
+    }
+}
+
+//# run 0x2::a::call_private_function
+
+//# run 0x2::a::call_friend_function
+
+//# run 0x2::a::call_public_function
+
+//# run 0x2::c::call_private_function
+
+//# run 0x2::c::call_friend_function
+
+//# run 0x2::c::call_public_function
+
+//# run --signers 0x1
+import 0x2.b;
+main(account: signer) {
+label b0:
+    b.private_function<u8>();
+    return;
+}
+
+//# run --signers 0x1
+import 0x2.b;
+main(account: signer) {
+label b0:
+    b.friend_function<u64>();
+    return;
+}
+
+//# run --signers 0x1
+import 0x2.b;
+main(account: signer) {
+label b0:
+    b.public_function<u128>();
+    return;
+}

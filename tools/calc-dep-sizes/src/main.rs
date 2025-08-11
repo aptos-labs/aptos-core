@@ -39,7 +39,7 @@ async fn list_files_with_extension(
         let mut entries = fs::read_dir(curr_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == extension) {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == extension) {
                 paths.push(path);
             } else if path.is_dir() {
                 stack.push(path);

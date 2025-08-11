@@ -49,8 +49,6 @@ use aptos_types::{
 };
 pub use mock_payload_manager::MockPayloadManager;
 #[cfg(test)]
-pub use mock_state_computer::EmptyStateComputer;
-#[cfg(test)]
 pub use mock_state_computer::RandomComputeResultStateComputer;
 pub use mock_storage::{EmptyStorage, MockStorage};
 use move_core_types::account_address::AccountAddress;
@@ -317,6 +315,7 @@ pub(crate) fn create_signed_transaction(gas_unit_price: u64) -> SignedTransactio
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
 
+    // TODO[Orderless]: Change this to transaction payload v2 format.
     let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
     let raw_transaction = RawTransaction::new(
         AccountAddress::random(),

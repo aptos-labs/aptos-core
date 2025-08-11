@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+warning: Unused value of parameter `y`. Consider removing the parameter, or prefixing with an underscore (e.g., `_y`), or binding to `_`
   ┌─ tests/unused-assignment/v1-locals/dont_warn_unused_self.move:5:27
   │
 5 │     fun receiver(self: S, y: u64) {

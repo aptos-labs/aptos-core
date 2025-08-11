@@ -148,9 +148,10 @@ impl ExecutionGasEvent {
                 ),
                 *cost,
             ),
-            LoadResource { addr, ty, cost } => {
-                Node::new(format!("load<{}::{}>", Render(addr), ty), *cost)
-            },
+            LoadResource { addr, ty, cost } => Node::new(
+                format!("load<{}::{}>", Render(addr), ty.to_canonical_string()),
+                *cost,
+            ),
             CreateTy { cost } => Node::new("create_ty", *cost),
         }
     }
@@ -199,14 +200,7 @@ impl WriteTransient {
 
 impl Dependency {
     fn to_erased(&self) -> Node<InternalGas> {
-        Node::new(
-            format!(
-                "{}{}",
-                Render(&self.id),
-                if self.is_new { " (new)" } else { "" }
-            ),
-            self.cost,
-        )
+        Node::new(self.render(), self.cost)
     }
 }
 
@@ -272,7 +266,7 @@ impl WriteStorage {
 
 impl EventStorage {
     fn to_erased(&self) -> Node<StoragePair> {
-        Node::new(format!("{}", self.ty), (self.cost, Fee::zero()))
+        Node::new(self.ty.to_canonical_string(), (self.cost, Fee::zero()))
     }
 }
 

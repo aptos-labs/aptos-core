@@ -1,0 +1,5 @@
+processed 3 tasks
+task 0 lines 1-19:  publish [module 0xc0ffee::m {]
+task 1 lines 21-21:  run 0xc0ffee::m::init --signers 0xc0ffee
+task 2 lines 23-23:  run 0xc0ffee::m::fetch_and_run --signers 0xc0ffee
+return values: 7

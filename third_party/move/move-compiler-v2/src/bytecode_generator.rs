@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Options;
+use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -317,7 +317,14 @@ impl<'env> Generator<'env> {
 
     /// Report an (internal) error at the location associated with the node.
     fn internal_error(&self, id: NodeId, msg: impl AsRef<str>) {
-        self.diag(id, Severity::Bug, msg)
+        let env = self.env();
+        let loc = env.get_node_loc(id);
+        env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            &format!("compiler internal error: {}", msg.as_ref()),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        );
     }
 
     fn diag(&self, id: NodeId, severity: Severity, msg: impl AsRef<str>) {
@@ -350,7 +357,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Dispatcher
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
@@ -418,10 +425,7 @@ impl<'env> Generator<'env> {
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
-                // Notice that we cannot be in reference mode here for reasons
-                // of typing: the result of the Mutate operator is `()` and cannot
-                // appear where references are processed.
-                let rhs_temp = self.gen_arg(rhs, false);
+                let rhs_temp = self.gen_escape_auto_ref_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
                 let lhs_type = self.get_node_type(lhs.node_id());
 
@@ -521,7 +525,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Values
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_value(&mut self, target: Vec<TempIndex>, id: NodeId, val: &Value) {
         let target = self.require_unary_target(id, target);
         let ty = self.get_node_type(id);
@@ -593,7 +597,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Locals
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
         let target = self.require_unary_target(id, targets);
         let temp = self.find_local(id, name);
@@ -638,12 +642,12 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Calls
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun: &Exp, args: &[Exp]) {
         // Arguments are first computed, finally the function. (On a stack machine, the
         // function is on the top).
         let mut arg_temps = self.gen_arg_list(args);
-        let fun_temp = self.gen_arg(fun, false);
+        let fun_temp = self.gen_escape_auto_ref_arg(fun, false);
 
         // The function can be a wrapper `struct W(|T|S|)` which we need to unpack first.
         let fun_ty = self.get_node_type(fun.node_id());
@@ -652,6 +656,16 @@ impl<'env> Generator<'env> {
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
             let struct_id = wrapper_struct.get_qualified_id();
+            if struct_id.module_id != self.func_env.module_env.get_id() {
+                self.error(
+                    id,
+                    format!(
+                    "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value ",
+                    wrapper_struct.get_full_name_str(),
+                    self.func_env.env().get_module(struct_id.module_id).get_full_name_str(),
+                    ),
+                )
+            }
             let inst = inst.to_vec();
             self.emit_with(id, |attr| {
                 Bytecode::Call(
@@ -849,7 +863,17 @@ impl<'env> Generator<'env> {
                         .get_type_parameter_count(),
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
-                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty {
+                if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
+                    if wrapper_mid != *mid {
+                        self.error(
+                            id,
+                            format!(
+                                "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
+                                target_ty.display(&self.func_env.get_type_display_ctx()),
+                                self.func_env.env().get_module(wrapper_mid).get_full_name_str(),
+                                ),
+                        );
+                    }
                     // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()
@@ -1224,7 +1248,9 @@ impl<'env> Generator<'env> {
     // nested.
     fn gen_tuple(&mut self, exp: &Exp, with_forced_temp: bool) -> Vec<TempIndex> {
         if let ExpData::Call(_, Operation::Tuple, args) = exp.as_ref() {
-            args.iter().map(|arg| self.gen_arg(arg, false)).collect()
+            args.iter()
+                .map(|arg| self.gen_escape_auto_ref_arg(arg, false))
+                .collect()
         } else {
             let exp_ty = self.env().get_node_type(exp.node_id());
             if exp_ty.is_tuple() {
@@ -1237,7 +1263,7 @@ impl<'env> Generator<'env> {
                 self.gen(temps.clone(), exp);
                 temps
             } else {
-                vec![self.gen_arg(exp, with_forced_temp)]
+                vec![self.gen_escape_auto_ref_arg(exp, with_forced_temp)]
             }
         }
     }
@@ -1282,7 +1308,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // References
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     fn gen_borrow(&mut self, target: TempIndex, id: NodeId, kind: ReferenceKind, arg: &Exp) {
         match arg.as_ref() {
             ExpData::Call(_arg_id, Operation::Select(mid, sid, fid), args) => {
@@ -1322,7 +1348,7 @@ impl<'env> Generator<'env> {
         // Borrow the temporary, allowing to do e.g. `&(1+2)`. Note to match
         // this capability in the stack machine, we need to keep those temps in locals
         // and can't manage them on the stack during stackification.
-        let temp = self.gen_arg(arg, false);
+        let temp = self.gen_escape_auto_ref_arg(arg, false);
         self.gen_borrow_temp(target, id, temp)
     }
 
@@ -1367,7 +1393,7 @@ impl<'env> Generator<'env> {
 // ======================================================================================
 // Structs
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     /// Generate code for a field selection. This needs to deal with the combination of the
     /// following cases which the type checker allows:
     /// (1) the operand is a reference or is not.
@@ -1640,7 +1666,7 @@ impl MatchMode {
     }
 }
 
-impl<'env> Generator<'env> {
+impl Generator<'_> {
     /// Generate code for assignment of an expression to a pattern. This involves
     /// flattening nested patterns as needed. The optional `next_scope` is a
     /// scope to enter after the rhs exp has been compiled.
@@ -2451,7 +2477,7 @@ impl ValueShape {
     }
 }
 
-impl<'a> fmt::Display for ValueShapeDisplay<'a> {
+impl fmt::Display for ValueShapeDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use ValueShape::*;
         let fmt_list = |list: &[ValueShape], sep: &str| {

@@ -6,6 +6,7 @@
 
 use crate::{
     block_storage::{pending_blocks::PendingBlocks, BlockStore},
+    counters,
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -26,7 +27,10 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
+use aptos_config::{
+    config::{BlockTransactionFilterConfig, ConsensusConfig},
+    network_id::NetworkId,
+};
 use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
 use aptos_infallible::Mutex;
 use aptos_network::{
@@ -132,7 +136,7 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     // TODO: remove
     let proof = make_initial_epoch_change_proof(&signer);
-    let mut safety_rules = SafetyRules::new(test_utils::test_storage(&signer));
+    let mut safety_rules = SafetyRules::new(test_utils::test_storage(&signer), false);
     safety_rules.initialize(&proof).unwrap();
 
     // TODO: mock channels
@@ -196,6 +200,9 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
+    let (opt_proposal_loopback_tx, _) =
+        aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("opt_proposal_loopback_queue"));
+
     // event processor
     RoundManager::new(
         epoch_state,
@@ -211,11 +218,13 @@ fn create_node_for_fuzzing() -> RoundManager {
         storage,
         OnChainConsensusConfig::default(),
         round_manager_tx,
+        BlockTransactionFilterConfig::default(),
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         None,
         Arc::new(MockPastProposalStatusTracker {}),
+        opt_proposal_loopback_tx,
     )
 }
 

@@ -7,6 +7,7 @@ use crate::log::{
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
@@ -25,7 +26,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
-    gas::{GasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -157,6 +158,62 @@ where
     }
 }
 
+impl<G> DependencyGasMeter for GasProfiler<G>
+where
+    G: AptosGasMeter,
+{
+    fn charge_dependency(
+        &mut self,
+        kind: DependencyKind,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_dependency(kind, addr, name, size));
+
+        if !cost.is_zero() {
+            self.dependencies.push(Dependency {
+                kind,
+                id: ModuleId::new(*addr, name.to_owned()),
+                size,
+                cost,
+            });
+        }
+
+        res
+    }
+}
+
+impl<G> NativeGasMeter for GasProfiler<G>
+where
+    G: AptosGasMeter,
+{
+    delegate! {
+        fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
+    }
+
+    fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.use_heap_memory_in_native_context(amount));
+        assert_eq!(
+            cost,
+            0.into(),
+            "Using heap memory does not incur any gas costs"
+        );
+        res
+    }
+
+    fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.frames
+            .last_mut()
+            .expect("Native function must have recorded the frame")
+            .native_gas += amount;
+
+        self.base.charge_native_execution(amount)
+    }
+}
+
 impl<G> GasMeter for GasProfiler<G>
 where
     G: AptosGasMeter,
@@ -205,6 +262,13 @@ where
 
         [UNPACK]
         fn charge_unpack(
+            &mut self,
+            is_generic: bool,
+            args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        ) -> PartialVMResult<()>;
+
+        [PACK_CLOSURE]
+        fn charge_pack_closure(
             &mut self,
             is_generic: bool,
             args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
@@ -320,9 +384,6 @@ where
         amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
-
         // Whenever a function gets called, the VM will notify the gas profiler
         // via `charge_call/charge_call_generic`.
         //
@@ -331,8 +392,14 @@ where
         //
         // Later when it realizes the function is native, it will transform the original frame
         // into a native-specific event that does not contain recursive structures.
-        let cur = self.frames.pop().expect("frame must exist");
-        let (module_id, name, ty_args) = match cur.name {
+        let frame = self.frames.pop().expect("frame must exist");
+
+        // Add native gas accumulated per frame.
+        let (mut cost, res) =
+            self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
+        cost += frame.native_gas;
+
+        let (module_id, name, ty_args) = match frame.name {
             FrameName::Function {
                 module_id,
                 name,
@@ -340,11 +407,12 @@ where
             } => (module_id, name, ty_args),
             FrameName::Script => unreachable!(),
         };
+
         // The following line of code is needed for correctness.
         //
         // This is because additional gas events may be produced after the frame has been
         // created and these events need to be preserved.
-        self.active_event_stream().extend(cur.events);
+        self.active_event_stream().extend(frame.events);
 
         self.record_gas_event(ExecutionGasEvent::CallNative {
             module_id,
@@ -481,32 +549,6 @@ where
 
         res
     }
-
-    fn charge_dependency(
-        &mut self,
-        is_new: bool,
-        addr: &AccountAddress,
-        name: &IdentStr,
-        size: NumBytes,
-    ) -> PartialVMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
-
-        if !cost.is_zero() {
-            self.dependencies.push(Dependency {
-                is_new,
-                id: ModuleId::new(*addr, name.to_owned()),
-                size,
-                cost,
-            });
-        }
-
-        res
-    }
-
-    fn charge_heap_memory(&mut self, amount: u64) -> PartialVMResult<()> {
-        self.base.charge_heap_memory(amount)
-    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {
@@ -598,7 +640,12 @@ where
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
         let mut total_refund = Fee::new(0);
-        for res in change_set.write_op_info_iter_mut(executor_view, module_storage) {
+        let fix_prev_materialized_size = self.feature_version() > RELEASE_V1_30;
+        for res in change_set.write_op_info_iter_mut(
+            executor_view,
+            module_storage,
+            fix_prev_materialized_size,
+        ) {
             let write_op_info = res.map_err(|err| err.finish(Location::Undefined))?;
             let key = write_op_info.key.clone();
             let op_type = write_op_type(&write_op_info.op_size);

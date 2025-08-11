@@ -1,41 +1,45 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::block_epilogue::BlockEndInfo;
-use std::fmt::Debug;
+use super::Transaction;
+use crate::state_store::state_slot::StateSlot;
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Debug)]
-pub struct BlockOutput<Output: Debug> {
+pub struct BlockOutput<Key, Output: Debug> {
     transaction_outputs: Vec<Output>,
-    block_end_info: Option<BlockEndInfo>,
+    // A BlockEpilogueTxn might be appended to the block.
+    // This field will be None iff the input is not a block, or an epoch change is triggered.
+    block_epilogue_txn: Option<Transaction>,
+    to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
-impl<Output: Debug> BlockOutput<Output> {
-    pub fn new(transaction_outputs: Vec<Output>, block_end_info: Option<BlockEndInfo>) -> Self {
+impl<Key, Output: Debug> BlockOutput<Key, Output> {
+    pub fn new(
+        transaction_outputs: Vec<Output>,
+        block_epilogue_txn: Option<Transaction>,
+        to_make_hot: BTreeMap<Key, StateSlot>,
+    ) -> Self {
         Self {
             transaction_outputs,
-            block_end_info,
+            block_epilogue_txn,
+            to_make_hot,
         }
     }
 
-    fn is_block_limit_reached(&self) -> bool {
-        self.block_end_info
-            .as_ref()
-            .map_or(false, BlockEndInfo::limit_reached)
-    }
-
-    /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        assert!(!self.is_block_limit_reached());
         self.transaction_outputs
     }
 
-    pub fn into_inner(self) -> (Vec<Output>, Option<BlockEndInfo>) {
-        (self.transaction_outputs, self.block_end_info)
+    pub fn into_inner(self) -> (Vec<Output>, Option<Transaction>, BTreeMap<Key, StateSlot>) {
+        (
+            self.transaction_outputs,
+            self.block_epilogue_txn,
+            self.to_make_hot,
+        )
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        assert!(!self.is_block_limit_reached());
         &self.transaction_outputs
     }
 }

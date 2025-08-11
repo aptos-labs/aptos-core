@@ -145,9 +145,9 @@ struct CopyDropAnalysis<'a> {
     exit_state: &'a ExitStateAnnotation,
 }
 
-impl<'a> DataflowAnalysis for CopyDropAnalysis<'a> {}
+impl DataflowAnalysis for CopyDropAnalysis<'_> {}
 
-impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
+impl TransferFunctions for CopyDropAnalysis<'_> {
     type State = CopyDropState;
 
     const BACKWARD: bool = false;
@@ -162,9 +162,8 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         let lifetime = self.lifetime.get_info_at(offset);
         let exit_state = self.exit_state.get_state_at(offset);
         // Only temps which are used after or borrowed need a copy
-        let temp_needs_copy = |temp, instr| {
-            live_var.is_temp_used_after(temp, instr) || lifetime.borrow_kind_before(*temp).is_some()
-        };
+        let temp_needs_copy =
+            |temp, instr| live_var.is_temp_used_after(temp, instr) || lifetime.is_borrowed(*temp);
         // References always need to be dropped to satisfy bytecode verifier borrow analysis, other values
         // only if this execution path can return.
         let temp_needs_drop = |temp: &TempIndex| {
@@ -238,7 +237,7 @@ struct Transformer<'a> {
     copy_drop: BTreeMap<CodeOffset, CopyDropState>,
 }
 
-impl<'a> Transformer<'a> {
+impl Transformer<'_> {
     fn run(&mut self, code: Vec<Bytecode>) {
         // Check and insert drop for parameters before the first instruction if it is a return
         if !code.is_empty() && code.first().unwrap().is_return() {
@@ -336,7 +335,7 @@ impl<'a> Transformer<'a> {
 // ---------------------------------------------------------------------------------------------------------
 // Copy and Move
 
-impl<'a> Transformer<'a> {
+impl Transformer<'_> {
     fn check_implicit_copy(&self, code_offset: CodeOffset, id: AttrId, src: TempIndex) {
         self.check_copy(id, src, || {
             (
@@ -366,12 +365,7 @@ impl<'a> Transformer<'a> {
                 // Only need to perform the actual copy if src is borrowed, as this
                 // information cannot be determined from live-var analysis in later
                 // phases.
-                if self
-                    .lifetime
-                    .get_info_at(code_offset)
-                    .borrow_kind_after(*src)
-                    .is_some()
-                {
+                if self.lifetime.get_info_at(code_offset).is_borrowed(*src) {
                     let ty = self.builder.get_local_type(*src);
                     let temp = self.builder.new_temp(ty);
                     self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
@@ -423,7 +417,7 @@ impl<'a> Transformer<'a> {
 // ---------------------------------------------------------------------------------------------------------
 // Drop
 
-impl<'a> Transformer<'a> {
+impl Transformer<'_> {
     /// Add implicit drops at the given code offset.
     fn check_and_add_implicit_drops(
         &mut self,
@@ -445,11 +439,7 @@ impl<'a> Transformer<'a> {
             }
             for temp in copy_drop_at.needs_drop.iter() {
                 // Give a better error message if we know its borrowed
-                let is_borrowed = self
-                    .lifetime
-                    .get_info_at(code_offset)
-                    .borrow_kind_after(*temp)
-                    .is_some();
+                let is_borrowed = self.lifetime.get_info_at(code_offset).is_borrowed(*temp);
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
                         if is_borrowed {
@@ -501,7 +491,7 @@ impl<'a> Transformer<'a> {
 /// at the arrow to the location), the 2nd vector is a list of location-based additional hints.
 type Description = (String, Vec<(Loc, String)>);
 
-impl<'a> Transformer<'a> {
+impl Transformer<'_> {
     /// Checks whether the type as the ability and if not reports an error. An optional temp is
     /// provided in the case the type is associated with a value. A function to describe
     /// the reason and possible a list of hints is provided as well.

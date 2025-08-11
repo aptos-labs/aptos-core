@@ -8,6 +8,7 @@ pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
 mod ledger_update_stage;
+pub mod measurements;
 mod metrics;
 pub mod native;
 pub mod pipeline;
@@ -19,23 +20,13 @@ use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
-use aptos_block_executor::counters::{
-    self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
-};
 use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
-use aptos_executor::{
-    block_executor::BlockExecutor,
-    metrics::{
-        COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
-        PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
-    },
-};
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
-use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
@@ -48,10 +39,9 @@ use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
-use metrics::TIMER;
+use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
-    collections::HashMap,
     fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
@@ -59,8 +49,16 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
+pub struct SingleRunResults {
+    pub measurements: OverallMeasurement,
+    pub per_stage_measurements: Vec<OverallMeasurement>,
+    pub per_stage_events: EventMeasurements,
+}
+
 pub fn default_benchmark_features() -> Features {
-    Features::default()
+    let mut features = Features::default();
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
@@ -133,7 +131,8 @@ pub fn run_benchmark<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
-) where
+) -> SingleRunResults
+where
     V: VMBlockExecutor + 'static,
 {
     create_checkpoint(
@@ -288,7 +287,7 @@ pub fn run_benchmark<V>(
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    let num_pipeline_txns = pipeline.join();
+    let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
 
     info!("Executed workload {}", workload_name);
 
@@ -298,7 +297,9 @@ pub fn run_benchmark<V>(
         num_pipeline_txns.unwrap_or_default()
     };
 
-    overall_measuring.print_end("Overall", num_txns);
+    let overall_results =
+        overall_measuring.elapsed("Overall".to_string(), "".to_string(), num_txns);
+    overall_results.print_end();
 
     if !pipeline_config.skip_commit {
         if verify_sequence_numbers {
@@ -309,6 +310,14 @@ pub fn run_benchmark<V>(
 
     // Assert there were no error log lines in the run.
     assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+
+    OverallMeasurement::print_end_table(&staged_results, &overall_results);
+    staged_events.print_end_table();
+    SingleRunResults {
+        measurements: overall_results,
+        per_stage_measurements: staged_results,
+        per_stage_events: staged_events,
+    }
 }
 
 fn init_workload<V>(
@@ -493,313 +502,6 @@ fn add_accounts_impl<V>(
     );
 }
 
-#[derive(Debug, Clone)]
-struct GasMeasurement {
-    pub gas: f64,
-    pub effective_block_gas: f64,
-
-    pub io_gas: f64,
-    pub execution_gas: f64,
-
-    pub storage_fee: f64,
-
-    pub approx_block_output: f64,
-
-    pub gas_count: u64,
-
-    pub speculative_abort_count: u64,
-}
-
-impl GasMeasurement {
-    pub fn sequential_gas_counter(gas_type: &str) -> Histogram {
-        block_executor_counters::TXN_GAS
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL, gas_type])
-    }
-
-    pub fn parallel_gas_counter(gas_type: &str) -> Histogram {
-        block_executor_counters::TXN_GAS
-            .with_label_values(&[block_executor_counters::Mode::PARALLEL, gas_type])
-    }
-
-    pub fn now() -> GasMeasurement {
-        let gas = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum();
-
-        let io_gas = Self::sequential_gas_counter(GasType::IO_GAS).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::IO_GAS).get_sample_sum();
-        let execution_gas = Self::sequential_gas_counter(GasType::EXECUTION_GAS).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::EXECUTION_GAS).get_sample_sum();
-
-        let storage_fee = Self::sequential_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
-            + Self::parallel_gas_counter(GasType::STORAGE_FEE).get_sample_sum()
-            - (Self::sequential_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum()
-                + Self::parallel_gas_counter(GasType::STORAGE_FEE_REFUND).get_sample_sum());
-
-        let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
-            + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
-
-        let effective_block_gas = block_executor_counters::EFFECTIVE_BLOCK_GAS
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
-            .get_sample_sum()
-            + block_executor_counters::EFFECTIVE_BLOCK_GAS
-                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
-                .get_sample_sum();
-
-        let approx_block_output = block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
-            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL])
-            .get_sample_sum()
-            + block_executor_counters::APPROX_BLOCK_OUTPUT_SIZE
-                .with_label_values(&[block_executor_counters::Mode::PARALLEL])
-                .get_sample_sum();
-
-        let speculative_abort_count = block_executor_counters::SPECULATIVE_ABORT_COUNT.get();
-
-        Self {
-            gas,
-            effective_block_gas,
-            io_gas,
-            execution_gas,
-            storage_fee,
-            approx_block_output,
-            gas_count,
-            speculative_abort_count,
-        }
-    }
-
-    pub fn elapsed_delta(self) -> Self {
-        let end = Self::now();
-
-        Self {
-            gas: end.gas - self.gas,
-            effective_block_gas: end.effective_block_gas - self.effective_block_gas,
-            io_gas: end.io_gas - self.io_gas,
-            execution_gas: end.execution_gas - self.execution_gas,
-            storage_fee: end.storage_fee - self.storage_fee,
-            approx_block_output: end.approx_block_output - self.approx_block_output,
-            gas_count: end.gas_count - self.gas_count,
-            speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
-        }
-    }
-}
-
-static OTHER_LABELS: &[(&str, bool, &str)] = &[
-    ("1.", true, "verified_state_view"),
-    ("2.", true, "state_checkpoint"),
-    ("2.1.", false, "sort_transactions"),
-    ("2.2.", false, "calculate_for_transaction_block"),
-    ("2.2.1.", false, "get_sharded_state_updates"),
-    ("2.2.2.", false, "calculate_block_state_updates"),
-    ("2.2.3.", false, "calculate_usage"),
-    ("2.2.4.", false, "make_checkpoint"),
-];
-
-#[derive(Debug, Clone)]
-struct ExecutionTimeMeasurement {
-    output_size: f64,
-
-    sig_verify_total_time: f64,
-    partitioning_total_time: f64,
-    execution_total_time: f64,
-    block_executor_total_time: f64,
-    block_executor_inner_total_time: f64,
-    by_other: HashMap<&'static str, f64>,
-    ledger_update_total: f64,
-    commit_total_time: f64,
-}
-
-impl ExecutionTimeMeasurement {
-    pub fn now() -> Self {
-        let output_size = PROCESSED_TXNS_OUTPUT_SIZE
-            .with_label_values(&["execution"])
-            .get_sample_sum();
-
-        let sig_verify_total = TIMER.with_label_values(&["sig_verify"]).get_sample_sum();
-        let partitioning_total = TIMER.with_label_values(&["partition"]).get_sample_sum();
-        let execution_total = TIMER.with_label_values(&["execute"]).get_sample_sum();
-        let block_executor_total = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum();
-        let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
-
-        let by_other = OTHER_LABELS
-            .iter()
-            .map(|(_prefix, _top_level, other_label)| {
-                (
-                    *other_label,
-                    OTHER_TIMERS
-                        .with_label_values(&[other_label])
-                        .get_sample_sum(),
-                )
-            })
-            .collect::<HashMap<_, _>>();
-        let ledger_update_total = UPDATE_LEDGER.get_sample_sum();
-        let commit_total = COMMIT_BLOCKS.get_sample_sum();
-
-        Self {
-            output_size,
-            sig_verify_total_time: sig_verify_total,
-            partitioning_total_time: partitioning_total,
-            execution_total_time: execution_total,
-            block_executor_total_time: block_executor_total,
-            block_executor_inner_total_time: block_executor_inner_total,
-            by_other,
-            ledger_update_total,
-            commit_total_time: commit_total,
-        }
-    }
-
-    pub fn elapsed_delta(self) -> Self {
-        let end = Self::now();
-
-        Self {
-            output_size: end.output_size - self.output_size,
-            sig_verify_total_time: end.sig_verify_total_time - self.sig_verify_total_time,
-            partitioning_total_time: end.partitioning_total_time - self.partitioning_total_time,
-            execution_total_time: end.execution_total_time - self.execution_total_time,
-            block_executor_total_time: end.block_executor_total_time
-                - self.block_executor_total_time,
-            block_executor_inner_total_time: end.block_executor_inner_total_time
-                - self.block_executor_inner_total_time,
-            by_other: end
-                .by_other
-                .into_iter()
-                .map(|(k, v)| (k, v - self.by_other.get(&k).unwrap()))
-                .collect::<HashMap<_, _>>(),
-            ledger_update_total: end.ledger_update_total - self.ledger_update_total,
-            commit_total_time: end.commit_total_time - self.commit_total_time,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct OverallMeasuring {
-    start_time: Instant,
-    start_execution: ExecutionTimeMeasurement,
-    start_gas: GasMeasurement,
-}
-
-impl OverallMeasuring {
-    pub fn start() -> Self {
-        Self {
-            start_time: Instant::now(),
-            start_execution: ExecutionTimeMeasurement::now(),
-            start_gas: GasMeasurement::now(),
-        }
-    }
-
-    pub fn print_end(self, prefix: &str, num_txns: u64) {
-        let elapsed = self.start_time.elapsed().as_secs_f64();
-        let num_txns = num_txns as f64;
-        let delta_execution = self.start_execution.elapsed_delta();
-        let delta_gas = self.start_gas.elapsed_delta();
-
-        info!(
-            "{} TPS: {} txn/s (over {} txns, in {} s)",
-            prefix,
-            num_txns / elapsed,
-            num_txns,
-            elapsed
-        );
-        info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
-        info!(
-            "{} effectiveGPS: {} gas/s ({} effective block gas, in {} s)",
-            prefix,
-            delta_gas.effective_block_gas / elapsed,
-            delta_gas.effective_block_gas,
-            elapsed
-        );
-        info!(
-            "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
-            prefix,
-            delta_gas.speculative_abort_count as f64 / num_txns,
-            delta_gas.speculative_abort_count,
-            num_txns
-        );
-        info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
-        info!(
-            "{} executionGPS: {} gas/s",
-            prefix,
-            delta_gas.execution_gas / elapsed
-        );
-        info!(
-            "{} GPT: {} gas/txn",
-            prefix,
-            delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
-        );
-        info!(
-            "{} Storage fee: {} octas/txn",
-            prefix,
-            delta_gas.storage_fee / (delta_gas.gas_count as f64).max(1.0)
-        );
-        info!(
-            "{} approx_output: {} bytes/s",
-            prefix,
-            delta_gas.approx_block_output / elapsed
-        );
-        info!(
-            "{} output: {} bytes/s",
-            prefix,
-            delta_execution.output_size / elapsed
-        );
-
-        info!(
-            "{} fraction of total: {:.4} in signature verification (component TPS: {:.1})",
-            prefix,
-            delta_execution.sig_verify_total_time / elapsed,
-            num_txns / delta_execution.sig_verify_total_time
-        );
-        info!(
-            "{} fraction of total: {:.4} in partitioning (component TPS: {:.1})",
-            prefix,
-            delta_execution.partitioning_total_time / elapsed,
-            num_txns / delta_execution.partitioning_total_time
-        );
-        info!(
-            "{} fraction of total: {:.4} in execution (component TPS: {:.1})",
-            prefix,
-            delta_execution.execution_total_time / elapsed,
-            num_txns / delta_execution.execution_total_time
-        );
-        info!(
-            "{} fraction of execution {:.4} in get execution output by executing (component TPS: {:.1})",
-            prefix,
-            delta_execution.block_executor_total_time / delta_execution.execution_total_time,
-            num_txns / delta_execution.block_executor_total_time
-        );
-        info!(
-            "{} fraction of execution {:.4} in inner block executor (component TPS: {:.1})",
-            prefix,
-            delta_execution.block_executor_inner_total_time / delta_execution.execution_total_time,
-            num_txns / delta_execution.block_executor_inner_total_time
-        );
-        for (prefix, top_level, other_label) in OTHER_LABELS {
-            let time_in_label = delta_execution.by_other.get(other_label).unwrap();
-            if *top_level || time_in_label / delta_execution.execution_total_time > 0.01 {
-                info!(
-                    "{} fraction of execution {:.4} in {} {} (component TPS: {:.1})",
-                    prefix,
-                    time_in_label / delta_execution.execution_total_time,
-                    prefix,
-                    other_label,
-                    num_txns / time_in_label
-                );
-            }
-        }
-
-        info!(
-            "{} fraction of total: {:.4} in ledger update (component TPS: {:.1})",
-            prefix,
-            delta_execution.ledger_update_total / elapsed,
-            num_txns / delta_execution.ledger_update_total
-        );
-
-        info!(
-            "{} fraction of total: {:.4} in commit (component TPS: {:.1})",
-            prefix,
-            delta_execution.commit_total_time / elapsed,
-            num_txns / delta_execution.commit_total_time
-        );
-    }
-}
-
 fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
     let total_supply =
         DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
@@ -808,7 +510,13 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 
 pub enum SingleRunMode {
     TEST,
-    BENCHMARK { approx_tps: usize },
+    BENCHMARK {
+        approx_tps: usize,
+        /// Number of blocks to run your test for. ~10-30 is a good number.
+        /// If your workflow has an end (generats no transactions after some point),
+        /// you can set a large number, and test will stop by itself.
+        run_for_blocks: Option<usize>,
+    },
 }
 
 pub fn run_single_with_default_params(
@@ -816,7 +524,7 @@ pub fn run_single_with_default_params(
     test_folder: impl AsRef<Path>,
     concurrency_level: usize,
     mode: SingleRunMode,
-) {
+) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
     AptosVM::set_num_shards_once(1);
@@ -830,18 +538,33 @@ pub fn run_single_with_default_params(
 
     let verify_sequence_numbers = false;
     let is_keyless = false;
+    let print_transactions = match mode {
+        SingleRunMode::TEST => true,
+        SingleRunMode::BENCHMARK { .. } => false,
+    };
     let num_accounts = match mode {
         SingleRunMode::TEST => 100,
         SingleRunMode::BENCHMARK { .. } => 100000,
     };
+    let num_blocks = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            run_for_blocks: None,
+            ..
+        } => 30,
+        SingleRunMode::BENCHMARK {
+            run_for_blocks: Some(num_blocks),
+            ..
+        } => num_blocks,
+    };
     let benchmark_block_size = match mode {
         SingleRunMode::TEST => 10,
-        SingleRunMode::BENCHMARK { approx_tps } => {
+        SingleRunMode::BENCHMARK { approx_tps, .. } => {
             debug_assert!(
                 false,
                 "Benchmark shouldn't be run in debug mode, use --release instead."
             );
-            std::cmp::max(10, std::cmp::min(10000, approx_tps / 4))
+            (approx_tps / 4).clamp(10, 10000)
         },
     };
 
@@ -859,13 +582,14 @@ pub fn run_single_with_default_params(
 
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
     create_db_with_accounts::<AptosVMBlockExecutor>(
-        num_accounts,   /* num_accounts */
-        10_000_000_000, /* init_account_balance */
-        10000,          /* block_size */
+        num_accounts,       /* num_accounts */
+        100000 * 100000000, /* init_account_balance */
+        10000,              /* block_size */
         &storage_dir,
         NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
         verify_sequence_numbers,
@@ -880,12 +604,13 @@ pub fn run_single_with_default_params(
     let execute_pipeline_config = PipelineConfig {
         generate_then_execute: true,
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        print_transactions,
         ..Default::default()
     };
 
     run_benchmark::<AptosVMBlockExecutor>(
         benchmark_block_size, /* block_size */
-        30,                   /* num_blocks */
+        num_blocks,           /* num_blocks */
         BenchmarkWorkload::TransactionMix(vec![(transaction_type, 1)]),
         1, /* transactions per sender */
         num_main_signer_accounts,
@@ -898,7 +623,7 @@ pub fn run_single_with_default_params(
         execute_pipeline_config,
         features,
         is_keyless,
-    );
+    )
 }
 
 #[cfg(test)]
@@ -933,7 +658,10 @@ mod tests {
         account_address::AccountAddress,
         on_chain_config::{FeatureFlag, Features},
         state_store::state_key::inner::StateKeyInner,
-        transaction::{Transaction, TransactionPayload},
+        transaction::{
+            signature_verified_transaction::into_signature_verified_block, Transaction,
+            TransactionOutput, TransactionPayload,
+        },
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use itertools::Itertools;
@@ -965,6 +693,7 @@ mod tests {
         let mut non_fa_features = default_benchmark_features();
         non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         non_fa_features.disable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
         // non_fa_features.disable(FeatureFlag::MODULE_EVENT_MIGRATION);
         // non_fa_features.disable(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION);
 
@@ -981,6 +710,7 @@ mod tests {
         let mut fa_features = default_benchmark_features();
         fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         fa_features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
         fa_features.disable(FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE);
 
         test_compare_prod_and_another::<E>(values_match, fa_features.clone(), |address| {
@@ -1033,7 +763,7 @@ mod tests {
             let block_id = HashValue::random();
             vm_executor
                 .execute_and_update_state(
-                    (block_id, vec![txn.clone()]).into(),
+                    (block_id, into_signature_verified_block(vec![txn.clone()])).into(),
                     parent_block_id,
                     BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
                 )
@@ -1054,7 +784,7 @@ mod tests {
         let block_id = HashValue::random();
         other_executor
             .execute_and_update_state(
-                (block_id, vec![txn]).into(),
+                (block_id, into_signature_verified_block(vec![txn])).into(),
                 parent_block_id,
                 BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
@@ -1076,7 +806,7 @@ mod tests {
         let other_txn_output = &other_to_commit.transaction_outputs[0];
         let other_cp_txn_output = &other_to_commit.transaction_outputs[1];
 
-        assert_eq!(vm_cp_txn_output, other_cp_txn_output);
+        assert_equal_transaction_outputs(vm_cp_txn_output, other_cp_txn_output);
 
         let vm_event_types = vm_txn_output
             .events()
@@ -1104,12 +834,12 @@ mod tests {
 
         let vm_writes = vm_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         let other_writes = other_txn_output
             .write_set()
-            .iter()
+            .write_op_iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
         for (key, value) in vm_writes.iter() {
@@ -1149,6 +879,16 @@ mod tests {
         if values_match {
             assert_eq!(vm_txn_output, other_txn_output);
         }
+    }
+
+    // TODO(HotState): hotness computation not implemented in all VMs, so their hotness part of the
+    // write set might be different.
+    fn assert_equal_transaction_outputs(output1: &TransactionOutput, output2: &TransactionOutput) {
+        assert_eq!(output1.write_set().as_v0(), output2.write_set().as_v0());
+        assert_eq!(output1.events(), output2.events());
+        assert_eq!(output1.gas_used(), output2.gas_used());
+        assert_eq!(output1.status(), output2.status());
+        assert_eq!(output1.auxiliary_data(), output2.auxiliary_data());
     }
 
     fn test_generic_benchmark<E>(

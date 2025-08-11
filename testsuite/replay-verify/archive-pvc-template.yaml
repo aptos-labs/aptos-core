@@ -8,11 +8,11 @@ metadata:
     run: some-label
 spec:
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 10Ti
-  storageClassName: ssd-data-xfs-immediate
+      storage: 12Ti
+  storageClassName: pd-balanced-xfs-immediate
   volumeMode: Filesystem
   dataSourceRef:
     name: testnet-archive

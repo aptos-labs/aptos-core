@@ -11,9 +11,11 @@ use crate::{
     },
     vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
 };
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
+use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
+use move_asm::assembler;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
@@ -21,7 +23,7 @@ use move_binary_format::{
 use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
@@ -30,18 +32,22 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    value::MoveTypeLayout,
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
-use move_vm_types::value_serde::ValueSerDeContext;
+use move_vm_types::values::Value;
+use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::{Debug, Write as FmtWrite},
+    fs,
     io::Write,
     path::Path,
+    str::FromStr,
 };
 use tempfile::NamedTempFile;
 
@@ -60,7 +66,7 @@ pub struct CompiledState<'a> {
     temp_file_mapping: BTreeMap<String, String>,
 }
 
-impl<'a> CompiledState<'a> {
+impl CompiledState<'_> {
     pub fn resolve_named_address(&self, s: &str) -> AccountAddress {
         if let Some(addr) = self
             .named_address_mapping
@@ -114,14 +120,12 @@ pub trait MoveTestAdapter<'a>: Sized {
     type Subcommand: Parser;
     type ExtraInitArgs: Parser;
 
+    fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value>;
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            experiments: vec![],
-        }
+        TestRunConfig::new(LanguageVersion::default(), vec![])
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -210,20 +214,46 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, opt_model, warnings_opt) = match run_config {
+                // It is possible that a module gets republished. In this case, we need to filter
+                // existing pre-compiled dependencies to remove old module. Because we do not know
+                // in advance the module we are compiling, we need to see if the module matches the
+                // one already compiled. This special case is sufficient for testing, and in case
+                // match is not found, compiler should complain when seeing a duplicate symbol.
+                let deps = state
+                    .source_files()
+                    .filter_map(|(dep_id, path)| {
+                        let re =
+                            Regex::new(r"module\s+(0x[0-9a-fA-F]+::[A-Za-z]\w*)\s*\{").unwrap();
+                        let code = std::fs::read_to_string(data_path).unwrap();
+                        if let Some(id) = re
+                            .captures(code.trim())
+                            .and_then(|c| ModuleId::from_str(&c[1]).ok())
+                        {
+                            id.ne(dep_id).then(|| path.to_owned())
+                        } else {
+                            Some(path.to_owned())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let (unit, opt_model, warnings_opt) = {
                     // Run the V2 compiler if requested
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments,
-                    } => compile_source_unit_v2(
+                        vm_config: _,
+                        use_masm: _,
+                        echo: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
                         experiments,
-                    )?,
+                    )?
                 };
                 let (named_addr_opt, module) = match unit {
                     AnnotatedCompiledUnit::Module(annot_module) => {
@@ -243,6 +273,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let module = compile_ir_module(state.dep_modules(), data_path)?;
+                (None, module, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let module = compile_asm_module(state.dep_modules(), data_path)?;
                 (None, module, None, None)
             },
         };
@@ -281,20 +315,28 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, opt_model, warning_opt) = match run_config {
+                let (unit, opt_model, warning_opt) = {
                     // Run the V2 compiler.
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments: v2_experiments,
-                    } => compile_source_unit_v2(
+                        vm_config: _,
+                        use_masm: _,
+                        echo: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
-                        &state.source_files().cloned().collect::<Vec<_>>(),
+                        &state
+                            .source_files()
+                            .map(|(_, path)| path)
+                            .cloned()
+                            .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
                         language_version,
                         v2_experiments,
-                    )?,
+                    )?
                 };
                 match unit {
                     AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, opt_model, warning_opt),
@@ -306,6 +348,10 @@ pub trait MoveTestAdapter<'a>: Sized {
             },
             SyntaxChoice::IR => {
                 let script = compile_ir_script(state.dep_modules(), data_path)?;
+                (script, None, None)
+            },
+            SyntaxChoice::ASM => {
+                let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
         };
@@ -328,6 +374,7 @@ pub trait MoveTestAdapter<'a>: Sized {
             command,
             name,
             number,
+            source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -346,12 +393,22 @@ pub trait MoveTestAdapter<'a>: Sized {
                     PrintBytecodeInputChoice::Script => {
                         let (script, _warning_opt) =
                             self.compile_script(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_script(String::new(), &script)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Script(&script))
+                                .disassemble()?
+                        }
                     },
                     PrintBytecodeInputChoice::Module => {
                         let (_data, _named_addr_opt, module, _warnings_opt) =
                             self.compile_module(syntax, data, start_line, command_lines_stop)?;
-                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                        if self.run_config().using_masm() {
+                            move_asm::disassembler::disassemble_module(String::new(), &module)?
+                        } else {
+                            disassembler_for_view(BinaryIndexedView::Module(&module))
+                                .disassemble()?
+                        }
                     },
                 };
                 Ok(Some(result))
@@ -369,10 +426,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
                 self.register_temp_filename(&data);
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_module(String::new(), &module)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
@@ -388,11 +449,9 @@ pub trait MoveTestAdapter<'a>: Sized {
                 }
                 let data_path = data.path().to_str().unwrap();
                 match syntax {
-                    SyntaxChoice::Source => self.compiled_state().add_with_source_file(
-                        named_addr_opt,
-                        module,
-                        (data_path.to_owned(), data),
-                    ),
+                    SyntaxChoice::Source | SyntaxChoice::ASM => self
+                        .compiled_state()
+                        .add_with_source_file(named_addr_opt, module, (data_path.to_owned(), data)),
                     SyntaxChoice::IR => {
                         self.compiled_state()
                             .add_and_generate_interface_file(module);
@@ -416,10 +475,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (script, warning_opt) =
                     self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
-                    let disassembler = disassembler_for_view(BinaryIndexedView::Script(&script));
+                    let out = if self.run_config().using_masm() {
+                        move_asm::disassembler::disassemble_script(String::new(), &script)?
+                    } else {
+                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
+                    };
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
-                        disassembler.disassemble()?
+                        out
                     ))
                 } else {
                     None
@@ -462,7 +525,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     gas_budget,
                     extra_args,
                 )?;
-                let rendered_return_value = display_return_values(return_values);
+                let rendered_return_value = self.display_return_values(return_values);
                 Ok(merge_output(output, rendered_return_value))
             },
             TaskCommand::View(ViewCommand { address, resource }) => {
@@ -488,6 +551,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 command: c,
                 name,
                 number,
+                source,
                 start_line,
                 command_lines_stop,
                 stop_line,
@@ -524,63 +588,59 @@ pub trait MoveTestAdapter<'a>: Sized {
             output
         }
     }
-}
 
+    fn display_return_values(&self, return_values: SerializedReturnValues) -> Option<String> {
+        let SerializedReturnValues {
+            mutable_reference_outputs,
+            return_values,
+        } = return_values;
+        let mut output = vec![];
+        if !mutable_reference_outputs.is_empty() {
+            let values = mutable_reference_outputs
+                .iter()
+                .map(|(idx, bytes, layout)| {
+                    let value = self.deserialize(bytes, layout).unwrap();
+                    (idx, value)
+                })
+                .collect::<Vec<_>>();
+            let printed = values
+                .iter()
+                .map(|(idx, v)| {
+                    let mut buf = String::new();
+                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    format!("local#{}: {}", idx, buf)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            output.push(format!("mutable inputs after call: {}", printed))
+        };
+        if !return_values.is_empty() {
+            let values = return_values
+                .iter()
+                .map(|(bytes, layout)| self.deserialize(bytes, layout).unwrap())
+                .collect::<Vec<_>>();
+            let printed = values
+                .iter()
+                .map(|v| {
+                    let mut buf = String::new();
+                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    buf
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            output.push(format!("return values: {}", printed))
+        };
+        if output.is_empty() {
+            None
+        } else {
+            Some(output.join("\n"))
+        }
+    }
+}
 fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
     let source_mapping =
         SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
     Disassembler::new(source_mapping, DisassemblerOptions::new())
-}
-
-fn display_return_values(return_values: SerializedReturnValues) -> Option<String> {
-    let SerializedReturnValues {
-        mutable_reference_outputs,
-        return_values,
-    } = return_values;
-    let mut output = vec![];
-    if !mutable_reference_outputs.is_empty() {
-        let values = mutable_reference_outputs
-            .iter()
-            .map(|(idx, bytes, layout)| {
-                let value = ValueSerDeContext::new().deserialize(bytes, layout).unwrap();
-                (idx, value)
-            })
-            .collect::<Vec<_>>();
-        let printed = values
-            .iter()
-            .map(|(idx, v)| {
-                let mut buf = String::new();
-                move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
-                format!("local#{}: {}", idx, buf)
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        output.push(format!("mutable inputs after call: {}", printed))
-    };
-    if !return_values.is_empty() {
-        let values = return_values
-            .iter()
-            .map(|(bytes, layout)| {
-                // TODO: add support for functions.
-                ValueSerDeContext::new().deserialize(bytes, layout).unwrap()
-            })
-            .collect::<Vec<_>>();
-        let printed = values
-            .iter()
-            .map(|v| {
-                let mut buf = String::new();
-                move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
-                buf
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        output.push(format!("return values: {}", printed))
-    };
-    if output.is_empty() {
-        None
-    } else {
-        Some(output.join("\n"))
-    }
 }
 
 impl<'a> CompiledState<'a> {
@@ -623,10 +683,10 @@ impl<'a> CompiledState<'a> {
         self.modules.values().map(|pmod| &pmod.module)
     }
 
-    pub fn source_files(&self) -> impl Iterator<Item = &String> {
+    pub fn source_files(&self) -> impl Iterator<Item = (&ModuleId, &String)> {
         self.modules
             .iter()
-            .filter_map(|(_, pmod)| Some(&pmod.source_file.as_ref()?.0))
+            .filter_map(|(id, pmod)| Some((id, &pmod.source_file.as_ref()?.0)))
     }
 
     pub fn add_with_source_file(
@@ -645,6 +705,25 @@ impl<'a> CompiledState<'a> {
         let processed = ProcessedModule {
             module,
             source_file: Some(source_file),
+        };
+        self.modules.insert(id, processed);
+    }
+
+    pub fn add_without_source_file(
+        &mut self,
+        named_addr_opt: Option<Symbol>,
+        module: CompiledModule,
+    ) {
+        let id = module.self_id();
+        self.check_not_precompiled(&id);
+        if let Some(named_addr) = named_addr_opt {
+            self.compiled_module_named_address_mapping
+                .insert(id.clone(), named_addr);
+        }
+
+        let processed = ProcessedModule {
+            module,
+            source_file: None,
         };
         self.modules.insert(id, processed);
     }
@@ -792,6 +871,38 @@ fn compile_ir_script<'a>(
     Ok(script)
 }
 
+fn compile_asm_module<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledModule> {
+    if let Either::Left(m) = compile_asm(deps, path)? {
+        Ok(m)
+    } else {
+        bail!("expected a module but found a script")
+    }
+}
+
+fn compile_asm_script<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<CompiledScript> {
+    if let Either::Right(s) = compile_asm(deps, path)? {
+        Ok(s)
+    } else {
+        bail!("expected a script but found a module")
+    }
+}
+
+fn compile_asm<'a>(
+    deps: impl Iterator<Item = &'a CompiledModule>,
+    path: &str,
+) -> Result<assembler::ModuleOrScript> {
+    let options = assembler::Options::default();
+    let source = fs::read_to_string(path)?;
+    assembler::assemble(&options, &source, deps)
+        .map_err(|diags| anyhow!(assembler::diag_to_string("test", &source, diags)))
+}
+
 pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
@@ -807,11 +918,13 @@ where
     Adapter::Subcommand: Debug,
 {
     let extension = path.extension().unwrap().to_str().unwrap();
-    let default_syntax = if extension == MOVE_IR_EXTENSION {
-        SyntaxChoice::IR
-    } else {
-        assert!(extension == MOVE_EXTENSION);
-        SyntaxChoice::Source
+    let default_syntax = match extension {
+        MOVE_EXTENSION => SyntaxChoice::Source,
+        MOVE_IR_EXTENSION => SyntaxChoice::IR,
+        MOVE_ASM_EXTENSION => SyntaxChoice::ASM,
+        _ => {
+            panic!("unexpected extensions `{}`", extension)
+        },
     };
 
     let mut output = String::new();
@@ -883,6 +996,14 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     if let Some(data) = &task.data {
         adapter.register_temp_filename(data);
     }
+    if adapter.run_config().echo {
+        writeln!(
+            output,
+            "task {} lines {}-{}: {}",
+            task_number, start_line, stop_line, task.source
+        )
+        .unwrap();
+    }
     let result = adapter.handle_command(task);
     let result_string = match result {
         Ok(None) => return,
@@ -891,12 +1012,17 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     };
     let result_string = adapter.rewrite_temp_filenames(result_string);
     assert!(!result_string.is_empty());
-    writeln!(
-        output,
-        "\ntask {} '{}'. lines {}-{}:\n{}",
-        task_number, task_name, start_line, stop_line, result_string
-    )
-    .unwrap();
+    if !adapter.run_config().echo {
+        // Print this only if echo is off. With
+        // echo this info is already printed.
+        write!(
+            output,
+            "\ntask {} '{}'. lines {}-{}:\n",
+            task_number, task_name, start_line, stop_line
+        )
+        .unwrap();
+    }
+    writeln!(output, "{}", result_string).unwrap();
 }
 
 fn handle_expected_output(

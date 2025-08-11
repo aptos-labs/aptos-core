@@ -30,8 +30,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        Version,
+        Transaction, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithProofV2, Version,
     },
 };
 use async_trait::async_trait;
@@ -59,7 +59,7 @@ pub trait StorageSynchronizerInterface {
     async fn apply_transaction_outputs(
         &mut self,
         notification_metadata: NotificationMetadata,
-        output_list_with_proof: TransactionOutputListWithProof,
+        output_list_with_proof: TransactionOutputListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
@@ -70,7 +70,7 @@ pub trait StorageSynchronizerInterface {
     async fn execute_transactions(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: TransactionListWithProof,
+        transaction_list_with_proof: TransactionListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
@@ -85,7 +85,7 @@ pub trait StorageSynchronizerInterface {
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
-        target_output_with_proof: TransactionOutputListWithProof,
+        target_output_with_proof: TransactionOutputListWithProofV2,
     ) -> Result<JoinHandle<()>, Error>;
 
     /// Returns true iff there is storage data that is still waiting
@@ -331,7 +331,7 @@ impl<
     async fn apply_transaction_outputs(
         &mut self,
         notification_metadata: NotificationMetadata,
-        output_list_with_proof: TransactionOutputListWithProof,
+        output_list_with_proof: TransactionOutputListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
@@ -355,7 +355,7 @@ impl<
     async fn execute_transactions(
         &mut self,
         notification_metadata: NotificationMetadata,
-        transaction_list_with_proof: TransactionListWithProof,
+        transaction_list_with_proof: TransactionListWithProofV2,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
@@ -380,7 +380,7 @@ impl<
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
-        target_output_with_proof: TransactionOutputListWithProof,
+        target_output_with_proof: TransactionOutputListWithProofV2,
     ) -> Result<JoinHandle<()>, Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
         let max_pending_data_chunks = self.driver_config.max_pending_data_chunks as usize;
@@ -455,6 +455,7 @@ impl<
 }
 
 /// A simple container that holds the handles to the spawned storage synchronizer threads
+#[allow(dead_code)]
 pub struct StorageSynchronizerHandles {
     pub executor: JoinHandle<()>,
     pub ledger_updater: JoinHandle<()>,
@@ -470,13 +471,13 @@ enum StorageDataChunk {
     States(NotificationId, StateValueChunkWithProof),
     Transactions(
         NotificationMetadata,
-        TransactionListWithProof,
+        TransactionListWithProofV2,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
     TransactionOutputs(
         NotificationMetadata,
-        TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
@@ -837,7 +838,7 @@ fn spawn_state_snapshot_receiver<
     storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
     target_ledger_info: LedgerInfoWithSignatures,
-    target_output_with_proof: TransactionOutputListWithProof,
+    target_output_with_proof: TransactionOutputListWithProofV2,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a state snapshot receiver
@@ -845,6 +846,7 @@ fn spawn_state_snapshot_receiver<
         // Get the target version and expected root hash
         let version = target_ledger_info.ledger_info().version();
         let expected_root_hash = target_output_with_proof
+            .get_output_list_with_proof()
             .proof
             .transaction_infos
             .first()
@@ -984,12 +986,12 @@ fn spawn_state_snapshot_receiver<
 /// block the async thread.
 async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    outputs_with_proof: TransactionOutputListWithProof,
+    outputs_with_proof: TransactionOutputListWithProofV2,
     target_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     // Apply the output chunk
-    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+    let num_outputs = outputs_with_proof.get_num_outputs();
     let result = tokio::task::spawn_blocking(move || {
         chunk_executor.enqueue_chunk_by_transaction_outputs(
             outputs_with_proof,
@@ -1024,12 +1026,15 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
 /// doesn't block the async thread.
 async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    transactions_with_proof: TransactionListWithProof,
+    transactions_with_proof: TransactionListWithProofV2,
     target_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     // Execute the transaction chunk
-    let num_transactions = transactions_with_proof.transactions.len();
+    let num_transactions = transactions_with_proof
+        .get_transaction_list_with_proof()
+        .transactions
+        .len();
     let result = tokio::task::spawn_blocking(move || {
         chunk_executor.enqueue_chunk_by_execution(
             transactions_with_proof,
@@ -1110,7 +1115,7 @@ async fn finalize_storage_and_send_commit<
     >,
     storage: DbReaderWriter,
     epoch_change_proofs: &[LedgerInfoWithSignatures],
-    target_output_with_proof: TransactionOutputListWithProof,
+    target_output_with_proof: TransactionOutputListWithProofV2,
     version: Version,
     target_ledger_info: &LedgerInfoWithSignatures,
     last_committed_state_index: u64,
@@ -1152,7 +1157,7 @@ async fn finalize_storage_and_send_commit<
 
     // Create and send the commit notification
     let commit_notification = create_commit_notification(
-        &target_output_with_proof,
+        target_output_with_proof,
         last_committed_state_index,
         version,
     );
@@ -1179,14 +1184,14 @@ async fn finalize_storage_and_send_commit<
 
 /// Creates a commit notification for the new committed state snapshot
 fn create_commit_notification(
-    target_output_with_proof: &TransactionOutputListWithProof,
+    target_output_with_proof: TransactionOutputListWithProofV2,
     last_committed_state_index: u64,
     version: u64,
 ) -> CommitNotification {
     let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
         target_output_with_proof
+            .consume_output_list_with_proof()
             .transactions_and_outputs
-            .clone()
             .into_iter()
             .unzip();
     let events = outputs

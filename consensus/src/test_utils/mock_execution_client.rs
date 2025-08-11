@@ -11,7 +11,6 @@ use crate::{
         pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
-    state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
 use anyhow::{anyhow, format_err, Result};
@@ -19,6 +18,8 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
     pipelined_block::PipelinedBlock,
+    vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381::PrivateKey, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -42,6 +43,8 @@ pub struct MockExecutionClient {
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
     payload_manager: Arc<dyn TPayloadManager>,
+    block_store_callback:
+        Mutex<Option<Box<dyn Fn(HashValue, Round, WrappedLedgerInfo) + Send + Sync>>>,
 }
 
 impl MockExecutionClient {
@@ -56,18 +59,34 @@ impl MockExecutionClient {
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
             payload_manager: Arc::from(DirectMempoolPayloadManager::new()),
+            block_store_callback: Mutex::new(None),
         }
+    }
+
+    pub fn set_callback(
+        &self,
+        callback: Box<dyn Fn(HashValue, Round, WrappedLedgerInfo) + Send + Sync>,
+    ) {
+        *self.block_store_callback.lock() = Some(callback);
     }
 
     pub async fn commit_to_storage(&self, blocks: OrderedBlocks) -> ExecutorResult<()> {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
-            callback,
         } = blocks;
 
         self.consensus_db
             .commit_to_storage(ordered_proof.ledger_info().clone());
+        if let Some(callback) = self.block_store_callback.lock().as_ref() {
+            for block in &ordered_blocks {
+                callback(
+                    block.id(),
+                    block.round(),
+                    WrappedLedgerInfo::new(VoteData::dummy(), ordered_proof.clone()),
+                );
+            }
+        }
         // mock sending commit notif to state sync
         let mut txns = vec![];
         for block in &ordered_blocks {
@@ -83,11 +102,6 @@ impl MockExecutionClient {
         }
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);
-
-        callback(
-            &ordered_blocks.into_iter().map(Arc::new).collect::<Vec<_>>(),
-            ordered_proof,
-        );
 
         Ok(())
     }
@@ -108,7 +122,6 @@ impl TExecutionClient for MockExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
-        _new_pipeline_enabled: bool,
     ) {
     }
 
@@ -118,9 +131,8 @@ impl TExecutionClient for MockExecutionClient {
 
     async fn finalize_order(
         &self,
-        blocks: &[Arc<PipelinedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
-        callback: StateComputerCommitCallBackType,
+        blocks: Vec<Arc<PipelinedBlock>>,
+        finality_proof: WrappedLedgerInfo,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
         info!(
@@ -128,7 +140,7 @@ impl TExecutionClient for MockExecutionClient {
             blocks.iter().map(|v| v.round()).collect::<Vec<_>>()
         );
 
-        for block in blocks {
+        for block in &blocks {
             self.block_cache.lock().insert(
                 block.id(),
                 block
@@ -142,12 +154,8 @@ impl TExecutionClient for MockExecutionClient {
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<PipelinedBlock>>(),
-                ordered_proof: finality_proof,
-                callback,
+                ordered_blocks: blocks,
+                ordered_proof: finality_proof.ledger_info().clone(),
             })
             .await
             .is_err()

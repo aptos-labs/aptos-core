@@ -9,7 +9,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    function::{ClosureVisitor, MoveClosure, MoveFunctionLayout},
+    function::{ClosureVisitor, MoveClosure},
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -267,40 +267,7 @@ pub enum MoveTypeLayout {
 
     // Added in bytecode version v8
     #[serde(rename(serialize = "fun", deserialize = "fun"))]
-    Function(MoveFunctionLayout),
-}
-
-impl MoveTypeLayout {
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveTypeLayout::*;
-        match (self, other) {
-            (
-                Function(MoveFunctionLayout(args1, res1, ab1)),
-                Function(MoveFunctionLayout(args2, res2, ab2)),
-            ) => {
-                // Notice that (currently) the function layout is not influencing
-                // serialization, but we anyway don't want it to diverge.
-                // Notice contra-variance for arguments.
-                Self::is_compatible_with_slice(args2, args1)
-                    && Self::is_compatible_with_slice(res1, res2)
-                    && ab1.is_subset(*ab2)
-            },
-            (Vector(t1), Vector(t2)) => t1.is_compatible_with(t2),
-            (Struct(s1), Struct(s2)) => s1.is_compatible_with(s2),
-            // For all other cases, equality is used
-            (t1, t2) => t1 == t2,
-        }
-    }
-
-    pub fn is_compatible_with_slice(this: &[Self], other: &[Self]) -> bool {
-        this.len() == other.len()
-            && this
-                .iter()
-                .zip(other)
-                .all(|(t1, t2)| t1.is_compatible_with(t2))
-    }
+    Function,
 }
 
 impl MoveValue {
@@ -521,31 +488,6 @@ impl MoveStructLayout {
         Self::WithVariants(variants)
     }
 
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    /// This only will consider runtime variants, decorated variants are only compatible
-    /// if equal.
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveStructLayout::*;
-        match (self, other) {
-            (RuntimeVariants(variants1), RuntimeVariants(variants2)) => {
-                variants1.len() <= variants2.len()
-                    && variants1.iter().zip(variants2).all(|(fields1, fields2)| {
-                        MoveTypeLayout::is_compatible_with_slice(fields1, fields2)
-                    })
-            },
-            (Runtime(fields1), Runtime(fields2)) => {
-                fields1.len() == fields2.len()
-                    && fields1
-                        .iter()
-                        .zip(fields2)
-                        .all(|(t1, t2)| t1.is_compatible_with(t2))
-            },
-            // All other cases require equality
-            (s1, s2) => s1 == s2,
-        }
-    }
-
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
         match self {
             Self::Runtime(vals) => vals,
@@ -623,8 +565,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
             MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
-            MoveTypeLayout::Function(fun) => Ok(MoveValue::Closure(Box::new(
-                deserializer.deserialize_seq(ClosureVisitor(fun))?,
+            MoveTypeLayout::Function => Ok(MoveValue::Closure(Box::new(
+                deserializer.deserialize_seq(ClosureVisitor)?,
             ))),
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
@@ -640,7 +582,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
 
 struct VectorElementVisitor<'a>(&'a MoveTypeLayout);
 
-impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for VectorElementVisitor<'_> {
     type Value = Vec<MoveValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -661,7 +603,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
 
 struct DecoratedStructFieldVisitor<'a>(&'a [MoveFieldLayout]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'_> {
     type Value = Vec<(Identifier, MoveValue)>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -685,7 +627,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for DecoratedStructFieldVisitor<'a> {
 
 struct StructFieldVisitor<'a>(&'a [MoveTypeLayout]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for StructFieldVisitor<'_> {
     type Value = Vec<MoveValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -709,7 +651,7 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
 
 struct StructVariantVisitor<'a>(&'a [Vec<MoveTypeLayout>]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for StructVariantVisitor<'a> {
+impl<'d> serde::de::Visitor<'d> for StructVariantVisitor<'_> {
     type Value = (u16, Vec<MoveValue>);
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -853,7 +795,7 @@ impl serde::Serialize for MoveValue {
 
 struct MoveFields<'a>(&'a [(Identifier, MoveValue)]);
 
-impl<'a> serde::Serialize for MoveFields<'a> {
+impl serde::Serialize for MoveFields<'_> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut t = serializer.serialize_map(Some(self.0.len()))?;
         for (f, v) in self.0.iter() {
@@ -914,9 +856,9 @@ impl serde::Serialize for MoveStruct {
                 // Unfortunately, we can't serialize this in the logical way: as a Serde struct named `type` with a field for
                 // each of `fields` because serde insists that struct and field names be `'static &str`'s
                 let mut t = serializer.serialize_struct(MOVE_STRUCT_NAME, 2)?;
-                // serialize type as string (e.g., 0x0::ModuleName::StructName<TypeArg1,TypeArg2>) instead of (e.g.
+                // serialize type as string (e.g., 0x0::ModuleName::StructName<TypeArg1, TypeArg2>) instead of (e.g.
                 // { address: 0x0...0, module: ModuleName, name: StructName, type_args: [TypeArg1, TypeArg2]})
-                t.serialize_field(MOVE_STRUCT_TYPE, &type_.to_string())?;
+                t.serialize_field(MOVE_STRUCT_TYPE, &type_.to_canonical_string())?;
                 t.serialize_field(MOVE_STRUCT_FIELDS, &MoveFields(fields))?;
                 t.end()
             },
@@ -952,7 +894,7 @@ impl fmt::Display for MoveTypeLayout {
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => fmt::Display::fmt(s, f),
-            Function(fun) => fmt::Display::fmt(fun, f),
+            Function => write!(f, "function"),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),
@@ -984,7 +926,7 @@ impl fmt::Display for MoveStructLayout {
                 }
             },
             Self::WithTypes { type_, fields } => {
-                write!(f, "Type: {}", type_)?;
+                write!(f, "Type: {}", type_.to_canonical_string())?;
                 write!(f, "Fields:")?;
                 for field in fields {
                     write!(f, "{}, ", field)?
@@ -1020,7 +962,12 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
-            MoveTypeLayout::Function(f) => TypeTag::Function(Box::new(f.try_into()?)),
+
+            // For function values, we cannot reconstruct the tag because we do not know the
+            // argument and return types.
+            MoveTypeLayout::Function => {
+                bail!("Function layout cannot be constructed from type tag")
+            },
 
             // Native layout variant is only used by MoveVM, and is irrelevant
             // for type tags which are used to key resources in the global state.
@@ -1041,76 +988,4 @@ impl TryInto<StructTag> for &MoveStructLayout {
             WithTypes { type_, .. } => Ok(type_.clone()),
         }
     }
-}
-
-impl fmt::Display for MoveValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MoveValue::U8(u) => write!(f, "{}u8", u),
-            MoveValue::U16(u) => write!(f, "{}u16", u),
-            MoveValue::U32(u) => write!(f, "{}u32", u),
-            MoveValue::U64(u) => write!(f, "{}u64", u),
-            MoveValue::U128(u) => write!(f, "{}u128", u),
-            MoveValue::U256(u) => write!(f, "{}u256", u),
-            MoveValue::Bool(false) => write!(f, "false"),
-            MoveValue::Bool(true) => write!(f, "true"),
-            MoveValue::Address(a) => write!(f, "{}", a.to_hex_literal()),
-            MoveValue::Signer(a) => write!(f, "signer({})", a.to_hex_literal()),
-            MoveValue::Vector(v) => fmt_list(f, "vector[", v, "]"),
-            MoveValue::Struct(s) => fmt::Display::fmt(s, f),
-            MoveValue::Closure(c) => fmt::Display::fmt(c, f),
-        }
-    }
-}
-
-impl fmt::Display for MoveStruct {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MoveStruct::Runtime(v) => fmt_list(f, "struct[", v, "]"),
-            MoveStruct::RuntimeVariant(tag, v) => fmt_list(f, &format!("variant#{}[", tag), v, "]"),
-            MoveStruct::WithFields(fields) => {
-                fmt_list(f, "{", fields.iter().map(DisplayFieldBinding), "}")
-            },
-            MoveStruct::WithTypes {
-                _type_: type_,
-                _fields: fields,
-            } => {
-                fmt::Display::fmt(type_, f)?;
-                fmt_list(f, " {", fields.iter().map(DisplayFieldBinding), "}")
-            },
-            MoveStruct::WithVariantFields(name, _tag, fields) => fmt_list(
-                f,
-                &format!("{}{{", name),
-                fields.iter().map(DisplayFieldBinding),
-                "}",
-            ),
-        }
-    }
-}
-
-struct DisplayFieldBinding<'a>(&'a (Identifier, MoveValue));
-
-impl fmt::Display for DisplayFieldBinding<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let DisplayFieldBinding((field, value)) = self;
-        write!(f, "{}: {}", field, value)
-    }
-}
-
-fn fmt_list<T: fmt::Display>(
-    f: &mut fmt::Formatter<'_>,
-    begin: &str,
-    items: impl IntoIterator<Item = T>,
-    end: &str,
-) -> fmt::Result {
-    write!(f, "{}", begin)?;
-    let mut items = items.into_iter();
-    if let Some(x) = items.next() {
-        write!(f, "{}", x)?;
-        for x in items {
-            write!(f, ", {}", x)?;
-        }
-    }
-    write!(f, "{}", end)?;
-    Ok(())
 }

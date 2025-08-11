@@ -3,8 +3,8 @@
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-    signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
-    Transaction,
+    signature_verified_transaction::SignatureVerifiedTransaction,
+    AuxiliaryInfo, Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
@@ -433,28 +433,66 @@ impl<T: Clone> TransactionWithDependencies<T> {
 pub struct ExecutableBlock {
     pub block_id: HashValue,
     pub transactions: ExecutableTransactions,
+    pub auxiliary_info: Vec<AuxiliaryInfo>,
 }
 
 impl ExecutableBlock {
-    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
+    pub fn new(
+        block_id: HashValue,
+        transactions: ExecutableTransactions,
+        auxiliary_info: Vec<AuxiliaryInfo>,
+    ) -> Self {
+        match &transactions {
+            ExecutableTransactions::Unsharded(txns) => {
+                assert!(txns.len() == auxiliary_info.len());
+            },
+            ExecutableTransactions::Sharded(_) => {
+                // Not supporting auxiliary info here because the sharded executor is only for
+                // benchmark purpose right now.
+                // TODO: Revisit when we need it.
+                assert!(auxiliary_info.is_empty());
+            },
+        }
         Self {
             block_id,
             transactions,
+            auxiliary_info,
         }
     }
 }
 
 impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
     fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+        let auxiliary_info = transactions
+            .iter()
+            .map(|_| AuxiliaryInfo::new_empty())
+            .collect();
+        Self::new(
+            block_id,
+            ExecutableTransactions::Unsharded(transactions),
+            auxiliary_info,
+        )
     }
 }
 
-impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
+impl
+    From<(
+        HashValue,
+        Vec<SignatureVerifiedTransaction>,
+        Vec<AuxiliaryInfo>,
+    )> for ExecutableBlock
+{
+    fn from(
+        (block_id, transactions, auxiliary_info): (
+            HashValue,
+            Vec<SignatureVerifiedTransaction>,
+            Vec<AuxiliaryInfo>,
+        ),
+    ) -> Self {
         Self::new(
             block_id,
-            ExecutableTransactions::Unsharded(into_signature_verified_block(transactions)),
+            ExecutableTransactions::Unsharded(transactions),
+            auxiliary_info,
         )
     }
 }
@@ -557,6 +595,13 @@ impl ExecutableTransactions {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
             ExecutableTransactions::Sharded(partitioned_txns) => partitioned_txns.num_txns(),
+        }
+    }
+
+    pub fn txns(&self) -> Vec<&SignatureVerifiedTransaction> {
+        match self {
+            ExecutableTransactions::Unsharded(txns) => txns.iter().collect(),
+            ExecutableTransactions::Sharded(_partitioned) => unimplemented!(""),
         }
     }
 

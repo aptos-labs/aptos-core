@@ -58,7 +58,7 @@ struct Context<'env, 'map> {
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
 }
-impl<'env, 'map> Context<'env, 'map> {
+impl<'env> Context<'env, '_> {
     fn new(
         compilation_env: &'env mut CompilationEnv,
         module_members: UniqueMap<ModuleIdent, ModuleMembers>,
@@ -516,7 +516,7 @@ fn module_(
     assert!(address.is_none());
     set_sender_address(context, &name, module_address);
     let _ = check_restricted_name_all_cases(context, NameCase::Module, &name.0);
-    if name.value().starts_with(|c| c == '_') {
+    if name.value().starts_with('_') {
         let msg = format!(
             "Invalid module name '{}'. Module names cannot start with '_'",
             name,
@@ -2580,11 +2580,12 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         PE::While(label, pb, ploop) => EE::While(label, exp(context, *pb), exp(context, *ploop)),
         PE::Loop(label, ploop) => EE::Loop(label, exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
-        PE::Lambda(pbs, pe, capture_kind) => {
+        PE::Lambda(pbs, pe, capture_kind, spec_opt) => {
             let tbs_opt = typed_bind_list(context, pbs);
             let e = exp_(context, *pe);
+            let ee_spec = spec_opt.map(|spec| Box::new(exp_(context, *spec)));
             match tbs_opt {
-                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind),
+                Some(tbs) => EE::Lambda(tbs, Box::new(e), capture_kind, ee_spec),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError
@@ -3311,10 +3312,13 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::Loop(_, eloop) => unbound_names_exp(unbound, eloop),
 
         EE::Block(seq) => unbound_names_sequence(unbound, seq),
-        EE::Lambda(ls, er, _capture_kind) => {
+        EE::Lambda(ls, er, _capture_kind, spec_opt) => {
             unbound_names_exp(unbound, er);
             // remove anything in `ls`
             unbound_names_typed_binds(unbound, ls);
+            if let Some(spec) = spec_opt {
+                unbound_names_exp(unbound, spec);
+            }
         },
         EE::Quant(_, rs, trs, cr_opt, er) => {
             unbound_names_exp(unbound, er);
@@ -3614,7 +3618,7 @@ fn check_valid_module_member_name_impl(
     }
     match member {
         M::Function => {
-            if n.value.starts_with(|c| c == '_') {
+            if n.value.starts_with('_') {
                 let msg = format!(
                     "Invalid {} name '{}'. {} names cannot start with '_'",
                     case.name(),

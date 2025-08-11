@@ -1,0 +1,17 @@
+processed 1 task
+task 0 lines 1-21:  publish [module 0x66::m {]
+Error: compilation errors:
+ error: too many arguments captured in lambda (can only capture up to a maximum of `64`, but captured `65`)
+   ┌─ TEMPFILE:12:17
+   │  
+12 │           let f = |y| x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 +
+   │ ╭─────────────────^
+13 │ │                     x10 + x11 + x12 + x13 + x14 + x15 + x16 + x17 + x18 + x19 +
+14 │ │                     x20 + x21 + x22 + x23 + x24 + x25 + x26 + x27 + x28 + x29 +
+15 │ │                     x30 + x31 + x32 + x33 + x34 + x35 + x36 + x37 + x38 + x39 +
+16 │ │                     x40 + x41 + x42 + x43 + x44 + x45 + x46 + x47 + x48 + x49 +
+17 │ │                     x50 + x51 + x52 + x53 + x54 + x55 + x56 + x57 + x58 + x59 +
+18 │ │                     x60 + x61 + x62 + x63 + x64 + y;
+   │ ╰───────────────────────────────────────────────────^
+
+

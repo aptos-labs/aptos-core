@@ -221,9 +221,9 @@ impl NibblePath {
     }
 
     // Returns the shard_id of the NibblePath, or None if it is root.
-    pub fn get_shard_id(&self) -> Option<u8> {
+    pub fn get_shard_id(&self) -> Option<usize> {
         if self.num_nibbles() > 0 {
-            Some(u8::from(self.get_nibble(0)))
+            Some(usize::from(self.get_nibble(0)))
         } else {
             None
         }
@@ -241,7 +241,7 @@ pub struct BitIterator<'a> {
     pos: std::ops::Range<usize>,
 }
 
-impl<'a> Peekable for BitIterator<'a> {
+impl Peekable for BitIterator<'_> {
     /// Returns the `next()` value without advancing the iterator.
     fn peek(&self) -> Option<Self::Item> {
         if self.pos.start < self.pos.end {
@@ -253,7 +253,7 @@ impl<'a> Peekable for BitIterator<'a> {
 }
 
 /// BitIterator spits out a boolean each time. True/false denotes 1/0.
-impl<'a> Iterator for BitIterator<'a> {
+impl Iterator for BitIterator<'_> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -262,7 +262,7 @@ impl<'a> Iterator for BitIterator<'a> {
 }
 
 /// Support iterating bits in reversed order.
-impl<'a> DoubleEndedIterator for BitIterator<'a> {
+impl DoubleEndedIterator for BitIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.pos.next_back().map(|i| self.nibble_path.get_bit(i))
     }
@@ -288,7 +288,7 @@ pub struct NibbleIterator<'a> {
 }
 
 /// NibbleIterator spits out a byte each time. Each byte must be in range [0, 16).
-impl<'a> Iterator for NibbleIterator<'a> {
+impl Iterator for NibbleIterator<'_> {
     type Item = Nibble;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -296,7 +296,7 @@ impl<'a> Iterator for NibbleIterator<'a> {
     }
 }
 
-impl<'a> Peekable for NibbleIterator<'a> {
+impl Peekable for NibbleIterator<'_> {
     /// Returns the `next()` value without advancing the iterator.
     fn peek(&self) -> Option<Self::Item> {
         if self.pos.start < self.pos.end {

@@ -4,7 +4,7 @@
 use crate::{
     move_workloads::{LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
-    EntryPoints,
+    EntryPoints, OrderBookState,
 };
 use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
@@ -80,6 +80,25 @@ pub enum TransactionTypeArg {
     SimpleScript,
     APTTransferWithPermissionedSigner,
     APTTransferWithMasterSigner,
+    /// Basic market where sell and buy prices are in distinct ranges,
+    /// and there are no matches.
+    OrderBookNoMatches1Market,
+    OrderBookNoMatches50Markets,
+    /// Basic market where sell and buy prices are in distinct ranges,
+    /// and there are no matches.
+    /// Basic market, 25% of orders are in the "overlap" interval.
+    /// Half of the orders are buys, half sells, and both have same size ranges.
+    OrderBookBalancedMatches25Pct1Market,
+    OrderBookBalancedMatches25Pct50Markets,
+    /// Basic market, 80% of orders are in the "overlap" interval.
+    /// Half of the orders are buys, half sells, and both have same size ranges.
+    OrderBookBalancedMatches80Pct1Market,
+    OrderBookBalancedMatches80Pct50Markets,
+    /// Basic market, 80% of orders are in the "overlap" interval.
+    /// Sells are 99 times smaller, but are 99 times more frequent than buys.
+    /// That means we will match rarely, but single match will be creating ~100 positions
+    OrderBookBalancedSizeSkewed80Pct1Market,
+    OrderBookBalancedSizeSkewed80Pct50Markets,
 }
 
 impl TransactionTypeArg {
@@ -101,7 +120,7 @@ impl TransactionTypeArg {
             }
         };
 
-        match self {
+        match &self {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
@@ -358,6 +377,72 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::APTTransferWithMasterSigner => {
                 call_custom_module(EntryPoints::APTTransferWithMasterSigner)
+            },
+            TransactionTypeArg::OrderBookNoMatches1Market
+            | TransactionTypeArg::OrderBookNoMatches50Markets => {
+                call_custom_module(EntryPoints::OrderBook {
+                    state: OrderBookState::new(),
+                    num_markets: if let TransactionTypeArg::OrderBookNoMatches50Markets = self {
+                        50
+                    } else {
+                        1
+                    },
+                    overlap_ratio: 0.0,
+                    buy_frequency: 0.5,
+                    max_sell_size: 1,
+                    max_buy_size: 1,
+                })
+            },
+            TransactionTypeArg::OrderBookBalancedMatches25Pct1Market
+            | TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets => {
+                call_custom_module(EntryPoints::OrderBook {
+                    state: OrderBookState::new(),
+                    num_markets: if let TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets =
+                        self
+                    {
+                        50
+                    } else {
+                        1
+                    },
+                    overlap_ratio: 0.25,
+                    buy_frequency: 0.5,
+                    max_sell_size: 1,
+                    max_buy_size: 1,
+                })
+            },
+            TransactionTypeArg::OrderBookBalancedMatches80Pct1Market
+            | TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets => {
+                call_custom_module(EntryPoints::OrderBook {
+                    state: OrderBookState::new(),
+                    num_markets: if let TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets =
+                        self
+                    {
+                        50
+                    } else {
+                        1
+                    },
+                    overlap_ratio: 0.8,
+                    buy_frequency: 0.5,
+                    max_sell_size: 1,
+                    max_buy_size: 1,
+                })
+            },
+            TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct1Market
+            | TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets => {
+                call_custom_module(EntryPoints::OrderBook {
+                    state: OrderBookState::new(),
+                    num_markets:
+                        if let TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets = self
+                        {
+                            50
+                        } else {
+                            1
+                        },
+                    overlap_ratio: 0.8,
+                    buy_frequency: 0.01,
+                    max_sell_size: 50,
+                    max_buy_size: 950,
+                })
             },
         }
     }

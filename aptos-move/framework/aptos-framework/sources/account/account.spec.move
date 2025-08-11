@@ -227,6 +227,10 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
+    spec rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) {
+        aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME && scheme != SINGLE_KEY_SCHEME && scheme != MULTI_KEY_SCHEME;
+    }
+
     spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
 
     spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
@@ -748,7 +752,7 @@ spec aptos_framework::account {
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
     }
 
-    spec set_originating_address(account: &signer) {
+    spec set_originating_address(_account: &signer) {
         pragma verify=false;
     }
 }

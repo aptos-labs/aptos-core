@@ -39,7 +39,13 @@ async fn test_get_index() {
 
 #[tokio::test]
 async fn test_basic_client() {
-    let swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.indexer_db_config.enable_statekeys = true;
+        }))
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     info.client().get_ledger_information().await.unwrap();
@@ -124,7 +130,7 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
                 non_conflicting: false,
-                use_fa_transfer: false,
+                use_fa_transfer: true,
             },
             100,
         )]],
@@ -246,7 +252,15 @@ async fn test_gas_estimation_gas_used_limit() {
 
 #[tokio::test]
 async fn test_bcs() {
-    let swarm = new_local_swarm_with_aptos(1).await;
+    let swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.indexer_db_config.enable_statekeys = true;
+            conf.indexer_db_config.enable_transaction = true;
+            conf.indexer_db_config.enable_event = true;
+        }))
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     // Create accounts
@@ -269,25 +283,6 @@ async fn test_bcs() {
         AuthenticationKey::try_from(account_resource.authentication_key()).unwrap();
     assert_eq!(expected_auth_key, onchain_auth_key);
     assert_eq!(0, account_resource.sequence_number());
-
-    // Check get resources
-    let resources = client
-        .get_account_resources_bcs(account)
-        .await
-        .unwrap()
-        .into_inner();
-    let bytes = resources
-        .get(&StructTag::from_str("0x1::account::Account").unwrap())
-        .unwrap();
-    let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
-    assert_eq!(0, account_resource.sequence_number());
-
-    let single_account_resource: AccountResource = client
-        .get_account_resource_bcs(account, "0x1::account::Account")
-        .await
-        .unwrap()
-        .into_inner();
-    assert_eq!(account_resource, single_account_resource);
 
     // Check Modules align
     let modules = client
@@ -339,14 +334,33 @@ async fn test_bcs() {
         .into_inner();
     let expected_txn_version = expected_txn.version;
 
+    // Check get resources
+    let resources = client
+        .get_account_resources_bcs(account)
+        .await
+        .unwrap()
+        .into_inner();
+    let bytes = resources
+        .get(&StructTag::from_str("0x1::account::Account").unwrap())
+        .unwrap();
+    let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
+    assert_eq!(1, account_resource.sequence_number());
+
+    let single_account_resource: AccountResource = client
+        .get_account_resource_bcs(account, "0x1::account::Account")
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(account_resource, single_account_resource);
+
     // Check transactions on an account
     let transactions = client
-        .get_account_transactions(account, Some(0), Some(2))
+        .get_account_ordered_transactions(account, Some(0), Some(2))
         .await
         .unwrap()
         .into_inner();
     let transactions_bcs = client
-        .get_account_transactions_bcs(account, Some(0), Some(2))
+        .get_account_ordered_transactions_bcs(account, Some(0), Some(2))
         .await
         .unwrap()
         .into_inner();
@@ -564,7 +578,7 @@ async fn test_view_function() {
     // Balance should be 0 and there should only be one return value
     let json_ret_values = client.view(&view_request, None).await.unwrap().into_inner();
     assert_eq!(json_ret_values.len(), 1);
-    assert!(!json_ret_values[0].as_bool().unwrap());
+    assert!(json_ret_values[0].as_bool().unwrap());
 
     // BCS
     let bcs_view_request = ViewFunction {
@@ -583,5 +597,5 @@ async fn test_view_function() {
         .unwrap()
         .into_inner();
     assert_eq!(bcs_ret_values.len(), 1);
-    assert!(!bcs_ret_values[0]);
+    assert!(bcs_ret_values[0]);
 }

@@ -39,12 +39,18 @@ use move_core_types::{
 use move_vm_runtime::{
     config::VMConfig,
     data_cache::TransactionDataCache,
+    dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, LoadedFunction, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
+    Loader, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{gas::GasMeter, value_serde::ValueSerDeContext, values::Value};
+use move_vm_types::{
+    gas::GasMeter,
+    value_serde::{FunctionValueExtension, ValueSerDeContext},
+    values::Value,
+};
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 
 pub mod respawned_session;
@@ -118,43 +124,6 @@ where
         }
     }
 
-    pub fn execute_entry_function(
-        &mut self,
-        func: LoadedFunction,
-        args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<()> {
-        if !func.is_entry() {
-            let module_id = func
-                .module_id()
-                .ok_or_else(|| {
-                    let msg = "Entry function always has module id".to_string();
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined)
-                })?
-                .clone();
-            return Err(PartialVMError::new(
-                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
-            )
-            .finish(Location::Module(module_id)));
-        }
-
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )?;
-        Ok(())
-    }
-
     pub fn execute_function_bypass_visibility(
         &mut self,
         module_id: &ModuleId,
@@ -165,17 +134,26 @@ where
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let func = module_storage.load_function(module_id, function_name, &ty_args)?;
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut self.data_cache,
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            module_storage,
-            self.resolver,
-        )
+        dispatch_loader!(module_storage, loader, {
+            let func = loader.load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                gas_meter,
+                traversal_context,
+                module_id,
+                function_name,
+                &ty_args,
+            )?;
+            MoveVM::execute_loaded_function(
+                func,
+                args,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                &mut self.extensions,
+                &loader,
+                self.resolver,
+            )
+        })
     }
 
     pub fn execute_loaded_function(
@@ -184,7 +162,7 @@ where
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        module_storage: &impl ModuleStorage,
+        loader: &impl Loader,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function(
             func,
@@ -193,7 +171,7 @@ where
             gas_meter,
             traversal_context,
             &mut self.extensions,
-            module_storage,
+            loader,
             self.resolver,
         )
     }
@@ -213,7 +191,7 @@ where
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
@@ -221,7 +199,7 @@ where
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                ValueSerDeContext::new()
+                ValueSerDeContext::new(function_extension.max_value_nest_depth())
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
@@ -240,7 +218,7 @@ where
         } = self;
 
         let change_set = data_cache
-            .into_custom_effects(&resource_converter, module_storage)
+            .into_custom_effects(&resource_converter)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let (change_set, resource_group_change_set) =
@@ -394,9 +372,16 @@ where
 
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = {
+                    // INVARIANT:
+                    //   We do not need to meter metadata access here. If this resource is in data
+                    //   cache, we must have already fetched metadata for its tag.
                     let metadata = module_storage
-                        .fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+                        .unmetered_get_existing_module_metadata(
+                            &struct_tag.address,
+                            &struct_tag.module,
+                        )
                         .map_err(|e| e.to_partial())?;
+
                     get_resource_group_member_from_metadata(&struct_tag, &metadata)
                 };
 

@@ -13,7 +13,7 @@ on:
 
 jobs:
   windows-build:
-    runs-on: windows-latest
+    runs-on: windows-2025
     if: | # Only run on each PR once an appropriate event occurs
       (
         github.event_name == 'workflow_dispatch' ||
@@ -41,7 +41,7 @@ jobs:
       # this case). See more here:
       # https://github.com/Swatinem/rust-cache#cache-details
       - name: Run cargo cache
-        uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # pin@v2.7.3
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # pin@v2.7.8
 
       - name: Install the Developer Tools
         run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1 -t

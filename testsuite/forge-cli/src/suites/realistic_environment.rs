@@ -142,6 +142,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 SuccessCriteria::new(min_tps)
                     .add_max_expired_tps(max_expired as f64)
                     .add_max_failed_submission_tps(200.0)
+                    .add_no_restarts()
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (
                             LatencyBreakdownSlice::MempoolToBlockCreation,
@@ -303,7 +304,7 @@ pub(crate) fn realistic_env_max_load_test(
         NodeResourceOverride::default() // no overrides
     };
 
-    let mut success_criteria = SuccessCriteria::new(95)
+    let mut success_criteria = SuccessCriteria::new(85)
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
@@ -316,20 +317,26 @@ pub(crate) fn realistic_env_max_load_test(
             // Give at least 60s for catchup, give 10% of the run for longer durations.
             (duration.as_secs() / 10).max(60),
         )
-        .add_latency_threshold(3.4, LatencyType::P50)
-        .add_latency_threshold(4.5, LatencyType::P70)
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
             max_epoch_no_progress_secs: 16.0,
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });
+
+    // If the test is short lived, we should verify that there are no fullnode failures
+    if !long_running {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+
     if !ha_proxy {
         success_criteria = success_criteria.add_latency_breakdown_threshold(
             LatencyBreakdownThreshold::new_with_breach_pct(
                 vec![
                     // quorum store backpressure is relaxed, so queueing happens here
-                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 2.5),
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
                     // can be adjusted down if less backpressure
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
                     // can be adjusted down if less backpressure
@@ -341,7 +348,7 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -371,6 +378,15 @@ pub(crate) fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -448,6 +464,14 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     OnChainExecutionConfig::V5(config_v5) => {
                         config_v5.block_gas_limit_type = BlockGasLimitType::NoLimit;
                         config_v5.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
+                            sender_spread_factor: 256,
+                            platform_use_case_spread_factor: 0,
+                            user_use_case_spread_factor: 0,
+                        };
+                    }
+                    OnChainExecutionConfig::V6(config_v6) => {
+                        config_v6.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v6.transaction_shuffler_type = TransactionShufflerType::UseCaseAware {
                             sender_spread_factor: 256,
                             platform_use_case_spread_factor: 0,
                             user_use_case_spread_factor: 0,

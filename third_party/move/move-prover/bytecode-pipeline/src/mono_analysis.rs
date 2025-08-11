@@ -6,6 +6,7 @@
 //! computes the distinct type instantiations in the model for structs and inlined functions.
 
 use itertools::Itertools;
+use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
     ast,
     ast::{Condition, ConditionKind, ExpData},
@@ -46,6 +47,17 @@ pub struct MonoInfo {
     pub native_inst: BTreeMap<ModuleId, BTreeSet<Vec<Type>>>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
+    /// A map from function types used in the program to the closures appearing in
+    /// code constructing values of this function type.
+    pub fun_infos: BTreeMap<Type, BTreeSet<ClosureInfo>>,
+}
+
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct ClosureInfo {
+    /// The function used to construct the closure.
+    pub fun: QualifiedInstId<FunId>,
+    /// Closure mask used by the function.
+    pub mask: ClosureMask,
 }
 
 /// Get the information computed by this analysis.
@@ -188,7 +200,7 @@ struct Analyzer<'a> {
     inst_opt: Option<Vec<Type>>,
 }
 
-impl<'a> Analyzer<'a> {
+impl Analyzer<'_> {
     fn analyze_funs(&mut self) {
         // Analyze top-level, verified functions. Any functions they call will be queued
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
@@ -361,14 +373,15 @@ impl<'a> Analyzer<'a> {
         }
     }
 
-    fn analyze_bytecode(&mut self, _target: &FunctionTarget<'_>, bc: &Bytecode) {
+    fn analyze_bytecode(&mut self, target: &FunctionTarget<'_>, bc: &Bytecode) {
         use Bytecode::*;
         use Operation::*;
-        // We only need to analyze function calls, not `pack` or other instructions
-        // because the types those are using are reflected in locals which are analyzed
+        // For monomorphization, we only need to analyze function calls, not `pack` or other
+        // instructions because the types those are using are reflected in locals which are analyzed
         // elsewhere.
         match bc {
-            Call(_, _, Function(mid, fid, targs), ..) => {
+            Call(_, _, Function(mid, fid, targs), ..)
+            | Call(_, _, Closure(mid, fid, targs, ..), ..) => {
                 let module_env = &self.env.get_module(*mid);
                 let callee_env = module_env.get_function(*fid);
                 let actuals = self.instantiate_vec(targs);
@@ -412,6 +425,19 @@ impl<'a> Analyzer<'a> {
                         self.todo_funs.push(entry);
                     }
                 }
+
+                // Record closure construction under the type of the constructed closure.
+                // Notice we strip abilities here as the prover does not consider them.
+                if let Call(_, dests, Closure(_mid, _fid, _targs, mask), ..) = bc {
+                    let fun_type =
+                        self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
+                    let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
+                    self.info
+                        .fun_infos
+                        .entry(fun_type)
+                        .or_default()
+                        .insert(ClosureInfo { fun, mask: *mask });
+                }
             },
             Call(_, _, WriteBack(_, edge), ..) => {
                 // In very rare occasions, not all types used in the function can appear in
@@ -429,6 +455,28 @@ impl<'a> Analyzer<'a> {
                 self.add_struct(struct_env, &mem.inst);
             },
             _ => {},
+        }
+    }
+
+    /// Normalize a function type. This remove abilities which are abstracted by the prover,
+    /// as well as ensures that singleton tuples aren't present. The resulting type
+    /// can be used to index function types.
+    fn normalize_fun_ty(&self, ty: Type) -> Type {
+        let Type::Fun(params, results, _) = ty else {
+            panic!("expected fun type")
+        };
+        Type::Fun(
+            Box::new(Type::tuple(params.flatten())),
+            Box::new(Type::tuple(results.flatten())),
+            AbilitySet::EMPTY,
+        )
+    }
+
+    fn instantiate(&self, ty: &Type) -> Type {
+        if let Some(inst) = &self.inst_opt {
+            ty.instantiate(inst)
+        } else {
+            ty.clone()
         }
     }
 
@@ -536,6 +584,12 @@ impl<'a> Analyzer<'a> {
             return;
         }
         ty.visit(&mut |t| match t {
+            Type::Fun(..) => {
+                self.info
+                    .fun_infos
+                    .entry(self.normalize_fun_ty(t.clone()))
+                    .or_default();
+            },
             Type::Vector(et) => {
                 self.info.vec_inst.insert(et.as_ref().clone());
             },

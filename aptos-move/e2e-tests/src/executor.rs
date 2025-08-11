@@ -27,8 +27,9 @@ use aptos_transaction_simulation::{
 };
 use aptos_types::{
     account_config::{
-        new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
-        ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
+        new_block_event_key, primary_apt_store, AccountResource, CoinInfoResource,
+        ConcurrentSupplyResource, FungibleStoreResource, NewBlockEvent, ObjectGroupResource,
+        CORE_CODE_ADDRESS,
     },
     block_executor::{
         config::{
@@ -49,8 +50,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionExecutableRef,
+        TransactionOutput, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -74,7 +75,6 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use claims::assert_ok;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -82,10 +82,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    ModuleStorage,
-};
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -248,8 +245,19 @@ impl FakeExecutor {
         executor
     }
 
-    pub fn from_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
-        let rest_client = aptos_rest_client::Client::builder(network_url).build();
+    fn from_remote_state_impl(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: Option<&str>,
+    ) -> Self {
+        let mut builder = aptos_rest_client::Client::builder(network_url);
+        if let Some(api_key) = api_key {
+            builder = builder
+                .api_key(api_key)
+                .expect("failed to configure API key")
+        }
+        let rest_client = builder.build();
+
         let debugger = Arc::new(RestDebuggerInterface::new(rest_client));
         let debugger_state_view = DebuggerStateView::new(debugger, txn_id);
         let state_store =
@@ -277,6 +285,29 @@ impl FakeExecutor {
             executor_mode: None,
             allow_block_executor_fallback: true,
         }
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id, with support for a custom API key to access node APIs.
+    ///
+    /// Simulations based on remote states rely heavily on API calls, which can easily run into
+    /// rate limits if executed repeatedly or in parallel.
+    /// Providing an API key raises these limits significantly.
+    ///
+    /// If you hit rate limits, you can create a free Aptos Build account and generate an API key:
+    /// - https://build.aptoslabs.com/docs/start#api-quick-start
+    pub fn from_remote_state_with_api_key(
+        network_url: AptosBaseUrl,
+        txn_id: u64,
+        api_key: &str,
+    ) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, Some(api_key))
+    }
+
+    /// Creates a [`FakeExecutor`] from a remote network state at the version specified by the
+    /// transaction id.
+    pub fn from_remote_state(network_url: AptosBaseUrl, txn_id: u64) -> Self {
+        Self::from_remote_state_impl(network_url, txn_id, None)
     }
 
     pub fn set_executor_mode(mut self, mode: ExecutorMode) -> Self {
@@ -621,11 +652,14 @@ impl FakeExecutor {
     }
 
     /// Reads the CoinStore resource value for an account from this executor's data store.
-    pub fn read_apt_coin_store_resource(
+    pub fn read_apt_fungible_store_resource(
         &self,
         account: &Account,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_apt_coin_store_resource_at_address(account.address())
+    ) -> Option<FungibleStoreResource> {
+        self.read_resource_from_group(
+            &primary_apt_store(*account.address()),
+            &ObjectGroupResource::struct_tag(),
+        )
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.
@@ -649,15 +683,6 @@ impl FakeExecutor {
     /// Reads the CoinInfo resource value from this executor's data store.
     pub fn read_apt_coin_info_resource(&self) -> Option<CoinInfoResource<AptosCoinType>> {
         self.read_resource(&AptosCoinType::coin_info_address())
-    }
-
-    /// Reads the CoinStore resource value for an account under the given address from this executor's
-    /// data store.
-    pub fn read_apt_coin_store_resource_at_address(
-        &self,
-        addr: &AccountAddress,
-    ) -> Option<CoinStoreResource<AptosCoinType>> {
-        self.read_resource(addr)
     }
 
     /// Executes the given block of transactions.
@@ -707,6 +732,7 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                blockstm_v2: false,
                 concurrency_level: if sequential {
                     1
                 } else {
@@ -718,7 +744,7 @@ impl FakeExecutor {
             },
             onchain: onchain_config,
         };
-        let txn_provider = DefaultTxnProvider::new(txn_block);
+        let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
         AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
@@ -876,20 +902,20 @@ impl FakeExecutor {
             &txn,
             &log_context,
             |gas_meter| {
-                let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
-                    // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has been removed")
+                let gas_profiler = match txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::Script(_)) => GasProfiler::new_script(gas_meter),
+                    Ok(TransactionExecutableRef::EntryFunction(entry_func))
+                        if !txn.payload().is_multisig() =>
+                    {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
                     },
+                    Ok(_) => unimplemented!("multisig or empty payload not supported yet"),
+                    Err(_) => unimplemented!("payload type is deprecated"),
                 };
                 gas_profiler
             },
@@ -1036,6 +1062,10 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
+    pub fn get_chain_id(&self) -> ChainId {
+        self.state_store.get_chain_id().unwrap()
+    }
+
     /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
     /// Additionally we have dynamic_args and gas_meter_type to configure it further.
@@ -1045,13 +1075,17 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-        iterations: u64,
+        num_measured_iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
     ) -> Measurement {
+        // First few runs will not be recorded: this ensures modules used for execution are cached.
+        const NUM_WARM_UP_RUNS: u64 = 1;
+
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
-            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
+            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..num_measured_iterations
+                + NUM_WARM_UP_RUNS)
                 .map(|_| *self.new_account_at(AccountAddress::random()).address())
                 .collect::<Vec<_>>(),
             _ => vec![],
@@ -1060,28 +1094,16 @@ impl FakeExecutor {
         let env = AptosEnvironment::new(&self.state_store);
         let resolver = self.state_store.as_move_resolver();
         let vm = MoveVmExt::new(&env);
-
-        // Create module storage, and ensure the module for the function we want to execute is
-        // cached.
         let module_storage = self.state_store.as_aptos_code_storage(&env);
-        assert_ok!(module_storage.fetch_verified_module(module.address(), module.name()));
 
-        // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
         let mut measurements = Vec::new();
-        while i < iterations {
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
-            // load function name into cache to ensure cache is hot
-            let _ = module_storage.load_function(
-                module,
-                &Self::name(function_name),
-                &type_params.clone(),
-            );
+        while i < num_measured_iterations + NUM_WARM_UP_RUNS {
+            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
-            let ty = type_params.clone();
             let mut arg = args.clone();
             match &dynamic_args {
                 ExecFuncTimerDynamicArgs::DistinctSigners => {
@@ -1122,25 +1144,26 @@ impl FakeExecutor {
             };
 
             let start = Instant::now();
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
             // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
             let result = match gas_meter_type {
                 GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
                     module,
                     &fun_name,
-                    ty,
+                    type_params.clone(),
                     arg,
                     regular.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
+                    &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
                     &fun_name,
-                    ty,
+                    type_params.clone(),
                     arg,
                     unmetered.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
+                    &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
                 ),
             };
@@ -1153,15 +1176,18 @@ impl FakeExecutor {
                     );
                 }
             }
-            measurements.push(Measurement {
-                elapsed,
-                execution_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
-                io_gas: regular
-                    .as_ref()
-                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
-            });
+
+            if i > NUM_WARM_UP_RUNS {
+                measurements.push(Measurement {
+                    elapsed,
+                    execution_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                    io_gas: regular
+                        .as_ref()
+                        .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+                });
+            }
             i += 1;
         }
 
@@ -1212,7 +1238,9 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1229,7 +1257,7 @@ impl FakeExecutor {
                     ),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
+                &mut traversal_context,
                 &module_storage,
             );
             if let Err(err) = result {
@@ -1269,7 +1297,10 @@ impl FakeExecutor {
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
+
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
             session
                 .execute_function_bypass_visibility(
                     &module_id,
@@ -1278,7 +1309,7 @@ impl FakeExecutor {
                     args,
                     // TODO(Gas): we probably want to switch to metered execution in the future
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
+                    &mut traversal_context,
                     &module_storage,
                 )
                 .unwrap_or_else(|e| {
@@ -1349,6 +1380,25 @@ impl FakeExecutor {
             max_gas_amount,
         )
     }
+
+    /// Force-rotates the authentication key of the account at the given address.
+    ///
+    /// Returns a new [`Account`] struct that contains the newly generated key pair, which you
+    /// can use to sign transactions.
+    pub fn rotate_account_authentication_key(&mut self, addr: AccountAddress) -> Account {
+        let account = Account::new_from_addr_with_new_keypair_from_seed(addr, &mut self.rng);
+
+        // Note: This does not update the mapping of originating addresses but it is probably fine
+        //       for testing purposes.
+        self.exec("account", "rotate_authentication_key_call", vec![], vec![
+            MoveValue::Signer(addr).simple_serialize().unwrap(),
+            MoveValue::vector_u8(account.auth_key())
+                .simple_serialize()
+                .unwrap(),
+        ]);
+
+        account
+    }
 }
 
 /// Finishes the session, and asserts there has been no modules published (publishing is the
@@ -1400,14 +1450,14 @@ pub fn assert_outputs_equal(
 
         let keys = txn_output_1
             .write_set()
-            .iter()
-            .chain(txn_output_2.write_set().iter())
+            .write_op_iter()
+            .chain(txn_output_2.write_set().write_op_iter())
             .map(|(k, _)| k)
             .collect::<BTreeSet<_>>();
         let mut differences = vec![];
         for key in keys {
-            let write1 = txn_output_1.write_set().get(key);
-            let write2 = txn_output_2.write_set().get(key);
+            let write1 = txn_output_1.write_set().get_write_op(key);
+            let write2 = txn_output_2.write_set().get_write_op(key);
 
             if write1 != write2 {
                 differences.push(format!(

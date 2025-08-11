@@ -12,7 +12,7 @@
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::ExpData,
-    model::{GlobalEnv, NodeId},
+    model::{FunctionEnv, NodeId},
 };
 
 /// Expression linter keeping track of traversal state.
@@ -42,7 +42,7 @@ impl ExpChecker for BlocksInConditions {
         "blocks_in_conditions".to_string()
     }
 
-    fn visit_expr_pre(&mut self, _env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_pre(&mut self, _function: &FunctionEnv, expr: &ExpData) {
         use CondExprState::*;
         use ExpData::{Block, IfElse, Match, Sequence, SpecBlock};
         match self.state {
@@ -77,7 +77,7 @@ impl ExpChecker for BlocksInConditions {
         }
     }
 
-    fn visit_expr_post(&mut self, env: &GlobalEnv, expr: &ExpData) {
+    fn visit_expr_post(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use CondExprState::*;
         match self.state {
             Some(Traversing {
@@ -88,6 +88,7 @@ impl ExpChecker for BlocksInConditions {
                 // We are done with traversing the condition of interest.
                 self.state = None;
                 if has_any_block && !has_spec_block {
+                    let env = function.env();
                     self.report(
                         env,
                         &env.get_node_loc(id),

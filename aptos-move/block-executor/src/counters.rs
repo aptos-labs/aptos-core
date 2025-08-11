@@ -368,3 +368,15 @@ pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static HOT_STATE_OP_ACCUMULATOR_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        // metric name
+        "aptos_hot_state_op_accumulator_counter",
+        // metric description
+        "Various counters for BlockHotStateOpAccumulator",
+        // metric labels (dimensions)
+        &["name"],
+    )
+    .unwrap()
+});

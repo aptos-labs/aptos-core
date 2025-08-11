@@ -513,7 +513,13 @@ pub enum Exp_ {
     While(Option<Label>, Box<Exp>, Box<Exp>),
     Loop(Option<Label>, Box<Exp>),
     Block(Sequence),
-    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind),
+    Lambda(
+        TypedLValueList,
+        Box<Exp>,
+        LambdaCaptureKind,
+        // optional spec block for lambda
+        Option<Box<Exp>>,
+    ),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -802,7 +808,7 @@ impl Visibility {
 
 pub struct AbilitySetIter<'a>(unique_set::Iter<'a, Ability>);
 
-impl<'a> Iterator for AbilitySetIter<'a> {
+impl Iterator for AbilitySetIter<'_> {
     type Item = Ability;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1698,7 +1704,7 @@ impl AstDebug for Exp_ {
                 }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e, capture_kind) => {
+            E::Lambda(sp!(_, bs), e, capture_kind, spec_opt) => {
                 if *capture_kind != LambdaCaptureKind::Default {
                     w.write(format!(" {}", capture_kind));
                 }
@@ -1706,6 +1712,9 @@ impl AstDebug for Exp_ {
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                if let Some(spec) = spec_opt {
+                    spec.ast_debug(w);
+                }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

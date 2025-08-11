@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 1-4:  publish [module 0xc0ffee::m {]
+task 1 lines 6-13:  run [script {]
+task 2 lines 15-21:  run [script {]
+task 3 lines 23-28:  run [script {]

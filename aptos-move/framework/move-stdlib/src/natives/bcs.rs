@@ -55,23 +55,39 @@ fn native_to_bytes(
     let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
-    let layout = match context.type_to_type_layout(&arg_type) {
-        Ok(layout) => layout,
-        Err(_) => {
-            context.charge(BCS_TO_BYTES_FAILURE)?;
-            return Err(SafeNativeError::Abort {
-                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
-            });
-        },
+    let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
+        // With lazy loading, propagate the error directly. This is because errors here are likely
+        // from metering, so we should not remap them in any way. Note that makes it possible to
+        // fail on constructing a very deep / large layout and not be charged, but this is already
+        // the case for regular execution, so we keep it simple. Also, charging more gas after
+        // out-of-gas failure in layout construction does not make any sense.
+        //
+        // Example:
+        //   - Constructing layout runs into dependency limit.
+        //   - We cannot do `context.charge(BCS_TO_BYTES_FAILURE)?;` because then we can end up in
+        //     the state where out of gas and dependency limit are hit at the same time.
+        context.type_to_type_layout(&arg_type)?
+    } else {
+        match context.type_to_type_layout(&arg_type) {
+            Ok(layout) => layout,
+            Err(_) => {
+                context.charge(BCS_TO_BYTES_FAILURE)?;
+                return Err(SafeNativeError::Abort {
+                    abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+                });
+            },
+        }
     };
 
     // TODO(#14175): Reading the reference performs a deep copy, and we can
     //               implement it in a more efficient way.
     let val = ref_to_val.read_ref()?;
 
-    let serialized_value = match ValueSerDeContext::new()
+    let function_value_extension = context.function_value_extension();
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let serialized_value = match ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
-        .with_func_args_deserialization(context.function_value_extension())
+        .with_func_args_deserialization(&function_value_extension)
         .serialize(&val, &layout)?
     {
         Some(serialized_value) => serialized_value,
@@ -136,9 +152,11 @@ fn serialized_size_impl(
     let value = reference.read_ref()?;
     let ty_layout = context.type_to_type_layout(ty)?;
 
-    ValueSerDeContext::new()
+    let function_value_extension = context.function_value_extension();
+    let max_value_nest_depth = context.max_value_nest_depth();
+    ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
-        .with_func_args_deserialization(context.function_value_extension())
+        .with_func_args_deserialization(&function_value_extension)
         .with_delayed_fields_serde()
         .serialized_size(&value, &ty_layout)
 }
@@ -197,7 +215,7 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         MoveTypeLayout::Struct(
             MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_),
         )
-        | MoveTypeLayout::Function(..) => Ok(None),
+        | MoveTypeLayout::Function => Ok(None),
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields)) => {
             let mut total = Some(0);
             for field in fields {

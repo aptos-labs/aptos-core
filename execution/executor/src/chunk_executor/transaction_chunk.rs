@@ -17,7 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
-    transaction::{Transaction, TransactionOutput, Version},
+    transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
@@ -52,6 +52,7 @@ pub trait TransactionChunk {
 
 pub struct ChunkToExecute {
     pub transactions: Vec<Transaction>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -71,6 +72,7 @@ impl TransactionChunk for ChunkToExecute {
     ) -> Result<ExecutionOutput> {
         let ChunkToExecute {
             transactions,
+            persisted_aux_info,
             first_version: _,
         } = self;
 
@@ -93,6 +95,10 @@ impl TransactionChunk for ChunkToExecute {
         DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             sig_verified_txns.into(),
+            persisted_aux_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
@@ -104,6 +110,7 @@ impl TransactionChunk for ChunkToExecute {
 pub struct ChunkToApply {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
 }
 
@@ -124,12 +131,17 @@ impl TransactionChunk for ChunkToApply {
         let Self {
             transactions,
             transaction_outputs,
+            persisted_aux_info,
             first_version: _,
         } = self;
 
         DoGetExecutionOutput::by_transaction_output(
             transactions,
             transaction_outputs,
+            persisted_aux_info
+                .into_iter()
+                .map(|info| AuxiliaryInfo::new(info, None))
+                .collect(),
             parent_state,
             state_view,
         )

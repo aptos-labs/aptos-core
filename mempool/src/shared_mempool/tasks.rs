@@ -20,7 +20,7 @@ use crate::{
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
@@ -33,7 +33,7 @@ use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig},
-    transaction::SignedTransaction,
+    transaction::{ReplayProtector, SignedTransaction},
     vm_status::{DiscardedVMStatus, StatusCode},
 };
 use aptos_vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
@@ -302,7 +302,15 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    // Filter out any disallowed transactions
     let mut statuses = vec![];
+    let transactions =
+        filter_transactions(&smp.transaction_filter_config, transactions, &mut statuses);
+
+    // If there are no transactions left after filtering, return early
+    if transactions.is_empty() {
+        return statuses;
+    }
 
     let start_storage_read = Instant::now();
     let state_view = smp
@@ -311,18 +319,23 @@ where
         .expect("Failed to get latest state checkpoint view.");
 
     // Track latency: fetching seq number
-    let seq_numbers = IO_POOL.install(|| {
+    let account_seq_numbers = IO_POOL.install(|| {
         transactions
             .par_iter()
-            .map(|(t, _, _)| {
-                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
-                    error!(LogSchema::new(LogEntry::DBError).error(&e));
-                    counters::DB_ERROR.inc();
-                    e
-                })
+            .map(|(t, _, _)| match t.replay_protector() {
+                ReplayProtector::Nonce(_) => Ok(None),
+                ReplayProtector::SequenceNumber(_) => {
+                    get_account_sequence_number(&state_view, t.sender())
+                        .map(Some)
+                        .inspect_err(|e| {
+                            error!(LogSchema::new(LogEntry::DBError).error(e));
+                            counters::DB_ERROR.inc();
+                        })
+                },
             })
             .collect::<Vec<_>>()
     });
+
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
@@ -333,20 +346,27 @@ where
         .into_iter()
         .enumerate()
         .filter_map(|(idx, (t, ready_time_at_sender, priority))| {
-            if let Ok(sequence_num) = seq_numbers[idx] {
-                if t.sequence_number() >= sequence_num {
-                    return Some((t, sequence_num, ready_time_at_sender, priority));
-                } else {
-                    statuses.push((
-                        t,
-                        (
-                            MempoolStatus::new(MempoolStatusCode::VmError),
-                            Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
-                        ),
-                    ));
+            if let Ok(account_sequence_num) = account_seq_numbers[idx] {
+                match account_sequence_num {
+                    Some(sequence_num) => {
+                        if t.sequence_number() >= sequence_num {
+                            return Some((t, Some(sequence_num), ready_time_at_sender, priority));
+                        } else {
+                            statuses.push((
+                                t,
+                                (
+                                    MempoolStatus::new(MempoolStatusCode::VmError),
+                                    Some(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD),
+                                ),
+                            ));
+                        }
+                    },
+                    None => {
+                        return Some((t, None, ready_time_at_sender, priority));
+                    },
                 }
             } else {
-                // Failed to get transaction
+                // Failed to get account's onchain sequence number
                 statuses.push((
                     t,
                     (
@@ -370,13 +390,75 @@ where
     statuses
 }
 
+/// Filters transactions based on the transaction filter configuration. Any
+/// transactions that are filtered out will have their statuses marked accordingly.
+fn filter_transactions(
+    transaction_filter_config: &TransactionFilterConfig,
+    transactions: Vec<(
+        SignedTransaction,
+        Option<u64>,
+        Option<BroadcastPeerPriority>,
+    )>,
+    statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
+) -> Vec<(
+    SignedTransaction,
+    Option<u64>,
+    Option<BroadcastPeerPriority>,
+)> {
+    // If the filter is not enabled, return early
+    if !transaction_filter_config.is_enabled() {
+        return transactions;
+    }
+
+    // Start the filter processing timer
+    let transaction_filter_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
+        .with_label_values(&[counters::FILTER_TRANSACTIONS_LABEL])
+        .start_timer();
+
+    // Filter the transactions and update the statuses accordingly
+    let transactions = transactions
+        .into_iter()
+        .filter_map(|(transaction, account_sequence_number, priority)| {
+            if transaction_filter_config
+                .transaction_filter()
+                .allows_transaction(&transaction)
+            {
+                Some((transaction, account_sequence_number, priority))
+            } else {
+                info!(LogSchema::event_log(
+                    LogEntry::TransactionFilter,
+                    LogEvent::TransactionRejected
+                )
+                .message(&format!(
+                    "Transaction {} rejected by filter",
+                    transaction.committed_hash()
+                )));
+
+                statuses.push((
+                    transaction.clone(),
+                    (
+                        MempoolStatus::new(MempoolStatusCode::RejectedByFilter),
+                        None,
+                    ),
+                ));
+                None
+            }
+        })
+        .collect();
+
+    // Update the filter processing latency metrics
+    transaction_filter_timer.stop_and_record();
+
+    transactions
+}
+
 /// Perfoms VM validation on the transactions and inserts those that passes
 /// validation into the mempool.
 #[cfg(not(feature = "consensus-only-perf-test"))]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     transactions: Vec<(
         SignedTransaction,
-        u64,
+        Option<u64>,
         Option<u64>,
         Option<BroadcastPeerPriority>,
     )>,
@@ -409,7 +491,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
-        for (idx, (transaction, sequence_info, ready_time_at_sender, priority)) in
+        for (idx, (transaction, account_sequence_number, ready_time_at_sender, priority)) in
             transactions.into_iter().enumerate()
         {
             if let Ok(validation_result) = &validation_results[idx] {
@@ -419,7 +501,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
-                            sequence_info,
+                            account_sequence_number,
                             timeline_state,
                             client_submitted,
                             ready_time_at_sender,
@@ -459,7 +541,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
 /// outstanding sequence numbers.
 #[cfg(feature = "consensus-only-perf-test")]
 fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
-    transactions: Vec<(SignedTransaction, u64, Option<u64>)>,
+    transactions: Vec<(SignedTransaction, Option<u64>, Option<u64>)>,
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(
@@ -478,11 +560,13 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     use super::priority;
 
     let mut mempool = smp.mempool.lock();
-    for (transaction, sequence_info, ready_time_at_sender, priority) in transactions.into_iter() {
+    for (transaction, account_sequence_number, ready_time_at_sender, priority) in
+        transactions.into_iter()
+    {
         let mempool_status = mempool.add_txn(
             transaction.clone(),
             0,
-            sequence_info,
+            account_sequence_number,
             timeline_state,
             client_submitted,
             read_time_at_sender,
@@ -631,13 +715,13 @@ pub(crate) fn process_committed_transactions(
     for transaction in transactions {
         pool.log_commit_transaction(
             &transaction.sender,
-            transaction.sequence_number,
+            transaction.replay_protector,
             tracking_usecases
                 .get(&transaction.use_case)
                 .map(|name| (transaction.use_case.clone(), name)),
             block_timestamp,
         );
-        pool.commit_transaction(&transaction.sender, transaction.sequence_number);
+        pool.commit_transaction(&transaction.sender, transaction.replay_protector);
     }
 
     if block_timestamp_usecs > 0 {
@@ -654,7 +738,7 @@ pub(crate) fn process_rejected_transactions(
     for transaction in transactions {
         pool.reject_transaction(
             &transaction.sender,
-            transaction.sequence_number,
+            transaction.replay_protector,
             &transaction.hash,
             &transaction.reason,
         );
@@ -693,5 +777,142 @@ pub(crate) async fn process_config_update<V, P>(
                 e
             );
         },
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_transaction_filters::transaction_filter::TransactionFilter;
+    use aptos_types::{
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, TransactionPayload},
+    };
+
+    #[test]
+    fn test_filter_transactions() {
+        // Create test transactions
+        let mut transactions = vec![];
+        for _ in 0..10 {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering enabled (the first and last transactions will be rejected)
+        let transaction_filter = TransactionFilter::empty()
+            .add_sender_filter(false, transactions[0].0.sender())
+            .add_sender_filter(false, transactions[9].0.sender());
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that the first and last transactions are filtered out
+        assert_eq!(filtered_transactions.len(), 8);
+        assert!(!filtered_transactions.contains(&transactions[0]));
+        assert!(!filtered_transactions.contains(&transactions[9]));
+
+        // Verify the filtered transaction statuses
+        assert_eq!(statuses.len(), 2);
+        verify_rejected_status(statuses[0].clone(), transactions[0].0.clone());
+        verify_rejected_status(statuses[1].clone(), transactions[9].0.clone());
+    }
+
+    #[test]
+    fn test_filter_transactions_disabled() {
+        // Create test transactions
+        let num_transactions = 10;
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering disabled
+        let transaction_filter = TransactionFilter::empty().add_all_filter(false); // Reject all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(false, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that all transactions are retained
+        assert_eq!(filtered_transactions.len(), num_transactions);
+        assert!(statuses.is_empty());
+        for transaction in transactions {
+            assert!(filtered_transactions.contains(&transaction));
+        }
+    }
+
+    #[test]
+    fn test_filter_transactions_empty() {
+        // Create test transactions
+        let num_transactions = 10;
+        let mut transactions = vec![];
+        for _ in 0..num_transactions {
+            let transaction = create_signed_transaction();
+            transactions.push((transaction, None, Some(BroadcastPeerPriority::Primary)));
+        }
+
+        // Create a config with filtering enabled (the filter is empty, so no transactions will be rejected)
+        let transaction_filter = TransactionFilter::empty(); // Allow all transactions
+        let transaction_filter_config = TransactionFilterConfig::new(true, transaction_filter);
+
+        // Filter the transactions
+        let mut statuses = vec![];
+        let filtered_transactions = filter_transactions(
+            &transaction_filter_config,
+            transactions.clone(),
+            &mut statuses,
+        );
+
+        // Verify that all transactions are retained
+        assert_eq!(filtered_transactions.len(), num_transactions);
+        assert!(statuses.is_empty());
+        for transaction in transactions {
+            assert!(filtered_transactions.contains(&transaction));
+        }
+    }
+
+    fn create_raw_transaction() -> RawTransaction {
+        RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        )
+    }
+
+    fn create_signed_transaction() -> SignedTransaction {
+        let raw_transaction = create_raw_transaction();
+        let private_key_1 = Ed25519PrivateKey::generate_for_testing();
+        let signature = private_key_1.sign(&raw_transaction).unwrap();
+
+        SignedTransaction::new(
+            raw_transaction.clone(),
+            private_key_1.public_key(),
+            signature.clone(),
+        )
+    }
+
+    fn verify_rejected_status(
+        status: (SignedTransaction, (MempoolStatus, Option<StatusCode>)),
+        transaction: SignedTransaction,
+    ) {
+        let rejected_status = MempoolStatus::new(MempoolStatusCode::RejectedByFilter);
+        assert_eq!(status, (transaction, (rejected_status, None)));
     }
 }

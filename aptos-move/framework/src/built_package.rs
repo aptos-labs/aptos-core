@@ -26,7 +26,7 @@ use legacy_move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::NumericalAddress,
 };
-use move_binary_format::{file_format_common, file_format_common::VERSION_7, CompiledModule};
+use move_binary_format::{file_format_common, file_format_common::VERSION_DEFAULT, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
@@ -144,7 +144,7 @@ impl Default for BuildOptions {
 impl BuildOptions {
     pub fn move_2() -> Self {
         BuildOptions {
-            bytecode_version: Some(VERSION_7),
+            bytecode_version: Some(VERSION_DEFAULT),
             language_version: Some(LanguageVersion::latest_stable()),
             compiler_version: Some(CompilerVersion::latest_stable()),
             ..Self::default()
@@ -306,7 +306,13 @@ impl BuiltPackage {
             }
 
             let runtime_metadata = extended_checks::run_extended_checks(model);
-            if model.diag_count(Severity::Warning) > 0 {
+            if model.diag_count(Severity::Warning) > 0
+                && !model
+                    .get_extension::<Options>()
+                    .is_some_and(|model_options| {
+                        model_options.experiment_on(Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS)
+                    })
+            {
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 model.report_diag(&mut error_writer, Severity::Warning);
                 if model.has_errors() {
@@ -340,11 +346,7 @@ impl BuiltPackage {
 
             // If enabled generate docs.
             if options.with_docs {
-                let docgen = if let Some(opts) = options.docgen_options.clone() {
-                    opts
-                } else {
-                    DocgenOptions::default()
-                };
+                let docgen = options.docgen_options.clone().unwrap_or_default();
                 let dep_paths = package
                     .deps_compiled_units
                     .iter()
@@ -429,6 +431,16 @@ impl BuiltPackage {
             .collect()
     }
 
+    /// Returns an iterator over the bytecode for the modules of the built package, along with the
+    /// module names.
+    pub fn module_code_iter<'a>(&'a self) -> impl Iterator<Item = (String, Vec<u8>)> + 'a {
+        self.package.root_modules().map(|unit_with_source| {
+            let bytecode_version = self.options.inferred_bytecode_version();
+            let code = unit_with_source.unit.serialize(Some(bytecode_version));
+            (unit_with_source.unit.name().as_str().to_string(), code)
+        })
+    }
+
     /// Returns the abis for this package, if available.
     pub fn extract_abis(&self) -> Option<Vec<EntryABI>> {
         self.package.compiled_abis.as_ref().map(|abis| {
@@ -457,6 +469,28 @@ impl BuiltPackage {
                 CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
                 CompiledUnit::Script(_) => None,
             })
+    }
+
+    /// Replaces a module by name with a new CompiledModule instance
+    #[cfg(feature = "testing")]
+    pub fn replace_module(
+        &mut self,
+        module_name: &str,
+        new_module: CompiledModule,
+    ) -> anyhow::Result<()> {
+        for unit_with_source in &mut self.package.root_compiled_units {
+            if let CompiledUnit::Module(named_module) = &mut unit_with_source.unit {
+                if named_module.name.as_str() == module_name {
+                    named_module.module = new_module;
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "Module '{}' not found in package",
+            module_name
+        ))
     }
 
     /// Returns the number of scripts in the package.

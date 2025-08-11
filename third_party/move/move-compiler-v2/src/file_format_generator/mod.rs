@@ -2,18 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod function_generator;
-mod module_generator;
+pub mod module_generator;
 mod peephole_optimizer;
 
 use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use legacy_move_compiler::compiled_unit as CU;
 use module_generator::ModuleGenerator;
-use move_binary_format::{file_format as FF, internals::ModuleIndex};
+use move_binary_format::{file_format as FF, internals::ModuleIndex, module_script_conversion};
 use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
-use move_model::{
-    ast::ModuleName,
-    model::{GlobalEnv, SCRIPT_MODULE_NAME},
-};
+use move_model::{ast::ModuleName, model::GlobalEnv};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use move_symbol_pool::Symbol;
 use std::collections::BTreeMap;
@@ -62,21 +59,7 @@ pub fn generate_file_format(
                     name,
                     ..
                 } = main_handle.expect("main handle defined");
-                // Because two scripts can have the same function name, we need to use
-                // the suffix of the script module name ("_0", "_1"...) to avoid the name conflict
-                let script_module_name = ctx.symbol_to_str(module_env.get_name().name());
-                let suffix = if script_module_name == SCRIPT_MODULE_NAME
-                    || script_module_name.len() <= SCRIPT_MODULE_NAME.len()
-                {
-                    ""
-                } else {
-                    &script_module_name[SCRIPT_MODULE_NAME.len()..]
-                };
-                let name = Symbol::from(format!(
-                    "{}{}",
-                    identifiers[name.into_index()].as_str(),
-                    suffix
-                ));
+                let name = Symbol::from(identifiers[name.into_index()].as_str());
                 let script = FF::CompiledScript {
                     version,
                     module_handles,
@@ -98,7 +81,7 @@ pub fn generate_file_format(
                     let module_name =
                         ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
                     script_index += 1;
-                    let module = move_model::script_into_module(
+                    let module = module_script_conversion::script_into_module(
                         script.clone(),
                         &module_name.name().display(env.symbol_pool()).to_string(),
                     );

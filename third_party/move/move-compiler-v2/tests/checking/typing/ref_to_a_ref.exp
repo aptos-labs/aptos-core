@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:2:18
+  │
+2 │     fun test1(): & &u64 {
+  │                  ^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:3:16
+  │
+3 │         let x: & &u64;
+  │                ^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:7:18
+  │
+7 │     fun test2(x: &mut &mut u64): (&mut &mut u64, &mut &mut u64) {(x, x)}
+  │                  ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:7:35
+  │
+7 │     fun test2(x: &mut &mut u64): (&mut &mut u64, &mut &mut u64) {(x, x)}
+  │                                   ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:7:50
+  │
+7 │     fun test2(x: &mut &mut u64): (&mut &mut u64, &mut &mut u64) {(x, x)}
+  │                                                  ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:9:18
+  │
+9 │     fun test3(x: &mut &mut u64): &mut &mut u64 {x}
+  │                  ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+  ┌─ tests/checking/typing/ref_to_a_ref.move:9:34
+  │
+9 │     fun test3(x: &mut &mut u64): &mut &mut u64 {x}
+  │                                  ^^^^^^^^^^^^^
+
+error: reference to a reference is not allowed
+   ┌─ tests/checking/typing/ref_to_a_ref.move:12:16
+   │
+12 │         let x: &mut &mut u64;
+   │                ^^^^^^^^^^^^^

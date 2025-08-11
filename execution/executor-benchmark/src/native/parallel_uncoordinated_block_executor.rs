@@ -28,8 +28,9 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExecutionStatus,
-        TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
+        block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
+        BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
+        TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -45,9 +46,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use std::{
     cell::Cell,
     collections::BTreeMap,
-    hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
-    u64,
 };
 use thread_local::ThreadLocal;
 
@@ -84,15 +83,23 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
-        _transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        let native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+        let block_epilogue_txn = Transaction::block_epilogue_v0(
+            transaction_slice_metadata
+                .append_state_checkpoint_to_block()
+                .unwrap(),
+            BlockEndInfo::new_empty(),
+        );
+
+        let mut native_transactions = NATIVE_EXECUTOR_POOL.install(|| {
             txn_provider
                 .get_txns()
                 .par_iter()
                 .map(NativeTransaction::parse)
                 .collect::<Vec<_>>()
         });
+        native_transactions.push(NativeTransaction::parse(&block_epilogue_txn.clone().into()));
 
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
@@ -112,7 +119,11 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
                 )
             })?;
 
-        Ok(BlockOutput::new(transaction_outputs, None))
+        Ok(BlockOutput::new(
+            transaction_outputs,
+            Some(block_epilogue_txn),
+            BTreeMap::new(),
+        ))
     }
 }
 
@@ -130,8 +141,13 @@ impl IncrementalOutput {
     }
 
     fn into_success_output(mut self, gas: u64) -> Result<TransactionOutput> {
-        self.events
-            .push(FeeStatement::new(gas, gas, 0, 0, 0).create_event_v2());
+        if gas != 0 {
+            self.events.push(
+                FeeStatement::new(gas, gas, 0, 0, 0)
+                    .create_event_v2()
+                    .expect("Creating FeeStatement should always succeed"),
+            );
+        }
 
         Ok(TransactionOutput::new(
             WriteSetMut::new(self.write_set).freeze()?,
@@ -264,6 +280,7 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()>;
@@ -362,6 +379,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                         recipient,
                         fail_on_recipient_account_existing,
                         fail_on_recipient_account_missing,
+                        !fa_migration_complete,
                         state_view,
                         &mut output,
                     )?;
@@ -403,12 +421,14 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                             recipient_address,
                             fail_on_recipient_account_existing,
                             fail_on_recipient_account_missing,
+                            true,
                             state_view,
                             &mut output,
                         )?;
                     }
                 }
             },
+            NativeTransaction::BlockEpilogue => return output.into_success_output(0),
         };
 
         self.reduce_apt_supply(fa_migration_complete, gas, state_view, &mut output)?;
@@ -436,8 +456,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         output: &mut IncrementalOutput,
     ) -> Result<()> {
         let sender_account_key = self.db_util.new_state_key_account(&sender_address);
-        let mut sender_account =
-            DbAccessUtil::get_account(&sender_account_key, state_view)?.unwrap();
+        let mut sender_account = DbAccessUtil::get_account(&sender_account_key, state_view)?
+            .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address));
 
         sender_account.sequence_number = sequence_number + 1;
 
@@ -552,7 +572,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: sender_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating WithdrawFAEvent should always succeed"),
             );
         }
 
@@ -664,7 +685,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     store: recipient_store_address,
                     amount: transfer_amount,
                 }
-                .create_event_v2(),
+                .create_event_v2()
+                .expect("Creating DepositFAEvent should always succeed"),
             )
         }
 
@@ -689,7 +711,8 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                             account: AccountAddress::ONE,
                             type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()?,
                         }
-                        .create_event_v2(),
+                        .create_event_v2()
+                        .expect("Creating CoinRegister should always succeed"),
                     );
                     (
                         DbAccessUtil::new_apt_coin_store(0, recipient_address),
@@ -725,6 +748,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()> {
@@ -738,7 +762,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
             None => {
                 if fail_on_account_missing {
                     bail!("account missing")
-                } else {
+                } else if create_account_resource {
                     let account = DbAccessUtil::new_account_resource(address);
                     output.write_set.push((
                         account_key,
@@ -800,7 +824,9 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         match self
             .cache_get_mut_or_init(&sender_account_key, |key| {
                 CachedResource::Account(
-                    DbAccessUtil::get_account(key, state_view).unwrap().unwrap(),
+                    DbAccessUtil::get_account(key, state_view)
+                        .unwrap()
+                        .unwrap_or_else(|| DbAccessUtil::new_account_resource(sender_address)),
                 )
             })
             .value_mut()
@@ -820,6 +846,7 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         address: AccountAddress,
         fail_on_account_existing: bool,
         fail_on_account_missing: bool,
+        _create_account_resource: bool,
         state_view: &(impl StateView + Sync),
         _output: &mut IncrementalOutput,
     ) -> Result<()> {
@@ -1000,7 +1027,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> Ref<'a, StateKey, CachedResource, RandomState> {
+    ) -> Ref<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get(key) {
             return ref_mut;
@@ -1016,7 +1043,7 @@ impl NativeValueCacheRawTransactionExecutor {
         &'a self,
         key: &StateKey,
         init_value: impl FnOnce(&StateKey) -> CachedResource,
-    ) -> RefMut<'a, StateKey, CachedResource, RandomState> {
+    ) -> RefMut<'a, StateKey, CachedResource> {
         // Data in cache is going to be the hot path, so short-circuit here to avoid cloning the key.
         if let Some(ref_mut) = self.cache.get_mut(key) {
             return ref_mut;
@@ -1218,6 +1245,7 @@ impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
                 }
                 (sender, sequence_number)
             },
+            NativeTransaction::BlockEpilogue => return output.into_success_output(0),
         };
 
         self.seq_nums.insert(sender, sequence_number);

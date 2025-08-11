@@ -1,0 +1,18 @@
+processed 2 tasks
+task 0 lines 1-24:  publish [module 0xc0ffee::m {]
+Error: compilation errors:
+ error: cannot pass `&mut ||u64 has copy + drop` to a function which expects argument of type `&mut ||u64 has drop`
+   ┌─ TEMPFILE:14:30
+   │
+14 │         assn<||u64 has drop>(&mut b, a);
+   │                              ^^^^^^
+
+
+task 1 lines 26-26:  run 0xc0ffee::m::foo
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

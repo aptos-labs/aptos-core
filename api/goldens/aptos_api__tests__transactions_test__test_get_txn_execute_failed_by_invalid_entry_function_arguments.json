@@ -25,7 +25,7 @@
               }
             }
           },
-          "guid_creation_num": "4",
+          "guid_creation_num": "2",
           "key_rotation_events": {
             "counter": "0",
             "guid": {
@@ -55,7 +55,7 @@
   "sequence_number": "0",
   "max_gas_amount": "100000000",
   "gas_unit_price": "0",
-  "expiration_timestamp_secs": "18446744073709551615",
+  "expiration_timestamp_secs": "60",
   "payload": {
     "function": "0x1::Coin::transfer",
     "type_arguments": [
@@ -69,9 +69,10 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x20e1f74f12aa955275a9d1a63190065d77e1903cc53b0116b704b3ace98fd7a57d303738799840523688cdaaad74ee0c73b6bee53517e4dcd6e7589296711108",
+    "signature": "0x70a98987e413c5174b0118da5390e867c8bd6da19fb951a4b8b335754accf3cb6e71d1da7067ea45212702526e8dc644efc9e8443343788eebea85f5367b850f",
     "type": "ed25519_signature"
   },
+  "replay_protection_nonce": null,
   "events": [
     {
       "guid": {

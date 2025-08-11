@@ -1,0 +1,22 @@
+processed 1 task
+task 0 lines 1-14:  publish --print-bytecode [module 0x66::test]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+fun f(l0: u64)
+l1: copy_loc l0
+    ld_u64 0
+    gt
+    br_false l0
+    copy_loc l0
+    // @5
+    ld_u64 1
+    sub
+    st_loc l0
+    branch l1
+l0: ret
+
+
+== END Bytecode ==

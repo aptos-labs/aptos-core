@@ -1,16 +1,29 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::errors::{SafeNativeError, SafeNativeResult};
+use crate::errors::{LimitExceededError, SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
     AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
-use aptos_gas_schedule::{AbstractValueSizeGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_32, AbstractValueSizeGasParameters, MiscGasParameters,
+    NativeGasParameters,
+};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::NativeContext;
+use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_core_types::{
+    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
+};
+use move_vm_runtime::{
+    native_extensions::NativeContextExtensions,
+    native_functions::{LoaderContext, NativeContext},
+    Function,
+};
 use move_vm_types::values::Value;
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
 /// or access certain VM functionalities.
@@ -19,39 +32,40 @@ use std::ops::{Deref, DerefMut};
 /// Major features include incremental gas charging and less ambiguous error handling. For this
 /// reason, native functions should always use [`SafeNativeContext`] instead of [`NativeContext`].
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c> {
-    pub(crate) inner: &'c mut NativeContext<'a, 'b>,
+pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
+    pub(crate) inner: &'d mut NativeContext<'a, 'b, 'c>,
 
-    pub(crate) timed_features: &'c TimedFeatures,
-    pub(crate) features: &'c Features,
+    pub(crate) timed_features: &'d TimedFeatures,
+    pub(crate) features: &'d Features,
     pub(crate) gas_feature_version: u64,
 
-    pub(crate) native_gas_params: &'c NativeGasParameters,
-    pub(crate) misc_gas_params: &'c MiscGasParameters,
+    pub(crate) native_gas_params: &'d NativeGasParameters,
+    pub(crate) misc_gas_params: &'d MiscGasParameters,
 
-    pub(crate) gas_budget: InternalGas,
-    pub(crate) gas_used: InternalGas,
+    // The fields below were used when there was no access to gas meter in native context. This is
+    // no longer the case, so these can be removed when the feature is stable.
+    pub(crate) legacy_gas_used: InternalGas,
+    pub(crate) legacy_enable_incremental_gas_charging: bool,
+    pub(crate) legacy_heap_memory_usage: u64,
 
-    pub(crate) enable_incremental_gas_charging: bool,
-
-    pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
+    pub(crate) gas_hook: Option<&'d (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
-    type Target = NativeContext<'a, 'b>;
+impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c, '_> {
+    type Target = NativeContext<'a, 'b, 'c>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
+impl DerefMut for SafeNativeContext<'_, '_, '_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
+impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -68,13 +82,38 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
             hook(node);
         }
 
-        self.gas_used += amount;
-
-        if self.gas_used > self.gas_budget && self.enable_incremental_gas_charging {
-            Err(SafeNativeError::OutOfGas)
-        } else {
+        if self.has_direct_gas_meter_access_in_native_context() {
+            self.gas_meter()
+                .charge_native_execution(amount)
+                .map_err(LimitExceededError::from_err)?;
             Ok(())
+        } else {
+            self.legacy_gas_used += amount;
+            if self.legacy_gas_used > self.legacy_gas_budget()
+                && self.legacy_enable_incremental_gas_charging
+            {
+                Err(SafeNativeError::LimitExceeded(
+                    LimitExceededError::LegacyOutOfGas,
+                ))
+            } else {
+                Ok(())
+            }
         }
+    }
+
+    /// Returns true if native functions have access to gas meter and cah charge gas. Otherwise,
+    /// only VM's interpreter needs to charge gas.
+    pub fn has_direct_gas_meter_access_in_native_context(&self) -> bool {
+        self.gas_feature_version >= RELEASE_V1_32
+    }
+
+    /// Charges gas for transitive dependencies of the specified module. Used for native dynamic
+    /// dispatch.
+    pub fn charge_gas_for_dependencies(&mut self, module_id: ModuleId) -> SafeNativeResult<()> {
+        self.inner
+            .loader_context()
+            .charge_gas_for_dependencies(module_id)
+            .map_err(LimitExceededError::from_err)
     }
 
     /// Evaluates the given gas expression within the current context immediately.
@@ -88,14 +127,34 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
     }
 
     /// Computes the abstract size of the input value.
-    pub fn abs_val_size(&self, val: &Value) -> AbstractValueSize {
+    pub fn abs_val_size(&self, val: &Value) -> PartialVMResult<AbstractValueSize> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size(val, self.gas_feature_version)
     }
 
+    /// Returns extensions with loader context and gas parameters. Allows to use mutable loader
+    /// context (wrapper around mutable references), while immutably borrowing the extension and
+    /// gas parameters.
+    pub fn extensions_with_loader_context_and_gas_params(
+        &mut self,
+    ) -> (
+        &NativeContextExtensions<'b>,
+        LoaderContext<'_, 'c>,
+        &AbstractValueSizeGasParameters,
+        u64,
+    ) {
+        let (extensions, native_layout_converter) = self.inner.extensions_with_loader_context();
+        (
+            extensions,
+            native_layout_converter,
+            &self.misc_gas_params.abs_val,
+            self.gas_feature_version,
+        )
+    }
+
     /// Computes the abstract size of the input value.
-    pub fn abs_val_size_dereferenced(&self, val: &Value) -> AbstractValueSize {
+    pub fn abs_val_size_dereferenced(&self, val: &Value) -> PartialVMResult<AbstractValueSize> {
         self.misc_gas_params
             .abs_val
             .abstract_value_size_dereferenced(val, self.gas_feature_version)
@@ -111,6 +170,20 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
         self.gas_feature_version
     }
 
+    pub fn max_value_nest_depth(&self) -> Option<u64> {
+        self.module_storage()
+            .runtime_environment()
+            .vm_config()
+            .enable_depth_checks
+            .then(|| {
+                self.module_storage()
+                    .runtime_environment()
+                    .vm_config()
+                    .max_value_nest_depth
+            })
+            .flatten()
+    }
+
     /// Returns a reference to the struct representing on-chain features.
     pub fn get_feature_flags(&self) -> &Features {
         self.features
@@ -121,21 +194,59 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
         self.timed_features.is_enabled(flag)
     }
 
-    /// Signals to the VM (and by extension, the gas meter) that the native function has
-    /// incurred additional heap memory usage that should be tracked.
-    pub fn use_heap_memory(&mut self, amount: u64) {
+    /// If gas metering in native context is available:
+    ///   - Records heap memory usage. If exceeds the maximum allowed limit, an error is returned.
+    ///
+    /// If not available:
+    ///   - Signals to the VM (and by extension, the gas meter) that the native function has
+    ///     incurred additional heap memory usage that should be tracked.
+    ///   - Charged by the VM after execution.
+    pub fn use_heap_memory(&mut self, amount: u64) -> SafeNativeResult<()> {
         if self.timed_feature_enabled(TimedFeatureFlag::FixMemoryUsageTracking) {
-            self.inner.use_heap_memory(amount);
+            if self.has_direct_gas_meter_access_in_native_context() {
+                self.gas_meter()
+                    .use_heap_memory_in_native_context(amount)
+                    .map_err(LimitExceededError::from_err)?;
+            } else {
+                self.legacy_heap_memory_usage =
+                    self.legacy_heap_memory_usage.saturating_add(amount);
+            }
         }
+        Ok(())
     }
 
-    /// Configures the behavior of [`Self::charge()`].
-    /// - If enabled, it will return an out of gas error as soon as the amount of gas used
-    ///   exceeds the remaining balance.
-    /// - If disabled, it will not return early errors, but the gas usage is still recorded,
-    ///   and the total amount will be reported back to the VM after the native function returns.
-    ///   This should only be used for backward compatibility reasons.
-    pub fn set_incremental_gas_charging(&mut self, enable: bool) {
-        self.enable_incremental_gas_charging = enable;
+    /// Loads a function definition corresponding to the given name. The module where the function
+    /// is defined must have been visited and metered (an error is returned otherwise).
+    pub fn load_function(
+        &mut self,
+        module_id: &ModuleId,
+        function_name: &Identifier,
+    ) -> VMResult<Arc<Function>> {
+        // INVARIANT:
+        //   There is no need to meter module loading due to function access. This is because this
+        //   function is only called for native dynamic dispatch, which pre-charges gas before the
+        //   dispatch logic:
+        //      1. Native function to load & charge modules is called.
+        //      2. Native is called to dispatch, which calls this function from native context.
+        //   Currently, native implementations in step (2) check if the module loading was metered,
+        //   but we still keep an invariant check here in case there is a mistake and the gas is
+        //   not charged.
+        let module = if self.features.is_lazy_loading_enabled() {
+            self.inner
+                .traversal_context()
+                .check_is_special_or_visited(module_id.address(), module_id.name())
+                .map_err(|err| err.finish(Location::Undefined))?;
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_lazily_verified_module(module_id)?
+        } else {
+            self.inner
+                .module_storage()
+                .unmetered_get_existing_eagerly_verified_module(
+                    module_id.address(),
+                    module_id.name(),
+                )?
+        };
+        module.get_function(function_name)
     }
 }

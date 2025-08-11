@@ -39,7 +39,7 @@ pub struct FunctionTarget<'env> {
     annotation_formatters: RefCell<Vec<Box<AnnotationFormatter>>>,
 }
 
-impl<'env> Clone for FunctionTarget<'env> {
+impl Clone for FunctionTarget<'_> {
     fn clone(&self) -> Self {
         // Annotation formatters are transient and forgotten on clone, so this is a cheap
         // handle.
@@ -305,7 +305,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Returns specification associated with this function.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.func_env.get_spec()
     }
 
@@ -421,6 +421,17 @@ impl<'env> FunctionTarget<'env> {
         result
     }
 
+    /// Get the set of temporaries mentioned in inline spec blocks.
+    pub fn get_temps_used_in_spec_blocks(&self) -> BTreeSet<TempIndex> {
+        let mut result = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            if let Bytecode::SpecBlock(_, spec) = bc {
+                result.append(&mut spec.used_temporaries());
+            }
+        }
+        result
+    }
+
     /// Returns all the mentioned locals (in non-spec-only bytecode instructions).
     pub fn get_mentioned_locals(&self) -> BTreeSet<TempIndex> {
         let mut res = BTreeSet::new();
@@ -454,14 +465,6 @@ impl<'env> FunctionTarget<'env> {
             texts.push(format!("     # {}", comment));
         }
 
-        // add location
-        if verbose {
-            texts.push(format!(
-                "     # {}",
-                self.get_bytecode_loc(attr_id).display(self.global_env())
-            ));
-        }
-
         // add annotations
         let annotations = self
             .annotation_formatters
@@ -489,13 +492,24 @@ impl<'env> FunctionTarget<'env> {
             ));
         }
 
-        // add the instruction itself with offset
-        texts.push(format!(
-            "{:>3}: {}",
-            offset,
-            code.display(self, label_offsets)
-        ));
+        // location string if verbose
+        let verbose_str = if verbose {
+            format!(
+                "# {}",
+                self.get_bytecode_loc(attr_id).display(self.global_env())
+            )
+        } else {
+            "".to_string()
+        };
 
+        // add the instruction itself with offset
+        let instr = format!(
+            "{:>3}: {:<40} {}",
+            offset,
+            code.display(self, label_offsets).to_string(),
+            verbose_str
+        );
+        texts.push(instr);
         texts.join("\n")
     }
 }
@@ -646,7 +660,7 @@ impl FunctionData {
 /// the given code offset. It should return None if there is no relevant annotation.
 pub type AnnotationFormatter = dyn Fn(&FunctionTarget<'_>, CodeOffset) -> Option<String>;
 
-impl<'env> FunctionTarget<'env> {
+impl FunctionTarget<'_> {
     /// Register a formatter. Each function target processor which introduces new annotations
     /// should register a formatter in order to get is value printed when a function target
     /// is displayed for debugging or testing.
@@ -665,7 +679,7 @@ impl<'env> FunctionTarget<'env> {
     }
 }
 
-impl<'env> fmt::Display for FunctionTarget<'env> {
+impl fmt::Display for FunctionTarget<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let modifier = if self.func_env.is_native() {
             "native "

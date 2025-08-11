@@ -16,14 +16,16 @@ use move_binary_format::{
     errors::*,
     file_format::{Constant, SignatureToken, VariantIndex},
 };
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
+use move_core_types::value::{MoveStruct, MoveValue};
 use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     gas_algebra::AbstractMemorySize,
     u256,
     value::{
-        self, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue, MASTER_ADDRESS_FIELD_OFFSET,
-        MASTER_SIGNER_VARIANT, PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
+        self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
+        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
 };
@@ -39,6 +41,15 @@ use std::{
     iter, mem,
     rc::Rc,
 };
+
+/// Values can be recursive, and so it is important that we do not use recursive algorithms over
+/// deeply nested values as it can cause stack overflow. Since it is not always possible to avoid
+/// recursion, we opt for a reasonable limit on VM value depth. It is defined in Move VM config,
+/// but since it is difficult to propagate config context everywhere, we use this constant.
+///
+/// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
+/// used there now).
+pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
 
 /***************************************************************************************
  *
@@ -395,9 +406,10 @@ impl ValueImpl {
  *
  **************************************************************************************/
 impl ValueImpl {
-    fn copy_value(&self) -> PartialVMResult<Self> {
+    fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         use ValueImpl::*;
 
+        check_depth(depth, max_depth)?;
         Ok(match self {
             Invalid => Invalid,
 
@@ -410,12 +422,15 @@ impl ValueImpl {
             Bool(x) => Bool(*x),
             Address(x) => Address(*x),
 
-            ContainerRef(r) => ContainerRef(r.copy_value()),
-            IndexedRef(r) => IndexedRef(r.copy_value()),
+            // Note: refs copy only clones Rc, so no need to increment depth.
+            ContainerRef(r) => ContainerRef(r.copy_by_ref()),
+            IndexedRef(r) => IndexedRef(r.copy_by_ref()),
 
-            // When cloning a container, we need to make sure we make a deep
-            // copy of the data instead of a shallow copy of the Rc.
-            Container(c) => Container(c.copy_value()?),
+            // When cloning a container, we need to make sure we make a deep copy of the data
+            // instead of a shallow copy of the Rc. Note that we do not increment the depth here
+            // because we have done it when entering this value. Inside the container, depth will
+            // be further incremented for nested values.
+            Container(c) => Container(c.copy_value(depth, max_depth)?),
 
             // Native values can be copied because this is how read_ref operates,
             // and copying is an internal API.
@@ -424,7 +439,7 @@ impl ValueImpl {
             ClosureValue(Closure(fun, captured)) => {
                 let captured = captured
                     .iter()
-                    .map(|v| v.copy_value())
+                    .map(|v| v.copy_value(depth + 1, max_depth))
                     .collect::<PartialVMResult<_>>()?;
                 ClosureValue(Closure(fun.clone_dyn()?, captured))
             },
@@ -433,12 +448,12 @@ impl ValueImpl {
 }
 
 impl Container {
-    fn copy_value(&self) -> PartialVMResult<Self> {
+    fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         let copy_rc_ref_vec_val = |r: &Rc<RefCell<Vec<ValueImpl>>>| {
             Ok(Rc::new(RefCell::new(
                 r.borrow()
                     .iter()
-                    .map(|v| v.copy_value())
+                    .map(|v| v.copy_value(depth + 1, max_depth))
                     .collect::<PartialVMResult<_>>()?,
             )))
         };
@@ -485,16 +500,16 @@ impl Container {
 }
 
 impl IndexedRef {
-    fn copy_value(&self) -> Self {
+    fn copy_by_ref(&self) -> Self {
         Self {
             idx: self.idx,
-            container_ref: self.container_ref.copy_value(),
+            container_ref: self.container_ref.copy_by_ref(),
         }
     }
 }
 
 impl ContainerRef {
-    fn copy_value(&self) -> Self {
+    fn copy_by_ref(&self) -> Self {
         match self {
             Self::Local(container) => Self::Local(container.copy_by_ref()),
             Self::Global { status, container } => Self::Global {
@@ -502,6 +517,13 @@ impl ContainerRef {
                 container: container.copy_by_ref(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+impl Value {
+    pub fn copy_value_with_depth(&self, max_depth: u64) -> PartialVMResult<Self> {
+        Ok(Self(self.0.copy_value(1, Some(max_depth))?))
     }
 }
 
@@ -523,9 +545,10 @@ impl ContainerRef {
  **************************************************************************************/
 
 impl ValueImpl {
-    fn equals(&self, other: &Self) -> PartialVMResult<bool> {
+    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use ValueImpl::*;
 
+        check_depth(depth, max_depth)?;
         let res = match (self, other) {
             (U8(l), U8(r)) => l == r,
             (U16(l), U16(r)) => l == r,
@@ -536,10 +559,11 @@ impl ValueImpl {
             (Bool(l), Bool(r)) => l == r,
             (Address(l), Address(r)) => l == r,
 
-            (Container(l), Container(r)) => l.equals(r)?,
+            (Container(l), Container(r)) => l.equals(r, depth, max_depth)?,
 
-            (ContainerRef(l), ContainerRef(r)) => l.equals(r)?,
-            (IndexedRef(l), IndexedRef(r)) => l.equals(r)?,
+            // We count references as +1 in nesting, hence increasing the depth.
+            (ContainerRef(l), ContainerRef(r)) => l.equals(r, depth + 1, max_depth)?,
+            (IndexedRef(l), IndexedRef(r)) => l.equals(r, depth + 1, max_depth)?,
 
             // Disallow equality for delayed values. The rationale behind this
             // semantics is that identifiers might not be deterministic, and
@@ -556,7 +580,7 @@ impl ValueImpl {
                     && captured1.len() == captured2.len()
                 {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        if !v1.equals(v2)? {
+                        if !v1.equals(v2, depth + 1, max_depth)? {
                             return Ok(false);
                         }
                     }
@@ -592,9 +616,15 @@ impl ValueImpl {
         Ok(res)
     }
 
-    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+    fn compare(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+    ) -> PartialVMResult<Ordering> {
         use ValueImpl::*;
 
+        check_depth(depth, max_depth)?;
         let res = match (self, other) {
             (U8(l), U8(r)) => l.cmp(r),
             (U16(l), U16(r)) => l.cmp(r),
@@ -605,10 +635,11 @@ impl ValueImpl {
             (Bool(l), Bool(r)) => l.cmp(r),
             (Address(l), Address(r)) => l.cmp(r),
 
-            (Container(l), Container(r)) => l.compare(r)?,
+            (Container(l), Container(r)) => l.compare(r, depth, max_depth)?,
 
-            (ContainerRef(l), ContainerRef(r)) => l.compare(r)?,
-            (IndexedRef(l), IndexedRef(r)) => l.compare(r)?,
+            // We count references as +1 in nesting, hence increasing the depth.
+            (ContainerRef(l), ContainerRef(r)) => l.compare(r, depth + 1, max_depth)?,
+            (IndexedRef(l), IndexedRef(r)) => l.compare(r, depth + 1, max_depth)?,
 
             // Disallow comparison for delayed values.
             // (see `ValueImpl::equals` above for details on reasoning behind it)
@@ -621,7 +652,7 @@ impl ValueImpl {
                 let o = fun1.cmp_dyn(fun2.as_ref())?;
                 if o == Ordering::Equal {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        let o = v1.compare(v2)?;
+                        let o = v1.compare(v2, depth + 1, max_depth)?;
                         if o != Ordering::Equal {
                             return Ok(o);
                         }
@@ -660,7 +691,7 @@ impl ValueImpl {
 }
 
 impl Container {
-    fn equals(&self, other: &Self) -> PartialVMResult<bool> {
+    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use Container::*;
 
         let res = match (self, other) {
@@ -672,7 +703,7 @@ impl Container {
                     return Ok(false);
                 }
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    if !v1.equals(v2)? {
+                    if !v1.equals(v2, depth + 1, max_depth)? {
                         return Ok(false);
                     }
                 }
@@ -710,7 +741,12 @@ impl Container {
         Ok(res)
     }
 
-    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+    fn compare(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+    ) -> PartialVMResult<Ordering> {
         use Container::*;
 
         let res = match (self, other) {
@@ -719,7 +755,7 @@ impl Container {
                 let r = &r.borrow();
 
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    let value_cmp = v1.compare(v2)?;
+                    let value_cmp = v1.compare(v2, depth + 1, max_depth)?;
                     if value_cmp.is_ne() {
                         return Ok(value_cmp);
                     }
@@ -761,19 +797,30 @@ impl Container {
 }
 
 impl ContainerRef {
-    fn equals(&self, other: &Self) -> PartialVMResult<bool> {
-        self.container().equals(other.container())
+    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
+        // Note: the depth passed in accounts for the container.
+        check_depth(depth, max_depth)?;
+        self.container().equals(other.container(), depth, max_depth)
     }
 
-    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
-        self.container().compare(other.container())
+    fn compare(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+    ) -> PartialVMResult<Ordering> {
+        // Note: the depth passed in accounts for the container.
+        check_depth(depth, max_depth)?;
+        self.container()
+            .compare(other.container(), depth, max_depth)
     }
 }
 
 impl IndexedRef {
-    fn equals(&self, other: &Self) -> PartialVMResult<bool> {
+    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use Container::*;
 
+        check_depth(depth, max_depth)?;
         let res = match (
             self.container_ref.container(),
             other.container_ref.container(),
@@ -787,7 +834,9 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].equals(&r2.borrow()[other.idx])?,
+            | (Locals(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].equals(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            },
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
             (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
@@ -872,7 +921,12 @@ impl IndexedRef {
         Ok(res)
     }
 
-    fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
+    fn compare(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+    ) -> PartialVMResult<Ordering> {
         use Container::*;
 
         let res = match (
@@ -888,7 +942,9 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].compare(&r2.borrow()[other.idx])?,
+            | (Locals(r1), Locals(r2)) => {
+                r1.borrow()[self.idx].compare(&r2.borrow()[other.idx], depth + 1, max_depth)?
+            },
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
             (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
@@ -976,11 +1032,25 @@ impl IndexedRef {
 
 impl Value {
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
-        self.0.equals(&other.0)
+        self.0
+            .equals(&other.0, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
     pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
-        self.0.compare(&other.0)
+        self.0
+            .compare(&other.0, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    // Test-only API to test depth checks.
+    #[cfg(test)]
+    pub fn equals_with_depth(&self, other: &Self, max_depth: u64) -> PartialVMResult<bool> {
+        self.0.equals(&other.0, 1, Some(max_depth))
+    }
+
+    // Test-only API to test depth checks.
+    #[cfg(test)]
+    pub fn compare_with_depth(&self, other: &Self, max_depth: u64) -> PartialVMResult<Ordering> {
+        self.0.compare(&other.0, 1, Some(max_depth))
     }
 }
 
@@ -993,18 +1063,20 @@ impl Value {
  **************************************************************************************/
 
 impl ContainerRef {
-    fn read_ref(self) -> PartialVMResult<Value> {
-        Ok(Value(ValueImpl::Container(self.container().copy_value()?)))
+    fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
+        Ok(Value(ValueImpl::Container(
+            self.container().copy_value(depth, max_depth)?,
+        )))
     }
 }
 
 impl IndexedRef {
-    fn read_ref(self) -> PartialVMResult<Value> {
+    fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
         use Container::*;
 
         let res = match self.container_ref.container() {
-            Vec(r) => r.borrow()[self.idx].copy_value()?,
-            Struct(r) => r.borrow()[self.idx].copy_value()?,
+            Vec(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Struct(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
 
             VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
             VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
@@ -1015,7 +1087,7 @@ impl IndexedRef {
             VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
             VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
 
-            Locals(r) => r.borrow()[self.idx].copy_value()?,
+            Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
         };
 
         Ok(Value(res))
@@ -1023,23 +1095,33 @@ impl IndexedRef {
 }
 
 impl ReferenceImpl {
-    fn read_ref(self) -> PartialVMResult<Value> {
+    fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
         match self {
-            Self::ContainerRef(r) => r.read_ref(),
-            Self::IndexedRef(r) => r.read_ref(),
+            Self::ContainerRef(r) => r.read_ref(depth, max_depth),
+            Self::IndexedRef(r) => r.read_ref(depth, max_depth),
         }
     }
 }
 
 impl StructRef {
     pub fn read_ref(self) -> PartialVMResult<Value> {
-        self.0.read_ref()
+        self.0.read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    #[cfg(test)]
+    pub fn read_ref_with_depth(self, max_depth: u64) -> PartialVMResult<Value> {
+        self.0.read_ref(1, Some(max_depth))
     }
 }
 
 impl Reference {
     pub fn read_ref(self) -> PartialVMResult<Value> {
-        self.0.read_ref()
+        self.0.read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    #[cfg(test)]
+    pub fn read_ref_with_depth(self, max_depth: u64) -> PartialVMResult<Value> {
+        self.0.read_ref(1, Some(max_depth))
     }
 }
 
@@ -1459,7 +1541,7 @@ impl ContainerRef {
                     | ValueImpl::ClosureValue(_)
                     | ValueImpl::DelayedFieldID { .. } => ValueImpl::IndexedRef(IndexedRef {
                         idx,
-                        container_ref: self.copy_value(),
+                        container_ref: self.copy_by_ref(),
                     }),
 
                     ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => {
@@ -1480,7 +1562,7 @@ impl ContainerRef {
             | Container::VecAddress(_)
             | Container::VecBool(_) => ValueImpl::IndexedRef(IndexedRef {
                 idx,
-                container_ref: self.copy_value(),
+                container_ref: self.copy_by_ref(),
             }),
         })
     }
@@ -1618,13 +1700,23 @@ impl Locals {
     }
 
     pub fn copy_loc(&self, idx: usize) -> PartialVMResult<Value> {
+        self.copy_loc_impl(idx, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    // Test-only API to test depth checks.
+    #[cfg(test)]
+    pub fn copy_loc_with_depth(&self, idx: usize, max_depth: u64) -> PartialVMResult<Value> {
+        self.copy_loc_impl(idx, Some(max_depth))
+    }
+
+    fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
         let v = self.0.borrow();
         match v.get(idx) {
             Some(ValueImpl::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
             .with_message(format!("cannot copy invalid value at index {}", idx))),
-            Some(v) => Ok(Value(v.copy_value()?)),
+            Some(v) => Ok(Value(v.copy_value(1, max_depth)?)),
             None => Err(
                 PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
                     format!("local index out of bounds: got {}, len: {}", idx, v.len()),
@@ -2402,7 +2494,7 @@ impl IntegerValue {
         match self {
             U8(x) => Ok(x),
             U16(x) => {
-                if x > (std::u8::MAX as u16) {
+                if x > (u8::MAX as u16) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u16({}) to u8", x)))
                 } else {
@@ -2410,7 +2502,7 @@ impl IntegerValue {
                 }
             },
             U32(x) => {
-                if x > (std::u8::MAX as u32) {
+                if x > (u8::MAX as u32) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u32({}) to u8", x)))
                 } else {
@@ -2418,7 +2510,7 @@ impl IntegerValue {
                 }
             },
             U64(x) => {
-                if x > (std::u8::MAX as u64) {
+                if x > (u8::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u8", x)))
                 } else {
@@ -2426,7 +2518,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u8::MAX as u128) {
+                if x > (u8::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u8", x)))
                 } else {
@@ -2434,7 +2526,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u8::MAX)) {
+                if x > (u256::U256::from(u8::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u8", x)))
                 } else {
@@ -2451,7 +2543,7 @@ impl IntegerValue {
             U8(x) => Ok(x as u16),
             U16(x) => Ok(x),
             U32(x) => {
-                if x > (std::u16::MAX as u32) {
+                if x > (u16::MAX as u32) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u32({}) to u16", x)))
                 } else {
@@ -2459,7 +2551,7 @@ impl IntegerValue {
                 }
             },
             U64(x) => {
-                if x > (std::u16::MAX as u64) {
+                if x > (u16::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u16", x)))
                 } else {
@@ -2467,7 +2559,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u16::MAX as u128) {
+                if x > (u16::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u16", x)))
                 } else {
@@ -2475,7 +2567,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u16::MAX)) {
+                if x > (u256::U256::from(u16::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u16", x)))
                 } else {
@@ -2493,7 +2585,7 @@ impl IntegerValue {
             U16(x) => Ok(x as u32),
             U32(x) => Ok(x),
             U64(x) => {
-                if x > (std::u32::MAX as u64) {
+                if x > (u32::MAX as u64) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u64({}) to u32", x)))
                 } else {
@@ -2501,7 +2593,7 @@ impl IntegerValue {
                 }
             },
             U128(x) => {
-                if x > (std::u32::MAX as u128) {
+                if x > (u32::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u32", x)))
                 } else {
@@ -2509,7 +2601,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u32::MAX)) {
+                if x > (u256::U256::from(u32::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u32", x)))
                 } else {
@@ -2528,7 +2620,7 @@ impl IntegerValue {
             U32(x) => Ok(x as u64),
             U64(x) => Ok(x),
             U128(x) => {
-                if x > (std::u64::MAX as u128) {
+                if x > (u64::MAX as u128) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u128({}) to u64", x)))
                 } else {
@@ -2536,7 +2628,7 @@ impl IntegerValue {
                 }
             },
             U256(x) => {
-                if x > (u256::U256::from(std::u64::MAX)) {
+                if x > (u256::U256::from(u64::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u64", x)))
                 } else {
@@ -2556,7 +2648,7 @@ impl IntegerValue {
             U64(x) => Ok(x as u128),
             U128(x) => Ok(x),
             U256(x) => {
-                if x > (u256::U256::from(std::u128::MAX)) {
+                if x > (u256::U256::from(u128::MAX)) {
                     Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                         .with_message(format!("Cannot cast u256({}) to u128", x)))
                 } else {
@@ -3470,42 +3562,14 @@ where
     write!(f, "]")
 }
 
-impl Container {
-    fn raw_address(&self) -> usize {
-        use Container::*;
-
-        match self {
-            Locals(r) => r.as_ptr() as usize,
-            Vec(r) => r.as_ptr() as usize,
-            Struct(r) => r.as_ptr() as usize,
-            VecU8(r) => r.as_ptr() as usize,
-            VecU16(r) => r.as_ptr() as usize,
-            VecU32(r) => r.as_ptr() as usize,
-            VecU64(r) => r.as_ptr() as usize,
-            VecU128(r) => r.as_ptr() as usize,
-            VecU256(r) => r.as_ptr() as usize,
-            VecBool(r) => r.as_ptr() as usize,
-            VecAddress(r) => r.as_ptr() as usize,
-        }
-    }
-}
-
-impl Locals {
-    pub fn raw_address(&self) -> usize {
-        self.0.as_ptr() as usize
-    }
-}
-
 impl Display for ContainerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Local(c) => write!(f, "(&container {:x})", c.raw_address()),
-            Self::Global { status, container } => write!(
-                f,
-                "(&container {:x} -- {:?})",
-                container.raw_address(),
-                &*status.borrow(),
-            ),
+            Self::Local(_) => write!(f, "(&container)"),
+            Self::Global {
+                status,
+                container: _,
+            } => write!(f, "(&container -- {:?})", &*status.borrow()),
         }
     }
 }
@@ -3518,7 +3582,7 @@ impl Display for IndexedRef {
 
 impl Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(container {:x}: ", self.raw_address())?;
+        write!(f, "(container: ")?;
 
         match self {
             Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
@@ -3764,6 +3828,7 @@ pub(crate) struct SerializationReadyValue<'c, 'l, 'v, L, V> {
     pub(crate) layout: &'l L,
     // Value to serialize.
     pub(crate) value: &'v V,
+    pub(crate) depth: u64,
 }
 
 fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
@@ -3772,12 +3837,11 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl<'c, 'l, 'v> serde::Serialize
-    for SerializationReadyValue<'c, 'l, 'v, MoveTypeLayout, ValueImpl>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, ValueImpl> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use MoveTypeLayout as L;
 
+        self.ctx.check_depth(self.depth).map_err(S::Error::custom)?;
         match (self.layout, self.value) {
             // Primitive types.
             (L::U8, ValueImpl::U8(x)) => serializer.serialize_u8(*x),
@@ -3795,15 +3859,21 @@ impl<'c, 'l, 'v> serde::Serialize
                     ctx: self.ctx,
                     layout: struct_layout,
                     value: &*r.borrow(),
+                    // Note: for struct, we increment depth for fields in the corresponding
+                    // serializer.
+                    depth: self.depth,
                 })
                 .serialize(serializer)
             },
 
             // Functions.
-            (L::Function(fun_layout), ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
+            (L::Function, ValueImpl::ClosureValue(clos)) => SerializationReadyValue {
                 ctx: self.ctx,
-                layout: fun_layout,
+                layout: &(),
                 value: clos,
+                // Note: for functions, we increment depth for captured arguments in the
+                // corresponding serializer.
+                depth: self.depth,
             }
             .serialize(serializer),
 
@@ -3827,6 +3897,7 @@ impl<'c, 'l, 'v> serde::Serialize
                                 ctx: self.ctx,
                                 layout,
                                 value,
+                                depth: self.depth + 1,
                             })?;
                         }
                         t.end()
@@ -3872,6 +3943,7 @@ impl<'c, 'l, 'v> serde::Serialize
                         ctx: self.ctx,
                         layout: &MoveStructLayout::signer_serialization_layout(),
                         value: &*r.borrow(),
+                        depth: self.depth,
                     })
                     .serialize(serializer)
                 }
@@ -3905,6 +3977,7 @@ impl<'c, 'l, 'v> serde::Serialize
                             ctx: &ctx,
                             layout: layout.as_ref(),
                             value: &value.0,
+                            depth: self.depth,
                         };
                         value.serialize(serializer)
                     },
@@ -3928,9 +4001,7 @@ impl<'c, 'l, 'v> serde::Serialize
     }
 }
 
-impl<'c, 'l, 'v> serde::Serialize
-    for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, Vec<ValueImpl>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut values = self.value.as_slice();
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
@@ -3960,6 +4031,7 @@ impl<'c, 'l, 'v> serde::Serialize
                         ctx: self.ctx,
                         layout: &variant_layouts[0],
                         value: &values[0],
+                        depth: self.depth + 1,
                     },
                 ),
                 _ => {
@@ -3974,6 +4046,7 @@ impl<'c, 'l, 'v> serde::Serialize
                             ctx: self.ctx,
                             layout,
                             value,
+                            depth: self.depth + 1,
                         })?
                     }
                     t.end()
@@ -3993,6 +4066,7 @@ impl<'c, 'l, 'v> serde::Serialize
                     ctx: self.ctx,
                     layout: field_layout,
                     value,
+                    depth: self.depth + 1,
                 })?;
             }
             t.end()
@@ -4009,7 +4083,7 @@ pub(crate) struct DeserializationSeed<'c, L> {
     pub(crate) layout: L,
 }
 
-impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTypeLayout> {
+impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLayout> {
     type Value = Value;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -4074,10 +4148,10 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
             }),
 
             // Functions
-            L::Function(fun_layout) => {
+            L::Function => {
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
-                    layout: fun_layout,
+                    layout: (),
                 };
                 let closure = deserializer.deserialize_seq(ClosureVisitor(seed))?;
                 Ok(Value(ValueImpl::ClosureValue(closure)))
@@ -4344,7 +4418,11 @@ impl Value {
 
     pub fn deserialize_constant(constant: &Constant) -> Option<Value> {
         let layout = Self::constant_sig_token_to_layout(&constant.type_)?;
-        ValueSerDeContext::new().deserialize(&constant.data, &layout)
+        // INVARIANT:
+        //   For constants, layout depth is bounded and cannot contain function values. Hence,
+        //   serialization depth is bounded. We still enable depth checks as a precaution.
+        ValueSerDeContext::new(Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+            .deserialize(&constant.data, &layout)
     }
 }
 
@@ -4367,26 +4445,28 @@ impl Drop for Locals {
 *
 **************************************************************************************/
 impl Container {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use Container::*;
 
         match self {
             Locals(_) => unreachable!("Should not ba able to visit a Locals container directly"),
             Vec(r) => {
                 let r = r.borrow();
-                if visitor.visit_vec(depth, r.len()) {
+                if visitor.visit_vec(depth, r.len())? {
                     for val in r.iter() {
-                        val.visit_impl(visitor, depth + 1);
+                        val.visit_impl(visitor, depth + 1)?;
                     }
                 }
+                Ok(())
             },
             Struct(r) => {
                 let r = r.borrow();
-                if visitor.visit_struct(depth, r.len()) {
+                if visitor.visit_struct(depth, r.len())? {
                     for val in r.iter() {
-                        val.visit_impl(visitor, depth + 1);
+                        val.visit_impl(visitor, depth + 1)?;
                     }
                 }
+                Ok(())
             },
             VecU8(r) => visitor.visit_vec_u8(depth, &r.borrow()),
             VecU16(r) => visitor.visit_vec_u16(depth, &r.borrow()),
@@ -4399,7 +4479,12 @@ impl Container {
         }
     }
 
-    fn visit_indexed(&self, visitor: &mut impl ValueVisitor, depth: usize, idx: usize) {
+    fn visit_indexed(
+        &self,
+        visitor: &mut impl ValueVisitor,
+        depth: u64,
+        idx: usize,
+    ) -> PartialVMResult<()> {
         use Container::*;
 
         match self {
@@ -4417,18 +4502,19 @@ impl Container {
 }
 
 impl Closure {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len()) {
+        if visitor.visit_closure(depth, captured.len())? {
             for val in captured {
-                val.visit_impl(visitor, depth + 1);
+                val.visit_impl(visitor, depth + 1)?;
             }
         }
+        Ok(())
     }
 }
 
 impl ContainerRef {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use ContainerRef::*;
 
         let (container, is_global) = match self {
@@ -4436,14 +4522,15 @@ impl ContainerRef {
             Global { container, .. } => (container, false),
         };
 
-        if visitor.visit_ref(depth, is_global) {
-            container.visit_impl(visitor, depth + 1);
+        if visitor.visit_ref(depth, is_global)? {
+            container.visit_impl(visitor, depth + 1)?;
         }
+        Ok(())
     }
 }
 
 impl IndexedRef {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use ContainerRef::*;
 
         let (container, is_global) = match &self.container_ref {
@@ -4451,19 +4538,19 @@ impl IndexedRef {
             Global { container, .. } => (container, false),
         };
 
-        if visitor.visit_ref(depth, is_global) {
-            container.visit_indexed(visitor, depth, self.idx)
+        if visitor.visit_ref(depth, is_global)? {
+            container.visit_indexed(visitor, depth, self.idx)?;
         }
+        Ok(())
     }
 }
 
 impl ValueImpl {
-    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: usize) {
+    fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use ValueImpl::*;
 
         match self {
             Invalid => unreachable!("Should not be able to visit an invalid value"),
-
             U8(val) => visitor.visit_u8(depth, *val),
             U16(val) => visitor.visit_u16(depth, *val),
             U32(val) => visitor.visit_u32(depth, *val),
@@ -4472,64 +4559,46 @@ impl ValueImpl {
             U256(val) => visitor.visit_u256(depth, *val),
             Bool(val) => visitor.visit_bool(depth, *val),
             Address(val) => visitor.visit_address(depth, *val),
-
             Container(c) => c.visit_impl(visitor, depth),
-
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
-
             ClosureValue(c) => c.visit_impl(visitor, depth),
-
             DelayedFieldID { id } => visitor.visit_delayed(depth, *id),
         }
     }
 }
 
 impl ValueView for ValueImpl {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.visit_impl(visitor, 0)
     }
 }
 
 impl ValueView for Value {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit(visitor)
     }
 }
 
 impl ValueView for Struct {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
-        if visitor.visit_struct(0, self.fields.len()) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
+        if visitor.visit_struct(0, self.fields.len())? {
             for val in self.fields.iter() {
-                val.visit_impl(visitor, 1);
+                val.visit_impl(visitor, 1)?;
             }
         }
+        Ok(())
     }
 }
 
 impl ValueView for Vector {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
     }
 }
 
-impl ValueView for IntegerValue {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
-        use IntegerValue::*;
-
-        match self {
-            U8(val) => visitor.visit_u8(0, *val),
-            U16(val) => visitor.visit_u16(0, *val),
-            U32(val) => visitor.visit_u32(0, *val),
-            U64(val) => visitor.visit_u64(0, *val),
-            U128(val) => visitor.visit_u128(0, *val),
-            U256(val) => visitor.visit_u256(0, *val),
-        }
-    }
-}
-
 impl ValueView for Reference {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         use ReferenceImpl::*;
 
         match &self.0 {
@@ -4540,19 +4609,13 @@ impl ValueView for Reference {
 }
 
 impl ValueView for VectorRef {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
     }
 }
 
 impl ValueView for StructRef {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
-        self.0.visit_impl(visitor, 0)
-    }
-}
-
-impl ValueView for SignerRef {
-    fn visit(&self, visitor: &mut impl ValueVisitor) {
+    fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
     }
 }
@@ -4572,8 +4635,8 @@ impl Vector {
             idx: usize,
         }
 
-        impl<'b> ValueView for ElemView<'b> {
-            fn visit(&self, visitor: &mut impl ValueVisitor) {
+        impl ValueView for ElemView<'_> {
+            fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
                 self.container.visit_indexed(visitor, 0, self.idx)
             }
         }
@@ -4591,8 +4654,8 @@ impl Reference {
     pub fn value_view(&self) -> impl ValueView + '_ {
         struct ValueBehindRef<'b>(&'b ReferenceImpl);
 
-        impl<'b> ValueView for ValueBehindRef<'b> {
-            fn visit(&self, visitor: &mut impl ValueVisitor) {
+        impl ValueView for ValueBehindRef<'_> {
+            fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
                 use ReferenceImpl::*;
 
                 match self.0 {
@@ -4612,14 +4675,15 @@ impl GlobalValue {
 
         struct Wrapper<'b>(&'b Rc<RefCell<Vec<ValueImpl>>>);
 
-        impl<'b> ValueView for Wrapper<'b> {
-            fn visit(&self, visitor: &mut impl ValueVisitor) {
+        impl ValueView for Wrapper<'_> {
+            fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
                 let r = self.0.borrow();
-                if visitor.visit_struct(0, r.len()) {
+                if visitor.visit_struct(0, r.len())? {
                     for val in r.iter() {
-                        val.visit_impl(visitor, 1);
+                        val.visit_impl(visitor, 1)?;
                     }
                 }
+                Ok(())
             }
         }
 
@@ -4640,9 +4704,51 @@ impl GlobalValue {
 #[cfg(feature = "fuzzing")]
 pub mod prop {
     use super::*;
+    use crate::values::function_values_impl::mock;
     #[allow(unused_imports)]
-    use move_core_types::value::{MoveStruct, MoveValue};
+    use move_core_types::{
+        ability::AbilitySet,
+        function::ClosureMask,
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
+        value::{MoveStruct, MoveValue},
+    };
     use proptest::{collection::vec, prelude::*};
+
+    fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
+        use move_core_types::language_storage::{FunctionTag, StructTag};
+        use proptest::prelude::any;
+
+        let leaf = prop_oneof![
+            1 => Just(TypeTag::Bool),
+            1 => Just(TypeTag::U8),
+            1 => Just(TypeTag::U16),
+            1 => Just(TypeTag::U32),
+            1 => Just(TypeTag::U64),
+            1 => Just(TypeTag::U128),
+            1 => Just(TypeTag::U256),
+            1 => Just(TypeTag::Address),
+            1 => Just(TypeTag::Signer),
+        ];
+
+        prop_oneof![
+            3 => leaf.clone(), // Direct leaf types at top level
+            2 => leaf.clone().prop_recursive(4, 16, 2, |inner| {
+                prop_oneof![
+                    1 => inner.clone().prop_map(|ty| TypeTag::Vector(Box::new(ty))),
+                    1 => any::<StructTag>().prop_map(|struct_tag| {
+                         TypeTag::Struct(Box::new(struct_tag))
+                     }),
+                ]
+            }),
+            1 => (vec(leaf.clone(), 0..=2), vec(leaf, 0..=2), any::<AbilitySet>()).prop_map(|(args, results, abilities)| {
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: args.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
+                    results: results.into_iter().map(FunctionParamOrReturnTag::Value).collect(),
+                    abilities,
+                }))
+            }),
+        ]
+    }
 
     pub fn value_strategy_with_layout(layout: &MoveTypeLayout) -> impl Strategy<Value = Value> {
         use MoveTypeLayout as L;
@@ -4725,14 +4831,23 @@ pub mod prop {
                     })
                     .boxed(),
             },
-            L::Struct(struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => struct_layout
-                // TODO(#13806): do we need to have a strategy for different variants?
-                .fields(Some(variants.len().wrapping_sub(1))) // choose last variant
-                .iter()
-                .map(value_strategy_with_layout)
-                .collect::<Vec<_>>()
-                .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
-                .boxed(),
+            L::Struct(_struct_layout @ MoveStructLayout::RuntimeVariants(variants)) => {
+                // Randomly choose a variant index
+                let variant_count = variants.len();
+                let variants = variants.clone();
+                (0..variant_count as u16)
+                    .prop_flat_map(move |variant_tag| {
+                        let variant_layouts = variants[variant_tag as usize].clone();
+                        variant_layouts
+                            .iter()
+                            .map(value_strategy_with_layout)
+                            .collect::<Vec<_>>()
+                            .prop_map(move |vals| {
+                                Value::struct_(Struct::pack_variant(variant_tag, vals))
+                            })
+                    })
+                    .boxed()
+            },
 
             L::Struct(struct_layout) => struct_layout
                 .fields(None)
@@ -4742,12 +4857,42 @@ pub mod prop {
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
 
-            L::Function(_function_layout) => {
-                // TODO(#15664): not clear how to generate closure values, we'd need
-                //   some test functions for this, and generate `AbstractFunction` impls.
-                //   As we do not generate function layouts in the first place, we can bail
-                //   out here
-                unreachable!("unexpected function layout")
+            L::Function => {
+                (
+                    "[a-z][a-z0-9_]{0,8}",
+                    any::<u8>().prop_map(|bits| ClosureMask::new((bits % 16) as u64)),
+                )
+                    .prop_flat_map(|(name, mask)| {
+                        let num_captured = mask.captured_count() as usize;
+
+                        // Generate random type arguments (0-3 type args)
+                        let ty_args_strategy = vec(type_tag_strategy(), 0..=3);
+
+                        // Generate random layouts for each captured value
+                        let captured_layouts_strategy = vec(layout_strategy(), num_captured);
+
+                        (ty_args_strategy, captured_layouts_strategy).prop_flat_map(
+                            move |(ty_args, captured_layouts)| {
+                                // Then recursively generate values matching those layouts
+                                let name = name.clone();
+                                let captured_strategies = captured_layouts
+                                    .iter()
+                                    .map(value_strategy_with_layout)
+                                    .collect::<Vec<_>>();
+
+                                captured_strategies.prop_map(move |captured_values| {
+                                    let fun = mock::MockAbstractFunction::new(
+                                        &name,
+                                        ty_args.clone(),
+                                        mask,
+                                        captured_layouts.clone(),
+                                    );
+                                    Value::closure(Box::new(fun), captured_values)
+                                })
+                            },
+                        )
+                    })
+                    .boxed()
             },
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
@@ -4759,6 +4904,7 @@ pub mod prop {
     pub fn layout_strategy() -> impl Strategy<Value = MoveTypeLayout> {
         use MoveTypeLayout as L;
 
+        // Non-recursive leafs
         let leaf = prop_oneof![
             1 => Just(L::U8),
             1 => Just(L::U16),
@@ -4770,13 +4916,21 @@ pub mod prop {
             1 => Just(L::Address),
         ];
 
-        leaf.prop_recursive(8, 32, 2, |inner| {
-            prop_oneof![
-                1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
-                1 => vec(inner, 0..1).prop_map(|f_layouts| {
-                     L::Struct(MoveStructLayout::new(f_layouts))}),
-            ]
-        })
+        // Return a random layout strategy
+        prop_oneof![
+            1 => leaf.clone(),
+            // Recursive leafs are 4x more likely than non-recursive leafs
+            4 => leaf.prop_recursive(8, 32, 2, |inner| {
+                prop_oneof![
+                    1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
+                    1 => vec(inner.clone(), 0..=5).prop_map(|f_layouts| {
+                            L::Struct(MoveStructLayout::new(f_layouts))}),
+                    1 => vec(vec(inner, 0..=3), 1..=4).prop_map(|variant_layouts| {
+                            L::Struct(MoveStructLayout::new_variants(variant_layouts))}),
+                ]
+            }),
+            2 => Just(L::Function),
+        ]
     }
 
     pub fn layout_and_value_strategy() -> impl Strategy<Value = (MoveTypeLayout, Value)> {
@@ -4787,8 +4941,10 @@ pub mod prop {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
+        use crate::values::function_values_impl::mock::MockAbstractFunction;
         use MoveTypeLayout as L;
 
         if let L::Native(kind, layout) = layout {
@@ -4865,11 +5021,39 @@ impl ValueImpl {
                 }
             },
 
+            (L::Function, ValueImpl::ClosureValue(closure)) => {
+                use better_any::TidExt;
+                use move_core_types::function::MoveClosure;
+
+                // Downcast to MockAbstractFunction to access data directly
+                if let Some(mock_fun) = closure.0.downcast_ref::<MockAbstractFunction>() {
+                    let move_closure = MoveClosure {
+                        module_id: mock_fun.data.module_id.clone(),
+                        fun_id: mock_fun.data.fun_id.clone(),
+                        ty_args: mock_fun.data.ty_args.clone(),
+                        mask: mock_fun.data.mask,
+                        captured: closure
+                            .1
+                            .iter()
+                            .zip(mock_fun.data.captured_layouts.iter())
+                            .map(|(captured_val, layout)| {
+                                (layout.clone(), captured_val.as_move_value(layout))
+                            })
+                            .collect(),
+                    };
+                    MoveValue::closure(move_closure)
+                } else {
+                    // Fallback for unknown function types
+                    panic!("Cannot convert unknown function type to MoveValue")
+                }
+            },
+
             (layout, val) => panic!("Cannot convert value {:?} as {:?}", val, layout),
         }
     }
 }
 
+#[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 impl Value {
     // TODO: Consider removing this API, or at least it should return a Result!
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
@@ -4887,4 +5071,11 @@ fn try_get_variant_field_layouts<'a>(
         }
     }
     None
+}
+
+fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
+    if max_depth.map_or(false, |max_depth| depth > max_depth) {
+        return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+    }
+    Ok(())
 }

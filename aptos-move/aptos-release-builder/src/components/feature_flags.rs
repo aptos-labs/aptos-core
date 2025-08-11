@@ -143,6 +143,12 @@ pub enum FeatureFlag {
     EnableFunctionValues,
     NewAccountsDefaultToFaStore,
     DefaultAccountResource,
+    JwkConsensusPerKeyMode,
+    TransactionPayloadV2,
+    OrderlessTransactions,
+    EnableLazyLoading,
+    CalculateTransactionFeeForDistribution,
+    DistributeTransactionFee,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -381,6 +387,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
             },
             FeatureFlag::DefaultAccountResource => AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE,
+            FeatureFlag::JwkConsensusPerKeyMode => AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE,
+            FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
+            FeatureFlag::EnableLazyLoading => AptosFeatureFlag::ENABLE_LAZY_LOADING,
+            FeatureFlag::CalculateTransactionFeeForDistribution => {
+                AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
+            },
+            FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
         }
     }
 }
@@ -546,6 +560,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::NewAccountsDefaultToFaStore
             },
             AptosFeatureFlag::DEFAULT_ACCOUNT_RESOURCE => FeatureFlag::DefaultAccountResource,
+            AptosFeatureFlag::JWK_CONSENSUS_PER_KEY_MODE => FeatureFlag::JwkConsensusPerKeyMode,
+            AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
+            AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
+            AptosFeatureFlag::ENABLE_LAZY_LOADING => FeatureFlag::EnableLazyLoading,
+            AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION => {
+                FeatureFlag::CalculateTransactionFeeForDistribution
+            },
+            AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
         }
     }
 }

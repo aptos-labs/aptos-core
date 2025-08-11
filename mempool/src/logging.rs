@@ -7,13 +7,18 @@ use anyhow::Error;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::Schema;
 use aptos_mempool_notifications::MempoolCommitNotification;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
 use serde::Serialize;
 use std::{fmt, fmt::Write, time::SystemTime};
 
 #[derive(Default)]
 pub struct TxnsLog {
-    txns: Vec<(AccountAddress, u64, Option<String>, Option<SystemTime>)>,
+    txns: Vec<(
+        AccountAddress,
+        ReplayProtector,
+        Option<String>,
+        Option<SystemTime>,
+    )>,
     len: usize,
     max_displayed: usize,
 }
@@ -31,25 +36,30 @@ impl TxnsLog {
         }
     }
 
-    pub fn new_txn(account: AccountAddress, seq_num: u64) -> Self {
+    pub fn new_txn(account: AccountAddress, replay_protector: ReplayProtector) -> Self {
         Self {
-            txns: vec![(account, seq_num, None, None)],
+            txns: vec![(account, replay_protector, None, None)],
             len: 0,
             max_displayed: usize::MAX,
         }
     }
 
-    pub fn add(&mut self, account: AccountAddress, seq_num: u64) {
+    pub fn add(&mut self, account: AccountAddress, replay_protector: ReplayProtector) {
         if self.txns.len() < self.max_displayed {
-            self.txns.push((account, seq_num, None, None));
+            self.txns.push((account, replay_protector, None, None));
         }
         self.len += 1;
     }
 
-    pub fn add_with_status(&mut self, account: AccountAddress, seq_num: u64, status: &str) {
+    pub fn add_with_status(
+        &mut self,
+        account: AccountAddress,
+        replay_protector: ReplayProtector,
+        status: &str,
+    ) {
         if self.txns.len() < self.max_displayed {
             self.txns
-                .push((account, seq_num, Some(status.to_string()), None));
+                .push((account, replay_protector, Some(status.to_string()), None));
         }
         self.len += 1;
     }
@@ -57,13 +67,17 @@ impl TxnsLog {
     pub fn add_full_metadata(
         &mut self,
         account: AccountAddress,
-        seq_num: u64,
+        replay_protector: ReplayProtector,
         status: &str,
         timestamp: SystemTime,
     ) {
         if self.txns.len() < self.max_displayed {
-            self.txns
-                .push((account, seq_num, Some(status.to_string()), Some(timestamp)));
+            self.txns.push((
+                account,
+                replay_protector,
+                Some(status.to_string()),
+                Some(timestamp),
+            ));
         }
         self.len += 1;
     }
@@ -77,8 +91,8 @@ impl fmt::Display for TxnsLog {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut txns = "".to_string();
 
-        for (account, seq_num, status, timestamp) in self.txns.iter() {
-            let mut txn = format!("{}:{}", account, seq_num);
+        for (account, replay_protector, status, timestamp) in self.txns.iter() {
+            let mut txn = format!("{}:{}", account, replay_protector);
             if let Some(status) = status {
                 write!(txn, ":{}", status)?;
             }
@@ -115,9 +129,10 @@ pub struct LogSchema<'a> {
     message_id: Option<&'a MempoolMessageId>,
     backpressure: Option<bool>,
     num_txns: Option<usize>,
+    message: Option<&'a str>,
 }
 
-impl<'a> LogSchema<'a> {
+impl LogSchema<'_> {
     pub fn new(name: LogEntry) -> Self {
         Self::new_event(name, None)
     }
@@ -142,6 +157,7 @@ impl<'a> LogSchema<'a> {
             message_id: None,
             backpressure: None,
             num_txns: None,
+            message: None,
         }
     }
 }
@@ -173,6 +189,7 @@ pub enum LogEntry {
     DBError,
     UnexpectedNetworkMsg,
     MempoolSnapshot,
+    TransactionFilter,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -194,6 +211,9 @@ pub enum LogEvent {
     // garbage-collect txns events
     SystemTTLExpiration,
     ClientExpiration,
+
+    // Transaction filter events
+    TransactionRejected,
 
     Success,
 }

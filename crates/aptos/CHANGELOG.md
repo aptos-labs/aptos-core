@@ -3,12 +3,39 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.7.0]
+- Turn off sharding in the local testnet
+
+## [7.6.1]
+- Mark language version 2.2 as stable.
+
+## [7.6.0]
+- Sets up confidential assets for localnet under the experimental address 0x7
+
+## [7.5.0]
+- Fix auto-update CLI command to work with more OS's including Mac and Linux on ARM
+- Update localnet indexer processors
+
+## [7.4.0]
+- UTF-8 characters are now allowed in Move source code comments (and thus error codes).
+- Additional compiler warnings on inline functions based on their visibility.
+- Various compiler bug fixes.
+- Add flag `--file-path <FILE_PATH>...` to `aptos move fmt`, which allows to specify individual files to format.
+- Fixed bug where `aptos move fmt` would format current directory if invalid `--package-path` was provided.
+
+## [7.3.0]
+
+- Update boogie from 3.2.4 to 3.5.1.
+- Change behavior of `aptos init` to first look and see if the account has an APT balance rather than checking if the account exists
+
+## [7.2.0]
+
 - Add ability to retrieve fungible asset balances
+- Add `aptos key extract-public-key` which generates a public key or a proof of possession for the given key.
 
 ## [7.1.0]
 - Add CLI outputs and on-disk storage to be stored in AIP-80 format.  Will allow for legacy formats to be taken in as well
-- Changes config output for Address to include leading 0x
-- Add `aptos key extract-public-key` which generates a public key or a proof of possession for the given key.
 
 ## [7.0.0]
 - Compiler v1 is now deprecated. It is now removed from the Aptos CLI.

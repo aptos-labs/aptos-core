@@ -5,7 +5,7 @@
 use anyhow::Result;
 use aptos_types::{
     contract_event::ContractEvent,
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
     write_set::{TransactionWrite, WriteSet},
 };
 use serde::Serialize;
@@ -69,6 +69,7 @@ impl TransactionAnalysis {
         &mut self,
         version: Version,
         txn: &Transaction,
+        _persisted_aux_info: &PersistedAuxiliaryInfo,
         _txn_info: &TransactionInfo,
         events: &[ContractEvent],
         write_set: &WriteSet,
@@ -86,7 +87,7 @@ impl TransactionAnalysis {
         }
 
         let mut write_set_size = 0;
-        for (index, (key, op)) in write_set.iter().enumerate() {
+        for (index, (key, op)) in write_set.write_op_iter().enumerate() {
             let write_op_size = key.size() + op.as_state_value().map_or(0, |value| value.size());
             write_set_size += write_op_size;
 

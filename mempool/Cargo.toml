@@ -31,6 +31,7 @@ aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
 bcs = { workspace = true }
@@ -55,6 +56,7 @@ aptos-id-generator = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
 aptos-time-service = { workspace = true, features = ["testing"] }
+aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 enum_dispatch = { workspace = true }
 proptest = { workspace = true }
 

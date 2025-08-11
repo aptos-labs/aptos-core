@@ -25,8 +25,8 @@ HELM_VERSION=3.2.4
 VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
-DOTNET_VERSION=6.0
-BOOGIE_VERSION=3.2.4
+DOTNET_VERSION=8.0
+BOOGIE_VERSION=3.5.1
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -492,7 +492,7 @@ function install_rustup_components_and_nightly {
 
 function install_cargo_sort {
   if ! command -v cargo-sort &>/dev/null; then
-    cargo install cargo-sort --locked
+    cargo install cargo-sort --locked --version 1.0.7
   fi
 }
 
@@ -1062,10 +1062,12 @@ install_libudev-dev
 
 install_python3
 if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
-  if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-    pip3 install pre-commit
-  else
+  if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
+    install_pkg pre-commit "$PACKAGE_MANAGER"
+  elif [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
     install_pkg python-pre-commit "$PACKAGE_MANAGER"
+  else
+    pip3 install pre-commit
   fi
 
   # For now best effort install, will need to improve later

@@ -15,8 +15,14 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, ident_str, identifier::Identifier,
     language_storage::ModuleId,
 };
-use move_vm_runtime::{AsUnsyncModuleStorage, ModuleStorage, StagingModuleStorage};
+use move_vm_runtime::{
+    dispatch_loader,
+    module_traversal::{TraversalContext, TraversalStorage},
+    AsUnsyncModuleStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage,
+    StagingModuleStorage,
+};
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 use std::path::PathBuf;
 
 const WORKING_ACCOUNT: AccountAddress = AccountAddress::TWO;
@@ -58,7 +64,7 @@ impl Adapter {
         &'a self,
         module_storage: &'a M,
         modules: Vec<CompiledModule>,
-    ) -> StagingModuleStorage<M> {
+    ) -> StagingModuleStorage<'a, M> {
         let module_bundle = modules
             .into_iter()
             .map(|module| {
@@ -151,9 +157,19 @@ fn load_phantom_module() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let _ = new_module_storage
-        .load_function(&module_id, ident_str!("foo"), &[])
-        .unwrap();
+    let traversal_storage = TraversalStorage::new();
+    dispatch_loader!(&new_module_storage, loader, {
+        loader
+            .load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                &module_id,
+                ident_str!("foo"),
+                &[],
+            )
+            .unwrap();
+    });
 }
 
 #[test]
@@ -211,9 +227,19 @@ fn load_with_extra_ability() {
     let module_storage = InMemoryStorage::new().into_unsync_module_storage();
     let new_module_storage = adapter.publish_modules_using_loader_v2(&module_storage, modules);
 
-    let _ = new_module_storage
-        .load_function(&module_id, ident_str!("foo"), &[])
-        .unwrap();
+    let traversal_storage = TraversalStorage::new();
+    dispatch_loader!(&new_module_storage, loader, {
+        loader
+            .load_instantiated_function(
+                &LegacyLoaderConfig::unmetered(),
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                &module_id,
+                ident_str!("foo"),
+                &[],
+            )
+            .unwrap();
+    });
 }
 
 #[test]

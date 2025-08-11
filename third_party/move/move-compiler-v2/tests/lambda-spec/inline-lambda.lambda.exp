@@ -1,0 +1,1269 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::Test {
+    private fun call_inline(y: u64) {
+        {
+          let z: u64 = Add<u64>(3, y);
+          {
+            let (x: u64): (u64) = Tuple(y);
+            {
+              let y: bool = Test::__lambda__1_inline_1_905__call_inline(x);
+              {
+                let z': bool = Test::__lambda__1_inline_2_916__call_inline(z, x);
+                {
+                  let w: bool = Test::__lambda__1_inline_3_927__call_inline(z, x);
+                  spec {
+                    assert Eq<bool>(y, Gt(x, 2));
+                    assert Eq<bool>(y, Test::$inline___lambda__1_inline_1_905__call_inline(x));
+                    assert Eq<bool>(z', Test::$inline___lambda__1_inline_2_916__call_inline(z, x));
+                    assert Eq<bool>(w, Test::$inline___lambda__1_inline_3_927__call_inline(z, x));
+                  }
+                  ;
+                  y
+                }
+              }
+            }
+          };
+          Tuple()
+        }
+    }
+    public fun test_apply(a1: u64,a2: u64) {
+        {
+          let r1: bool = {
+            let (v: u64): (u64) = Tuple(0);
+            spec {
+              assert Neq<u64>(v, 42);
+              assert Test::$inline___lambda__1_inline_1_267__test_apply(v);
+            }
+            ;
+            Test::__lambda__1_inline_1_267__test_apply(v)
+          };
+          spec {
+            assert r1;
+          }
+          ;
+          {
+            let r2: bool = {
+              let (v: u64): (u64) = Tuple(0);
+              spec {
+                assert Neq<u64>(v, 42);
+                assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, v);
+              }
+              ;
+              Test::__lambda__1_inline_1_393__test_apply(a1, a2, v)
+            };
+            spec {
+              assert Not(r2);
+            }
+            ;
+            Tuple()
+          }
+        }
+    }
+    private fun __lambda__1_inline_1_905__call_inline(x: u64): bool {
+        Gt<u64>(x, 2)
+    }
+    private fun __lambda__1_inline_2_916__call_inline(z: u64,x: u64): bool {
+        Gt<u64>(x, z)
+    }
+    private fun __lambda__1_inline_3_927__call_inline(z: u64,x: u64): bool {
+        loop {
+          if Gt<u64>(z, 0) {
+            {
+              let _x: u64 = Add<u64>(x, 1);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Gt<u64>(x, 5)
+    }
+    private fun __lambda__1_inline_1_267__test_apply(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    spec {
+      ensures Eq<bool>(result0(), Ge($t0, 0));
+    }
+
+    private fun __lambda__1_inline_1_393__test_apply(a1: u64,a2: u64,v: u64): bool {
+        Neq<u64>(v, Add<u64>(a1, a2))
+    }
+    spec fun $inline___lambda__1_inline_1_905__call_inline(x: u64): bool {
+        Gt<u64>(x, 2)
+    }
+    spec fun $inline___lambda__1_inline_2_916__call_inline(z: u64,x: u64): bool {
+        Gt<u64>(x, z)
+    }
+    spec fun $inline___lambda__1_inline_3_927__call_inline(z: u64,x: u64): bool;
+    spec fun $inline___lambda__1_inline_1_267__test_apply(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    spec fun $inline___lambda__1_inline_1_393__test_apply(a1: u64,a2: u64,v: u64): bool {
+        Neq<u64>(v, Add<u64>(a1, a2))
+    }
+} // end 0x42::Test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::Test {
+    fun call_inline(y: u64) {
+        let z = 3 + y;
+        {
+            let (x) = (y);
+            let y = __lambda__1_inline_1_905__call_inline(x);
+            let z' = __lambda__1_inline_2_916__call_inline(z, x);
+            let w = __lambda__1_inline_3_927__call_inline(z, x);
+
+            /* spec {
+              assert Eq<bool>(y, Gt(x, 2));
+              assert Eq<bool>(y, Test::$inline___lambda__1_inline_1_905__call_inline(x));
+              assert Eq<bool>(z', Test::$inline___lambda__1_inline_2_916__call_inline(z, x));
+              assert Eq<bool>(w, Test::$inline___lambda__1_inline_3_927__call_inline(z, x));
+            }
+             */
+            ;
+            y
+        };
+    }
+    public fun test_apply(a1: u64, a2: u64) {
+        let r1 = {
+            let (v) = (0);
+
+            /* spec {
+              assert Neq<u64>(v, 42);
+              assert Test::$inline___lambda__1_inline_1_267__test_apply(v);
+            }
+             */
+            ;
+            __lambda__1_inline_1_267__test_apply(v)
+        };
+
+        /* spec {
+          assert r1;
+        }
+         */
+        ;
+        let r2 = {
+            let (v) = (0);
+
+            /* spec {
+              assert Neq<u64>(v, 42);
+              assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, v);
+            }
+             */
+            ;
+            __lambda__1_inline_1_393__test_apply(a1, a2, v)
+        };
+
+        /* spec {
+          assert Not(r2);
+        }
+         */
+        ;
+    }
+    fun __lambda__1_inline_1_905__call_inline(x: u64): bool {
+        x > 2
+    }
+    fun __lambda__1_inline_2_916__call_inline(z: u64, x: u64): bool {
+        x > z
+    }
+    fun __lambda__1_inline_3_927__call_inline(z: u64, x: u64): bool {
+        while (z > 0) {
+            let _x = x + 1;
+        };
+        x > 5
+    }
+    fun __lambda__1_inline_1_267__test_apply(v: u64): bool {
+        v >= 0
+    }
+    fun __lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool {
+        v != a1 + a2
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun Test::call_inline($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: bool
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+  0: $t2 := 3
+  1: $t1 := +($t2, $t0)
+  2: $t4 := infer($t0)
+  3: $t5 := Test::__lambda__1_inline_1_905__call_inline($t4)
+  4: $t7 := infer($t1)
+  5: $t6 := Test::__lambda__1_inline_2_916__call_inline($t7, $t4)
+  6: $t9 := infer($t1)
+  7: $t8 := Test::__lambda__1_inline_3_927__call_inline($t9, $t4)
+  8: spec {
+  assert Eq<bool>($t5, Gt($t4, 2));
+  assert Eq<bool>($t5, Test::$inline___lambda__1_inline_1_905__call_inline($t4));
+  assert Eq<bool>($t6, Test::$inline___lambda__1_inline_2_916__call_inline($t1, $t4));
+  assert Eq<bool>($t8, Test::$inline___lambda__1_inline_3_927__call_inline($t1, $t4));
+}
+
+  9: $t3 := infer($t5)
+ 10: return ()
+}
+
+
+[variant baseline]
+public fun Test::test_apply($t0: u64, $t1: u64) {
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: $t4 := 0
+  1: $t3 := infer($t4)
+  2: spec {
+  assert Neq<u64>($t3, 42);
+  assert Test::$inline___lambda__1_inline_1_267__test_apply($t3);
+}
+
+  3: $t2 := Test::__lambda__1_inline_1_267__test_apply($t3)
+  4: spec {
+  assert $t2;
+}
+
+  5: $t7 := 0
+  6: $t6 := infer($t7)
+  7: spec {
+  assert Neq<u64>($t6, 42);
+  assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, $t6);
+}
+
+  8: $t8 := infer($t0)
+  9: $t9 := infer($t1)
+ 10: $t5 := Test::__lambda__1_inline_1_393__test_apply($t8, $t9, $t6)
+ 11: spec {
+  assert Not($t5);
+}
+
+ 12: return ()
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_905__call_inline($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 2
+  2: $t1 := >($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_2_916__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: $t2 := >($t3, $t0)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_3_927__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: label L0
+  1: $t4 := infer($t0)
+  2: $t5 := 0
+  3: $t3 := >($t4, $t5)
+  4: if ($t3) goto 5 else goto 10
+  5: label L2
+  6: $t7 := infer($t1)
+  7: $t8 := 1
+  8: $t6 := +($t7, $t8)
+  9: goto 12
+ 10: label L3
+ 11: goto 14
+ 12: label L4
+ 13: goto 0
+ 14: label L1
+ 15: $t9 := infer($t1)
+ 16: $t10 := 5
+ 17: $t2 := >($t9, $t10)
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_267__test_apply($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 0
+  2: $t1 := >=($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bool {
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t4 := infer($t2)
+  1: $t6 := infer($t0)
+  2: $t5 := +($t6, $t1)
+  3: $t3 := !=($t4, $t5)
+  4: return $t3
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun Test::call_inline($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: bool
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t1 := +($t2, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  2: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t5 := Test::__lambda__1_inline_1_905__call_inline($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5
+     # refs: []
+     #
+  4: $t7 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5, $t7
+     # refs: []
+     #
+  5: $t6 := Test::__lambda__1_inline_2_916__call_inline($t7, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5, $t6
+     # refs: []
+     #
+  6: $t9 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t5, $t6, $t9
+     # refs: []
+     #
+  7: $t8 := Test::__lambda__1_inline_3_927__call_inline($t9, $t4)
+     # abort state: {returns}
+     # live vars: $t1, $t4, $t5, $t6, $t8
+     # refs: []
+     #
+  8: spec {
+  assert Eq<bool>($t5, Gt($t4, 2));
+  assert Eq<bool>($t5, Test::$inline___lambda__1_inline_1_905__call_inline($t4));
+  assert Eq<bool>($t6, Test::$inline___lambda__1_inline_2_916__call_inline($t1, $t4));
+  assert Eq<bool>($t8, Test::$inline___lambda__1_inline_3_927__call_inline($t1, $t4));
+}
+
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+  9: $t3 := infer($t5)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 10: return ()
+}
+
+
+[variant baseline]
+public fun Test::test_apply($t0: u64, $t1: u64) {
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := infer($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: spec {
+  assert Neq<u64>($t3, 42);
+  assert Test::$inline___lambda__1_inline_1_267__test_apply($t3);
+}
+
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  3: $t2 := Test::__lambda__1_inline_1_267__test_apply($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  4: spec {
+  assert $t2;
+}
+
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  5: $t7 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t7
+     # refs: []
+     #
+  6: $t6 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t6
+     # refs: []
+     #
+  7: spec {
+  assert Neq<u64>($t6, 42);
+  assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, $t6);
+}
+
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t6
+     # refs: []
+     #
+  8: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t6, $t8
+     # refs: []
+     #
+  9: $t9 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t8, $t9
+     # refs: []
+     #
+ 10: $t5 := Test::__lambda__1_inline_1_393__test_apply($t8, $t9, $t6)
+     # abort state: {returns}
+     # live vars: $t5
+     # refs: []
+     #
+ 11: spec {
+  assert Not($t5);
+}
+
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 12: return ()
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_905__call_inline($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 2
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := >($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_2_916__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  1: $t2 := >($t3, $t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_3_927__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  1: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  2: $t5 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := >($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 10
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  5: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: $t7 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t7
+     # refs: []
+     #
+  7: $t8 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t7, $t8
+     # refs: []
+     #
+  8: $t6 := +($t7, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  9: goto 12
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 10: label L3
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: goto 14
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 12: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 13: goto 0
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 14: label L1
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 15: $t9 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t9
+     # refs: []
+     #
+ 16: $t10 := 5
+     # abort state: {returns}
+     # live vars: $t9, $t10
+     # refs: []
+     #
+ 17: $t2 := >($t9, $t10)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_267__test_apply($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 0
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := >=($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bool {
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t4 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t6 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4, $t6
+     # refs: []
+     #
+  2: $t5 := +($t6, $t1)
+     # abort state: {returns}
+     # live vars: $t4, $t5
+     # refs: []
+     #
+  3: $t3 := !=($t4, $t5)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  4: return $t3
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::Test {
+    private fun call_inline(y: u64) {
+        {
+          let z: u64 = Add<u64>(3, y);
+          {
+            let (x: u64): (u64) = Tuple(y);
+            {
+              let y: bool = Test::__lambda__1_inline_1_905__call_inline(x);
+              {
+                let z': bool = Test::__lambda__1_inline_2_916__call_inline(z, x);
+                {
+                  let w: bool = Test::__lambda__1_inline_3_927__call_inline(z, x);
+                  spec {
+                    assert Eq<bool>(y, Gt(x, 2));
+                    assert Eq<bool>(y, Test::$inline___lambda__1_inline_1_905__call_inline(x));
+                    assert Eq<bool>(z', Test::$inline___lambda__1_inline_2_916__call_inline(z, x));
+                    assert Eq<bool>(w, Test::$inline___lambda__1_inline_3_927__call_inline(z, x));
+                  }
+                  ;
+                  y
+                }
+              }
+            }
+          };
+          Tuple()
+        }
+    }
+    public fun test_apply(a1: u64,a2: u64) {
+        {
+          let r1: bool = spec {
+            assert true;
+            assert Test::$inline___lambda__1_inline_1_267__test_apply(0);
+          }
+          ;
+          Test::__lambda__1_inline_1_267__test_apply(0);
+          spec {
+            assert r1;
+          }
+          ;
+          {
+            let r2: bool = spec {
+              assert true;
+              assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, 0);
+            }
+            ;
+            Test::__lambda__1_inline_1_393__test_apply(a1, a2, 0);
+            spec {
+              assert Not(r2);
+            }
+            ;
+            Tuple()
+          }
+        }
+    }
+    private fun __lambda__1_inline_1_905__call_inline(x: u64): bool {
+        Gt<u64>(x, 2)
+    }
+    private fun __lambda__1_inline_2_916__call_inline(z: u64,x: u64): bool {
+        Gt<u64>(x, z)
+    }
+    private fun __lambda__1_inline_3_927__call_inline(z: u64,x: u64): bool {
+        loop {
+          if Gt<u64>(z, 0) {
+            {
+              let _x: u64 = Add<u64>(x, 1);
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        Gt<u64>(x, 5)
+    }
+    private fun __lambda__1_inline_1_267__test_apply(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    spec {
+      ensures Eq<bool>(result0(), Ge($t0, 0));
+    }
+
+    private fun __lambda__1_inline_1_393__test_apply(a1: u64,a2: u64,v: u64): bool {
+        Neq<u64>(v, Add<u64>(a1, a2))
+    }
+    spec fun $inline___lambda__1_inline_1_905__call_inline(x: u64): bool {
+        Gt<u64>(x, 2)
+    }
+    spec fun $inline___lambda__1_inline_2_916__call_inline(z: u64,x: u64): bool {
+        Gt<u64>(x, z)
+    }
+    spec fun $inline___lambda__1_inline_3_927__call_inline(z: u64,x: u64): bool;
+    spec fun $inline___lambda__1_inline_1_267__test_apply(v: u64): bool {
+        Ge<u64>(v, 0)
+    }
+    spec fun $inline___lambda__1_inline_1_393__test_apply(a1: u64,a2: u64,v: u64): bool {
+        Neq<u64>(v, Add<u64>(a1, a2))
+    }
+} // end 0x42::Test
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun Test::call_inline($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: bool
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+  0: $t2 := 3
+  1: $t1 := +($t2, $t0)
+  2: $t4 := infer($t0)
+  3: $t5 := Test::__lambda__1_inline_1_905__call_inline($t4)
+  4: $t7 := infer($t1)
+  5: $t6 := Test::__lambda__1_inline_2_916__call_inline($t7, $t4)
+  6: $t9 := infer($t1)
+  7: $t8 := Test::__lambda__1_inline_3_927__call_inline($t9, $t4)
+  8: spec {
+  assert Eq<bool>($t5, Gt($t4, 2));
+  assert Eq<bool>($t5, Test::$inline___lambda__1_inline_1_905__call_inline($t4));
+  assert Eq<bool>($t6, Test::$inline___lambda__1_inline_2_916__call_inline($t1, $t4));
+  assert Eq<bool>($t8, Test::$inline___lambda__1_inline_3_927__call_inline($t1, $t4));
+}
+
+  9: $t3 := infer($t5)
+ 10: return ()
+}
+
+
+[variant baseline]
+public fun Test::test_apply($t0: u64, $t1: u64) {
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: spec {
+  assert true;
+  assert Test::$inline___lambda__1_inline_1_267__test_apply(0);
+}
+
+  1: $t3 := 0
+  2: $t2 := Test::__lambda__1_inline_1_267__test_apply($t3)
+  3: spec {
+  assert $t2;
+}
+
+  4: spec {
+  assert true;
+  assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, 0);
+}
+
+  5: $t5 := infer($t0)
+  6: $t6 := infer($t1)
+  7: $t7 := 0
+  8: $t4 := Test::__lambda__1_inline_1_393__test_apply($t5, $t6, $t7)
+  9: spec {
+  assert Not($t4);
+}
+
+ 10: return ()
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_905__call_inline($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 2
+  2: $t1 := >($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_2_916__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: $t2 := >($t3, $t0)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_3_927__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: label L0
+  1: $t4 := infer($t0)
+  2: $t5 := 0
+  3: $t3 := >($t4, $t5)
+  4: if ($t3) goto 5 else goto 10
+  5: label L2
+  6: $t7 := infer($t1)
+  7: $t8 := 1
+  8: $t6 := +($t7, $t8)
+  9: goto 12
+ 10: label L3
+ 11: goto 14
+ 12: label L4
+ 13: goto 0
+ 14: label L1
+ 15: $t9 := infer($t1)
+ 16: $t10 := 5
+ 17: $t2 := >($t9, $t10)
+ 18: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_267__test_apply($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 0
+  2: $t1 := >=($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bool {
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t4 := infer($t2)
+  1: $t6 := infer($t0)
+  2: $t5 := +($t6, $t1)
+  3: $t3 := !=($t4, $t5)
+  4: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun Test::call_inline($t0: u64) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: bool
+     var $t7: u64 [unused]
+     var $t8: bool
+     var $t9: u64 [unused]
+     # live vars: $t0
+  0: $t2 := 3
+     # live vars: $t0, $t2
+  1: $t1 := +($t2, $t0)
+     # live vars: $t0, $t1
+  2: $t4 := move($t0)
+     # live vars: $t1, $t4
+  3: $t5 := Test::__lambda__1_inline_1_905__call_inline($t4)
+     # live vars: $t1, $t4, $t5
+  4: $t0 := copy($t1)
+     # live vars: $t0, $t1, $t4, $t5
+  5: $t6 := Test::__lambda__1_inline_2_916__call_inline($t0, $t4)
+     # live vars: $t1, $t4, $t5, $t6
+  6: $t0 := copy($t1)
+     # live vars: $t0, $t1, $t4, $t5, $t6
+  7: $t8 := Test::__lambda__1_inline_3_927__call_inline($t0, $t4)
+     # live vars: $t1, $t4, $t5, $t6, $t8
+  8: spec {
+  assert Eq<bool>($t5, Gt($t4, 2));
+  assert Eq<bool>($t5, Test::$inline___lambda__1_inline_1_905__call_inline($t4));
+  assert Eq<bool>($t6, Test::$inline___lambda__1_inline_2_916__call_inline($t1, $t4));
+  assert Eq<bool>($t8, Test::$inline___lambda__1_inline_3_927__call_inline($t1, $t4));
+}
+
+     # live vars:
+  9: return ()
+}
+
+
+[variant baseline]
+public fun Test::test_apply($t0: u64, $t1: u64) {
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64 [unused]
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: spec {
+  assert true;
+  assert Test::$inline___lambda__1_inline_1_267__test_apply(0);
+}
+
+     # live vars: $t0, $t1
+  1: $t3 := 0
+     # live vars: $t0, $t1, $t3
+  2: $t2 := Test::__lambda__1_inline_1_267__test_apply($t3)
+     # live vars: $t0, $t1, $t2
+  3: spec {
+  assert $t2;
+}
+
+     # live vars: $t0, $t1
+  4: spec {
+  assert true;
+  assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, 0);
+}
+
+     # live vars: $t0, $t1
+  5: $t3 := move($t0)
+     # live vars: $t1, $t3
+  6: $t6 := move($t1)
+     # live vars: $t3, $t6
+  7: $t7 := 0
+     # live vars: $t3, $t6, $t7
+  8: $t4 := Test::__lambda__1_inline_1_393__test_apply($t3, $t6, $t7)
+     # live vars: $t4
+  9: spec {
+  assert Not($t4);
+}
+
+     # live vars:
+ 10: return ()
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_905__call_inline($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 2
+     # live vars: $t0, $t3
+  2: $t1 := >($t0, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_2_916__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t1 := move($t1)
+     # live vars: $t0, $t1
+  1: $t2 := >($t1, $t0)
+     # live vars: $t2
+  2: return $t2
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_3_927__call_inline($t0: u64, $t1: u64): bool {
+     var $t2: bool [unused]
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     # live vars: $t0, $t1
+  0: label L0
+     # live vars: $t0, $t1
+  1: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  2: $t5 := 0
+     # live vars: $t0, $t1, $t4, $t5
+  3: $t3 := >($t4, $t5)
+     # live vars: $t0, $t1, $t3
+  4: if ($t3) goto 5 else goto 10
+     # live vars: $t0, $t1
+  5: label L2
+     # live vars: $t0, $t1
+  6: $t4 := copy($t1)
+     # live vars: $t0, $t1, $t4
+  7: $t5 := 1
+     # live vars: $t0, $t1, $t4, $t5
+  8: $t4 := +($t4, $t5)
+     # live vars: $t0, $t1
+  9: goto 0
+     # live vars: $t0, $t1
+ 10: label L3
+     # live vars: $t1
+ 11: $t1 := move($t1)
+     # live vars: $t1
+ 12: $t0 := 5
+     # live vars: $t0, $t1
+ 13: $t3 := >($t1, $t0)
+     # live vars: $t3
+ 14: return $t3
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_267__test_apply($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 0
+     # live vars: $t0, $t3
+  2: $t1 := >=($t0, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bool {
+     var $t3: bool
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2
+  2: $t0 := +($t0, $t1)
+     # live vars: $t0, $t2
+  3: $t3 := !=($t2, $t0)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.Test {
+
+
+call_inline(y: u64) /* def_idx: 0 */ {
+L1:	z: u64
+L2:	x: u64
+L3:	y: bool
+L4:	z': bool
+L5:	w: bool
+B0:
+	0: LdU64(3)
+	1: CopyLoc[0](y: u64)
+	2: Add
+	3: StLoc[1](z: u64)
+	4: MoveLoc[0](y: u64)
+	5: StLoc[2](x: u64)
+	6: CopyLoc[2](x: u64)
+	7: Call __lambda__1_inline_1_905__call_inline(u64): bool
+	8: StLoc[3](y: bool)
+	9: CopyLoc[1](z: u64)
+	10: CopyLoc[2](x: u64)
+	11: Call __lambda__1_inline_2_916__call_inline(u64, u64): bool
+	12: StLoc[4](z': bool)
+	13: CopyLoc[1](z: u64)
+	14: CopyLoc[2](x: u64)
+	15: Call __lambda__1_inline_3_927__call_inline(u64, u64): bool
+	16: StLoc[5](w: bool)
+	17: Nop
+	18: Ret
+}
+public test_apply(a1: u64, a2: u64) /* def_idx: 1 */ {
+L2:	r1: bool
+L3:	r2: bool
+B0:
+	0: Nop
+	1: LdU64(0)
+	2: Call __lambda__1_inline_1_267__test_apply(u64): bool
+	3: StLoc[2](r1: bool)
+	4: Nop
+	5: Nop
+	6: MoveLoc[0](a1: u64)
+	7: MoveLoc[1](a2: u64)
+	8: LdU64(0)
+	9: Call __lambda__1_inline_1_393__test_apply(u64, u64, u64): bool
+	10: StLoc[3](r2: bool)
+	11: Nop
+	12: Ret
+}
+__lambda__1_inline_1_905__call_inline(x: u64): bool /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](x: u64)
+	1: LdU64(2)
+	2: Gt
+	3: Ret
+}
+__lambda__1_inline_2_916__call_inline(z: u64, x: u64): bool /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[1](x: u64)
+	1: MoveLoc[0](z: u64)
+	2: Gt
+	3: Ret
+}
+__lambda__1_inline_3_927__call_inline(z: u64, x: u64): bool /* def_idx: 4 */ {
+B0:
+	0: CopyLoc[0](z: u64)
+	1: LdU64(0)
+	2: Gt
+	3: BrFalse(9)
+B1:
+	4: CopyLoc[1](x: u64)
+	5: LdU64(1)
+	6: Add
+	7: Pop
+	8: Branch(0)
+B2:
+	9: MoveLoc[1](x: u64)
+	10: LdU64(5)
+	11: Gt
+	12: Ret
+}
+__lambda__1_inline_1_267__test_apply(v: u64): bool /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[0](v: u64)
+	1: LdU64(0)
+	2: Ge
+	3: Ret
+}
+__lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool /* def_idx: 6 */ {
+B0:
+	0: MoveLoc[2](v: u64)
+	1: MoveLoc[0](a1: u64)
+	2: MoveLoc[1](a2: u64)
+	3: Add
+	4: Neq
+	5: Ret
+}
+}
+============ bytecode verification succeeded ========

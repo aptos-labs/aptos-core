@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-4:  publish [module 0xAA00::M0 {]
+task 1 lines 6-17:  publish [module 0xAA00::M1 {]

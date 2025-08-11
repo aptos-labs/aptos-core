@@ -60,7 +60,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
     fn initialize_package(
         &mut self,
         package: &Package,
-        publisher: &mut LocalAccount,
+        publisher: &LocalAccount,
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {

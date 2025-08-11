@@ -24,19 +24,7 @@ use move_prover_boogie_backend::{
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use simplelog::{
-    CombinedLogger, Config, ConfigBuilder, LevelPadding, SimpleLogger, TermLogger, TerminalMode,
-};
-use std::{
-    collections::BTreeMap,
-    sync::atomic::{AtomicBool, Ordering},
-};
-
-/// Atomic used to prevent re-initialization of logging.
-static LOGGER_CONFIGURED: AtomicBool = AtomicBool::new(false);
-
-/// Atomic used to detect whether we are running in test mode.
-static TEST_MODE: AtomicBool = AtomicBool::new(false);
+use std::collections::BTreeMap;
 
 /// Represents options provided to the tool. Most of those options are configured via a toml
 /// source; some over the command line flags.
@@ -728,10 +716,6 @@ impl Options {
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
         }
 
-        if matches.get_flag("ban-int-2-bv") {
-            options.prover.ban_int_2_bv = true;
-        }
-
         if matches.get_flag("aptos") {
             options.backend.custom_natives = Some(CustomNativeOptions {
                 template_bytes: include_bytes!(
@@ -763,38 +747,11 @@ impl Options {
     /// Sets up logging based on provided options. This should be called as early as possible
     /// and before any use of info!, warn! etc.
     pub fn setup_logging(&self) {
-        if LOGGER_CONFIGURED
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            return;
-        }
-        let config = ConfigBuilder::new()
-            .set_time_level(LevelFilter::Debug)
-            .set_level_padding(LevelPadding::Off)
-            .build();
-        // Ignore error if logger is already setup
-        let _logger = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
-            CombinedLogger::init(vec![TermLogger::new(
-                self.verbosity_level,
-                config,
-                TerminalMode::Mixed,
-            )])
-        } else {
-            CombinedLogger::init(vec![SimpleLogger::new(self.verbosity_level, config)])
-        };
+        move_compiler_v2::logging::setup_logging(Some(self.verbosity_level))
     }
 
     pub fn setup_logging_for_test(&self) {
-        if LOGGER_CONFIGURED
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            return;
-        }
-        TEST_MODE.store(true, Ordering::Relaxed);
-        // Ignore error if logger is already setup
-        let _ = SimpleLogger::init(self.verbosity_level, Config::default());
+        move_compiler_v2::logging::setup_logging_for_testing(Some(self.verbosity_level))
     }
 
     /// Convenience function to enable debugging (like high verbosity) on this instance.

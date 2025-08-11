@@ -22,7 +22,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter as MoveGasMeter, SimpleInstruction},
+    gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -46,7 +46,52 @@ where
     }
 }
 
-impl<A> MoveGasMeter for StandardGasMeter<A>
+impl<A> DependencyGasMeter for StandardGasMeter<A>
+where
+    A: GasAlgebra,
+{
+    #[inline]
+    fn charge_dependency(
+        &mut self,
+        _kind: DependencyKind,
+        addr: &AccountAddress,
+        _name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Modules under special addresses are considered system modules that should always
+        // be loaded, and are therefore excluded from gas charging.
+        //
+        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
+        //       `.is_special()`. We should double check if this address still needs special
+        //       treatment.
+        if self.feature_version() >= 15 && !addr.is_special() {
+            self.algebra
+                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+            self.algebra.count_dependency(size)?;
+        }
+        Ok(())
+    }
+}
+
+impl<A> NativeGasMeter for StandardGasMeter<A>
+where
+    A: GasAlgebra,
+{
+    fn legacy_gas_budget_in_native_context(&self) -> InternalGas {
+        self.algebra.balance_internal()
+    }
+
+    fn charge_native_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.algebra.charge_execution(amount)
+    }
+
+    #[inline]
+    fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
+}
+
+impl<A> GasMeter for StandardGasMeter<A>
 where
     A: GasAlgebra,
 {
@@ -241,7 +286,7 @@ where
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -295,12 +340,30 @@ where
     }
 
     #[inline]
+    fn charge_pack_closure(
+        &mut self,
+        is_generic: bool,
+        args: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<()> {
+        let num_args = NumArgs::new(args.len() as u64);
+
+        match is_generic {
+            false => self
+                .algebra
+                .charge_execution(PACK_CLOSURE_BASE + PACK_CLOSURE_PER_ARG * num_args),
+            true => self.algebra.charge_execution(
+                PACK_CLOSURE_GENERIC_BASE + PACK_CLOSURE_GENERIC_PER_ARG * num_args,
+            ),
+        }
+    }
+
+    #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_value_size_stack_and_heap(val, self.feature_version());
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
@@ -322,8 +385,9 @@ where
 
         let cost = EQ_BASE
             + EQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }
@@ -334,8 +398,9 @@ where
 
         let cost = NEQ_BASE
             + NEQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())
-                    + abs_val_params.abstract_value_size_dereferenced(rhs, self.feature_version()));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
+                    + abs_val_params
+                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
 
         self.algebra.charge_execution(cost)
     }
@@ -481,33 +546,6 @@ where
         let cost = SUBST_TY_PER_NODE * num_nodes;
 
         self.algebra.charge_execution(cost)
-    }
-
-    #[inline]
-    fn charge_dependency(
-        &mut self,
-        _is_new: bool,
-        addr: &AccountAddress,
-        _name: &IdentStr,
-        size: NumBytes,
-    ) -> PartialVMResult<()> {
-        // Modules under special addresses are considered system modules that should always
-        // be loaded, and are therefore excluded from gas charging.
-        //
-        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
-        //       `.is_special()`. We should double check if this address still needs special
-        //       treatment.
-        if self.feature_version() >= 15 && !addr.is_special() {
-            self.algebra
-                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
-            self.algebra.count_dependency(size)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn charge_heap_memory(&mut self, _amount: u64) -> PartialVMResult<()> {
-        Ok(())
     }
 }
 

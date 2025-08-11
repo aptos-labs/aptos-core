@@ -1,4 +1,4 @@
-// -- Model dump before bytecode pipeline
+// -- Model dump before first bytecode pipeline
 module 0x42::assign {
     struct T {
         h: u64,
@@ -25,7 +25,7 @@ module 0x42::assign {
     }
 } // end 0x42::assign
 
-// -- Sourcified model before bytecode pipeline
+// -- Sourcified model before first bytecode pipeline
 module 0x42::assign {
     struct T has drop {
         h: u64,
@@ -49,7 +49,95 @@ module 0x42::assign {
     }
 }
 
-============ initial bytecode ================
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun assign::assign_field($t0: &mut 0x42::assign::S, $t1: u64) {
+     var $t2: &mut u64
+  0: $t2 := borrow_field<0x42::assign::S>.f($t0)
+  1: write_ref($t2, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun assign::assign_int($t0: &mut u64) {
+     var $t1: u64
+  0: $t1 := 42
+  1: write_ref($t0, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun assign::assign_pattern($t0: 0x42::assign::S, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: 0x42::assign::T
+     var $t5: u64
+  0: ($t1, $t4) := unpack 0x42::assign::S($t0)
+  1: $t2 := unpack 0x42::assign::T($t4)
+  2: $t5 := infer($t1)
+  3: $t3 := +($t5, $t2)
+  4: return $t3
+}
+
+
+[variant baseline]
+fun assign::assign_struct($t0: &mut 0x42::assign::S) {
+     var $t1: 0x42::assign::S
+     var $t2: u64
+     var $t3: 0x42::assign::T
+     var $t4: u64
+  0: $t2 := 42
+  1: $t4 := 42
+  2: $t3 := pack 0x42::assign::T($t4)
+  3: $t1 := pack 0x42::assign::S($t2, $t3)
+  4: write_ref($t0, $t1)
+  5: return ()
+}
+
+
+Diagnostics:
+warning: Unused value of parameter `f`. Consider removing the parameter, or prefixing with an underscore (e.g., `_f`), or binding to `_`
+   ┌─ tests/bytecode-generator/assign.move:20:30
+   │
+20 │     fun assign_pattern(s: S, f: u64, h: u64): u64 {
+   │                              ^
+
+warning: Unused value of parameter `h`. Consider removing the parameter, or prefixing with an underscore (e.g., `_h`), or binding to `_`
+   ┌─ tests/bytecode-generator/assign.move:20:38
+   │
+20 │     fun assign_pattern(s: S, f: u64, h: u64): u64 {
+   │                                      ^
+
+// -- Model dump before second bytecode pipeline
+module 0x42::assign {
+    struct T {
+        h: u64,
+    }
+    struct S {
+        f: u64,
+        g: T,
+    }
+    private fun assign_field(s: &mut S,f: u64) {
+        select assign::S.f<&mut S>(s) = f;
+        Tuple()
+    }
+    private fun assign_int(x: &mut u64) {
+        x = 42;
+        Tuple()
+    }
+    private fun assign_pattern(s: S,f: u64,h: u64): u64 {
+        assign::S{ f, g: assign::T{ h } } = s;
+        Add<u64>(f, h)
+    }
+    private fun assign_struct(s: &mut S) {
+        s = pack assign::S(42, pack assign::T(42));
+        Tuple()
+    }
+} // end 0x42::assign
+
+============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
 fun assign::assign_field($t0: &mut 0x42::assign::S, $t1: u64) {

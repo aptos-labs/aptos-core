@@ -7,18 +7,19 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction::TransactionSchema,
         transaction_by_hash::TransactionByHashSchema,
+        transaction_summaries_by_account::TransactionSummariesByAccountSchema,
     },
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
-use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{NativeBatch, SchemaBatch, WriteBatch},
     DB,
 };
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::{IndexedTransactionSummary, ReplayProtector, Transaction, Version};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
 
@@ -43,7 +44,7 @@ impl TransactionDb {
         )
     }
 
-    pub(super) fn db(&self) -> &DB {
+    pub(crate) fn db(&self) -> &DB {
         &self.db
     }
 
@@ -135,13 +136,30 @@ impl TransactionDb {
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
-                batch.put::<TransactionByAccountSchema>(
-                    &(txn.sender(), txn.sequence_number()),
-                    &version,
-                )?;
+                if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
+                    batch.put::<OrderedTransactionByAccountSchema>(
+                        &(txn.sender(), seq_num),
+                        &version,
+                    )?;
+                }
             }
         }
-        batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
+
+        let transaction_hash = transaction.hash();
+
+        if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
+            let txn_summary = IndexedTransactionSummary::V1 {
+                sender: signed_txn.sender(),
+                replay_protector: signed_txn.replay_protector(),
+                version,
+                transaction_hash,
+            };
+            batch.put::<TransactionSummariesByAccountSchema>(
+                &(signed_txn.sender(), version),
+                &txn_summary,
+            )?;
+        }
+        batch.put::<TransactionByHashSchema>(&transaction_hash, &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
@@ -163,11 +181,11 @@ impl TransactionDb {
     /// Deletes TransactionByHash indices given a list of transactions.
     pub(crate) fn prune_transaction_by_hash_indices(
         &self,
-        transactions: &[Transaction],
+        transaction_hashes: impl Iterator<Item = HashValue>,
         db_batch: &mut SchemaBatch,
     ) -> Result<()> {
-        for transaction in transactions {
-            db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;
+        for hash in transaction_hashes {
+            db_batch.delete::<TransactionByHashSchema>(&hash)?;
         }
         Ok(())
     }

@@ -14,7 +14,7 @@ use aptos_storage_service_types::{
     requests::{DataRequest, TransactionsWithProofRequest},
     responses::{CompleteDataRange, DataResponse, StorageServiceResponse},
 };
-use aptos_types::transaction::TransactionListWithProof;
+use aptos_types::transaction::TransactionListWithProofV2;
 use claims::assert_matches;
 
 #[tokio::test]
@@ -183,6 +183,7 @@ async fn disable_compression() {
 
     // Create a data client config that disables compression
     let data_client_config = AptosDataClientConfig {
+        enable_transaction_data_v2: false,
         use_compression: false,
         ..Default::default()
     };
@@ -265,6 +266,6 @@ async fn disable_compression() {
             .get_transactions_with_proof(100, 50, 100, false, request_timeout)
             .await
             .unwrap();
-        assert_eq!(response.payload, TransactionListWithProof::new_empty());
+        assert_eq!(response.payload, TransactionListWithProofV2::new_empty());
     }
 }

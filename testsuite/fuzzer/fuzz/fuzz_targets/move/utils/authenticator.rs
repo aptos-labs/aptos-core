@@ -3,9 +3,9 @@
 
 #![allow(dead_code)]
 
-use super::helpers::UserAccount;
 use aptos_types::keyless::{AnyKeylessPublicKey, EphemeralCertificate};
 use arbitrary::Arbitrary;
+use fuzzer::UserAccount;
 use serde::{Deserialize, Serialize};
 use serde_json;
 

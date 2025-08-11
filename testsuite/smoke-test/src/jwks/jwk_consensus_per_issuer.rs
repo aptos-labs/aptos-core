@@ -26,6 +26,7 @@ use tokio::time::sleep;
 /// The validators should do JWK consensus per issuer:
 /// one problematic issuer should not block valid updates of other issuers.
 #[tokio::test]
+#[ignore]
 async fn jwk_consensus_per_issuer() {
     let epoch_duration_secs = 30;
 

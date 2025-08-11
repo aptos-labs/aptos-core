@@ -1,271 +1,158 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::{BuildOptions, BuiltPackage};
+use anyhow::{anyhow, bail};
+use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_sdk::bcs;
-use move_binary_format::CompiledModule;
+use move_package::source_package::std_lib::StdVersion;
+use serde::{Deserialize, Serialize};
 use std::{
-    fmt::Write,
+    collections::BTreeMap,
+    fs,
+    io::Write,
     path::{Path, PathBuf},
 };
 
-pub fn create_prebuilt_packages_rs_file(
+/// Get the local framework path based on this source file's location.
+/// Note: If this source file is moved to a different location, this function
+/// may need to be updated.
+fn get_local_framework_path() -> String {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("aptos-move").join("framework"))
+        .expect("framework path")
+        .to_string_lossy()
+        .to_string()
+}
+
+/// Prebuilt package that stores metadata, modules, and scripts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrebuiltPackage {
+    pub metadata: PackageMetadata,
+    pub modules: BTreeMap<String, Vec<u8>>,
+    pub scripts: Vec<Vec<u8>>,
+}
+
+/// Bundle of multiple prebuilt packages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrebuiltPackagesBundle {
+    pub packages: BTreeMap<String, PrebuiltPackage>,
+}
+
+impl PrebuiltPackagesBundle {
+    /// Returns the package corresponding to the given name. Panics if such a package does not
+    /// exist.
+    pub fn get_package(&self, package_name: &str) -> &PrebuiltPackage {
+        self.packages
+            .get(package_name)
+            .unwrap_or_else(|| panic!("Package {package_name} does not exist"))
+    }
+}
+
+/// Configuration for building a prebuilt package.
+#[derive(Debug, Clone)]
+pub struct PrebuiltPackageConfig {
+    /// If true, packages are compiled with latest (possibly unstable) version.
+    pub latest_language: bool,
+    /// If true, will use the local Aptos framework.
+    pub use_local_std: bool,
+}
+
+impl PrebuiltPackageConfig {
+    /// Returns built options corresponding to the prebuilt config.
+    pub fn build_options(&self) -> BuildOptions {
+        let mut build_options = BuildOptions::move_2();
+        build_options.dev = true;
+        if self.latest_language {
+            build_options = build_options.set_latest_language();
+        }
+        if self.use_local_std {
+            build_options.override_std = Some(StdVersion::Local(get_local_framework_path()));
+        }
+        build_options
+    }
+}
+
+/// Creates a [PrebuiltPackagesBundle] from the provided list of packages, serializes it and saves
+/// as a file in `base_dir/prebuilt.mpb` (`base_dir` should be a Cargo crate). Also generates a
+/// Rust file in that crate that allows to access prebuilt information. The output file must live
+/// in the same crate.
+pub fn create_prebuilt_packages_bundle(
     base_dir: impl AsRef<Path>,
-    packages_to_build: Vec<(&str, &str)>,
-    output_file: impl AsRef<Path>,
-) -> std::result::Result<(), anyhow::Error> {
-    let mut string_buffer = "".to_string();
-    //
-    // File header
-    //
-    writeln!(
-        string_buffer,
-        r#"// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0"#
-    )
-    .expect("Writing header comment failed");
+    packages_to_build: Vec<(PathBuf, PrebuiltPackageConfig)>,
+    output_rust_file: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    // Step 1: save serialized pre-built data.
+    let mut packages = BTreeMap::new();
 
-    //
-    // Module comment
-    //
-    writeln!(
-        string_buffer,
-        r#"
-// This file was generated. Do not modify!
-//
-// To update this code, run `cargo run -p module-publish` in aptos core.
-// That test compiles the set of modules defined in
-// `testsuite/simple/src/simple/sources/`
-// and it writes the binaries here.
-// The module name (prefixed with `MODULE_`) is a `Lazy` instance that returns the
-// byte array of the module binary.
-// This crate should also provide a Rust file that allows proper manipulation of each
-// module defined below."#
-    )
-    .expect("Writing header comment failed");
+    for (package_path, config) in packages_to_build {
+        let package = BuiltPackage::build(package_path, config.build_options())
+            .map_err(|err| anyhow!("Failed to build a package: {err:?}"))?;
 
-    //
-    // use ... directives
-    //
-    writeln!(
-        string_buffer,
-        "
-use aptos_transaction_generator_lib::entry_point_trait::PreBuiltPackages;
-use once_cell::sync::Lazy;
-use std::collections::HashMap;",
-    )
-    .expect("Use directive failed");
-    writeln!(string_buffer).expect("Empty line failed");
+        let metadata = package.extract_metadata()?;
+        let modules = package.module_code_iter().collect();
+        let scripts = package.extract_script_code();
+        if scripts.len() > 1 {
+            bail!("For benchmarks, define 1 script per package to make name resolution easier")
+        }
 
-    let mut packages = Vec::new();
-    for (package_name, additional_package) in packages_to_build {
-        packages.push(write_package(
-            &mut string_buffer,
-            base_dir.as_ref().join(additional_package),
-            package_name,
-        ));
+        packages.insert(package.name().to_owned(), PrebuiltPackage {
+            metadata,
+            modules,
+            scripts,
+        });
     }
 
-    write_accessors(&mut string_buffer, packages);
+    let bundle = PrebuiltPackagesBundle { packages };
+    let bundle_bytes = bcs::to_bytes(&bundle)
+        .map_err(|err| anyhow!("Failed to serialize prebuilt packages: {err:?}"))?;
+    fs::write(base_dir.as_ref().join("prebuilt.mpb"), bundle_bytes)
+        .map_err(|err| anyhow!("Failed to save serialized packages: {err:?}"))?;
 
-    writeln!(
-        string_buffer,
-        "
+    // Step 2: generate implementation to access prebuilt packages.
+    let code = r#"
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// This file was generated. Do not modify!
+//
+// To update this code, run `testsuite/benchmark-workloads/generate.py`.
+
+use aptos_sdk::bcs;
+use aptos_transaction_generator_lib::{
+    entry_point_trait::PreBuiltPackages, publishing::prebuild_packages::PrebuiltPackagesBundle,
+};
+use once_cell::sync::Lazy;
+
+/// Bytes of all pre-build packages.
+#[rustfmt::skip]
+const PREBUILT_BUNDLE_BYTES: &[u8] =
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/prebuilt.mpb"));
+
+/// Pre-built deserialized data: for each package, stores package metadata, compiled modules and
+/// scripts.
+#[rustfmt::skip]
+static PREBUILT_BUNDLE: Lazy<PrebuiltPackagesBundle> = Lazy::new(|| {
+    bcs::from_bytes::<PrebuiltPackagesBundle>(PREBUILT_BUNDLE_BYTES)
+        .expect("prebuilt.mpb can be deserialized")
+});
+
+#[rustfmt::skip]
 #[derive(Debug)]
 pub struct PreBuiltPackagesImpl;
 
-impl PreBuiltPackages for PreBuiltPackagesImpl {{
-    fn package_metadata(&self, package_name: &str) -> &[u8] {{
-        &PACKAGE_TO_METADATA[package_name]
-    }}
-
-    fn package_modules(&self, package_name: &str) -> &[Vec<u8>] {{
-        &PACKAGE_TO_MODULES[package_name]
-    }}
-
-    fn package_script(&self, package_name: &str) -> Option<&Vec<u8>> {{
-        PACKAGE_TO_SCRIPT.get(package_name)
-    }}
-}}",
-    )
-    .expect("PreBuiltPackages failed");
-
-    let mut generic_mod = std::fs::File::create(output_file).unwrap();
-    {
-        use std::io::Write;
-        write!(generic_mod, "{}", string_buffer)?;
+#[rustfmt::skip]
+impl PreBuiltPackages for PreBuiltPackagesImpl {
+    fn package_bundle(&self) -> &PrebuiltPackagesBundle {
+        &PREBUILT_BUNDLE
     }
+}
+"#;
+
+    let mut file = fs::File::create(output_rust_file)
+        .map_err(|err| anyhow!("Failed to create output file: {err:?}"))?;
+    write!(file, "{}", code.trim_start())?;
+
     Ok(())
-}
-
-// Write out given package
-fn write_package(file: &mut String, package_path: PathBuf, package_name: &str) -> (String, bool) {
-    println!("Building package {}", package_name);
-    // build package
-    let mut build_options = BuildOptions::move_2();
-    build_options.dev = true;
-    let package =
-        BuiltPackage::build(package_path, build_options).expect("building package must succeed");
-    let modules = package.extract_code();
-    let mut scripts = package.extract_script_code();
-    let package_metadata = package.extract_metadata().expect("Metadata must exist");
-    let metadata = bcs::to_bytes(&package_metadata).expect("Metadata must serialize");
-
-    // write out package metadata
-    write_lazy(
-        file,
-        format!("PACKAGE_{}_METADATA", package_name.to_uppercase()).as_str(),
-        &metadata,
-    );
-
-    let mut module_names = Vec::new();
-
-    // write out all modules
-    for module in &modules {
-        // this is an unfortunate way to find the module name but it is not
-        // clear how to do it otherwise
-        let compiled_module = CompiledModule::deserialize(module).expect("Module must deserialize");
-        let module_name = compiled_module.self_id().name().to_owned().into_string();
-        // start Lazy declaration
-        let name: String = format!(
-            "MODULE_{}_{}",
-            package_name.to_uppercase(),
-            module_name.to_uppercase()
-        );
-        writeln!(file).expect("Empty line failed");
-        write_lazy(file, name.as_str(), module);
-        module_names.push(name);
-    }
-
-    assert!(
-        scripts.len() <= 1,
-        "Only single script can be added per package"
-    );
-
-    let has_script = if let Some(script) = scripts.pop() {
-        let name: String = format!("SCRIPT_{}", package_name.to_uppercase());
-        writeln!(file).expect("Empty line failed");
-        write_lazy(file, name.as_str(), &script);
-        true
-    } else {
-        false
-    };
-
-    writeln!(file).expect("Empty line failed");
-    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
-    writeln!(
-        file,
-        "pub static MODULES_{}: Lazy<Vec<Vec<u8>>> = Lazy::new(|| {{ vec![",
-        package_name.to_uppercase(),
-    )
-    .expect("Lazy MODULES declaration failed");
-
-    for module_name in module_names {
-        writeln!(file, "\t{}.to_vec(),", module_name).expect("Module name declaration failed");
-    }
-
-    writeln!(file, "]}});").expect("Lazy declaration closing } failed");
-    (package_name.to_string(), has_script)
-}
-
-fn write_accessors(file: &mut String, packages: Vec<(String, bool)>) {
-    writeln!(file).expect("Empty line failed");
-    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
-    writeln!(
-        file,
-        "pub static PACKAGE_TO_METADATA: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {{ HashMap::from([",
-    )
-    .expect("Lazy PACKAGE_TO_METADATA declaration failed");
-
-    for (package, _) in &packages {
-        writeln!(
-            file,
-            "\t(\"{}\".to_string(), PACKAGE_{}_METADATA.to_vec()),",
-            package,
-            package.to_uppercase()
-        )
-        .expect("PACKAGE_TO_METADATA declaration failed");
-    }
-    writeln!(file, "])}});").expect("Lazy declaration closing } failed");
-
-    writeln!(file).expect("Empty line failed");
-    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
-    writeln!(
-        file,
-        "pub static PACKAGE_TO_MODULES: Lazy<HashMap<String, Vec<Vec<u8>>>> = Lazy::new(|| {{ HashMap::from([",
-    )
-    .expect("Lazy PACKAGE_TO_MODULES declaration failed");
-
-    for (package, _) in &packages {
-        writeln!(
-            file,
-            "\t(\"{}\".to_string(), MODULES_{}.to_vec()),",
-            package,
-            package.to_uppercase()
-        )
-        .expect("PACKAGE_TO_MODULES declaration failed");
-    }
-    writeln!(file, "])}});").expect("Lazy declaration closing } failed");
-
-    writeln!(file).expect("Empty line failed");
-    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
-    writeln!(
-        file,
-        "pub static PACKAGE_TO_SCRIPT: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {{ HashMap::from([",
-    )
-    .expect("Lazy PACKAGE_TO_SCRIPT declaration failed");
-
-    for (package, has_script) in &packages {
-        if *has_script {
-            writeln!(
-                file,
-                "\t(\"{}\".to_string(), SCRIPT_{}.to_vec()),",
-                package,
-                package.to_uppercase()
-            )
-            .expect("PACKAGE_TO_SCRIPT declaration failed");
-        }
-    }
-    writeln!(file, "])}});").expect("Lazy declaration closing } failed");
-}
-
-// Write out a `Lazy` declaration
-fn write_lazy(file: &mut String, data_name: &str, data: &[u8]) {
-    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
-    writeln!(
-        file,
-        "pub static {}: Lazy<Vec<u8>> = Lazy::new(|| {{",
-        data_name,
-    )
-    .expect("Lazy declaration failed");
-    write_vector(file, data);
-    writeln!(file, "}});").expect("Lazy declaration closing } failed");
-}
-
-// count of elements on a single line
-const DATA_BREAK_UP: usize = 18;
-
-// Write out a vector of bytes
-fn write_vector(file: &mut String, data: &[u8]) {
-    writeln!(file, "\tvec![").expect("Vector header failed");
-    write!(file, "\t\t").expect("Tab write failed");
-    let mut newline = false;
-    for (idx, datum) in data.iter().enumerate() {
-        if (idx + 1) % DATA_BREAK_UP == 0 {
-            writeln!(file, "{},", datum).expect("Vector write failed");
-            write!(file, "\t\t").expect("Tab write failed");
-            newline = true;
-        } else {
-            if idx == data.len() - 1 {
-                write!(file, "{},", datum).expect("Vector write failed");
-            } else {
-                write!(file, "{}, ", datum).expect("Vector write failed");
-            }
-            newline = false;
-        }
-    }
-    if !newline {
-        writeln!(file).expect("Empty writeln failed");
-    }
-    writeln!(file, "\t]").expect("Vector footer failed");
 }

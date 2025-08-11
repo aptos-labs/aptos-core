@@ -44,6 +44,7 @@ paste = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
 regex = { workspace = true }
+rstest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
@@ -56,6 +57,7 @@ aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
+aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 move-package = { workspace = true }
 passkey-types = { workspace = true }
 percent-encoding = { workspace = true }

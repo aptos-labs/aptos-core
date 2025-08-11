@@ -7,7 +7,8 @@
 // DEBUG
 // use backtrace::Backtrace;
 use crate::{
-    boogie_helpers::{boogie_inst_suffix, boogie_struct_name},
+    boogie_helpers,
+    boogie_helpers::{boogie_inst_suffix, boogie_reverse_function_name, boogie_struct_name},
     options::{BoogieOptions, VectorTheory},
     prover_task_runner::{ProverTaskRunner, RunBoogieWithSeeds},
 };
@@ -109,7 +110,7 @@ static INCONCLUSIVE_DIAG_STARTS: Lazy<Regex> = Lazy::new(|| {
 static INCONSISTENCY_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^inconsistency_detected\((?P<args>[^)]*)\)").unwrap());
 
-impl<'env> BoogieWrapper<'env> {
+impl BoogieWrapper<'_> {
     /// Calls boogie on the given file. On success, returns a struct representing the analyzed
     /// output of boogie.
     pub fn call_boogie(&self, boogie_file: &str) -> anyhow::Result<BoogieOutput> {
@@ -1315,6 +1316,20 @@ impl ModelValue {
         None
     }
 
+    /// Extract the arguments of a list of the form `(<ctor_prefix>... element...)`, also returning
+    /// the ctor string for further analysis.
+    fn extract_ctor_and_list(&self, ctor_prefix: &str) -> Option<(String, &[ModelValue])> {
+        if let ModelValue::List(elems) = self {
+            if !elems.is_empty() {
+                let literal = elems[0].extract_literal()?;
+                if let Some(stripped) = literal.strip_prefix(ctor_prefix) {
+                    return Some((stripped.to_string(), &elems[1..]));
+                }
+            }
+        }
+        None
+    }
+
     /// Extract a $Value box value.
     fn extract_box(&self) -> &ModelValue {
         if let ModelValue::List(elems) = self {
@@ -1434,9 +1449,31 @@ impl ModelValue {
                 // effect the verification outcome, we may not have much need for seeing it.
                 Some(PrettyDoc::text("<generic>"))
             },
+            Type::Fun(..) => {
+                let repr = if let Some((ctor_rest, args)) = self.extract_ctor_and_list("|$closure'")
+                {
+                    let end = ctor_rest.rfind("'")?;
+                    let fun_name_mangled = &ctor_rest[..end];
+                    let fun_name = boogie_reverse_function_name(wrapper.env, fun_name_mangled)
+                        .unwrap_or_else(|| fun_name_mangled.to_string());
+                    format!("{}(captured={:?})", fun_name, args)
+                } else if let Some((_, args)) = self.extract_ctor_and_list("|$unknown_function'") {
+                    format!(
+                        "<some `{}`>(captured={:?})",
+                        ty.display(&wrapper.env.get_type_display_ctx()),
+                        args
+                    )
+                } else {
+                    format!(
+                        "<some `{}`>(captured={:?})",
+                        ty.display(&wrapper.env.get_type_display_ctx()),
+                        self
+                    )
+                };
+                Some(PrettyDoc::text(repr))
+            },
             Type::Tuple(_)
             | Type::Primitive(_)
-            | Type::Fun(..)
             | Type::TypeDomain(_)
             | Type::ResourceDomain(_, _, _)
             | Type::Error
@@ -1507,6 +1544,11 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
+        let struct_name = &boogie_struct_name(struct_env, inst);
+        let mut ctor_name = struct_env
+            .get_name()
+            .display(struct_env.symbol_pool())
+            .to_string();
         let entries = if struct_env.is_intrinsic() {
             let mut rep = self.extract_literal()?.to_string();
             if rep.starts_with("T@") {
@@ -1516,14 +1558,33 @@ impl ModelValue {
             }
             vec![PrettyDoc::text(rep)]
         } else {
-            let struct_name = &boogie_struct_name(struct_env, inst);
-            let values = self
-                .extract_list(struct_name)
-                // It appears sometimes keys are represented witout, sometimes with enclosing
-                // bars?
-                .or_else(|| self.extract_list(&format!("|{}|", struct_name)))?;
+            let mut variant = None;
+            let mut values: &[ModelValue] = &[];
+            if struct_env.has_variants() {
+                // Probe which of the variants we are looking at
+                for vari in struct_env.get_variants() {
+                    let variant_name =
+                        boogie_helpers::boogie_struct_variant_name(struct_env, inst, vari);
+                    if let Some(vals) = self
+                        .extract_list(&variant_name)
+                        // It appears sometimes keys are represented without, sometimes with enclosing
+                        // bars?
+                        .or_else(|| self.extract_list(&format!("|{}|", variant_name)))
+                    {
+                        variant = Some(vari);
+                        values = vals;
+                        ctor_name =
+                            format!("{}::{}", ctor_name, vari.display(struct_env.symbol_pool()));
+                        break;
+                    }
+                }
+            } else {
+                values = self
+                    .extract_list(struct_name)
+                    .or_else(|| self.extract_list(&format!("|{}|", struct_name)))?;
+            }
             struct_env
-                .get_fields()
+                .get_fields_optional_variant(variant)
                 .enumerate()
                 .map(|(i, f)| {
                     let ty = f.get_type().instantiate(inst);
@@ -1543,13 +1604,13 @@ impl ModelValue {
         };
         Some(
             PrettyDoc::text(format!(
-                "{}.{}",
+                "{}::{}",
                 struct_env
                     .module_env
                     .get_name()
                     .name()
                     .display(struct_env.symbol_pool()),
-                struct_env.get_name().display(struct_env.symbol_pool())
+                ctor_name
             ))
             .append(Self::pretty_vec_or_struct_body(entries)),
         )
@@ -1659,7 +1720,7 @@ impl From<ParseIntError> for ModelParseError {
 
 const MODEL_END_MARKER: &str = "*** END_MODEL";
 
-impl<'s> ModelParser<'s> {
+impl ModelParser<'_> {
     fn skip_space(&mut self) {
         while self.input[self.at..].starts_with(|ch| [' ', '\r', '\n', '\t'].contains(&ch)) {
             self.at = usize::saturating_add(self.at, 1);

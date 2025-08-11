@@ -7,7 +7,7 @@ use crate::{
         epoch_ending::restore::EpochHistory,
         transaction::{
             analysis::TransactionAnalysis,
-            manifest::{TransactionBackup, TransactionChunk},
+            manifest::{TransactionBackup, TransactionChunk, TransactionChunkFormat},
         },
     },
     metrics::{
@@ -35,7 +35,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
+    transaction::{
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithAuxiliaryInfos,
+        TransactionListWithProof, TransactionListWithProofV2, Version,
+    },
     write_set::WriteSet,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM};
@@ -76,7 +79,7 @@ pub struct TransactionRestoreOpt {
 
 impl TransactionRestoreOpt {
     pub fn replay_from_version(&self) -> Version {
-        self.replay_from_version.unwrap_or(Version::max_value())
+        self.replay_from_version.unwrap_or(Version::MAX)
     }
 }
 
@@ -84,15 +87,14 @@ pub struct TransactionRestoreController {
     inner: TransactionRestoreBatchController,
 }
 
-#[allow(dead_code)]
 struct LoadedChunk {
     pub manifest: TransactionChunk,
     pub txns: Vec<Transaction>,
+    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub txn_infos: Vec<TransactionInfo>,
     pub event_vecs: Vec<Vec<ContractEvent>>,
     pub write_sets: Vec<WriteSet>,
     pub range_proof: TransactionAccumulatorRangeProof,
-    pub ledger_info: LedgerInfoWithSignatures,
 }
 
 impl LoadedChunk {
@@ -103,14 +105,33 @@ impl LoadedChunk {
     ) -> Result<Self> {
         let mut file = BufReader::new(storage.open_for_read(&manifest.transactions).await?);
         let mut txns = Vec::new();
+        let mut persisted_aux_info = Vec::new();
         let mut txn_infos = Vec::new();
         let mut event_vecs = Vec::new();
         let mut write_sets = Vec::new();
 
         while let Some(record_bytes) = file.read_record_bytes().await? {
-            let (txn, txn_info, events, write_set): (_, _, _, WriteSet) =
-                bcs::from_bytes(&record_bytes)?;
+            let (txn, aux_info, txn_info, events, write_set): (
+                _,
+                PersistedAuxiliaryInfo,
+                _,
+                _,
+                WriteSet,
+            ) = match manifest.format {
+                TransactionChunkFormat::V0 => {
+                    let (txn, txn_info, events, write_set) = bcs::from_bytes(&record_bytes)?;
+                    (
+                        txn,
+                        PersistedAuxiliaryInfo::None,
+                        txn_info,
+                        events,
+                        write_set,
+                    )
+                },
+                TransactionChunkFormat::V1 => bcs::from_bytes(&record_bytes)?,
+            };
             txns.push(txn);
+            persisted_aux_info.push(aux_info);
             txn_infos.push(txn_info);
             event_vecs.push(events);
             write_sets.push(write_set);
@@ -134,14 +155,19 @@ impl LoadedChunk {
         }
 
         // make a `TransactionListWithProof` to reuse its verification code.
-        let txn_list_with_proof = TransactionListWithProof::new(
-            txns,
-            Some(event_vecs),
-            Some(manifest.first_version),
-            TransactionInfoListWithProof::new(range_proof, txn_infos),
-        );
+        let txn_list_with_proof =
+            TransactionListWithProofV2::new(TransactionListWithAuxiliaryInfos::new(
+                TransactionListWithProof::new(
+                    txns,
+                    Some(event_vecs),
+                    Some(manifest.first_version),
+                    TransactionInfoListWithProof::new(range_proof, txn_infos),
+                ),
+                persisted_aux_info,
+            ));
         txn_list_with_proof.verify(ledger_info.ledger_info(), Some(manifest.first_version))?;
         // and disassemble it to get things back.
+        let (txn_list_with_proof, persisted_aux_info) = txn_list_with_proof.into_parts();
         let txns = txn_list_with_proof.transactions;
         let range_proof = txn_list_with_proof
             .proof
@@ -152,10 +178,10 @@ impl LoadedChunk {
         Ok(Self {
             manifest,
             txns,
+            persisted_aux_info,
             txn_infos,
             event_vecs,
             range_proof,
-            ledger_info,
             write_sets,
         })
     }
@@ -164,6 +190,7 @@ impl LoadedChunk {
         self,
     ) -> (
         Vec<Transaction>,
+        Vec<PersistedAuxiliaryInfo>,
         Vec<TransactionInfo>,
         Vec<Vec<ContractEvent>>,
         Vec<WriteSet>,
@@ -171,14 +198,14 @@ impl LoadedChunk {
         let Self {
             manifest: _,
             txns,
+            persisted_aux_info,
             txn_infos,
             event_vecs,
             write_sets,
             range_proof: _,
-            ledger_info: _,
         } = self;
 
-        (txns, txn_infos, event_vecs, write_sets)
+        (txns, persisted_aux_info, txn_infos, event_vecs, write_sets)
     }
 }
 
@@ -291,7 +318,7 @@ impl TransactionRestoreBatchController {
             );
             AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
 
-            let kv_only = self.replay_from_version.map_or(false, |(_, k)| k);
+            let kv_only = self.replay_from_version.is_some_and(|(_, k)| k);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;
@@ -402,7 +429,15 @@ impl TransactionRestoreBatchController {
         restore_handler: &RestoreHandler,
     ) -> Result<
         Option<
-            impl Stream<Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>>,
+            impl Stream<
+                Item = Result<(
+                    Transaction,
+                    PersistedAuxiliaryInfo,
+                    TransactionInfo,
+                    WriteSet,
+                    Vec<ContractEvent>,
+                )>,
+            >,
         >,
     > {
         // get the next expected transaction version of the current aptos db from txn_info CF
@@ -429,12 +464,19 @@ impl TransactionRestoreBatchController {
                 future::ok(async move {
                     let mut first_version = chunk.manifest.first_version;
                     let mut last_version = chunk.manifest.last_version;
-                    let (mut txns, mut txn_infos, mut event_vecs, mut write_sets) = chunk.unpack();
+                    let (
+                        mut txns,
+                        mut persisted_aux_info,
+                        mut txn_infos,
+                        mut event_vecs,
+                        mut write_sets,
+                    ) = chunk.unpack();
 
                     // remove the txns that exceeds the target_version to be restored
                     if target_version < last_version {
                         let num_to_keep = (target_version - first_version + 1) as usize;
                         txns.drain(num_to_keep..);
+                        persisted_aux_info.drain(num_to_keep..);
                         txn_infos.drain(num_to_keep..);
                         event_vecs.drain(num_to_keep..);
                         write_sets.drain(num_to_keep..);
@@ -446,6 +488,7 @@ impl TransactionRestoreBatchController {
                         let num_to_remove = (global_first_version - first_version) as usize;
 
                         txns.drain(..num_to_remove);
+                        persisted_aux_info.drain(..num_to_remove);
                         txn_infos.drain(..num_to_remove);
                         event_vecs.drain(..num_to_remove);
                         write_sets.drain(..num_to_remove);
@@ -457,6 +500,8 @@ impl TransactionRestoreBatchController {
                         let num_to_save =
                             (min(first_to_replay, last_version + 1) - first_version) as usize;
                         let txns_to_save: Vec<_> = txns.drain(..num_to_save).collect();
+                        let persisted_aux_info_to_save: Vec<_> =
+                            persisted_aux_info.drain(..num_to_save).collect();
                         let txn_infos_to_save: Vec<_> = txn_infos.drain(..num_to_save).collect();
                         let event_vecs_to_save: Vec<_> = event_vecs.drain(..num_to_save).collect();
                         let write_sets_to_save = write_sets.drain(..num_to_save).collect();
@@ -464,6 +509,7 @@ impl TransactionRestoreBatchController {
                             restore_handler.save_transactions(
                                 first_version,
                                 &txns_to_save,
+                                &persisted_aux_info_to_save,
                                 &txn_infos_to_save,
                                 &event_vecs_to_save,
                                 write_sets_to_save,
@@ -483,7 +529,8 @@ impl TransactionRestoreBatchController {
 
                     // create iterator of txn and its outputs to be replayed after the snapshot.
                     Ok(stream::iter(
-                        izip!(txns, txn_infos, write_sets, event_vecs).map(Result::<_>::Ok),
+                        izip!(txns, persisted_aux_info, txn_infos, write_sets, event_vecs)
+                            .map(Result::<_>::Ok),
                     ))
                 })
             })
@@ -509,7 +556,13 @@ impl TransactionRestoreBatchController {
         &self,
         restore_handler: &RestoreHandler,
         txns_to_execute_stream: impl Stream<
-            Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>,
+            Item = Result<(
+                Transaction,
+                PersistedAuxiliaryInfo,
+                TransactionInfo,
+                WriteSet,
+                Vec<ContractEvent>,
+            )>,
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
@@ -524,8 +577,13 @@ impl TransactionRestoreBatchController {
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()
             .map_ok(|chunk| {
-                let (txns, txn_infos, write_sets, events): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
-                    chunk.into_iter().multiunzip();
+                let (txns, persisted_aux_info, txn_infos, write_sets, events): (
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                ) = chunk.into_iter().multiunzip();
                 let handler = arc_restore_handler.clone();
                 base_version += offset;
                 offset = txns.len() as u64;
@@ -538,6 +596,7 @@ impl TransactionRestoreBatchController {
                         handler.save_transactions_and_replay_kv(
                             base_version,
                             &txns,
+                            &persisted_aux_info,
                             &txn_infos,
                             &events,
                             write_sets,
@@ -587,7 +646,13 @@ impl TransactionRestoreBatchController {
         &self,
         restore_handler: &RestoreHandler,
         txns_to_execute_stream: impl Stream<
-            Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>,
+            Item = Result<(
+                Transaction,
+                PersistedAuxiliaryInfo,
+                TransactionInfo,
+                WriteSet,
+                Vec<ContractEvent>,
+            )>,
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
@@ -599,8 +664,13 @@ impl TransactionRestoreBatchController {
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()
             .map_ok(|chunk| {
-                let (txns, txn_infos, write_sets, events): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
-                    chunk.into_iter().multiunzip();
+                let (txns, persisted_aux_info, txn_infos, write_sets, events): (
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                ) = chunk.into_iter().multiunzip();
                 let chunk_replayer = chunk_replayer.clone();
                 let verify_execution_mode = self.verify_execution_mode.clone();
 
@@ -610,6 +680,7 @@ impl TransactionRestoreBatchController {
                     tokio::task::spawn_blocking(move || {
                         chunk_replayer.enqueue_chunks(
                             txns,
+                            persisted_aux_info,
                             txn_infos,
                             write_sets,
                             events,
@@ -693,9 +764,18 @@ impl TransactionRestoreBatchController {
                 let mut version = chunk.manifest.first_version;
                 let last_version = chunk.manifest.last_version;
 
-                for (txn, txn_info, events, write_set) in itertools::multizip(chunk.unpack()) {
+                for (txn, persisted_aux_info, txn_info, events, write_set) in
+                    itertools::multizip(chunk.unpack())
+                {
                     if let Some(analysis) = &mut analysis {
-                        analysis.add_transaction(version, &txn, &txn_info, &events, &write_set)?;
+                        analysis.add_transaction(
+                            version,
+                            &txn,
+                            &persisted_aux_info,
+                            &txn_info,
+                            &events,
+                            &write_set,
+                        )?;
                     }
                     version += 1;
                 }

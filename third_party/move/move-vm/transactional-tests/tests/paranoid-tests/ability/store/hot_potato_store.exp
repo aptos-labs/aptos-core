@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-17:  publish [module 0x2.A {]
+task 1 lines 19-27:  run --signers 0x1  [import 0x2.A;]

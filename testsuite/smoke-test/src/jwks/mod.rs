@@ -4,10 +4,14 @@
 mod dummy_provider;
 mod jwk_consensus_basic;
 mod jwk_consensus_per_issuer;
+mod jwk_consensus_per_key;
 mod jwk_consensus_provider_change_mind;
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::{common::types::TransactionSummary, test::CliTestFramework};
+use aptos::{
+    common::types::{GasOptions, TransactionSummary},
+    test::CliTestFramework,
+};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
@@ -75,7 +79,14 @@ script {{
     };
     println!("script={script}");
 
-    cli.run_script(account_idx, script.as_str()).await.unwrap()
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(20000),
+        expiration_secs: 60,
+    };
+    cli.run_script_with_gas_options(account_idx, script.as_str(), Some(gas_options))
+        .await
+        .unwrap()
 }
 
 async fn get_patched_jwks(rest_client: &Client) -> PatchedJWKs {

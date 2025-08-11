@@ -92,6 +92,14 @@ macro_rules! generate_error_traits {
             ) -> Self where Self: Sized;
 
             #[allow(unused)]
+            fn [<$trait_name:snake _with_optional_vm_status_and_ledger_info>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                vm_status: Option<aptos_types::vm_status::StatusCode>,
+                ledger_info: Option<&aptos_api_types::LedgerInfo>
+            ) -> Self where Self: Sized;
+
+            #[allow(unused)]
             fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(
                 err: Err,
                 error_code: aptos_api_types::AptosErrorCode,
@@ -196,6 +204,30 @@ macro_rules! generate_error_response {
                     None,
                     None,
                     None,
+                    None,
+                ))
+            }
+            fn [<$name:snake _with_optional_vm_status_and_ledger_info>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                vm_status: Option<aptos_types::vm_status::StatusCode>,
+                ledger_info: Option<&aptos_api_types::LedgerInfo>
+            ) -> Self where Self: Sized {
+                let error = if let Some(vm_status) = vm_status {
+                    aptos_api_types::AptosError::new_with_vm_status(err, error_code, vm_status)
+                } else {
+                    aptos_api_types::AptosError::new_with_error_code(err, error_code)
+                };
+                let payload = poem_openapi::payload::Json(Box::new(error));
+                Self::from($enum_name::$name(
+                    payload,
+                    ledger_info.map(|info| info.chain_id),
+                    ledger_info.map(|info| info.ledger_version.into()),
+                    ledger_info.map(|info| info.oldest_ledger_version.into()),
+                    ledger_info.map(|info| info.ledger_timestamp.into()),
+                    ledger_info.map(|info| info.epoch.into()),
+                    ledger_info.map(|info| info.block_height.into()),
+                    ledger_info.map(|info| info.oldest_block_height.into()),
                     None,
                 ))
             }
@@ -663,7 +695,9 @@ pub fn resource_not_found<E: NotFoundError>(
         "Resource",
         format!(
             "Address({}), Struct tag({}) and Ledger version({})",
-            address, struct_tag, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            ledger_version
         ),
         AptosErrorCode::ResourceNotFound,
         ledger_info,
@@ -698,7 +732,10 @@ pub fn struct_field_not_found<E: NotFoundError>(
         "Struct Field",
         format!(
             "Address({}), Struct tag({}), Field name({}) and Ledger version({})",
-            address, struct_tag, field_name, ledger_version
+            address,
+            struct_tag.to_canonical_string(),
+            field_name,
+            ledger_version
         ),
         AptosErrorCode::StructFieldNotFound,
         ledger_info,

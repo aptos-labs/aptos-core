@@ -5,19 +5,21 @@ use crate::{
     counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
     payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use futures::future::Shared;
+use move_core_types::account_address::AccountAddress;
 use std::{future::Future, sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
-    txn_filter: Arc<TransactionFilter>,
+    txn_filter_config: Arc<BlockTransactionFilterConfig>,
     txn_deduper: Arc<dyn TransactionDeduper>,
     txn_shuffler: Arc<dyn TransactionShuffler>,
 }
@@ -25,13 +27,13 @@ pub struct BlockPreparer {
 impl BlockPreparer {
     pub fn new(
         payload_manager: Arc<dyn TPayloadManager>,
-        txn_filter: Arc<TransactionFilter>,
+        txn_filter_config: Arc<BlockTransactionFilterConfig>,
         txn_deduper: Arc<dyn TransactionDeduper>,
         txn_shuffler: Arc<dyn TransactionShuffler>,
     ) -> Self {
         Self {
             payload_manager,
-            txn_filter,
+            txn_filter_config,
             txn_deduper,
             txn_shuffler,
         }
@@ -60,14 +62,26 @@ impl BlockPreparer {
                    result
                 }
         }?;
-        let txn_filter = self.txn_filter.clone();
+
+        let txn_filter_config = self.txn_filter_config.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
+
         let block_id = block.id();
+        let block_author = block.author();
+        let block_epoch = block.epoch();
         let block_timestamp_usecs = block.timestamp_usecs();
+
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         let result = tokio::task::spawn_blocking(move || {
-            let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
+            let filtered_txns = filter_block_transactions(
+                txn_filter_config,
+                block_id,
+                block_author,
+                block_epoch,
+                block_timestamp_usecs,
+                txns,
+            );
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = {
                 let _timer = TXN_SHUFFLE_SECONDS.start_timer();
@@ -86,4 +100,30 @@ impl BlockPreparer {
         counters::BLOCK_PREPARER_LATENCY.observe_duration(start_time.elapsed());
         result.map(|result| (result, block_gas_limit))
     }
+}
+
+/// Filters transactions in a block based on the filter configuration
+fn filter_block_transactions(
+    txn_filter_config: Arc<BlockTransactionFilterConfig>,
+    block_id: HashValue,
+    block_author: Option<AccountAddress>,
+    block_epoch: u64,
+    block_timestamp_usecs: u64,
+    txns: Vec<SignedTransaction>,
+) -> Vec<SignedTransaction> {
+    // If the transaction filter is disabled, return early
+    if !txn_filter_config.is_enabled() {
+        return txns;
+    }
+
+    // Otherwise, filter the transactions
+    txn_filter_config
+        .block_transaction_filter()
+        .filter_block_transactions(
+            block_id,
+            block_author,
+            block_epoch,
+            block_timestamp_usecs,
+            txns,
+        )
 }

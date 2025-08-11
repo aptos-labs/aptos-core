@@ -3,7 +3,6 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
-    loaded_data::runtime_types::Type,
     values::{
         AbstractFunction, DeserializationSeed, SerializationReadyValue, SerializedFunctionData,
         Value,
@@ -13,8 +12,6 @@ use crate::{
 use mockall::automock;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -23,15 +20,6 @@ use std::cell::RefCell;
 /// An extension to (de)serialize information about function values.
 #[cfg_attr(test, automock)]
 pub trait FunctionValueExtension {
-    /// Given the module's id and the function name, returns the parameter types of the
-    /// corresponding function, instantiated with the provided set of type tags.
-    fn get_function_arg_tys(
-        &self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        ty_arg_tags: Vec<TypeTag>,
-    ) -> PartialVMResult<Vec<Type>>;
-
     /// Create an implementation of an `AbstractFunction` from the serialization data.
     fn create_from_serialization_data(
         &self,
@@ -43,6 +31,9 @@ pub trait FunctionValueExtension {
         &self,
         fun: &dyn AbstractFunction,
     ) -> PartialVMResult<SerializedFunctionData>;
+
+    /// Returns the maximum allowed nesting depth of a VM value.
+    fn max_value_nest_depth(&self) -> Option<u64>;
 }
 
 /// An extension to (de)serializer to lookup information about delayed fields.
@@ -55,7 +46,7 @@ pub(crate) struct DelayedFieldsExtension<'a> {
     pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping>,
 }
 
-impl<'a> DelayedFieldsExtension<'a> {
+impl DelayedFieldsExtension<'_> {
     // Temporarily limit the number of delayed fields per resource, until proper charges are
     // implemented.
     // TODO[agg_v2](clean):
@@ -74,23 +65,48 @@ impl<'a> DelayedFieldsExtension<'a> {
     }
 }
 
+/// Contains information on how to resolve function values.
+#[derive(Clone)]
+pub(crate) struct FunctionValueExtensionWithContext<'a> {
+    extension: &'a dyn FunctionValueExtension,
+}
+
+impl<'a> FunctionValueExtensionWithContext<'a> {
+    /// Returns serialized function data.
+    pub(crate) fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        self.extension.get_serialization_data(fun)
+    }
+
+    /// Creates a function from serialized data.
+    pub(crate) fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        self.extension.create_from_serialization_data(data)
+    }
+}
+
 /// A (de)serializer context for a single Move [Value], containing optional extensions. If
 /// extension is not provided, but required at (de)serialization time, (de)serialization fails.
 pub struct ValueSerDeContext<'a> {
-    #[allow(dead_code)]
-    pub(crate) function_extension: Option<&'a dyn FunctionValueExtension>,
+    pub(crate) function_extension: Option<FunctionValueExtensionWithContext<'a>>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
     pub(crate) legacy_signer: bool,
+    /// Maximum allowed depth of a VM value. Enforced by serializer.
+    pub(crate) max_value_nested_depth: Option<u64>,
 }
 
 impl<'a> ValueSerDeContext<'a> {
     /// Default (de)serializer that disallows delayed fields.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(max_value_nested_depth: Option<u64>) -> Self {
         Self {
             function_extension: None,
             delayed_fields_extension: None,
             legacy_signer: false,
+            max_value_nested_depth,
         }
     }
 
@@ -104,14 +120,16 @@ impl<'a> ValueSerDeContext<'a> {
     /// function value deserialization.
     pub fn with_func_args_deserialization(
         mut self,
-        function_extension: &'a dyn FunctionValueExtension,
+        extension: &'a dyn FunctionValueExtension,
     ) -> Self {
-        self.function_extension = Some(function_extension);
+        self.function_extension = Some(FunctionValueExtensionWithContext { extension });
         self
     }
 
-    pub fn required_function_extension(&self) -> PartialVMResult<&dyn FunctionValueExtension> {
-        self.function_extension.ok_or_else(|| {
+    pub(crate) fn required_function_extension(
+        &self,
+    ) -> PartialVMResult<&FunctionValueExtensionWithContext<'a>> {
+        self.function_extension.as_ref().ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                 "require function extension context for serialization of closures".to_string(),
             )
@@ -121,10 +139,21 @@ impl<'a> ValueSerDeContext<'a> {
     /// Returns the same extension but without allowing the delayed fields.
     pub(crate) fn clone_without_delayed_fields(&self) -> Self {
         Self {
-            function_extension: self.function_extension,
+            function_extension: self.function_extension.clone(),
             delayed_fields_extension: None,
             legacy_signer: self.legacy_signer,
+            max_value_nested_depth: self.max_value_nested_depth,
         }
+    }
+
+    pub(crate) fn check_depth(&self, depth: u64) -> PartialVMResult<()> {
+        if self
+            .max_value_nested_depth
+            .map_or(false, |max_depth| depth > max_depth)
+        {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+        }
+        Ok(())
     }
 
     /// Custom (de)serializer such that:
@@ -165,6 +194,7 @@ impl<'a> ValueSerDeContext<'a> {
             ctx: &self,
             layout,
             value: &value.0,
+            depth: 1,
         };
 
         match bcs::to_bytes(&value).ok() {
@@ -194,6 +224,7 @@ impl<'a> ValueSerDeContext<'a> {
             ctx: &self,
             layout,
             value: &value.0,
+            depth: 1,
         };
         bcs::serialized_size(&value).map_err(|e| {
             PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(

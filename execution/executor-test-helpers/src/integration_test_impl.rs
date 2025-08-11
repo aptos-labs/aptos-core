@@ -20,7 +20,10 @@ use aptos_storage_interface::{
     DbReaderWriter,
 };
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, primary_apt_store, AccountResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::LedgerInfo,
@@ -30,14 +33,15 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
+        AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo,
         Transaction::{self, UserTransaction},
-        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
+        TransactionListWithProofV2, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
-    AptosCoinType,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use move_core_types::move_resource::MoveStructType;
 use rand::SeedableRng;
 use std::{path::Path, sync::Arc};
 
@@ -160,7 +164,7 @@ pub fn test_execution_with_storage_impl_inner(
     let reconfig2 = core_resources_account.sign_with_transaction_builder(
         txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
     );
-    let block2 = vec![block2_meta, UserTransaction(reconfig2)];
+    let block2 = into_signature_verified_block(vec![block2_meta, UserTransaction(reconfig2)]);
 
     let block3_id = gen_block_id(3);
     let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
@@ -179,11 +183,16 @@ pub fn test_execution_with_storage_impl_inner(
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3); // append state checkpoint txn
+    let block3 = block(block3);
 
     let output1 = executor
         .execute_block(
-            (block1_id, block1.clone()).into(),
+            (
+                block1_id,
+                block1.clone(),
+                gen_auxiliary_info_for_block(&block1),
+            )
+                .into(),
             parent_block_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -295,7 +304,12 @@ pub fn test_execution_with_storage_impl_inner(
     // Execute block 2, 3, 4
     let output2 = executor
         .execute_block(
-            (block2_id, block2).into(),
+            (
+                block2_id,
+                block2.clone(),
+                gen_auxiliary_info_for_block(&block2),
+            )
+                .into(),
             epoch2_genesis_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -316,7 +330,12 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output3 = executor
         .execute_block(
-            (block3_id, block3.clone()).into(),
+            (
+                block3_id,
+                block3.clone(),
+                gen_auxiliary_info_for_block(&block3),
+            )
+                .into(),
             epoch3_genesis_id,
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -400,9 +419,13 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 }
 
 pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress) -> u64 {
-    CoinStoreResource::<AptosCoinType>::fetch_move_resource(state_view, address)
-        .unwrap()
-        .map_or(0, |coin_store| coin_store.coin())
+    FungibleStoreResource::fetch_move_resource_from_group(
+        state_view,
+        &primary_apt_store(*address),
+        &ObjectGroupResource::struct_tag(),
+    )
+    .unwrap()
+    .map_or(0, |fa_store| fa_store.balance())
 }
 
 pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>
@@ -418,10 +441,12 @@ where
 }
 
 pub fn verify_transactions(
-    txn_list_with_proof: &TransactionListWithProof,
+    txn_list_with_proof: &TransactionListWithProofV2,
     expected_txns: &[Transaction],
 ) -> Result<()> {
-    let txns = &txn_list_with_proof.transactions;
+    let txns = &txn_list_with_proof
+        .get_transaction_list_with_proof()
+        .transactions;
     ensure!(
         *txns == expected_txns,
         "expected txns {:?} doesn't equal to returned txns {:?}",
@@ -450,4 +475,21 @@ pub fn verify_committed_txn_status(
     );
 
     Ok(())
+}
+
+fn gen_auxiliary_info_for_block(block: &[SignatureVerifiedTransaction]) -> Vec<AuxiliaryInfo> {
+    block
+        .iter()
+        .map(|txn| {
+            txn.borrow_into_inner().try_as_signed_user_txn().map_or(
+                AuxiliaryInfo::new_empty(),
+                |_| {
+                    AuxiliaryInfo::new(
+                        PersistedAuxiliaryInfo::None,
+                        Some(EphemeralAuxiliaryInfo { proposer_index: 0 }),
+                    )
+                },
+            )
+        })
+        .collect()
 }

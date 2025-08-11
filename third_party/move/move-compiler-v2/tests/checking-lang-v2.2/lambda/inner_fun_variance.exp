@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot pass `&vector<|u64|u64 has drop>` to a function which expects argument of type `&vector<|u64|u64>`
+  ┌─ tests/checking-lang-v2.2/lambda/inner_fun_variance.move:8:13
+  │
+8 │         zzz(&b);
+  │             ^^
+
+error: cannot pass `vector<|&u64| has copy + drop>` to a function which expects argument of type `vector<|&mut u64| has copy + drop>` (mutability mismatch)
+   ┌─ tests/checking-lang-v2.2/lambda/inner_fun_variance.move:22:15
+   │
+22 │         apply(vector[func]);
+   │               ^^^^^^

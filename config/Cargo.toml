@@ -20,6 +20,7 @@ aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-temppath = { workspace = true }
+aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
@@ -34,6 +35,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_merge = { workspace = true }
 serde_yaml = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 
@@ -49,3 +52,6 @@ fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 smoke-test = []
 testing = []
 tokio-console = []
+
+[package.metadata.cargo-machete]
+ignored = ["strum"]

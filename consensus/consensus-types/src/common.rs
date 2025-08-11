@@ -14,8 +14,11 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
+    account_address::AccountAddress,
+    transaction::{ReplayProtector, SignedTransaction},
+    validator_verifier::ValidatorVerifier,
+    vm_status::DiscardedVMStatus,
+    PeerId,
 };
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
@@ -23,7 +26,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fmt::{self, Write},
-    u64,
 };
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -36,15 +38,15 @@ pub type Author = AccountAddress;
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TransactionSummary {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub hash: HashValue,
 }
 
 impl TransactionSummary {
-    pub fn new(sender: AccountAddress, sequence_number: u64, hash: HashValue) -> Self {
+    pub fn new(sender: AccountAddress, replay_protector: ReplayProtector, hash: HashValue) -> Self {
         Self {
             sender,
-            sequence_number,
+            replay_protector,
             hash,
         }
     }
@@ -52,14 +54,14 @@ impl TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.replay_protector,)
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TxnSummaryWithExpiration {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub expiration_timestamp_secs: u64,
     pub hash: HashValue,
 }
@@ -67,13 +69,13 @@ pub struct TxnSummaryWithExpiration {
 impl TxnSummaryWithExpiration {
     pub fn new(
         sender: AccountAddress,
-        sequence_number: u64,
+        replay_protector: ReplayProtector,
         expiration_timestamp_secs: u64,
         hash: HashValue,
     ) -> Self {
         Self {
             sender,
-            sequence_number,
+            replay_protector,
             expiration_timestamp_secs,
             hash,
         }
@@ -82,7 +84,7 @@ impl TxnSummaryWithExpiration {
 
 impl fmt::Display for TxnSummaryWithExpiration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{:?}", self.sender, self.replay_protector,)
     }
 }
 
@@ -118,7 +120,7 @@ impl TransactionInProgress {
 #[derive(Clone)]
 pub struct RejectedTransactionSummary {
     pub sender: AccountAddress,
-    pub sequence_number: u64,
+    pub replay_protector: ReplayProtector,
     pub hash: HashValue,
     pub reason: DiscardedVMStatus,
 }
@@ -141,7 +143,11 @@ impl ProofWithData {
         self.proofs.extend(other.proofs);
     }
 
-    pub fn len(&self) -> usize {
+    pub fn num_proofs(&self) -> usize {
+        self.proofs.len()
+    }
+
+    pub fn num_txns(&self) -> usize {
         self.proofs
             .iter()
             .map(|proof| proof.num_txns() as usize)
@@ -278,15 +284,15 @@ impl Payload {
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(proof_with_status) => proof_with_status.len(),
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.num_txns(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 // here we return the actual length of the payload; limit is considered at the stage
                 // where we prepare the block from the payload
-                proof_with_status.proof_with_data.len()
+                proof_with_status.proof_with_data.num_txns()
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
             | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
-                proof_with_data.len()
+                proof_with_data.num_txns()
                     + inline_batches
                         .iter()
                         .map(|(_, txns)| txns.len())
@@ -299,18 +305,18 @@ impl Payload {
     pub fn len_for_execution(&self) -> u64 {
         match self {
             Payload::DirectMempool(txns) => txns.len() as u64,
-            Payload::InQuorumStore(proof_with_status) => proof_with_status.len() as u64,
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.num_txns() as u64,
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 // here we return the actual length of the payload; limit is considered at the stage
                 // where we prepare the block from the payload
-                (proof_with_status.proof_with_data.len() as u64)
+                (proof_with_status.proof_with_data.num_txns() as u64)
                     .min(proof_with_status.max_txns_to_execute.unwrap_or(u64::MAX))
             },
             Payload::QuorumStoreInlineHybrid(
                 inline_batches,
                 proof_with_data,
                 max_txns_to_execute,
-            ) => ((proof_with_data.len()
+            ) => ((proof_with_data.num_txns()
                 + inline_batches
                     .iter()
                     .map(|(_, txns)| txns.len())
@@ -325,7 +331,7 @@ impl Payload {
                 inline_batches,
                 proof_with_data,
                 execution_limit,
-            ) => ((proof_with_data.len()
+            ) => ((proof_with_data.num_txns()
                 + inline_batches
                     .iter()
                     .map(|(_, txns)| txns.len())
@@ -753,7 +759,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     for txn in txns {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
-                            sequence_number: txn.sequence_number(),
+                            replay_protector: txn.replay_protector(),
                             hash: txn.committed_hash(),
                         });
                     }

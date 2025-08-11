@@ -15,8 +15,8 @@ use aptos_types::{
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
-        Version,
+        SignedTransaction, Transaction, TransactionExecutableRef, TransactionInfo,
+        TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -68,7 +68,8 @@ impl AptosDebugger {
     ) -> anyhow::Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
-        let txn_provider = DefaultTxnProvider::new(sig_verified_txns);
+        // TODO(grao): Pass in persisted info.
+        let txn_provider = DefaultTxnProvider::new_without_info(sig_verified_txns);
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
         print_transaction_stats(txn_provider.get_txns(), version);
@@ -142,19 +143,22 @@ impl AptosDebugger {
             &txn,
             &log_context,
             |gas_meter| {
-                let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
-                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-
-                    // Deprecated.
-                    TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has already been checked because before this function is called")
+                let gas_profiler = match txn
+                    .executable_ref()
+                    .expect("Module bundle payload has been removed")
+                {
+                    TransactionExecutableRef::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionExecutableRef::EntryFunction(entry_func) => {
+                        GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        )
+                    },
+                    TransactionExecutableRef::Empty => {
+                        // TODO[Orderless]: Implement this
+                        unimplemented!("not supported yet")
                     },
                 };
                 gas_profiler
@@ -382,18 +386,24 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
     let entry_functions = sig_verified_txns
         .iter()
         .filter_map(|txn| {
-            txn.expect_valid()
-                .try_as_signed_user_txn()
-                .map(|txn| match &txn.payload() {
-                    TransactionPayload::EntryFunction(txn) => format!(
+            txn.expect_valid().try_as_signed_user_txn().map(|txn| {
+                let mut executable_type = match &txn.payload().executable_ref() {
+                    Ok(TransactionExecutableRef::EntryFunction(txn)) => format!(
                         "entry: {:?}::{:?}",
                         txn.module().name.as_str(),
                         txn.function().as_str()
                     ),
-                    TransactionPayload::Script(_) => "script".to_string(),
-                    TransactionPayload::ModuleBundle(_) => panic!("deprecated module bundle"),
-                    TransactionPayload::Multisig(_) => "multisig".to_string(),
-                })
+                    Ok(TransactionExecutableRef::Script(_)) => "script".to_string(),
+                    Ok(TransactionExecutableRef::Empty) => "empty".to_string(),
+                    Err(e) => {
+                        panic!("deprecated transaction payload: {}", e)
+                    },
+                };
+                if txn.payload().is_multisig() {
+                    executable_type = format!("multisig: {}", executable_type);
+                }
+                executable_type
+            })
         })
         // Count number of instances for each (irrsepsecitve of order)
         .sorted()

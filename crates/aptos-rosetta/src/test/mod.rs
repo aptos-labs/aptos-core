@@ -84,6 +84,7 @@ fn test_transaction(
             None,
             178,                      // gas used, chosen arbitrarily
             ExecutionStatus::Success, // TODO: Add other statuses
+            None,
         )),
         events,
         accumulator_root_hash: Default::default(),
@@ -128,14 +129,24 @@ impl FaData {
                 store: self.store_address,
                 amount: self.amount,
             };
-            (self.previous_balance + self.amount, event.create_event_v2())
+            (
+                self.previous_balance + self.amount,
+                event
+                    .create_event_v2()
+                    .expect("Creating DepositFAEvent should always succeed"),
+            )
         } else {
             let event = WithdrawFAEvent {
                 store: self.store_address,
                 amount: self.amount,
             };
 
-            (self.previous_balance - self.amount, event.create_event_v2())
+            (
+                self.previous_balance - self.amount,
+                event
+                    .create_event_v2()
+                    .expect("Creating WithdrawFAEvent should always succeed"),
+            )
         };
 
         let store = FungibleStoreResource::new(self.fa_metadata_address, new_balance, false);

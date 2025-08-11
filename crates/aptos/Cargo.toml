@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "7.1.0"
+version = "7.7.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -30,7 +30,7 @@ aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
+aptos-indexer-processor-sdk = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
 aptos-localnet = { workspace = true }
@@ -38,7 +38,6 @@ aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
-aptos-protos = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
@@ -52,6 +51,7 @@ aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 aptos-workspace-server = { workspace = true }
 async-trait = { workspace = true }
+backoff = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bollard = { workspace = true }
@@ -60,9 +60,7 @@ clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
 clap_complete = { workspace = true }
 colored = { workspace = true }
 dashmap = { workspace = true }
-diesel = { workspace = true, features = [
-    "postgres_backend",
-] }
+diesel = { workspace = true, features = ["postgres_backend"] }
 diesel-async = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
@@ -94,23 +92,27 @@ processor = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
-self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = ["archive-zip", "compression-zip-deflate"] }
+self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = [
+    "archive-zip",
+    "compression-zip-deflate",
+] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { workspace = true }
 set_env = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
-tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [features]
 default = []

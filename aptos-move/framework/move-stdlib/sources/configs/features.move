@@ -689,6 +689,49 @@ module std::features {
         is_enabled(DEFAULT_ACCOUNT_RESOURCE)
     }
 
+    /// If enabled, JWK consensus should run in per-key mode, where:
+    /// - The consensus is for key-level updates
+    ///   (e.g., "issuer A key 1 should be deleted", "issuer B key 2 should be upserted");
+    /// - transaction type `ValidatorTransaction::ObservedJWKUpdate` is reused;
+    /// - while a key-level update is mostly represented by a new type `KeyLevelUpdate` locally,
+    ///   For simplicity, it is represented by type `ProviderJWKs` (used to represent issuer-level update)
+    ///   in JWK Consensus messages, in validator transactions, and in Move.
+    const JWK_CONSENSUS_PER_KEY_MODE: u64 = 92;
+
+    public fun get_jwk_consensus_per_key_mode_feature(): u64 { JWK_CONSENSUS_PER_KEY_MODE }
+
+    public fun is_jwk_consensus_per_key_mode_enabled(): bool acquires Features {
+        is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
+    }
+
+    /// Whether orderless transactions are enabled.
+    /// Lifetime: transient
+    const ORDERLESS_TRANSACTIONS: u64 = 94;
+
+    public fun get_orderless_transactions_feature(): u64 { ORDERLESS_TRANSACTIONS }
+
+    public fun orderless_transactions_enabled(): bool acquires Features {
+        is_enabled(ORDERLESS_TRANSACTIONS)
+    }
+
+    /// Whether to calculate the transaction fee for distribution.
+    const CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION: u64 = 96;
+
+    public fun get_calculate_transaction_fee_for_distribution_feature(): u64 { CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION }
+
+    public fun is_calculate_transaction_fee_for_distribution_enabled(): bool acquires Features {
+        is_enabled(CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION)
+    }
+
+    /// Whether to distribute transaction fee to validators.
+    const DISTRIBUTE_TRANSACTION_FEE: u64 = 97;
+
+    public fun get_distribute_transaction_fee_feature(): u64 { DISTRIBUTE_TRANSACTION_FEE }
+
+    public fun is_distribute_transaction_fee_enabled(): bool acquires Features {
+        is_enabled(DISTRIBUTE_TRANSACTION_FEE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

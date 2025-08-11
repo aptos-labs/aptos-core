@@ -129,7 +129,6 @@ pub(crate) fn check_gas(
         .calculate_intrinsic_gas(raw_bytes_len)
         .evaluate(gas_feature_version, &gas_params.vm);
     let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
-
     if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,
@@ -184,27 +183,32 @@ pub(crate) fn check_gas(
     // If this is for a potentially new account, ensure there's enough gas to cover storage, execution, and IO costs.
     // TODO: This isn't the cleaning code, thus we localize it just here and will remove it
     // once accountv2 is available and we no longer need to create accounts.
+    let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
     if crate::aptos_vm::should_create_account_resource(
         txn_metadata,
         features,
         resolver,
         module_storage,
-    )? {
-        let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
+    )? && (gas_unit_price != 0 || !features.is_default_account_resource_enabled())
+    {
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
         let pricing = DiskSpacePricing::new(gas_feature_version, features);
         let storage_fee_per_account_create: u64 = pricing
             .hack_estimated_fee_for_account_creation(txn_gas_params)
             .into();
 
-        let expected = gas_unit_price * 10 + 2 * storage_fee_per_account_create;
+        let expected = gas_unit_price * 10
+            + if features.is_new_account_default_to_fa_store() {
+                1
+            } else {
+                2
+            } * storage_fee_per_account_create;
         let actual = gas_unit_price * max_gas_amount;
-
         if actual < expected {
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Insufficient gas for sponsored transaction; min {}, submitted {}",
+                    "[VM] Insufficient gas for account creation; min {}, submitted {}",
                     expected, actual,
                 ),
             );

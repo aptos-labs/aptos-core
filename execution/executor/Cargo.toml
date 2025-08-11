@@ -46,6 +46,7 @@ aptos-db-indexer = { workspace = true, features = ["fuzzing"] }
 aptos-executor-test-helpers = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
 arr_macro = { workspace = true }

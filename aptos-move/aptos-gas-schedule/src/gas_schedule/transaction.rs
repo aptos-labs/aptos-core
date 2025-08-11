@@ -7,7 +7,7 @@
 use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
-        RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
+        RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
     },
 };
 use aptos_gas_algebra::{
@@ -238,23 +238,23 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             dependency_per_module: InternalGas,
-            { 15.. => "dependency_per_module" },
+            { RELEASE_V1_10.. => "dependency_per_module" },
             74460,
         ],
         [
             dependency_per_byte: InternalGasPerByte,
-            { 15.. => "dependency_per_byte" },
+            { RELEASE_V1_10.. => "dependency_per_byte" },
             42,
         ],
         [
             max_num_dependencies: NumModules,
-            { 15.. => "max_num_dependencies" },
-            512,
+            { RELEASE_V1_10.. => "max_num_dependencies" },
+            768,
         ],
         [
             max_total_dependency_size: NumBytes,
-            { 15.. => "max_total_dependency_size" },
-            1024 * 1024 * 12 / 10, // 1.2 MB
+            { RELEASE_V1_10.. => "max_total_dependency_size" },
+            1024 * 1024 * 18 / 10, // 1.8 MB
         ],
         [
             keyless_base_cost: InternalGas,

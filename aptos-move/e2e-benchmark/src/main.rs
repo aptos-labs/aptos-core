@@ -9,8 +9,10 @@ use aptos_transaction_generator_lib::{
     entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
     publishing::publish_util::{Package, PackageHandler},
 };
-use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType, OrderBookState};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
+};
 use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -336,6 +338,14 @@ fn main() {
             repeats: 100,
             map_type: MapType::OrderedMap,
         }),
+        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::OrderBook {
+            state: OrderBookState::new(),
+            num_markets: 1,
+            overlap_ratio: 0.0, // Since we run a single txn, no matches will happen irrespectively
+            buy_frequency: 0.5,
+            max_sell_size: 1,
+            max_buy_size: 1,
+        }),
     ];
 
     let mut failures = Vec::new();
@@ -361,12 +371,9 @@ fn main() {
             PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
-        execute_txn(
-            &mut executor,
-            &publisher,
-            0,
-            package.publish_transaction_payload(),
-        );
+        for payload in package.publish_transaction_payload(&ChainId::test()) {
+            execute_txn(&mut executor, &publisher, 0, payload);
+        }
         if let Some(init_entry_point) = entry_point.initialize_entry_point() {
             execute_txn(
                 &mut executor,

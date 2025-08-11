@@ -175,18 +175,19 @@ mod testing {
     }
 
     fn get_annotated_struct_layout(
-        context: &NativeContext,
+        context: &mut NativeContext,
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        match annotated_type_layout {
-            MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
-            _ => Err(
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) = annotated_type_layout {
+            Ok(annotated_struct_layout)
+        } else {
+            Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
                     "Could not convert Type to fully-annotated MoveTypeLayout via NativeContext"
                         .to_string(),
                 ),
-            ),
+            )
         }
     }
 
@@ -248,7 +249,7 @@ mod testing {
 
     /// Prints any `Value` in a user-friendly manner.
     pub(crate) fn print_value(
-        context: &NativeContext,
+        context: &mut NativeContext,
         out: &mut String,
         val: Value,
         ty: Type,
@@ -258,14 +259,18 @@ mod testing {
         single_line: bool,
         include_int_types: bool,
     ) -> PartialVMResult<()> {
-        // get type layout in VM format
-        let ty_layout = context.type_to_type_layout(&ty)?;
+        // Get type layout in VM format. We do not expect to see any delayed fields here because
+        // this debug implementation is
+        //  1. Not used in production, instead debug implementation from 0x1::string_utils is used.
+        //  2. Not called in block-execution context where delayed fields are relevant.
+        let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
 
         match &ty_layout {
             MoveTypeLayout::Vector(_) => {
-                // get the inner type T of a vector<T>
+                // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
+                // in the debug context.
                 let inner_ty = get_vector_inner_type(&ty)?;
-                let inner_tyl = context.type_to_type_layout(inner_ty)?;
+                let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
                 match inner_tyl {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
@@ -446,7 +451,7 @@ mod testing {
                         .map_err(fmt_error_to_partial_vm_error)?;
                 } else {
                     let is_complex_inner_type =
-                        vec.last().map_or(false, is_vector_or_struct_move_value);
+                        vec.last().is_some_and(is_vector_or_struct_move_value);
                     print_non_u8_vector(
                         out,
                         move_std_addr,
@@ -460,8 +465,11 @@ mod testing {
                     )?;
                 }
             },
-            MoveValue::Closure(clos) => {
-                write!(out, "{}", clos).map_err(fmt_error_to_partial_vm_error)?;
+            MoveValue::Closure(_) => {
+                // Using non-Aptos Move stdlib with function values is not supported. In general,
+                // this debug implementation should be removed and replaced by the new one from
+                // Aptos Move.
+                return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED));
             },
             MoveValue::Struct(move_struct) => match move_struct {
                 MoveStruct::WithTypes {
@@ -512,7 +520,8 @@ mod testing {
                         let str = move_value_as_escaped_string(val)?;
                         write!(out, "\"{}\"", str).map_err(fmt_error_to_partial_vm_error)?
                     } else {
-                        write!(out, "{} ", type_tag).map_err(fmt_error_to_partial_vm_error)?;
+                        write!(out, "{} ", type_tag.to_canonical_string())
+                            .map_err(fmt_error_to_partial_vm_error)?;
                         write!(out, "{}", STRUCT_BEGIN).map_err(fmt_error_to_partial_vm_error)?;
 
                         // For each field, print its name and value (and type)
@@ -586,7 +595,7 @@ mod testing {
         single_line: bool,
         include_int_types: bool,
         vec: Vec<ValType>,
-        print_inner_value: impl Fn(
+        mut print_inner_value: impl FnMut(
             &mut String,
             ValType,
             &AccountAddress,

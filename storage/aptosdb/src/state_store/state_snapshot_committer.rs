@@ -124,14 +124,14 @@ impl StateSnapshotCommitter {
 
                                         updates
                                             .iter()
-                                            .filter_map(|(k, db_update)| {
-                                                db_update.to_jmt_update_opt(k, min_version)
+                                            .filter_map(|(key, slot)| {
+                                                slot.maybe_update_jmt(key, min_version)
                                             })
                                             .collect_vec()
                                     };
 
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
-                                        shard_id as u8,
+                                        shard_id,
                                         jmt_update_refs(&updates),
                                         Some(&node_hashes),
                                         version,

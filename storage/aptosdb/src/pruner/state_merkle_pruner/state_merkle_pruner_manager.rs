@@ -80,13 +80,13 @@ where
             .set(min_readable_version as i64);
 
         self.state_merkle_db
-            .write_pruner_progress(min_readable_version)
+            .write_pruner_progress(&S::progress_metadata_key(None), min_readable_version)
     }
 
     fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()
-            .map_or(false, |w| w.is_pruning_pending())
+            .is_some_and(|w| w.is_pruning_pending())
     }
 
     #[cfg(test)]

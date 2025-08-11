@@ -8,11 +8,12 @@ use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
         boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
-        boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
-        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_type, boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob,
-        boogie_well_formed_expr, boogie_well_formed_expr_bv,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_num_type_base_bv,
+        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
+        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
+        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
+        boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
@@ -21,8 +22,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
-        TempIndex, Value,
+        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
+        SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -144,7 +145,7 @@ impl<'env> SpecTranslator<'env> {
 // Axioms
 // ======
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_axioms(&self, env: &GlobalEnv, mono_info: &MonoInfo) {
         let type_display_ctx = env.get_type_display_ctx();
         for (axiom, type_insts) in &mono_info.axioms {
@@ -174,7 +175,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Variables
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_vars(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -226,7 +227,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Functions
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -255,6 +256,99 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
+    /// Generates axioms for uninterpreted spec function.
+    fn generate_spec_function_axioms(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        boogie_name: String,
+        param_list: String,
+    ) {
+        let collect_conditions = |kind: ConditionKind| {
+            fun.spec
+                .borrow()
+                .conditions
+                .clone()
+                .into_iter()
+                .filter(|cond| cond.kind == kind)
+                .collect_vec()
+        };
+        let emit_condition = |conditions: &[Condition], negate: bool| {
+            for (i, cond) in conditions.iter().enumerate() {
+                if i > 0 {
+                    emitln!(self.writer, " && ");
+                }
+                for (j, exp) in cond.all_exps().enumerate() {
+                    emit!(self.writer, "{}(", if negate { "!" } else { "" });
+                    self.translate_exp(exp);
+                    emit!(self.writer, ")");
+                    if j > 0 {
+                        emitln!(self.writer, " && ");
+                    }
+                }
+            }
+        };
+        let aborts_if = collect_conditions(ConditionKind::AbortsIf);
+        let requires = collect_conditions(ConditionKind::Requires);
+        let ensures = collect_conditions(ConditionKind::Ensures);
+        let emit_requires = || {
+            if !requires.is_empty() {
+                emit!(self.writer, "(");
+                emit_condition(&requires, false);
+                emit!(self.writer, ") ");
+            }
+            if !aborts_if.is_empty() {
+                if !requires.is_empty() {
+                    emitln!(self.writer, " && ");
+                }
+                emit!(self.writer, "(");
+                emit_condition(&aborts_if, true);
+                emit!(self.writer, ")");
+            }
+        };
+        let emit_predicate = |exp| {
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, "(");
+                emit_requires();
+                emit!(self.writer, "==> ");
+            }
+            emit!(self.writer, "(");
+            self.translate_exp(exp);
+            emit!(self.writer, ")");
+            if !requires.is_empty() || !aborts_if.is_empty() {
+                emit!(self.writer, ")");
+            }
+        };
+        for cond in ensures.iter() {
+            let call = format!(
+                "{}({})",
+                boogie_name,
+                fun.params
+                    .iter()
+                    .map(|Parameter(n, ..)| { format!("{}", n.display(module_env.symbol_pool())) })
+                    .join(", ")
+            );
+            //TODO(#16256): currently spec function does not support tuple as return type
+            for exp in cond.all_exps() {
+                if !param_list.is_empty() {
+                    emitln!(
+                        self.writer,
+                        "axiom (forall {} ::\n(var $ret0 := {};",
+                        param_list,
+                        call,
+                    );
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n));");
+                } else {
+                    emitln!(self.writer, "axiom (var $ret0 := {};", call,);
+                    emit_predicate(exp);
+                    emitln!(self.writer, "\n);");
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
             // This function is native and expected to be found in the prelude.
@@ -322,7 +416,7 @@ impl<'env> SpecTranslator<'env> {
                         .type_inst
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| Type::TypeParameter(i as u16));
+                        .unwrap_or(Type::TypeParameter(i as u16));
                     // There can be name clashes after instantiation. Parameters still need
                     // to be there but all are instantiated with the same type. We escape
                     // the redundant parameters.
@@ -436,6 +530,9 @@ impl<'env> SpecTranslator<'env> {
                     );
                 }
             }
+            // Generate axioms from the spec block attached to the spec function
+            // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
+            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
@@ -452,12 +549,13 @@ impl<'env> SpecTranslator<'env> {
 // Emit any finalization items
 // ============================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
     }
 
     /// Translate lifted functions for choice expressions.
+    #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_choice_functions(&self) {
         let env = self.env;
         let infos_ref = self.lifted_choice_infos.borrow();
@@ -478,6 +576,13 @@ impl<'env> SpecTranslator<'env> {
                 ..self.clone()
             };
 
+            let skip_immutable_reference = |ty: &Type| {
+                if !ty.is_mutable_reference() {
+                    ty.skip_reference().clone()
+                } else {
+                    ty.clone()
+                }
+            };
             // Pairs of context parameter names and boogie types
             let param_decls = info
                 .free_vars
@@ -485,14 +590,15 @@ impl<'env> SpecTranslator<'env> {
                 .map(|(s, ty)| {
                     (
                         s.display(env.symbol_pool()).to_string(),
-                        boogie_type(env, ty.skip_reference()),
+                        boogie_type(env, &skip_immutable_reference(ty)),
                     )
                 })
-                .chain(
-                    info.used_temps
-                        .iter()
-                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty.skip_reference()))),
-                )
+                .chain(info.used_temps.iter().map(|(t, ty)| {
+                    (
+                        format!("$t{}", t),
+                        boogie_type(env, &skip_immutable_reference(ty)),
+                    )
+                }))
                 .chain(info.used_memory.iter().map(|(m, l)| {
                     let struct_env = &env.get_struct(m.to_qualified_id());
                     (
@@ -509,6 +615,11 @@ impl<'env> SpecTranslator<'env> {
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
                 let suffix = boogie_type_suffix(env, ty.skip_reference());
+                let n = if ty.is_mutable_reference() {
+                    format!("$Dereference({})", n)
+                } else {
+                    n.to_owned()
+                };
                 emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);
@@ -655,7 +766,7 @@ impl<'env> SpecTranslator<'env> {
 // Expressions
 // ===========
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn translate(&self, exp: &Exp, type_inst: &[Type]) {
         *self.fresh_var_count.borrow_mut() = 0;
         if type_inst.is_empty() {
@@ -884,7 +995,7 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_select_variant(node_id, *module_id, *struct_id, field_ids, args);
             },
             Operation::TestVariants(module_id, struct_id, variants) => {
-                self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
+                self.translate_test_variants(*module_id, *struct_id, variants, args);
             },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
@@ -929,7 +1040,11 @@ impl<'env> SpecTranslator<'env> {
                 let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
                 if exp_arith_flag {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
-                    let literal = boogie_num_type_base(&arg_node_type);
+                    let literal = boogie_num_type_base(
+                        self.env,
+                        Some(self.env.get_node_loc(args[0].node_id())),
+                        &arg_node_type,
+                    );
                     emit!(self.writer, "$int2bv.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
@@ -941,7 +1056,11 @@ impl<'env> SpecTranslator<'env> {
                 let exp_bv_flag = global_state.get_node_num_oper(args[0].node_id()) == Bitwise;
                 if exp_bv_flag {
                     let arg_node_type = self.env.get_node_type(args[0].node_id());
-                    let literal = boogie_num_type_base(&arg_node_type);
+                    let literal = boogie_num_type_base(
+                        self.env,
+                        Some(self.env.get_node_loc(args[0].node_id())),
+                        &arg_node_type,
+                    );
                     emit!(self.writer, "$bv2int.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
@@ -1145,8 +1264,9 @@ impl<'env> SpecTranslator<'env> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let is_vector_table_module = module_env.is_std_vector() || module_env.is_table();
-        let bv_flag = if is_vector_table_module && !args.is_empty() {
+        let is_vector_table_cmp_module =
+            module_env.is_std_vector() || module_env.is_table() || module_env.is_cmp();
+        let bv_flag = if is_vector_table_cmp_module && !args.is_empty() {
             global_state.get_node_num_oper(args[0].node_id()) == Bitwise
         } else {
             global_state.get_node_num_oper(node_id) == Bitwise
@@ -1290,6 +1410,7 @@ impl<'env> SpecTranslator<'env> {
         }
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let inst = &self.inst_slice(inst);
         let l = self.fresh_var_name("l");
         emit!(self.writer, "(var {} := ", l);
         self.translate_exp(&args[0]);
@@ -1328,23 +1449,15 @@ impl<'env> SpecTranslator<'env> {
 
     fn translate_test_variants(
         &self,
-        node_id: NodeId,
         module_id: ModuleId,
         struct_id: StructId,
         variants: &[Symbol],
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
-            self.env.error(
-                &self.env.get_node_loc(node_id),
-                "cannot test variants of intrinsic struct",
-            );
-        }
         let struct_type = &self.get_node_type(args[0].node_id());
-        let (_, _, _) = struct_type.skip_reference().require_struct();
-        let inst = self.env.get_node_instantiation(node_id);
-        let inst = &self.inst_slice(&inst);
+        let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let inst = &self.inst_slice(inst);
         let test_var_result = self.fresh_var_name("test_variant_var");
         emit!(self.writer, "(var {} := ", test_var_result);
         self.translate_exp(&args[0]);
@@ -1845,16 +1958,11 @@ impl<'env> SpecTranslator<'env> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
+            let oper_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
             emit!(self.writer, "${}'{}'(", bv_op, oper_base);
             self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
             emit!(self.writer, ")");
@@ -1874,16 +1982,11 @@ impl<'env> SpecTranslator<'env> {
             .expect("global number operation state");
         let binding = self.env.get_node_type(args[0].node_id());
         let common_type = binding.skip_reference();
-        let oper_base = match common_type {
-            Type::Primitive(PrimitiveType::U8) => "Bv8",
-            Type::Primitive(PrimitiveType::U16) => "Bv16",
-            Type::Primitive(PrimitiveType::U32) => "Bv32",
-            Type::Primitive(PrimitiveType::U64) => "Bv64",
-            Type::Primitive(PrimitiveType::U128) => "Bv128",
-            Type::Primitive(PrimitiveType::U256) => "Bv256",
-            Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-            _ => unreachable!(),
-        };
+        let oper_base = boogie_num_type_base_bv(
+            self.env,
+            Some(self.env.get_node_loc(args[0].node_id())),
+            common_type,
+        );
         emit!(self.writer, "{}'{}'(", boogie_op, oper_base);
         self.translate_seq(args.iter(), ", ", |e| {
             let num_oper_e = global_state.get_node_num_oper(e.node_id());
@@ -1893,7 +1996,11 @@ impl<'env> SpecTranslator<'env> {
                     emit!(
                         self.writer,
                         "$int2bv.{}(",
-                        boogie_num_type_base(common_type)
+                        boogie_num_type_base(
+                            self.env,
+                            Some(self.env.get_node_loc(e.node_id())),
+                            common_type
+                        )
                     );
                 } else {
                     self.env.error(
@@ -1936,12 +2043,31 @@ impl<'env> SpecTranslator<'env> {
             .env
             .get_cloned_extension::<GlobalNumberOperationState>();
         let arg = args[0].clone();
-        self.env
-            .update_node_type(arg.node_id(), self.env.get_node_type(node_id));
         let cast_oper = global_state.get_node_num_oper(node_id);
         global_state.update_node_oper(args[0].node_id(), cast_oper, true);
         self.env.set_extension(global_state);
-        self.translate_exp(&arg);
+        let target_type = self.env.get_node_type(node_id).skip_reference().clone();
+        let source_type = self
+            .env
+            .get_node_type(arg.node_id())
+            .skip_reference()
+            .clone();
+        let check_cast =
+            |ty: &Type| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num));
+        if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {
+            let target_base =
+                boogie_num_type_base(self.env, Some(self.env.get_node_loc(node_id)), &target_type);
+            let source_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(arg.node_id())),
+                &source_type,
+            );
+            emit!(self.writer, "$castBv{}to{}(", source_base, target_base);
+            self.translate_exp(&arg);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(&arg);
+        }
     }
 
     fn translate_primitive_call(&self, fun: &str, args: &[Exp]) {
@@ -1957,17 +2083,16 @@ impl<'env> SpecTranslator<'env> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_left_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
-            let oper_right_base = boogie_num_type_base(&self.env.get_node_type(args[1].node_id()));
+            let oper_left_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
+            let oper_right_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[1].node_id())),
+                &self.env.get_node_type(args[1].node_id()),
+            );
             emit!(
                 self.writer,
                 "{}{}From{}(",
@@ -1989,17 +2114,16 @@ impl<'env> SpecTranslator<'env> {
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
         if num_oper == Bitwise {
-            let oper_left_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
-                Type::Primitive(PrimitiveType::U8) => "Bv8",
-                Type::Primitive(PrimitiveType::U16) => "Bv16",
-                Type::Primitive(PrimitiveType::U32) => "Bv32",
-                Type::Primitive(PrimitiveType::U64) => "Bv64",
-                Type::Primitive(PrimitiveType::U128) => "Bv128",
-                Type::Primitive(PrimitiveType::U256) => "Bv256",
-                Type::Primitive(PrimitiveType::Num) => "<<num is not unsupported here>>",
-                _ => unreachable!(),
-            };
-            let oper_right_base = boogie_num_type_base(&self.env.get_node_type(args[1].node_id()));
+            let oper_left_base = boogie_num_type_base_bv(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+            );
+            let oper_right_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[1].node_id())),
+                &self.env.get_node_type(args[1].node_id()),
+            );
             emit!(
                 self.writer,
                 "{}{}From{}(",

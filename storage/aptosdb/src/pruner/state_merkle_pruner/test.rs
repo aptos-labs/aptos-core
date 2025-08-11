@@ -17,12 +17,13 @@ use crate::{
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
+use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -234,7 +235,7 @@ fn test_state_store_pruner_partial_version() {
     );
 
     if aptos_db.state_merkle_db().sharding_enabled() {
-        for i in 0..NUM_STATE_SHARDS as u8 {
+        for i in 0..NUM_STATE_SHARDS {
             assert_eq!(
                 aptos_db
                     .state_merkle_db()

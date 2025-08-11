@@ -1,0 +1,58 @@
+processed 6 tasks
+task 0 lines 6-17:  publish --print-bytecode [module 0x66::h_1]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::h_1
+// Function definition at index 0
+public fun f()
+    ld_u64 1
+    ld_u64 1
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+== END Bytecode ==
+task 1 lines 19-19:  run --verbose 0x66::h_1::f
+task 2 lines 23-34:  publish --print-bytecode [module 0x66::h_5]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::h_5
+// Function definition at index 0
+public fun f()
+    ld_u64 5
+    ld_u64 5
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+== END Bytecode ==
+task 3 lines 36-36:  run --verbose 0x66::h_5::f
+task 4 lines 40-51:  publish --print-bytecode [module 0x66::h_10]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::h_10
+// Function definition at index 0
+public fun f()
+    ld_u64 10
+    ld_u64 10
+    eq
+    br_true l0
+    ld_u64 255
+    // @5
+    abort
+l0: ret
+
+
+== END Bytecode ==
+task 5 lines 53-53:  run --verbose 0x66::h_10::f

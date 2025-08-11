@@ -54,7 +54,10 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
-pub use publishing::{entry_point_trait, prebuild_packages::create_prebuilt_packages_rs_file};
+pub use publishing::{
+    entry_point_trait,
+    prebuild_packages::{create_prebuilt_packages_bundle, PrebuiltPackageConfig},
+};
 
 pub const SEND_AMOUNT: u64 = 1;
 
@@ -124,7 +127,7 @@ impl Default for TransactionType {
             invalid_transaction_ratio: 0,
             sender_use_account_pool: false,
             non_conflicting: false,
-            use_fa_transfer: false,
+            use_fa_transfer: true,
         }
     }
 }

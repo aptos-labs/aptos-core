@@ -2,18 +2,64 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::publish_util::Package;
+use crate::publishing::prebuild_packages::PrebuiltPackagesBundle;
+use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     move_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format::CompiledScript,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
+    CompiledModule,
+};
 use rand::rngs::StdRng;
 
 pub trait PreBuiltPackages: std::fmt::Debug + Sync + Send {
-    fn package_metadata(&self, package_name: &str) -> &[u8];
-    fn package_modules(&self, package_name: &str) -> &[Vec<u8>];
-    fn package_script(&self, package_name: &str) -> Option<&Vec<u8>>;
+    fn package_bundle(&self) -> &PrebuiltPackagesBundle;
+
+    fn package_metadata(&self, package_name: &str) -> PackageMetadata {
+        self.package_bundle()
+            .get_package(package_name)
+            .metadata
+            .clone()
+    }
+
+    fn package_modules(&self, package_name: &str) -> Vec<(String, CompiledModule, u32)> {
+        let mut results = vec![];
+        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+
+        let modules = &self.package_bundle().get_package(package_name).modules;
+        for (module_name, bytes) in modules {
+            let (module, binary_format_version) = if let Ok(module) =
+                CompiledModule::deserialize_with_config(bytes, &default_config)
+            {
+                (module, VERSION_DEFAULT)
+            } else {
+                let module =
+                    CompiledModule::deserialize(bytes).expect("Module must always deserialize");
+                (module, VERSION_MAX)
+            };
+            results.push((module_name.to_owned(), module, binary_format_version));
+        }
+
+        results
+    }
+
+    fn package_script(&self, package_name: &str) -> Option<CompiledScript> {
+        let scripts = &self.package_bundle().get_package(package_name).scripts;
+        assert!(
+            scripts.len() <= 1,
+            "Only single script per package is supported"
+        );
+
+        scripts
+            .last()
+            .map(|bytes| CompiledScript::deserialize(bytes).expect("Script must deserialize"))
+    }
 }
 
 pub enum MultiSigConfig {
