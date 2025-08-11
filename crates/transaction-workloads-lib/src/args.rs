@@ -121,14 +121,14 @@ impl TransactionTypeArg {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
                 non_conflicting: false,
-                use_fa_transfer: false,
+                use_fa_transfer: true,
                 encrypted: false,
             },
             TransactionTypeArg::EncryptedCoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
                 non_conflicting: false,
-                use_fa_transfer: false,
+                use_fa_transfer: true,
                 encrypted: true,
             },
             TransactionTypeArg::AptFaTransfer => TransactionType::CoinTransfer {
