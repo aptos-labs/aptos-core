@@ -30,6 +30,7 @@ use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecut
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -37,12 +38,15 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
-        Transaction,
+        Transaction, TransactionExecutableRef,
     },
     validator_signer::ValidatorSigner,
+    vm::module_metadata::get_randomness_annotation_for_entry_function,
 };
+use aptos_vm_validator::vm_validator::ValidationState;
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use move_vm_runtime::ModuleStorage;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
@@ -51,6 +55,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+
 static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -123,6 +128,7 @@ pub struct PipelineBuilder {
     txn_notifier: Arc<dyn TxnNotifier>,
     pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     order_vote_enabled: bool,
+    module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
 }
 
 fn spawn_shared_fut<
@@ -242,6 +248,7 @@ impl PipelineBuilder {
         enable_pre_commit: bool,
         order_vote_enabled: bool,
     ) -> Self {
+        let module_cache = Arc::new(Mutex::new(None));
         Self {
             block_preparer,
             executor,
@@ -254,6 +261,7 @@ impl PipelineBuilder {
             txn_notifier,
             pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
             order_vote_enabled,
+            module_cache,
         }
     }
 
@@ -393,6 +401,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
+                self.module_cache.clone(),
             ),
             None,
         );
@@ -551,15 +560,61 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
+        module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
-        let maybe_rand = randomness_rx
-            .await
-            .map_err(|_| anyhow!("randomness tx cancelled"))?;
+
+        let latest_state_view = executor
+            .state_view(block.parent_id())
+            .map_err(anyhow::Error::from)?;
+
+        let mut has_randomness = false;
+        let start = Instant::now();
+        {
+            let mut cache_guard = module_cache.lock();
+            if let Some(cache_mut) = cache_guard.as_mut() {
+                cache_mut.reset_state_view(latest_state_view)
+            } else {
+                *cache_guard = Some(ValidationState::new(latest_state_view));
+            }
+            let cache_ref = cache_guard.as_mut().unwrap();
+
+            for txn in user_txns.iter() {
+                if let Some(txn) = txn.borrow_into_inner().try_as_signed_user_txn() {
+                    if let Ok(TransactionExecutableRef::EntryFunction(entry_fn)) =
+                        txn.executable_ref()
+                    {
+                        if let Ok(Some(metadata)) = cache_ref.unmetered_get_module_metadata(
+                            entry_fn.module().address(),
+                            entry_fn.module().name(),
+                        ) {
+                            if get_randomness_annotation_for_entry_function(entry_fn, &metadata)
+                                .is_some()
+                            {
+                                has_randomness = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let elapsed = start.elapsed();
+        counters::PIPELINE_TRACING
+            .with_label_values(&["rand_check", "work_time"])
+            .observe(elapsed.as_secs_f64());
+
+        let maybe_rand = if has_randomness {
+            randomness_rx
+                .await
+                .map_err(|_| anyhow!("randomness tx cancelled"))?
+        } else {
+            None
+        };
 
         tracker.start_working();
         let metadata_txn = if is_randomness_enabled {
@@ -603,6 +658,8 @@ impl PipelineBuilder {
             .collect();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
+            // use the guard to ensure execution doesn't run concurrently too
+            let _guard = module_cache.lock();
             executor
                 .execute_and_update_state(
                     (block.id(), txns, auxiliary_info).into(),

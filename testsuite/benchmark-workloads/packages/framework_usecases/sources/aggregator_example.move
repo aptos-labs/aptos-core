@@ -1,5 +1,3 @@
-
-
 module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;
@@ -53,7 +51,8 @@ module 0xABCD::aggregator_example {
         );
     }
 
-    public entry fun increment() acquires Counter {
+    #[randomness]
+    entry fun increment() acquires Counter {
         assert!(exists<Counter>(@publisher_address), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
         let counter = borrow_global_mut<Counter>(@publisher_address);
         *(&mut counter.count) = counter.count + 1;

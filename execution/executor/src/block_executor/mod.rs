@@ -119,7 +119,9 @@ where
         self.inner
             .read()
             .as_ref()
-            .expect("BlockExecutor is not reset")
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "BlockExecutor is not reset".into(),
+            })?
             .ledger_update(block_id, parent_block_id)
     }
 
@@ -147,6 +149,11 @@ where
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "finish"]);
 
         *self.inner.write() = None;
+    }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.maybe_initialize()?;
+        self.inner.read().as_ref().unwrap().state_view(block_id)
     }
 }
 
@@ -378,5 +385,18 @@ where
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
 
         Ok(())
+    }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        let mut block_vec = self.block_tree.get_blocks_opt(&[block_id])?;
+        let block = block_vec
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+        Ok(CachedStateView::new(
+            StateViewId::BlockExecution { block_id },
+            Arc::clone(&self.db.reader),
+            block.output.result_state().latest().clone(),
+        )?)
     }
 }
