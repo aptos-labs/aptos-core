@@ -90,12 +90,6 @@ pub enum SessionId {
     ScheduledTxnAbort {
         hash: HashValue,
     },
-    SystemTxn {
-        // A generic session id for a system txn
-        // This is current used in execute_system_function_no_gas_meter() call while getting
-        // ready_txns at the beggining of the block
-        hash: HashValue,
-    },
 }
 
 impl SessionId {
@@ -209,10 +203,6 @@ impl SessionId {
         Self::ScheduledTxnAbort { hash }
     }
 
-    pub fn system_txn(hash: HashValue) -> Self {
-        Self::SystemTxn { hash }
-    }
-
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
@@ -232,7 +222,6 @@ impl SessionId {
             | Self::ScheduledTxnPrologue { hash: _ }
             | Self::ScheduledTxnEpilogue { hash: _ }
             | Self::ScheduledTxnAbort { hash: _ }
-            | Self::SystemTxn { hash: _ }
             | Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void

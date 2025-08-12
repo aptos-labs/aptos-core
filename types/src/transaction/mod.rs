@@ -2835,9 +2835,6 @@ pub enum Transaction {
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
 
-    /// Transaction that was originally scheduled by user; it will be executed by the system
-    ScheduledTransaction(ScheduledTransactionInfoWithKey),
-
     /// Transaction to update the block metadata resource at the beginning of a block,
     /// when on-chain randomness is enabled.
     BlockMetadataExt(BlockMetadataExt),
@@ -2847,6 +2844,9 @@ pub enum Transaction {
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     /// Replaces StateCheckpoint, with optionally having more data.
     BlockEpilogue(BlockEpiloguePayload),
+
+    /// Transaction that was originally scheduled by user; it will be executed by the system
+    ScheduledTransaction(ScheduledTransactionInfoWithKey),
 }
 
 impl From<BlockMetadataExt> for Transaction {
