@@ -101,6 +101,10 @@ pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
 pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
 pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
 
+// Broadcast event labels
+pub const DROP_BROADCAST_LABEL: &str = "drop_broadcast";
+pub const RUNNING_LABEL: &str = "running";
+
 // Histogram buckets with a large range of 0-500s and some constant sized buckets between:
 // 0-1.5s (every 25ms), 1.5-2s (every 100ms), 2-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
 const MEMPOOL_LATENCY_BUCKETS: &[f64] = &[
@@ -555,6 +559,22 @@ pub fn shared_mempool_broadcast_size(network_id: NetworkId, num_txns: usize) {
     SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE
         .with_label_values(&[network_id.as_str()])
         .observe(num_txns as f64);
+}
+
+/// Counter for the number and type of broadcast events that shared mempool executes
+static SHARED_MEMPOOL_BROADCAST_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_shared_mempool_broadcast_events",
+        "Broadcast events (at runtime) for shared mempool",
+        &["event", "network_id"]
+    )
+    .unwrap()
+});
+
+pub fn shared_mempool_broadcast_event_inc(event_label: &str, network_id: NetworkId) {
+    SHARED_MEMPOOL_BROADCAST_EVENTS
+        .with_label_values(&[event_label, network_id.as_str()])
+        .inc();
 }
 
 static SHARED_MEMPOOL_BROADCAST_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
