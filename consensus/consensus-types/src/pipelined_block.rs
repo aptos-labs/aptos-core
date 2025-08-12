@@ -69,6 +69,7 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
+pub type RandResult = Option<Randomness>;
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
@@ -81,6 +82,7 @@ pub type PostCommitResult = ();
 #[derive(Clone)]
 pub struct PipelineFutures {
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub rand_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
@@ -115,7 +117,7 @@ pub struct PipelineInputTx {
 
 pub struct PipelineInputRx {
     pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
-    pub rand_fut: TaskFuture<Option<Randomness>>,
+    pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
@@ -554,6 +556,16 @@ impl PipelinedBlock {
         if let Some(fut) = self.pipeline_futs() {
             // this may be cancelled
             let _ = fut.commit_ledger_fut.await;
+        }
+    }
+
+    pub async fn wait_for_commit_vote(&self) -> Option<CommitVote> {
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            fut.commit_vote_fut.await.ok()
+        } else {
+            None
         }
     }
 }
