@@ -25,7 +25,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.GIT_SHA || 'devnet' }} # hardcode to a known good build when not running on workflow_call
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
 

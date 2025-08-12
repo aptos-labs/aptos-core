@@ -17,7 +17,7 @@ jobs:
     runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Rust
         uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
