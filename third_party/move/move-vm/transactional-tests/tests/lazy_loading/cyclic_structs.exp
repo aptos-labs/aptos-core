@@ -1,0 +1,25 @@
+processed 6 tasks
+task 0 lines 1-11:  publish --verbose [module 0x66::list]
+task 1 lines 14-18:  publish --verbose [module 0x66::cons]
+task 2 lines 21-33:  publish --verbose [module 0x66::list]
+task 3 lines 36-52:  publish --verbose [module 0x66::app]
+task 4 lines 55-55:  run 0x66::app::create_list --signers 0x42 --verbose
+Error: Function execution failed with VMError: {
+    message: Definition of struct 0x0000000000000000000000000000000000000000000000000000000000000066::list::List is recursive: failed to construct its depth formula,
+    major_status: RUNTIME_CYCLIC_MODULE_DEPENDENCY,
+    sub_status: None,
+    location: 0x66::list,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("app") }), FunctionDefinitionIndex(1), 1)] }),
+}
+task 5 lines 57-57:  run 0x66::app::list_exists --args @0x42 --verbose
+Error: Function execution failed with VMError: {
+    message: Depth of a layout exceeded the maximum of 128 during construction,
+    major_status: VM_MAX_VALUE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x66::app,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

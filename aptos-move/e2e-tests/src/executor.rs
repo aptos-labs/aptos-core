@@ -1399,6 +1399,22 @@ impl FakeExecutor {
 
         account
     }
+
+    /// Enables and disables specified features, committing the result to the state.
+    pub fn enable_features(
+        &mut self,
+        signer: &AccountAddress,
+        enabled: Vec<FeatureFlag>,
+        disabled: Vec<FeatureFlag>,
+    ) {
+        let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
+        self.exec("features", "change_feature_flags_internal", vec![], vec![
+            MoveValue::Signer(*signer).simple_serialize().unwrap(),
+            bcs::to_bytes(&enabled).unwrap(),
+            bcs::to_bytes(&disabled).unwrap(),
+        ]);
+    }
 }
 
 /// Finishes the session, and asserts there has been no modules published (publishing is the
