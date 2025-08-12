@@ -49,6 +49,8 @@ aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-environment = { workspace = true }
+aptos-vm-types = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
@@ -68,6 +70,7 @@ maplit = { workspace = true }
 mini-moka = { workspace = true }
 mirai-annotations = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
