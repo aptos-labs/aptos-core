@@ -1,0 +1,19 @@
+//# publish
+module 0x66::a
+
+//# publish
+module 0x66::b
+
+
+//# publish
+module 0x66::b
+friend 0x66::a
+
+
+//# publish
+module 0x66::b
+// Friends cannot be removed, publish fails
+
+//# publish --skip-check-friend-linking
+module 0x66::b
+// Friends if treated as private can be removed, publish succeeds
