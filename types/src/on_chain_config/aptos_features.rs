@@ -431,7 +431,7 @@ impl Features {
     }
 
     pub fn is_lightweight_resource_existence_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE)
+        true //self.is_enabled(FeatureFlag::LIGHTWEIGHT_RESOURCE_EXISTENCE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
