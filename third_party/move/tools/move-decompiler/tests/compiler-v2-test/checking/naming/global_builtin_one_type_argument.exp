@@ -1,0 +1,43 @@
+module 0x8675309::M {
+    struct R has key {
+    }
+    fun t(account: &signer) {
+        exists(0x0);
+        move_to(R{}, account);
+        borrow_global(0x0);
+        borrow_global_mut(0x0);
+        let R{} = move_from(0x0);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtin_one_type_argument.move:5:16
+  │
+5 │         exists(0x0);
+  │                ^^^
+
+error: cannot use `R` with an operator which expects a value of type `&signer`
+  ┌─ global_builtin_one_type_argument.move:6:17
+  │
+6 │         move_to(R{}, account);
+  │                 ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtin_one_type_argument.move:7:23
+  │
+7 │         borrow_global(0x0);
+  │                       ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtin_one_type_argument.move:8:27
+  │
+8 │         borrow_global_mut(0x0);
+  │                           ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ global_builtin_one_type_argument.move:9:29
+  │
+9 │         let R{} = move_from(0x0);
+  │                             ^^^

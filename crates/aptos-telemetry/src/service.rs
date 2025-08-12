@@ -21,7 +21,6 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use rand_core::OsRng;
 use reqwest::Url;
-use serde::Deserialize;
 use std::{
     collections::BTreeMap,
     env,
@@ -33,8 +32,6 @@ use uuid::Uuid;
 
 // The chain ID key
 const CHAIN_ID_KEY: &str = "CHAIN_ID";
-// The IP address key
-const IP_ADDRESS_KEY: &str = "IP_ADDRESS";
 // The telemetry token key
 const TELEMETRY_TOKEN_KEY: &str = "TELEMETRY_TOKEN";
 // The default for unknown metric values
@@ -349,7 +346,7 @@ async fn send_build_information(
     telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_build_info_telemetry_event(build_info).await;
-    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+    prepare_and_send_telemetry_event(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the core node metrics via telemetry
@@ -376,7 +373,7 @@ async fn send_node_config(
         name: APTOS_NODE_CONFIG_EVENT_NAME.into(),
         params: node_config,
     };
-    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+    prepare_and_send_telemetry_event(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the core node metrics via telemetry
@@ -387,7 +384,7 @@ async fn send_node_core_metrics(
     telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_core_metric_telemetry_event(node_config).await;
-    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+    prepare_and_send_telemetry_event(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the node network metrics via telemetry
@@ -397,7 +394,7 @@ async fn send_node_network_metrics(
     telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_network_metric_telemetry_event().await;
-    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+    prepare_and_send_telemetry_event(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Collects and sends the system information via telemetry
@@ -407,13 +404,13 @@ async fn send_system_information(
     telemetry_sender: Option<TelemetrySender>,
 ) {
     let telemetry_event = create_system_info_telemetry_event().await;
-    send_telemetry_event_with_ip(peer_id, chain_id, telemetry_sender, telemetry_event).await;
+    prepare_and_send_telemetry_event(peer_id, chain_id, telemetry_sender, telemetry_event).await;
 }
 
 /// Fetches the IP address and sends the given telemetry event
 /// along with the IP address. Also sends a randomly generated
 /// token to help correlate metrics across events.
-pub(crate) async fn send_telemetry_event_with_ip(
+pub(crate) async fn prepare_and_send_telemetry_event(
     peer_id: String,
     chain_id: String,
     telemetry_sender: Option<TelemetrySender>,
@@ -421,26 +418,12 @@ pub(crate) async fn send_telemetry_event_with_ip(
 ) -> JoinHandle<()> {
     // Update the telemetry event with the ip address and random token
     let TelemetryEvent { name, mut params } = telemetry_event;
-    params.insert(IP_ADDRESS_KEY.to_string(), get_origin_ip().await);
     params.insert(TELEMETRY_TOKEN_KEY.to_string(), TELEMETRY_TOKEN.clone());
     params.insert(CHAIN_ID_KEY.into(), chain_id);
     let telemetry_event = TelemetryEvent { name, params };
 
     // Send the telemetry event
     send_telemetry_event(peer_id, telemetry_sender, telemetry_event).await
-}
-
-/// Gets the IP origin of the machine by pinging a url.
-/// If none is found, returns UNKNOWN.
-async fn get_origin_ip() -> String {
-    let resp = reqwest::get(HTTPBIN_URL).await;
-    match resp {
-        Ok(json) => match json.json::<OriginIP>().await {
-            Ok(origin_ip) => origin_ip.origin,
-            Err(_) => UNKNOWN_METRIC_VALUE.into(),
-        },
-        Err(_) => UNKNOWN_METRIC_VALUE.into(),
-    }
 }
 
 /// Sends the given event and params to the telemetry endpoint
@@ -545,10 +528,4 @@ fn spawn_event_sender_to_google_analytics(
             },
         }
     })
-}
-
-/// A json struct useful for fetching the machine origin/IP
-#[derive(Deserialize)]
-struct OriginIP {
-    origin: String,
 }

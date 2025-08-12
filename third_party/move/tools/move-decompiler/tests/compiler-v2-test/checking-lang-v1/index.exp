@@ -1,0 +1,72 @@
+module 0x42::test {
+    struct R has drop, key {
+        value: bool,
+    }
+    struct X<M> has copy, drop, store {
+        value: M,
+    }
+    struct Y<T> has drop, key {
+        field: T,
+    }
+    fun init(s: &signer) {
+        move_to(R{value: true}, s);
+    }
+    fun init_2(s: &signer) {
+        move_to<X<bool>>(Y<X<bool>>{field: X<bool>{value: true}}, s);
+    }
+    fun test_resource_1() {
+        if (!(*&borrow_global(0x1).value == true)) abort 0;
+    }
+    fun test_resource_2() {
+        &mut borrow_global_mut(0x1).value = false;
+        if (!(*&borrow_global(0x1).value == false)) abort 1;
+    }
+    fun test_resource_3() {
+        if (!(*&&borrow_global<X<bool>>(0x1).field.value == true)) abort 0;
+    }
+    fun test_resource_4() {
+        &mut &mut borrow_global_mut<X<bool>>(0x1).field.value = false;
+        if (!(*&&borrow_global<X<bool>>(0x1).field.value == false)) abort 1;
+    }
+    fun test_vector() {
+        let _t0 = X<u64>{value: 2};
+        let _t6 = 0x1::vector::empty<X<u64>>();
+        let _t7 = &mut _t6;
+        0x1::vector::push_back<X<u64>>(_t7, _t0);
+        0x1::vector::push_back<X<u64>>(_t7, _t0);
+        if (!(*&0x1::vector::borrow<X<u64>>(&_t6, 0).value == 2)) abort 0;
+    }
+    fun test_vector_borrow() {
+        let _t11 = 0x1::vector::empty<Y<X<bool>>>();
+        let _t12 = &mut _t11;
+        0x1::vector::push_back<Y<X<bool>>>(_t12, Y<X<bool>>{field: X<bool>{value: true}});
+        0x1::vector::push_back<Y<X<bool>>>(_t12, Y<X<bool>>{field: X<bool>{value: false}});
+        let _t3 = _t11;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 0).field.value == true)) abort 0;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 1).field.value == false)) abort 0;
+    }
+    fun test_vector_borrow_mut() {
+        let _t11 = 0x1::vector::empty<Y<X<bool>>>();
+        let _t12 = &mut _t11;
+        0x1::vector::push_back<Y<X<bool>>>(_t12, Y<X<bool>>{field: X<bool>{value: true}});
+        0x1::vector::push_back<Y<X<bool>>>(_t12, Y<X<bool>>{field: X<bool>{value: false}});
+        let _t3 = _t11;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 0).field.value == true)) abort 0;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 1).field.value == false)) abort 0;
+        &mut &mut 0x1::vector::borrow_mut<Y<X<bool>>>(&mut _t3, 0).field.value = false;
+        &mut &mut 0x1::vector::borrow_mut<Y<X<bool>>>(&mut _t3, 1).field.value = true;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 0).field.value == false)) abort 0;
+        if (!(*&&0x1::vector::borrow<Y<X<bool>>>(&_t3, 1).field.value == true)) abort 0;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+   ┌─ index.move:25:16
+   │
+25 │         if (!(*&&borrow_global<X<bool>>(0x1).field.value == true)) abort 0;
+   │                ^^
+   │                │
+   │                Unexpected '&&'
+   │                Expected an expression term

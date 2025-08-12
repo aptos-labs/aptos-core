@@ -1,0 +1,42 @@
+module 0x1::M {
+}
+
+module 0x2::M {
+    struct X {
+    }
+    public fun x(): X {
+        X{}
+    }
+}
+
+module 0x4::M {
+    use 0x2::M;
+    struct X {
+    }
+    public fun x(): X {
+        X{}
+    }
+    public fun both(): (X, X) {
+        (X{}, M::x())
+    }
+}
+
+module 0x2::M2 {
+    use 0x2::M;
+    use 0x4::M;
+    struct X {
+    }
+    public fun x(): (M::X, X, M::X) {
+        (M::x(), X{}, M::x())
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: duplicate declaration, item, or annotation
+   ┌─ address_directives.move:26:14
+   │
+25 │     use 0x2::M;
+   │              - Alias previously defined here
+26 │     use 0x4::M;
+   │              ^ Duplicate module alias 'M'. Module aliases must be unique within a given namespace
