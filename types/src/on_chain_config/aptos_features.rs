@@ -245,6 +245,7 @@ impl FeatureFlag {
             FeatureFlag::ORDERLESS_TRANSACTIONS,
             FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION,
             FeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::ENABLE_LAZY_LOADING,
         ]
     }
 }

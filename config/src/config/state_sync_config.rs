@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; /* 10 MiB */
+const SERVER_MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
+
+// The maximum message size per state sync message (for v2 data requests)
+const CLIENT_MAX_MESSAGE_SIZE_V2: usize = 15 * 1024 * 1024; // 15 MiB (used for v2 data requests)
+const SERVER_MAX_MESSAGE_SIZE_V2: usize = 40 * 1024 * 1024; // 40 MiB (used for v2 data requests)
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
@@ -159,6 +163,8 @@ pub struct StorageServiceConfig {
     pub max_network_channel_size: u64,
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
+    /// Maximum number of bytes to send per network message (for v2 data)
+    pub max_network_chunk_bytes_v2: u64,
     /// Maximum number of active subscriptions (per peer)
     pub max_num_active_subscriptions: u64,
     /// Maximum period (ms) of pending optimistic fetch requests
@@ -187,7 +193,8 @@ impl Default for StorageServiceConfig {
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
-            max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_network_chunk_bytes: SERVER_MAX_MESSAGE_SIZE as u64,
+            max_network_chunk_bytes_v2: SERVER_MAX_MESSAGE_SIZE_V2 as u64,
             max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
@@ -442,7 +449,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            enable_transaction_data_v2: false, // TODO: flip this once V2 data is enabled
+            enable_transaction_data_v2: true,
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             ignore_low_score_peers: true,
@@ -451,7 +458,7 @@ impl Default for AptosDataClientConfig {
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 20, // 20 seconds
-            max_response_bytes: MAX_MESSAGE_SIZE as u64,
+            max_response_bytes: CLIENT_MAX_MESSAGE_SIZE_V2 as u64,
             max_response_timeout_ms: 60_000, // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_lag_secs: 20, // 20 seconds

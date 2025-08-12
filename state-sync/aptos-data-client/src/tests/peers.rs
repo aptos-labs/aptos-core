@@ -279,6 +279,7 @@ async fn bad_peer_is_eventually_added_back() {
 
         // Create a data client config with peer ignoring enabled
         let data_client_config = AptosDataClientConfig {
+            enable_transaction_data_v2: false,
             ignore_low_score_peers: true,
             ..Default::default()
         };

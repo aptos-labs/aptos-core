@@ -1,0 +1,89 @@
+module 0x99::noexit_loops {
+    struct R {
+    }
+    fun bar(_x: u64) {
+        ()
+    }
+    fun baz(_: &u64) {
+        ()
+    }
+    fun f1() {
+        let _t0 = 0;
+        loop _t0 = _t0 + 1
+    }
+    fun f10() {
+        loop continue
+    }
+    fun f11() {
+        loop continue
+    }
+    fun f12() {
+        ()
+    }
+    fun f13(cond: bool) {
+        let _t2;
+        if (cond) _t2 = 0 else _t2 = 1;
+        1 + (_t2 + 2);
+        loop continue
+    }
+    fun f14(p: bool, q: bool) {
+        if (p) {
+            if (q) loop continue};
+    }
+    fun f15() {
+        let _t0 = 0;
+        _t0 + 1;
+    }
+    fun f16() {
+        loop continue
+    }
+    fun f2(): u64 {
+        let _t0 = 1 + 1;
+        loop _t0 = _t0 + 1
+    }
+    fun f3(): u64 {
+        let _t0 = 1;
+        loop _t0 = _t0 + foo(_t0)
+    }
+    fun foo(x: u64): u64 {
+        x + 1
+    }
+    fun f4(): R {
+        loop continue
+    }
+    fun f5(): u64 {
+        loop continue
+    }
+    fun f6() {
+        loop continue
+    }
+    fun f7(): R {
+        loop continue
+    }
+    fun f8() {
+        loop continue
+    }
+    fun f9() {
+        loop continue
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:52:9
+   │
+52 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `u64`
+   ┌─ noexit_loops.move:55:9
+   │
+55 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:61:9
+   │
+61 │         loop continue
+   │         ^^^^^^^^^^^^^

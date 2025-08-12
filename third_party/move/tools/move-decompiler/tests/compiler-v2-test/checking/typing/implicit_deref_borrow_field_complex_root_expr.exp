@@ -1,0 +1,28 @@
+module 0x8675309::M {
+    struct S has drop {
+        f: u64,
+    }
+    fun t0(cond: bool, s: &S, s_mut: &mut S) {
+        let _t6;
+        let _t5;
+        let _t4;
+        let _t3;
+        if (cond) _t3 = s else _t3 = s;
+        *&_t3.f;
+        if (cond) _t4 = /*freeze*/s_mut else _t4 = s;
+        *&_t4.f;
+        if (cond) _t5 = s else _t5 = /*freeze*/s_mut;
+        *&_t5.f;
+        if (cond) _t6 = s_mut else _t6 = s_mut;
+        *&_t6.f;
+        *&(&S{f: 0}).f;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot assign `&S` to left-hand side of type `&mut S` (mutability mismatch)
+   ┌─ implicit_deref_borrow_field_complex_root_expr.move:12:46
+   │
+12 │         if (cond) _t4 = /*freeze*/s_mut else _t4 = s;
+   │                                              ^^^

@@ -1,0 +1,34 @@
+module 0x2::X {
+    public fun a(): address {
+        0x0
+    }
+    public fun bar() {
+        ()
+    }
+    public fun u(): u64 {
+        0
+    }
+}
+
+module 0x2::M {
+    use 0x2::X;
+    fun bar() {
+        X::bar();
+    }
+    fun t() {
+        X::u();
+        X::u();
+        X::u();
+        X::a();
+        X::a();
+        X::a();
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot return `integer` from a function with result type `address`
+  ┌─ use_function.move:3:9
+  │
+3 │         0x0
+  │         ^^^

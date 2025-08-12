@@ -1414,6 +1414,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("GITHUB_ACTIONS", "false")
 @click.option("--balance-clusters", is_flag=True)
 @envoption("FORGE_BLOCKING", "true")
+@envoption("FORGE_CONTINUOUS_TEST_MODE", "false")
 @envoption("GITHUB_SERVER_URL")
 @envoption("GITHUB_REPOSITORY")
 @envoption("GITHUB_RUN_ID")
@@ -1460,6 +1461,7 @@ def test(
     github_actions: str,
     balance_clusters: bool,
     forge_blocking: Optional[str],
+    forge_continuous_test_mode: str,
     github_server_url: Optional[str],
     github_repository: Optional[str],
     github_run_id: Optional[str],
@@ -1755,7 +1757,14 @@ def test(
 
         log.info(result.format(forge_context))
 
-        if not result.succeeded() and forge_blocking == "true":
+        # Exit with error if required based on test result and mode
+        if (
+            forge_blocking == "true"
+            and forge_continuous_test_mode == "false"
+            and not result.succeeded()
+        ):
+            raise SystemExit(1)
+        if forge_continuous_test_mode == "true" and result.is_hard_failure():
             raise SystemExit(1)
 
     except Exception as e:

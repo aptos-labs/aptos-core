@@ -1,0 +1,25 @@
+module 0xc0ffee::dummy1 {
+    fun bar(b: bool) {
+        if (b) baz();
+    }
+    fun baz() {
+        ()
+    }
+}
+
+module 0xc0ffee::dummy2 {
+    struct State has key {
+        value: u64,
+    }
+    fun tuple_assignments(s: &signer, state: State) {
+        move_to(state, s);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `State` with an operator which expects a value of type `&signer`
+   ┌─ assign_tuple_wg.move:15:17
+   │
+15 │         move_to(state, s);
+   │                 ^^^^^

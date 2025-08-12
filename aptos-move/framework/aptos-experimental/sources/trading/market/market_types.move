@@ -22,7 +22,10 @@ module aptos_experimental::market_types {
         /// 1. Insufficient margin
         /// 2. Order is reduce_only but does not reduce
         REJECTED,
-        SIZE_REDUCED
+        SIZE_REDUCED,
+        /// Order has been acknowledged by the engine. This is used when the system wants to provide an early acknowledgement
+        /// of the order placement along with order id before the order is opened.
+        ACKNOWLEDGED,
     }
 
     public fun order_status_open(): OrderStatus {
@@ -43,6 +46,10 @@ module aptos_experimental::market_types {
 
     public fun order_status_size_reduced(): OrderStatus {
         OrderStatus::SIZE_REDUCED
+    }
+
+    public fun order_status_acknowledged(): OrderStatus {
+        OrderStatus::ACKNOWLEDGED
     }
 
     enum SettleTradeResult has drop {

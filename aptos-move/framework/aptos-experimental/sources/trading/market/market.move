@@ -379,7 +379,7 @@ module aptos_experimental::market {
         next_fill_id
     }
 
-    fun emit_event_for_order<M: store + copy + drop>(
+    public fun emit_event_for_order<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
@@ -830,7 +830,7 @@ module aptos_experimental::market {
                 order_id,
                 client_order_id,
                 orig_size,
-                0, // 0 because order was never placed
+                remaining_size,
                 vector[],
                 0, // match_count
                 is_bid,
