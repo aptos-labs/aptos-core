@@ -151,13 +151,13 @@ impl MoveTool {
 
 #[derive(Parser)]
 pub struct FrameworkPackageArgs {
-    /// Git revision or branch for the Aptos framework
+    /// Git revision or branch for the Supra framework
     ///
     /// This is mutually exclusive with `--framework-local-dir`
     #[clap(long, group = "framework_package_args")]
     pub(crate) framework_git_rev: Option<String>,
 
-    /// Local framework directory for the Aptos framework
+    /// Local framework directory for the Supra framework
     ///
     /// This is mutually exclusive with `--framework-git-rev`
     #[clap(long, value_parser, group = "framework_package_args")]

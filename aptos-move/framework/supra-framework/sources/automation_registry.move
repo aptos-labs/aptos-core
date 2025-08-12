@@ -478,6 +478,46 @@ module supra_framework::automation_registry {
         enumerable_map::get_value(&automation_task_metadata.tasks, task_index)
     }
 
+    /// Retrieves specific metadata details of an automation task entry by its task index.
+    ///
+    /// 1. `address`                 - The owner of the task.
+    /// 2. `vector<u8>`              - The payload transaction (encoded).
+    /// 3. `u64`                     - The expiry time of the task (timestamp).
+    /// 4. `vector<u8>`              - The hash of the transaction.
+    /// 5. `u64`                     - The maximum gas amount allowed for the task.
+    /// 6. `u64`                     - The gas price cap for executing the task.
+    /// 7. `u64`                     - The automation fee cap for the current epoch.
+    /// 8. `vector<vector<u8>>`      - Auxiliary data related to the task (can be multiple items).
+    /// 9. `u64`                     - The time at which the task was registered (timestamp).
+    /// 10. `u8`                     - The state of the task (e.g., active, cancelled, completed).
+    /// 11. `u64`                    - The locked fee reserved for the next epoch execution.
+    public fun deconstruct_task_metadata(
+        task_metadata: &AutomationTaskMetaData
+    ): (address, vector<u8>, u64, vector<u8>, u64, u64, u64, vector<vector<u8>>, u64, u8, u64) {
+        (
+            task_metadata.owner,
+            task_metadata.payload_tx,
+            task_metadata.expiry_time,
+            task_metadata.tx_hash,
+            task_metadata.max_gas_amount,
+            task_metadata.gas_price_cap,
+            task_metadata.automation_fee_cap_for_epoch,
+            task_metadata.aux_data,
+            task_metadata.registration_time,
+            task_metadata.state,
+            task_metadata.locked_fee_for_next_epoch
+        )
+    }
+
+    #[view]
+    /// Retrieves the owner address of a task by its task index.
+    public fun get_task_owner(task_index: u64): address acquires AutomationRegistry {
+        let automation_task_metadata = borrow_global<AutomationRegistry>(@supra_framework);
+        assert!(enumerable_map::contains(&automation_task_metadata.tasks, task_index), EAUTOMATION_TASK_NOT_FOUND);
+        let task_metadata = enumerable_map::get_value(&automation_task_metadata.tasks, task_index);
+        task_metadata.owner
+    }
+
     #[view]
     /// Retrieves the details of a automation tasks entry by their task index.
     /// If a task does not exist, it is not included in the result, and no error is reported
