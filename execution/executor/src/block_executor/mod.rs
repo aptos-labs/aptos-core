@@ -23,7 +23,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
@@ -50,6 +50,7 @@ pub mod block_tree;
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     inner: RwLock<Option<BlockExecutorInner<V>>>,
+    execution_lock: Mutex<()>,
 }
 
 impl<V> BlockExecutor<V>
@@ -60,6 +61,7 @@ where
         Self {
             db,
             inner: RwLock::new(None),
+            execution_lock: Mutex::new(()),
         }
     }
 
@@ -102,6 +104,8 @@ where
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
+        // guarantee only one block being executed at a time
+        let _guard = self.execution_lock.lock();
         self.inner
             .read()
             .as_ref()
@@ -119,7 +123,9 @@ where
         self.inner
             .read()
             .as_ref()
-            .expect("BlockExecutor is not reset")
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "BlockExecutor is not reset".into(),
+            })?
             .ledger_update(block_id, parent_block_id)
     }
 
@@ -147,6 +153,11 @@ where
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "finish"]);
 
         *self.inner.write() = None;
+    }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        self.maybe_initialize()?;
+        self.inner.read().as_ref().unwrap().state_view(block_id)
     }
 }
 
@@ -378,5 +389,18 @@ where
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
 
         Ok(())
+    }
+
+    fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {
+        let mut block_vec = self.block_tree.get_blocks_opt(&[block_id])?;
+        let block = block_vec
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(block_id))?;
+        Ok(CachedStateView::new(
+            StateViewId::BlockExecution { block_id },
+            Arc::clone(&self.db.reader),
+            block.output.result_state().latest().clone(),
+        )?)
     }
 }

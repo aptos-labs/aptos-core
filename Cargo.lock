@@ -988,6 +988,7 @@ dependencies = [
  "mirai-annotations",
  "mockall 0.11.4",
  "move-core-types",
+ "move-vm-runtime",
  "num-derive",
  "num-traits",
  "once_cell",
