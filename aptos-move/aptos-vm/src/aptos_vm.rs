@@ -2415,45 +2415,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    pub fn execute_system_function_no_gas_meter(
-        state_view: &impl StateView,
-        module_id: &ModuleId,
-        function_name: &Identifier,
-        type_args: Vec<TypeTag>,
-        args: Vec<Vec<u8>>,
-        block_id: HashValue,
-    ) -> Result<Vec<Vec<u8>>, VMStatus> {
-        // Create VM instance with environment
-        let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(&env, state_view);
-
-        // Create a new session
-        let resolver = state_view.as_move_resolver();
-        let mut session = vm.new_session(&resolver, SessionId::system_txn(block_id), None);
-
-        // Set up gas meter and traversal context
-        let mut gas_meter = UnmeteredGasMeter;
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
-
-        // Get code storage adapter and ensure it's properly referenced
-        let code_storage = state_view.as_aptos_code_storage(&env);
-        let code_storage_ref = &code_storage;
-
-        // Execute the function
-        let result = session.execute_function_bypass_visibility(
-            module_id,
-            function_name,
-            type_args,
-            args,
-            &mut gas_meter,
-            &mut traversal_context,
-            code_storage_ref,
-        )?;
-
-        Ok(result.return_values.into_iter().map(|v| v.0).collect())
-    }
-
     pub fn execute_view_function(
         state_view: &impl StateView,
         module_id: ModuleId,

@@ -48,12 +48,11 @@ fn get_scheduled_txns(h: &mut MoveHarness, acc: &Account) -> Vec<ScheduledTransa
 
 fn execute_scheduled_txns(
     h: &mut MoveHarness,
-    scheduled_txns: &[ScheduledTransactionInfoWithKey],
+    scheduled_txns: Vec<ScheduledTransactionInfoWithKey>,
 ) -> Vec<TransactionOutput> {
     use aptos_types::transaction::Transaction;
     let txns: Vec<Transaction> = scheduled_txns
-        .iter()
-        .cloned()
+        .into_iter()
         .map(Transaction::ScheduledTransaction)
         .collect();
 
@@ -128,7 +127,7 @@ fn test_basic_execute() {
 
     let scheduled_txns = get_scheduled_txns(&mut h, &acc);
     assert_eq!(scheduled_txns.len(), num_txns);
-    let outputs = execute_scheduled_txns(&mut h, &scheduled_txns);
+    let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
     assert!(outputs
         .iter()
         .all(|output| output.status().status().unwrap().is_success()));
@@ -178,7 +177,7 @@ fn test_user_func_abort() {
 
     let scheduled_txns = get_scheduled_txns(&mut h, &acc);
     assert_eq!(scheduled_txns.len(), 1);
-    let output = execute_scheduled_txns(&mut h, &scheduled_txns);
+    let output = execute_scheduled_txns(&mut h, scheduled_txns);
     assert_eq!(
         output[0].status().status().unwrap(),
         ExecutionStatus::MoveAbort {
@@ -215,7 +214,7 @@ fn test_run_and_cancel_race_condition() {
 
     let scheduled_txns = get_scheduled_txns(&mut h, &acc);
     assert_eq!(scheduled_txns.len(), 1);
-    let outputs = execute_scheduled_txns(&mut h, &scheduled_txns);
+    let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
     assert!(outputs
         .iter()
         .all(|output| output.status().status().unwrap().is_success()));
@@ -278,7 +277,7 @@ fn test_cancel_and_run_race_condition() {
     assert_success!(result);
 
     // Run the cancelled transaction
-    let output = execute_scheduled_txns(&mut h, &[txn_to_cancel.clone()]);
+    let output = execute_scheduled_txns(&mut h, vec![txn_to_cancel.clone()]);
     assert!(
         output[0].status().is_discarded(),
         "Expected the cancelled transaction to be discarded, but it was not. Output: {:?}",
@@ -382,7 +381,7 @@ fn test_mod_publish_error() {
     assert_eq!(scheduled_txns.len(), 1);
 
     // Execute the scheduled transaction and expect it to return abort status
-    let outputs = execute_scheduled_txns(&mut h, scheduled_txns.as_slice());
+    let outputs = execute_scheduled_txns(&mut h, scheduled_txns);
     assert_eq!(outputs.len(), 1);
 
     // Check that the transaction failed with the correct abort code

@@ -217,6 +217,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 })
             },
             ScheduledTransaction(_) => {
+                // todo: to be addressed in the future commit regarding APIs
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
