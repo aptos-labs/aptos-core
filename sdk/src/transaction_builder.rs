@@ -16,7 +16,7 @@ use aptos_types::{
     function_info::FunctionInfo,
     transaction::{EntryFunction, Script},
 };
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -360,7 +360,8 @@ impl TransactionFactory {
             payload: if self.use_txn_payload_v2_format || self.use_replay_protection_nonce {
                 payload.upgrade_payload_with_fn(
                     self.use_txn_payload_v2_format,
-                    self.use_replay_protection_nonce.then_some(|| thread_rng().gen()),
+                    self.use_replay_protection_nonce
+                        .then_some(|| thread_rng().gen()),
                 )
             } else {
                 payload
