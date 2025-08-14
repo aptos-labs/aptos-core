@@ -430,7 +430,7 @@ pub trait TransactionWrite: Debug {
             Modification => WriteOpSize::Modification {
                 write_len: self.bytes().unwrap().len() as u64,
             },
-            Deletion { .. } => WriteOpSize::Deletion,
+            Deletion => WriteOpSize::Deletion,
         }
     }
 }
