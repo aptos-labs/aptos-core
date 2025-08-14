@@ -660,21 +660,26 @@ module aptos_std::ordered_map {
         }
     }
 
+    native fun binary_search_impl<K, V>(key: &K, entries: &vector<Entry<K, V>>, start: u64, end: u64): u64;
+
     // return index containing the key, or insert position.
     // I.e. index of first element that has key larger or equal to the passed `key` argument.
-    fun binary_search<K, V>(key: &K, entries: &vector<Entry<K, V>>, start: u64, end: u64): u64 {
-        let l = start;
-        let r = end;
-        while (l != r) {
-            let mid = l + ((r - l) >> 1);
-            let comparison = cmp::compare(&entries.borrow(mid).key, key);
-            if (comparison.is_lt()) {
-                l = mid + 1;
-            } else {
-                r = mid;
-            };
-        };
-        l
+    inline fun binary_search<K, V>(key: &K, entries: &vector<Entry<K, V>>, start: u64, end: u64): u64 {
+        // TODO gate
+        binary_search_impl(key, entries, start, end)
+
+        // let l = start;
+        // let r = end;
+        // while (l != r) {
+        //     let mid = l + ((r - l) >> 1);
+        //     let comparison = cmp::compare(&entries.borrow(mid).key, key);
+        //     if (comparison.is_lt()) {
+        //         l = mid + 1;
+        //     } else {
+        //         r = mid;
+        //     };
+        // };
+        // l
     }
 
     // see if useful, and add

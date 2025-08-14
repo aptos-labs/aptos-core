@@ -24,6 +24,7 @@ pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+pub mod ordered_map;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
@@ -102,6 +103,11 @@ pub fn all_natives(
         "account_abstraction",
         account_abstraction::make_all(builder)
     );
+    add_natives_from_module!(
+        "ordered_map",
+        ordered_map::make_all(builder)
+    );
+
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(

@@ -2787,6 +2787,15 @@ impl VectorRef {
         Ok(Value(self.0.borrow_elem(idx)?))
     }
 
+    pub fn borrow_elem_unchecked(&self, idx: usize) -> PartialVMResult<Value> {
+        let c = self.0.container();
+        if idx >= c.len() {
+            return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
+                .with_sub_status(INDEX_OUT_OF_BOUNDS));
+        }
+        Ok(Value(self.0.borrow_elem(idx)?))
+    }
+
     /// Returns a RefCell reference to the underlying vector of a `&vector<u8>` value.
     pub fn as_bytes_ref(&self) -> std::cell::Ref<'_, Vec<u8>> {
         let c = self.0.container();

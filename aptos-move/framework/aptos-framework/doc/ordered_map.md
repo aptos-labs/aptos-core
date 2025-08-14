@@ -80,6 +80,7 @@ allowing cleaner iterator APIs.
 -  [Function `for_each_ref_friend`](#0x1_ordered_map_for_each_ref_friend)
 -  [Function `for_each_mut`](#0x1_ordered_map_for_each_mut)
 -  [Function `new_iter`](#0x1_ordered_map_new_iter)
+-  [Function `binary_search_impl`](#0x1_ordered_map_binary_search_impl)
 -  [Function `binary_search`](#0x1_ordered_map_binary_search)
 -  [Specification](#@Specification_1)
     -  [Enum `OrderedMap`](#@Specification_1_OrderedMap)
@@ -125,7 +126,7 @@ allowing cleaner iterator APIs.
     -  [Function `keys`](#@Specification_1_keys)
     -  [Function `values`](#@Specification_1_values)
     -  [Function `to_vec_pair`](#@Specification_1_to_vec_pair)
-    -  [Function `binary_search`](#@Specification_1_binary_search)
+    -  [Function `binary_search_impl`](#@Specification_1_binary_search_impl)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp">0x1::cmp</a>;
@@ -1854,6 +1855,28 @@ to O(n).
 
 </details>
 
+<a id="0x1_ordered_map_binary_search_impl"></a>
+
+## Function `binary_search_impl`
+
+
+
+<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search_impl">binary_search_impl</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search_impl">binary_search_impl</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64;
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_ordered_map_binary_search"></a>
 
 ## Function `binary_search`
@@ -1869,19 +1892,22 @@ to O(n).
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search">binary_search</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64 {
-    <b>let</b> l = start;
-    <b>let</b> r = end;
-    <b>while</b> (l != r) {
-        <b>let</b> mid = l + ((r - l) &gt;&gt; 1);
-        <b>let</b> comparison = <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(mid).key, key);
-        <b>if</b> (comparison.is_lt()) {
-            l = mid + 1;
-        } <b>else</b> {
-            r = mid;
-        };
-    };
-    l
+<pre><code>inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search">binary_search</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64 {
+    // TODO gate
+    <a href="ordered_map.md#0x1_ordered_map_binary_search_impl">binary_search_impl</a>(key, entries, start, end)
+
+    // <b>let</b> l = start;
+    // <b>let</b> r = end;
+    // <b>while</b> (l != r) {
+    //     <b>let</b> mid = l + ((r - l) &gt;&gt; 1);
+    //     <b>let</b> comparison = <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(mid).key, key);
+    //     <b>if</b> (comparison.is_lt()) {
+    //         l = mid + 1;
+    //     } <b>else</b> {
+    //         r = mid;
+    //     };
+    // };
+    // l
 }
 </code></pre>
 
@@ -2753,12 +2779,12 @@ std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
 
 
 
-<a id="@Specification_1_binary_search"></a>
+<a id="@Specification_1_binary_search_impl"></a>
 
-### Function `binary_search`
+### Function `binary_search_impl`
 
 
-<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search">binary_search</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64
+<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_binary_search_impl">binary_search_impl</a>&lt;K, V&gt;(key: &K, entries: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ordered_map.md#0x1_ordered_map_Entry">ordered_map::Entry</a>&lt;K, V&gt;&gt;, start: u64, end: u64): u64
 </code></pre>
 
 

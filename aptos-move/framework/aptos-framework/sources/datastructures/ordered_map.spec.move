@@ -113,7 +113,7 @@ spec aptos_std::ordered_map {
     }
 
 
-    spec binary_search {
+    spec binary_search_impl {
         pragma opaque;
         pragma verify = false;
     }
