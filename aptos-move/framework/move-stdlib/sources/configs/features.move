@@ -727,6 +727,17 @@ module std::features {
         is_enabled(SUPRA_AUTOMATION_TASK_SYNC)
     }
 
+    /// Whether the automation task sync on block basis is enabled.
+    const SUPRA_COUNT_FAILED_PROPOSALS: u64 = 93;
+
+    public fun get_supra_count_failed_proposals_feature(): u64 {
+        SUPRA_COUNT_FAILED_PROPOSALS
+    }
+
+    public fun supra_count_failed_proposals_enabled(): bool acquires Features {
+        is_enabled(SUPRA_COUNT_FAILED_PROPOSALS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

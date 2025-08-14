@@ -126,6 +126,7 @@ pub enum FeatureFlag {
     SupraAutomationPayloadGasCheck,
     PrivatePoll,
     SupraAutomationTaskSync,
+    SupraCountFailedProposals,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -323,9 +324,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SupraNativeAutomation => AptosFeatureFlag::SUPRA_NATIVE_AUTOMATION,
             FeatureFlag::SupraEthTrie => AptosFeatureFlag::SUPRA_ETH_TRIE,
-            FeatureFlag::SupraAutomationPayloadGasCheck => AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK,
+            FeatureFlag::SupraAutomationPayloadGasCheck => {
+                AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK
+            },
             FeatureFlag::PrivatePoll => AptosFeatureFlag::PRIVATE_POLL,
             FeatureFlag::SupraAutomationTaskSync => AptosFeatureFlag::SUPRA_AUTOMATION_TASK_SYNC,
+            FeatureFlag::SupraCountFailedProposals => {
+                AptosFeatureFlag::SUPRA_COUNT_FAILED_PROPOSALS
+            },
         }
     }
 }
@@ -451,10 +457,15 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AbortIfMultisigPayloadMismatch
             },
             AptosFeatureFlag::SUPRA_NATIVE_AUTOMATION => FeatureFlag::SupraNativeAutomation,
-            AptosFeatureFlag::SUPRA_ETH_TRIE=> FeatureFlag::SupraEthTrie,
-            AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK => FeatureFlag::SupraAutomationPayloadGasCheck,
+            AptosFeatureFlag::SUPRA_ETH_TRIE => FeatureFlag::SupraEthTrie,
+            AptosFeatureFlag::SUPRA_AUTOMATION_PAYLOAD_GAS_CHECK => {
+                FeatureFlag::SupraAutomationPayloadGasCheck
+            },
             AptosFeatureFlag::PRIVATE_POLL => FeatureFlag::PrivatePoll,
             AptosFeatureFlag::SUPRA_AUTOMATION_TASK_SYNC => FeatureFlag::SupraAutomationTaskSync,
+            AptosFeatureFlag::SUPRA_COUNT_FAILED_PROPOSALS => {
+                FeatureFlag::SupraCountFailedProposals
+            },
         }
     }
 }
