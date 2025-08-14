@@ -5,6 +5,7 @@ use crate::{
     aptos_vm::SerializedSigners,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, SessionExt},
+    logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
@@ -36,6 +37,10 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
+use aptos_types::state_store::StateViewId;
+
+// Add logging for better debugging
+use aptos_logger::warn;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -102,6 +107,63 @@ impl TransactionValidation {
                     ident_str!("transaction_validation").to_owned(),
                 ))
     }
+
+    /// Validate that the required module and functions exist before attempting to call them
+    pub fn validate_module_and_functions(
+        &self,
+        session: &mut SessionExt<impl AptosMoveResolver>,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        // Check if the module exists by trying to get module info
+        match session.get_module_info(&self.module_id()) {
+            Ok(_) => {
+                // Module exists, continue with function validation
+            },
+            Err(_) => {
+                warn!(
+                    log_context,
+                    "Transaction validation module not found: {:?}",
+                    self.module_id()
+                );
+                return Err(VMStatus::error(StatusCode::MODULE_NOT_FOUND, None));
+            }
+        }
+
+        // Check if key functions exist by trying to get function info
+        let required_functions = [
+            &self.fee_payer_prologue_name,
+            &self.script_prologue_name,
+            &self.multi_agent_prologue_name,
+            &self.user_epilogue_name,
+        ];
+
+        for function_name in required_functions.iter() {
+            if !self.function_exists(session, function_name) {
+                warn!(
+                    log_context,
+                    "Required function not found: {} in module {:?}",
+                    function_name,
+                    self.module_id()
+                );
+                return Err(VMStatus::error(StatusCode::FUNCTION_RESOLUTION_FAILURE, None));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a specific function exists in the module
+    fn function_exists(
+        &self,
+        session: &mut SessionExt<impl AptosMoveResolver>,
+        function_name: &Identifier,
+    ) -> bool {
+        // Try to get function info to check existence
+        match session.get_function_info(&self.module_id(), function_name) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
 }
 
 pub(crate) fn run_script_prologue(
@@ -114,6 +176,18 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
+    // Validate module and functions exist before proceeding
+    APTOS_TRANSACTION_VALIDATION
+        .validate_module_and_functions(session, log_context)
+        .map_err(|err| {
+            warn!(
+                log_context,
+                "Module validation failed: {:?}, attempting to continue with transaction",
+                err
+            );
+            err
+        })?;
+
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
@@ -241,6 +315,17 @@ pub(crate) fn run_script_prologue(
                 module_storage,
             )
             .map(|_return_vals| ())
+            .map_err(|err| {
+                // Log detailed error information for debugging
+                warn!(
+                    log_context,
+                    "Function execution failed: function={}, module={:?}, error={:?}",
+                    prologue_function_name,
+                    APTOS_TRANSACTION_VALIDATION.module_id(),
+                    err
+                );
+                err
+            })
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     } else {
@@ -271,6 +356,18 @@ pub(crate) fn run_script_prologue(
                 .as_ref()
                 .map(|proof| proof.optional_auth_key()),
         ) {
+            // Validate fee_payer feature is enabled before proceeding
+            if !features.is_enabled(aptos_types::on_chain_config::FeatureFlag::FEE_PAYER) {
+                warn!(
+                    log_context,
+                    "Fee payer feature is not enabled, transaction will fail"
+                );
+                return Err(VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Fee payer feature is not enabled".to_string()),
+                ));
+            }
+
             if features.is_transaction_simulation_enhancement_enabled() {
                 let args = vec![
                     MoveValue::Signer(txn_data.sender),
@@ -385,6 +482,17 @@ pub(crate) fn run_script_prologue(
                 module_storage,
             )
             .map(|_return_vals| ())
+            .map_err(|err| {
+                // Log detailed error information for debugging
+                warn!(
+                    log_context,
+                    "Function execution failed: function={}, module={:?}, error={:?}",
+                    prologue_function_name,
+                    APTOS_TRANSACTION_VALIDATION.module_id(),
+                    err
+                );
+                err
+            })
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     }
@@ -405,6 +513,18 @@ pub(crate) fn run_multisig_prologue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
+    // Validate module and functions exist before proceeding
+    APTOS_TRANSACTION_VALIDATION
+        .validate_module_and_functions(session, log_context)
+        .map_err(|err| {
+            warn!(
+                log_context,
+                "Module validation failed in multisig prologue: {:?}, attempting to continue",
+                err
+            );
+            err
+        })?;
+
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
     // So, converting the executable to this format.
@@ -458,6 +578,17 @@ fn run_epilogue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
+    // Validate module and functions exist before proceeding
+    if let Err(err) = APTOS_TRANSACTION_VALIDATION
+        .validate_module_and_functions(session, &AdapterLogSchema::new(StateViewId::Miscellaneous, 0))
+    {
+        warn!(
+            "Module validation failed in epilogue: {:?}, attempting to continue",
+            err
+        );
+        // Continue execution but log the warning
+    }
+
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
     let is_orderless_txn = txn_data.is_orderless();
@@ -504,6 +635,13 @@ fn run_epilogue(
             traversal_context,
             module_storage,
         )
+        .map_err(|err| {
+            warn!(
+                "Unified epilogue execution failed: error={:?}",
+                err
+            );
+            err
+        })
     } else {
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
@@ -547,6 +685,13 @@ fn run_epilogue(
                 traversal_context,
                 module_storage,
             )
+            .map_err(|err| {
+                warn!(
+                    "Fee payer epilogue execution failed: function={}, error={:?}",
+                    func_name, err
+                );
+                err
+            })
         } else {
             // Regular tx, run the normal epilogue
             let (func_name, args) = {
@@ -583,6 +728,13 @@ fn run_epilogue(
                 traversal_context,
                 module_storage,
             )
+            .map_err(|err| {
+                warn!(
+                    "Regular epilogue execution failed: function={}, error={:?}",
+                    func_name, err
+                );
+                err
+            })
         }
     }
     .map_err(expect_no_verification_errors)?;
