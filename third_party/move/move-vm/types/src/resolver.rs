@@ -17,12 +17,15 @@ pub struct ResourceSizeInfo {
     // Size of the resource or resource group member. None if it does not exist
     pub size: Option<u64>,
     // Number of bytes loaded when accessing this resource, used for gas charging only
-    pub bytes_loaded: u64,
+    pub bytes_loaded_for_gas_charge: u64,
 }
 
 impl ResourceSizeInfo {
     pub fn new(size: Option<u64>, bytes_loaded: u64) -> Self {
-        Self { size, bytes_loaded }
+        Self {
+            size,
+            bytes_loaded_for_gas_charge: bytes_loaded,
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     config::VMConfig,
-    data_cache::{DataCacheGasMeterWrapper, TransactionDataCache},
+    data_cache::{DataCacheGasMeterWrapper, TransactionDataCache, TypeWithRuntimeEnvironment},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -36,7 +36,6 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::TypeTag,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
@@ -51,7 +50,6 @@ use move_vm_types::{
         self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
         Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
     },
-    views::TypeView,
 };
 use std::{
     cell::RefCell,
@@ -105,17 +103,6 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
     layout_converter: &'ctx LayoutConverter<'ctx, LoaderImpl>,
-}
-
-struct TypeWithRuntimeEnvironment<'a, 'b> {
-    ty: &'a Type,
-    runtime_environment: &'b RuntimeEnvironment,
-}
-
-impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
-    fn to_type_tag(&self) -> TypeTag {
-        self.runtime_environment.ty_to_ty_tag(self.ty).unwrap()
-    }
 }
 
 impl Interpreter {
@@ -1106,7 +1093,7 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        if !data_cache.contains_resource_data(&addr, ty) {
+        if !data_cache.contains_resource_value(&addr, ty) {
             data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 self.loader,
                 self.layout_converter,
