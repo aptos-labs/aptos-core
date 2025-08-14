@@ -80,6 +80,8 @@ pub enum EntryPoints {
     Republish,
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, with replay protection nonce
+    NopOrderless,
     /// Empty (NoOp) function, signed by publisher as fee-payer
     NopFeePayer,
     /// Empty (NoOp) function, signed by 2 accounts
@@ -278,6 +280,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -343,6 +346,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -432,6 +436,10 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::Nop5Signers => {
                 get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
+            },
+            EntryPoints::NopOrderless => {
+                get_payload_void(module_id, ident_str!("nop_orderless").to_owned())
+                    .set_replay_protection_nonce(rng.expect("Must provide RNG").gen())
             },
             EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
             EntryPoints::GetCounter => {
@@ -930,6 +938,7 @@ impl EntryPointTrait for EntryPoints {
         match self {
             EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
+            | EntryPoints::NopOrderless
             | EntryPoints::NopFeePayer
             | EntryPoints::Step
             | EntryPoints::GetCounter

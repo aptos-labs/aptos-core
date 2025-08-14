@@ -900,12 +900,15 @@ impl TransactionPayload {
                 multisig_address,
                 replay_protection_nonce: old_replay_protection_nonce,
             } => {
-                assert!(old_replay_protection_nonce.is_none(), "trying to set replay protection nonce twice.");
+                assert!(
+                    old_replay_protection_nonce.is_none(),
+                    "trying to set replay protection nonce twice."
+                );
                 TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: Some(replay_protection_nonce),
                 }
-            }
+            },
         };
         TransactionPayload::Payload(TransactionPayloadInner::V1 {
             executable,
