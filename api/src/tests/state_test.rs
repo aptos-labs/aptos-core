@@ -160,7 +160,7 @@ async fn test_merkle_leaves_with_nft_transfer(
             vec![false, false, false],
         ))
         .expiration_timestamp_secs(ctx.get_expiration_time())
-        .upgrade_payload(
+        .upgrade_payload_with_rng(
             &mut ctx.rng,
             use_txn_payload_v2_format,
             use_orderless_transactions,
@@ -185,7 +185,7 @@ async fn test_merkle_leaves_with_nft_transfer(
             vec!["int".as_bytes().to_vec()],
         ))
         .expiration_timestamp_secs(ctx.get_expiration_time())
-        .upgrade_payload(
+        .upgrade_payload_with_rng(
             &mut ctx.rng,
             use_txn_payload_v2_format,
             use_orderless_transactions,
@@ -212,7 +212,7 @@ async fn test_merkle_leaves_with_nft_transfer(
                 1,
             ))
             .expiration_timestamp_secs(ctx.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut ctx.rng,
                 use_txn_payload_v2_format,
                 use_orderless_transactions,
@@ -239,7 +239,7 @@ async fn test_merkle_leaves_with_nft_transfer(
                 1,
             ))
             .expiration_timestamp_secs(ctx.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut ctx.rng,
                 use_txn_payload_v2_format,
                 use_orderless_transactions,

@@ -845,18 +845,32 @@ impl TransactionPayload {
     }
 
     // Used in sdk and a lot of tests when upgrading current payload format to the new format.
-    pub fn upgrade_payload(
+    pub fn upgrade_payload_with_rng(
         self,
         rng: &mut impl Rng,
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
+        self.upgrade_payload_with_fn(
+            use_txn_payload_v2_format,
+            use_orderless_transactions.then_some(|| rng.gen()),
+        )
+    }
+
+    pub fn upgrade_payload_with_fn<F>(
+        self,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: Option<F>,
+    ) -> Self
+    where
+        F: FnOnce() -> u64,
+    {
         if use_txn_payload_v2_format {
             let executable = self
                 .executable()
                 .expect("ModuleBundle variant is deprecated");
             let mut extra_config = self.extra_config();
-            if use_orderless_transactions {
+            if let Some(replay_nonce_f) = use_orderless_transactions {
                 extra_config = match extra_config {
                     TransactionExtraConfig::V1 {
                         multisig_address,
@@ -864,7 +878,7 @@ impl TransactionPayload {
                     } => TransactionExtraConfig::V1 {
                         multisig_address,
                         replay_protection_nonce: replay_protection_nonce
-                            .or_else(|| Some(rng.gen())),
+                            .or_else(|| Some(replay_nonce_f())),
                     },
                 }
             }
@@ -875,6 +889,28 @@ impl TransactionPayload {
         } else {
             self
         }
+    }
+
+    pub fn set_replay_protection_nonce(self, replay_protection_nonce: u64) -> Self {
+        let executable = self
+            .executable()
+            .expect("ModuleBundle variant is deprecated");
+        let extra_config = match self.extra_config() {
+            TransactionExtraConfig::V1 {
+                multisig_address,
+                replay_protection_nonce: old_replay_protection_nonce,
+            } => {
+                assert!(old_replay_protection_nonce.is_none(), "trying to set replay protection nonce twice.");
+                TransactionExtraConfig::V1 {
+                    multisig_address,
+                    replay_protection_nonce: Some(replay_protection_nonce),
+                }
+            }
+        };
+        TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config,
+        })
     }
 }
 
