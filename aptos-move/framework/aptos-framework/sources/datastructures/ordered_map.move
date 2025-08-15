@@ -131,6 +131,19 @@ module aptos_std::ordered_map {
         value
     }
 
+    /// Remove a key/value pair from the map.
+    /// Returns none if `key` doesn't exist.
+    public fun remove_or_none<K: drop, V>(self: &mut OrderedMap<K, V>, key: &K): Option<V> {
+        let len = self.entries.length();
+        let index = binary_search(key, &self.entries, 0, len);
+        if (index < len && key == &self.entries[index].key) {
+            let Entry { key: _, value } = self.entries.remove(index);
+            option::some(value)
+        } else {
+            option::none()
+        }
+    }
+
     /// Returns whether map contains a given key.
     public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
         !self.find(key).iter_is_end(self)
@@ -567,33 +580,14 @@ module aptos_std::ordered_map {
     }
 
     /// Apply the function to a reference of each key-value pair in the map.
-    ///
-    /// Current implementation is O(n * log(n)). After function values will be optimized
-    /// to O(n).
     public inline fun for_each_ref<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
-        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
-        // but is the only one available through the public API.
-        if (!self.is_empty()) {
-            let (k, v) = self.borrow_front();
-            f(k, v);
+        let iter = self.new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            f(iter.iter_borrow_key(self), iter.iter_borrow(self));
+            iter = iter.iter_next(self);
+        }
 
-            let cur_k = self.next_key(k);
-            while (cur_k.is_some()) {
-                let k = cur_k.destroy_some();
-                f(&k, self.borrow(&k));
-
-                cur_k = self.next_key(&k);
-            };
-        };
-
-        // TODO: if we make iterator api public update to:
-        // let iter = self.new_begin_iter();
-        // while (!iter.iter_is_end(self)) {
-        //     f(iter.iter_borrow_key(self), iter.iter_borrow(self));
-        //     iter = iter.iter_next(self);
-        // }
-
-        // TODO: once move supports private functions udpate to:
+        // TODO: once move supports private functions update to:
         // vector::for_each_ref(
         //     &self.entries,
         //     |entry| {
@@ -602,46 +596,14 @@ module aptos_std::ordered_map {
         // );
     }
 
-    // TODO: Temporary friend implementaiton, until for_each_ref can be made efficient.
-    public(friend) inline fun for_each_ref_friend<K: copy + drop, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
+    /// Apply the function to a mutable reference of each key-value pair in the map.
+    public inline fun for_each_mut<K: copy + drop, V>(self: &mut OrderedMap<K, V>, f: |&K, &mut V|) {
         let iter = self.new_begin_iter();
         while (!iter.iter_is_end(self)) {
-            f(iter.iter_borrow_key(self), iter.iter_borrow(self));
+            let key = *iter.iter_borrow_key(self);
+            f(&key, iter.iter_borrow_mut(self));
             iter = iter.iter_next(self);
         }
-    }
-
-    /// Apply the function to a mutable reference of each key-value pair in the map.
-    ///
-    /// Current implementation is O(n * log(n)). After function values will be optimized
-    /// to O(n).
-    public inline fun for_each_mut<K: copy + drop, V>(self: &mut OrderedMap<K, V>, f: |&K, &mut V|) {
-        // This implementation is innefficient: O(log(n)) for next_key / borrow lookups every time,
-        // but is the only one available through the public API.
-        if (!self.is_empty()) {
-            let (k, _v) = self.borrow_front();
-
-            let k = *k;
-            let done = false;
-            while (!done) {
-                f(&k, self.borrow_mut(&k));
-
-                let cur_k = self.next_key(&k);
-                if (cur_k.is_some()) {
-                    k = cur_k.destroy_some();
-                } else {
-                    done = true;
-                }
-            };
-        };
-
-        // TODO: if we make iterator api public update to:
-        // let iter = self.new_begin_iter();
-        // while (!iter.iter_is_end(self)) {
-        //     let key = *iter.iter_borrow_key(self);
-        //     f(key, iter.iter_borrow_mut(self));
-        //     iter = iter.iter_next(self);
-        // }
 
         // TODO: once move supports private functions udpate to:
         // vector::for_each_mut(
@@ -939,7 +901,7 @@ module aptos_std::ordered_map {
     fun test_upsert_test() {
         let map = new<u64, u64>();
         // test adding 3 elements using upsert
-        map.upsert::<u64, u64>(1, 1);
+        map.upsert<u64, u64>(1, 1);
         map.upsert(2, 2);
         map.upsert(3, 3);
 
