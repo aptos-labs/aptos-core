@@ -4,7 +4,7 @@ task 0 lines 1-6:  publish --print-bytecode [module 0x66::test1]
 == BEGIN Bytecode ==
 // Bytecode version v7
 module 0x66::test1
-struct S
+struct S has copy + drop
   _1: u64
   _2: u8
 
@@ -16,11 +16,11 @@ task 1 lines 8-19:  publish --print-bytecode [module 0x66::test2]
 // Bytecode version v7
 module 0x66::test2
 use 0x66::test1
-struct T
+struct T has drop
   _1: test1::S
 
 // Function definition at index 0
-fun get(l0: test2::T): test1::S
+fun get(l0: T): test1::S
     borrow_loc l0
     borrow_field T, _1
     read_ref

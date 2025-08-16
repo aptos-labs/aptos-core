@@ -2,11 +2,11 @@ processed 4 tasks
 task 0 lines 1-16:  print-bytecode --input=module [// Moving a type defined as part of the same module is valid.]
 // Bytecode version v7
 module 0x2d6::M
-struct T
+struct T has key
   b: bool
 
 // Function definition at index 0
-public fun new(): M::T
+public fun new(): T
     ld_true
     pack T
     ret
@@ -14,7 +14,7 @@ public fun new(): M::T
 // Function definition at index 1
 fun f(l0: signer)
     borrow_loc l0
-    call M::new
+    call new
     move_to T
     ret
 

@@ -1,0 +1,32 @@
+//**** Cross-compiled for `masm` syntax from `tests/assembler/acquires.masm`
+
+//# init --addresses A=0x42
+
+//# publish --verbose
+// Bytecode version v7
+module 0x42::N
+use 0x1::signer
+struct R<T0: store> has key
+  v: T0
+
+// Function definition at index 0
+#[persistent] entry public fun ex(l0: signer, l1: u64)
+    ld_u64 0
+    abort
+
+// Function definition at index 1
+#[persistent] public fun give(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack R<u64>
+    move_to R<u64>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun take(l0: &signer): u64 acquires R
+    move_loc l0
+    call signer::address_of
+    move_from R<u64>
+    unpack R<u64>
+    ret
+

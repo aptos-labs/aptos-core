@@ -11,7 +11,7 @@ task 1 lines 4-9:  publish --print-bytecode [module 0x66::test2]
 == BEGIN Bytecode ==
 // Bytecode version v7
 module 0x66::test2
-friend 66::test1
+friend 0x66::test1
 // Function definition at index 0
 friend fun friend_fun(): u8
     ld_u8 255

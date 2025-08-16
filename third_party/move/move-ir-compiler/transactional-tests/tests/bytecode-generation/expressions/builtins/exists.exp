@@ -2,7 +2,7 @@ processed 4 tasks
 task 0 lines 1-11:  print-bytecode --input=module [module 0x5d5.M {]
 // Bytecode version v7
 module 0x5d5::M
-struct T
+struct T has key
   b: bool
 
 // Function definition at index 0

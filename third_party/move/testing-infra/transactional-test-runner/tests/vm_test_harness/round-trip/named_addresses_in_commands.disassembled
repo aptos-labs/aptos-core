@@ -1,0 +1,51 @@
+//**** Cross-compiled for `masm` syntax from `tests/vm_test_harness/named_addresses_in_commands.move`
+
+//# init --addresses A=42
+
+//# run --signers A
+// Bytecode version v8
+script
+use 0x1::signer
+// Function definition at index 0
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    ld_const<address> 42
+    eq
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 1000
+    abort
+
+
+
+//# publish
+// Bytecode version v8
+module 0x2a::M
+struct Foo has key
+  x: u64
+
+// Function definition at index 0
+#[persistent] public fun publish_foo(l0: &signer)
+    move_loc l0
+    ld_u64 500
+    pack Foo
+    move_to Foo
+    ret
+
+
+
+//# run --signers A
+// Bytecode version v8
+script
+use 0x2a::M
+// Function definition at index 0
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish_foo
+    ret
+
+
+
+//# view --address A --resource 0x2a::M::Foo

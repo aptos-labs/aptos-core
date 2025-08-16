@@ -1,0 +1,5 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/leading_comment.move`
+
+//# publish
+module 0x42::M {
+}

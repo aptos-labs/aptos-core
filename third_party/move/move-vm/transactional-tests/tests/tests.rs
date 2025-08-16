@@ -9,6 +9,7 @@ use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunCo
 use move_vm_runtime::config::VMConfig;
 use once_cell::sync::Lazy;
 use std::{
+    collections::BTreeSet,
     path::{Path, PathBuf},
     string::ToString,
 };
@@ -134,6 +135,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         vm_config: config.vm_config,
         use_masm: true,
         echo: true,
+        cross_compilation_targets: BTreeSet::new(),
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)

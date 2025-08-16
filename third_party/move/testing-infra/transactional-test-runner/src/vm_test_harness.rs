@@ -559,6 +559,22 @@ pub struct TestRunConfig {
     pub use_masm: bool,
     /// Whether to print each command executed to test output.
     pub echo: bool,
+    /// Set of targets into which to cross-compile.
+    pub cross_compilation_targets: BTreeSet<CrossCompileTarget>,
+}
+
+/// A cross-compile target. A new transactional test source file
+/// is generated for the target, with all embedded source code
+/// replaced by the result of decompiling or disassembling it.
+/// The file is placed in `<path>.decompiled` and `<path>.disassembled`,
+/// respectively.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossCompileTarget {
+    /// The syntax into which to cross-compile.
+    pub syntax: SyntaxChoice,
+    /// Whether the cross-compiled result should be run as a test
+    /// after cross-compilation.
+    pub run_after: bool,
 }
 
 impl Default for TestRunConfig {
@@ -580,12 +596,23 @@ impl TestRunConfig {
             },
             use_masm: true,
             echo: true,
+            cross_compilation_targets: BTreeSet::new(),
         }
     }
 
     pub fn with_masm(self) -> Self {
         Self {
             use_masm: true,
+            ..self
+        }
+    }
+
+    pub fn cross_compile_into(self, syntax: SyntaxChoice, run_after: bool) -> Self {
+        assert!(matches!(syntax, SyntaxChoice::ASM | SyntaxChoice::Source));
+        let mut cross_compilation_targets = self.cross_compilation_targets.clone();
+        cross_compilation_targets.insert(CrossCompileTarget { syntax, run_after });
+        Self {
+            cross_compilation_targets,
             ..self
         }
     }
