@@ -464,7 +464,7 @@ impl TestContext {
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -531,7 +531,7 @@ impl TestContext {
             factory
                 .account_transfer(account.address(), TRANSFER_AMOUNT)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -549,7 +549,7 @@ impl TestContext {
             factory
                 .add_dispatchable_authentication_function(func)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -618,7 +618,7 @@ impl TestContext {
             factory
                 .create_multisig_account(additional_owners, signatures_required)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -641,7 +641,7 @@ impl TestContext {
             factory
                 .create_multisig_account_with_existing_account(owners, signatures_required)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -663,7 +663,7 @@ impl TestContext {
             factory
                 .create_multisig_transaction(multisig_account, payload)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -683,7 +683,7 @@ impl TestContext {
             factory
                 .approve_multisig_transaction(multisig_account, transaction_id)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -703,7 +703,7 @@ impl TestContext {
             factory
                 .reject_multisig_transaction(multisig_account, transaction_id)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -723,7 +723,7 @@ impl TestContext {
             factory
                 .create_multisig_transaction_with_payload_hash(multisig_account, payload)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -753,7 +753,7 @@ impl TestContext {
                 .account_transfer(receiver, amount)
                 .expiration_timestamp_secs(self.get_expiration_time())
                 .sequence_number(sender.sequence_number())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -772,7 +772,7 @@ impl TestContext {
                 .create_user_account(account.public_key())
                 .expiration_timestamp_secs(self.get_expiration_time())
                 .sequence_number(creator.sequence_number())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,
@@ -788,7 +788,7 @@ impl TestContext {
             .sender(root_account.address())
             .sequence_number(root_account.sequence_number())
             .expiration_timestamp_secs(self.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut self.rng,
                 self.use_txn_payload_v2_format,
                 self.use_orderless_transactions,
@@ -868,7 +868,7 @@ impl TestContext {
             self.transaction_factory()
                 .payload(payload)
                 .expiration_timestamp_secs(self.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut self.rng,
                     self.use_txn_payload_v2_format,
                     self.use_orderless_transactions,

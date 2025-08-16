@@ -306,7 +306,7 @@ async fn test_simulate_txn_with_aggregator(
             .transaction_factory()
             .payload(payload)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,

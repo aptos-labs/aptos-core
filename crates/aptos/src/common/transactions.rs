@@ -204,7 +204,7 @@ impl TxnOptions {
             .sequence_number(sequence_number)
             .expiration_timestamp_secs(expiration_time_secs);
         if self.replay_protection_type == ReplayProtectionType::Nonce {
-            txn_builder = txn_builder.upgrade_payload(rng, true, true);
+            txn_builder = txn_builder.upgrade_payload_with_rng(rng, true, true);
         }
         let unsigned_transaction = txn_builder.build();
 

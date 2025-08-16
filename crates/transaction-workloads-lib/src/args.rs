@@ -26,6 +26,7 @@ pub enum TransactionTypeArg {
     RepublishAndCall,
     // Simple EntryPoints
     NoOp,
+    NoOpOrderless,
     NoOpFeePayer,
     NoOp2Signers,
     NoOp5Signers,
@@ -203,6 +204,7 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop),
+            TransactionTypeArg::NoOpOrderless => call_custom_module(EntryPoints::NopOrderless),
             TransactionTypeArg::NoOpFeePayer => call_custom_module(EntryPoints::NopFeePayer),
             TransactionTypeArg::NoOp2Signers => call_custom_module(EntryPoints::Nop),
             TransactionTypeArg::NoOp5Signers => call_custom_module(EntryPoints::Nop),

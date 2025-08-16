@@ -16,7 +16,7 @@ use aptos_types::{
     function_info::FunctionInfo,
     transaction::{EntryFunction, Script},
 };
-use rand::Rng;
+use rand::{thread_rng, Rng};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -80,13 +80,13 @@ impl TransactionBuilder {
         self.payload.replay_protection_nonce().is_some()
     }
 
-    pub fn upgrade_payload(
+    pub fn upgrade_payload_with_rng(
         mut self,
         rng: &mut impl Rng,
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
-        self.payload = self.payload.upgrade_payload(
+        self.payload = self.payload.upgrade_payload_with_rng(
             rng,
             use_txn_payload_v2_format,
             use_orderless_transactions,
@@ -117,11 +117,20 @@ impl TransactionBuilder {
 }
 
 #[derive(Clone, Debug)]
+enum TransactionExpiration {
+    Relative { expiration_duration: u64 },
+    Absolute { expiration_timestamp: u64 },
+}
+
+#[derive(Clone, Debug)]
 pub struct TransactionFactory {
     max_gas_amount: u64,
     gas_unit_price: u64,
-    transaction_expiration_time: u64,
+    transaction_expiration: TransactionExpiration,
     chain_id: ChainId,
+
+    use_txn_payload_v2_format: bool,
+    use_replay_protection_nonce: bool,
 }
 
 impl TransactionFactory {
@@ -130,8 +139,12 @@ impl TransactionFactory {
             // TODO(Gas): double check if this right
             max_gas_amount: MAX_GAS_AMOUNT,
             gas_unit_price: GAS_UNIT_PRICE,
-            transaction_expiration_time: 30,
+            transaction_expiration: TransactionExpiration::Relative {
+                expiration_duration: 30,
+            },
             chain_id,
+            use_txn_payload_v2_format: false,
+            use_replay_protection_nonce: false,
         }
     }
 
@@ -146,7 +159,21 @@ impl TransactionFactory {
     }
 
     pub fn with_transaction_expiration_time(mut self, transaction_expiration_time: u64) -> Self {
-        self.transaction_expiration_time = transaction_expiration_time;
+        self.transaction_expiration = TransactionExpiration::Relative {
+            expiration_duration: transaction_expiration_time,
+        };
+        self
+    }
+
+    /// Sets the transaction expiration timestamp to an absolute value.
+    /// Generally only useful for testing.
+    pub fn with_absolute_transaction_expiration_timestamp(
+        mut self,
+        transaction_expiration_timestamp: u64,
+    ) -> Self {
+        self.transaction_expiration = TransactionExpiration::Absolute {
+            expiration_timestamp: transaction_expiration_timestamp,
+        };
         self
     }
 
@@ -163,8 +190,16 @@ impl TransactionFactory {
         self.gas_unit_price
     }
 
+    /// Returns relative duration of transaction expiration.
     pub fn get_transaction_expiration_time(&self) -> u64 {
-        self.transaction_expiration_time
+        match self.transaction_expiration {
+            TransactionExpiration::Relative {
+                expiration_duration,
+            } => expiration_duration,
+            TransactionExpiration::Absolute { .. } => {
+                unimplemented!()
+            },
+        }
     }
 
     pub fn get_chain_id(&self) -> ChainId {
@@ -322,7 +357,15 @@ impl TransactionFactory {
         TransactionBuilder {
             sender: None,
             sequence_number: None,
-            payload,
+            payload: if self.use_txn_payload_v2_format || self.use_replay_protection_nonce {
+                payload.upgrade_payload_with_fn(
+                    self.use_txn_payload_v2_format,
+                    self.use_replay_protection_nonce
+                        .then_some(|| thread_rng().gen()),
+                )
+            } else {
+                payload
+            },
             max_gas_amount: self.max_gas_amount,
             gas_unit_price: self.gas_unit_price,
             expiration_timestamp_secs: self.expiration_timestamp(),
@@ -331,10 +374,19 @@ impl TransactionFactory {
     }
 
     fn expiration_timestamp(&self) -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + self.transaction_expiration_time
+        match self.transaction_expiration {
+            TransactionExpiration::Relative {
+                expiration_duration,
+            } => {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    + expiration_duration
+            },
+            TransactionExpiration::Absolute {
+                expiration_timestamp,
+            } => expiration_timestamp,
+        }
     }
 }

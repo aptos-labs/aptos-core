@@ -221,7 +221,9 @@ impl TransactionGenerator {
 
     pub fn create_transaction_factory() -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            .with_transaction_expiration_time(300)
+            // executor benchmark doesn't have BlockMetadata txns, time doesn't pass for it
+            // so we need to use absolute timestamp (so orderless txns are not rejected as too far in the future)
+            .with_absolute_transaction_expiration_timestamp(30)
             .with_gas_unit_price(100)
     }
 
