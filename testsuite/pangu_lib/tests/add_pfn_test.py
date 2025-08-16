@@ -75,6 +75,6 @@ class node_tests_add_pfn(unittest.TestCase):
             add_pfn_main(args, system_args)
         except:
             self.fail("add_pfn_main() raised exception unexpectedly!")
-        self.assertEquals(4, len(kubernetes.namespaced_resource_dictionary["default"]))
+        self.assertEqual(4, len(kubernetes.namespaced_resource_dictionary["default"]))
         filesystem.assert_reads(self)
         filesystem.assert_writes(self)
