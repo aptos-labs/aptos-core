@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/check-aptos-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork

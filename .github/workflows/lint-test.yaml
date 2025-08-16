@@ -31,7 +31,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -41,7 +41,7 @@ jobs:
     needs: file_change_determinator
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
@@ -59,7 +59,7 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   # Run all rust lints. This is a PR required job.
@@ -67,7 +67,7 @@ jobs:
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
@@ -84,7 +84,7 @@ jobs:
     needs: file_change_determinator
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -103,7 +103,7 @@ jobs:
       )
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run rust doc tests
         uses: ./.github/actions/rust-doc-tests
         with:
@@ -122,7 +122,7 @@ jobs:
       )
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run rust smoke tests
         uses: ./.github/actions/rust-smoke-tests
@@ -141,7 +141,7 @@ jobs:
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
@@ -159,7 +159,7 @@ jobs:
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
@@ -184,7 +184,7 @@ jobs:
       )
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Install Move Prover tools
       - name: Run dev_setup.sh
         run: |
@@ -207,7 +207,7 @@ jobs:
       )
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run aptos cached packages build test
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -220,7 +220,7 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-api --exclude aptos-executor-benchmark --exclude aptos-backup-cli --retries 3 --no-fail-fast -F consensus-only-perf-test
         env:
           RUST_MIN_STACK: 4297152
@@ -230,7 +230,7 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # prebuild aptos-node binary, so that tests don't start before node is built.
       # also prebuild aptos-node binary as a separate step to avoid feature unification issues
       - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
