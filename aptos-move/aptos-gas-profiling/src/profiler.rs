@@ -235,6 +235,13 @@ where
             &mut self,
             locals: impl Iterator<Item = impl ValueView> + Clone,
         ) -> PartialVMResult<()>;
+
+        fn charge_deserialize_resource(
+            &mut self,
+            addr: AccountAddress,
+            ty: &impl TypeView,
+            val: impl ValueView,
+        ) -> PartialVMResult<()>;
     }
 
     record_bytecode! {
@@ -521,17 +528,18 @@ where
         res
     }
 
-    fn charge_load_resource(
+    fn charge_load_resource_bytes(
         &mut self,
         addr: AccountAddress,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
+        ty: &impl TypeView,
+        resource_exists: bool,
         bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         let ty_tag = ty.to_type_tag();
 
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_load_resource(addr, ty, val, bytes_loaded));
+        let (cost, res) = self.delegate_charge(|base| {
+            base.charge_load_resource_bytes(addr, ty, resource_exists, bytes_loaded)
+        });
 
         self.record_gas_event(ExecutionGasEvent::LoadResource {
             addr,
