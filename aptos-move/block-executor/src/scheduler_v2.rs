@@ -148,7 +148,7 @@ impl<'a> AbortManager<'a> {
 
     pub(crate) fn invalidate_dependencies(
         &mut self,
-        dependencies: BTreeSet<(TxnIndex, Incarnation)>,
+        dependencies: BTreeMap<TxnIndex, Incarnation>,
     ) -> Result<(), PanicError> {
         // Might want to consider iterating over incarnations in reverse order to ensure
         // that invalidate method implementation can avoid outdated try_abort calls.

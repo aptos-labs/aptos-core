@@ -13,7 +13,7 @@ use proptest::{
     collection::vec, prelude::*, sample::Index, strategy::ValueTree, test_runner::TestRunner,
 };
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap},
     fmt::Debug,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -116,7 +116,7 @@ fn test_dependencies(
         rayon::scope(|s| {
             for _ in 0..num_workers {
                 s.spawn(|_| loop {
-                    let process_deps = |invalidated_deps: BTreeSet<(TxnIndex, Incarnation)>| {
+                    let process_deps = |invalidated_deps: BTreeMap<TxnIndex, Incarnation>| {
                         for (txn_idx, incarnation) in invalidated_deps {
                             assert_ok!(rescheduled_reads.push((txn_idx, incarnation + 1)));
                         }
@@ -129,23 +129,31 @@ fn test_dependencies(
                             match &transactions[idx].1 {
                                 Operator::Read => Some((transactions[idx].0, idx as TxnIndex, 0)),
                                 Operator::Insert(v) => {
-                                    process_deps(map.data().write_v2::<false>(
-                                        key,
-                                        idx as TxnIndex,
-                                        0,
-                                        Arc::new(MockValue::new(Some(*v))),
-                                        None,
-                                    ));
+                                    process_deps(
+                                        map.data()
+                                            .write_v2::<false>(
+                                                key,
+                                                idx as TxnIndex,
+                                                0,
+                                                Arc::new(MockValue::new(Some(*v))),
+                                                None,
+                                            )
+                                            .unwrap(),
+                                    );
                                     None
                                 },
                                 Operator::InsertAndRemove(v) => {
-                                    process_deps(map.data().write_v2::<false>(
-                                        key.clone(),
-                                        idx as TxnIndex,
-                                        0,
-                                        Arc::new(MockValue::new(Some(*v))),
-                                        None,
-                                    ));
+                                    process_deps(
+                                        map.data()
+                                            .write_v2::<false>(
+                                                key.clone(),
+                                                idx as TxnIndex,
+                                                0,
+                                                Arc::new(MockValue::new(Some(*v))),
+                                                None,
+                                            )
+                                            .unwrap(),
+                                    );
                                     sleep(Duration::from_millis(sleep_millis));
                                     process_deps(
                                         map.data()
@@ -234,7 +242,7 @@ fn test_dependencies(
 
         let mut expected_deps: HashMap<
             KeyType<[u8; 32]>,
-            BTreeMap<ShiftedTxnIndex, BTreeSet<(TxnIndex, Incarnation)>>,
+            BTreeMap<ShiftedTxnIndex, BTreeMap<TxnIndex, Incarnation>>,
         > = HashMap::new();
         for (idx, txn) in transactions.iter().enumerate() {
             if let Operator::Read = txn.1 {
@@ -252,10 +260,10 @@ fn test_dependencies(
                     .or_default()
                     .entry(expected_idx.clone())
                     .or_default()
-                    .insert((
+                    .insert(
                         idx as TxnIndex,
                         correct_read[idx].load(Ordering::Relaxed) as u32 / 2,
-                    ));
+                    );
             }
         }
 
