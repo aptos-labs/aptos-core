@@ -1311,9 +1311,7 @@ module aptos_framework::delegation_pool {
         calculate_total_voting_power(pool, delegated_votes)
     }
 
-    inline fun borrow_mut_delegators_allowlist(
-        pool_address: address
-    ): &mut SmartTable<address, bool> acquires DelegationPoolAllowlisting {
+    inline fun borrow_mut_delegators_allowlist(pool_address: address): &mut SmartTable<address, bool> {
         &mut borrow_global_mut<DelegationPoolAllowlisting>(pool_address).allowlist
     }
 
