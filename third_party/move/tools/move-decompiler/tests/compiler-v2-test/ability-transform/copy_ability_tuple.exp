@@ -7,14 +7,8 @@ module 0x42::M {
     }
     public fun g(s: &signer) {
         let (_t4,_t5) = f(R{f: 1});
-        move_to(_t4, s);
+        move_to<R>(s, _t4);
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot use `R` with an operator which expects a value of type `&signer`
-   ┌─ copy_ability_tuple.move:10:17
-   │
-10 │         move_to(_t4, s);
-   │                 ^^^
+============ recompilation succeeded ========

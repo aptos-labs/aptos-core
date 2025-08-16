@@ -1,9 +1,9 @@
 module 0x42::B {
+    friend 0x42::A;
     friend fun foo() {
         ()
     }
 }
-
 module 0x42::A {
     use 0x42::B;
     friend fun foo() {
@@ -11,13 +11,4 @@ module 0x42::A {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with env checking errors
-error: function `0x42::B::foo` cannot be called from function `0x42::A::foo` because module `0x42::A` is not a `friend` of `0x42::B`
-   ┌─ mix_friend_package_visibility_valid.move:2:16
-   │
- 2 │     friend fun foo() {
-   │                ^^^ callee
-   ·
-10 │         B::foo();
-   │         -------- called here
+============ recompilation succeeded ========

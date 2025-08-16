@@ -3,7 +3,8 @@ module 0x8675309::Tester {
         f: u64,
     }
     fun bump_and_give(x_ref: &mut X, _other: &u64): &u64 {
-        &mut x_ref.f = *&x_ref.f + 1;
+        let _t7 = *&x_ref.f + 1;
+        *&mut x_ref.f = _t7;
         &x_ref.f
     }
     fun contrived_example(result: &mut u64) {
@@ -15,10 +16,4 @@ module 0x8675309::Tester {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-  ┌─ imm_borrow_loc_trivial.move:6:9
-  │
-6 │         &mut x_ref.f = *&x_ref.f + 1;
-  │         ^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========

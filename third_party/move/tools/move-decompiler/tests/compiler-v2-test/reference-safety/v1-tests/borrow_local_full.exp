@@ -11,45 +11,27 @@ module 0x8675309::M {
     }
     fun t0() {
         let _t0 = 0;
+        let _t5 = &mut _t0;
         let _t1 = &mut _t0;
-        *&mut _t0;
-        *_t1;
-        *id_mut<u64>(&mut _t0);
-        *&mut _t0;
+        let _t7 = *_t5;
+        let _t9 = *_t1;
+        let _t11 = id_mut<u64>(&mut _t0);
+        let _t13 = *_t11;
+        let _t15 = *&mut _t0;
+        let _t16 = &_t0;
         let _t2 = &mut _t0;
-        *_t2;
-        *&_t0;
-        *_t2;
+        let _t19 = *_t2;
+        let _t20 = *_t16;
+        let _t22 = *_t2;
         let _t3 = &_t0;
-        *_t3;
-        *&_t0;
-        *_t3;
+        let _t26 = *_t3;
+        let _t27 = *&_t0;
+        let _t29 = *_t3;
         _t3 = id<u64>(&_t0);
-        *_t3;
-        *&_t0;
-        *_t3;
+        let _t34 = *_t3;
+        let _t35 = *&_t0;
+        let _t37 = *_t3;
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with stackless-bytecode checks failed
-error: cannot copy local `_t0` which is still mutably borrowed
-   ┌─ borrow_local_full.move:15:15
-   │
-14 │         let _t1 = &mut _t0;
-   │                   -------- local `_t0` previously mutably borrowed here
-15 │         *&mut _t0;
-   │               ^^^ copy attempted here
-16 │         *_t1;
-   │         ---- conflicting reference `_t1` used here
-
-error: cannot copy local `_t0` which is still mutably borrowed
-   ┌─ borrow_local_full.move:21:11
-   │
-19 │         let _t2 = &mut _t0;
-   │                   -------- local `_t0` previously mutably borrowed here
-20 │         *_t2;
-21 │         *&_t0;
-   │           ^^^ copy attempted here
-22 │         *_t2;
-   │         ---- conflicting reference `_t2` used here
+============ recompilation succeeded ========

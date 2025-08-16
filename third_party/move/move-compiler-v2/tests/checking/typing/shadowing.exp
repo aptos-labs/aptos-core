@@ -90,7 +90,7 @@ module 0x8675309::M {
         {
             let x = false;
             {
-                let x = 0x0;
+                let x = @0x0;
                 x;
             };
             x;
@@ -103,7 +103,7 @@ module 0x8675309::M {
             let (a,x) = (false, false);
             a && x;
         } else {
-            let x = 0x0;
+            let x = @0x0;
             x;
         };
         x;

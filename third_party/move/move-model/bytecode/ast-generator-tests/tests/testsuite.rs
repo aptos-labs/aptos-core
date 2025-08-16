@@ -59,7 +59,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
                     env.set_function_def(fun_id, def);
                 }
             }
-            let sourcifier = Sourcifier::new(&env);
+            let sourcifier = Sourcifier::new(&env, true);
             for mid in modules {
                 sourcifier.print_module(mid)
             }

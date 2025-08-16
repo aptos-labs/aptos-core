@@ -60,27 +60,27 @@ module 0x42::pack_unpack {
         S{f1: x,f2: y,f3: z}
     }
     fun pack2(x: u8, y: u8, z: u8): S {
-        let $f1 = x;
-        let $f3 = y;
-        S{f1: $f1,f2: z,f3: $f3}
+        let _f1 = x;
+        let _f3 = y;
+        S{f1: _f1,f2: z,f3: _f3}
     }
     fun pack3(x: u8, y: u8, z: u8): S {
-        let $f2 = x;
-        S{f1: y,f2: $f2,f3: z}
+        let _f2 = x;
+        S{f1: y,f2: _f2,f3: z}
     }
     fun pack4(x: u8, y: u8, z: u8): S {
-        let $f2 = x;
-        let $f3 = y;
-        S{f1: z,f2: $f2,f3: $f3}
+        let _f2 = x;
+        let _f3 = y;
+        S{f1: z,f2: _f2,f3: _f3}
     }
     fun pack5(x: u8, y: u8, z: u8): S {
-        let $f3 = x;
-        S{f1: y,f2: z,f3: $f3}
+        let _f3 = x;
+        S{f1: y,f2: z,f3: _f3}
     }
     fun pack6(x: u8, y: u8, z: u8): S {
-        let $f3 = x;
-        let $f2 = y;
-        S{f1: z,f2: $f2,f3: $f3}
+        let _f3 = x;
+        let _f2 = y;
+        S{f1: z,f2: _f2,f3: _f3}
     }
 }
 

@@ -113,44 +113,44 @@ module 0x42::test {
     }
     fun bitand_vec_coin_new(x: vector<Coin>, index: u64) {
         {
-            let $t2 = 42u256;
-            let $t1 = &mut 0x1::vector::borrow_mut<Coin>(&mut x, index).0;
-            *$t1 = *$t1 & $t2
+            let _t2 = 42u256;
+            let _t1 = &mut 0x1::vector::borrow_mut<Coin>(&mut x, index).0;
+            *_t1 = *_t1 & _t2
         };
     }
     fun bitor_vec_new(x: &mut vector<u256>, index: u64) {
         {
-            let $t2 = 42u256;
-            let $t1 = 0x1::vector::borrow_mut<u256>(x, index);
-            *$t1 = *$t1 | $t2
+            let _t2 = 42u256;
+            let _t1 = 0x1::vector::borrow_mut<u256>(x, index);
+            *_t1 = *_t1 | _t2
         };
     }
     fun coin_double(self: &mut Coin) {
         {
-            let $t2 = 2u256;
-            let $t1 = &mut self.0;
-            *$t1 = *$t1 * $t2
+            let _t2 = 2u256;
+            let _t1 = &mut self.0;
+            *_t1 = *_t1 * _t2
         };
     }
     fun coin_mod_2(self: &mut Coin) {
         {
-            let $t2 = 2u256;
-            let $t1 = &mut self.0;
-            *$t1 = *$t1 % $t2
+            let _t2 = 2u256;
+            let _t1 = &mut self.0;
+            *_t1 = *_t1 % _t2
         };
     }
     fun half_wrapped_coin_new(x: &mut Wrapper<Coin>) {
         {
-            let $t2 = 2u256;
-            let $t1 = &mut x.0.0;
-            *$t1 = *$t1 / $t2
+            let _t2 = 2u256;
+            let _t1 = &mut x.0.0;
+            *_t1 = *_t1 / _t2
         };
     }
     fun shl_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) {
         {
-            let $t2 = 1u8;
-            let $t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
-            *$t1 = *$t1 << $t2
+            let _t2 = 1u8;
+            let _t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
+            *_t1 = *_t1 << _t2
         };
     }
     fun shr_coin_at(addr: address)
@@ -158,23 +158,23 @@ module 0x42::test {
     {
         let coin = borrow_global_mut<Coin>(addr);
         {
-            let $t2 = 1u8;
-            let $t1 = &mut coin.0;
-            *$t1 = *$t1 >> $t2
+            let _t2 = 1u8;
+            let _t1 = &mut coin.0;
+            *_t1 = *_t1 >> _t2
         };
     }
     fun sub1(x: &mut u256) {
         {
-            let $t2 = 1u256;
-            let $t1 = x;
-            *$t1 = *$t1 - $t2
+            let _t2 = 1u256;
+            let _t1 = x;
+            *_t1 = *_t1 - _t2
         };
     }
     fun xor_vec_wrapped_coin_new(x: vector<Wrapper<Coin>>, index: u64) {
         {
-            let $t2 = 1u256;
-            let $t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
-            *$t1 = *$t1 ^ $t2
+            let _t2 = 1u256;
+            let _t1 = &mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut x, index).0.0;
+            *_t1 = *_t1 ^ _t2
         };
     }
 }

@@ -1,4 +1,5 @@
 module 0x815::a {
+    friend 0x815::c;
     friend fun f() {
         ()
     }
@@ -6,13 +7,12 @@ module 0x815::a {
         ()
     }
 }
-
 module 0x815::b {
+    friend 0x815::c;
     friend fun f() {
         ()
     }
 }
-
 module 0x815::c {
     use 0x815::a;
     use 0x815::b;
@@ -23,31 +23,4 @@ module 0x815::c {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with env checking errors
-error: function `0x815::a::f` cannot be called from function `0x815::c::f` because module `0x815::c` is not a `friend` of `0x815::a`
-   ┌─ direct_visibility.move:2:16
-   │
- 2 │     friend fun f() {
-   │                ^ callee
-   ·
-20 │         a::f();
-   │         ------ called here
-
-error: function `0x815::a::g` cannot be called from function `0x815::c::f` because module `0x815::c` is not a `friend` of `0x815::a`
-   ┌─ direct_visibility.move:5:16
-   │
- 5 │     friend fun g() {
-   │                ^ callee
-   ·
-21 │         a::g();
-   │         ------ called here
-
-error: function `0x815::b::f` cannot be called from function `0x815::c::f` because module `0x815::c` is not a `friend` of `0x815::b`
-   ┌─ direct_visibility.move:11:16
-   │
-11 │     friend fun f() {
-   │                ^ callee
-   ·
-22 │         b::f();
-   │         ------ called here
+============ recompilation succeeded ========

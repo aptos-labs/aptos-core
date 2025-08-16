@@ -20,9 +20,9 @@ module 0x42::test {
 module 0x42::test {
     fun inc_new(x: &u256) {
         {
-            let $t2 = 1u256;
-            let $t1 = x;
-            *$t1 = *$t1 + $t2
+            let _t2 = 1u256;
+            let _t1 = x;
+            *_t1 = *_t1 + _t2
         };
     }
     fun inc_old(x: &u256) {

@@ -453,10 +453,10 @@ module 0x42::test {
         let S7(_w,_x,_y,_z) = x;
     }
     fun test_lambda_param(): bool {
-        lambda_param(|arg0| __lambda__1__test_lambda_param(arg0))
+        lambda_param(|arg0| lambda__1__test_lambda_param(arg0))
     }
-    fun __lambda__1__test_lambda_param(param$0: S2): bool {
-        let S2(x,_) = param$0;
+    fun lambda__1__test_lambda_param(param_0: S2): bool {
+        let S2(x,_) = param_0;
         x
     }
 }

@@ -91,7 +91,7 @@ module 0x42::m {
             let x' = 0x1::vector::length<T>(v);
             let len = 0x1::vector::length<T>(v);
             while (i < len) {
-                if (__lambda__1_inline_1_956__test(issuer, x, 0x1::vector::borrow<T>(v, i))) {
+                if (lambda__1_inline_1_956__test(issuer, x, 0x1::vector::borrow<T>(v, i))) {
                     find = true;
                     found_index = i;
                     break
@@ -107,7 +107,7 @@ module 0x42::m {
             (find, found_index)
         };
     }
-    fun __lambda__1_inline_1_956__test(issuer: vector<u8>, x: u64, obj: &T): bool {
+    fun lambda__1_inline_1_956__test(issuer: vector<u8>, x: u64, obj: &T): bool {
 
         /* spec {
           assume Gt(Len<u8>($t0), 0);

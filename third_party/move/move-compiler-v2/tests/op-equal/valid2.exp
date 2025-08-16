@@ -35,18 +35,18 @@ module 0xc0ffee::m {
     }
     fun foo(self: &mut S): u64 {
         {
-            let $t2 = 1;
-            let $t1 = &mut self.x;
-            *$t1 = *$t1 + $t2
+            let _t2 = 1;
+            let _t1 = &mut self.x;
+            *_t1 = *_t1 + _t2
         };
         1
     }
     public fun test(): u64 {
         let s = S{x: 0};
         {
-            let $t2 = foo(&mut s);
-            let $t1 = &mut s.x;
-            *$t1 = *$t1 + $t2
+            let _t2 = foo(&mut s);
+            let _t1 = &mut s.x;
+            *_t1 = *_t1 + _t2
         };
         s.x
     }

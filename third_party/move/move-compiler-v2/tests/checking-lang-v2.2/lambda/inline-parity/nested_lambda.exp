@@ -1,6 +1,6 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::Test {
-    public fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+    public fun apply(f: |u64, u64|u64,x: u64,y: u64): u64 {
         (f)(x, y)
     }
     public fun test(): u64 {
@@ -16,16 +16,16 @@ module 0x42::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
-    public fun apply(f: |(u64, u64)|u64, x: u64, y: u64): u64 {
+    public fun apply(f: |u64, u64|u64, x: u64, y: u64): u64 {
         f(x, y)
     }
     public fun test(): u64 {
-        apply(|(arg0,arg1)| __lambda__1__test(arg0, arg1), 1, apply(|(arg0,arg1)| __lambda__2__test(arg0, arg1), 2, 1))
+        apply(|arg0,arg1| lambda__1__test(arg0, arg1), 1, apply(|arg0,arg1| lambda__2__test(arg0, arg1), 2, 1))
     }
-    fun __lambda__1__test(x: u64, y: u64): u64 {
+    fun lambda__1__test(x: u64, y: u64): u64 {
         x + y
     }
-    fun __lambda__2__test(x: u64, y: u64): u64 {
+    fun lambda__2__test(x: u64, y: u64): u64 {
         x * y
     }
 }

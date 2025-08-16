@@ -23,7 +23,7 @@ module 0xc0ffee::n {
     public fun test(): 0xc0ffee::m::Lazy {
         <<wrongly typed closure expression>>
     }
-    fun __lambda__1__test() {
+    fun lambda__1__test() {
     }
 }
 

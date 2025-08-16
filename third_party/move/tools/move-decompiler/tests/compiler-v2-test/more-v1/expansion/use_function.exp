@@ -1,6 +1,6 @@
 module 0x2::X {
     public fun a(): address {
-        0x0
+        @0x0
     }
     public fun bar() {
         ()
@@ -9,26 +9,19 @@ module 0x2::X {
         0
     }
 }
-
 module 0x2::M {
     use 0x2::X;
     fun bar() {
         X::bar();
     }
     fun t() {
-        X::u();
-        X::u();
-        X::u();
-        X::a();
-        X::a();
-        X::a();
+        let _t0 = X::u();
+        let _t1 = X::u();
+        let _t2 = X::u();
+        let _t3 = X::a();
+        let _t4 = X::a();
+        let _t5 = X::a();
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: cannot return `integer` from a function with result type `address`
-  ┌─ use_function.move:3:9
-  │
-3 │         0x0
-  │         ^^^
+============ recompilation succeeded ========

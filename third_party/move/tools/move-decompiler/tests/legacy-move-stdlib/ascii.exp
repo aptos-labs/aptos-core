@@ -7,7 +7,9 @@ module 0x1::ascii {
         bytes: vector<u8>,
     }
     public fun length(string: &String): u64 {
-        0x1::vector::length<u8>(as_bytes(string))
+        let _t2 = as_bytes(string);
+        let _t3 = 0x1::vector::length<u8>(_t2);
+        _t3
     }
     public fun byte(char: Char): u8 {
         let Char{byte: _t2} = char;
@@ -15,8 +17,10 @@ module 0x1::ascii {
     }
     public fun string(bytes: vector<u8>): String {
         let _t1 = try_string(bytes);
-        if (!option::is_some<String>(&_t1)) abort 65536;
-        option::destroy_some<String>(_t1)
+        let _t5 = option::is_some<String>(&_t1);
+        if (!_t5) abort 65536;
+        let _t7 = option::destroy_some<String>(_t1);
+        _t7
     }
     public fun as_bytes(string: &String): &vector<u8> {
         &string.bytes
@@ -25,9 +29,14 @@ module 0x1::ascii {
         let _t2 = 0;
         'l0: loop {
             loop {
-                if (!(_t2 < 0x1::vector::length<u8>(&string.bytes))) break 'l0;
-                if (!is_printable_char(*0x1::vector::borrow<u8>(&string.bytes, _t2))) break;
-                _t2 = _t2 + 1
+                let _t8 = 0x1::vector::length<u8>(&string.bytes);
+                if (!(_t2 < _t8)) break 'l0;
+                let _t11 = &string.bytes;
+                let _t12 = _t2;
+                let _t13 = 0x1::vector::borrow<u8>(_t11, _t12);
+                if (!is_printable_char(*_t13)) break;
+                _t2 = _t2 + 1;
+                continue
             };
             return false
         };
@@ -42,16 +51,24 @@ module 0x1::ascii {
         let _t2 = 0;
         'l0: loop {
             loop {
-                if (!(_t2 < 0x1::vector::length<u8>(&bytes))) break 'l0;
-                if (!is_valid_char(*0x1::vector::borrow<u8>(&bytes, _t2))) break;
-                _t2 = _t2 + 1
+                let _t7 = 0x1::vector::length<u8>(&bytes);
+                if (!(_t2 < _t7)) break 'l0;
+                let _t9 = &bytes;
+                let _t10 = _t2;
+                let _t11 = 0x1::vector::borrow<u8>(_t9, _t10);
+                if (!is_valid_char(*_t11)) break;
+                _t2 = _t2 + 1;
+                continue
             };
-            return option::none<String>()
+            let _t14 = option::none<String>();
+            return _t14
         };
-        option::some<String>(String{bytes: bytes})
+        let _t20 = option::some<String>(String{bytes: bytes});
+        _t20
     }
     public fun char(byte: u8): Char {
-        if (!is_valid_char(byte)) abort 65536;
+        let _t2 = is_valid_char(byte);
+        if (!_t2) abort 65536;
         Char{byte: byte}
     }
     public fun is_valid_char(b: u8): bool {
@@ -62,7 +79,8 @@ module 0x1::ascii {
         _t2
     }
     public fun pop_char(string: &mut String): Char {
-        Char{byte: 0x1::vector::pop_back<u8>(&mut string.bytes)}
+        let _t3 = 0x1::vector::pop_back<u8>(&mut string.bytes);
+        Char{byte: _t3}
     }
     public fun push_char(string: &mut String, char: Char) {
         0x1::vector::push_back<u8>(&mut string.bytes, *&(&char).byte);

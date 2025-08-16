@@ -18,6 +18,7 @@ module 0x1::M {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x1::M {
+    #[testonly]
     fun bar() {
     }
     fun foo() {

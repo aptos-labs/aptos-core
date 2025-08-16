@@ -20,7 +20,7 @@ module 0x42::M {
         *ref = HasDrop<NoAbilities,u64>{a: 1};
     }
     fun f2() {
-        HasDrop<NoAbilities,u64>{a: 1};
+        let _t1 = HasDrop<NoAbilities,u64>{a: 1};
     }
     fun f3(_x: HasDrop<NoAbilities, u64>) {
         ()
@@ -29,35 +29,19 @@ module 0x42::M {
         (x, x)
     }
     fun f5(s: &signer, x: HasKey<NoAbilities, u64>) {
-        move_to<NoAbilities,u64>(x, s);
+        move_to<HasKey<NoAbilities, u64>>(s, x);
     }
     fun f6(): HasKey<NoAbilities, u64> {
-        move_from<NoAbilities,u64>(0x0)
+        let _t1 = move_from<HasKey<NoAbilities, u64>>(@0x0);
+        _t1
     }
     fun f7(): bool {
-        exists<NoAbilities,u64>(0x0)
+        let _t1 = exists<HasKey<NoAbilities, u64>>(@0x0);
+        _t1
     }
     fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
         RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities,u64>{a: 1}}
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: expected 1 type argument but 2 were provided
-   ┌─ phantom_param_op_abilities.move:32:9
-   │
-32 │         move_to<NoAbilities,u64>(x, s);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: expected 1 type argument but 2 were provided
-   ┌─ phantom_param_op_abilities.move:35:9
-   │
-35 │         move_from<NoAbilities,u64>(0x0)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: expected 1 type argument but 2 were provided
-   ┌─ phantom_param_op_abilities.move:38:9
-   │
-38 │         exists<NoAbilities,u64>(0x0)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+============ recompilation succeeded ========

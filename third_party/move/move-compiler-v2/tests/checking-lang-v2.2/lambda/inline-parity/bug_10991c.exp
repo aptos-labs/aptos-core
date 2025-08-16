@@ -1,6 +1,6 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::Test {
-    private fun foo(g: |(u64, u64, u64, u64)|u64,x: u64,y: u64,z: u64,q: u64): u64 {
+    private fun foo(g: |u64, u64, u64, u64|u64,x: u64,y: u64,z: u64,q: u64): u64 {
         (g)(x, y, z, q)
     }
     public fun test() {
@@ -24,15 +24,15 @@ module 0x42::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
-    fun foo(g: |(u64, u64, u64, u64)|u64, x: u64, y: u64, z: u64, q: u64): u64 {
+    fun foo(g: |u64, u64, u64, u64|u64, x: u64, y: u64, z: u64, q: u64): u64 {
         g(x, y, z, q)
     }
     public fun test() {
-        if (foo(|(arg0,arg1,arg2,arg3)| __lambda__1__test(arg0, arg1, arg2, arg3), 10, 100, 1000, 10000) == 10100) () else abort 0;
+        if (foo(|arg0,arg1,arg2,arg3| lambda__1__test(arg0, arg1, arg2, arg3), 10, 100, 1000, 10000) == 10100) () else abort 0;
     }
-    fun __lambda__1__test(param$0: u64, y: u64, param$2: u64, q: u64): u64 {
-        let _ = param$2;
-        let _ = param$0;
+    fun lambda__1__test(param_0: u64, y: u64, param_2: u64, q: u64): u64 {
+        let _ = param_2;
+        let _ = param_0;
         y + q
     }
 }

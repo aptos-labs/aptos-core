@@ -7,7 +7,7 @@ module 0x42::assign {
         g: T,
     }
     fun assign_field(s: &mut S, f: u64) {
-        &mut s.f = f;
+        *&mut s.f = f;
     }
     fun assign_int(x: &mut u64) {
         *x = 42;
@@ -22,10 +22,4 @@ module 0x42::assign {
     }
 }
 
---- unable to recompile the decompiled code:
-exiting with context checking errors
-error: invalid assignment
-   ┌─ assign.move:10:9
-   │
-10 │         &mut s.f = f;
-   │         ^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+============ recompilation succeeded ========
