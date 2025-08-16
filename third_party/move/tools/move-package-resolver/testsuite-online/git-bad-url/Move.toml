@@ -1,0 +1,6 @@
+[package]
+name = "Pack"
+version = "0.1.2"
+
+[dependencies]
+MoveStdlib = { git = "https://aptoslabs.com/does-not-exist", rev = "main", subdir = "move-stdlib" }
