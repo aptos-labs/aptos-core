@@ -469,10 +469,11 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
     <b>let</b> bucket = self.buckets.<a href="smart_table.md#0x1_smart_table_borrow_mut">borrow_mut</a>(index);
     // We set a per-bucket limit here <b>with</b> a upper bound (10000) that nobody should normally reach.
     <b>assert</b>!(bucket.<a href="smart_table.md#0x1_smart_table_length">length</a>() &lt;= 10000, <a href="../../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="smart_table.md#0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE">EEXCEED_MAX_BUCKET_SIZE</a>));
-    <b>assert</b>!(bucket.all(| entry | {
+    <b>let</b> key_not_in_bucket = bucket.all(|entry| {
         <b>let</b> e: &<a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; = entry;
         &e.key != &key
-    }), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
+    });
+    <b>assert</b>!(key_not_in_bucket, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_table.md#0x1_smart_table_EALREADY_EXIST">EALREADY_EXIST</a>));
     <b>let</b> e = <a href="smart_table.md#0x1_smart_table_Entry">Entry</a> { <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>, key, value };
     <b>if</b> (self.target_bucket_size == 0) {
         <b>let</b> estimated_entry_size = max(size_of_val(&e), 1);
