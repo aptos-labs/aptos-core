@@ -42,7 +42,7 @@ module aptos_experimental::pending_order_book_index {
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
     ) {
-        let (price_move_up_index, price_move_down_index, time_based_index) =
+        let (price_move_down_index, price_move_up_index, time_based_index) =
             trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(
