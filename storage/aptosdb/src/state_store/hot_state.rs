@@ -207,6 +207,16 @@ impl Committer {
             self.commit(&to_commit);
             self.evict();
             *self.committed.lock() = to_commit;
+            let versions: Vec<_> = self
+                .heads
+                .iter()
+                .enumerate()
+                .map(|(id, head_opt)| head_opt.as_ref().map(|head| self.base.shards[id].get(head)))
+                .collect();
+            info!("versions: {versions:?}");
+
+            let sizes: Vec<_> = self.base.shards.iter().map(|shard| shard.len()).collect();
+            info!("shard sizes: {sizes:?}");
 
             GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
             GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
@@ -322,6 +332,7 @@ impl Committer {
                 self.total_value_bytes -= slot.size();
             }
         }
+        info!("num items evicted: {}", num_evicted);
         COUNTER.inc_with_by(&["hot_state_evict"], num_evicted as u64);
     }
 }
