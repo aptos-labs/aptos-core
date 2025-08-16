@@ -34,7 +34,6 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
-derive_more = { workspace = true }
 fixed = { workspace = true }
 fxhash = { workspace = true }
 hashbrown = { workspace = true }
