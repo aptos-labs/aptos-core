@@ -37,12 +37,16 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
-        Transaction,
+        Transaction, TransactionExecutableRef,
     },
     validator_signer::ValidatorSigner,
+    vm::module_metadata::get_randomness_annotation_for_entry_function,
 };
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use move_vm_runtime::ModuleStorage;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
@@ -51,6 +55,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
+
 static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -123,6 +128,7 @@ pub struct PipelineBuilder {
     txn_notifier: Arc<dyn TxnNotifier>,
     pre_commit_status: Arc<Mutex<PreCommitStatus>>,
     order_vote_enabled: bool,
+    execution_lock: Arc<Mutex<()>>,
 }
 
 fn spawn_shared_fut<
@@ -254,6 +260,7 @@ impl PipelineBuilder {
             txn_notifier,
             pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
             order_vote_enabled,
+            execution_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -393,6 +400,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
+                self.execution_lock.clone(),
             ),
             None,
         );
@@ -551,15 +559,48 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
+        execution_lock: Arc<Mutex<()>>,
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
         let (user_txns, block_gas_limit) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
-        let maybe_rand = randomness_rx
-            .await
-            .map_err(|_| anyhow!("randomness tx cancelled"))?;
+
+        let latest_state_view = executor
+            .state_view(block.parent_id())
+            .map_err(anyhow::Error::from)?;
+
+        let mut has_randomness = false;
+
+        for txn in user_txns.iter() {
+            if let Some(txn) = txn.borrow_into_inner().try_as_signed_user_txn() {
+                if let Ok(TransactionExecutableRef::EntryFunction(entry_fn)) = txn.executable_ref()
+                {
+                    let env = AptosEnvironment::new(&latest_state_view);
+                    let code_storage = latest_state_view.as_aptos_code_storage(&env);
+                    if let Ok(Some(metadata)) = code_storage.unmetered_get_module_metadata(
+                        entry_fn.module().address(),
+                        entry_fn.module().name(),
+                    ) {
+                        if get_randomness_annotation_for_entry_function(entry_fn, &metadata)
+                            .is_some()
+                        {
+                            has_randomness = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let maybe_rand = if has_randomness {
+            randomness_rx
+                .await
+                .map_err(|_| anyhow!("randomness tx cancelled"))?
+        } else {
+            None
+        };
 
         tracker.start_working();
         let metadata_txn = if is_randomness_enabled {
@@ -603,6 +644,8 @@ impl PipelineBuilder {
             .collect();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
+            // take the lock to ensure only one execution is running at a time
+            let _guard = execution_lock.lock();
             executor
                 .execute_and_update_state(
                     (block.id(), txns, auxiliary_info).into(),
