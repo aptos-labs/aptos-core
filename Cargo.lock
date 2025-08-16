@@ -849,6 +849,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-framework",
  "aptos-language-e2e-tests",
+ "aptos-replay-benchmark",
  "aptos-rest-client",
  "aptos-transaction-simulation",
  "aptos-types",
@@ -860,9 +861,12 @@ dependencies = [
  "itertools 0.13.0",
  "legacy-move-compiler",
  "move-binary-format",
+ "move-command-line-common",
+ "move-compiler-v2",
  "move-core-types",
  "move-model",
  "move-package",
+ "rand 0.7.3",
  "rocksdb",
  "serde",
  "tempfile",
@@ -4718,6 +4722,7 @@ dependencies = [
  "bcs 0.1.4",
  "lru",
  "move-core-types",
+ "rand 0.7.3",
  "tokio",
 ]
 
