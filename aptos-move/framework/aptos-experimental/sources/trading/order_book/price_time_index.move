@@ -3,17 +3,19 @@
 /// The orders are matched based on time-price priority.
 ///
 /// This is internal module, which cannot be used directly, use OrderBook instead.
-module aptos_experimental::active_order_book {
+module aptos_experimental::price_time_index {
     use std::option::{Self, Option};
     use aptos_std::math64::mul_div;
     use aptos_framework::big_ordered_map::BigOrderedMap;
     use aptos_experimental::order_book_types::{
         OrderIdType,
         UniqueIdxType,
+        new_default_big_ordered_map
+    };
+    use aptos_experimental::single_order_types::{
         new_active_matched_order,
         ActiveMatchedOrder,
-        get_slippage_pct_precision,
-        new_default_big_ordered_map
+        get_slippage_pct_precision
     };
     #[test_only]
     use std::vector;
@@ -24,6 +26,7 @@ module aptos_experimental::active_order_book {
     /// There is a code bug that breaks internal invariant
     const EINTERNAL_INVARIANT_BROKEN: u64 = 2;
 
+    friend aptos_experimental::single_order_book;
     friend aptos_experimental::order_book;
 
     /// ========= Active OrderBook ===========
@@ -35,12 +38,12 @@ module aptos_experimental::active_order_book {
 
     const U64_MAX: u64 = 0xffffffffffffffff;
 
-    struct ActiveBidKey has store, copy, drop {
+    struct PriceTime has store, copy, drop {
         price: u64,
         tie_breaker: UniqueIdxType
     }
 
-    struct ActiveBidData has store, copy, drop {
+    struct OrderData has store, copy, drop {
         order_id: OrderIdType,
         size: u64
     }
@@ -50,17 +53,17 @@ module aptos_experimental::active_order_book {
     /// - invariant - all buys are smaller than sells, at all times.
     /// - tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
     ///   that is taken first, is the one inserted first, amongst those with same bid price.
-    enum ActiveOrderBook has store {
+    enum PriceTimeIndex has store {
         V1 {
-            buys: BigOrderedMap<ActiveBidKey, ActiveBidData>,
-            sells: BigOrderedMap<ActiveBidKey, ActiveBidData>
+            buys: BigOrderedMap<PriceTime, OrderData>,
+            sells: BigOrderedMap<PriceTime, OrderData>
         }
     }
 
-    public(friend) fun new_active_order_book(): ActiveOrderBook {
+    public(friend) fun new_price_time_idx(): PriceTimeIndex {
         // potentially add max value to both sides (that will be skipped),
         // so that max_key never changes, and doesn't create conflict.
-        ActiveOrderBook::V1 {
+        PriceTimeIndex::V1 {
             buys: new_default_big_ordered_map(),
             sells: new_default_big_ordered_map()
         }
@@ -68,7 +71,7 @@ module aptos_experimental::active_order_book {
 
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
     /// aborts if there are no buys
-    public(friend) fun best_bid_price(self: &ActiveOrderBook): Option<u64> {
+    public(friend) fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
         if (self.buys.is_empty()) {
             option::none()
         } else {
@@ -79,7 +82,7 @@ module aptos_experimental::active_order_book {
 
     /// Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
     /// aborts if there are no sells
-    public(friend) fun best_ask_price(self: &ActiveOrderBook): Option<u64> {
+    public(friend) fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
         if (self.sells.is_empty()) {
             option::none()
         } else {
@@ -88,7 +91,7 @@ module aptos_experimental::active_order_book {
         }
     }
 
-    public(friend) fun get_mid_price(self: &ActiveOrderBook): Option<u64> {
+    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
         let best_bid = self.best_bid_price();
         let best_ask = self.best_ask_price();
         if (best_bid.is_none() || best_ask.is_none()) {
@@ -101,7 +104,7 @@ module aptos_experimental::active_order_book {
     }
 
     public(friend) fun get_slippage_price(
-        self: &ActiveOrderBook, is_bid: bool, slippage_pct: u64
+        self: &PriceTimeIndex, is_bid: bool, slippage_pct: u64
     ): Option<u64> {
         let mid_price = self.get_mid_price();
         if (mid_price.is_none()) {
@@ -120,7 +123,7 @@ module aptos_experimental::active_order_book {
 
     // TODO check if keeping depth book is more efficient than computing impact prices manually
 
-    fun get_impact_bid_price(self: &ActiveOrderBook, impact_size: u64): Option<u64> {
+    fun get_impact_bid_price(self: &PriceTimeIndex, impact_size: u64): Option<u64> {
         let total_value = (0 as u128);
         let total_size = 0;
         let orders = &self.buys;
@@ -148,7 +151,7 @@ module aptos_experimental::active_order_book {
         option::some((total_value / (total_size as u128)) as u64)
     }
 
-    fun get_impact_ask_price(self: &ActiveOrderBook, impact_size: u64): Option<u64> {
+    fun get_impact_ask_price(self: &PriceTimeIndex, impact_size: u64): Option<u64> {
         let total_value = 0 as u128;
         let total_size = 0;
         let orders = &self.sells;
@@ -186,13 +189,13 @@ module aptos_experimental::active_order_book {
     }
 
     public(friend) fun cancel_active_order(
-        self: &mut ActiveOrderBook,
+        self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: UniqueIdxType,
         is_bid: bool
     ): u64 {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = ActiveBidKey { price, tie_breaker };
+        let key = PriceTime { price, tie_breaker };
         let value =
             if (is_bid) {
                 self.buys.remove(&key)
@@ -203,13 +206,13 @@ module aptos_experimental::active_order_book {
     }
 
     public(friend) fun is_active_order(
-        self: &ActiveOrderBook,
+        self: &PriceTimeIndex,
         price: u64,
         unique_priority_idx: UniqueIdxType,
         is_bid: bool
     ): bool {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = ActiveBidKey { price: price, tie_breaker };
+        let key = PriceTime { price: price, tie_breaker };
         if (is_bid) {
             self.buys.contains(&key)
         } else {
@@ -219,7 +222,7 @@ module aptos_experimental::active_order_book {
 
     /// Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
     public fun is_taker_order(
-        self: &ActiveOrderBook, price: u64, is_bid: bool
+        self: &PriceTimeIndex, price: u64, is_bid: bool
     ): bool {
         if (is_bid) {
             let best_ask_price = self.best_ask_price();
@@ -232,9 +235,9 @@ module aptos_experimental::active_order_book {
 
     fun single_match_with_current_active_order(
         remaining_size: u64,
-        cur_key: ActiveBidKey,
-        cur_value: ActiveBidData,
-        orders: &mut BigOrderedMap<ActiveBidKey, ActiveBidData>
+        cur_key: PriceTime,
+        cur_value: OrderData,
+        orders: &mut BigOrderedMap<PriceTime, OrderData>
     ): ActiveMatchedOrder {
         let is_cur_match_fully_consumed = cur_value.size <= remaining_size;
 
@@ -261,7 +264,7 @@ module aptos_experimental::active_order_book {
     }
 
     fun get_single_match_for_buy_order(
-        self: &mut ActiveOrderBook, price: u64, size: u64
+        self: &mut PriceTimeIndex, price: u64, size: u64
     ): ActiveMatchedOrder {
         let (smallest_key, smallest_value) = self.sells.borrow_front();
         assert!(price >= smallest_key.price, EINTERNAL_INVARIANT_BROKEN);
@@ -274,7 +277,7 @@ module aptos_experimental::active_order_book {
     }
 
     fun get_single_match_for_sell_order(
-        self: &mut ActiveOrderBook, price: u64, size: u64
+        self: &mut PriceTimeIndex, price: u64, size: u64
     ): ActiveMatchedOrder {
         let (largest_key, largest_value) = self.buys.borrow_back();
         assert!(price <= largest_key.price, EINTERNAL_INVARIANT_BROKEN);
@@ -287,7 +290,7 @@ module aptos_experimental::active_order_book {
     }
 
     public(friend) fun get_single_match_result(
-        self: &mut ActiveOrderBook,
+        self: &mut PriceTimeIndex,
         price: u64,
         size: u64,
         is_bid: bool
@@ -301,14 +304,14 @@ module aptos_experimental::active_order_book {
 
     /// Increase the size of the order in the orderbook without altering its position in the price-time priority.
     public(friend) fun increase_order_size(
-        self: &mut ActiveOrderBook,
+        self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: UniqueIdxType,
         size_delta: u64,
         is_bid: bool
     ) {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = ActiveBidKey { price, tie_breaker };
+        let key = PriceTime { price, tie_breaker };
         if (is_bid) {
             self.buys.borrow_mut(&key).size += size_delta;
         } else {
@@ -318,14 +321,14 @@ module aptos_experimental::active_order_book {
 
     /// Decrease the size of the order in the order book without altering its position in the price-time priority.
     public(friend) fun decrease_order_size(
-        self: &mut ActiveOrderBook,
+        self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: UniqueIdxType,
         size_delta: u64,
         is_bid: bool
     ) {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = ActiveBidKey { price, tie_breaker };
+        let key = PriceTime { price, tie_breaker };
         if (is_bid) {
             self.buys.borrow_mut(&key).size -= size_delta;
         } else {
@@ -334,7 +337,7 @@ module aptos_experimental::active_order_book {
     }
 
     public(friend) fun place_maker_order(
-        self: &mut ActiveOrderBook,
+        self: &mut PriceTimeIndex,
         order_id: OrderIdType,
         price: u64,
         unique_priority_idx: UniqueIdxType,
@@ -342,8 +345,8 @@ module aptos_experimental::active_order_book {
         is_bid: bool
     ) {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = ActiveBidKey { price, tie_breaker };
-        let value = ActiveBidData { order_id, size };
+        let key = PriceTime { price, tie_breaker };
+        let value = OrderData { order_id, size };
         // Assert that this is not a taker order
         assert!(!self.is_taker_order(price, is_bid), EINVALID_MAKER_ORDER);
         if (is_bid) {
@@ -354,8 +357,8 @@ module aptos_experimental::active_order_book {
     }
 
     #[test_only]
-    public fun destroy_active_order_book(self: ActiveOrderBook) {
-        let ActiveOrderBook::V1 { sells, buys } = self;
+    public fun destroy_price_time_idx(self: PriceTimeIndex) {
+        let PriceTimeIndex::V1 { sells, buys } = self;
         sells.destroy(|_v| {});
         buys.destroy(|_v| {});
     }
@@ -371,7 +374,7 @@ module aptos_experimental::active_order_book {
     }
 
     #[test_only]
-    fun place_test_order(self: &mut ActiveOrderBook, order: TestOrder):
+    fun place_test_order(self: &mut PriceTimeIndex, order: TestOrder):
         vector<ActiveMatchedOrder> {
         let result = vector::empty();
         let remaining_size = order.size;
@@ -395,7 +398,7 @@ module aptos_experimental::active_order_book {
     #[test]
     // TODO (skedia) Add more comprehensive tests for the acive order book
     fun test_active_order_book() {
-        let active_order_book = new_active_order_book();
+        let active_order_book = new_price_time_idx();
 
         assert!(active_order_book.best_bid_price().is_none());
         assert!(active_order_book.best_ask_price().is_none());
@@ -503,12 +506,12 @@ module aptos_experimental::active_order_book {
                 ],
             7
         );
-        active_order_book.destroy_active_order_book();
+        active_order_book.destroy_price_time_idx();
     }
 
     #[test]
     fun test_get_impact_sell_price() {
-        let active_order_book = new_active_order_book();
+        let active_order_book = new_price_time_idx();
 
         // Add sell orders at different prices
         active_order_book.place_test_order(
@@ -560,12 +563,12 @@ module aptos_experimental::active_order_book {
         // (50 * 100 + 100 * 150 + 150 * 200) / 300 = 166
         assert!(active_order_book.get_impact_ask_price(1000).destroy_some() == 166, 4);
 
-        active_order_book.destroy_active_order_book();
+        active_order_book.destroy_price_time_idx();
     }
 
     #[test]
     fun test_get_impact_bid_price() {
-        let active_order_book = new_active_order_book();
+        let active_order_book = new_price_time_idx();
 
         // Place test buy orders at different prices
         active_order_book.place_test_order(
@@ -617,12 +620,12 @@ module aptos_experimental::active_order_book {
         // (50 * 200 + 100 * 150 + 150 * 100) / 300 = 133
         assert!(active_order_book.get_impact_bid_price(1000).destroy_some() == 133, 4);
 
-        active_order_book.destroy_active_order_book();
+        active_order_book.destroy_price_time_idx();
     }
 
     #[test]
     fun test_get_slippage_price() {
-        let active_order_book = new_active_order_book();
+        let active_order_book = new_price_time_idx();
 
         // Add sell orders at different prices
         active_order_book.place_test_order(
@@ -693,7 +696,7 @@ module aptos_experimental::active_order_book {
         assert!(active_order_book.get_slippage_price(false, 10).destroy_some() == 100);
         assert!(active_order_book.get_slippage_price(false, 0).destroy_some() == 100);
 
-        active_order_book.destroy_active_order_book();
+        active_order_book.destroy_price_time_idx();
 
     }
 }

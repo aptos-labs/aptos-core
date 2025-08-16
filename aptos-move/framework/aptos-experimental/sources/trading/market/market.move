@@ -61,18 +61,22 @@ module aptos_experimental::market {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
         pre_cancel_order_for_tracker, is_pre_cancelled
     };
-    use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
+    use aptos_experimental::price_time_index::PriceTimeIndex;
     use aptos_experimental::order_book_types::{
         new_order_id_type,
         new_ascending_id_generator,
         AscendingIdGenerator,
-        TriggerCondition,
-        Order,
-        OrderIdType, TimeInForce, immediate_or_cancel, post_only
+        OrderIdType
     };
+    use aptos_experimental::single_order_types::{
+        Order
+    };
+    use aptos_experimental::order_book_types::TriggerCondition;
+    use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
     use aptos_experimental::market_types::{
         Self,
         OrderStatus,
@@ -1077,7 +1081,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
-        let order = self.order_book.cancel_order(account, order_id);
+        let order = self.order_book.cancel_order( account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
         self.cancel_order_helper(order, callbacks);
     }
