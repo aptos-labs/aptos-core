@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_key::StateKey;
+use crate::state_store::{state_key::StateKey, state_slot::StateSlot};
 use aptos_crypto::HashValue;
-use derive_more::Deref;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
+use std::{collections::BTreeMap, fmt::Debug};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -18,7 +19,7 @@ pub enum BlockEpiloguePayload {
     },
     V1 {
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     },
 }
@@ -27,7 +28,14 @@ impl BlockEpiloguePayload {
     pub fn try_as_block_end_info(&self) -> Option<&BlockEndInfo> {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
-            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(block_end_info),
+            BlockEpiloguePayload::V1 { block_end_info, .. } => Some(&block_end_info.inner),
+        }
+    }
+
+    pub fn try_get_slots_to_make_hot(&self) -> Option<&BTreeMap<StateKey, StateSlot>> {
+        match self {
+            Self::V0 { .. } => None,
+            Self::V1 { block_end_info, .. } => Some(&block_end_info.to_make_hot),
         }
     }
 }
@@ -94,33 +102,66 @@ impl BlockEndInfo {
 
 /// Wrapper type to temporarily host the hot_state_ops which will not serialize until
 /// the hot state is made entirely deterministic
-/// TODO(HotState): maybe get rid of this struct now that it doesn't have anything more than
-/// `BlockEndInfo`?
-#[derive(Debug, Deref)]
-pub struct TBlockEndInfoExt<Key: Debug> {
-    #[deref]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TBlockEndInfoExt<Key: Debug + Ord> {
     inner: BlockEndInfo,
-    _phantom: PhantomData<Key>,
+    to_make_hot: BTreeMap<Key, StateSlot>,
 }
 
 pub type BlockEndInfoExt = TBlockEndInfoExt<StateKey>;
 
-impl<Key: Debug> TBlockEndInfoExt<Key> {
+impl<Key: Debug + Ord> TBlockEndInfoExt<Key> {
     pub fn new_empty() -> Self {
         Self {
             inner: BlockEndInfo::new_empty(),
-            _phantom: PhantomData,
+            to_make_hot: BTreeMap::new(),
         }
     }
 
-    pub fn new(inner: BlockEndInfo) -> Self {
-        Self {
-            inner,
-            _phantom: PhantomData,
-        }
+    pub fn new(inner: BlockEndInfo, to_make_hot: BTreeMap<Key, StateSlot>) -> Self {
+        Self { inner, to_make_hot }
     }
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
+    }
+}
+
+impl<Key> Serialize for TBlockEndInfoExt<Key>
+where
+    Key: Debug + Ord,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<'de, Key> Deserialize<'de> for TBlockEndInfoExt<Key>
+where
+    Key: Debug + Ord,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = BlockEndInfo::deserialize(deserializer)?;
+        Ok(Self::new(inner, BTreeMap::new()))
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl<Key: Debug + Ord> Arbitrary for TBlockEndInfoExt<Key> {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        // TODO(HotState): it's used in db tests (encode/decode), so we need to make sure that
+        // serializing the data and then deserializing it reproduces the original value.
+        any::<BlockEndInfo>()
+            .prop_map(|inner| Self::new(inner, BTreeMap::new()))
+            .boxed()
     }
 }

@@ -88,9 +88,6 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
-            }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
@@ -292,10 +289,11 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        TBlockEndInfoExt::new(inner)
+        let to_make_hot = self.get_slots_to_make_hot();
+        TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    pub(crate) fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }

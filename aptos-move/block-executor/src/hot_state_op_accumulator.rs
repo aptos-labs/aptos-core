@@ -61,18 +61,16 @@ where
         }
     }
 
-    pub fn add_transaction<'a>(
+    pub fn add_transaction(
         &mut self,
-        writes: impl Iterator<Item = &'a Key>,
-        reads: impl Iterator<Item = &'a Key>,
-    ) where
-        Key: 'a,
-    {
+        writes: impl IntoIterator<Item = Key>,
+        reads: impl IntoIterator<Item = Key>,
+    ) {
         for key in writes {
-            if self.to_make_hot.remove(key).is_some() {
+            if self.to_make_hot.remove(&key).is_some() {
                 COUNTER.inc_with(&["promotion_removed_by_write"]);
             }
-            self.writes.get_or_insert_owned(key);
+            self.writes.get_or_insert_owned(&key);
         }
 
         for key in reads {
@@ -80,15 +78,15 @@ where
                 COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
             }
-            if self.to_make_hot.contains_key(key) {
+            if self.to_make_hot.contains_key(&key) {
                 continue;
             }
-            if self.writes.contains(key) {
+            if self.writes.contains(&key) {
                 continue;
             }
             let slot = self
                 .base_view
-                .get_state_slot(key)
+                .get_state_slot(&key)
                 .expect("base_view.get_slot() failed.");
             let make_hot = match slot {
                 StateSlot::ColdVacant => {
@@ -123,7 +121,7 @@ where
                 },
             };
             if make_hot {
-                self.to_make_hot.insert(key.clone(), slot);
+                self.to_make_hot.insert(key, slot);
             }
         }
     }
