@@ -435,7 +435,7 @@ impl SimpleVMTestAdapter<'_> {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
-        let mut data_cache = TransactionDataCache::empty();
+        let mut data_cache = TransactionDataCache::empty(true);
 
         let return_values = dispatch_loader!(code_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig::unmetered();
