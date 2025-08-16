@@ -11,6 +11,18 @@ inputs:
     description: "The number of seconds to wait for the images to be available"
     required: false
     default: "1800" # a sane default based on the longest observed build time on the main branch
+  PROFILE_RELEASE:
+    description: "If true, wait for the release default images to be available."
+    required: false
+    default: false
+  PROFILE_PERF:
+    description: "If true, wait for the performance images to be available."
+    required: false
+    default: false
+  FEATURE_FAILPOINTS:
+    description: "If true, wait for the failpoints images to be available."
+    required: false
+    default: false
 runs:
   using: composite
   steps:
@@ -23,5 +35,5 @@ runs:
     # The source code must be checkout out by the workflow that invokes this action.
     - name: Run wait-images-ci
       run: |
-        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
+        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} PROFILE_RELEASE=${{ inputs.PROFILE_RELEASE }} PROFILE_PERF=${{ inputs.PROFILE_PERF }} FEATURE_FAILPOINTS=${{ inputs.FEATURE_FAILPOINTS }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
       shell: bash

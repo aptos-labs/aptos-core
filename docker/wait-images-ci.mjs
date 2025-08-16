@@ -15,61 +15,31 @@ import {
   pnpmInstall,
   waitForImageToBecomeAvailable,
   joinTagSegments,
+  getImagesToWaitFor,
 } from "./image-helpers.js";
-
-const IMAGES_TO_WAIT_FOR = {
-  validator: {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-      CargoBuildFeatures.Failpoints,
-    ],
-  },
-  "validator-testing": {
-    [CargoBuildProfiles.Performance]: [
-      CargoBuildFeatures.Default,
-    ],
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-      CargoBuildFeatures.Failpoints,
-    ],
-  },
-  forge: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-  tools: {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-  "indexer-grpc": {
-    [CargoBuildProfiles.Release]: [
-      CargoBuildFeatures.Default,
-    ],
-  },
-};
-
 
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
+  const BOOLEAN_ARGS = ["PROFILE_RELEASE", "PROFILE_PERF", "FEATURE_FAILPOINTS"];
 
-  const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS);
+  const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
+
+  // if none are set, check all images
+  if (!parsedArgs.PROFILE_RELEASE && !parsedArgs.PROFILE_PERF && !parsedArgs.FEATURE_FAILPOINTS) {
+    parsedArgs.PROFILE_RELEASE = parsedArgs.PROFILE_PERF = parsedArgs.FEATURE_FAILPOINTS = true;
+  }
 
   await assertExecutingInRepoRoot();
   await installCrane();
 
-  const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
-
+  const imagesToWaitFor = getImagesToWaitFor(parsedArgs);
+  
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
   // iterate over all images to wait for
-  for (const [image, imageConfig] of Object.entries(IMAGES_TO_WAIT_FOR)) {
+  for (const [image, imageConfig] of Object.entries(imagesToWaitFor)) {
     for (const [profile, features] of Object.entries(imageConfig)) {
       // build profiles that are not the default "release" will have a separate prefix
       const profilePrefix = profile === CargoBuildProfiles.Release ? "" : profile;
