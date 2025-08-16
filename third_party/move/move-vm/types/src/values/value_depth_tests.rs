@@ -123,7 +123,7 @@ fn test_serialization() {
             L::Struct(Runtime(vec![L::U16])),
         ),
         (
-            Value::vector_for_testing_only(vec![Value::vector_u8(vec![0, 1])]),
+            Value::vector_unchecked(vec![Value::vector_u8(vec![0, 1])]).unwrap(),
             L::Vector(Box::new(L::Vector(Box::new(L::U8)))),
         ),
         (
@@ -142,7 +142,7 @@ fn test_serialization() {
         // Serialize second variant, so the depth is 3.
         Value::struct_(Struct::pack(vec![
             Value::u16(1),
-            Value::vector_for_testing_only(vec![Value::vector_u8(vec![1, 2])]),
+            Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2])]).unwrap(),
         ])),
         L::Struct(RuntimeVariants(vec![vec![L::Bool], vec![L::Vector(
             Box::new(L::Vector(Box::new(L::U8))),
@@ -186,7 +186,7 @@ where
     let v = Value::vector_u8(vec![0, 1]);
     assert_ok!(f(&v, &v, 1));
 
-    let v = Value::vector_for_testing_only(vec![Value::vector_u8(vec![0, 1])]);
+    let v = Value::vector_unchecked(vec![Value::vector_u8(vec![0, 1])]).unwrap();
     let err = assert_err!(f(&v, &v, 1));
     assert_eq!(err.major_status(), StatusCode::VM_MAX_VALUE_DEPTH_REACHED);
 
@@ -226,7 +226,7 @@ where
     let v = Value::vector_u8(vec![0, 1]);
     assert_ok!(f(&v, 1));
 
-    let v = Value::vector_for_testing_only(vec![Value::vector_u8(vec![0, 1])]);
+    let v = Value::vector_unchecked(vec![Value::vector_u8(vec![0, 1])]).unwrap();
     let err = assert_err!(f(&v, 1));
     assert_eq!(err.major_status(), StatusCode::VM_MAX_VALUE_DEPTH_REACHED);
 
