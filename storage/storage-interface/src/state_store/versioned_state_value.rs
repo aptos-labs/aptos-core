@@ -18,6 +18,8 @@ pub struct StateUpdateRef<'kv> {
 impl StateUpdateRef<'_> {
     /// NOTE: the lru_info in the result is not initialized yet.
     pub fn to_result_slot(&self) -> StateSlot {
+        // TODO(HotState): distinguish uninitialized lru info with a single entry (prev and next
+        // are `None`).
         match self.state_op.clone() {
             BaseStateOp::Creation(value) | BaseStateOp::Modification(value) => {
                 StateSlot::HotOccupied {
