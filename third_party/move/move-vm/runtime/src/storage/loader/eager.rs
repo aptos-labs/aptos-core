@@ -8,8 +8,8 @@ use crate::{
         dependencies_gas_charging::check_type_tag_dependencies_and_charge_gas,
         loader::traits::{
             FunctionDefinitionLoader, InstantiatedFunctionLoader, InstantiatedFunctionLoaderHelper,
-            LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
-            StructDefinitionLoader,
+            LegacyLoaderConfig, Loader, ModuleLoader, ModuleMetadataLoader, NativeModuleLoader,
+            ScriptLoader, StructDefinitionLoader,
         },
     },
     Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script,
@@ -52,6 +52,10 @@ where
     /// Returns a new eager loader.
     pub fn new(module_storage: &'a T) -> Self {
         Self { module_storage }
+    }
+
+    pub fn as_unmetered_module_storage(&self) -> &T {
+        self.module_storage
     }
 
     /// Converts a type tag into a runtime type. Can load struct definitions.
@@ -144,6 +148,21 @@ where
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.module_storage.runtime_environment()
+    }
+}
+
+impl<'a, T> ModuleLoader for EagerLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_module(
+        &self,
+        _gas_meter: &mut impl DependencyGasMeter,
+        _traversal_context: &mut TraversalContext,
+        id: &ModuleId,
+    ) -> VMResult<Option<Arc<Module>>> {
+        self.module_storage
+            .unmetered_get_eagerly_verified_module(id.address(), id.name())
     }
 }
 

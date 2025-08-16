@@ -12,8 +12,11 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
 sha3 = { workspace = true }
