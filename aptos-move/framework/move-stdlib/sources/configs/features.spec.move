@@ -19,7 +19,7 @@ spec std::features {
     spec apply_diff(features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>) {
         aborts_if [abstract] false; // TODO(#12011)
         ensures [abstract] forall i in disable: !spec_contains(features, i);
-        ensures [abstract] forall i in enable: !vector::spec_contains(disable, i)
+        ensures [abstract] forall i in enable: !std::vector::spec_contains(disable, i)
             ==> spec_contains(features, i);
         pragma opaque;
     }
