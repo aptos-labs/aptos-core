@@ -1,6 +1,7 @@
 module aptos_framework::genesis {
     use std::error;
     use std::fixed_point32;
+    use std::signer;
     use std::vector;
 
     use aptos_std::simple_map;
@@ -20,6 +21,7 @@ module aptos_framework::genesis {
     use aptos_framework::gas_schedule;
     use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
+    use aptos_framework::scheduled_txns;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::staking_config;
@@ -147,6 +149,8 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+
+        scheduled_txns::initialize(aptos_framework);
     }
 
     /// Only called for testnets and e2e tests.
@@ -170,6 +174,7 @@ module aptos_framework::genesis {
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         aptos_account::register_apt(&core_resources); // registers APT store
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
+        scheduled_txns::initialize(aptos_framework);
     }
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {

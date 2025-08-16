@@ -137,6 +137,22 @@ module aptos_framework::transaction_fee {
         event::emit(fee_statement)
     }
 
+    #[test_only]
+    public fun store_aptos_coin_burn_cap_for_test(
+        aptos_framework: &signer,
+        burn_cap: BurnCapability<AptosCoin>,
+    ) {
+        store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+    }
+
+    #[test_only]
+    public fun store_aptos_coin_mint_cap_for_test(
+        aptos_framework: &signer,
+        mint_cap: MintCapability<AptosCoin>,
+    ) {
+        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+    }
+
     // DEPRECATED section:
 
     #[deprecated]
