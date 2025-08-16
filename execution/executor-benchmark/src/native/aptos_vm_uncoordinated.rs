@@ -22,7 +22,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::collections::BTreeMap;
 
 pub struct AptosVMParallelUncoordinatedBlockExecutor;
 
@@ -80,7 +79,6 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
         Ok(BlockOutput::new(
             transaction_outputs,
             Some(block_epilogue_txn.into()),
-            BTreeMap::new(),
         ))
     }
 }
