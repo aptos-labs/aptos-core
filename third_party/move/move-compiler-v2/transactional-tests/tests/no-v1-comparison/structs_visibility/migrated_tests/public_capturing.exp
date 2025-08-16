@@ -1,0 +1,9 @@
+processed 5 tasks
+task 0 lines 1-6:  publish [module 0x42::test {]
+task 1 lines 8-30:  publish [module 0x42::test_capturing {]
+task 2 lines 32-32:  run 0x42::test_capturing::one_captured --args 3
+return values: 5
+task 3 lines 34-34:  run 0x42::test_capturing::two_captured --args 3 2u8
+return values: 8
+task 4 lines 36-36:  run 0x42::test_capturing::struct_captured --args 3
+return values: 7
