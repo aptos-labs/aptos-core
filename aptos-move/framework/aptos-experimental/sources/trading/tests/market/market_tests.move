@@ -23,7 +23,8 @@ module aptos_experimental::market_tests {
     use aptos_experimental::event_utils;
     use aptos_experimental::market_types::{order_status_open};
     use aptos_experimental::market::{new_market, new_market_config, OrderEvent};
-    use aptos_experimental::order_book_types::{OrderIdType, good_till_cancelled, post_only, immediate_or_cancel};
+    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
     const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;

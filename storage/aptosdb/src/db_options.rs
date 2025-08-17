@@ -168,6 +168,7 @@ where
     table_options.set_block_size(rocksdb_config.block_size as usize);
     let cache = Cache::new_lru_cache(rocksdb_config.block_cache_size as usize);
     table_options.set_block_cache(&cache);
+    table_options.set_optimize_filters_for_memory(true);
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
         let mut cf_opts = Options::default();
