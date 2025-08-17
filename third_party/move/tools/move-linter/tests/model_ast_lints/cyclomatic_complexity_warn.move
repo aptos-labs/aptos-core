@@ -1390,4 +1390,110 @@ module 0xc0ffee::complexity {
                 12
             }
     }
+
+    // complexity: 10
+    public fun block_return_1(b: u64): u64 {
+            let a = if (b == 1) { // +1
+                1
+            }else if (b == 2) { // +1
+                0
+            }else if (b == 3) { // +1
+                1
+            }else if (b == 4) { // +1
+                0
+            }else if (b == 5) { // +1
+                1
+            }else if (b == 6) { // +1
+                0
+            }else if (b == 7) { // +1
+                1
+            }else if (b == 8) { // +1
+                0
+            }else if (b == 9) { // +1
+                1
+            }else {
+                12
+            };
+            a
+    }
+
+    // complexity: 10
+        public fun block_return_2(b: u64): u64 {
+            let a = if (b == 1) { // +1
+                1
+            }else if (b == 2) { // +1
+                0
+            }else if (b == 3) { // +1
+                1
+            }else if (b == 4) { // +1
+                0
+            }else if (b == 5) { // +1
+                1
+            }else if (b == 6) { // +1
+                0
+            }else if (b == 7) { // +1
+                1
+            }else if (b == 8) { // +1
+                0
+            }else if (b == 9) { // +1
+                1
+            }else {
+                12
+            };
+            return a
+    }
+
+    // complexity: 10
+    public fun block_return_3(b: u64): u64 {
+            let a = if (b == 1) { // +1
+                1
+            }else if (b == 2) { // +1
+                0
+            }else if (b == 3) { // +1
+                1
+            }else if (b == 4) { // +1
+                0
+            }else if (b == 5) { // +1
+                1
+            }else if (b == 6) { // +1
+                0
+            }else if (b == 7) { // +1
+                1
+            }else if (b == 8) { // +1
+                0
+            }else if (b == 9) { // +1
+                1
+            }else {
+                12
+            };
+            {return a}
+    }
+
+        //complexity: 11
+        public fun block_return_4(b: u64): u64 {
+            let a = if (b == 1) { // +1
+                1
+            }else if (b == 2) { // +1
+                0
+            }else if (b == 3) { // +1
+                1
+            }else if (b == 4) { // +1
+                0
+            }else if (b == 5) { // +1
+                1
+            }else if (b == 6) { // +1
+                0
+            }else if (b == 7) { // +1
+                1
+            }else if (b == 8) { // +1
+                0
+            }else if (b == 9) { // +1
+                1
+            }else {
+                12
+            };
+            return {return a} // +1
+    }
+
+
 }
