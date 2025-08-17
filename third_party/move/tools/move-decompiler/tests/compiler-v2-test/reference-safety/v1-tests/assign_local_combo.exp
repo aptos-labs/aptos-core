@@ -1,0 +1,49 @@
+module 0x8675309::M {
+    struct S has copy, drop {
+        f: u64,
+        g: u64,
+    }
+    fun id<T>(r: &T): &T {
+        r
+    }
+    fun id_mut<T>(r: &mut T): &mut T {
+        r
+    }
+    fun t0(cond: bool) {
+        let _t2;
+        let _t1 = S{f: 0,g: 0};
+        if (cond) _t2 = &(&_t1).f else _t2 = &(&_t1).g;
+        *_t2;
+        S{f: 0,g: 0};
+    }
+    fun t1(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) _t3 = &mut (&mut S{f: 0,g: 0}).f else _t3 = &mut other.f;
+        *_t3;
+        S{f: 0,g: 0};
+    }
+    fun t2(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) _t3 = &mut S{f: 0,g: 0} else _t3 = other;
+        *_t3;
+        S{f: 0,g: 0};
+    }
+    fun t3(cond: bool, other: &mut S) {
+        let _t3;
+        if (cond) _t3 = id_mut<S>(&mut S{f: 0,g: 0}) else _t3 = other;
+        *_t3;
+        S{f: 0,g: 0};
+    }
+    fun t4(cond: bool) {
+        let _t2 = &(&S{f: 0,g: 0}).f;
+        if (cond) S{f: 0,g: 0} else *_t2;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: expected `u64` but found a value of type `S`
+   ┌─ assign_local_combo.move:39:9
+   │
+39 │         if (cond) S{f: 0,g: 0} else *_t2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

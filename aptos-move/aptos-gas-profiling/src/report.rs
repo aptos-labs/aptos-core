@@ -130,11 +130,7 @@ impl TransactionGasLog {
             Value::Array(
                 deps.iter()
                     .map(|dep| {
-                        let name = format!(
-                            "{}{}",
-                            Render(&dep.id),
-                            if dep.is_new { " (new)" } else { "" }
-                        );
+                        let name = dep.render();
                         let cost_scaled =
                             format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
                         let cost_scaled =

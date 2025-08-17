@@ -1,0 +1,6 @@
+processed 5 tasks
+task 0 lines 1-3:  publish [module 0x66::incompatible_generic_function]
+task 1 lines 5-7:  publish --verbose [module 0x66::incompatible_generic_function]
+task 2 lines 9-11:  publish --verbose [module 0x66::incompatible_generic_function]
+task 3 lines 13-17:  publish [module 0x66::incompatible_generic_structure]
+task 4 lines 19-23:  publish --verbose [module 0x66::incompatible_generic_structure]

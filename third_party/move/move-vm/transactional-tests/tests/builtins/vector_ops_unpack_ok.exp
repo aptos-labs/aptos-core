@@ -1,1 +1,5 @@
 processed 4 tasks
+task 0 lines 1-9:  run [main() {]
+task 1 lines 11-19:  run [main() {]
+task 2 lines 21-30:  run [main() {]
+task 3 lines 33-42:  run [main() {]

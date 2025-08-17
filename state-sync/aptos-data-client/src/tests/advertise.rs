@@ -28,8 +28,13 @@ async fn request_works_only_when_data_available() {
         // Create a base config for a validator
         let base_config = utils::create_validator_base_config();
 
+        // Create the aptos data client config
+        let data_client_config = AptosDataClientConfig {
+            enable_transaction_data_v2: false,
+            ..Default::default()
+        };
+
         // Create the mock network, mock time, client and poller
-        let data_client_config = AptosDataClientConfig::default();
         let (mut mock_network, mut mock_time, client, poller) =
             MockNetwork::new(Some(base_config), Some(data_client_config), None);
 

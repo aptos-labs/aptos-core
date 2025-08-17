@@ -1,6 +1,7 @@
 processed 5 tasks
-
-task 2 'run'. lines 42-55:
+task 0 lines 1-25:  publish [module 0x66::helpers]
+task 1 lines 27-40:  run --verbose [script]
+task 2 lines 42-55:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: None,
     major_status: CALL_TYPE_MISMATCH_ERROR,
@@ -10,8 +11,8 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 5)],
     exec_state: None,
 }
-
-task 4 'run'. lines 72-85:
+task 3 lines 57-70:  run --verbose [script]
+task 4 lines 72-85:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: None,
     major_status: CALL_TYPE_MISMATCH_ERROR,

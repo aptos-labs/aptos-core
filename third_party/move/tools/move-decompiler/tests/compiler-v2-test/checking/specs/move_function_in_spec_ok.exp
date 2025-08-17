@@ -1,0 +1,22 @@
+module 0x42::move_function_in_spec {
+    struct TypeInfo has copy, drop, store, key {
+        account_address: address,
+    }
+    fun foo<T>() {
+        *&(&type_of<T>()).account_address;
+    }
+    public fun type_of<T>(): TypeInfo {
+        abort 1
+    }
+    public fun no_change(target: address, new_addr: address): bool {
+        *&borrow_global(target).account_address == new_addr
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unable to infer instantiation of type `&key + struct{account_address}` (consider providing type arguments or annotating the type)
+   ┌─ move_function_in_spec_ok.move:12:11
+   │
+12 │         *&borrow_global(target).account_address == new_addr
+   │           ^^^^^^^^^^^^^^^^^^^^^

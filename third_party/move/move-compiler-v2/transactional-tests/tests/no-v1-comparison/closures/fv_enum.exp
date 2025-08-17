@@ -1,1 +1,5 @@
 processed 4 tasks
+task 0 lines 1-78:  publish [module 0x66::fv_enum_basic {]
+task 1 lines 80-80:  run 0x66::fv_enum_basic::call_square --args 7
+task 2 lines 82-82:  run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+task 3 lines 84-84:  run 0x66::fv_enum_basic::test_fun_vec --signers 0x66

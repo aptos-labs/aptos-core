@@ -29,12 +29,13 @@ move-model = { workspace = true }
 move-resource-viewer = { workspace = true }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { workspace = true }
-move-vm-runtime = { workspace = true, features = ["testing"] }
+move-vm-runtime = { workspace = true, features = ["testing", "disable_verifier_cache"] }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
+tera = { workspace = true }
 termcolor = { workspace = true }
 
 # Optional dependencies for fuzzing

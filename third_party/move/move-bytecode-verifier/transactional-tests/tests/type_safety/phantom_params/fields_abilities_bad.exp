@@ -1,6 +1,6 @@
 processed 5 tasks
-
-task 1 'publish'. lines 16-21:
+task 0 lines 1-14:  publish [// Negative version of tests in fields_abilities_ok instantiating the non-phantom]
+task 1 lines 16-21:  publish [module 0x1.M2 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -8,8 +8,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 2 'publish'. lines 23-28:
+task 2 lines 23-28:  publish [module 0x1.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -17,8 +16,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 3 'publish'. lines 30-35:
+task 3 lines 30-35:  publish [module 0x1.M4 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M4'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -26,8 +24,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 4 'publish'. lines 37-42:
+task 4 lines 37-42:  publish [module 0x1.M5 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M5'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,

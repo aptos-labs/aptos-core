@@ -14,6 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config,
     chain_id::ChainId,
+    on_chain_config::FeatureFlag,
     test_helpers::transaction_test_helpers,
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
@@ -25,8 +26,39 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use move_ir_compiler::Compiler;
+use test_case::test_case;
 
 pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
+
+fn executor_with_lazy_loading(enable_lazy_loading: bool) -> FakeExecutor {
+    let mut executor = FakeExecutor::from_head_genesis();
+    let addr = AccountAddress::ONE;
+    if enable_lazy_loading {
+        executor.enable_features(&addr, vec![FeatureFlag::ENABLE_LAZY_LOADING], vec![]);
+    } else {
+        executor.enable_features(&addr, vec![], vec![FeatureFlag::ENABLE_LAZY_LOADING]);
+    }
+    executor
+}
+
+fn success_if_lazy_loading_enabled_or_invariant_violation(
+    enable_lazy_loading: bool,
+    status: TransactionStatus,
+) {
+    if enable_lazy_loading {
+        assert!(matches!(
+            status,
+            TransactionStatus::Keep(ExecutionStatus::Success)
+        ));
+    } else {
+        assert!(matches!(
+            status,
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::UNEXPECTED_VERIFIER_ERROR
+            )))
+        ));
+    }
+}
 
 #[test]
 fn verify_signature() {
@@ -539,7 +571,7 @@ fn bad_module() -> (CompiledModule, Vec<u8>) {
 
 fn good_module_uses_bad(
     address: AccountAddress,
-    bad_dep: CompiledModule,
+    bad_dep: &CompiledModule,
 ) -> (CompiledModule, Vec<u8>) {
     let good_module_code = format!(
         "
@@ -547,9 +579,11 @@ fn good_module_uses_bad(
         import 0x1.Test;
         struct S {{ b: bool }}
 
-        foo(): Test.S1 {{
+        public foo() {{
+            let s: Test.S1;
         label b0:
-            return Test.new_S1();
+            s = Test.new_S1();
+            return;
         }}
         public bar() {{
         label b0:
@@ -564,7 +598,7 @@ fn good_module_uses_bad(
     let compiler = Compiler {
         deps: framework_modules
             .iter()
-            .chain(std::iter::once(&bad_dep))
+            .chain(std::iter::once(bad_dep))
             .collect(),
     };
     let module = compiler
@@ -575,18 +609,52 @@ fn good_module_uses_bad(
     (module, bytes)
 }
 
-#[test]
-fn test_script_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
+fn execute_script_for_test(
+    executor: &mut FakeExecutor,
+    script_code: &str,
+    ty_args: Vec<TypeTag>,
+    link_to_good_module: bool,
+) -> TransactionStatus {
     // Get a module that fails verification into the store.
-    let (module, bytes) = bad_module();
-    executor.add_module(&module.self_id(), bytes);
+    let (bad_module, bad_module_bytes) = bad_module();
+    executor.add_module(&bad_module.self_id(), bad_module_bytes);
 
     // Create a module that tries to use that module.
+    let (good_module, good_module_bytes) =
+        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, &bad_module);
+    executor.add_module(&good_module.self_id(), good_module_bytes);
+
+    let deps = if link_to_good_module {
+        vec![&good_module]
+    } else {
+        vec![&bad_module]
+    };
+    let compiler = Compiler { deps };
+
+    let script = compiler
+        .into_script_blob(script_code)
+        .expect("Failed to compile");
+
+    // Create a transaction that tries to use that module.
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
+
+    let txn = sender
+        .account()
+        .transaction()
+        .script(Script::new(script, ty_args, vec![]))
+        .sequence_number(10)
+        .max_gas_amount(100_000)
+        .gas_unit_price(1)
+        .sign();
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
+    executor.execute_transaction(txn).status().clone()
+}
+
+#[test_case(true)]
+#[test_case(false)]
+fn test_script_dependency_fails_verification(enable_lazy_loading: bool) {
+    let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
     let code = "
     import 0x1.Test;
@@ -599,41 +667,19 @@ fn test_script_dependency_fails_verification() {
     }
     ";
 
-    let compiler = Compiler {
-        deps: vec![&module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
+    let status = execute_script_for_test(&mut executor, code, vec![], false);
+    assert!(matches!(
+        status,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::UNEXPECTED_VERIFIER_ERROR
+        )))
+    ));
 }
 
-#[test]
-fn test_type_tag_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (module, bytes) = bad_module();
-    executor.add_module(&module.self_id(), bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
+#[test_case(true)]
+#[test_case(false)]
+fn test_type_tag_dependency_fails_verification(enable_lazy_loading: bool) {
+    let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
     let code = "
     main<T>() {
@@ -642,106 +688,70 @@ fn test_type_tag_dependency_fails_verification() {
     }
     ";
 
-    let compiler = Compiler {
-        deps: vec![&module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            script,
-            vec![TypeTag::Struct(Box::new(StructTag {
-                address: account_config::CORE_CODE_ADDRESS,
-                module: Identifier::new("Test").unwrap(),
-                name: Identifier::new("S1").unwrap(),
-                type_args: vec![],
-            }))],
-            vec![],
-        ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
+    let ty_args = vec![TypeTag::Struct(Box::new(StructTag {
+        address: account_config::CORE_CODE_ADDRESS,
+        module: Identifier::new("Test").unwrap(),
+        name: Identifier::new("S1").unwrap(),
+        type_args: vec![],
+    }))];
+    let status = execute_script_for_test(&mut executor, code, ty_args, false);
+    assert!(matches!(
+        status,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::UNEXPECTED_VERIFIER_ERROR
+        )))
+    ));
 }
 
-#[test]
-fn test_script_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
+#[test_case(true)]
+#[test_case(false)]
+fn test_script_transitive_dependency_fails_verification_bar(enable_lazy_loading: bool) {
+    let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
     let code = "
     import 0x1.Test2;
 
     main() {
     label b0:
+        // bar does not use bad module, but Test2 does
         Test2.bar();
         return;
     }
     ";
 
-    let compiler = Compiler {
-        deps: vec![&good_module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
+    let status = execute_script_for_test(&mut executor, code, vec![], true);
+    success_if_lazy_loading_enabled_or_invariant_violation(enable_lazy_loading, status);
 }
 
-#[test]
-fn test_type_tag_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
+#[test_case(true)]
+#[test_case(false)]
+fn test_script_transitive_dependency_fails_verification_foo(enable_lazy_loading: bool) {
+    let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
+    let code = "
+    import 0x1.Test2;
 
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
+    main() {
+    label b0:
+        // foo uses bad module
+        Test2.foo();
+        return;
+    }
+    ";
 
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
+    let status = execute_script_for_test(&mut executor, code, vec![], true);
+    assert!(matches!(
+        status,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::UNEXPECTED_VERIFIER_ERROR
+        )))
+    ));
+}
+
+#[test_case(true)]
+#[test_case(false)]
+fn test_type_tag_transitive_dependency_fails_verification(enable_lazy_loading: bool) {
+    let mut executor = executor_with_lazy_loading(enable_lazy_loading);
 
     let code = "
     main<T>() {
@@ -750,34 +760,14 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     }
     ";
 
-    let compiler = Compiler {
-        deps: vec![&good_module],
-    };
-    let script = compiler.into_script_blob(code).expect("Failed to compile");
-    let txn = sender
-        .account()
-        .transaction()
-        .script(Script::new(
-            script,
-            vec![TypeTag::Struct(Box::new(StructTag {
-                address: account_config::CORE_CODE_ADDRESS,
-                module: Identifier::new("Test2").unwrap(),
-                name: Identifier::new("S").unwrap(),
-                type_args: vec![],
-            }))],
-            vec![],
-        ))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
+    let ty_args = vec![TypeTag::Struct(Box::new(StructTag {
+        address: account_config::CORE_CODE_ADDRESS,
+        module: Identifier::new("Test2").unwrap(),
+        name: Identifier::new("S").unwrap(),
+        type_args: vec![],
+    }))];
+
+    // Type tag is using good module, so for lazy loading there should be no verification errors.
+    let status = execute_script_for_test(&mut executor, code, ty_args, true);
+    success_if_lazy_loading_enabled_or_invariant_violation(enable_lazy_loading, status);
 }

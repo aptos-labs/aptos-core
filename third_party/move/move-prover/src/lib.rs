@@ -10,6 +10,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use log::{log_enabled, Level};
 use move_abigen::Abigen;
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
@@ -273,8 +274,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         }
         if options.prover.dump_bytecode {
             if let Some(out) = module_env.disassemble() {
-                let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
-                fs::write(dump_file, out).expect("dumping disassembled module");
+                debug!("disassembled bytecode:\n{}", out);
             }
         }
         for func_env in module_env.get_functions() {
@@ -289,7 +289,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         pipeline_factory::default_pipeline_with_options(&options.prover)
     };
 
-    if options.prover.dump_bytecode {
+    if log_enabled!(Level::Debug) && options.prover.dump_bytecode {
         let dump_file_base = output_dir
             .join(output_prefix)
             .into_os_string()

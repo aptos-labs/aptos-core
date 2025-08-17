@@ -1,0 +1,8 @@
+module 0x1::signer {
+    public fun address_of(s: &signer): address {
+        *borrow_address(s)
+    }
+    public native fun borrow_address(s: &signer): &address;
+}
+
+============ recompilation succeeded ========

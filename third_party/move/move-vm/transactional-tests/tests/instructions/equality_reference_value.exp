@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-24:  publish [module 0x1.Token {]
+task 1 lines 26-33:  run --signers 0x1 [import 0x1.Token;]

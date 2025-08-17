@@ -158,7 +158,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
 }
 
 fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let p = path.to_str().unwrap_or_default();
     let exp_suffix = if SEPARATE_BASELINE.iter().any(|s| p.contains(s)) {
         Some(format!("{}.exp", config.name))
@@ -171,7 +171,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    let vm_test_config = TestRunConfig::compiler_v2(language_version, experiments);
+    let vm_test_config = TestRunConfig::new(language_version, experiments);
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }

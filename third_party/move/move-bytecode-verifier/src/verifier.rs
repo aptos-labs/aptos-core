@@ -20,6 +20,11 @@ use move_core_types::{state::VMState, vm_status::StatusCode};
 use serde::Serialize;
 use std::time::Instant;
 
+/// Configuration for the bytecode verifier.
+///
+/// Always add new fields to the end, as we rely on the hash or serialized bytes of config to
+/// detect if it has changed (e.g., new feature flag was enabled). Also, do not delete existing
+/// fields, or change the type of existing field.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct VerifierConfig {
     pub scope: VerificationScope,
@@ -48,6 +53,9 @@ pub struct VerifierConfig {
     pub max_function_return_values: Option<usize>,
     /// Maximum depth of a type node.
     pub max_type_depth: Option<usize>,
+    /// If enabled, signature checker V2 also checks parameter and return types in function
+    /// signatures.
+    pub sig_checker_v2_fix_function_signatures: bool,
 }
 
 /// Scope of verification.
@@ -132,7 +140,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
         DuplicationChecker::verify_module(module)?;
 
         if config.use_signature_checker_v2 {
-            signature_v2::verify_module(module)?;
+            signature_v2::verify_module(config, module)?;
         } else {
             SignatureChecker::verify_module(module)?;
         }
@@ -255,6 +263,7 @@ impl Default for VerifierConfig {
             use_signature_checker_v2: true,
 
             sig_checker_v2_fix_script_ty_param_count: true,
+            sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
             enable_resource_access_control: true,
@@ -302,8 +311,8 @@ impl VerifierConfig {
             max_per_mod_meter_units: Some(1000 * 8000),
 
             use_signature_checker_v2: true,
-
             sig_checker_v2_fix_script_ty_param_count: true,
+            sig_checker_v2_fix_function_signatures: true,
 
             enable_enum_types: true,
             enable_resource_access_control: true,

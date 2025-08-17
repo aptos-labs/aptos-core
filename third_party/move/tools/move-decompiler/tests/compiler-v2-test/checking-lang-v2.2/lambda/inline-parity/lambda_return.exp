@@ -1,0 +1,19 @@
+module 0x42::LambdaReturn {
+    public fun inline_apply2(f: |u64|(u64), b: u64): u64 {
+        f(b)
+    }
+    fun test_lambda_symbol_param() {
+        if (!(inline_apply2(|arg0| __lambda__1__test_lambda_symbol_param(arg0), 3) == 3)) abort 0;
+    }
+    fun __lambda__1__test_lambda_symbol_param(x: u64): u64 {
+        x
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid name
+  ┌─ lambda_return.move:8:9
+  │
+8 │     fun __lambda__1__test_lambda_symbol_param(x: u64): u64 {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid function name '__lambda__1__test_lambda_symbol_param'. Function names cannot start with '_'

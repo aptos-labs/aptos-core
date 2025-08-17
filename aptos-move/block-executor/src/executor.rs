@@ -47,7 +47,6 @@ use aptos_types::{
     state_store::{state_value::StateValue, TStateView},
     transaction::{
         block_epilogue::TBlockEndInfoExt, BlockExecutableTransaction, BlockOutput, FeeDistribution,
-        Transaction,
     },
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
@@ -71,7 +70,7 @@ use rayon::ThreadPool;
 use scopeguard::defer;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -257,7 +256,71 @@ where
         Ok(())
     }
 
+    fn process_delayed_field_output(
+        maybe_output: Option<&E::Output>,
+        idx_to_execute: TxnIndex,
+        read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        is_v2: bool,
+    ) -> Result<(), PanicError> {
+        let mut prev_modified_delayed_fields = last_input_output
+            .delayed_field_keys(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.collect());
+
+        // TODO[agg_v2](optimize): see if/how we want to incorporate DeltaHistory from read set into
+        // versioned_delayed_fields. Without it, currently, materialized reads cannot check history
+        // and fail early.
+        //
+        // We can extract histories with something like the code below, and then include history in
+        // change.into_entry_no_additional_history().
+        //
+        // for id in read_set.get_delayed_field_keys() {
+        //     if !delayed_field_change_set.contains_key(id) {
+        //         let read_value = read_set.get_delayed_field_by_kind(id, DelayedFieldReadKind::Bounded).unwrap();
+        //     }
+        // }
+
+        if let Some(output) = maybe_output {
+            for (id, change) in output.delayed_field_change_set().into_iter() {
+                prev_modified_delayed_fields.remove(&id);
+
+                let entry = change.into_entry_no_additional_history();
+
+                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
+                if let Err(e) =
+                    versioned_cache
+                        .delayed_fields()
+                        .record_change(id, idx_to_execute, entry)
+                {
+                    match e {
+                        PanicOr::CodeInvariantError(m) => {
+                            return Err(code_invariant_error(format!(
+                                "Record change failed with CodeInvariantError: {:?}",
+                                m
+                            )));
+                        },
+                        PanicOr::Or(_) => {
+                            read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                                MVDelayedFieldsError::DeltaApplicationFailure,
+                            ));
+                        },
+                    };
+                }
+            }
+        }
+
+        for id in prev_modified_delayed_fields {
+            versioned_cache
+                .delayed_fields()
+                .remove(&id, idx_to_execute, is_v2)?;
+        }
+
+        Ok(())
+    }
+
     fn execute_v2(
+        worker_id: u32,
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         signature_verified_block: &TP,
@@ -290,9 +353,6 @@ where
         );
         let execution_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
-        let mut prev_modified_resource_keys = last_input_output
-            .modified_resource_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
             return Err(code_invariant_error(format!(
@@ -303,6 +363,14 @@ where
         let maybe_output =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
+        Self::process_delayed_field_output(
+            maybe_output,
+            idx_to_execute,
+            &mut read_set,
+            last_input_output,
+            versioned_cache,
+            true,
+        )?;
         Self::process_resource_group_output_v2(
             maybe_output,
             idx_to_execute,
@@ -311,6 +379,13 @@ where
             versioned_cache,
             &mut abort_manager,
         )?;
+
+        let mut prev_modified_resource_keys = last_input_output
+            .modified_resource_keys_no_aggregator_v1(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.collect());
+        let mut prev_modified_aggregator_v1_keys = last_input_output
+            .modified_aggregator_v1_keys(idx_to_execute)
+            .map_or_else(HashSet::new, |keys| keys.collect());
 
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         let mut resource_write_set = vec![];
@@ -326,7 +401,25 @@ where
                     maybe_layout,
                 ))?;
             }
-            // TODO(BlockSTMv2): delayed fields and aggregator v1.
+
+            // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
+            // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
+            // commit-time validation in BlockSTMv2.
+            for (key, value) in output.aggregator_v1_write_set().into_iter() {
+                prev_modified_aggregator_v1_keys.remove(&key);
+
+                versioned_cache.data().write(
+                    key,
+                    idx_to_execute,
+                    incarnation,
+                    Arc::new(value),
+                    None,
+                );
+            }
+            for (key, delta) in output.aggregator_v1_delta_set().into_iter() {
+                prev_modified_aggregator_v1_keys.remove(&key);
+                versioned_cache.data().add_delta(key, idx_to_execute, delta);
+            }
         }
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -338,6 +431,10 @@ where
             )?;
         }
 
+        for key in prev_modified_aggregator_v1_keys {
+            versioned_cache.data().remove(&key, idx_to_execute);
+        }
+
         last_input_output.record(
             idx_to_execute,
             read_set,
@@ -345,7 +442,24 @@ where
             resource_write_set,
         );
 
-        scheduler.finish_execution(abort_manager)?;
+        // It is important to call finish_execution after recording the input/output.
+        if let Some(module_validation_requirements) = scheduler.finish_execution(abort_manager)? {
+            Self::module_validation_v2(
+                idx_to_execute,
+                incarnation,
+                scheduler,
+                &module_validation_requirements,
+                last_input_output,
+                global_module_cache,
+                versioned_cache,
+            )?;
+            scheduler.finish_cold_validation_requirement(
+                worker_id,
+                idx_to_execute,
+                incarnation,
+                true,
+            )?;
+        }
         Ok(())
     }
 
@@ -385,9 +499,6 @@ where
             .modified_group_key_and_tags_cloned(idx_to_execute)
             .into_iter()
             .collect();
-        let mut prev_modified_delayed_fields = last_input_output
-            .delayed_field_keys(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
 
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
@@ -399,6 +510,15 @@ where
 
         let processed_output =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+
+        Self::process_delayed_field_output(
+            processed_output,
+            idx_to_execute,
+            &mut read_set,
+            last_input_output,
+            versioned_cache,
+            false,
+        )?;
 
         // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
         // May happen, for instance, when the recent execution wrote outside of the previous write/delta
@@ -466,46 +586,6 @@ where
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
 
-            let delayed_field_change_set = output.delayed_field_change_set();
-
-            // TODO[agg_v2](optimize): see if/how we want to incorporate DeltaHistory from read set into versoined_delayed_fields.
-            // Without that, currently materialized reads cannot check history and fail early.
-            //
-            // We can extract histories with something like the code below,
-            // and then change change.into_entry_no_additional_history() to include history.
-            //
-            // for id in read_set.get_delayed_field_keys() {
-            //     if !delayed_field_change_set.contains_key(id) {
-            //         let read_value = read_set.get_delayed_field_by_kind(id, DelayedFieldReadKind::Bounded).unwrap();
-            //     }
-            // }
-
-            for (id, change) in delayed_field_change_set.into_iter() {
-                prev_modified_delayed_fields.remove(&id);
-
-                let entry = change.into_entry_no_additional_history();
-
-                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
-                if let Err(e) =
-                    versioned_cache
-                        .delayed_fields()
-                        .record_change(id, idx_to_execute, entry)
-                {
-                    match e {
-                        PanicOr::CodeInvariantError(m) => {
-                            return Err(code_invariant_error(format!(
-                                "Record change failed with CodeInvariantError: {:?}",
-                                m
-                            )));
-                        },
-                        PanicOr::Or(_) => {
-                            read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                                MVDelayedFieldsError::DeltaApplicationFailure,
-                            ));
-                        },
-                    };
-                }
-            }
             Ok(resource_write_set)
         };
 
@@ -537,9 +617,6 @@ where
                 .group_data()
                 .remove(&k, idx_to_execute, tags);
         }
-        for id in prev_modified_delayed_fields {
-            versioned_cache.delayed_fields().remove(&id, idx_to_execute);
-        }
 
         last_input_output.record(
             idx_to_execute,
@@ -548,6 +625,62 @@ where
             resource_write_set,
         );
         Ok(needs_suffix_validation)
+    }
+
+    fn module_validation_v2(
+        idx_to_validate: TxnIndex,
+        incarnation_to_validate: Incarnation,
+        scheduler: &SchedulerV2,
+        updated_module_keys: &BTreeSet<ModuleId>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+    ) -> Result<bool, PanicError> {
+        // The previous read-set must be recorded because:
+        // 1. The transaction has finished at least one execution in order for it
+        // to be eligible for module validation (status must have been executed).
+        // 2. The only possible time to take the read-set from txn_last_input_output
+        // is in prepare_and_queue_commit_ready_txn (applying module publishing output).
+        // However, required module validation necessarily occurs before the commit.
+        let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+            code_invariant_error(format!(
+                "Prior read-set of txn {} incarnation {} not recorded for module verification",
+                idx_to_validate, incarnation_to_validate
+            ))
+        })?;
+        // Perform invariant checks or return early based on read set's incarnation.
+        let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
+            code_invariant_error(
+                "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
+            )
+        })?;
+        if blockstm_v2_incarnation < incarnation_to_validate {
+            return Err(code_invariant_error(format!(
+                "For txn_idx {}, read set incarnation {} < incarnation to validate {}",
+                idx_to_validate, blockstm_v2_incarnation, incarnation_to_validate
+            )));
+        }
+        if blockstm_v2_incarnation > incarnation_to_validate {
+            // No need to validate as a newer incarnation has already been executed
+            // and recorded its output.
+            return Ok(true);
+        }
+
+        if !read_set.validate_module_reads(
+            global_module_cache,
+            versioned_cache.module_cache(),
+            Some(updated_module_keys),
+        ) {
+            scheduler.direct_abort(idx_to_validate, incarnation_to_validate, false)?;
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     fn validate(
@@ -582,8 +715,11 @@ where
         read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
             && (skip_module_reads_validation
-                || read_set
-                    .validate_module_reads(global_module_cache, versioned_cache.module_cache()))
+                || read_set.validate_module_reads(
+                    global_module_cache,
+                    versioned_cache.module_cache(),
+                    None,
+                ))
     }
 
     fn update_transaction_on_abort(
@@ -655,32 +791,41 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        is_v2: bool,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
             .read_set(txn_idx)
-            .expect("Read set must be recorded");
+            .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
 
-        let mut execution_still_valid =
-            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?;
-
-        if execution_still_valid {
-            if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
-                if let Err(e) = versioned_cache
-                    .delayed_fields()
-                    .try_commit(txn_idx, delayed_field_ids.collect())
-                {
-                    match e {
-                        CommitError::ReExecutionNeeded(_) => {
-                            execution_still_valid = false;
-                        },
-                        CommitError::CodeInvariantError(msg) => {
-                            return Err(code_invariant_error(msg));
-                        },
-                    }
-                }
-            }
+        if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
+            || (is_v2
+                && !read_set.validate_aggregator_v1_reads(
+                    versioned_cache.data(),
+                    last_input_output
+                        .modified_aggregator_v1_keys(txn_idx)
+                        .ok_or_else(|| {
+                            code_invariant_error("Modified aggregator v1 keys must be recorded")
+                        })?,
+                    txn_idx,
+                )?)
+        {
+            return Ok(false);
         }
-        Ok(execution_still_valid)
+
+        let delayed_field_ids = last_input_output
+            .delayed_field_keys(txn_idx)
+            .ok_or_else(|| code_invariant_error("Delayed field keys must be recorded"))?;
+        if let Err(e) = versioned_cache
+            .delayed_fields()
+            .try_commit(txn_idx, delayed_field_ids)
+        {
+            return match e {
+                CommitError::ReExecutionNeeded(_) => Ok(false),
+                CommitError::CodeInvariantError(msg) => Err(code_invariant_error(msg)),
+            };
+        }
+
+        Ok(true)
     }
 
     /// This method may be executed by different threads / workers, but is guaranteed to be executed
@@ -689,7 +834,7 @@ where
     /// overhead. On the other hand, materialization that happens after commit (& after this method)
     /// is concurrent and deals with logic such as patching delayed fields / resource groups
     /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
-    /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
+    /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flat-combining
     /// way, the materialization can be almost embarrassingly parallelizable.
     /// TODO(BlockSTMv2): Change the signature to use shared_sync_params.
     #[allow(clippy::too_many_arguments)]
@@ -720,9 +865,15 @@ where
         let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
-        if !Self::validate_and_commit_delayed_fields(txn_idx, versioned_cache, last_input_output)? {
+        if !Self::validate_and_commit_delayed_fields(
+            txn_idx,
+            versioned_cache,
+            last_input_output,
+            scheduler.is_v2(),
+        )? {
             // Transaction needs to be re-executed, one final time.
             side_effect_at_commit = true;
+            counters::SPECULATIVE_ABORT_COUNT.inc();
 
             let parallel_state = ParallelState::new(
                 versioned_cache,
@@ -732,28 +883,50 @@ where
                 incarnation + 1,
             );
 
-            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
-            // We are going to skip reducing validation index here, as we
-            // are executing immediately, and will reduce it unconditionally
-            // after execution, inside finish_execution_during_commit.
-            // Because of that, we can also ignore _needs_suffix_validation result.
-            let _needs_suffix_validation = Self::execute(
-                txn_idx,
-                incarnation + 1,
-                block.get_txn(txn_idx),
-                last_input_output,
-                versioned_cache,
-                executor,
-                base_view,
-                global_module_cache,
-                runtime_environment,
-                parallel_state,
-            )?;
+            match scheduler.as_v2() {
+                None => {
+                    Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+                    // We are going to skip reducing validation index here, as we
+                    // are executing immediately, and will reduce it unconditionally
+                    // after execution, inside finish_execution_during_commit.
+                    // Because of that, we can also ignore _needs_suffix_validation result.
+                    let _needs_suffix_validation = Self::execute(
+                        txn_idx,
+                        incarnation + 1,
+                        block.get_txn(txn_idx),
+                        last_input_output,
+                        versioned_cache,
+                        executor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        parallel_state,
+                    )?;
+                },
+                Some((scheduler, worker_id)) => {
+                    scheduler.direct_abort(txn_idx, incarnation, true)?;
+                    Self::execute_v2(
+                        worker_id,
+                        txn_idx,
+                        incarnation + 1,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        executor,
+                        base_view,
+                        global_module_cache,
+                        runtime_environment,
+                        parallel_state,
+                        scheduler,
+                    )?;
+                },
+            }
 
             if !Self::validate_and_commit_delayed_fields(
                 txn_idx,
                 versioned_cache,
                 last_input_output,
+                scheduler.is_v2(),
             )
             .unwrap_or(false)
             {
@@ -766,10 +939,18 @@ where
         }
 
         let module_write_set = last_input_output.module_write_set(txn_idx);
+        let mut module_ids_for_v2 = BTreeSet::new();
         // Publish modules before we decrease validation index (in V1) so that validations observe
         // the new module writes as well.
         if !module_write_set.is_empty() {
             side_effect_at_commit = true;
+
+            if scheduler.is_v2() {
+                module_ids_for_v2 = module_write_set
+                    .iter()
+                    .map(|write| write.module_id().clone())
+                    .collect();
+            }
 
             Self::publish_module_writes(
                 txn_idx,
@@ -779,7 +960,8 @@ where
                 runtime_environment,
             )?;
 
-            scheduler.set_module_read_validation();
+            // Record validation requirements after the modules are published.
+            scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
 
         if side_effect_at_commit {
@@ -882,47 +1064,51 @@ where
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
-        let aggregator_v1_delta_keys = last_input_output.aggregator_v1_delta_keys(txn_idx);
-        let mut aggregator_v1_delta_writes = Vec::with_capacity(aggregator_v1_delta_keys.len());
-        for k in aggregator_v1_delta_keys.into_iter() {
-            // Note that delta materialization happens concurrently, but under concurrent
-            // commit_hooks (which may be dispatched by the coordinator), threads may end up
-            // contending on delta materialization of the same aggregator. However, the
-            // materialization is based on previously materialized values and should not
-            // introduce long critical sections. Moreover, with more aggregators, and given
-            // that the commit_hook will be performed at dispersed times based on the
-            // completion of the respective previous tasks of threads, this should not be
-            // an immediate bottleneck - confirmed by an experiment with 32 core and a
-            // single materialized aggregator. If needed, the contention may be further
-            // mitigated by batching consecutive commit_hooks.
-            let committed_delta = versioned_cache
-                .data()
-                .materialize_delta(&k, txn_idx)
-                .unwrap_or_else(|op| {
-                    // TODO[agg_v1](cleanup): this logic should improve with the new AGGR data structure
-                    // TODO[agg_v1](cleanup): and the ugly base_view parameter will also disappear.
-                    let storage_value = base_view
-                        .get_state_value(&k)
-                        .expect("Error reading the base value for committed delta in storage");
+        let mut aggregator_v1_delta_writes = Vec::with_capacity(4);
+        if let Some(aggregator_v1_delta_keys_iter) =
+            last_input_output.aggregator_v1_delta_keys(txn_idx)
+        {
+            for k in aggregator_v1_delta_keys_iter {
+                // Note that delta materialization happens concurrently, but under concurrent
+                // commit_hooks (which may be dispatched by the coordinator), threads may end up
+                // contending on delta materialization of the same aggregator. However, the
+                // materialization is based on previously materialized values and should not
+                // introduce long critical sections. Moreover, with more aggregators, and given
+                // that the commit_hook will be performed at dispersed times based on the
+                // completion of the respective previous tasks of threads, this should not be
+                // an immediate bottleneck - confirmed by an experiment with 32 core and a
+                // single materialized aggregator. If needed, the contention may be further
+                // mitigated by batching consecutive commit_hooks.
+                let committed_delta = versioned_cache
+                    .data()
+                    .materialize_delta(&k, txn_idx)
+                    .unwrap_or_else(|op| {
+                        // TODO[agg_v1](cleanup): this logic should improve with the new AGGR data structure
+                        // TODO[agg_v1](cleanup): and the ugly base_view parameter will also disappear.
+                        let storage_value = base_view
+                            .get_state_value(&k)
+                            .expect("Error reading the base value for committed delta in storage");
 
-                    let w: T::Value = TransactionWrite::from_state_value(storage_value);
-                    let value_u128 = w
-                        .as_u128()
-                        .expect("Aggregator base value deserialization error")
-                        .expect("Aggregator base value must exist");
+                        let w: T::Value = TransactionWrite::from_state_value(storage_value);
+                        let value_u128 = w
+                            .as_u128()
+                            .expect("Aggregator base value deserialization error")
+                            .expect("Aggregator base value must exist");
 
-                    versioned_cache
-                        .data()
-                        .set_base_value(k.clone(), ValueWithLayout::RawFromStorage(Arc::new(w)));
-                    op.apply_to(value_u128)
-                        .expect("Materializing delta w. base value set must succeed")
-                });
+                        versioned_cache.data().set_base_value(
+                            k.clone(),
+                            ValueWithLayout::RawFromStorage(Arc::new(w)),
+                        );
+                        op.apply_to(value_u128)
+                            .expect("Materializing delta w. base value set must succeed")
+                    });
 
-            // Must contain committed value as we set the base value above.
-            aggregator_v1_delta_writes.push((
-                k,
-                WriteOp::legacy_modification(serialize(&committed_delta).into()),
-            ));
+                // Must contain committed value as we set the base value above.
+                aggregator_v1_delta_writes.push((
+                    k,
+                    WriteOp::legacy_modification(serialize(&committed_delta).into()),
+                ));
+            }
         }
         aggregator_v1_delta_writes
     }
@@ -1094,7 +1280,7 @@ where
         shared_counter: &AtomicU32,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-        block_epilogue_txn: &ExplicitSyncWrapper<Option<Transaction>>,
+        block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         num_txns_materialized: &AtomicU32,
         total_txns_to_materialize: &AtomicU32,
         num_running_workers: &AtomicU32,
@@ -1184,7 +1370,7 @@ where
                         if Self::execute(
                             num_txns as u32,
                             0,
-                            &T::from_txn(txn.clone()),
+                            &txn,
                             last_input_output,
                             versioned_cache,
                             &executor,
@@ -1209,6 +1395,7 @@ where
                             num_txns as u32,
                             versioned_cache,
                             last_input_output,
+                            false,
                         ) != Ok(true)
                         {
                             return Err(code_invariant_error(
@@ -1345,8 +1532,7 @@ where
         &self,
         block: &TP,
         environment: &AptosEnvironment,
-        // TODO: use worker id.
-        _worker_id: u32,
+        worker_id: u32,
         num_workers: u32,
         shared_sync_params: &SharedSyncParams<'_, '_, T, E, S>,
         start_delayed_field_id_counter: u32,
@@ -1368,7 +1554,7 @@ where
         let versioned_cache = shared_sync_params.versioned_cache;
         let global_module_cache = shared_sync_params.global_module_cache;
         let delayed_field_id_counter = shared_sync_params.delayed_field_id_counter;
-        let scheduler_wrapper = SchedulerWrapper::V2(scheduler);
+        let scheduler_wrapper = SchedulerWrapper::V2(scheduler, worker_id);
 
         loop {
             while scheduler.commit_hooks_try_lock() {
@@ -1397,8 +1583,8 @@ where
                 scheduler.commit_hooks_unlock();
             }
 
-            // TODO(BlockSTMv2): pass worker_id to next_task.
-            match scheduler.next_task()? {
+            let next_task = scheduler.next_task(worker_id);
+            match next_task? {
                 TaskKind::Execute(txn_idx, incarnation) => {
                     if incarnation > num_workers.pow(2) + num_txns + 30 {
                         // Something is wrong if we observe high incarnations (e.g. a bug
@@ -1409,6 +1595,7 @@ where
                     }
 
                     Self::execute_v2(
+                        worker_id,
                         txn_idx,
                         incarnation,
                         block,
@@ -1447,6 +1634,23 @@ where
                 TaskKind::NextTask => {
                     // TODO: Anything intelligent to do here?.
                 },
+                TaskKind::ModuleValidation(txn_idx, incarnation, modules_to_validate) => {
+                    Self::module_validation_v2(
+                        txn_idx,
+                        incarnation,
+                        scheduler,
+                        modules_to_validate,
+                        last_input_output,
+                        global_module_cache,
+                        versioned_cache,
+                    )?;
+                    scheduler.finish_cold_validation_requirement(
+                        worker_id,
+                        txn_idx,
+                        incarnation,
+                        false, // Was not deferred (obtained as a task).
+                    )?;
+                },
                 TaskKind::Done => {
                     break;
                 },
@@ -1464,12 +1668,12 @@ where
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
         block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
-        block_epilogue_txn: Option<Transaction>,
+        block_epilogue_txn: Option<T>,
         mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: impl Send + 'static,
         last_input_output: TxnLastInputOutput<T, E::Output, E::Error>,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, E::Output>, ()> {
         // Check for errors or remaining commit tasks before any side effects.
         let mut has_error = shared_maybe_error.load(Ordering::SeqCst);
         if !has_error && has_remaining_commit_tasks {
@@ -1516,7 +1720,7 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // BlockSTMv2 should have less restrictions on the number of workers but we
         // still sanity check that it is not instantiated w. concurrency level 1.
@@ -1615,7 +1819,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T::Key, E::Output>, ()> {
+    ) -> Result<BlockOutput<T, E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1724,7 +1928,7 @@ where
         outputs: &[E::Output],
         block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
-    ) -> Transaction {
+    ) -> T {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
         if !self
             .config
@@ -1732,10 +1936,10 @@ where
             .block_gas_limit_type
             .add_block_limit_outcome_onchain()
         {
-            return Transaction::StateCheckpoint(block_id);
+            return T::state_checkpoint(block_id);
         }
         if !features.is_calculate_transaction_fee_for_distribution_enabled() {
-            return Transaction::block_epilogue_v0(block_id, block_end_info.to_persistent());
+            return T::block_epilogue_v0(block_id, block_end_info.to_persistent());
         }
 
         let mut amount = BTreeMap::new();
@@ -1790,11 +1994,7 @@ where
                 }
             }
         }
-        Transaction::block_epilogue_v1(
-            block_id,
-            block_end_info.to_persistent(),
-            FeeDistribution::new(amount),
-        )
+        T::block_epilogue_v1(block_id, block_end_info, FeeDistribution::new(amount))
     }
 
     /// Converts module write into cached module representation, and adds it to the module cache.
@@ -1943,7 +2143,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<T::Key, E::Output>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T, E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
@@ -1968,14 +2168,12 @@ where
         );
 
         let mut block_epilogue_txn = None;
-        let mut block_epilogue_txn_to_execute;
         let mut idx = 0;
         while idx <= num_txns {
             let txn = if idx != num_txns {
                 signature_verified_block.get_txn(idx as TxnIndex)
             } else if block_epilogue_txn.is_some() {
-                block_epilogue_txn_to_execute = T::from_txn(block_epilogue_txn.clone().unwrap());
-                &block_epilogue_txn_to_execute
+                block_epilogue_txn.as_ref().unwrap()
             } else {
                 break;
             };
@@ -2290,7 +2488,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<T::Key, E::Output>, E::Error> {
+    ) -> BlockExecutionResult<BlockOutput<T, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {

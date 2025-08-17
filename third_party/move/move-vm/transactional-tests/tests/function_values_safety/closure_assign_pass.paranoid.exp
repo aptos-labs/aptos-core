@@ -1,6 +1,7 @@
 processed 3 tasks
-
-task 2 'run'. lines 49-63:
+task 0 lines 1-33:  publish [module 0x66::helpers]
+task 1 lines 36-47:  run --verbose [script]
+task 2 lines 49-63:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u32 has copy, got |u64|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

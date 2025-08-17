@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 2-416:
+task 0 lines 2-416:  publish [module 0x42::pwn {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::pwn'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

@@ -125,7 +125,7 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![])
+        TestRunConfig::new(LanguageVersion::default(), vec![])
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -236,14 +236,16 @@ pub trait MoveTestAdapter<'a>: Sized {
                     })
                     .collect::<Vec<_>>();
 
-                let (unit, opt_model, warnings_opt) = match run_config {
+                let (unit, opt_model, warnings_opt) = {
                     // Run the V2 compiler if requested
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments,
                         vm_config: _,
                         use_masm: _,
-                    } => compile_source_unit_v2(
+                        echo: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &deps,
@@ -251,7 +253,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         language_version,
                         experiments,
-                    )?,
+                    )?
                 };
                 let (named_addr_opt, module) = match unit {
                     AnnotatedCompiledUnit::Module(annot_module) => {
@@ -313,14 +315,16 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, opt_model, warning_opt) = match run_config {
+                let (unit, opt_model, warning_opt) = {
                     // Run the V2 compiler.
-                    TestRunConfig::CompilerV2 {
+                    let TestRunConfig {
                         language_version,
                         experiments: v2_experiments,
                         vm_config: _,
                         use_masm: _,
-                    } => compile_source_unit_v2(
+                        echo: _,
+                    } = run_config;
+                    compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &state
@@ -332,7 +336,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         language_version,
                         v2_experiments,
-                    )?,
+                    )?
                 };
                 match unit {
                     AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, opt_model, warning_opt),
@@ -370,6 +374,7 @@ pub trait MoveTestAdapter<'a>: Sized {
             command,
             name,
             number,
+            source,
             start_line,
             command_lines_stop,
             stop_line,
@@ -546,6 +551,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 command: c,
                 name,
                 number,
+                source,
                 start_line,
                 command_lines_stop,
                 stop_line,
@@ -990,6 +996,14 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     if let Some(data) = &task.data {
         adapter.register_temp_filename(data);
     }
+    if adapter.run_config().echo {
+        writeln!(
+            output,
+            "task {} lines {}-{}: {}",
+            task_number, start_line, stop_line, task.source
+        )
+        .unwrap();
+    }
     let result = adapter.handle_command(task);
     let result_string = match result {
         Ok(None) => return,
@@ -998,12 +1012,17 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     };
     let result_string = adapter.rewrite_temp_filenames(result_string);
     assert!(!result_string.is_empty());
-    writeln!(
-        output,
-        "\ntask {} '{}'. lines {}-{}:\n{}",
-        task_number, task_name, start_line, stop_line, result_string
-    )
-    .unwrap();
+    if !adapter.run_config().echo {
+        // Print this only if echo is off. With
+        // echo this info is already printed.
+        write!(
+            output,
+            "\ntask {} '{}'. lines {}-{}:\n",
+            task_number, task_name, start_line, stop_line
+        )
+        .unwrap();
+    }
+    writeln!(output, "{}", result_string).unwrap();
 }
 
 fn handle_expected_output(

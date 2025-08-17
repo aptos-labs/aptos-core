@@ -26,8 +26,9 @@ use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
 use move_vm_runtime::{
-    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, ModuleStorage,
-    StagingModuleStorage,
+    dispatch_loader, module_traversal::TraversalContext, FunctionDefinitionLoader,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, LoadedFunctionOwner,
+    ModuleStorage, StagingModuleStorage,
 };
 
 #[derive(Deref, DerefMut)]
@@ -102,57 +103,72 @@ impl<'r> UserSession<'r> {
 
         let init_func_name = ident_str!("init_module");
         for module in modules {
-            // Check if module existed previously. If not, we do not run initialization.
-            if module_storage.check_module_exists(module.self_addr(), module.self_name())? {
+            // INVARIANT:
+            //   We have charged for the old version (if it exists) before when pre-processing the
+            //   module bundle. We have also charged for the new versions as well.
+            if features.is_lazy_loading_enabled() {
+                traversal_context
+                    .check_is_special_or_visited(module.self_addr(), module.self_name())
+                    .map_err(|err| err.finish(Location::Undefined))?;
+            }
+
+            if module_storage
+                .unmetered_check_module_exists(module.self_addr(), module.self_name())?
+            {
+                // Module existed before, so do not run initialization.
                 continue;
             }
 
             self.session.execute(|session| {
-                if gas_feature_version <= RELEASE_V1_30 {
-                    let module_id = module.self_id();
-                    let init_function_exists = staging_module_storage
-                        .load_function(&module_id, init_func_name, &[])
-                        .is_ok();
-
-                    if init_function_exists {
-                        // We need to check that init_module function we found is well-formed.
-                        verifier::module_init::legacy_verify_module_init_function(module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-
-                        session.execute_function_bypass_visibility(
-                            &module_id,
+                dispatch_loader!(&staging_module_storage, loader, {
+                    #[allow(clippy::collapsible_else_if)]
+                    if gas_feature_version <= RELEASE_V1_30 {
+                        if let Ok(init_func) = loader.load_instantiated_function(
+                            &LegacyLoaderConfig::unmetered(),
+                            gas_meter,
+                            traversal_context,
+                            &module.self_id(),
                             init_func_name,
-                            vec![],
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
-                            gas_meter,
-                            traversal_context,
-                            &staging_module_storage,
-                        )?;
-                    }
-                } else {
-                    let module = staging_module_storage
-                        .fetch_existing_verified_module(module.self_addr(), module.self_name())?;
-                    if let Ok(function) = module.get_function(init_func_name) {
-                        verifier::module_init::verify_init_module_function(&function)?;
+                            &[],
+                        ) {
+                            // We need to check that init_module function we found is well-formed.
+                            verifier::module_init::legacy_verify_module_init_function(module)
+                                .map_err(|e| e.finish(Location::Undefined))?;
 
-                        let loaded_function = LoadedFunction {
-                            owner: LoadedFunctionOwner::Module(module),
-                            ty_args: vec![],
-                            function,
-                        };
-                        session.execute_loaded_function(
-                            loaded_function,
-                            vec![MoveValue::Signer(destination)
-                                .simple_serialize()
-                                .expect("Signer is always serializable")],
+                            session.execute_loaded_function(
+                                init_func,
+                                vec![MoveValue::Signer(destination).simple_serialize().unwrap()],
+                                gas_meter,
+                                traversal_context,
+                                &loader,
+                            )?;
+                        }
+                    } else {
+                        if let Ok((module, function)) = loader.load_function_definition(
                             gas_meter,
                             traversal_context,
-                            &staging_module_storage,
-                        )?;
+                            &module.self_id(),
+                            init_func_name,
+                        ) {
+                            verifier::module_init::verify_init_module_function(&function)?;
+
+                            let loaded_function = LoadedFunction {
+                                owner: LoadedFunctionOwner::Module(module),
+                                ty_args: vec![],
+                                function,
+                            };
+                            session.execute_loaded_function(
+                                loaded_function,
+                                vec![MoveValue::Signer(destination)
+                                    .simple_serialize()
+                                    .expect("Signer is always serializable")],
+                                gas_meter,
+                                traversal_context,
+                                &loader,
+                            )?;
+                        }
                     }
-                }
+                });
                 Ok::<_, VMStatus>(())
             })?;
         }

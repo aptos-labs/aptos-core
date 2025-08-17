@@ -1,59 +1,55 @@
 processed 3 tasks
+task 0 lines 1-10:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 3
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    ld_u64 42
+    // @5
+    move_loc l1
+    write_ref
+    ret
 
-task 0 'print-bytecode'. lines 1-10:
-// Move bytecode v7
-script {
+
+task 1 lines 12-23:  print-bytecode --input=module [module 0x3d.Foobar {]
+// Bytecode version v7
+module 0x3d::Foobar
+struct FooCoin
+  value: u64
+
+// Function definition at index 0
+public fun borrow_mut_field(l0: &mut Foobar::FooCoin)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field FooCoin, value
+    st_loc l1
+    move_loc l1
+    pop
+    // @5
+    ret
 
 
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-L1:	loc1: &mut u64
-B0:
-	0: LdU64(3)
-	1: StLoc[0](loc0: u64)
-	2: MutBorrowLoc[0](loc0: u64)
-	3: StLoc[1](loc1: &mut u64)
-	4: LdU64(42)
-	5: MoveLoc[1](loc1: &mut u64)
-	6: WriteRef
-	7: Ret
-}
-}
+task 2 lines 25-36:  print-bytecode --input=module [module 0x4d.Foobar {]
+// Bytecode version v7
+module 0x4d::Foobar
+struct FooCoin<T0>
+  value: u64
 
-task 1 'print-bytecode'. lines 12-23:
-// Move bytecode v7
-module 3d.Foobar {
-struct FooCoin {
-	value: u64
-}
+// Function definition at index 0
+public fun borrow_mut_field(l0: &mut Foobar::FooCoin<address>)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field FooCoin<address>, value
+    st_loc l1
+    move_loc l1
+    pop
+    // @5
+    ret
 
-public borrow_mut_field(Arg0: &mut FooCoin) /* def_idx: 0 */ {
-L1:	loc0: &mut u64
-B0:
-	0: MoveLoc[0](Arg0: &mut FooCoin)
-	1: MutBorrowField[0](FooCoin.value: u64)
-	2: StLoc[1](loc0: &mut u64)
-	3: MoveLoc[1](loc0: &mut u64)
-	4: Pop
-	5: Ret
-}
-}
 
-task 2 'print-bytecode'. lines 25-36:
-// Move bytecode v7
-module 4d.Foobar {
-struct FooCoin<Ty0> {
-	value: u64
-}
-
-public borrow_mut_field(Arg0: &mut FooCoin<address>) /* def_idx: 0 */ {
-L1:	loc0: &mut u64
-B0:
-	0: MoveLoc[0](Arg0: &mut FooCoin<address>)
-	1: MutBorrowFieldGeneric[0](FooCoin.value: u64)
-	2: StLoc[1](loc0: &mut u64)
-	3: MoveLoc[1](loc0: &mut u64)
-	4: Pop
-	5: Ret
-}
-}

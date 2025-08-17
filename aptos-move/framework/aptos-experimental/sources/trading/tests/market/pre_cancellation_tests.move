@@ -2,6 +2,7 @@
 module aptos_experimental::pre_cancellation_tests {
     use std::option;
     use aptos_framework::timestamp;
+    use aptos_experimental::order_book_types::good_till_cancelled;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
@@ -11,9 +12,6 @@ module aptos_experimental::pre_cancellation_tests {
         place_order_and_verify, verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{
-        good_till_cancelled,
-    };
     use aptos_experimental::market::{new_market, new_market_config, cancel_order_with_client_id};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
@@ -126,7 +124,7 @@ module aptos_experimental::pre_cancellation_tests {
             false, // Not a maker order
             order_id,
             option::some(1000),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,

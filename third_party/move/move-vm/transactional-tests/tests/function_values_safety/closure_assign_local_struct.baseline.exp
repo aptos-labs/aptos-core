@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 43-66:
+task 0 lines 1-39:  publish [module 0x66::helpers]
+task 1 lines 43-66:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: None,
     major_status: STLOC_TYPE_MISMATCH_ERROR,

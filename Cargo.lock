@@ -510,6 +510,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest 0.11.23",
+ "rstest",
  "serde",
  "serde_json",
  "tokio",
@@ -709,6 +710,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-crypto",
  "aptos-drop-helper",
+ "aptos-gas-schedule",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -2850,7 +2852,6 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
- "claims",
  "goldenfile",
  "move-binary-format",
  "move-command-line-common",
@@ -4309,7 +4310,6 @@ dependencies = [
  "reqwest 0.11.23",
  "reqwest-middleware",
  "reqwest-retry",
- "serde",
  "serde_json",
  "sysinfo",
  "tokio",
@@ -4572,7 +4572,6 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -6297,7 +6296,10 @@ name = "bytecode-verifier-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "libtest-mimic",
  "move-transactional-test-runner",
+ "once_cell",
+ "walkdir",
 ]
 
 [[package]]
@@ -11172,6 +11174,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "test-case",
 ]
 
 [[package]]
@@ -11844,15 +11847,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module-publish"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
-]
-
-[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12063,6 +12057,7 @@ dependencies = [
  "clap 4.5.21",
  "codespan",
  "codespan-reporting",
+ "colored",
  "ethnum",
  "flexi_logger",
  "im",
@@ -12158,6 +12153,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "datatest-stable",
+ "libtest-mimic",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -12166,6 +12162,9 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
+ "once_cell",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
@@ -12320,11 +12319,11 @@ dependencies = [
  "itertools 0.13.0",
  "legacy-move-compiler",
  "log",
+ "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
  "move-core-types",
- "move-disassembler",
  "move-ir-types",
  "move-prover-test-utils",
  "move-symbol-pool",
@@ -12371,6 +12370,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-package-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-rest-client",
+ "fs2",
+ "futures",
+ "git2 0.16.1",
+ "hex",
+ "move-core-types",
+ "percent-encoding",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "move-package-manifest"
 version = "0.1.0"
 dependencies = [
@@ -12410,7 +12427,6 @@ dependencies = [
  "once_cell",
  "serde",
  "shell-words",
- "simplelog",
  "tempfile",
  "toml 0.7.8",
  "walkdir",
@@ -12631,6 +12647,7 @@ dependencies = [
  "once_cell",
  "regex",
  "tempfile",
+ "tera",
  "termcolor",
 ]
 
@@ -12709,6 +12726,7 @@ dependencies = [
  "anyhow",
  "better_any",
  "bytes",
+ "cfg-if",
  "claims",
  "fail",
  "hashbrown 0.14.3",
@@ -13524,11 +13542,8 @@ name = "package-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
- "aptos-transaction-workloads-lib",
- "bcs 0.1.4",
+ "aptos-transaction-generator-lib",
  "clap 4.5.21",
- "move-package",
 ]
 
 [[package]]
@@ -16857,17 +16872,6 @@ dependencies = [
  "num-traits",
  "thiserror",
  "time",
-]
-
-[[package]]
-name = "simplelog"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc0ffd69814a9b251d43afcabf96dad1b29f5028378056257be9e3fecc9f720"
-dependencies = [
- "chrono",
- "log",
- "termcolor",
 ]
 
 [[package]]

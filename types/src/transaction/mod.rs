@@ -54,7 +54,9 @@ pub mod use_case;
 pub mod user_transaction_context;
 pub mod webauthn;
 
-pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload, FeeDistribution};
+pub use self::block_epilogue::{
+    BlockEndInfo, BlockEndInfoExt, BlockEpiloguePayload, FeeDistribution, TBlockEndInfoExt,
+};
 use crate::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::TransactionEvent,
@@ -845,6 +847,7 @@ impl TransactionPayload {
     // Used in sdk and a lot of tests when upgrading current payload format to the new format.
     pub fn upgrade_payload(
         self,
+        rng: &mut impl Rng,
         use_txn_payload_v2_format: bool,
         use_orderless_transactions: bool,
     ) -> Self {
@@ -860,10 +863,8 @@ impl TransactionPayload {
                         replay_protection_nonce,
                     } => TransactionExtraConfig::V1 {
                         multisig_address,
-                        replay_protection_nonce: replay_protection_nonce.or_else(|| {
-                            let mut rng = rand::thread_rng();
-                            Some(rng.gen())
-                        }),
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(rng.gen())),
                     },
                 }
             }
@@ -1489,7 +1490,7 @@ impl TransactionStatus {
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
             Self::Keep(s) => Ok(s.clone()),
-            _ => Err(format_err!("Not Keep.")),
+            status => Err(format_err!("Expected kept status, got {:?}", status)),
         }
     }
 
@@ -2862,12 +2863,12 @@ impl Transaction {
 
     pub fn block_epilogue_v1(
         block_id: HashValue,
-        block_end_info: BlockEndInfo,
+        block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
             block_id,
-            block_end_info,
+            block_end_info: block_end_info.to_persistent(),
             fee_distribution,
         })
     }
@@ -2980,7 +2981,19 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         None
     }
 
-    fn from_txn(_txn: Transaction) -> Self {
+    fn state_checkpoint(_block_id: HashValue) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v0(_block_id: HashValue, _block_end_info: BlockEndInfo) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v1(
+        _block_id: HashValue,
+        _block_end_info: TBlockEndInfoExt<Self::Key>,
+        _fee_distribution: FeeDistribution,
+    ) -> Self {
         unimplemented!()
     }
 }
