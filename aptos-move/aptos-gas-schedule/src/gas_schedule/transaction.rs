@@ -249,7 +249,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_num_dependencies: NumModules,
             { RELEASE_V1_10.. => "max_num_dependencies" },
-            768,
+            1000,
         ],
         [
             max_total_dependency_size: NumBytes,

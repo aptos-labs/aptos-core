@@ -305,7 +305,9 @@ where
                 return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
             }
             if self.total_dependency_size > self.vm_gas_params.txn.max_total_dependency_size {
-                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+                return Err(PartialVMError::new(
+                    StatusCode::DEPENDENCY_SIZE_LIMIT_REACHED,
+                ));
             }
         }
         Ok(())

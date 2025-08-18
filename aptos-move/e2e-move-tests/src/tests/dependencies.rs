@@ -18,6 +18,15 @@ fn assert_dependency_limit_reached(status: TransactionStatus) {
     ));
 }
 
+fn assert_dependency_size_limit_reached(status: TransactionStatus) {
+    assert!(matches!(
+        status,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::DEPENDENCY_SIZE_LIMIT_REACHED
+        )))
+    ));
+}
+
 #[test_case(true, true)]
 #[test_case(true, false)]
 #[test_case(false, true)]
@@ -54,7 +63,7 @@ fn exceeding_max_num_dependencies_on_publish(
     if enable_lazy_loading {
         assert_success!(res);
     } else {
-        assert_dependency_limit_reached(res);
+        assert_dependency_size_limit_reached(res);
 
         // Publishing should succeed if we increase the limit.
         if change_max_num_dependencies {
