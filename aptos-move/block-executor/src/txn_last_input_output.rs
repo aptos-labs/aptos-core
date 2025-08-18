@@ -26,7 +26,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::Module;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::HashSet,
+    collections::{BTreeSet, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
@@ -461,6 +461,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
+        }
+    }
+
+    pub(crate) fn get_storage_keys_read(&self, txn_idx: TxnIndex) -> BTreeSet<T::Key> {
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+        read_set
+            .get_read_summary()
+            .into_iter()
+            .filter_map(|k| match k {
+                InputOutputKey::Resource(key) | InputOutputKey::Group(key, _) => Some(key),
+                InputOutputKey::DelayedField(_) => None,
+            })
+            .collect()
+    }
+
+    pub(crate) fn get_storage_keys_written(&self, txn_idx: TxnIndex) -> Option<BTreeSet<T::Key>> {
+        match self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("Output must exist")
+            .as_ref()
+        {
+            ExecutionStatus::Success(o) | ExecutionStatus::SkipRest(o) => {
+                Some(o.get_storage_keys_written())
+            },
+            _ => None,
         }
     }
 
