@@ -6,7 +6,7 @@ struct T
   u: u64
 
 // Function definition at index 0
-fun f(): M::T
+fun f(): T
     ld_u64 0
     pack T
     ret
