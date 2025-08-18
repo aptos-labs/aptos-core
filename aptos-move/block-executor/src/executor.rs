@@ -1667,7 +1667,6 @@ where
         shared_maybe_error: &AtomicBool,
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
-        block_limit_processor: ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
         block_epilogue_txn: Option<T>,
         mut versioned_cache: MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: impl Send + 'static,
@@ -1701,16 +1700,10 @@ where
         // Explicit async drops
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
-        let to_make_hot = block_epilogue_txn
-            .is_some()
-            .then(|| block_limit_processor.acquire().get_slots_to_make_hot())
-            .unwrap_or_default();
-
         // Return final result
         Ok(BlockOutput::new(
             final_results.into_inner(),
             block_epilogue_txn,
-            to_make_hot,
         ))
     }
 
@@ -1732,7 +1725,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
@@ -1804,7 +1797,6 @@ where
             &shared_maybe_error,
             !scheduler.post_commit_processing_queue_is_empty(),
             final_results,
-            block_limit_processor,
             None, // BlockSTMv2 doesn't handle block epilogue yet.
             versioned_cache,
             scheduler,
@@ -1836,7 +1828,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1912,7 +1904,6 @@ where
             &shared_maybe_error,
             scheduler.pop_from_commit_queue().is_ok(),
             final_results,
-            block_limit_processor,
             block_epilogue_txn.into_inner(),
             versioned_cache,
             scheduler,
@@ -2147,7 +2138,7 @@ where
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None, BTreeMap::new()));
+            return Ok(BlockOutput::new(vec![], None));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -2475,11 +2466,7 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        let to_make_hot = block_epilogue_txn
-            .is_some()
-            .then(|| block_limit_processor.get_slots_to_make_hot())
-            .unwrap_or_default();
-        Ok(BlockOutput::new(ret, block_epilogue_txn, to_make_hot))
+        Ok(BlockOutput::new(ret, block_epilogue_txn))
     }
 
     pub fn execute_block(
@@ -2594,7 +2581,7 @@ where
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| E::Output::discard_output(error_code))
                 .collect();
-            return Ok(BlockOutput::new(ret, None, BTreeMap::new()));
+            return Ok(BlockOutput::new(ret, None));
         }
 
         Err(sequential_error)
