@@ -1599,9 +1599,31 @@ impl StructRef {
     }
 
     fn get_variant_tag(&self) -> PartialVMResult<VariantIndex> {
-        let tag_ref = Value(self.0.borrow_elem(0)?).value_as::<Reference>()?;
-        let tag_value = tag_ref.read_ref()?;
-        tag_value.value_as::<u16>()
+        match self.0.container() {
+            Container::Struct(vals) => {
+                let vals = vals.borrow();
+                vals.first()
+                    .and_then(|v| match v {
+                        ValueImpl::U16(x) => Some(*x),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    })
+            },
+            Container::Locals(_)
+            | Container::Vec(_)
+            | Container::VecU8(_)
+            | Container::VecU64(_)
+            | Container::VecU128(_)
+            | Container::VecBool(_)
+            | Container::VecAddress(_)
+            | Container::VecU16(_)
+            | Container::VecU32(_)
+            | Container::VecU256(_) => Err(PartialVMError::new(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            )),
+        }
     }
 }
 
