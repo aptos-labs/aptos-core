@@ -78,11 +78,21 @@ service:
   exposeMetrics: false
   # -- Whether to expose the admin port on fullnodes
   exposeAdmin: false
+  # -- Whether to expose the gRPC port on the external service
+  exposeGrpcPort: false
   # -- The externalTrafficPolicy for the fullnode service
   externalTrafficPolicy:
   # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs
   loadBalancerSourceRanges: []
   annotations: {}
+  internal:
+    # -- The Kubernetes ServiceType to use for the internal service.
+    type: ClusterIP
+    annotations: {}
+    # -- If set, the hostname to use for the internal LB
+    hostname:
+    # -- Whether to expose the gRPC port on the internal service
+    exposeGrpcPort: false
 
 ingress:
   # -- Change enabled to true and fill out the rest of the fields to expose the REST API externally via your ingress controller
@@ -112,7 +122,7 @@ backup:
   image:
     # -- Image repo to use for backup images
     repo: aptoslabs/tools
-    # -- Image tag to use for backup images
+    # -- Image tag to use for backup images. If set, overrides `imageTag`
     tag:
     # -- Image pull policy to use for backup images
     pullPolicy: IfNotPresent
@@ -157,8 +167,8 @@ backup_verify:
       cpu: 32
       memory: 60Gi
     requests:
-      cpu: 8
-      memory: 8Gi
+      cpu: 16
+      memory: 30Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -183,7 +193,7 @@ restore:
   image:
     # -- Image repo to use for restore images
     repo: aptoslabs/tools
-    # -- Image tag to use for restore images
+    # -- Image tag to use for restore images. If set, overrides `imageTag`
     tag:
     # -- Image pull policy to use for restore images
     pullPolicy: IfNotPresent

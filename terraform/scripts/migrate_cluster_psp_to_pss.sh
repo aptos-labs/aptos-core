@@ -2,7 +2,7 @@
 
 function msg() {
   if [[ ${VERBOSE} == true ]]; then
-    echo ${@} 2>&1
+    echo "$@" 2>&1
   fi
 }
 
@@ -37,7 +37,8 @@ function list_ns() {
 
 function migrate() {
   msg "Creating resource PodSecurityPolicy/privileged-psp"
-  local scriptdir=$(dirname $(readlink -f ${0}))
+  local scriptdir
+  scriptdir=$(dirname "$(readlink -f "${0}")")
   kubectl apply -f "${scriptdir}"/privileged-psp.yaml
 
   msg "Creating role 'privileged-psp'"
@@ -65,7 +66,6 @@ function clean() {
 
 POLICY_VERSION=v1.24
 VERBOSE=false
-DEBUG=false
 cmd=""
 
 optspec="h-:"
@@ -74,7 +74,6 @@ while getopts "$optspec" optchar; do
     -)
       case "${OPTARG}" in
         debug)
-          DEBUG=true
           set +x
           ;;
         verbose)
@@ -82,7 +81,6 @@ while getopts "$optspec" optchar; do
           ;;
         policy-version=*)
           val=${OPTARG#*=}
-          opt=${OPTARG%=$val}
           POLICY_VERSION=${val}
           ;;
         *)
@@ -105,7 +103,7 @@ case $# in
     cmd="usage"
     ;;
   1)
-    cmd=${1}
+    cmd="${1}"
     ;;
   *)
     echo "Too many parameters on the command line" >&2
@@ -113,9 +111,9 @@ case $# in
     ;;
 esac
 
-case ${cmd} in
+case "${cmd}" in
   usage)
-    echo "Usage: $(basename ${0}) [--verbose] [--debug] [--policy-version=<value>] check | migrate | clean" >&2
+    echo "Usage: $(basename "${0}") [--verbose] [--debug] [--policy-version=<value>] check | migrate | clean" >&2
     echo "Default PSS policy version: ${POLICY_VERSION}" >&2
     exit 1
     ;;
@@ -132,7 +130,7 @@ case ${cmd} in
     migrate
     ;;
   *)
-    echo "Unknown command:" ${cmd}
+    echo "Unknown command: ${cmd}"
     exit 2
     ;;
 esac

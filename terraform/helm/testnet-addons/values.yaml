@@ -12,6 +12,11 @@ genesis:
   # -- Aptos Chain ID
   chain_id:
 
+tools:
+  image:
+    repo: aptoslabs/tools
+    tag:
+
 waypoint:
   image:
     # -- Image repo to use for serving waypoint and genesis

@@ -119,13 +119,12 @@ transforms:
         (!has_log_level_annotation && is_error_log)
 
       retain_log
-  
+
   delete_temp_fields:
     type: remap
     inputs:
       - filter_forge_logs
-    source:
-      del(.min_log_level_to_retain)
+    source: del(.min_log_level_to_retain)
 
   final_logs:
     type: filter
@@ -133,46 +132,18 @@ transforms:
       - delete_temp_fields
     # temporarily filter out noisy logs in vector until https://github.com/aptos-labs/aptos-core/pull/13965 lands in mainnet release
     # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C06TH3DH7SB/p1721328005384169?thread_ts=1720695143.603089&cid=C06TH3DH7SB until lands in mainnet release
+    # temporarily filter out noisy logs from https://aptos-org.slack.com/archives/C08L5ETPN8Y/p1743105723097009 until code change lands to downgrade them to trace level
     condition: |
       if is_string(.message) {
         message = to_string!(.message)
-        if .level == "debug" && ( .message == "ReceiveProactiveRandShare" || .message == "ReceiveRandShareFastPath" ) {
+        if .level == "debug" && ( .message == "ReceiveOrderVote" || .message == "Received a commit vote not in the next 100 rounds, ignored." || .message == "sent_peer_monitoring_response" ) {
           return false
         }
         if starts_with(message, "ReceiveVote") || starts_with(message, "OrderVote:") || starts_with(message, "Receive commit vote BlockInfo") {
           return false
         }
+        if .level == "debug" && contains(message, "Received response for expired request_id") {
+          return false
+        }
       }
       true
-
-  uptrace_logs:
-    type: remap
-    inputs:
-      - final_logs
-    source: |
-      . = flatten(., ".") # in order for fields to become individual, filterable top-level fields in uptrace we need to flatten nested objects into top-level keys.
-      .service_name = .k8s.labels.app
-      .repo = "k8s"
-
-  # datadog_logs:
-  #   type: remap
-  #   inputs:
-  #     - final_logs
-  #   source: |
-  #     .ddsource = "k8s"
-  #     if is_string(.k8s.labels.app) {
-  #       .service = .k8s.labels.app
-  #     }
-  #     .ddtags, _ = "kube_cluster_name:" + .k8s.cluster + ",kube_namespace:" + .k8s.namespace + ",pod_name:" + .k8s.pod_name
-
-  # signoz_logs:
-  #   type: remap
-  #   inputs:
-  #     - final_logs
-  #   source: |
-  #     .severity_text = del(.level)
-  #     .source_type = "k8s"
-  #     tmp = { "k8s": del(.k8s)}
-  #     resources_tmp = flatten(tmp, ".")
-  #     . = flatten(., ".")
-  #     .resources = resources_tmp

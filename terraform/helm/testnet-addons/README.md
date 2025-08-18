@@ -30,6 +30,8 @@ Additional components for aptos-nodes testnet
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template |
+| tools.image.repo | string | `"aptoslabs/tools"` |  |
+| tools.image.tag | string | `nil` |  |
 | waypoint.affinity | object | `{}` |  |
 | waypoint.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for waypoint image |
 | waypoint.image.repo | string | `"joseluisq/static-web-server"` | Image repo to use for serving waypoint and genesis |

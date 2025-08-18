@@ -76,11 +76,19 @@ app.kubernetes.io/managed-by: helm
 {{- end -}}
 
 {{/*
-Create the name of the service account to use
+Create the name of the service accounts to use
 */}}
-{{- define "aptos-validator.serviceAccountName" -}}
+{{- define "aptos-validator.validatorServiceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-    {{ default (include "aptos-validator.fullname" .) .Values.serviceAccount.name }}
+    {{ include "aptos-validator.fullname" $ }}-validator
+{{- else -}}
+    {{ default "default" .Values.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{- define "aptos-validator.fullnodeServiceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+    {{ include "aptos-validator.fullname" $ }}-fullnode
 {{- else -}}
     {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}
