@@ -1,0 +1,77 @@
+processed 9 tasks
+task 1 lines 5-10:  run [script {]
+task 2 lines 13-13:  view --address 0x1 --resource 0x42::N::R<u64>
+[No Resource Exists]
+task 3 lines 15-31:  publish [module 0x42::N {]
+Error: compilation errors:
+ error: type `u64` is missing required ability `key`
+   ┌─ TEMPFILE1:25:17
+   │
+25 │         move_to<u64>(R<u64>{v: 0}, p0);
+   │                 ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: cannot use `R<u64>` with an operator which expects a value of type `&signer`
+   ┌─ TEMPFILE1:25:22
+   │
+25 │         move_to<u64>(R<u64>{v: 0}, p0);
+   │                      ^^^^^^^^^^^^
+
+error: cannot bind `u64` to left-hand side of type `R<u64>`
+   ┌─ TEMPFILE1:28:13
+   │
+28 │         let R<u64>{v: _t4} = move_from<u64>(signer::address_of(p0));
+   │             ^^^^^^^^^^^^^^
+
+error: type `u64` is missing required ability `key`
+   ┌─ TEMPFILE1:28:40
+   │
+28 │         let R<u64>{v: _t4} = move_from<u64>(signer::address_of(p0));
+   │                                        ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+
+task 4 lines 34-34:  run --signers 0x1 --args 0 -- 0x42::N::ex
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 36-42:  run --signers 0x1 [script {]
+Error: compilation errors:
+ error: unbound module
+   ┌─ TEMPFILE2:38:9
+   │
+38 │     use 0x42::N;
+   │         ^^^^^^^ Invalid 'use'. Unbound module: '0x42::N'
+
+error: unbound module
+   ┌─ TEMPFILE2:40:9
+   │
+40 │         N::give(&p0);
+   │         ^ Unbound module or type alias 'N'
+
+
+task 6 lines 45-45:  view --address 0x1 --resource 0x42::N::R<u64>
+[No Resource Exists]
+task 7 lines 47-53:  run --signers 0x1  [script {]
+Error: compilation errors:
+ error: unbound module
+   ┌─ TEMPFILE3:49:9
+   │
+49 │     use 0x42::N;
+   │         ^^^^^^^ Invalid 'use'. Unbound module: '0x42::N'
+
+error: unbound module
+   ┌─ TEMPFILE3:51:9
+   │
+51 │         N::take(&p0);
+   │         ^ Unbound module or type alias 'N'
+
+
+task 8 lines 56-56:  view --address 0x1 --resource 0x42::N::R<u64>
+[No Resource Exists]

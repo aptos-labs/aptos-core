@@ -92,7 +92,7 @@ impl<T: fmt::Write> Disassembler<T> {
         for friend in module.module().friend_decls.iter() {
             let addr = module.module().address_identifier_at(friend.address);
             let name = module.module().identifier_at(friend.name);
-            writeln!(dis.out, "friend {}::{}", addr.short_str_lossless(), name)?
+            writeln!(dis.out, "friend 0x{}::{}", addr.short_str_lossless(), name)?
         }
 
         // Process struct and function definitions
@@ -127,7 +127,11 @@ impl<T: fmt::Write> Disassembler<T> {
                 ">",
             )?
         }
+        if !str.abilities().is_empty() {
+            write!(self.out, " has {}", str.abilities())?
+        }
         writeln!(self.out)?;
+
         if str.variant_count() == 0 {
             self.fields("  ", str.fields_optional_variant(None))?
         } else {
@@ -309,8 +313,19 @@ impl<T: fmt::Write> Disassembler<T> {
                 )?
             }
         }
-        writeln!(self.out)?;
-
+        let acquired = fdef.acquired_resources();
+        if !acquired.is_empty() {
+            self.out.write_str(" acquires ")?;
+            for (pos, def_idx) in acquired.iter().enumerate() {
+                if pos > 0 {
+                    self.out.write_str(", ")?
+                }
+                let view =
+                    StructDefinitionView::new(fdef.module(), fdef.module().struct_def_at(*def_idx));
+                self.out.write_str(view.name().as_str())?
+            }
+        }
+        self.out.write_str("\n")?;
         if let Some(unit) = fdef.code() {
             // Declare locals
             let locals_sign = fdef.module().signature_at(unit.locals);
@@ -707,7 +722,7 @@ impl<T: fmt::Write> Disassembler<T> {
 
     fn module_id_prefix(&self, module_id: &ModuleId) -> anyhow::Result<String> {
         if &self.self_module == module_id {
-            Ok(format!("{}::", self.self_module.name))
+            Ok("".to_string())
         } else if let Some(short) = self.reverse_module_aliases.get(module_id) {
             Ok(format!("{}::", short))
         } else {

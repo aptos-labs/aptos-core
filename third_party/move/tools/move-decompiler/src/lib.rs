@@ -6,7 +6,7 @@ use anyhow::Context;
 use clap::Parser;
 use codespan::Span;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::WriteColor};
-use move_binary_format::{file_format::CompiledScript, CompiledModule};
+use move_binary_format::{file_format::CompiledScript, module_script_conversion, CompiledModule};
 use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::files::FileHash;
 use move_model::{
@@ -203,10 +203,8 @@ impl Decompiler {
 
     /// Decompiles the give binary script. Same as `decompile_module` but for scripts.
     pub fn decompile_script(&mut self, script: CompiledScript, source_map: SourceMap) -> String {
-        self.decompile_module(
-            move_model::convert_script_to_module(script, self.env.get_module_count()),
-            source_map,
-        )
+        let module = module_script_conversion::script_into_module(script, "main");
+        self.decompile_module(module, source_map)
     }
 
     /// Return the environment the decompiler has built so far.

@@ -18,7 +18,10 @@ use either::Either;
 use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::file_format::{CodeOffset, Visibility};
-use move_core_types::{account_address::AccountAddress, function::ClosureMask};
+use move_core_types::{
+    account_address::AccountAddress, function::ClosureMask,
+    language_storage::pseudo_script_module_id,
+};
 use num::BigInt;
 use std::{
     borrow::Borrow,
@@ -3072,7 +3075,11 @@ impl ModuleName {
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
+        // TODO: remove all usages of MAX_ADDRESS for script addresses; for now
+        // identify MAX_ADDRESS and the one in `language_storage::pseudo_script_module`
+        // as script.
         self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
+            || self.0 == Address::Numerical(pseudo_script_module_id().address)
     }
 }
 
