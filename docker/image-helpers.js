@@ -122,8 +122,36 @@ export const CargoBuildProfiles = {
   Performance: "performance",
 }
 
+export function getImagesToWaitFor(args) {
+  const perfImages = ["validator", "validator-testing"];
+  const images = ["forge", "tools", "indexer-grpc"];
+  const imagesToWaitFor = {};
+  for (const image of [...perfImages, ...images]) {
+    const imageConfig = {};
 
-export function parseArgsFromFlagOrEnv(requiredArgs, optionalArgs) {
+    if (args.PROFILE_RELEASE) {
+      imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Default];
+    }
+
+    if (perfImages.includes(image)) {
+      if (args.PROFILE_PERF) {
+        imageConfig[CargoBuildProfiles.Performance] = [CargoBuildFeatures.Default];
+      }
+
+      if (args.FEATURE_FAILPOINTS) {
+        if (imageConfig[CargoBuildProfiles.Release] !== undefined) {
+          imageConfig[CargoBuildProfiles.Release].push(CargoBuildFeatures.Failpoints);
+        } else {
+          imageConfig[CargoBuildProfiles.Release] = [CargoBuildFeatures.Failpoints];
+        }
+      }
+    }
+    imagesToWaitFor[image] = imageConfig;
+  }
+  return imagesToWaitFor;
+}
+
+export function parseArgsFromFlagOrEnv(requiredArgs, optionalArgs, booleanArgs) {
   const parsedArgs = {};
 
   for (const arg of requiredArgs) {
@@ -138,6 +166,12 @@ export function parseArgsFromFlagOrEnv(requiredArgs, optionalArgs) {
   for (const arg of optionalArgs) {
     const argValue = argv[arg.toLowerCase().replaceAll("_", "-")] ?? process.env[arg];
     parsedArgs[arg] = argValue;
+  }
+
+  for (const arg of booleanArgs) { 
+    const argExists = (argv[arg.toLowerCase().replaceAll("_", "-")] !== undefined) || 
+    (process.env[arg] === "true");
+    parsedArgs[arg] = argExists;
   }
 
   return parsedArgs;
