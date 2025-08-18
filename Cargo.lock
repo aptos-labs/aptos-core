@@ -11174,6 +11174,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "test-case",
 ]
 
 [[package]]
@@ -12633,6 +12634,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
+ "move-decompiler",
  "move-disassembler",
  "move-ir-compiler",
  "move-ir-types",

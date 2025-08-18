@@ -68,7 +68,7 @@ use aptos_types::{
         TimedFeatureFlag, TimedFeatures,
     },
     randomness::Randomness,
-    state_store::{state_key::StateKey, StateView, TStateView},
+    state_store::{StateView, TStateView},
     transaction::{
         authenticator::{AbstractionAuthData, AnySignature, AuthenticationProof},
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
@@ -1545,8 +1545,7 @@ impl AptosVM {
         // Lazy loading otherwise.
 
         // With lazy loading, we will check only immediate dependencies for linking checks,
-        // not the whole transitive dependencies closure, so charge gas here for them.
-        // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
+        // not the whole dependencies closure, so charge gas here for them.
         for (dep_addr, dep_name) in modules
             .iter()
             .flat_map(|module| module.immediate_dependencies_iter())
@@ -1573,7 +1572,6 @@ impl AptosVM {
             .iter()
             .flat_map(|module| module.immediate_friends_iter())
         {
-            // TODO(lazy-loading): Add a test for this when PRs are connected end to end.
             if !module_ids_in_bundle.contains(&(friend_addr, friend_name)) {
                 let msg = format!(
                     "Module {}::{} is declared as a friend and should be part of the \
@@ -2897,7 +2895,7 @@ impl AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2945,7 +2943,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<StateKey, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: false,
