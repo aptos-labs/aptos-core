@@ -1,0 +1,10 @@
+//**** Cross-compiled for `masm` syntax from `tests/assembler/declare_entry_fun.masm`
+
+//# publish --print-bytecode
+// Bytecode version v7
+module 0x66::test
+// Function definition at index 0
+entry public fun f(l0: u64): u64
+    move_loc l0
+    ret
+
