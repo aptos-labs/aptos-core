@@ -163,7 +163,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
                 let (entry, bytes_loaded) =
                     context.create_data_cache_entry(data_store, address, ty, false)?;
                 let exists = entry.exists()?;
-                (exists, Some(bytes_loaded))
+                (exists, bytes_loaded)
             } else {
                 let exists = self.data_store.get_resource_existence(&address, ty)?;
                 (exists, None)
@@ -404,7 +404,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         address: AccountAddress,
         ty: &Type,
         load_data: bool,
-    ) -> PartialVMResult<(&'c CachedInformation, NumBytes)> {
+    ) -> PartialVMResult<(&'c CachedInformation, Option<NumBytes>)> {
         dispatch_loader!(&self.module_storage, loader, {
             data_store.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 &loader,

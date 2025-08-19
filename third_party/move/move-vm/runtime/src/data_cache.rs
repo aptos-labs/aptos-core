@@ -285,62 +285,63 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
         mut load_data: bool,
-    ) -> PartialVMResult<(&CachedInformation, NumBytes)> {
+    ) -> PartialVMResult<(&CachedInformation, Option<NumBytes>)> {
         if !self.check_resource_existence_without_load {
             // Without the feature flag we will always load and deserialize the whole resource
             load_data = true;
         }
         let existing_entry = self.account_map.entry(*addr).or_default().entry(ty.clone());
 
-        let create_and_charge_entry = |gas_meter: &mut DataCacheGasMeterWrapper<'_, T>,
-                                       traversal_context,
-                                       struct_tag,
-                                       layout,
-                                       contains_delayed_fields,
-                                       existed_before: bool|
-         -> PartialVMResult<(CachedInformation, NumBytes)> {
-            let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
-                metadata_loader,
-                gas_meter,
-                traversal_context,
-                module_storage,
-                resource_resolver,
-                addr,
-                struct_tag,
-                layout,
-                contains_delayed_fields,
-                load_data,
-            )?;
-            let num_bytes_loaded = if !existed_before {
-                NumBytes::new(bytes_loaded)
-            } else {
-                NumBytes::zero()
+        let create_and_charge_entry =
+            |gas_meter: &mut DataCacheGasMeterWrapper<'_, T>,
+             traversal_context,
+             struct_tag,
+             layout,
+             contains_delayed_fields,
+             existed_before: bool|
+             -> PartialVMResult<(CachedInformation, Option<NumBytes>)> {
+                let (cached_info, bytes_loaded) = TransactionDataCache::create_cached_info(
+                    metadata_loader,
+                    gas_meter,
+                    traversal_context,
+                    module_storage,
+                    resource_resolver,
+                    addr,
+                    struct_tag,
+                    layout,
+                    contains_delayed_fields,
+                    load_data,
+                )?;
+                let num_bytes_loaded = if !existed_before {
+                    Some(NumBytes::new(bytes_loaded))
+                } else {
+                    None
+                };
+                if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
+                    if let Some(v) = cached_info.maybe_value().and_then(|v| v.view()) {
+                        full_gas_meter.charge_deserialize_resource(
+                            *addr,
+                            &TypeWithRuntimeEnvironment {
+                                ty,
+                                runtime_environment: module_storage.runtime_environment(),
+                            },
+                            v,
+                        )?;
+                    }
+                    if let Some(bytes_loaded) = num_bytes_loaded {
+                        full_gas_meter.charge_load_resource_bytes(
+                            *addr,
+                            &TypeWithRuntimeEnvironment {
+                                ty,
+                                runtime_environment: module_storage.runtime_environment(),
+                            },
+                            cached_info.exists()?,
+                            bytes_loaded,
+                        )?;
+                    }
+                }
+                Ok((cached_info, num_bytes_loaded))
             };
-            if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
-                if let Some(v) = cached_info.maybe_value().and_then(|v| v.view()) {
-                    full_gas_meter.charge_deserialize_resource(
-                        *addr,
-                        &TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        },
-                        v,
-                    )?;
-                }
-                if !existed_before {
-                    full_gas_meter.charge_load_resource_bytes(
-                        *addr,
-                        &TypeWithRuntimeEnvironment {
-                            ty,
-                            runtime_environment: module_storage.runtime_environment(),
-                        },
-                        cached_info.exists()?,
-                        num_bytes_loaded,
-                    )?;
-                }
-            }
-            Ok((cached_info, num_bytes_loaded))
-        };
 
         let (entry, bytes_loaded) = match existing_entry {
             Entry::Vacant(vacant_entry) => {
@@ -389,7 +390,7 @@ impl TransactionDataCache {
                     )?;
                     occupied_entry.get_mut().value = cached_info;
                 }
-                (occupied_entry.into_mut(), NumBytes::zero())
+                (occupied_entry.into_mut(), None)
             },
         };
 
