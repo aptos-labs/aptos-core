@@ -4,13 +4,14 @@
 use crate::{
     server::{
         configuration::CONFIGURATION_DISABLED_MESSAGE,
+        identity_information::IDENTITY_INFO_DISABLED_MESSAGE,
         peer_information::PEER_INFO_DISABLED_MESSAGE, serve_requests,
         system_information::SYS_INFO_DISABLED_MESSAGE, utils::get_all_metrics,
     },
-    CONFIGURATION_PATH, FORGE_METRICS_PATH, INDEX_PATH, JSON_METRICS_PATH, METRICS_PATH,
-    PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    CONFIGURATION_PATH, FORGE_METRICS_PATH, IDENTITY_INFORMATION_PATH, INDEX_PATH,
+    JSON_METRICS_PATH, METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
 };
-use aptos_config::config::{AptosDataClientConfig, BaseConfig, NodeConfig};
+use aptos_config::config::{AptosDataClientConfig, BaseConfig, Identity, NodeConfig};
 use aptos_data_client::client::AptosDataClient;
 use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_storage_interface::DbReader;
@@ -87,6 +88,7 @@ async fn test_inspect_index() {
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response_body_string.contains(CONFIGURATION_PATH));
     assert!(response_body_string.contains(FORGE_METRICS_PATH));
+    assert!(response_body_string.contains(IDENTITY_INFORMATION_PATH));
     assert!(response_body_string.contains(JSON_METRICS_PATH));
     assert!(response_body_string.contains(METRICS_PATH));
     assert!(response_body_string.contains(PEER_INFORMATION_PATH));
@@ -107,6 +109,38 @@ async fn test_inspect_json_metrics() {
     // Verify that the response contains the expected information
     assert_eq!(response.status(), StatusCode::OK);
     assert!(response_body_string.contains(INT_COUNTER_NAME));
+}
+
+#[tokio::test]
+async fn test_inspect_identity_information() {
+    // Create a validator config (with a single validator identity)
+    let mut config = NodeConfig::get_default_validator_config();
+    if let Some(network_config) = config.validator_network.as_mut() {
+        network_config.identity = Identity::None; // Reset the identity
+        network_config
+            .set_listen_address_and_prepare_identity()
+            .unwrap(); // Generates a random identity
+    }
+    config.full_node_networks = vec![];
+
+    // Disable the identity information endpoint and ping it
+    config.inspection_service.expose_identity_information = false;
+    let mut response = send_get_request_to_path(&config, IDENTITY_INFORMATION_PATH).await;
+    let response_body = body::to_bytes(response.body_mut()).await.unwrap();
+
+    // Verify that the response contains an error
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response_body, IDENTITY_INFO_DISABLED_MESSAGE);
+
+    // Enable the identity information endpoint and ping it
+    config.inspection_service.expose_identity_information = true;
+    let mut response = send_get_request_to_path(&config, IDENTITY_INFORMATION_PATH).await;
+    let response_body = body::to_bytes(response.body_mut()).await.unwrap();
+    let response_body_string = read_to_string(response_body.as_ref()).unwrap();
+
+    // Verify that the response contains the expected information
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(response_body_string.contains("Identity Information:"));
 }
 
 #[tokio::test]
