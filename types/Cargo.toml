@@ -57,6 +57,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 quick_cache = { workspace = true }
 rand = { workspace = true }
+rapidhash = { workspace = true }
 rayon = { workspace = true }
 ref-cast = { workspace = true }
 ring = { workspace = true }
