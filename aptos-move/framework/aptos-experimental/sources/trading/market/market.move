@@ -472,7 +472,7 @@ module aptos_experimental::market {
                 user_addr,
                 orig_size,
                 remaining_size,
-                orig_size,
+                remaining_size,
                 limit_price,
                 is_bid,
                 false,
