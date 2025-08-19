@@ -511,6 +511,10 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
         self.function_handle_view.attributes()
     }
 
+    pub fn acquired_resources(&self) -> &[StructDefinitionIndex] {
+        &self.function_def.acquires_global_resources
+    }
+
     pub fn is_entry(&self) -> bool {
         self.function_def.is_entry
     }

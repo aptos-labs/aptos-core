@@ -25,10 +25,6 @@ use legacy_move_compiler::{
     },
     Compiler, Flags, PASS_EXPANSION, PASS_PARSER,
 };
-use move_binary_format::{
-    file_format::{CompiledModule, CompiledScript},
-    module_script_conversion,
-};
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
@@ -58,7 +54,6 @@ pub mod ty_invariant_analysis;
 pub mod well_known;
 
 pub use builder::binary_module_loader;
-use move_binary_format::access::ScriptAccess;
 
 /// Represents information about a package: the sources it contains and the package private
 /// address mapping.
@@ -507,20 +502,6 @@ pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
             .with_notes(notes);
         env.add_diag(diag);
     }
-}
-
-/// Converts the given compiled script into an equivalent compiled module. This assigns
-/// a unique name to the module based on the script function's name and the passed index.
-/// The index must be unique w.r.t. the context of where the result shall be used
-/// since the function name alone can be used by multiple scripts in the context.
-pub fn convert_script_to_module(script: CompiledScript, index: usize) -> CompiledModule {
-    let fhd = script
-        .function_handles
-        .first()
-        .expect("malformed script without function");
-    let name = script.identifier_at(fhd.name);
-    let unique_name = format!("{}_{}", name, index);
-    module_script_conversion::script_into_module(script, &unique_name)
 }
 
 // =================================================================================================

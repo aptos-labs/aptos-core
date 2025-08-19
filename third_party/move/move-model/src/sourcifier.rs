@@ -95,14 +95,16 @@ impl<'a> Sourcifier<'a> {
     /// as a parameter.
     pub fn print_fun(&self, fun_id: QualifiedId<FunId>, def: Option<&Exp>) {
         let fun_env = self.env().get_function(fun_id);
-        match fun_env.visibility() {
-            Visibility::Private => {},
-            Visibility::Public => {
-                emit!(self.writer, "public ")
-            },
-            Visibility::Friend => {
-                emit!(self.writer, "friend ")
-            },
+        if !fun_env.module_env.is_script_module() {
+            match fun_env.visibility() {
+                Visibility::Private => {},
+                Visibility::Public => {
+                    emit!(self.writer, "public ")
+                },
+                Visibility::Friend => {
+                    emit!(self.writer, "friend ")
+                },
+            }
         }
         if fun_env.is_entry() {
             emit!(self.writer, "entry ")

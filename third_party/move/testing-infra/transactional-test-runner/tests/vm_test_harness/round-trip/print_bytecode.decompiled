@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/print_bytecode.mvir`
+
+//# print-bytecode
+script {
+    entry fun main<T0, T1>() {
+        ()
+    }
+}
+
+
+//# print-bytecode --input=module
+module 0x42::M {
+    fun f<T0, T1>() {
+        ()
+    }
+}
