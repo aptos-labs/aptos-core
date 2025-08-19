@@ -1,7 +1,7 @@
 [package]
 name = "aptos-node"
 description = "Aptos node"
-version = "1.34.0"
+version = "1.34.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
