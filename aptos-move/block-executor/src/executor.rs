@@ -137,24 +137,26 @@ where
         }
     }
 
+    // The bool indicates whether the execution result is a speculative abort.
     fn process_execution_result<'a>(
         execution_result: &'a ExecutionStatus<E::Output, E::Error>,
         read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
         txn_idx: TxnIndex,
-    ) -> Result<Option<&'a E::Output>, PanicError> {
+    ) -> Result<(Option<&'a E::Output>, bool), PanicError> {
         match execution_result {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                Ok(Some(output))
+                Ok((Some(output), false))
             },
             ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
                 // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
-                // from DeltaApplicationFailure.
+                // from DeltaApplicationFailure. This is also why we return the bool
+                // separately for now instead of relying on the read set.
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
                 ));
-                Ok(None)
+                Ok((None, true))
             },
-            ExecutionStatus::Abort(_err) => Ok(None),
+            ExecutionStatus::Abort(_err) => Ok((None, false)),
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 Err(code_invariant_error(format!(
                     "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
@@ -369,8 +371,16 @@ where
             )));
         }
 
-        let maybe_output =
+        let (maybe_output, is_speculative_failure) =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+
+        if is_speculative_failure {
+            // Recording in order to check the invariant that the final, committed incarnation
+            // of each transaction is not a speculative failure.
+            last_input_output.record_speculative_failure(idx_to_execute);
+            let _ = scheduler.finish_execution(abort_manager)?;
+            return Ok(());
+        }
 
         Self::process_delayed_field_output(
             maybe_output,
@@ -512,7 +522,7 @@ where
                 idx_to_execute, incarnation
             )));
         }
-        let processed_output =
+        let (processed_output, _) =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
         // CAUTION: any updates applied to shared multi-versioned data structures must occur
@@ -668,28 +678,30 @@ where
         // 2. The only possible time to take the read-set from txn_last_input_output
         // is in prepare_and_queue_commit_ready_txn (applying module publishing output).
         // However, required module validation necessarily occurs before the commit.
-        let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
-            code_invariant_error(format!(
-                "Prior read-set of txn {} incarnation {} not recorded for module verification",
-                idx_to_validate, incarnation_to_validate
-            ))
-        })?;
+        let (read_set, is_speculative_failure) =
+            last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+                code_invariant_error(format!(
+                    "Prior read-set of txn {} incarnation {} not recorded for module verification",
+                    idx_to_validate, incarnation_to_validate
+                ))
+            })?;
         // Perform invariant checks or return early based on read set's incarnation.
         let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
             code_invariant_error(
                 "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
             )
         })?;
+        if blockstm_v2_incarnation > incarnation_to_validate || is_speculative_failure {
+            // No need to validate as a newer incarnation has already been executed
+            // and recorded its output, or the incarnation has resulted in a speculative
+            // failure, which means there will be a further re-execution.
+            return Ok(true);
+        }
         if blockstm_v2_incarnation < incarnation_to_validate {
             return Err(code_invariant_error(format!(
                 "For txn_idx {}, read set incarnation {} < incarnation to validate {}",
                 idx_to_validate, blockstm_v2_incarnation, incarnation_to_validate
             )));
-        }
-        if blockstm_v2_incarnation > incarnation_to_validate {
-            // No need to validate as a newer incarnation has already been executed
-            // and recorded its output.
-            return Ok(true);
         }
 
         if !read_set.validate_module_reads(
@@ -717,9 +729,13 @@ where
         skip_module_reads_validation: bool,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let read_set = last_input_output
+        let (read_set, is_speculative_failure) = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
+
+        if is_speculative_failure {
+            return false;
+        }
 
         assert!(
             !read_set.is_incorrect_use(),
@@ -777,9 +793,13 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         is_v2: bool,
     ) -> Result<bool, PanicError> {
-        let read_set = last_input_output
+        let (read_set, is_speculative_failure) = last_input_output
             .read_set(txn_idx)
             .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
+
+        if is_speculative_failure {
+            return Ok(false);
+        }
 
         if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
             || (is_v2
