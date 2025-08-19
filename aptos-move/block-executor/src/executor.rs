@@ -2245,6 +2245,9 @@ where
                             )
                         });
 
+                    // FIXME: not sure if sequential execution and parallel execution generate the
+                    // same read set. At least if we take the final output they should have the
+                    // same write set.
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
