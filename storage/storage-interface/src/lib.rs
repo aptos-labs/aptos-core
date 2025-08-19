@@ -234,6 +234,13 @@ pub trait DbReader: Send + Sync {
             limit: u64,
         ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>>;
 
+        /// Returns an iterator of transaction auxiliary data starting from the given version.
+        fn get_auxiliary_data_iterator(
+            &self,
+            start_version: Version,
+            limit: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_>>;
+
         fn get_transaction_accumulator_range_proof(
             &self,
             start_version: Version,
@@ -417,6 +424,17 @@ pub trait DbReader: Send + Sync {
             known_version: u64,
         ) -> Result<LedgerInfoWithSignatures>;
 
+        /// Returns an epoch ending ledger info iterator for the given range.
+        ///
+        /// Note: the end epoch is exclusive (an epoch ending ledger info for the
+        /// end epoch is not returned), e.g., if the start epoch is 1 and the end
+        /// epoch is 5, epoch ending ledger infos for epochs 1 -> 4 are returned.
+        fn get_epoch_ending_ledger_info_iterator(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> Result<Box<dyn Iterator<Item = Result<LedgerInfoWithSignatures>> + '_>>;
+
         /// Gets the transaction accumulator root hash at specified version.
         /// Caller must guarantee the version is not greater than the latest version.
         fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
@@ -459,6 +477,22 @@ pub trait DbReader: Send + Sync {
             version: Version,
             start_idx: usize,
             chunk_size: usize,
+        ) -> Result<StateValueChunkWithProof>;
+
+        /// Returns an iterator of state key value pairs starting from the index.
+        fn get_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
+
+        /// Returns a state value chunk proof for the given state key values.
+        fn get_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            state_key_values: Vec<(StateKey, StateValue)>,
         ) -> Result<StateValueChunkWithProof>;
 
         /// Returns if the state store pruner is enabled.

@@ -14,72 +14,77 @@ use mockall::{
 
 #[tokio::test]
 async fn test_cachable_requests_compression() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Create test data
-        let start_version = 0;
-        let end_version = 454;
-        let proof_version = end_version;
-        let include_events = false;
-        let compression_options = [true, false];
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Create test data
+            let start_version = 0;
+            let end_version = 454;
+            let proof_version = end_version;
+            let include_events = false;
+            let compression_options = [true, false];
 
-        // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_reader();
-        let mut transaction_lists_with_proof = vec![];
-        for _ in compression_options {
-            // Create and save test transaction lists
-            let transaction_list_with_proof = utils::create_transaction_list_with_proof(
-                start_version,
-                end_version,
-                proof_version,
-                include_events,
-                use_request_v2,
-            );
-            transaction_lists_with_proof.push(transaction_list_with_proof.clone());
-
-            // Expect the data to be fetched from storage exactly once
-            utils::expect_get_transactions(
-                &mut db_reader,
-                start_version,
-                end_version - start_version + 1,
-                proof_version,
-                include_events,
-                transaction_list_with_proof.clone(),
-            );
-        }
-
-        // Create a storage service config
-        let storage_config = utils::create_storage_config(use_request_v2);
-
-        // Create the storage client and server
-        let (mut mock_client, mut service, _, _, _) =
-            MockClient::new(Some(db_reader), Some(storage_config));
-        utils::update_storage_server_summary(&mut service, end_version, 10);
-        tokio::spawn(service.start());
-
-        // Repeatedly fetch the data and verify the responses
-        for (i, use_compression) in compression_options.iter().enumerate() {
-            for _ in 0..10 {
-                let response = utils::get_transactions_with_proof(
-                    &mut mock_client,
+            // Create the mock db reader
+            let mut db_reader = mock::create_mock_db_reader();
+            let mut transaction_lists_with_proof = vec![];
+            for _ in compression_options {
+                // Create and save test transaction lists
+                let transaction_list_with_proof = utils::create_transaction_list_with_proof(
                     start_version,
                     end_version,
                     proof_version,
                     include_events,
-                    *use_compression,
                     use_request_v2,
-                    storage_config.max_network_chunk_bytes_v2,
-                )
-                .await
-                .unwrap();
-
-                // Verify the response is correct
-                assert_eq!(response.is_compressed(), *use_compression);
-                utils::verify_transaction_with_proof_response(
-                    use_request_v2,
-                    transaction_lists_with_proof[i].clone(),
-                    response,
                 );
+                transaction_lists_with_proof.push(transaction_list_with_proof.clone());
+
+                // Expect the data to be fetched from storage exactly once
+                utils::expect_get_transactions(
+                    &mut db_reader,
+                    start_version,
+                    end_version - start_version + 1,
+                    proof_version,
+                    include_events,
+                    transaction_list_with_proof.clone(),
+                    use_size_and_time_aware_chunking,
+                );
+            }
+
+            // Create a storage service config
+            let storage_config =
+                utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
+
+            // Create the storage client and server
+            let (mut mock_client, mut service, _, _, _) =
+                MockClient::new(Some(db_reader), Some(storage_config));
+            utils::update_storage_server_summary(&mut service, end_version, 10);
+            tokio::spawn(service.start());
+
+            // Repeatedly fetch the data and verify the responses
+            for (i, use_compression) in compression_options.iter().enumerate() {
+                for _ in 0..10 {
+                    let response = utils::get_transactions_with_proof(
+                        &mut mock_client,
+                        start_version,
+                        end_version,
+                        proof_version,
+                        include_events,
+                        *use_compression,
+                        use_request_v2,
+                        storage_config.max_network_chunk_bytes_v2,
+                    )
+                    .await
+                    .unwrap();
+
+                    // Verify the response is correct
+                    assert_eq!(response.is_compressed(), *use_compression);
+                    utils::verify_transaction_with_proof_response(
+                        use_request_v2,
+                        transaction_lists_with_proof[i].clone(),
+                        response,
+                    );
+                }
             }
         }
     }
@@ -87,71 +92,76 @@ async fn test_cachable_requests_compression() {
 
 #[tokio::test]
 async fn test_cachable_requests_data_versions() {
-    // Test both v1 and v2 data requests
-    for use_request_v2 in [false, true] {
-        // Create test data
-        let start_versions = [0, 76, 101, 230, 300, 454];
-        let end_version = 454;
-        let proof_version = end_version;
-        let include_events = false;
+    // Test size and time-aware chunking
+    for use_size_and_time_aware_chunking in [false, true] {
+        // Test both v1 and v2 data requests
+        for use_request_v2 in [false, true] {
+            // Create test data
+            let start_versions = [0, 76, 101, 230, 300, 454];
+            let end_version = 454;
+            let proof_version = end_version;
+            let include_events = false;
 
-        // Create the mock db reader
-        let mut db_reader = mock::create_mock_db_reader();
-        let mut transaction_lists_with_proof = vec![];
-        for start_version in start_versions {
-            // Create and save test transaction lists
-            let transaction_list_with_proof = utils::create_transaction_list_with_proof(
-                start_version,
-                end_version,
-                proof_version,
-                include_events,
-                use_request_v2,
-            );
-            transaction_lists_with_proof.push(transaction_list_with_proof.clone());
-
-            // Expect the data to be fetched from storage once
-            utils::expect_get_transactions(
-                &mut db_reader,
-                start_version,
-                end_version - start_version + 1,
-                proof_version,
-                include_events,
-                transaction_list_with_proof.clone(),
-            );
-        }
-
-        // Create a storage service config
-        let storage_config = utils::create_storage_config(use_request_v2);
-
-        // Create the storage client and server
-        let (mut mock_client, mut service, _, _, _) =
-            MockClient::new(Some(db_reader), Some(storage_config));
-        utils::update_storage_server_summary(&mut service, end_version, 10);
-        tokio::spawn(service.start());
-
-        // Repeatedly fetch the data and verify the responses
-        for (i, start_version) in start_versions.iter().enumerate() {
-            for _ in 0..10 {
-                let response = utils::get_transactions_with_proof(
-                    &mut mock_client,
-                    *start_version,
+            // Create the mock db reader
+            let mut db_reader = mock::create_mock_db_reader();
+            let mut transaction_lists_with_proof = vec![];
+            for start_version in start_versions {
+                // Create and save test transaction lists
+                let transaction_list_with_proof = utils::create_transaction_list_with_proof(
+                    start_version,
                     end_version,
                     proof_version,
                     include_events,
-                    true,
                     use_request_v2,
-                    storage_config.max_network_chunk_bytes_v2,
-                )
-                .await
-                .unwrap();
-
-                // Verify the response is correct
-                assert!(response.is_compressed());
-                utils::verify_transaction_with_proof_response(
-                    use_request_v2,
-                    transaction_lists_with_proof[i].clone(),
-                    response,
                 );
+                transaction_lists_with_proof.push(transaction_list_with_proof.clone());
+
+                // Expect the data to be fetched from storage once
+                utils::expect_get_transactions(
+                    &mut db_reader,
+                    start_version,
+                    end_version - start_version + 1,
+                    proof_version,
+                    include_events,
+                    transaction_list_with_proof.clone(),
+                    use_size_and_time_aware_chunking,
+                );
+            }
+
+            // Create a storage service config
+            let storage_config =
+                utils::create_storage_config(use_request_v2, use_size_and_time_aware_chunking);
+
+            // Create the storage client and server
+            let (mut mock_client, mut service, _, _, _) =
+                MockClient::new(Some(db_reader), Some(storage_config));
+            utils::update_storage_server_summary(&mut service, end_version, 10);
+            tokio::spawn(service.start());
+
+            // Repeatedly fetch the data and verify the responses
+            for (i, start_version) in start_versions.iter().enumerate() {
+                for _ in 0..10 {
+                    let response = utils::get_transactions_with_proof(
+                        &mut mock_client,
+                        *start_version,
+                        end_version,
+                        proof_version,
+                        include_events,
+                        true,
+                        use_request_v2,
+                        storage_config.max_network_chunk_bytes_v2,
+                    )
+                    .await
+                    .unwrap();
+
+                    // Verify the response is correct
+                    assert!(response.is_compressed());
+                    utils::verify_transaction_with_proof_response(
+                        use_request_v2,
+                        transaction_lists_with_proof[i].clone(),
+                        response,
+                    );
+                }
             }
         }
     }
@@ -197,7 +207,9 @@ async fn test_cachable_requests_eviction() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
+    let storage_config = utils::create_storage_config(false, false);
+    let (mut mock_client, mut service, _, _, _) =
+        MockClient::new(Some(db_reader), Some(storage_config));
     utils::update_storage_server_summary(&mut service, version + 10, 10);
     tokio::spawn(service.start());
 
