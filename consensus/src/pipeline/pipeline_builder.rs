@@ -35,6 +35,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     randomness::Randomness,
+    state_store::StateViewId,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         AuxiliaryInfo, EphemeralAuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction,
@@ -568,7 +569,8 @@ impl PipelineBuilder {
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
-        let latest_state_view = executor
+        let grand_parent_id = block.quorum_cert().parent_block().id();
+        let parent_state_view = executor
             .state_view(block.parent_id())
             .map_err(anyhow::Error::from)?;
 
@@ -577,9 +579,17 @@ impl PipelineBuilder {
         {
             let mut cache_guard = module_cache.lock();
             if let Some(cache_mut) = cache_guard.as_mut() {
-                cache_mut.reset_state_view(latest_state_view)
+                let previous_state_view = cache_mut.state_view_id();
+                let expected_state_view = StateViewId::BlockExecution {
+                    block_id: grand_parent_id,
+                };
+                if previous_state_view == expected_state_view {
+                    cache_mut.reset_state_view(parent_state_view);
+                } else {
+                    cache_mut.reset_all(parent_state_view);
+                }
             } else {
-                *cache_guard = Some(ValidationState::new(latest_state_view));
+                *cache_guard = Some(ValidationState::new(parent_state_view));
             }
             let cache_ref = cache_guard.as_mut().unwrap();
 

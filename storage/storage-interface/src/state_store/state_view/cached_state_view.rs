@@ -19,8 +19,8 @@ use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use aptos_types::{
     state_store::{
         hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewId,
-        StateViewResult, TStateView, NUM_STATE_SHARDS,
+        state_storage_usage::StateStorageUsage, StateViewId, StateViewResult, TStateView,
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };

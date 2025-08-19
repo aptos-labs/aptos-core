@@ -14,7 +14,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView},
+    state_store::{state_key::StateKey, MoveResourceExt, StateView, StateViewId},
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
@@ -86,6 +86,11 @@ impl<S: StateView> ValidationState<S> {
     /// the VM.
     pub fn reset_state_view(&mut self, state_view: S) {
         self.state_view = state_view;
+    }
+
+    ///  Returns the current state view ID for the caller to decide whether it's compatible with other state views.
+    pub fn state_view_id(&self) -> StateViewId {
+        self.state_view.id()
     }
 
     /// Resets the state to the new one, empties module cache, and resets the VM based on the new
