@@ -4718,6 +4718,7 @@ dependencies = [
  "proptest-derive",
  "quick_cache",
  "rand 0.7.3",
+ "rapidhash",
  "rayon",
  "ref-cast",
  "reqwest 0.11.23",
@@ -15413,6 +15414,12 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
 ]
+
+[[package]]
+name = "rapidhash"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9813f789f95ee4fe6b4d01834404d7cccacbc3f6c029343af910b3c2835eb9f1"
 
 [[package]]
 name = "raw-cpuid"
