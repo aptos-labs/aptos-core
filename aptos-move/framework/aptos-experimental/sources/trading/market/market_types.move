@@ -99,9 +99,9 @@ module aptos_experimental::market_types {
         place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
         // cleanup_order_f arguments: account, order_id, is_bid, remaining_size
         cleanup_order_f: |address, OrderIdType, bool, u64| has drop + copy,
-        /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
+        // decrease_order_size_f arguments: account, order_id, is_bid, price, size
         decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
-        /// get a string representation of order metadata to be used in events
+        // get a string representation of order metadata to be used in events
         get_order_metadata_bytes: |M| vector<u8> has drop + copy
     ): MarketClearinghouseCallbacks<M> {
         MarketClearinghouseCallbacks::V1 {

@@ -65,7 +65,6 @@ module aptos_experimental::market {
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
         pre_cancel_order_for_tracker, is_pre_cancelled
     };
-    use aptos_experimental::price_time_index::PriceTimeIndex;
     use aptos_experimental::order_book_types::{
         new_order_id_type,
         new_ascending_id_generator,
