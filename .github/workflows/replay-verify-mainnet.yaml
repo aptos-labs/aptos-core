@@ -53,6 +53,9 @@ jobs:
       - uses: ./.github/actions/check-aptos-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+      - name: Test
+        run: | 
+          echo ${{ '' || false }};
 
   replay:
     if: |
