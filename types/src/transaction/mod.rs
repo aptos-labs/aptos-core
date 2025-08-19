@@ -2868,7 +2868,7 @@ impl Transaction {
     ) -> Self {
         Self::BlockEpilogue(BlockEpiloguePayload::V1 {
             block_id,
-            block_end_info: block_end_info.to_persistent(),
+            block_end_info,
             fee_distribution,
         })
     }
