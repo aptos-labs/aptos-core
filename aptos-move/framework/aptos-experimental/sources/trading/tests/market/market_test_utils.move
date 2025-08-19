@@ -377,7 +377,7 @@ module aptos_experimental::market_test_utils {
                 taker_addr,
                 size,
                 size - total_fill_size,
-                size,
+                size - total_fill_size,
                 taker_price,
                 is_bid,
                 false,
