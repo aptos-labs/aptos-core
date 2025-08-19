@@ -318,17 +318,17 @@ impl TransactionDataCache {
                     None
                 };
                 if let DataCacheGasMeterWrapper::Full(full_gas_meter) = gas_meter {
-                    if let Some(v) = cached_info.maybe_value().and_then(|v| v.view()) {
-                        full_gas_meter.charge_deserialize_resource(
-                            *addr,
-                            &TypeWithRuntimeEnvironment {
-                                ty,
-                                runtime_environment: module_storage.runtime_environment(),
-                            },
-                            v,
-                        )?;
-                    }
                     if let Some(bytes_loaded) = num_bytes_loaded {
+                        if let Some(v) = cached_info.maybe_value().and_then(|v| v.view()) {
+                            full_gas_meter.charge_deserialize_resource(
+                                *addr,
+                                &TypeWithRuntimeEnvironment {
+                                    ty,
+                                    runtime_environment: module_storage.runtime_environment(),
+                                },
+                                v,
+                            )?;
+                        }
                         full_gas_meter.charge_load_resource_bytes(
                             *addr,
                             &TypeWithRuntimeEnvironment {
