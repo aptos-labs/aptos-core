@@ -65,4 +65,4 @@ jobs:
       IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
       START_VERSION: ${{ inputs.START_VERSION }}
       END_VERSION: ${{ inputs.END_VERSION }}
-      DRY_RUN: ${{ inputs.DRY_RUN }}
+      DRY_RUN: ${{ inputs.DRY_RUN || false }}
