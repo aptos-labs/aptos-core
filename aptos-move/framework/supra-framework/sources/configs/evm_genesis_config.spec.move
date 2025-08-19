@@ -1,4 +1,4 @@
-spec supra_framework::evm_config {
+spec supra_framework::evm_genesis_config {
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -10,7 +10,7 @@ spec supra_framework::evm_config {
 
     spec on_new_epoch(framework: &signer) {
         requires @supra_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<EvmConfig>;
+        include config_buffer::OnNewEpochRequirement<EvmGenesisConfig>;
         aborts_if false;
     }
 

@@ -16,8 +16,8 @@ use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
-use aptos_types::account_address::{create_resource_address, create_seed_for_pbo_module};
 use aptos_types::{
+    account_address::{create_resource_address, create_seed_for_pbo_module},
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
@@ -32,10 +32,9 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
-        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        OnChainEvmConfig,
-        APTOS_MAX_KNOWN_VERSION,
+        AutomationRegistryConfig, FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig,
+        OnChainEvmGenesisConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
@@ -59,7 +58,6 @@ use std::{
     collections::BTreeSet,
     hash::{Hash, Hasher},
 };
-use aptos_types::on_chain_config::AutomationRegistryConfig;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -109,7 +107,7 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
-    pub automation_registry_config: Option<AutomationRegistryConfig>
+    pub automation_registry_config: Option<AutomationRegistryConfig>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -157,8 +155,7 @@ pub fn encode_supra_mainnet_genesis_transaction(
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
     let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
-    // Derive the EVM config from the chain ID.
-    let evm_config = OnChainEvmConfig::new_v1(chain_id);
+
     initialize(
         &mut session,
         chain_id,
@@ -167,7 +164,6 @@ pub fn encode_supra_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
         supra_config_bytes,
-        &evm_config,
     );
     initialize_features(
         &mut session,
@@ -252,6 +248,7 @@ pub fn encode_genesis_transaction_for_testnet(
     execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
     supra_config_bytes: Vec<u8>,
+    evm_genesis_config: Option<OnChainEvmGenesisConfig>,
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(
         encode_genesis_change_set_for_testnet(
@@ -271,6 +268,7 @@ pub fn encode_genesis_transaction_for_testnet(
             execution_config,
             gas_schedule,
             supra_config_bytes,
+            evm_genesis_config,
         ),
     ))
 }
@@ -292,10 +290,10 @@ pub fn encode_genesis_change_set_for_testnet(
     execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
     supra_config_bytes: Vec<u8>,
+    evm_genesis_config: Option<OnChainEvmGenesisConfig>,
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
-    // Derive the EVM config from the chain ID. 
-    let evm_config = OnChainEvmConfig::new_v1(chain_id);
+
     // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
@@ -315,7 +313,6 @@ pub fn encode_genesis_change_set_for_testnet(
         execution_config,
         gas_schedule,
         supra_config_bytes,
-        &evm_config,
     );
     initialize_features(
         &mut session,
@@ -342,6 +339,10 @@ pub fn encode_genesis_change_set_for_testnet(
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
+
+    if let Some(evm_genesis_config) = evm_genesis_config {
+        initialize_evm_genesis_config(&mut session, &evm_genesis_config);
+    }
 
     create_accounts(&mut session, accounts);
 
@@ -491,7 +492,6 @@ fn initialize(
     execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
     supra_config_bytes: Vec<u8>,
-    evm_config: &OnChainEvmConfig,
 ) {
     let gas_schedule_blob =
         bcs::to_bytes(gas_schedule).expect("Failure serializing genesis gas schedule");
@@ -502,7 +502,6 @@ fn initialize(
     let execution_config_bytes =
         bcs::to_bytes(execution_config).expect("Failure serializing genesis consensus config");
 
-    let evm_config_bytes = bcs::to_bytes(evm_config).expect("Failure serializing genesis evm config");
     // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
     // denominator).
     let rewards_rate_denominator = 1_000_000_000;
@@ -536,7 +535,6 @@ fn initialize(
             MoveValue::U64(rewards_rate_denominator),
             MoveValue::U64(genesis_config.voting_power_increase_limit),
             MoveValue::U64(genesis_config.genesis_timestamp_in_microseconds),
-            MoveValue::vector_u8(evm_config_bytes),
         ]),
     );
 }
@@ -571,7 +569,10 @@ fn initialize_supra_coin(session: &mut SessionExt) {
     );
 }
 
-fn initialize_supra_native_automation(session: &mut SessionExt, genesis_config: &GenesisConfiguration) {
+fn initialize_supra_native_automation(
+    session: &mut SessionExt,
+    genesis_config: &GenesisConfiguration,
+) {
     let Some(config) = &genesis_config.automation_registry_config else {
         return;
     };
@@ -581,6 +582,25 @@ fn initialize_supra_native_automation(session: &mut SessionExt, genesis_config: 
         "initialize_supra_native_automation",
         vec![],
         config.serialize_into_move_values_with_signer(CORE_CODE_ADDRESS),
+    );
+}
+
+fn initialize_evm_genesis_config(
+    session: &mut SessionExt,
+    evm_genesis_config: &OnChainEvmGenesisConfig,
+) {
+    let evm_genesis_config_bytes =
+        bcs::to_bytes(evm_genesis_config).expect("Failure serializing genesis evm config");
+
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_evm_genesis_config",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::vector_u8(evm_genesis_config_bytes),
+        ]),
     );
 }
 
@@ -1228,6 +1248,7 @@ pub fn generate_test_genesis(
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
         b"test".to_vec(),
+        None,
     );
     (genesis, test_validators)
 }
@@ -1258,6 +1279,7 @@ pub fn generate_mainnet_genesis(
         &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
         b"test".to_vec(),
+        None,
     );
     (genesis, test_validators)
 }
@@ -1692,7 +1714,6 @@ pub fn test_mainnet_end_to_end() {
             balance: employee_balance,
         },
     ]);
-    
 
     let pbo_config_val0 = PboDelegatorConfiguration {
         delegator_config: DelegatorConfiguration {

@@ -19,7 +19,7 @@ module supra_framework::config_buffer {
 
     use supra_framework::system_addresses;
 
-    friend supra_framework::evm_config;
+    friend supra_framework::evm_genesis_config;
     friend supra_framework::consensus_config;
     friend supra_framework::execution_config;
     friend supra_framework::supra_config;
@@ -37,15 +37,13 @@ module supra_framework::config_buffer {
     const ESTD_SIGNER_NEEDED: u64 = 1;
 
     struct PendingConfigs has key {
-        configs: SimpleMap<String, Any>,
+        configs: SimpleMap<String, Any>
     }
 
     public fun initialize(supra_framework: &signer) {
         system_addresses::assert_supra_framework(supra_framework);
         if (!exists<PendingConfigs>(@supra_framework)) {
-            move_to(supra_framework, PendingConfigs {
-                configs: simple_map::new(),
-            })
+            move_to(supra_framework, PendingConfigs { configs: simple_map::new() })
         }
     }
 
@@ -54,9 +52,7 @@ module supra_framework::config_buffer {
         if (exists<PendingConfigs>(@supra_framework)) {
             let config = borrow_global<PendingConfigs>(@supra_framework);
             simple_map::contains_key(&config.configs, &type_info::type_name<T>())
-        } else {
-            false
-        }
+        } else { false }
     }
 
     /// Upsert an on-chain config to the buffer for the next epoch.
@@ -82,7 +78,7 @@ module supra_framework::config_buffer {
 
     #[test_only]
     struct DummyConfig has drop, store {
-        data: u64,
+        data: u64
     }
 
     #[test(fx = @std)]

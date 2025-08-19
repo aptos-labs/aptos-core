@@ -1344,7 +1344,7 @@ Create a vesting schedule with the given schedule of distributions, a vesting st
     );
     <b>assert</b>!(
         sum &lt;= denominator,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting_without_staking.md#0x1_vesting_without_staking_EINVALID_VESTING_SCHEDULE">EINVALID_VESTING_SCHEDULE</a>),
     );
     <b>assert</b>!(
         denominator != 0,
@@ -1704,9 +1704,10 @@ Unlock any vested portion of the grant.
             .period_duration;
 
     // Index is 0-based <b>while</b> period is 1-based so we need <b>to</b> subtract 1.
+    <b>let</b> one = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(1, 1);
     <b>let</b> total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(0, 1);
     <b>while</b> (last_completed_period &gt;= next_period_to_vest
-        && vesting_record.left_amount != 0
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_less">fixed_point32::less</a>(total_vesting_fraction, one)
         && next_period_to_vest &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule)) {
         <b>let</b> schedule_index = next_period_to_vest - 1;
         <b>let</b> vesting_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, schedule_index);
@@ -1719,7 +1720,9 @@ Unlock any vested portion of the grant.
 
     <b>let</b> periods_fast_forward = 0;
 
-    <b>if</b> (last_completed_period &gt;= next_period_to_vest && vesting_record.left_amount != 0) {
+    <b>if</b> (last_completed_period &gt;= next_period_to_vest
+        && vesting_record.left_amount != 0
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_less">fixed_point32::less</a>(total_vesting_fraction, one)) {
         <b>let</b> final_fraction = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(schedule, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) - 1);
         // Determine how many periods is needed based on the left_amount
         periods_fast_forward = last_completed_period - next_period_to_vest + 1;
@@ -1730,11 +1733,16 @@ Unlock any vested portion of the grant.
         total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_add">fixed_point32::add</a>(
             total_vesting_fraction, added_fraction
         );
-
     };
+
+    // Make sure the total <a href="vesting.md#0x1_vesting">vesting</a> fraction is not greater than 1.
+    total_vesting_fraction = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_min">fixed_point32::min</a>(total_vesting_fraction, one);
     // We don't need <b>to</b> check vesting_record.left_amount &gt; 0 because vest_transfer will handle that.
     <b>let</b> transfer_happened = <a href="vesting_without_staking.md#0x1_vesting_without_staking_vest_transfer">vest_transfer</a>(
-        vesting_record, signer_cap, beneficiary, total_vesting_fraction
+        vesting_record,
+        signer_cap,
+        beneficiary,
+        total_vesting_fraction,
     );
     //If no amount was transferred DO NOT advance last_vested_period in the <a href="vesting.md#0x1_vesting">vesting</a> record
     // This check is needed because <b>if</b> the fraction is too low, `vesting_record.init_amount * vesting_fraction`
@@ -1791,12 +1799,12 @@ Unlock any vested portion of the grant.
             vesting_record.left_amount,
             <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_multiply_u64">fixed_point32::multiply_u64</a>(vesting_record.init_amount, vesting_fraction),
         );
-        <b>if</b> (amount &gt; 0) {
-            //<b>update</b> left_amount for the shareholder
-            vesting_record.left_amount = vesting_record.left_amount - amount;
-            <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(&vesting_signer, beneficiary, amount);
-            <b>true</b>
-        } <b>else</b> { <b>false</b> }
+    <b>if</b> (amount &gt; 0) {
+        //<b>update</b> left_amount for the shareholder
+        vesting_record.left_amount = vesting_record.left_amount - amount;
+        <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;SupraCoin&gt;(&vesting_signer, beneficiary, amount);
+        <b>true</b>
+    } <b>else</b> { <b>false</b> }
 }
 </code></pre>
 
@@ -1836,7 +1844,7 @@ Unlock any vested portion of the grant.
     <b>let</b> schedule = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map_ref">vector::map_ref</a>(
         &vesting_numerators,
         |numerator| {
-                <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator)
+            <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, vesting_denominator)
         },
     );
 

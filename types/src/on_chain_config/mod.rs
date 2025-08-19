@@ -26,7 +26,7 @@ mod aptos_version;
 mod chain_id;
 mod commit_history;
 mod consensus_config;
-mod evm_config;
+mod evm_genesis_config;
 mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
@@ -65,7 +65,7 @@ pub use self::{
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
-    evm_config::OnChainEvmConfig,
+    evm_genesis_config::{OnChainEvmGenesisConfig, GenesisEvmContract, GenesisEvmEOA, EVM_GENESIS_EVENT_MOVE_TYPE_TAG},
     automation_registry::{AutomationRegistryConfig, AutomationRegistryConfigV1}
 };
 

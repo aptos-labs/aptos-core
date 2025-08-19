@@ -1034,16 +1034,6 @@ The value of aggregatable coin used for transaction fees redistribution does not
 
 
 
-<a id="0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED"></a>
-
-SUPRA pairing is not eanbled yet.
-
-
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED">EAPT_PAIRING_IS_NOT_ENABLED</a>: u64 = 28;
-</code></pre>
-
-
-
 <a id="0x1_coin_EBURN_REF_NOT_FOUND"></a>
 
 The BurnRef does not exist.
@@ -1254,6 +1244,16 @@ PairedFungibleAssetRefs resource does not exist.
 
 
 
+<a id="0x1_coin_ESUP_PAIRING_IS_NOT_ENABLED"></a>
+
+SUPRA pairing is not eanbled yet.
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_ESUP_PAIRING_IS_NOT_ENABLED">ESUP_PAIRING_IS_NOT_ENABLED</a>: u64 = 28;
+</code></pre>
+
+
+
 <a id="0x1_coin_ETRANSFER_REF_NOT_FOUND"></a>
 
 The TransferRef does not exist.
@@ -1375,6 +1375,9 @@ Create SUPRA pairing by passing <code>SupraCoin</code>.
     supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 ) <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_supra_framework">system_addresses::assert_supra_framework</a>(supra_framework);
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>()) {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="coin.md#0x1_coin_ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED">ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED</a>)
+    };
     <a href="coin.md#0x1_coin_create_and_return_paired_metadata_if_not_exist">create_and_return_paired_metadata_if_not_exist</a>&lt;CoinType&gt;(<b>true</b>);
 }
 </code></pre>
@@ -1413,7 +1416,7 @@ Create SUPRA pairing by passing <code>SupraCoin</code>.
 
 
 
-<pre><code><b>fun</b> <a href="coin.md#0x1_coin_create_and_return_paired_metadata_if_not_exist">create_and_return_paired_metadata_if_not_exist</a>&lt;CoinType&gt;(allow_apt_creation: bool): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_create_and_return_paired_metadata_if_not_exist">create_and_return_paired_metadata_if_not_exist</a>&lt;CoinType&gt;(allow_sup_creation: bool): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
 
@@ -1422,7 +1425,7 @@ Create SUPRA pairing by passing <code>SupraCoin</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_create_and_return_paired_metadata_if_not_exist">create_and_return_paired_metadata_if_not_exist</a>&lt;CoinType&gt;(allow_apt_creation: bool): Object&lt;Metadata&gt; {
+<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_create_and_return_paired_metadata_if_not_exist">create_and_return_paired_metadata_if_not_exist</a>&lt;CoinType&gt;(allow_sup_creation: bool): Object&lt;Metadata&gt; {
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EMIGRATION_FRAMEWORK_NOT_ENABLED">EMIGRATION_FRAMEWORK_NOT_ENABLED</a>)
@@ -1432,13 +1435,13 @@ Create SUPRA pairing by passing <code>SupraCoin</code>.
     <b>let</b> type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;();
     <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&map.coin_to_fungible_asset_map, type)) {
         <b>let</b> is_sup = <a href="coin.md#0x1_coin_is_sup">is_sup</a>&lt;CoinType&gt;();
-        <b>assert</b>!(!is_sup || allow_apt_creation, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EAPT_PAIRING_IS_NOT_ENABLED">EAPT_PAIRING_IS_NOT_ENABLED</a>));
+        <b>assert</b>!(!is_sup || allow_sup_creation, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_ESUP_PAIRING_IS_NOT_ENABLED">ESUP_PAIRING_IS_NOT_ENABLED</a>));
         <b>let</b> metadata_object_cref =
             <b>if</b> (is_sup) {
-                <a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(@supra_framework, @aptos_fungible_asset)
+                <a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(@supra_framework, @supra_fungible_asset)
             } <b>else</b> {
                 <a href="object.md#0x1_object_create_named_object">object::create_named_object</a>(
-                    &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@aptos_fungible_asset),
+                    &<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@supra_fungible_asset),
                     *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;())
                 )
             };
@@ -1558,16 +1561,10 @@ Conversion from coin to fungible asset
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>&lt;CoinType&gt;(
     <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;
 ): FungibleAsset <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    // TODO: Replace the below <a href="code.md#0x1_code">code</a> <b>with</b> a call <b>to</b> `coin_to_fungible_asset_internal`
-    // once we fully support `FungibleAsset`s. The below guard is used because we need <b>to</b>
-    // preserve the function signature but want <b>to</b> keep the feature flag active <b>to</b> avoid
-    // breaking the tests. The `<b>else</b>` branch will never be taken in the production <a href="code.md#0x1_code">code</a>
-    // <b>as</b> this feature is set by default.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>()) {
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>()) {
         <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="coin.md#0x1_coin_ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED">ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED</a>)
-    } <b>else</b> {
-        <a href="coin.md#0x1_coin_coin_to_fungible_asset_internal">coin_to_fungible_asset_internal</a>(<a href="coin.md#0x1_coin">coin</a>)
-    }
+    };
+    <a href="coin.md#0x1_coin_coin_to_fungible_asset_internal">coin_to_fungible_asset_internal</a>(<a href="coin.md#0x1_coin">coin</a>)
 }
 </code></pre>
 
@@ -2367,16 +2364,10 @@ Voluntarily migrate to fungible store for <code>CoinType</code> if not yet.
 <pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_migrate_to_fungible_store">migrate_to_fungible_store</a>&lt;CoinType&gt;(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 ) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    // TODO: Replace the below <a href="code.md#0x1_code">code</a> <b>with</b> a call <b>to</b> `migrate_to_fungible_store_internal`
-    // once we fully support `FungibleAsset`s. The below guard is used because we need <b>to</b>
-    // preserve the function signature but want <b>to</b> keep the feature flag active <b>to</b> avoid
-    // breaking the tests. The `<b>else</b>` branch will never be taken in the production <a href="code.md#0x1_code">code</a>
-    // <b>as</b> this feature is set by default.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>()) {
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>()) {
         <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="coin.md#0x1_coin_ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED">ECOIN_TO_FUNGIBLE_ASSET_FEATURE_NOT_ENABLED</a>)
-    } <b>else</b> {
-        <a href="coin.md#0x1_coin_migrate_to_fungible_store_internal">migrate_to_fungible_store_internal</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>)
-    }
+    };
+    <a href="coin.md#0x1_coin_migrate_to_fungible_store_internal">migrate_to_fungible_store_internal</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>)
 }
 </code></pre>
 
