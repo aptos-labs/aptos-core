@@ -208,6 +208,13 @@ module aptos_framework::scheduled_txns {
     }
 
     #[event]
+    struct TransactionCancelledEvent has drop, store {
+        scheduled_txn_time: u64,
+        scheduled_txn_hash: u256,
+        sender_addr: address,
+    }
+
+    #[event]
     struct TransactionFailedEvent has drop, store {
         scheduled_txn_time: u64,
         scheduled_txn_hash: u256,
@@ -292,10 +299,9 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
-    public entry fun continue_shutdown(
-        framework: &signer, cancel_batch_size: u64
+    entry fun continue_shutdown(
+        cancel_batch_size: u64
     ) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
-        system_addresses::assert_aptos_framework(framework);
         process_shutdown_batch(cancel_batch_size);
     }
 
@@ -554,11 +560,21 @@ module aptos_framework::scheduled_txns {
         let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
         // verify sender
+        let sender_addr = signer::address_of(sender);
         assert!(
-            signer::address_of(sender) == txn.sender_addr,
+            sender_addr == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
-        cancel_internal(signer::address_of(sender), key, deposit_amt);
+        cancel_internal(sender_addr, key, deposit_amt);
+
+        // emit cancel event
+        event::emit(
+            TransactionCancelledEvent {
+                scheduled_txn_time: key.time,
+                scheduled_txn_hash: key.txn_id,
+                sender_addr
+            }
+        );
     }
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
@@ -829,6 +845,11 @@ module aptos_framework::scheduled_txns {
     #[test_only]
     public fun shutdown_test(fx: &signer) acquires AuxiliaryData {
         start_shutdown(fx);
+    }
+
+    #[test_only]
+    public fun continue_shutdown_test(batch_size: u64) acquires AuxiliaryData, ScheduleQueue, ToRemoveTbl {
+        continue_shutdown(batch_size);
     }
 
     #[test_only]
@@ -1108,7 +1129,7 @@ module aptos_framework::scheduled_txns {
 
         // Verify that next call to shutdown complete without error
         while (txns_count_pre_batch > 0) {
-            continue_shutdown(fx, SHUTDOWN_CANCEL_BATCH_SIZE_DEFAULT);
+            continue_shutdown(SHUTDOWN_CANCEL_BATCH_SIZE_DEFAULT);
             let txns_count_post_batch = get_num_txns();
             assert!(
                 txns_count_pre_batch
