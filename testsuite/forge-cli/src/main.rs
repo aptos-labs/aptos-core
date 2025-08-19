@@ -41,7 +41,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[clap(long, default_value_t = 300)]
+    #[clap(long, default_value_t = 600)]
     duration_secs: usize,
     #[clap(flatten)]
     options: Options,
