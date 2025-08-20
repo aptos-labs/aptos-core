@@ -65,6 +65,10 @@ impl StacklessBytecodeChecker for ZeroAddress {
     }
 
     fn check(&self, target: &FunctionTarget) {
+        if !target.is_exposed() {
+            return;
+        }
+
         let fn_params = target.func_env.get_parameters();
         let address_params: BTreeMap<usize, &Parameter> = (0..target.get_parameter_count())
             .zip(fn_params.iter())
