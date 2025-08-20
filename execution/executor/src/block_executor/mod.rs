@@ -198,7 +198,7 @@ where
             .expect("Must exist.")
             .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         let parent_output = &parent_block.output;
-        info!(
+        debug!(
             block_id = block_id,
             first_version = parent_output.execution_output.next_version(),
             "execute_block"
@@ -253,7 +253,7 @@ where
         parent_block_id: HashValue,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = UPDATE_LEDGER.start_timer();
-        info!(
+        debug!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "ledger_update"
         );
@@ -275,12 +275,12 @@ where
 
         // TODO(aldenhu): remove, assuming no retries.
         if let Some(complete_result) = block.output.get_complete_result() {
-            info!(block_id = block_id, "ledger_update already done.");
+            debug!(block_id = block_id, "ledger_update already done.");
             return Ok(complete_result);
         }
 
         if parent_block_id != committed_block_id && parent_out.has_reconfiguration() {
-            info!(block_id = block_id, "ledger_update for reconfig suffix.");
+            debug!(block_id = block_id, "ledger_update for reconfig suffix.");
 
             // Parent must have done all state checkpoint and ledger update since this method
             // is being called.
@@ -321,7 +321,7 @@ where
 
     fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
         let _timer = COMMIT_BLOCKS.start_timer();
-        info!(
+        debug!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "pre_commit_block",
         );
@@ -349,7 +349,7 @@ where
         let _timer = OTHER_TIMERS.timer_with(&["commit_ledger"]);
 
         let block_id = ledger_info_with_sigs.ledger_info().consensus_block_id();
-        info!(
+        debug!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
             "commit_ledger"
         );

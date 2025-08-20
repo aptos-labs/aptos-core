@@ -4,7 +4,7 @@
 use crate::{
     counters, hot_state_op_accumulator::BlockHotStateOpAccumulator, types::ReadWriteSummary,
 };
-use aptos_logger::{info, warn};
+use aptos_logger::{debug, info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
@@ -227,7 +227,7 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         );
         counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
 
-        info!(
+        debug!(
             effective_block_gas = accumulated_effective_block_gas,
             raw_block_gas = accumulated_raw_block_gas,
             block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),

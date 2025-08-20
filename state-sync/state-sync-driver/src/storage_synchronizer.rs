@@ -714,7 +714,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
             match result {
                 Ok(notification) => {
                     // Log the successful commit
-                    info!(
+                    debug!(
                         LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
                             "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
@@ -1005,7 +1005,7 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     // Update the logs and metrics if the chunk was applied successfully
     if result.is_ok() {
         // Log the application event
-        info!(
+        debug!(
             LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
                 "Applied a new transaction output chunk! Transaction total: {:?}.",
                 num_outputs

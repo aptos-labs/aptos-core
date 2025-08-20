@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::info;
+use aptos_logger::debug;
 use aptos_mempool_notifications::CommittedTransaction;
 use aptos_types::transaction::use_case::UseCaseKey;
 use std::{
@@ -82,7 +82,7 @@ impl UseCaseHistory {
                 result.insert(use_case, name);
             }
         }
-        info!("Computed new use case tracking set: {:?}", list_to_print);
+        debug!("Computed new use case tracking set: {:?}", list_to_print);
 
         result
     }

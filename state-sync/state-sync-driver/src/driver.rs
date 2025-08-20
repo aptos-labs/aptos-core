@@ -318,7 +318,7 @@ impl<
         &mut self,
         commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
-        info!(
+        debug!(
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
                 commit_notification.get_transactions().len(),

@@ -42,7 +42,7 @@ use aptos_db_indexer_schemas::{
 };
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
 use aptos_scratchpad::SparseMerkleTree;
@@ -941,7 +941,7 @@ impl StateStore {
     fn put_usage(state: &State, batch: &mut SchemaBatch) -> Result<()> {
         if let Some(version) = state.version() {
             let usage = state.usage();
-            info!("Write usage at version {version}, {usage:?}.");
+            debug!("Write usage at version {version}, {usage:?}.");
             batch.put::<VersionDataSchema>(&version, &usage.into())?;
         } else {
             assert_eq!(state.usage().items(), 0);
