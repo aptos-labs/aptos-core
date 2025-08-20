@@ -185,38 +185,123 @@ impl DataResponse {
     /// Returns a summary label for the response
     pub fn get_label(&self) -> &'static str {
         match self {
-            Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
-            Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
-            Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
-            Self::NumberOfStatesAtVersion(_) => "number_of_states_at_version",
-            Self::ServerProtocolVersion(_) => "server_protocol_version",
-            Self::StateValueChunkWithProof(_) => "state_value_chunk_with_proof",
-            Self::StorageServerSummary(_) => "storage_server_summary",
-            Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
-            Self::TransactionsWithProof(_) => "transactions_with_proof",
-            Self::NewTransactionsOrOutputsWithProof(_) => "new_transactions_or_outputs_with_proof",
-            Self::TransactionsOrOutputsWithProof(_) => "transactions_or_outputs_with_proof",
+            Self::EpochEndingLedgerInfos(_) => Self::get_epoch_ending_ledger_info_label(),
+            Self::NewTransactionOutputsWithProof(_) => {
+                Self::get_new_transaction_outputs_with_proof_label()
+            },
+            Self::NewTransactionsWithProof(_) => Self::get_new_transactions_with_proof_label(),
+            Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
+            Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
+            Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
+            Self::StorageServerSummary(_) => Self::get_storage_server_summary_label(),
+            Self::TransactionOutputsWithProof(_) => {
+                Self::get_transaction_outputs_with_proof_label()
+            },
+            Self::TransactionsWithProof(_) => Self::get_transactions_with_proof_label(),
+            Self::NewTransactionsOrOutputsWithProof(_) => {
+                Self::get_new_transactions_or_outputs_with_proof_label()
+            },
+            Self::TransactionsOrOutputsWithProof(_) => {
+                Self::get_transactions_or_outputs_with_proof_label()
+            },
 
             // Transaction data v2 responses (transactions with auxiliary data)
             Self::TransactionDataWithProof(response) => {
                 match response.transaction_data_response_type {
-                    TransactionDataResponseType::TransactionData => "transactions_with_proof_v2",
+                    TransactionDataResponseType::TransactionData => {
+                        Self::get_transactions_with_proof_v2_label()
+                    },
                     TransactionDataResponseType::TransactionOutputData => {
-                        "transaction_outputs_with_proof_v2"
+                        Self::get_transaction_outputs_with_proof_v2_label()
                     },
                 }
             },
             Self::NewTransactionDataWithProof(response) => {
                 match response.transaction_data_response_type {
                     TransactionDataResponseType::TransactionData => {
-                        "new_transactions_with_proof_v2"
+                        Self::new_transactions_with_proof_v2_label()
                     },
                     TransactionDataResponseType::TransactionOutputData => {
-                        "new_transaction_outputs_with_proof_v2"
+                        Self::get_transaction_outputs_with_proof_v2_label()
                     },
                 }
             },
         }
+    }
+
+    /// Returns a label for the epoch ending ledger info response
+    pub fn get_epoch_ending_ledger_info_label() -> &'static str {
+        "epoch_ending_ledger_infos"
+    }
+
+    /// Returns a label for the new transaction outputs with proof response
+    pub fn get_new_transaction_outputs_with_proof_label() -> &'static str {
+        "new_transaction_outputs_with_proof"
+    }
+
+    /// Returns a label for the new transactions with proof response
+    pub fn get_new_transactions_with_proof_label() -> &'static str {
+        "new_transactions_with_proof"
+    }
+
+    /// Returns a label for the number of states at version response
+    pub fn get_number_of_states_at_version_label() -> &'static str {
+        "number_of_states_at_version"
+    }
+
+    /// Returns a label for the server protocol version response
+    pub fn get_server_protocol_version_label() -> &'static str {
+        "server_protocol_version"
+    }
+
+    /// Returns a label for the state value chunk with proof response
+    pub fn get_state_value_chunk_with_proof_label() -> &'static str {
+        "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the storage server summary response
+    pub fn get_storage_server_summary_label() -> &'static str {
+        "storage_server_summary"
+    }
+
+    /// Returns a label for the transaction outputs with proof response
+    pub fn get_transaction_outputs_with_proof_label() -> &'static str {
+        "transaction_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions with proof response
+    pub fn get_transactions_with_proof_label() -> &'static str {
+        "transactions_with_proof"
+    }
+
+    /// Returns a label for the new transactions or outputs with proof response
+    pub fn get_new_transactions_or_outputs_with_proof_label() -> &'static str {
+        "new_transactions_or_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions or outputs with proof response
+    pub fn get_transactions_or_outputs_with_proof_label() -> &'static str {
+        "transactions_or_outputs_with_proof"
+    }
+
+    /// Returns a label for the transactions with proof v2 response
+    pub fn get_transactions_with_proof_v2_label() -> &'static str {
+        "transactions_with_proof_v2"
+    }
+
+    /// Returns a label for the transaction outputs with proof v2 response
+    pub fn get_transaction_outputs_with_proof_v2_label() -> &'static str {
+        "transaction_outputs_with_proof_v2"
+    }
+
+    /// Returns a label for the new transactions with proof v2 response
+    pub fn new_transactions_with_proof_v2_label() -> &'static str {
+        "new_transactions_with_proof_v2"
+    }
+
+    /// Returns a label for the new transaction outputs with proof v2 response
+    pub fn new_transaction_outputs_with_proof_v2_label() -> &'static str {
+        "new_transaction_outputs_with_proof_v2"
     }
 }
 

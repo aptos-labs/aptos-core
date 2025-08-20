@@ -21,6 +21,8 @@ pub const SUBSCRIPTION_ADD: &str = "subscription_add";
 pub const SUBSCRIPTION_EXPIRE: &str = "subscription_expire";
 pub const SUBSCRIPTION_FAILURE: &str = "subscription_failure";
 pub const SUBSCRIPTION_NEW_STREAM: &str = "subscription_new_stream";
+pub const TRUNCATION_FOR_SIZE: &str = "size_truncation";
+pub const TRUNCATION_FOR_TIME: &str = "time_truncation";
 
 // Latency buckets for request processing latencies (seconds)
 const REQUEST_PROCESSING_LATENCY_BUCKETS_SECS: &[f64] = &[
@@ -48,13 +50,13 @@ pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counter for the number of times a storage response overflowed the network
-/// frame limit size and had to be retried.
+/// Counter for the number of times a storage response overflowed
+/// the network frame limit size or storage read time.
 pub static NETWORK_FRAME_OVERFLOW: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_storage_service_server_network_frame_overflow",
         "Counters for network frame overflows in the storage server",
-        &["response_type"]
+        &["truncation_reason", "response_type"]
     )
     .unwrap()
 });
@@ -213,10 +215,10 @@ pub static SUBSCRIPTION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Increments the network frame overflow counter for the given response
-pub fn increment_network_frame_overflow(response_type: &str) {
+/// Increments the chunk truncation counter for the given response
+pub fn increment_chunk_truncation_counter(truncation_reason: &str, response_type: &str) {
     NETWORK_FRAME_OVERFLOW
-        .with_label_values(&[response_type])
+        .with_label_values(&[truncation_reason, response_type])
         .inc()
 }
 
