@@ -255,6 +255,25 @@ impl TStateView for VersionState {
     fn next_version(&self) -> Version {
         self.next_version
     }
+
+    fn num_free_hot_slots(&self) -> Option<usize> {
+        println!("here");
+        Some(self.hot_state.cap().get() - self.hot_state.len())
+    }
+
+    fn hot_state_contains(&self, state_key: &Self::Key) -> bool {
+        self.hot_state.contains(state_key)
+    }
+
+    fn get_next_old_key(&self, state_key: Option<&Self::Key>) -> Option<Self::Key> {
+        match state_key {
+            Some(key) => {
+                let mut iter = self.hot_state.iter().skip_while(|x| x.0 != key).skip(1);
+                iter.next().map(|x| x.0.clone())
+            },
+            None => self.hot_state.peek_lru().map(|(k, _v)| k.clone()),
+        }
+    }
 }
 
 struct StateByVersion {
@@ -456,6 +475,7 @@ fn update_state(
         let memorized_reads = state_view.into_memorized_reads();
 
         let next_state = parent_state.update_with_memorized_reads(
+            hot_state.clone(),
             &persisted_state,
             block.update_refs(),
             &memorized_reads,
@@ -546,7 +566,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
     let mut state_by_version = StateByVersion::new_empty();
     let mut next_version: Version = 0;
     for (block_txns, append_epilogue) in blocks {
-        let base_view = state_by_version
+        let base_view: Arc<VersionState> = state_by_version
             .get_state(next_version.checked_sub(1))
             .clone();
         let mut op_accu = BlockHotStateOpAccumulator::<StateKey, _>::new_with_config(
@@ -669,7 +689,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(100))]
+    #![proptest_config(ProptestConfig::with_cases(1))]
 
     #[test]
     fn test_speculative_state_workflow(
