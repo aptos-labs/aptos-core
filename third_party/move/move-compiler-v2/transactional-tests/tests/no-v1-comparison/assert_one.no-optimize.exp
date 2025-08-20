@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 21-34:
+task 0 lines 1-19:  publish [module 0x42::Test {]
+task 1 lines 21-34:  run [script {]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(14566554180833181696),

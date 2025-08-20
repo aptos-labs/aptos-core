@@ -1,24 +1,22 @@
 processed 1 task
-
-task 0 'publish'. lines 1-14:
+task 0 lines 1-14:  publish --print-bytecode [module 0xcafe::vectors {]
 
 == BEGIN Bytecode ==
-// Move bytecode v8
-module cafe.vectors {
+// Bytecode version v8
+module 0xcafe::vectors
+// Function definition at index 0
+#[persistent] entry public fun guess_flips_break2(l0: vector<u8>): u64
+    local l1: &vector<u8>
+    borrow_loc l0
+    copy_loc l0
+    copy_loc l0
+    pop
+    pop
+    // @5
+    st_loc l1
+    move_loc l1
+    vec_len <u8>
+    ret
 
 
-entry public guess_flips_break2(Arg0: vector<u8>): u64 /* def_idx: 0 */ {
-L1:	loc0: &vector<u8>
-B0:
-	0: ImmBorrowLoc[0](Arg0: vector<u8>)
-	1: CopyLoc[0](Arg0: vector<u8>)
-	2: CopyLoc[0](Arg0: vector<u8>)
-	3: Pop
-	4: Pop
-	5: StLoc[1](loc0: &vector<u8>)
-	6: MoveLoc[1](loc0: &vector<u8>)
-	7: VecLen(2)
-	8: Ret
-}
-}
 == END Bytecode ==

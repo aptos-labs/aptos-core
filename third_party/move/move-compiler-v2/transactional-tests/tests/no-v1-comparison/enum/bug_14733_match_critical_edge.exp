@@ -1,22 +1,16 @@
 processed 8 tasks
-
-task 1 'run'. lines 73-73:
+task 0 lines 6-71:  publish [module 0x815::m {]
+task 1 lines 73-73:  run 0x815::m::test1
 return values: 22
-
-task 2 'run'. lines 75-75:
+task 2 lines 75-75:  run 0x815::m::test2
 return values: 0
-
-task 3 'run'. lines 77-77:
+task 3 lines 77-77:  run 0x815::m::test3
 return values: 10
-
-task 4 'run'. lines 79-79:
+task 4 lines 79-79:  run 0x815::m::test4
 return values: 21
-
-task 5 'run'. lines 81-81:
+task 5 lines 81-81:  run 0x815::m::test5
 return values: 43
-
-task 6 'run'. lines 83-83:
+task 6 lines 83-83:  run 0x815::m::test6
 return values: 25
-
-task 7 'run'. lines 85-85:
+task 7 lines 85-85:  run 0x815::m::test7
 return values: 15

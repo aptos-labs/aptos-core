@@ -1,0 +1,43 @@
+module 0xcafe::m {
+    fun map(x: u64, f: |u64|(u64) has drop): u64 {
+        f(x)
+    }
+    fun no_name_clash(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__no_name_clash(c, arg0))
+    }
+    fun __lambda__1__no_name_clash(c: u64, y: u64): u64 {
+        y + c
+    }
+    fun with_name_clash1(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash1(c, arg0))
+    }
+    fun __lambda__1__with_name_clash1(c: u64, x: u64): u64 {
+        x + c
+    }
+    fun with_name_clash2(x: u64, c: u64): u64 {
+        map(x, |arg0| __lambda__1__with_name_clash2(c, arg0))
+    }
+    fun __lambda__1__with_name_clash2(c: u64, x: u64): u64 {
+        c + 1 + x
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid name
+  ┌─ basic.move:8:9
+  │
+8 │     fun __lambda__1__no_name_clash(c: u64, y: u64): u64 {
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid function name '__lambda__1__no_name_clash'. Function names cannot start with '_'
+
+error: invalid name
+   ┌─ basic.move:14:9
+   │
+14 │     fun __lambda__1__with_name_clash1(c: u64, x: u64): u64 {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid function name '__lambda__1__with_name_clash1'. Function names cannot start with '_'
+
+error: invalid name
+   ┌─ basic.move:20:9
+   │
+20 │     fun __lambda__1__with_name_clash2(c: u64, x: u64): u64 {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid function name '__lambda__1__with_name_clash2'. Function names cannot start with '_'

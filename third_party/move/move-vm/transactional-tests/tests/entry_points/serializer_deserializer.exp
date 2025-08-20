@@ -1,5 +1,5 @@
 processed 4 tasks
-task 0 lines 1-38:  publish
+task 0 lines 1-38:  publish [module 0x42::t {]
 task 1 lines 40-40:  run 0x42::t::add --signers 0x42
 task 2 lines 42-42:  view --address 0x42 --resource 0x42::t::Ints
 drop key 0x42::t::Ints {

@@ -1,12 +1,11 @@
 processed 6 tasks
-
-task 2 'run'. lines 30-30:
+task 0 lines 1-26:  publish [module 0x42::test {]
+task 1 lines 28-28:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 30-30:  run --verbose --args @0x1 -- 0x42::test::ok1
 return values: true
-
-task 3 'run'. lines 32-32:
+task 3 lines 32-32:  run --verbose --signers 0x1 -- 0x42::test::ok2
 return values: true
-
-task 4 'run'. lines 34-34:
+task 4 lines 34-34:  run --verbose --args @0x1 -- 0x42::test::fail1
 Error: Function execution failed with VMError: {
     message: not allowed to perform `reads 0x42::test::R(@0x2)`,
     major_status: ACCESS_DENIED,
@@ -16,8 +15,7 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(1), 1)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 5 'run'. lines 36-36:
+task 5 lines 36-36:  run --verbose --signers 0x1 -- 0x42::test::fail2
 Error: Function execution failed with VMError: {
     message: not allowed to perform `reads 0x42::test::R(@0x2)`,
     major_status: ACCESS_DENIED,

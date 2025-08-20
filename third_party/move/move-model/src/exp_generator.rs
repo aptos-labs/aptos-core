@@ -6,7 +6,7 @@ use crate::{
     ast::{Address, Exp, ExpData, Operation, Pattern, QuantKind, TempIndex, Value},
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedId, QualifiedInstId, SpecFunId,
-        StructId,
+        StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
@@ -372,6 +372,19 @@ pub trait ExpGenerator<'env> {
                 field_env.struct_env.get_id(),
                 field_env.get_id(),
             ),
+            vec![exp],
+        )
+        .into_exp()
+    }
+
+    /// Makes an expression which tests a variant.
+    fn mk_variant_test(&self, struct_env: &StructEnv, variant: Symbol, exp: Exp) -> Exp {
+        let node_id = self.new_node(Type::Primitive(PrimitiveType::Bool), None);
+        ExpData::Call(
+            node_id,
+            Operation::TestVariants(struct_env.module_env.get_id(), struct_env.get_id(), vec![
+                variant,
+            ]),
             vec![exp],
         )
         .into_exp()

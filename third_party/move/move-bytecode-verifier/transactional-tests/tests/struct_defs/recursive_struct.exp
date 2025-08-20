@@ -1,6 +1,6 @@
 processed 6 tasks
-
-task 1 'publish'. lines 10-14:
+task 0 lines 1-8:  publish [module 0x1.Cup {]
+task 1 lines 10-14:  publish [module 0x1.M0 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M0'. Got VMError: {
     major_status: RECURSIVE_STRUCT_DEFINITION,
     sub_status: None,
@@ -8,8 +8,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 2 'publish'. lines 16-28:
+task 2 lines 16-28:  publish [module 0x1.M1 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M1'. Got VMError: {
     major_status: RECURSIVE_STRUCT_DEFINITION,
     sub_status: None,
@@ -17,8 +16,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 3 'publish'. lines 30-49:
+task 3 lines 30-49:  publish [module 0x1.M2 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: RECURSIVE_STRUCT_DEFINITION,
     sub_status: None,
@@ -26,8 +24,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 1)],
     offsets: [],
 }
-
-task 4 'publish'. lines 51-58:
+task 4 lines 51-58:  publish [module 0x1.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: RECURSIVE_STRUCT_DEFINITION,
     sub_status: None,
@@ -35,8 +32,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 5 'publish'. lines 60-70:
+task 5 lines 60-70:  publish [module 0x1.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: RECURSIVE_STRUCT_DEFINITION,
     sub_status: None,

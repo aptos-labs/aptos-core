@@ -194,6 +194,277 @@ impl StorageReader {
             Ok(None)
         }
     }
+
+    /// Returns an epoch ending ledger info response (bound by the max response size in bytes)
+    fn get_epoch_ending_ledger_infos_by_size(
+        &self,
+        start_epoch: u64,
+        expected_end_epoch: u64,
+        max_response_size: u64,
+    ) -> Result<EpochChangeProof, Error> {
+        // Calculate the number of ledger infos to fetch
+        let expected_num_ledger_infos = inclusive_range_len(start_epoch, expected_end_epoch)?;
+        let max_num_ledger_infos = self.config.max_epoch_chunk_size;
+        let mut num_ledger_infos_to_fetch = min(expected_num_ledger_infos, max_num_ledger_infos);
+
+        // Attempt to serve the request
+        while num_ledger_infos_to_fetch >= 1 {
+            // The DbReader interface returns the epochs up to: `end_epoch - 1`.
+            // However, we wish to fetch epoch endings up to end_epoch (inclusive).
+            let end_epoch = start_epoch
+                .checked_add(num_ledger_infos_to_fetch)
+                .ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered("End epoch has overflown!".into())
+                })?;
+            let epoch_change_proof = self
+                .storage
+                .get_epoch_ending_ledger_infos(start_epoch, end_epoch)
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_ledger_infos_to_fetch == 1 {
+                return Ok(epoch_change_proof); // We cannot return less than a single item
+            }
+
+            // Attempt to divide up the request if it overflows the message size
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&epoch_change_proof, max_response_size)?;
+            if !overflow_frame {
+                return Ok(epoch_change_proof);
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::EpochEndingLedgerInfos(epoch_change_proof).get_label(),
+                );
+                let new_num_ledger_infos_to_fetch = num_ledger_infos_to_fetch / 2;
+                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_ledger_infos_to_fetch, num_bytes, max_response_size, new_num_ledger_infos_to_fetch);
+                num_ledger_infos_to_fetch = new_num_ledger_infos_to_fetch; // Try again with half the amount of data
+            }
+        }
+
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Unable to serve the get_epoch_ending_ledger_infos request! Start epoch: {:?}, \
+            expected end epoch: {:?}. The data cannot fit into a single network frame!",
+            start_epoch, expected_end_epoch
+        )))
+    }
+
+    /// Returns a transaction with proof response (bound by the max response size in bytes)
+    fn get_transactions_with_proof_by_size(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
+        include_events: bool,
+        max_response_size: u64,
+    ) -> Result<TransactionDataWithProofResponse, Error> {
+        // Calculate the number of transactions to fetch
+        let expected_num_transactions = inclusive_range_len(start_version, end_version)?;
+        let max_num_transactions = self.config.max_transaction_chunk_size;
+        let mut num_transactions_to_fetch = min(expected_num_transactions, max_num_transactions);
+
+        // Attempt to serve the request
+        while num_transactions_to_fetch >= 1 {
+            let transaction_list_with_proof = self
+                .storage
+                .get_transactions(
+                    start_version,
+                    num_transactions_to_fetch,
+                    proof_version,
+                    include_events,
+                )
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionData,
+                transaction_list_with_proof: Some(transaction_list_with_proof),
+                transaction_output_list_with_proof: None,
+            };
+            if num_transactions_to_fetch == 1 {
+                return Ok(response); // We cannot return less than a single item
+            }
+
+            // Attempt to divide up the request if it overflows the message size
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_response_size)?;
+            if !overflow_frame {
+                return Ok(response);
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::TransactionDataWithProof(response).get_label(),
+                );
+                let new_num_transactions_to_fetch = num_transactions_to_fetch / 2;
+                debug!("The request for {:?} transactions was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_transactions_to_fetch, num_bytes, max_response_size, new_num_transactions_to_fetch);
+                num_transactions_to_fetch = new_num_transactions_to_fetch; // Try again with half the amount of data
+            }
+        }
+
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Unable to serve the get_transactions_with_proof request! Proof version: {:?}, \
+            start version: {:?}, end version: {:?}, include events: {:?}. The data cannot fit into \
+            a single network frame!",
+            proof_version, start_version, end_version, include_events,
+        )))
+    }
+
+    /// Returns a transaction output with proof response (bound by the max response size in bytes)
+    fn get_transaction_outputs_with_proof_by_size(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
+        max_response_size: u64,
+    ) -> Result<TransactionDataWithProofResponse, Error> {
+        // Calculate the number of transaction outputs to fetch
+        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
+        let max_num_outputs = self.config.max_transaction_output_chunk_size;
+        let mut num_outputs_to_fetch = min(expected_num_outputs, max_num_outputs);
+
+        // Attempt to serve the request
+        while num_outputs_to_fetch >= 1 {
+            let output_list_with_proof = self
+                .storage
+                .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+                transaction_list_with_proof: None,
+                transaction_output_list_with_proof: Some(output_list_with_proof),
+            };
+            if num_outputs_to_fetch == 1 {
+                return Ok(response); // We cannot return less than a single item
+            }
+
+            // Attempt to divide up the request if it overflows the message size
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_response_size)?;
+            if !overflow_frame {
+                return Ok(response);
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::TransactionDataWithProof(response).get_label(),
+                );
+                let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_outputs_to_fetch, num_bytes, max_response_size, new_num_outputs_to_fetch);
+                num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
+            }
+        }
+
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Unable to serve the get_transaction_outputs_with_proof request! Proof version: {:?}, \
+            start version: {:?}, end version: {:?}. The data cannot fit into a single network frame!",
+            proof_version, start_version, end_version
+        )))
+    }
+
+    /// Returns a transaction or output with proof response (bound by the max response size in bytes)
+    fn get_transactions_or_outputs_with_proof_by_size(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
+        include_events: bool,
+        max_num_output_reductions: u64,
+        max_response_size: u64,
+    ) -> Result<TransactionDataWithProofResponse, Error> {
+        // Calculate the number of transaction outputs to fetch
+        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
+        let max_num_outputs = self.config.max_transaction_output_chunk_size;
+        let mut num_outputs_to_fetch = min(expected_num_outputs, max_num_outputs);
+
+        // Attempt to serve the outputs. Halve the data only as many
+        // times as the fallback count allows. If the data still
+        // doesn't fit, return a transaction chunk instead.
+        let mut num_output_reductions = 0;
+        while num_output_reductions <= max_num_output_reductions {
+            let output_list_with_proof = self
+                .storage
+                .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            let response = TransactionDataWithProofResponse {
+                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
+                transaction_list_with_proof: None,
+                transaction_output_list_with_proof: Some(output_list_with_proof),
+            };
+
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&response, max_response_size)?;
+
+            if !overflow_frame {
+                return Ok(response);
+            } else if num_outputs_to_fetch == 1 {
+                break; // We cannot return less than a single item. Fallback to transactions
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::TransactionDataWithProof(response).get_label(),
+                );
+                let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
+                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Current number of data reductions: {:?}",
+                    num_outputs_to_fetch, num_bytes, max_response_size, num_output_reductions);
+                num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
+                num_output_reductions += 1;
+            }
+        }
+
+        // Return transactions only
+        self.get_transactions_with_proof_by_size(
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+            max_response_size,
+        )
+    }
+
+    /// Returns a state value chunk with proof response (bound by the max response size in bytes)
+    fn get_state_value_chunk_with_proof_by_size(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        max_response_size: u64,
+    ) -> Result<StateValueChunkWithProof, Error> {
+        // Calculate the number of state values to fetch
+        let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
+        let max_num_state_values = self.config.max_state_chunk_size;
+        let mut num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
+
+        // Attempt to serve the request
+        while num_state_values_to_fetch >= 1 {
+            let state_value_chunk_with_proof = self
+                .storage
+                .get_state_value_chunk_with_proof(
+                    version,
+                    start_index as usize,
+                    num_state_values_to_fetch as usize,
+                )
+                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            if num_state_values_to_fetch == 1 {
+                return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
+            }
+
+            // Attempt to divide up the request if it overflows the message size
+            let (overflow_frame, num_bytes) =
+                check_overflow_network_frame(&state_value_chunk_with_proof, max_response_size)?;
+            if !overflow_frame {
+                return Ok(state_value_chunk_with_proof);
+            } else {
+                increment_network_frame_overflow(
+                    DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
+                        .get_label(),
+                );
+                let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
+                debug!("The request for {:?} state values was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
+                    num_state_values_to_fetch, num_bytes, max_response_size, new_num_state_values_to_fetch);
+                num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
+            }
+        }
+
+        Err(Error::UnexpectedErrorEncountered(format!(
+            "Unable to serve the get_state_value_chunk_with_proof request! Version: {:?}, \
+            start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
+            version, start_index, end_index
+        )))
+    }
 }
 
 impl StorageReaderInterface for StorageReader {
@@ -246,54 +517,13 @@ impl StorageReaderInterface for StorageReader {
         end_version: u64,
         include_events: bool,
     ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
-        // Calculate the number of transactions to fetch
-        let expected_num_transactions = inclusive_range_len(start_version, end_version)?;
-        let max_num_transactions = self.config.max_transaction_chunk_size;
-        let mut num_transactions_to_fetch = min(expected_num_transactions, max_num_transactions);
-
-        // Attempt to serve the request
-        while num_transactions_to_fetch >= 1 {
-            let transaction_list_with_proof = self
-                .storage
-                .get_transactions(
-                    start_version,
-                    num_transactions_to_fetch,
-                    proof_version,
-                    include_events,
-                )
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            let response = TransactionDataWithProofResponse {
-                transaction_data_response_type: TransactionDataResponseType::TransactionData,
-                transaction_list_with_proof: Some(transaction_list_with_proof),
-                transaction_output_list_with_proof: None,
-            };
-            if num_transactions_to_fetch == 1 {
-                return Ok(response); // We cannot return less than a single item
-            }
-
-            // Attempt to divide up the request if it overflows the message size
-            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
-            let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
-            if !overflow_frame {
-                return Ok(response);
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::TransactionDataWithProof(response).get_label(),
-                );
-                let new_num_transactions_to_fetch = num_transactions_to_fetch / 2;
-                debug!("The request for {:?} transactions was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
-                    num_transactions_to_fetch, num_bytes, max_network_chunk_bytes, new_num_transactions_to_fetch);
-                num_transactions_to_fetch = new_num_transactions_to_fetch; // Try again with half the amount of data
-            }
-        }
-
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_transactions_with_proof request! Proof version: {:?}, \
-            start version: {:?}, end version: {:?}, include events: {:?}. The data cannot fit into \
-            a single network frame!",
-            proof_version, start_version, end_version, include_events,
-        )))
+        self.get_transactions_with_proof_by_size(
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+            self.config.max_network_chunk_bytes,
+        )
     }
 
     fn get_epoch_ending_ledger_infos(
@@ -301,50 +531,11 @@ impl StorageReaderInterface for StorageReader {
         start_epoch: u64,
         expected_end_epoch: u64,
     ) -> aptos_storage_service_types::Result<EpochChangeProof, Error> {
-        // Calculate the number of ledger infos to fetch
-        let expected_num_ledger_infos = inclusive_range_len(start_epoch, expected_end_epoch)?;
-        let max_num_ledger_infos = self.config.max_epoch_chunk_size;
-        let mut num_ledger_infos_to_fetch = min(expected_num_ledger_infos, max_num_ledger_infos);
-
-        // Attempt to serve the request
-        while num_ledger_infos_to_fetch >= 1 {
-            // The DbReader interface returns the epochs up to: `end_epoch - 1`.
-            // However, we wish to fetch epoch endings up to end_epoch (inclusive).
-            let end_epoch = start_epoch
-                .checked_add(num_ledger_infos_to_fetch)
-                .ok_or_else(|| {
-                    Error::UnexpectedErrorEncountered("End epoch has overflown!".into())
-                })?;
-            let epoch_change_proof = self
-                .storage
-                .get_epoch_ending_ledger_infos(start_epoch, end_epoch)
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            if num_ledger_infos_to_fetch == 1 {
-                return Ok(epoch_change_proof); // We cannot return less than a single item
-            }
-
-            // Attempt to divide up the request if it overflows the message size
-            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
-            let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&epoch_change_proof, max_network_chunk_bytes)?;
-            if !overflow_frame {
-                return Ok(epoch_change_proof);
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::EpochEndingLedgerInfos(epoch_change_proof).get_label(),
-                );
-                let new_num_ledger_infos_to_fetch = num_ledger_infos_to_fetch / 2;
-                debug!("The request for {:?} ledger infos was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
-                    num_ledger_infos_to_fetch, num_bytes, max_network_chunk_bytes, new_num_ledger_infos_to_fetch);
-                num_ledger_infos_to_fetch = new_num_ledger_infos_to_fetch; // Try again with half the amount of data
-            }
-        }
-
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_epoch_ending_ledger_infos request! Start epoch: {:?}, \
-            expected end epoch: {:?}. The data cannot fit into a single network frame!",
-            start_epoch, expected_end_epoch
-        )))
+        self.get_epoch_ending_ledger_infos_by_size(
+            start_epoch,
+            expected_end_epoch,
+            self.config.max_network_chunk_bytes,
+        )
     }
 
     fn get_transaction_outputs_with_proof(
@@ -353,48 +544,12 @@ impl StorageReaderInterface for StorageReader {
         start_version: u64,
         end_version: u64,
     ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
-        // Calculate the number of transaction outputs to fetch
-        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
-        let max_num_outputs = self.config.max_transaction_output_chunk_size;
-        let mut num_outputs_to_fetch = min(expected_num_outputs, max_num_outputs);
-
-        // Attempt to serve the request
-        while num_outputs_to_fetch >= 1 {
-            let output_list_with_proof = self
-                .storage
-                .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            let response = TransactionDataWithProofResponse {
-                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
-                transaction_list_with_proof: None,
-                transaction_output_list_with_proof: Some(output_list_with_proof),
-            };
-            if num_outputs_to_fetch == 1 {
-                return Ok(response); // We cannot return less than a single item
-            }
-
-            // Attempt to divide up the request if it overflows the message size
-            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
-            let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
-            if !overflow_frame {
-                return Ok(response);
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::TransactionDataWithProof(response).get_label(),
-                );
-                let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
-                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, new_num_outputs_to_fetch);
-                num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
-            }
-        }
-
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_transaction_outputs_with_proof request! Proof version: {:?}, \
-            start version: {:?}, end version: {:?}. The data cannot fit into a single network frame!",
-            proof_version, start_version, end_version
-        )))
+        self.get_transaction_outputs_with_proof_by_size(
+            proof_version,
+            start_version,
+            end_version,
+            self.config.max_network_chunk_bytes,
+        )
     }
 
     fn get_transactions_or_outputs_with_proof(
@@ -405,60 +560,16 @@ impl StorageReaderInterface for StorageReader {
         include_events: bool,
         max_num_output_reductions: u64,
     ) -> aptos_storage_service_types::Result<TransactionDataWithProofResponse, Error> {
-        // Calculate the number of transaction outputs to fetch
-        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
-        let max_num_outputs = self.config.max_transaction_output_chunk_size;
-        let mut num_outputs_to_fetch = min(expected_num_outputs, max_num_outputs);
-
-        // Attempt to serve the outputs. Halve the data only as many
-        // times as the fallback count allows. If the data still
-        // doesn't fit, return a transaction chunk instead.
-        let mut num_output_reductions = 0;
-        while num_output_reductions <= max_num_output_reductions {
-            let output_list_with_proof = self
-                .storage
-                .get_transaction_outputs(start_version, num_outputs_to_fetch, proof_version)
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            let response = TransactionDataWithProofResponse {
-                transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
-                transaction_list_with_proof: None,
-                transaction_output_list_with_proof: Some(output_list_with_proof),
-            };
-
-            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
-            let (overflow_frame, num_bytes) =
-                check_overflow_network_frame(&response, max_network_chunk_bytes)?;
-
-            if !overflow_frame {
-                return Ok(response);
-            } else if num_outputs_to_fetch == 1 {
-                break; // We cannot return less than a single item. Fallback to transactions
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::TransactionDataWithProof(response).get_label(),
-                );
-                let new_num_outputs_to_fetch = num_outputs_to_fetch / 2;
-                debug!("The request for {:?} outputs was too large (num bytes: {:?}, limit: {:?}). Current number of data reductions: {:?}",
-                    num_outputs_to_fetch, num_bytes, max_network_chunk_bytes, num_output_reductions);
-                num_outputs_to_fetch = new_num_outputs_to_fetch; // Try again with half the amount of data
-                num_output_reductions += 1;
-            }
-        }
-
-        // Return transactions only
-        self.get_transactions_with_proof(proof_version, start_version, end_version, include_events)
+        self.get_transactions_or_outputs_with_proof_by_size(
+            proof_version,
+            start_version,
+            end_version,
+            include_events,
+            max_num_output_reductions,
+            self.config.max_network_chunk_bytes,
+        )
     }
 
-    // TODOs:
-    // 1. Make this function respect the `max_network_chunk_bytes` limit. It's
-    //    currently not respected because the auxiliary information is not
-    //    size checked. However, this is okay for now because the limit is not
-    //    a hard limit, and auxiliary information is still quite small (e.g., u32
-    //    per transaction). However, we should address this.
-    // 2. Make this function respect the `max_response_bytes` limit in each request.
-    //    It's currently not respected because we only consider the
-    //    `max_network_chunk_bytes` limit as defined by the storage service config.
-    //    We should also address this.
     fn get_transaction_data_with_proof(
         &self,
         transaction_data_with_proof_request: &GetTransactionDataWithProofRequest,
@@ -468,29 +579,42 @@ impl StorageReaderInterface for StorageReader {
         let start_version = transaction_data_with_proof_request.start_version;
         let end_version = transaction_data_with_proof_request.end_version;
 
+        // Calculate the max response size to use
+        let max_response_bytes = min(
+            transaction_data_with_proof_request.max_response_bytes,
+            self.config.max_network_chunk_bytes_v2,
+        );
+
         // Fetch the transaction data based on the request type
         match transaction_data_with_proof_request.transaction_data_request_type {
             TransactionDataRequestType::TransactionData(request) => {
                 // Get the transaction list with proof
-                self.get_transactions_with_proof(
+                self.get_transactions_with_proof_by_size(
                     proof_version,
                     start_version,
                     end_version,
                     request.include_events,
+                    max_response_bytes,
                 )
             },
             TransactionDataRequestType::TransactionOutputData => {
                 // Get the transaction output list with proof
-                self.get_transaction_outputs_with_proof(proof_version, start_version, end_version)
+                self.get_transaction_outputs_with_proof_by_size(
+                    proof_version,
+                    start_version,
+                    end_version,
+                    max_response_bytes,
+                )
             },
             TransactionDataRequestType::TransactionOrOutputData(request) => {
                 // Get the transaction or output list with proof
-                self.get_transactions_or_outputs_with_proof(
+                self.get_transactions_or_outputs_with_proof_by_size(
                     proof_version,
                     start_version,
                     end_version,
                     request.include_events,
                     0, // Fetch all outputs, or return transactions
+                    max_response_bytes,
                 )
             },
         }
@@ -513,50 +637,12 @@ impl StorageReaderInterface for StorageReader {
         start_index: u64,
         end_index: u64,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error> {
-        // Calculate the number of state values to fetch
-        let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
-        let max_num_state_values = self.config.max_state_chunk_size;
-        let mut num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
-
-        // Attempt to serve the request
-        while num_state_values_to_fetch >= 1 {
-            let state_value_chunk_with_proof = self
-                .storage
-                .get_state_value_chunk_with_proof(
-                    version,
-                    start_index as usize,
-                    num_state_values_to_fetch as usize,
-                )
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            if num_state_values_to_fetch == 1 {
-                return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
-            }
-
-            // Attempt to divide up the request if it overflows the message size
-            let max_network_chunk_bytes = self.config.max_network_chunk_bytes;
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &state_value_chunk_with_proof,
-                max_network_chunk_bytes,
-            )?;
-            if !overflow_frame {
-                return Ok(state_value_chunk_with_proof);
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
-                        .get_label(),
-                );
-                let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
-                debug!("The request for {:?} state values was too large (num bytes: {:?}, limit: {:?}). Retrying with {:?}.",
-                    num_state_values_to_fetch, num_bytes, max_network_chunk_bytes, new_num_state_values_to_fetch);
-                num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
-            }
-        }
-
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_state_value_chunk_with_proof request! Version: {:?}, \
-            start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
-            version, start_index, end_index
-        )))
+        self.get_state_value_chunk_with_proof_by_size(
+            version,
+            start_index,
+            end_index,
+            self.config.max_network_chunk_bytes,
+        )
     }
 }
 

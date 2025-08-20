@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-9:
+task 0 lines 1-9:  publish [module 0x8675309::M {]
 Error: compilation errors:
  bug: bytecode verification failed with unexpected status code `LOOP_IN_INSTANTIATION_GRAPH`:
 Error message: edges with constructors: [f0#0 --StructInstantiation(StructHandleIndex(0), [TypeParameter(0)])--> f0#0], nodes: [f0#0]

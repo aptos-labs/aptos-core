@@ -1,5 +1,5 @@
 processed 3 tasks
-task 0 lines 1-12:  publish
+task 0 lines 1-12:  publish [module 0x2.a {]
 task 1 lines 14-14:  run 0x2::a::test
 Error: Function execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -8,7 +8,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
 }
-task 2 lines 16-24:  run --signers 0x1
+task 2 lines 16-24:  run --signers 0x1 [import 0x1.string;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),

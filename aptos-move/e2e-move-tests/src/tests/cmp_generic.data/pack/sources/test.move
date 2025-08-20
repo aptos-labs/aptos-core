@@ -2,10 +2,15 @@
  module 0x99::primitive_cmp {
     //* bool group
     fun test_left_lt_right_bool(x: bool, y: bool): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -21,10 +26,15 @@
 
     //* address group
     fun test_left_lt_right_address(x: address, y: address): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -40,10 +50,15 @@
 
     //* vector group
     fun test_left_lt_right_vector(x: vector<u8>, y: vector<u8>): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -59,10 +74,15 @@
 
     //* nested vector group
     fun test_left_lt_right_nested_vector(x: vector<vector<u8>>, y: vector<vector<u8>>): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -220,10 +240,15 @@
 
     //* Simple struct group
     fun test_simple_struct_lt(x: Int, y: Int): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -239,10 +264,15 @@
 
     //* Complex struct group
     fun test_complex_struct_lt(x: Complex, y: Complex): bool {
-        // a and b are created to test our optimization
+        // a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -258,17 +288,28 @@
 
     //* Complex struct with vector group
     fun test_complex_struct_vec_lt(x: ComplexWithVec, y: ComplexWithVec): bool {
-        // a and b are created to test our optimization
+// a and b are created to test our reference support and optimization
         let a = &x;
         let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y &&
+        &x.b < &y.b &&
         x.b < y.b &&
+        &x.c < &y.c &&
         x.c < y.c &&
+        &x.c[0] < &y.c[0] &&
         x.c[0] < y.c[0] &&
+        &x.d < &y.d &&
         x.d < y.d &&
+        &x.d[0] < &y.d[0] &&
         x.d[0] < y.d[0] &&
+        &x.d[0][0] < &y.d[0][0] &&
         x.d[0][0] < y.d[0][0]
     }
 
@@ -278,6 +319,7 @@
         let a = &cmp::compare(&x, &y);
         let b = &cmp::compare(&y, &x);
 
+        a < b &&
         *a < *b &&
         cmp::compare(&x, &y) < cmp::compare(&y, &x) &&
         cmp::compare(&x.b, &y.b) < cmp::compare(&y.b, &x.b) &&
@@ -514,7 +556,6 @@
 
 /// Module for testing generic types
  module 0x99::generic_cmp {
-    use std::cmp;
     public struct Int has drop, copy {
         a: u8,
         b: u16,
@@ -538,10 +579,15 @@
 
     //* Simple generic arg group
     fun test_generic_arg_lt<T: drop + copy>(x: T, y: T): bool {
-        // a and b are created to test our optimization
-        let a = &cmp::compare(&x, &y);
-        let b = &cmp::compare(&y, &x);
+        // a and b are created to test our reference support and optimization
+        let a = &x;
+        let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y
     }
@@ -558,10 +604,15 @@
 
     //* Simple generic struct arg group
     fun test_generic_struct_lt(x: Foo<address>, y: Foo<address>): bool {
-        // a and b are created to test our optimization
-        let a = &cmp::compare(&x, &y);
-        let b = &cmp::compare(&y, &x);
+        // a and b are created to test our reference support and optimization
+        let a = &x;
+        let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y &&
         x.x < y.x
@@ -582,10 +633,15 @@
 
     //* Complex generic struct arg group
     public fun test_generic_complex_struct_lt(x: Bar<Int, Complex>, y: Bar<Int, Complex>): bool {
-         // a and b are created to test our optimization
-        let a = &cmp::compare(&x, &y);
-        let b = &cmp::compare(&y, &x);
+         // a and b are created to test our reference support and optimization
+        let a = &x;
+        let b = &y;
 
+        let c = &mut x;
+        let d = &mut y;
+
+        c < d &&
+        a < b &&
         *a < *b &&
         x < y &&
         x.x < y.x &&
@@ -740,6 +796,8 @@ module 0x99::function_value_cmp {
         // - `f2` named to `closure#0module2::test;`
         let f1: ||u64 has drop = module1::test;
         let f2: ||u64 has drop = module2::test;
+        assert!(&mut f1 < &mut f2, 0);
+        assert!(&f1 < &f2, 0);
         assert!(f1 < f2, 0);
     }
     entry fun test_function_name_cmp(){
@@ -748,6 +806,8 @@ module 0x99::function_value_cmp {
         // - `f2` named to `closure#0module1::test1;`
         let f1: ||u64 has drop = module1::test;
         let f2: ||u64 has drop = module1::test1;
+        assert!(&mut f1 < &mut f2, 0);
+        assert!(&f1 < &f2, 0);
         assert!(f1 < f2, 0);
 
         // f3 < f4 due to function name by lambda order
@@ -755,6 +815,8 @@ module 0x99::function_value_cmp {
         // - `f4` named to `closure#0function_value_cmp::__lambda__2__test_function_name_cmp;`
         let f3: ||u64 has drop = ||1;
         let f4: ||u64 has drop = ||1;
+        assert!(&mut f3 < &mut f4, 0);
+        assert!(&f3 < &f4, 0);
         assert!(f3 < f4, 0);
 
         // f5 < f6 due to function name by lambda order
@@ -762,6 +824,8 @@ module 0x99::function_value_cmp {
         // - `f6` named to `closure#0function_value_cmp::__lambda__4__test_function_name_cmp;`
         let f5: ||u64 has drop = ||1;
         let f6: ||u64 has drop = ||100;
+        assert!(&mut f5 < &mut f6, 0);
+        assert!(&f5 < &f6, 0);
         assert!(f5 < f6, 0);
     }
     entry fun test_typed_arg_cmp(){
@@ -770,6 +834,8 @@ module 0x99::function_value_cmp {
         let y: u64 = 1;
         let f1: || has drop = ||module1::test2(x);
         let f2: || has drop = ||module1::test2(y);
+        assert!(&mut f1 < &mut f2, 0);
+        assert!(&f1 < &f2, 0);
         assert!(f1 < f2, 0);
     }
     entry fun test_captured_var_cmp(){
@@ -778,6 +844,8 @@ module 0x99::function_value_cmp {
         let y = 2;
         let f1: ||u64 has drop = ||module1::test3(x);
         let f2: ||u64 has drop = ||module1::test3(y);
+        assert!(&mut f1 < &mut f2, 0);
+        assert!(&f1 < &f2, 0);
         assert!(f1 < f2, 0);
     }
 }

@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-16:
+task 0 lines 1-16:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: READREF_EXISTS_MUTABLE_BORROW_ERROR,
     sub_status: None,

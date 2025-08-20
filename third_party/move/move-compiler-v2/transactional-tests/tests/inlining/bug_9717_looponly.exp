@@ -1,1 +1,6 @@
 processed 5 tasks
+task 0 lines 1-130:  publish [module 0xcafe::vectors {]
+task 1 lines 132-132:  run 0xcafe::vectors::test_guess_flips_break
+task 2 lines 134-134:  run 0xcafe::vectors::test_guess_flips_abort
+task 3 lines 136-136:  run 0xcafe::vectors::test_guess_flips_nocheck
+task 4 lines 138-138:  run 0xcafe::vectors::test_guess_flips_continue

@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-74:  publish [// A module which provides the functions to manage objects.]
+task 1 lines 76-101:  publish [module 0x42::token {]
+task 2 lines 103-115:  run --signers 0x42 [script {]

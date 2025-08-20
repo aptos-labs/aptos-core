@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-10:
+task 0 lines 1-10:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: BORROWLOC_REFERENCE_ERROR,
     sub_status: None,

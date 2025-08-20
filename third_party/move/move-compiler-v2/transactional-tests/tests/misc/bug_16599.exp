@@ -1,1 +1,5 @@
 processed 4 tasks
+task 0 lines 1-24:  publish [module 0xCAFE::m0 {]
+task 1 lines 26-26:  run 0xCAFE::m0::test
+task 2 lines 28-53:  publish [module 0xCAFE::m1 {]
+task 3 lines 55-55:  run 0xCAFE::m1::test

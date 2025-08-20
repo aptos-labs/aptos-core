@@ -24,8 +24,12 @@ move-stackless-bytecode = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
+libtest-mimic = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-prover-test-utils = { workspace = true }
+once_cell = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
 
 [features]
 default = []

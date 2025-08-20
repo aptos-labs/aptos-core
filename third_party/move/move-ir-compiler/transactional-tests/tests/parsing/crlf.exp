@@ -1,59 +1,43 @@
 processed 6 tasks
-
-task 0 'print-bytecode'. lines 1-6:
-// Move bytecode v7
-script {
-
-
-main() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 8-14:
-// Move bytecode v7
-script {
+task 0 lines 1-6:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
-
-task 2 'print-bytecode'. lines 16-20:
-// Move bytecode v7
-script {
+task 1 lines 8-14:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
-
-task 3 'print-bytecode'. lines 22-27:
-// Move bytecode v7
-script {
+task 2 lines 16-20:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}
+task 3 lines 22-27:  print-bytecode [main() {]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ret
 
-task 4 'print-bytecode'. lines 29-36:
+
+task 4 lines 29-36:  print-bytecode [// In Move, /* */ are block comment delimiters. Not so in Move IR, so the `/*` below]
 Error: ParserError: Invalid Token: invalid token kind for statement Slash
+task 5 lines 38-46:  print-bytecode [// Since /* */ are not block comment delimiters, they do not behave in any unique way when]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    ret
 
-task 5 'print-bytecode'. lines 38-46:
-// Move bytecode v7
-script {
 
-
-main() /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-}

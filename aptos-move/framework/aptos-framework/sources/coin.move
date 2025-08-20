@@ -584,7 +584,7 @@ module aptos_framework::coin {
         if (exists<CoinStore<CoinType>>(account)) {
             let CoinStore<CoinType> { coin, frozen, deposit_events, withdraw_events } =
                 move_from<CoinStore<CoinType>>(account);
-            if (is_coin_initialized<CoinType>()) {
+            if (is_coin_initialized<CoinType>() && coin.value > 0) {
                 let metadata = ensure_paired_metadata<CoinType>();
                 let store = primary_fungible_store::ensure_primary_store_exists(account, metadata);
 
@@ -2057,14 +2057,13 @@ module aptos_framework::coin {
         maybe_convert_to_fungible_store<FakeMoney>(bob_addr);
         assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
         register<FakeMoney>(bob);
-        assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
+        assert!(coin_store_exists<FakeMoney>(bob_addr), 0);
 
         maybe_convert_to_fungible_store<FakeMoney>(account_addr);
         assert!(!coin_store_exists<FakeMoney>(account_addr), 0);
-        assert!(is_account_registered<FakeMoney>(account_addr), 0);
+        assert!(!is_account_registered<FakeMoney>(account_addr), 0);
 
         primary_fungible_store::deposit(bob_addr, coin_to_fungible_asset(mint<FakeMoney>(100, &mint_cap)));
-        assert!(!coin_store_exists<FakeMoney>(bob_addr), 0);
 
         move_to(account, FakeMoneyCapabilities {
             burn_cap,

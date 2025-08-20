@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-25:  publish [module 0x42::m {]
+task 1 lines 27-27:  run 0x42::m::t1
+task 2 lines 29-29:  run 0x42::m::t2

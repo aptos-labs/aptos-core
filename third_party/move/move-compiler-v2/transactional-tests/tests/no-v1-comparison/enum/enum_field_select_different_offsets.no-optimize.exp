@@ -1,15 +1,12 @@
 processed 7 tasks
-
-task 1 'run'. lines 42-42:
+task 0 lines 1-40:  publish [module 0x42::m {]
+task 1 lines 42-42:  run 0x42::m::test_get_x_v1
 return values: 43
-
-task 2 'run'. lines 44-44:
+task 2 lines 44-44:  run 0x42::m::test_get_x_v2
 return values: 43
-
-task 3 'run'. lines 46-46:
+task 3 lines 46-46:  run 0x42::m::test_get_x_v3
 return values: 43
-
-task 4 'run'. lines 48-48:
+task 4 lines 48-48:  run 0x42::m::test_get_y_v1
 Error: Function execution failed with VMError: {
     major_status: STRUCT_VARIANT_MISMATCH,
     sub_status: None,
@@ -17,11 +14,9 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(3), 4)],
 }
-
-task 5 'run'. lines 50-50:
+task 5 lines 50-50:  run 0x42::m::test_get_y_v2
 return values: true
-
-task 6 'run'. lines 52-52:
+task 6 lines 52-52:  run 0x42::m::test_get_y_v3
 Error: Function execution failed with VMError: {
     major_status: STRUCT_VARIANT_MISMATCH,
     sub_status: None,

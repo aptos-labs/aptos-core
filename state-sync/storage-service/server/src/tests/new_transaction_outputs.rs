@@ -63,6 +63,7 @@ async fn test_get_new_transaction_outputs() {
                 peer_version,
                 highest_epoch,
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -160,6 +161,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 highest_epoch,
                 Some(peer_network_1),
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -171,6 +173,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
                 highest_epoch,
                 Some(peer_network_2),
                 use_request_v2,
+                storage_config.max_network_chunk_bytes_v2,
             )
             .await;
 
@@ -227,6 +230,7 @@ async fn test_get_new_transaction_outputs_disable_v2() {
         0,
         0,
         true, // use_request_v2
+        storage_config.max_network_chunk_bytes_v2,
     )
     .await;
 
@@ -288,9 +292,14 @@ async fn test_get_new_transaction_outputs_epoch_change() {
         tokio::spawn(service.start());
 
         // Send a request to optimistically fetch new transaction outputs
-        let response_receiver =
-            get_new_outputs_with_proof(&mut mock_client, peer_version, peer_epoch, use_request_v2)
-                .await;
+        let response_receiver = get_new_outputs_with_proof(
+            &mut mock_client,
+            peer_version,
+            peer_epoch,
+            use_request_v2,
+            storage_config.max_network_chunk_bytes_v2,
+        )
+        .await;
 
         // Wait until the optimistic fetch is active
         utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
@@ -365,6 +374,7 @@ async fn test_get_new_transaction_outputs_max_chunk() {
             peer_version,
             highest_epoch,
             use_request_v2,
+            storage_service_config.max_network_chunk_bytes_v2,
         )
         .await;
 
@@ -397,6 +407,7 @@ async fn get_new_outputs_with_proof(
     known_version: u64,
     known_epoch: u64,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     get_new_outputs_with_proof_for_peer(
         mock_client,
@@ -404,6 +415,7 @@ async fn get_new_outputs_with_proof(
         known_epoch,
         None,
         use_request_v2,
+        max_response_bytes_v2,
     )
     .await
 }
@@ -415,10 +427,15 @@ async fn get_new_outputs_with_proof_for_peer(
     known_epoch: u64,
     peer_network_id: Option<PeerNetworkId>,
     use_request_v2: bool,
+    max_response_bytes_v2: u64,
 ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
     // Create the data request
     let data_request = if use_request_v2 {
-        DataRequest::get_new_transaction_output_data_with_proof(known_version, known_epoch, 0)
+        DataRequest::get_new_transaction_output_data_with_proof(
+            known_version,
+            known_epoch,
+            max_response_bytes_v2,
+        )
     } else {
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,

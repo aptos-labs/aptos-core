@@ -9,12 +9,14 @@
 use crate::{options::BoogieOptions, COMPILED_MODULE_AVAILABLE};
 use itertools::Itertools;
 use move_binary_format::file_format::TypeParameterIndex;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+};
 use move_model::{
     ast::{Address, MemoryLabel, TempIndex, Value},
     model::{
-        FieldEnv, FieldId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId, SpecFunId,
-        StructEnv, StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
+        SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -25,6 +27,8 @@ use move_prover_bytecode_pipeline::number_operation::{
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
@@ -184,6 +188,24 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String 
     )
 }
 
+/// Reverse map mangled function name to source level function name.
+pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
+    // TODO: in order to make this actually reversible, we can't use ${}_{}{} above
+    //   but must use something like ${}${}{}. This requires also changes in the prelude.
+    static REX: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^\$([0-9,a-f,A-F]+)_(\w+)_(\w+)").expect("regex compiles"));
+    let cap = REX.captures(s)?;
+    let addr = cap.get(1)?;
+    let module_name = cap.get(2)?;
+    let fun_name = cap.get(3)?;
+    Some(format!(
+        "0x{}::{}::{}",
+        addr.as_str(),
+        module_name.as_str(),
+        fun_name.as_str()
+    ))
+}
+
 /// Return boogie name of given function
 /// Currently bv_flag is used when generating vector functions
 pub fn boogie_function_bv_name(
@@ -325,10 +347,29 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type) -> String {
         Struct(mid, sid, inst) => boogie_struct_name(&env.get_module(*mid).into_struct(*sid), inst),
         Reference(_, bt) => format!("$Mutation ({})", boogie_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
-        Fun(..) | Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
+        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
+}
+
+fn fun_type(env: &GlobalEnv, params: &Type, results: &Type, _abilities: AbilitySet) -> String {
+    // Abilities are abstracted out in the prover, but for completeness and future changes,
+    // we pass them into this function.
+    let params = params
+        .clone()
+        .flatten()
+        .iter()
+        .map(|t| boogie_type_suffix(env, t))
+        .join("_");
+    let results = results
+        .clone()
+        .flatten()
+        .iter()
+        .map(|t| boogie_type_suffix(env, t))
+        .join("_");
+    format!("$fun#{}#{}", params, results)
 }
 
 /// Return boogie type for a local with given signature token.
@@ -359,7 +400,8 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
         },
         Reference(_, bt) => format!("$Mutation ({})", boogie_bv_type(env, bt)),
         TypeParameter(idx) => boogie_type_param(env, *idx),
-        Fun(..) | Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
+        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
@@ -470,8 +512,10 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
             boogie_type_suffix_for_struct(&env.get_module(*mid).into_struct(*sid), inst, bv_flag)
         },
         TypeParameter(idx) => boogie_type_param(env, *idx),
-        Fun(..) | Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..)
-        | Reference(..) => format!("<<unsupported {:?}>>", ty),
+        Fun(params, results, abilities) => fun_type(env, params, results, *abilities),
+        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) | Reference(..) => {
+            format!("<<unsupported {:?}>>", ty)
+        },
     }
 }
 
@@ -1110,4 +1154,20 @@ pub fn boogie_reflection_type_is_struct(env: &GlobalEnv, ty: &Type) -> String {
         Some(TypeInfoPack::Struct(..)) => "true".to_string(),
         Some(TypeInfoPack::Symbolic(idx)) => format!("(#{}_info is $TypeParamStruct)", idx),
     }
+}
+
+/// Return name of generated function for applying a function value.
+pub fn boogie_fun_apply_name(env: &GlobalEnv, ty: &Type) -> String {
+    format!("$apply'{}'", boogie_type_suffix(env, ty))
+}
+
+/// Return name of generated function for constructing a closure based on given function and mask.
+pub fn boogie_closure_pack_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    mask: ClosureMask,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    format!("$closure'{}'_{}", fun_name, mask)
 }

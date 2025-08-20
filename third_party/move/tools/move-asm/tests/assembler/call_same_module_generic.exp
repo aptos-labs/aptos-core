@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-11:  publish --print-bytecode
+task 0 lines 1-11:  publish --print-bytecode [module 0x66::test]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -12,7 +12,7 @@ fun f<T0>(l0: T0): T0
 // Function definition at index 1
 fun g(): u64
     ld_u64 10
-    call test::f<u64>
+    call f<u64>
     ret
 
 

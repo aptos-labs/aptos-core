@@ -1,0 +1,27 @@
+module 0xcafe::m {
+    struct S<T> {
+        x: T,
+    }
+    fun consume<T>(s: S<T>, x: T, f: |(S<T>, T)|(T)): T {
+        f(s, x)
+    }
+    fun pattern(s: S<u64>, x: u64): u64 {
+        consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
+    }
+    fun __lambda__1__pattern(param$0: S<u64>, _y: u64): u64 {
+        let S<u64>{x: _t4} = param$0;
+        _y = _t4;
+        _y + _y
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+  ┌─ pattern.move:9:29
+  │
+9 │         consume<u64>(s, x, |(arg0,arg1)| __lambda__1__pattern(arg0, arg1))
+  │                             ^
+  │                             │
+  │                             Unexpected '('
+  │                             Expected a variable or struct or variant name

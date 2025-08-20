@@ -1,0 +1,22 @@
+module 0x2::Token {
+    struct Coin<AssetType: copy + drop> has store {
+        type: AssetType,
+        value: u64,
+    }
+    public fun split<ATy: copy + drop>(coin: Coin<ATy>, amount: u64): (Coin<ATy>, Coin<ATy>) {
+        (coin, withdraw<ATy>(&mut coin, amount))
+    }
+    public fun withdraw<ATy: copy + drop>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
+        if (!(*&coin.value >= amount)) abort 10;
+        &mut coin.value = *&coin.value - amount;
+        Coin<ATy>{type: *&coin.type,value: amount}
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+   ┌─ multi_pool_money_market_token.move:11:9
+   │
+11 │         &mut coin.value = *&coin.value - amount;
+   │         ^^^^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 8-8:
+task 0 lines 1-6:  publish [module 0xc0ffee::m {]
+task 1 lines 8-8:  run 0xc0ffee::m::test --args 1
 return values: 4

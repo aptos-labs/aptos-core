@@ -1,1 +1,3 @@
 processed 3 tasks
+task 1 lines 3-5:  publish [module A::M {}]
+task 2 lines 7-9:  publish [module K::S {}]

@@ -1,7 +1,7 @@
 processed 3 tasks
-task 0 lines 1-7:  print-bytecode
+task 0 lines 1-7:  print-bytecode [// expecting error because default is script]
 Error: expected a script but found a module
-task 1 lines 9-14:  print-bytecode --input module
+task 1 lines 9-14:  print-bytecode --input module [module 0x66::m]
 // Bytecode version v7
 module 0x66::m
 // Function definition at index 0
@@ -10,7 +10,7 @@ public fun f(l0: u64): u64
     ret
 
 
-task 2 lines 17-21:  print-bytecode
+task 2 lines 17-21:  print-bytecode [script]
 // Bytecode version v7
 script
 // Function definition at index 0

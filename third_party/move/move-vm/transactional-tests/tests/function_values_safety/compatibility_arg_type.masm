@@ -1,0 +1,32 @@
+
+//# publish
+module 0x66::compatible_function_since_private
+fun foo(x: |u64|u32)
+
+//# publish
+module 0x66::compatible_function_since_private
+fun foo(x: |bool|u32)
+
+//# publish
+module 0x66::incompatible_function_since_persistent
+#[persistent] fun foo(x: |u64|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_persistent
+#[persistent] fun foo(x: |bool|u32)
+
+//# publish
+module 0x66::incompatible_function_since_public
+public fun foo(x: |u64|u32)
+
+//# publish --verbose
+module 0x66::incompatible_function_since_public
+public fun foo(x: |bool|u32)
+
+//# publish
+module 0x66::incompatible_function_result_since_public
+public fun foo(): |u64|u32
+
+//# publish --verbose
+module 0x66::incompatible_function_result_since_public
+public fun foo(): |bool|u32

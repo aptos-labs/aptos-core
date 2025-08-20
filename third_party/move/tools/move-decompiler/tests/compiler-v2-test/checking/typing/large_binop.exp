@@ -1,0 +1,16 @@
+script {
+    entry fun <SELF>_0() {
+        ()
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: unexpected token
+  ┌─ large_binop.move:2:15
+  │
+2 │     entry fun <SELF>_0() {
+  │               ^
+  │               │
+  │               Unexpected '<'
+  │               Expected an identifier

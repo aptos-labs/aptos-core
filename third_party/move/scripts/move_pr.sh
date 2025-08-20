@@ -98,7 +98,7 @@ MOVE_CRATES="\
   -p move-vm-runtime\
   -p move-vm-types\
   -p move-ast-generator-tests\
-  -p tools/move-asm\
+  -p move-asm\
 "
 
 # This is a list of crates for integration testing.

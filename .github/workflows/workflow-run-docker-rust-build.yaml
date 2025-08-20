@@ -30,6 +30,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
   workflow_dispatch:
     inputs:
@@ -56,6 +61,11 @@ on:
         required: false
         type: string
         description: The target docker registry to push to
+      DRY_RUN: 
+        required: false
+        type: boolean
+        description: If true, the workflow will not build and push images.
+        default: false
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -66,6 +76,10 @@ env:
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
   TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
+  GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
+  PROFILE_RELEASE: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
+  PROFILE_PERF: ${{ inputs.PROFILE == 'performance' }}
+  FEATURE_FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
 
 permissions:
   contents: read
@@ -103,7 +117,51 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
+      - name: Check if docker images already exist
+        id: check-images
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        continue-on-error: true
+        with:
+          GIT_SHA: ${{ env.GIT_SHA }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
+          WAIT_FOR_IMAGE_SECONDS: 1
+          PROFILE_RELEASE : ${{ env.PROFILE_RELEASE }}
+          PROFILE_PERF: ${{ env.PROFILE_PERF }}
+          FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      
+      - name: Lock Check and Creation
+        id: lock
+        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        run: |
+          set +e
+          output=$(gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt)
+          result=$?
+          set -e
+          if [[ $result -eq 0 ]]; then
+            if [[ "$output" == *"${{ github.run_id }}"* ]]; then
+              echo "Lock file for current workflow exists. Continuing ..."
+            else
+              echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
+              echo "$output" | tee -a $GITHUB_STEP_SUMMARY
+              echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          else
+            echo "Lock file does not exist"
+            echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${{ env.GIT_SHA }}.txt
+            gcloud storage cp ${{ env.GIT_SHA }}.txt gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+            echo "Docker Build locked"
+          fi
+
       - name: Build and Push Rust images
+        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
@@ -118,4 +176,9 @@ jobs:
             sudo systemctl stop docker
             sudo tar --posix -cf /home/runner/docker-cache.tzst -P -C /var/lib/docker --use-compress-program zstdmt .
           fi
-
+      
+      - name: Post-run Lock Cleanup 
+        if: ${{ always() && steps.lock.outcome == 'success' }}
+        run: | 
+          gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
+          echo "Docker Build unlocked"

@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-29:  publish [module 0xc0ffee::smallest_multiple {]
+task 1 lines 31-31:  run 0xc0ffee::smallest_multiple::test_smallest_multiple

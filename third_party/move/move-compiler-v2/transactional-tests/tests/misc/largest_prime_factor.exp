@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-39:  publish [module 0xc0ffee::largest_prime_factor {]
+task 1 lines 41-41:  run 0xc0ffee::largest_prime_factor::test_largest_prime_factor

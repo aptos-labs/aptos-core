@@ -1,6 +1,11 @@
 processed 23 tasks
-
-task 6 'run'. lines 102-102:
+task 0 lines 2-89:  publish [module 0x99::test_struct {]
+task 1 lines 91-91:  run --verbose --signers 0x1 -- 0x99::test_struct::init
+task 2 lines 93-93:  run --verbose --signers 0x1 -- 0x99::test_struct::test_exist
+task 3 lines 95-95:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_1
+task 4 lines 97-97:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_2
+task 5 lines 99-101:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_3 [//expect to fail]
+task 6 lines 102-102:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_borrow_from
 Error: Function execution failed with VMError: {
     message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,
@@ -10,8 +15,8 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 8 'run'. lines 107-107:
+task 7 lines 104-106:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from [//expect to fail]
+task 8 lines 107-107:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_move_from
 Error: Function execution failed with VMError: {
     message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,
@@ -21,8 +26,8 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(5), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 10 'run'. lines 112-115:
+task 9 lines 109-111:  run --verbose --signers 0x1 -- 0x99::test_struct::test_move_from [// expected to fail as the functon value has been removed above]
+task 10 lines 112-115:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from [/// Test cases for function values wrapped in enums as keys]
 Error: Function execution failed with VMError: {
     message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,
@@ -32,8 +37,9 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(6), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 13 'run'. lines 230-230:
+task 11 lines 116-225:  publish [module 0x99::test_enum {]
+task 12 lines 227-229:  run --verbose --signers 0x1 -- 0x99::test_enum::init [//expect to fail]
+task 13 lines 230-230:  run --verbose --signers 0x1 -- 0x99::test_enum::bad_init
 Error: Function execution failed with VMError: {
     message: Failed to move resource into 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: RESOURCE_ALREADY_EXISTS,
@@ -43,8 +49,11 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(1), 5)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 18 'run'. lines 241-241:
+task 14 lines 232-232:  run --verbose --signers 0x1 -- 0x99::test_enum::test_exist
+task 15 lines 234-234:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_1
+task 16 lines 236-236:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_2
+task 17 lines 238-240:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_3 [//expect to fail]
+task 18 lines 241-241:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_borrow_from
 Error: Function execution failed with VMError: {
     message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,
@@ -54,8 +63,8 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(5), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 20 'run'. lines 246-246:
+task 19 lines 243-245:  run --verbose --signers 0x1 -- 0x99::test_enum::test_borrow_from [//expect to fail]
+task 20 lines 246-246:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_move_from
 Error: Function execution failed with VMError: {
     message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,
@@ -65,8 +74,8 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(6), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-
-task 22 'run'. lines 251-251:
+task 21 lines 248-250:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from [// expected to fail as the functon value has been removed above]
+task 22 lines 251-251:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
 Error: Function execution failed with VMError: {
     message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
     major_status: MISSING_DATA,

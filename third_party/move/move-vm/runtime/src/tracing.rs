@@ -23,9 +23,6 @@ use ::{
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
-const MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME: &str = "MOVE_VM_TRACE_FLUSH";
-
-#[cfg(any(debug_assertions, feature = "debugging"))]
 const MOVE_VM_STEPPING_ENV_VAR_NAME: &str = "MOVE_VM_STEP";
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
@@ -55,10 +52,6 @@ pub static LOGGING_FILE_WRITER: Lazy<Mutex<std::io::BufWriter<File>>> = Lazy::ne
 });
 
 #[cfg(any(debug_assertions, feature = "debugging"))]
-pub static SINGLE_STEP_FLUSHING: Lazy<bool> =
-    Lazy::new(|| env::var(MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME).is_ok());
-
-#[cfg(any(debug_assertions, feature = "debugging"))]
 static DEBUG_CONTEXT: Lazy<Mutex<DebugContext>> = Lazy::new(|| Mutex::new(DebugContext::new()));
 
 // Only include in debug builds
@@ -80,9 +73,7 @@ pub(crate) fn trace(
                 pc,
             ))
             .unwrap();
-        if *SINGLE_STEP_FLUSHING {
-            buf_writer.flush().unwrap();
-        }
+        buf_writer.flush().unwrap();
     }
     if *DEBUGGING_ENABLED {
         DEBUG_CONTEXT.lock().unwrap().debug_loop(

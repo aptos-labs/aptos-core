@@ -1,5 +1,5 @@
 processed 3 tasks
-task 0 lines 1-26:  publish
-task 1 lines 28-40:  run --args 0 1 b"xyz"
+task 0 lines 1-26:  publish [// the VM will provide the values for mutable inputs after the function returns]
+task 1 lines 28-40:  run --args 0 1 b"xyz" [import 0x42.M;]
 task 2 lines 42-42:  run 0x42::M::t --args 0 1 b"xyz"
 mutable inputs after call: local#0: 112, local#1: { 224 }, local#2: [120, 0, 122]

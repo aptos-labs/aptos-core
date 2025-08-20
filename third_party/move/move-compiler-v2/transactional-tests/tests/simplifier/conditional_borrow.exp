@@ -1,7 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 54-54:
+task 0 lines 1-52:  publish [module 0x8675::M {]
+task 1 lines 54-54:  run 0x8675::M::test
 return values: 11
-
-task 2 'run'. lines 56-56:
+task 2 lines 56-56:  run 0x8675::M::testb
 return values: 11

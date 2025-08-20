@@ -183,6 +183,7 @@ async fn disable_compression() {
 
     // Create a data client config that disables compression
     let data_client_config = AptosDataClientConfig {
+        enable_transaction_data_v2: false,
         use_compression: false,
         ..Default::default()
     };

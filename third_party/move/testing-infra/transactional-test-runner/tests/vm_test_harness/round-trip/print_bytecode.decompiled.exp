@@ -1,0 +1,17 @@
+processed 2 tasks
+task 0 lines 3-8:  print-bytecode [script {]
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main<T0, T1>()
+    ret
+
+
+task 1 lines 11-16:  print-bytecode --input=module [module 0x42::M {]
+// Bytecode version v8
+module 0x42::M
+// Function definition at index 0
+fun f<T0, T1>()
+    ret
+
+

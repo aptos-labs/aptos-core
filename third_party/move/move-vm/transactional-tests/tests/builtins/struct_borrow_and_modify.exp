@@ -1,7 +1,7 @@
 processed 6 tasks
-task 0 lines 1-35:  publish
-task 1 lines 37-44:  run --signers 0x1
-task 2 lines 47-55:  run --signers 0x1
-task 3 lines 58-66:  run --signers 0x1
-task 4 lines 69-77:  run --signers 0x1
-task 5 lines 79-87:  run --signers 0x1
+task 0 lines 1-35:  publish [module 0x1.M {]
+task 1 lines 37-44:  run --signers 0x1 [import 0x1.M;]
+task 2 lines 47-55:  run --signers 0x1 [import 0x1.M;]
+task 3 lines 58-66:  run --signers 0x1 [import 0x1.M;]
+task 4 lines 69-77:  run --signers 0x1 [import 0x1.M;]
+task 5 lines 79-87:  run --signers 0x1 [import 0x1.M;]

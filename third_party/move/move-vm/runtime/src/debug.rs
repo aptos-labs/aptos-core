@@ -118,7 +118,6 @@ pub(crate) struct DebugContext {
 enum InputChecker {
     StepRemaining(usize),
     StepOverRemaining {
-        function_string: String,
         stack_depth: usize,
         remaining: usize,
     },
@@ -146,7 +145,7 @@ impl DebugContext {
         interpreter: &dyn InterpreterDebugInterface,
     ) {
         let instr_string = format!("{:?}", instr);
-        let function_string = function.name_as_pretty_string();
+        let function_string = format!("{}::{}", function.name_as_pretty_string(), pc);
         let breakpoint_hit = self
             .breakpoints
             .iter()
@@ -163,13 +162,10 @@ impl DebugContext {
                 }
             },
             InputChecker::StepOverRemaining {
-                function_string: target_function_string,
                 stack_depth,
                 remaining,
             } => {
-                if &function_string == target_function_string
-                    && *stack_depth == interpreter.get_stack_frames(usize::MAX).stack_trace().len()
-                {
+                if *stack_depth >= interpreter.get_stack_frames(usize::MAX).stack_trace().len() {
                     if *remaining == 1 {
                         self.input_checker = InputChecker::Continue;
                         true
@@ -225,7 +221,6 @@ impl DebugContext {
                             },
                             DebugCommand::StepOver(n) => {
                                 self.input_checker = InputChecker::StepOverRemaining {
-                                    function_string: function_string.clone(),
                                     stack_depth: interpreter
                                         .get_stack_frames(usize::MAX)
                                         .stack_trace()

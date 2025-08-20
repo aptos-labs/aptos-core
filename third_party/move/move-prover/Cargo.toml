@@ -25,7 +25,6 @@ move-prover-bytecode-pipeline = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-simplelog = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]

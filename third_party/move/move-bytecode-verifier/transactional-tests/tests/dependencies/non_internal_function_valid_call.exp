@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-39:  publish [module 0x42.Test {]
+task 1 lines 41-54:  run [import 0x42.Test;]

@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 9-20:
+task 0 lines 1-7:  publish [module 0x42.M {]
+task 1 lines 9-20:  run [import 0x42.M;]
 Error: Script execution failed with VMError: {
     major_status: LOOKUP_FAILED,
     sub_status: None,

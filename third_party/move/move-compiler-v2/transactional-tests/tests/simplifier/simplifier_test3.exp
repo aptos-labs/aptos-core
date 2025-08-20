@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 19-19:
+task 0 lines 1-17:  publish [module 0x8675::M {]
+task 1 lines 19-19:  run 0x8675::M::test
 return values: 65

@@ -1,0 +1,32 @@
+module 0x99::basic_struct {
+    struct Wrapper<T> has key {
+        fv: T,
+    }
+    fun add_resource_with_struct(acc: &signer, f: |&||(u64)|(u64) has copy + drop + store) {
+        move_to<|&||(u64)|(u64) has copy + drop + store>(Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f}, acc);
+    }
+    fun test(f: &||(u64)): u64 {
+        let _t1;
+        if (f == f) _t1 = 1 else _t1 = 2;
+        _t1
+    }
+    public fun test_driver(acc: &signer) {
+        add_resource_with_struct(acc, |arg0| test(arg0));
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: type `|&||u64|u64 has copy + drop + store` is missing required ability `key`
+  ┌─ compiler_ok_case.move:6:17
+  │
+6 │         move_to<|&||(u64)|(u64) has copy + drop + store>(Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f}, acc);
+  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = required by instantiating type parameter `T:key` of function `move_to`
+
+error: cannot use `Wrapper<|&||u64|u64 has copy + drop + store>` with an operator which expects a value of type `&signer`
+  ┌─ compiler_ok_case.move:6:58
+  │
+6 │         move_to<|&||(u64)|(u64) has copy + drop + store>(Wrapper<|&||(u64)|(u64) has copy + drop + store>{fv: f}, acc);
+  │                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,31 @@
+module 0x42::test {
+    struct X has copy, drop, key {
+        value: bool,
+    }
+    fun no_optimize_resource(): bool {
+        *&(&mut *borrow_global(0x1)).value
+    }
+    fun no_optimize_vector() {
+        0x1::vector::borrow_mut<u64>(&mut *0x1::vector::borrow<vector<u64>>(&vector[vector[1, 2]], 0), 1);
+    }
+    fun optimize_resource(): bool {
+        *&borrow_global(0x1).value
+    }
+    fun optimize_vector() {
+        0x1::vector::borrow_mut<u64>(0x1::vector::borrow_mut<vector<u64>>(&mut vector[vector[1, 2]], 0), 1);
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot use `integer` with an operator which expects a value of type `address`
+  ┌─ borrow_deref_optimize.move:6:32
+  │
+6 │         *&(&mut *borrow_global(0x1)).value
+  │                                ^^^
+
+error: cannot use `integer` with an operator which expects a value of type `address`
+   ┌─ borrow_deref_optimize.move:12:25
+   │
+12 │         *&borrow_global(0x1).value
+   │                         ^^^

@@ -3,14 +3,15 @@ module aptos_experimental::order_book_client_order_id {
     use std::option;
     use std::signer;
     use aptos_experimental::order_book_types::new_order_id_type;
-    use aptos_experimental::order_book::{new_order_book, new_order_request};
+    use aptos_experimental::order_book_types::good_till_cancelled;
+    use aptos_experimental::order_book::{new_order_request, destroy_order_book, set_up_test_with_id};
 
     #[test(user1 = @0x456)]
     public fun test_try_cancel_order_with_client_order_id_success(
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let client_order_id = 12345;
         let order_id = new_order_id_type(1);
@@ -26,6 +27,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -41,7 +43,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_again =
             order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_again.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -49,17 +51,15 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let nonexistent_client_order_id = 99999;
 
         // Test: Try to cancel a non-existent client order ID - should return false
         let cancel_result =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, nonexistent_client_order_id
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, nonexistent_client_order_id);
         assert!(cancel_result.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456, user2 = @0x789)]
@@ -67,7 +67,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer, user2: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let user2_addr = signer::address_of(user2);
         let client_order_id = 12345;
@@ -84,6 +84,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -94,7 +95,7 @@ module aptos_experimental::order_book_client_order_id {
         assert!(
             order_book.try_cancel_order_with_client_order_id(user2_addr, client_order_id).is_none()
         );
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -102,7 +103,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
 
         // Create multiple orders with different client order IDs
@@ -125,6 +126,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(order_req_1);
@@ -140,6 +142,7 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 43 // metadata
             );
         order_book.place_maker_order(order_req_2);
@@ -155,48 +158,37 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 44 // metadata
             );
         order_book.place_maker_order(order_req_3);
 
         // Test: Cancel orders in different order than they were placed
         let cancel_result_2 =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_2
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_2);
         assert!(cancel_result_2.is_some());
 
         let cancel_result_1 =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_1
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_1);
         assert!(cancel_result_1.is_some());
 
         let cancel_result_3 =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_3
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_3);
         assert!(cancel_result_3.is_some());
 
         // Test: Try to cancel already cancelled orders - should all return false
         let cancel_result_1_again =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_1
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_1);
         assert!(cancel_result_1_again.is_none());
 
         let cancel_result_2_again =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_2
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_2);
         assert!(cancel_result_2_again.is_none());
 
         let cancel_result_3_again =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id_3
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id_3);
         assert!(cancel_result_3_again.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -204,7 +196,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let order_id = new_order_id_type(1);
 
@@ -219,6 +211,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
 
@@ -229,7 +222,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result =
             order_book.try_cancel_order_with_client_order_id(user1_addr, 12345);
         assert!(cancel_result.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -237,7 +230,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let _user2_addr = @0x789;
         let client_order_id = 12345;
@@ -254,6 +247,7 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
@@ -275,17 +269,18 @@ module aptos_experimental::order_book_client_order_id {
                 100, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req2);
 
         // Verify this is a taker order
-        let is_taker = order_book.is_taker_order(option::some(1000), false, option::none());
+        let is_taker = order_book.is_taker_order(1000, false, option::none());
         assert!(is_taker);
 
         // Execute the match - this should fully fill the maker order
         let single_match =
-            order_book.get_single_match_for_taker(option::some(1000), 100, false);
+            order_book.get_single_match_for_taker(1000, 100, false);
 
         // Verify the match
         let matched_size = single_match.get_matched_size();
@@ -296,7 +291,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_after_full_match =
             order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_after_full_match.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -304,7 +299,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let client_order_id = 12345;
 
@@ -320,17 +315,18 @@ module aptos_experimental::order_book_client_order_id {
                 200, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
 
         // Verify this is a taker order
-        let is_taker = order_book.is_taker_order(option::some(1000), false, option::none());
+        let is_taker = order_book.is_taker_order(1000, false, option::none());
         assert!(is_taker);
 
         // Execute the match - this should partially fill the maker order
         let single_match =
-            order_book.get_single_match_for_taker(option::some(1000), 100, false);
+            order_book.get_single_match_for_taker(1000, 100, false);
 
         // Verify the match
         let matched_size = single_match.get_matched_size();
@@ -354,7 +350,7 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_after_cancel =
             order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id);
         assert!(cancel_result_after_cancel.is_none());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -362,7 +358,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
 
         // Test with edge case client order IDs
@@ -388,20 +384,19 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
 
             // Test cancellation
             let cancel_result =
-                order_book.try_cancel_order_with_client_order_id(
-                    user1_addr, client_order_id
-                );
+                order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id);
             assert!(cancel_result.is_some());
 
             i += 1;
         };
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -409,7 +404,7 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
         let client_order_id = 12345;
 
@@ -425,24 +420,20 @@ module aptos_experimental::order_book_client_order_id {
                 300, // remaining_size
                 true, // is_bid
                 option::none(), // trigger_condition
+                good_till_cancelled(),
                 42 // metadata
             );
         order_book.place_maker_order(maker_order_req);
 
         // First partial match
         let single_match1 =
-            order_book.get_single_match_for_taker(
-                option::some(1000), 100, // Match 100 out of 300
-                false
-            );
+            order_book.get_single_match_for_taker(1000, 100, false);
         assert!(single_match1.get_matched_size() == 100, 0);
         assert!(order_book.get_remaining_size(maker_order_id) == 200, 1);
 
         // Order should still be cancellable after first partial match
         let can_cancel_after_first =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, client_order_id + 1 // Wrong client order ID
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, client_order_id + 1); // Wrong client order ID
         assert!(can_cancel_after_first.is_none());
 
         let can_cancel_after_first_correct =
@@ -451,7 +442,7 @@ module aptos_experimental::order_book_client_order_id {
 
         // Verify order is now removed after cancellation
         assert!(order_book.get_remaining_size(maker_order_id) == 0);
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 
     #[test(user1 = @0x456)]
@@ -459,14 +450,12 @@ module aptos_experimental::order_book_client_order_id {
         user1: &signer
     ) {
         // Setup a basic order book
-        let order_book = new_order_book<u64>();
+        let order_book = set_up_test_with_id();
         let user1_addr = signer::address_of(user1);
 
         // Create multiple orders with different client order IDs that will be fully matched
         let client_order_ids = vector[1001, 1002, 1003];
-        let order_ids = vector[new_order_id_type(1), new_order_id_type(2), new_order_id_type(
-            3
-        )];
+        let order_ids = vector[new_order_id_type(1), new_order_id_type(2), new_order_id_type(3)];
 
         // Place all maker orders
         let i = 0;
@@ -484,6 +473,7 @@ module aptos_experimental::order_book_client_order_id {
                     100, // remaining_size
                     true, // is_bid
                     option::none(), // trigger_condition
+                    good_till_cancelled(),
                     42 // metadata
                 );
             order_book.place_maker_order(order_req);
@@ -492,17 +482,12 @@ module aptos_experimental::order_book_client_order_id {
 
         // Fully match the first order
         let single_match1 =
-            order_book.get_single_match_for_taker(
-                option::some(1002), // Match against the highest price (order 3)
-                100, false
-            );
+            order_book.get_single_match_for_taker(1002, 100, false);
         assert!(single_match1.get_matched_size() == 100);
 
         // Try to cancel the fully matched order - should return false
         let cancel_result_fully_matched =
-            order_book.try_cancel_order_with_client_order_id(
-                user1_addr, 1003 // This order was fully matched
-            );
+            order_book.try_cancel_order_with_client_order_id(user1_addr, 1003); // This order was fully matched
         assert!(cancel_result_fully_matched.is_none());
 
         // Try to cancel the remaining orders - should return true
@@ -513,6 +498,6 @@ module aptos_experimental::order_book_client_order_id {
         let cancel_result_2 =
             order_book.try_cancel_order_with_client_order_id(user1_addr, 1002);
         assert!(cancel_result_2.is_some());
-        order_book.destroy_order_book();
+        destroy_order_book(order_book);
     }
 }

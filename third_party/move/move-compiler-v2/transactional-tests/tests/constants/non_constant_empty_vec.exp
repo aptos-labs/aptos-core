@@ -1,22 +1,16 @@
 processed 8 tasks
-
-task 1 'run'. lines 33-33:
+task 0 lines 1-31:  publish [// These vectors should not be made constants]
+task 1 lines 33-33:  run 0x42::M::empty_struct_vec
 return values: []
-
-task 2 'run'. lines 35-35:
+task 2 lines 35-35:  run 0x42::M::empty_struct_vec
 return values: []
-
-task 3 'run'. lines 37-37:
+task 3 lines 37-37:  run 0x42::M::empty_signer_vec
 return values: []
-
-task 4 'run'. lines 39-39:
+task 4 lines 39-39:  run 0x42::M::empty_generic_vec --type-args 0x42::M::S
 return values: []
-
-task 5 'run'. lines 41-41:
+task 5 lines 41-41:  run 0x42::M::empty_struct_vec_vec
 return values: []
-
-task 6 'run'. lines 43-43:
+task 6 lines 43-43:  run 0x42::M::empty_signer_vec_vec
 return values: []
-
-task 7 'run'. lines 45-45:
+task 7 lines 45-45:  run 0x42::M::empty_generic_vec_vec --type-args 0x42::M::S
 return values: []

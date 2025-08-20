@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-11:  publish --print-bytecode
+task 0 lines 1-11:  publish --print-bytecode [address acc = 0x66]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -11,7 +11,7 @@ fun f(l0: u64)
 // Function definition at index 1
 fun g()
     ld_u64 1
-    call test::f
+    call f
     ret
 
 

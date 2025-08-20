@@ -1,4 +1,10 @@
 processed 8 tasks
-
-task 7 'run'. lines 90-90:
+task 0 lines 8-76:  publish [module 0x66::calculator {]
+task 1 lines 78-78:  run 0x66::calculator::init_module --signers 0x66
+task 2 lines 80-80:  run 0x66::calculator::number --signers 0x66 --args 10
+task 3 lines 82-82:  run 0x66::calculator::add --signers 0x66
+task 4 lines 84-84:  run 0x66::calculator::number --signers 0x66 --args 20
+task 5 lines 86-86:  run 0x66::calculator::sub --signers 0x66
+task 6 lines 88-88:  run 0x66::calculator::number --signers 0x66 --args 5
+task 7 lines 90-90:  run 0x66::calculator::view --signers 0x66
 return values: 25

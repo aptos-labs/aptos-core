@@ -1,0 +1,24 @@
+module 0x8675309::Tester {
+    struct X has key {
+        f: u64,
+    }
+    fun bump_and_give(x_ref: &mut X, _other: &u64): &u64 {
+        &mut x_ref.f = *&x_ref.f + 1;
+        &x_ref.f
+    }
+    fun contrived_example(result: &mut u64) {
+        let _t1 = X{f: 0};
+        let _t3 = bump_and_give(&mut _t1, &100);
+        if (!(*_t3 == *&(&_t1).f)) abort 42;
+        *result = *_t3;
+        let X{f: _t20} = _t1;
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: invalid assignment
+  ┌─ imm_borrow_loc_trivial.move:6:9
+  │
+6 │         &mut x_ref.f = *&x_ref.f + 1;
+  │         ^^^^^^^^^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

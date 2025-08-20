@@ -1,9 +1,9 @@
 processed 9 tasks
-task 0 lines 1-27:  publish
-task 1 lines 29-33:  run --args 0
-task 2 lines 35-39:  run --args false
-task 3 lines 41-46:  run --args 0 false 0 0
-task 4 lines 48-52:  run --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0
+task 0 lines 1-27:  publish [// ref arguments are now allowed]
+task 1 lines 29-33:  run --args 0 [main(r1: &u64) {]
+task 2 lines 35-39:  run --args false [main(r1: &mut bool) {]
+task 3 lines 41-46:  run --args 0 false 0 0 [import 0x42.M;]
+task 4 lines 48-52:  run --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0 [main<T1, T2, T3, T4>(r1: &T1, r2: &mut T2, r3: &T3, r4: &mut T4) {]
 task 5 lines 54-54:  run 0x42::M::t1 --args 0
 task 6 lines 56-56:  run 0x42::M::t2 --args false
 mutable inputs after call: local#0: false

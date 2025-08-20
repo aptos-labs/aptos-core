@@ -6,11 +6,11 @@ module aptos_experimental::pending_order_book_index {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         UniqueIdxType,
-        TriggerCondition,
         new_default_big_ordered_map
     };
+    use aptos_experimental::order_book_types::TriggerCondition;
 
-    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
 
     struct PendingOrderKey has store, copy, drop {
         price: u64,
@@ -41,10 +41,9 @@ module aptos_experimental::pending_order_book_index {
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_bid: bool
     ) {
-        let (price_move_up_index, price_move_down_index, time_based_index) =
-            trigger_condition.index(is_bid);
+        let (price_move_down_index, price_move_up_index, time_based_index) =
+            trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.remove(
                 &PendingOrderKey {
@@ -71,12 +70,10 @@ module aptos_experimental::pending_order_book_index {
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
         unique_priority_idx: UniqueIdxType,
-        is_bid: bool
     ) {
         // Add this order to the pending order book index
         let (price_move_down_index, price_move_up_index, time_based_index) =
-            trigger_condition.index(is_bid);
-
+            trigger_condition.index();
         if (price_move_up_index.is_some()) {
             self.price_move_up_index.add(
                 PendingOrderKey {
@@ -99,10 +96,10 @@ module aptos_experimental::pending_order_book_index {
     }
 
     public(friend) fun take_ready_price_based_orders(
-        self: &mut PendingOrderBookIndex, current_price: u64
+        self: &mut PendingOrderBookIndex, current_price: u64, order_limit: u64
     ): vector<OrderIdType> {
         let orders = vector::empty();
-        while (!self.price_move_up_index.is_empty()) {
+        while (!self.price_move_up_index.is_empty() && orders.length() < order_limit ) {
             let (key, order_id) = self.price_move_up_index.borrow_front();
             if (current_price >= key.price) {
                 orders.push_back(*order_id);
@@ -111,7 +108,7 @@ module aptos_experimental::pending_order_book_index {
                 break;
             }
         };
-        while (!self.price_move_down_index.is_empty()) {
+        while (!self.price_move_down_index.is_empty() && orders.length() < order_limit) {
             let (key, order_id) = self.price_move_down_index.borrow_back();
             if (current_price <= key.price) {
                 orders.push_back(*order_id);
@@ -124,10 +121,10 @@ module aptos_experimental::pending_order_book_index {
     }
 
     public(friend) fun take_time_time_based_orders(
-        self: &mut PendingOrderBookIndex
+        self: &mut PendingOrderBookIndex, order_limit: u64
     ): vector<OrderIdType> {
         let orders = vector::empty();
-        while (!self.time_based_index.is_empty()) {
+        while (!self.time_based_index.is_empty() && orders.length() < order_limit) {
             let current_time = timestamp::now_seconds();
             let (time, order_id) = self.time_based_index.borrow_front();
             if (current_time >= time) {

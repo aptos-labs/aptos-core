@@ -5,6 +5,7 @@ module aptos_experimental::market_tests {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
+    use aptos_experimental::event_utils::latest_emitted_events;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
@@ -20,15 +21,13 @@ module aptos_experimental::market_tests {
         verify_fills
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{
-        good_till_cancelled,
-        post_only,
-        immediate_or_cancel
-    };
-    use aptos_experimental::market::{new_market, new_market_config};
+    use aptos_experimental::market_types::{order_status_open};
+    use aptos_experimental::market::{new_market, new_market_config, OrderEvent};
     use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
     const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
+    const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;
 
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
@@ -74,7 +73,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -100,7 +99,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -166,7 +165,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 2000000,
                 false,
                 good_till_cancelled(),
@@ -363,9 +362,9 @@ module aptos_experimental::market_tests {
         // Taker order will be immediately match in the same transaction
         let limit_price =
             if (is_market_order) {
-                option::none() // Market order has no price
+                1 // Market order has no price, use max to ensure it matches
             } else {
-                option::some(1000) // Limit price for limit order
+                1000
             };
         let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
@@ -468,9 +467,9 @@ module aptos_experimental::market_tests {
         // Taker order is IOC, which will partially match and remaining will be cancelled
         let limit_price =
             if (is_market_order) {
-                option::none() // Market order has no price
+                1 // Market order has no price, use minimum to ensure it matches
             } else {
-                option::some(1000) // Limit price for limit order
+                1000
             };
         let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
@@ -631,7 +630,7 @@ module aptos_experimental::market_tests {
     }
 
     #[test(admin = @0x1, market_signer = @0x123, taker = @0x789)]
-    public fun test_market_order_no_match(
+    public fun test_market_order_empty_order_book(
         admin: &signer, market_signer: &signer, taker: &signer
     ) {
         // Setup accounts
@@ -642,22 +641,46 @@ module aptos_experimental::market_tests {
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
+        market.place_market_order(
+            taker,
+            1000000,
+            false, // is_buy
+            new_test_order_metadata(1),
+                option::none(), // client_order_id
+            1000,
+            true,
+                &test_market_callbacks(),
+        );
 
-        let _taker_order_id =
-            place_order_and_verify(
-                &mut market,
-                taker,
-                option::none(),
-                1000000, // 1 BTC
-                false, // is_buy
-                immediate_or_cancel(), // order_type
-                &mut event_store,
-                false, // Despite it being a "taker", this order will not cross
-                true,
-                new_test_order_metadata(1),
-                option::none(),
-                &test_market_callbacks()
-            );
+        let events = latest_emitted_events<OrderEvent>(&mut event_store, option::some(1));
+        let order_place_event = events[0];
+        let order_id = order_place_event.get_order_id_from_event();
+        order_place_event.verify_order_event(
+            order_id,
+            option::none(), // client_order_id
+            market.get_market(),
+            signer::address_of(taker),
+            1000000,
+            1000000,
+            1000000,
+            1, // price
+            false,
+            false, // Even if it's a market order, it won't cross.
+            order_status_open()
+        );
+        verify_cancel_event(
+            &mut market,
+            taker,
+            false, // Not a maker order
+            order_id,
+            option::none(), // client_order_id
+            1, // price
+            1000000, // original size
+            0, // filled size
+            1000000, // remaining size
+            false, // Order is cancelled
+            &mut event_store
+        );
         market.destroy_market()
     }
 
@@ -703,7 +726,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000, // 1 BTC
                 false, // is_bid
                 good_till_cancelled(),
@@ -797,7 +820,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(990),
+                990,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -870,7 +893,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -973,7 +996,7 @@ module aptos_experimental::market_tests {
             false,
             maker1_order_id,
             option::none(),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,
@@ -986,7 +1009,7 @@ module aptos_experimental::market_tests {
             maker1,
             taker_order_id,
             option::none(),
-            option::some(1000),
+            1000,
             1000000,
             false,
             vector[1000000],
@@ -1081,7 +1104,7 @@ module aptos_experimental::market_tests {
             maker1,
             taker_order_id,
             option::some(1),
-            option::some(1001),
+            1001,
             1000000,
             false,
             vector[1000000],
@@ -1172,7 +1195,7 @@ module aptos_experimental::market_tests {
             false,
             maker1_order_id,
             option::none(),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,

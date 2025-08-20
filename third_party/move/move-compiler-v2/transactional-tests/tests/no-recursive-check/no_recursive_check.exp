@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-27:
+task 0 lines 1-27:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  bug: bytecode verification failed with unexpected status code `RECURSIVE_STRUCT_DEFINITION`:
 Error message: none
@@ -18,8 +17,7 @@ Error message: none
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 
-
-task 1 'run'. lines 29-29:
+task 1 lines 29-29:  run 0xc0ffee::m::main
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

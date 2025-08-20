@@ -1,0 +1,23 @@
+processed 4 tasks
+task 0 lines 1-26:  publish --verbose [module 0x66::a]
+task 1 lines 28-28:  run 0x66::a::init_a --signers 0x66 --verbose
+task 2 lines 30-30:  run 0x66::a::func_a --verbose
+Error: Function execution failed with VMError: {
+    message: None,
+    major_status: CALL_STACK_OVERFLOW,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: None,
+}
+task 3 lines 32-32:  run 0x66::a::func_a_borrow_a --args @0x66 --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x66::a::A` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000066, name: Identifier("a") }), FunctionDefinitionIndex(2), 5)] }),
+}

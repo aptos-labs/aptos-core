@@ -4,7 +4,7 @@
 //! Comparison operation rewriter
 //! - The in-house Lt/Le/Gt/Ge operations only allow integer operands.
 //! - We visit Lt/Le/Gt/Ge operations
-//!   - If their operands are not references or integer primitive types,
+//!   - If their operands are not integer primitive types,
 //!     - we rewrite the operation to use the `std::cmp::compare` function,
 //!     - and then interpret the result using `std::cmp::is_lt`, `std::cmp::is_le`, etc.
 //!
@@ -18,7 +18,7 @@
 //!   - Given an ast exp representing a comparison operation, e.g., `Call(Operation::Lt, [arg1, arg2])`,
 //!   - the function takes five steps:
 //!     1. check if `arg1` and `arg2` can be transformed based on their types
-//!     2. transform `arg1` and `arg2` into `&arg1` and `&arg2`
+//!     2. transform `arg1` and `arg2`, if not already references, into `&arg1` and `&arg2`
 //!     3. create a call to `std::cmp::compare`: `exp1 = Call(MoveFunction(std::cmp::compare), [&arg1, &arg2])`
 //!     4. create an immutable reference to the result of `std::cmp::compare`: `exp2 = Call(Borrow(Immutable), [exp1])`
 //!     5. generate a final call of `is_lt / is_le / is_gt / is_ge` to interpret the result of `std::cmp::compare`: `exp3 = Call(MoveFunction(std::cmp::is_le), [exp2])`
@@ -153,12 +153,14 @@ impl<'env> CmpRewriter<'env> {
         if args.iter().any(|arg| self.arg_cannot_transform(arg)) {
             return None;
         }
+        // Get the expected type-parameter type for the `std::cmp::compare` function
+        let arg_ty = self.env.get_node_type(args[0].node_id());
+        let expected_arg_ty = arg_ty.drop_reference();
 
-        // Step 2: Transform `arg1` and `arg2` into `&arg1` and `&arg2`
+        // Step 2: Transform `arg1` and `arg2` into `&arg1` and `&arg2` (do nothing if already references)
         let transformed_args: Vec<Exp> = args.iter().map(|arg| self.rewrite_cmp_arg(arg)).collect();
 
         // Step 3: Create an inner call to `std::cmp::compare(&arg1, &arg2)`
-        let expected_arg_ty = self.env.get_node_type(args[0].as_ref().node_id());
         let call_cmp = self.generate_call_to_compare(call_id, transformed_args, expected_arg_ty)?;
 
         // Step 4: Create a immutable reference to the result of `std::cmp::compare(&arg1, &arg2)`
@@ -223,7 +225,6 @@ impl<'env> CmpRewriter<'env> {
 
     /// Create a new immutable reference for the result of `std::cmp::compare`
     fn immborrow_compare_res(&self, call_cmp: Exp) -> Exp {
-        // Create a new immutable reference for the return value of `std::cmp::compare`
         let call_cmp_id = call_cmp.node_id();
         let cmp_loc = self.env.get_node_loc(call_cmp_id);
         let cmp_ty = self.env.get_node_type(call_cmp_id);
@@ -293,42 +294,46 @@ impl<'env> CmpRewriter<'env> {
         )
     }
 
-    /// We cannot rewrite references or integer primitive types
-    /// - References are not allowed in Lt/Le/Gt/Ge operations
+    /// We cannot rewrite integer primitive types and "Num"
     /// - Integer primitive types are supported by the VM natively
+    /// - "Num" is for spec only
     fn arg_cannot_transform(&mut self, arg: &Exp) -> bool {
         let arg_ty = self.env.get_node_type(arg.as_ref().node_id());
-        matches!(
-            arg_ty,
-            Type::Reference(_, _)
-                | Type::Primitive(
-                    PrimitiveType::U8
-                        | PrimitiveType::U16
-                        | PrimitiveType::U32
-                        | PrimitiveType::U64
-                        | PrimitiveType::U128
-                        | PrimitiveType::U256
-                        | PrimitiveType::Num
-                )
-        )
+        arg_ty.is_number()
     }
 
-    /// Insert a new immutable reference before the argument
+    /// Obtain a reference to the argument
     fn rewrite_cmp_arg(&mut self, arg: &Exp) -> Exp {
+        // Deref a reference, return the inner reference
         if let Some(arg_ref) = self.remove_deref_from_arg(arg) {
             return arg_ref;
         }
-        // Insert a new immutable reference before the argument
-        let arg_loc = self.env.get_node_loc(arg.as_ref().node_id());
-        let arg_ty = self.env.get_node_type(arg.as_ref().node_id());
-        let new_ref_type = Type::Reference(ReferenceKind::Immutable, Box::new(arg_ty.clone()));
-        let new_ref_id = self.env.new_node(arg_loc, new_ref_type);
-        ExpData::Call(
-            new_ref_id,
-            Operation::Borrow(ReferenceKind::Immutable),
-            vec![arg.clone()],
-        )
-        .into_exp()
+        let node_id = arg.as_ref().node_id();
+        let arg_loc = self.env.get_node_loc(node_id);
+        let arg_ty = self.env.get_node_type(node_id);
+
+        match arg_ty {
+            // Already a immutable reference, return it directly
+            Type::Reference(ReferenceKind::Immutable, _) => arg.clone(),
+            // Already a mutable reference, freeze and return it
+            Type::Reference(ReferenceKind::Mutable, inner_ty) => {
+                let new_ref_type = Type::Reference(ReferenceKind::Immutable, Box::new(*inner_ty));
+                let new_ref_id = self.env.new_node(arg_loc, new_ref_type);
+                ExpData::Call(new_ref_id, Operation::Freeze(false), vec![arg.clone()]).into_exp()
+            },
+            _ => {
+                // Not a reference, create a new immutable reference
+                let new_ref_type =
+                    Type::Reference(ReferenceKind::Immutable, Box::new(arg_ty.clone()));
+                let new_ref_id = self.env.new_node(arg_loc, new_ref_type);
+                ExpData::Call(
+                    new_ref_id,
+                    Operation::Borrow(ReferenceKind::Immutable),
+                    vec![arg.clone()],
+                )
+                .into_exp()
+            },
+        }
     }
 
     /// Optimization: if the argument is a dereference operation, we get the inner reference directly

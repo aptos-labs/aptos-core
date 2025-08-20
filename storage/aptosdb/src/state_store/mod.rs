@@ -996,7 +996,6 @@ impl StateStore {
             version,
             start_idx,
         )?
-        .map(|it| it)
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1016,8 +1015,7 @@ impl StateStore {
             version,
             first_index,
         )?
-        .take(chunk_size)
-        .map(|it| it);
+        .take(chunk_size);
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {

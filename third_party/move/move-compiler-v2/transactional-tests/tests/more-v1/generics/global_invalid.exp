@@ -1,6 +1,5 @@
 processed 3 tasks
-
-task 0 'publish'. lines 1-8:
+task 0 lines 1-8:  publish --print-bytecode [module 0x42::m {]
 Error: compilation errors:
  error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'
   ┌─ TEMPFILE:4:17
@@ -27,8 +26,7 @@ error: Expected a struct type. Global storage operations are restricted to struc
   │         Invalid call to MoveFrom<T>.
 
 
-
-task 1 'publish'. lines 10-22:
+task 1 lines 10-22:  publish --print-bytecode [module 0x41::n {]
 Error: compilation errors:
  error: no function named `invalid` found
    ┌─ TEMPFILE1:14:9
@@ -43,8 +41,7 @@ error: expected a struct with field `f` but found `()`
    │         ^^^^^^^^^^^
 
 
-
-task 2 'run'. lines 24-30:
+task 2 lines 24-30:  run --signers 0x41 [script {]
 Error: compilation errors:
  error: unbound module
    ┌─ TEMPFILE2:26:9

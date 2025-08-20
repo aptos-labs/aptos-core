@@ -1,0 +1,54 @@
+// Having references as immediate parameters or return types is allowed. All other use cases are
+// not allowed.
+
+//# publish
+module 0x42::a
+
+struct A<T>
+    x: T
+
+struct B
+    x: |&u64, &mut u64|(&u64, &mut u64)
+
+struct C has copy
+    x: |B|B has copy
+
+struct D has drop
+    x: |B|B has drop
+
+public fun foo(f: |&u64, &mut u64|(&u64, &mut u64) has drop)
+    ret
+
+public fun bar(f: |&u64, &mut u64|u32 has drop)
+    ret
+
+
+//# publish
+module 0x42::b
+
+public fun foo(f: |&&u64|u32 has drop)
+    ret
+
+
+//# publish
+module 0x42::b
+
+public fun foo(f: |vector<&u64>|u32 has drop)
+    ret
+
+
+//# publish
+module 0x42::c
+
+struct A<T>
+    x: T
+
+public fun foo(f: |A<&u64>|u32 has drop)
+    ret
+
+
+//# publish
+module 0x42::d
+
+struct A
+    x: |vector<&u64>|

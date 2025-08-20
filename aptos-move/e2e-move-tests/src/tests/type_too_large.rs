@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{ExecutionStatus, TransactionStatus},
+};
+use move_core_types::vm_status::StatusCode;
+use test_case::test_case;
 
-#[test]
-fn type_too_large() {
-    let mut h = MoveHarness::new();
+#[test_case(true)]
+#[test_case(false)]
+fn type_too_large(enable_lazy_loading: bool) {
+    let mut h = MoveHarness::new_with_lazy_loading(enable_lazy_loading);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -22,7 +28,17 @@ fn type_too_large() {
         vec![],
     );
 
-    // The abort code is NFE_BCS_SERIALIZATION_FAILURE = 0x1c5, since the actual VM error
-    // for TOO_MANY_TYPE_NODES is hidden by the bcs serializer and turned into this generic error.
-    assert_abort!(result, 0x1C5);
+    // With lazy loading, layout construction errors with too many type nodes and the error is
+    // propagated. Without lazy loading, the error happens inside the serializer and is remapped
+    // to serialization failure error code (legacy behaviour).
+    if enable_lazy_loading {
+        assert!(matches!(
+            result,
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::TOO_MANY_TYPE_NODES
+            )))
+        ));
+    } else {
+        assert_abort!(result, 0x1C5);
+    }
 }

@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 1-6:  publish --print-bytecode
+task 0 lines 1-6:  publish --print-bytecode [module 0x66::test1]
 
 == BEGIN Bytecode ==
 // Bytecode version v7
@@ -11,7 +11,7 @@ public fun f(l0: u64): u64
 
 
 == END Bytecode ==
-task 1 lines 9-16:  publish --print-bytecode
+task 1 lines 9-16:  publish --print-bytecode [module 0x66::test2]
 
 == BEGIN Bytecode ==
 // Bytecode version v7

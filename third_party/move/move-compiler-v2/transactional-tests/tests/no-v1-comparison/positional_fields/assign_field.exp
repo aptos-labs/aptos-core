@@ -1,22 +1,16 @@
 processed 8 tasks
-
-task 1 'run'. lines 122-122:
+task 0 lines 1-120:  publish [module 0x42::test {]
+task 1 lines 122-122:  run --verbose -- 0x42::test::test_simple
 return values: { 42, true }
-
-task 2 'run'. lines 124-124:
+task 2 lines 124-124:  run --verbose -- 0x42::test::test_simple_ref
 return values: { 42, true }
-
-task 3 'run'. lines 126-126:
+task 3 lines 126-126:  run --verbose -- 0x42::test::test_assign0
 return values: { 0, false }
-
-task 4 'run'. lines 128-128:
+task 4 lines 128-128:  run --verbose -- 0x42::test::test_assign1
 return values: 4
-
-task 5 'run'. lines 130-130:
+task 5 lines 130-130:  run --verbose -- 0x42::test::test_assign_chained
 return values: { { { 0 }, 42 }, { 1 }, { { 2 }, 42 } }
-
-task 6 'run'. lines 132-132:
+task 6 lines 132-132:  run --verbose -- 0x42::test::test_assign_enum_1
 return values: true
-
-task 7 'run'. lines 134-134:
+task 7 lines 134-134:  run --verbose -- 0x42::test::test_assign_enum_2
 return values: true

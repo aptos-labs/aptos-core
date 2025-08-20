@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-33:
+task 0 lines 1-33:  publish [module 0x42.Token {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::Token'. Got VMError: {
     major_status: CALL_TYPE_MISMATCH_ERROR,
     sub_status: None,

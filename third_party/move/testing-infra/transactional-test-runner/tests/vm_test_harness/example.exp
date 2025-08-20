@@ -1,9 +1,9 @@
 processed 9 tasks
-
-task 2 'view'. lines 13-15:
+task 1 lines 7-11:  run [script {]
+task 2 lines 13-15:  view --address 0x1 --resource 0x42::N::R<u64>
 [No Resource Exists]
-
-task 4 'run'. lines 37-37:
+task 3 lines 17-35:  publish [module A::N {]
+task 4 lines 37-37:  run --signers 0x1 --args 0 -- 0x42::N::ex
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -11,11 +11,11 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 6 'view'. lines 47-49:
+task 5 lines 39-45:  run --signers 0x1 [script {]
+task 6 lines 47-49:  view --address 0x1 --resource 0x42::N::R<u64>
 key 0x42::N::R<u64> {
     v: 0
 }
-
-task 8 'view'. lines 60-62:
+task 7 lines 51-58:  run --signers 0x1 --syntax=mvir [import 0x42.N;]
+task 8 lines 60-62:  view --address 0x1 --resource 0x42::N::R<u64>
 [No Resource Exists]

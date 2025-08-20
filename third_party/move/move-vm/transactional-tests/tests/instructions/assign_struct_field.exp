@@ -1,6 +1,6 @@
 processed 2 tasks
-task 0 lines 1-25:  publish
-task 1 lines 27-47:  run
+task 0 lines 1-25:  publish [module 0x42.Tester {]
+task 1 lines 27-47:  run [import 0x42.Tester;]
 Error: Script execution failed with VMError: {
     major_status: CALL_BORROWED_MUTABLE_REFERENCE_ERROR,
     sub_status: None,

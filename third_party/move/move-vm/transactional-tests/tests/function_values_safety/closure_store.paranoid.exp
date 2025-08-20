@@ -1,6 +1,6 @@
 processed 2 tasks
-task 0 lines 1-21:  publish
-task 1 lines 23-33:  run --verbose
+task 0 lines 1-23:  publish [module 0x66::helpers]
+task 1 lines 25-35:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Type |u64|u32 has unexpected ability: expected drop + store, got ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

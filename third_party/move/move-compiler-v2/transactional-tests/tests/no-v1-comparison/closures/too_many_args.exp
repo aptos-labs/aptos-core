@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'publish'. lines 1-104:
+task 0 lines 1-104:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: too many arguments captured in lambda (can only capture up to a maximum of `64`, but captured `66`)
    ┌─ TEMPFILE:90:17

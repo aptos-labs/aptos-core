@@ -32,11 +32,8 @@ mod storage;
 
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
-    code_storage::{ambassador_impl_CodeStorage, CodeStorage},
-    dependencies_gas_charging::{
-        check_dependencies_and_charge_gas, check_script_dependencies_and_check_gas,
-        check_type_tag_dependencies_and_charge_gas,
-    },
+    code_storage::CodeStorage,
+    dependencies_gas_charging::check_dependencies_and_charge_gas,
     environment::{
         ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
     },
@@ -44,7 +41,14 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    loader::{eager::EagerLoader, lazy::LazyLoader, traits::Loader},
+    loader::{
+        eager::EagerLoader,
+        lazy::LazyLoader,
+        traits::{
+            FunctionDefinitionLoader, InstantiatedFunctionLoader, LegacyLoaderConfig, Loader,
+            ScriptLoader, StructDefinitionLoader,
+        },
+    },
     module_storage::{
         ambassador_impl_ModuleStorage, AsFunctionValueExtension, FunctionValueExtensionAdapter,
         ModuleStorage,
@@ -52,6 +56,7 @@ pub use storage::{
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
 };
 
+// TODO(lazy-loading): revisit this macro in favour of a callback or an enum.
 #[macro_export]
 macro_rules! dispatch_loader {
     ($module_storage:expr, $loader:ident, $dispatch:stmt) => {

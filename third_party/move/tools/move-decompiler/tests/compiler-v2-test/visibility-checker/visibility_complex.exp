@@ -1,0 +1,67 @@
+module 0x42::A {
+    friend fun foo() {
+        ()
+    }
+}
+
+module 0x42::B {
+    friend fun foo() {
+        ()
+    }
+}
+
+module 0x42::C {
+    use 0x42::A;
+    use 0x42::B;
+    friend fun foo() {
+        A::foo();
+        B::foo();
+    }
+}
+
+module 0x42::D {
+    use 0x42::B;
+    use 0x42::C;
+    friend fun bar() {
+        B::foo();
+        C::foo();
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with env checking errors
+error: function `0x42::A::foo` cannot be called from function `0x42::C::foo` because module `0x42::C` is not a `friend` of `0x42::A`
+   ┌─ visibility_complex.move:2:16
+   │
+ 2 │     friend fun foo() {
+   │                ^^^ callee
+   ·
+17 │         A::foo();
+   │         -------- called here
+
+error: function `0x42::B::foo` cannot be called from function `0x42::C::foo` because module `0x42::C` is not a `friend` of `0x42::B`
+   ┌─ visibility_complex.move:8:16
+   │
+ 8 │     friend fun foo() {
+   │                ^^^ callee
+   ·
+18 │         B::foo();
+   │         -------- called here
+
+error: function `0x42::B::foo` cannot be called from function `0x42::D::bar` because module `0x42::D` is not a `friend` of `0x42::B`
+   ┌─ visibility_complex.move:8:16
+   │
+ 8 │     friend fun foo() {
+   │                ^^^ callee
+   ·
+26 │         B::foo();
+   │         -------- called here
+
+error: function `0x42::C::foo` cannot be called from function `0x42::D::bar` because module `0x42::D` is not a `friend` of `0x42::C`
+   ┌─ visibility_complex.move:16:16
+   │
+16 │     friend fun foo() {
+   │                ^^^ callee
+   ·
+27 │         C::foo();
+   │         -------- called here

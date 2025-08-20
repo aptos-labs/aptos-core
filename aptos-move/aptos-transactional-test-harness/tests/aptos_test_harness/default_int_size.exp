@@ -1,4 +1,3 @@
 processed 2 tasks
-
-task 1 'run'. lines 4-21:
+task 1 lines 4-21:  run --signers Alice --show-events [script {]
 Error: Failed to execute transaction. ExecutionStatus: ExecutionFailure { location: Script, function: 0, code_offset: 10 }

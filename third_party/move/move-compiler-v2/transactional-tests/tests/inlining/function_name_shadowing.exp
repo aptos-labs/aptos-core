@@ -1,6 +1,6 @@
 processed 3 tasks
-
-task 1 'publish'. lines 12-28:
+task 0 lines 1-10:  publish [module 0x42::OtherModule {]
+task 1 lines 12-28:  publish [module 0x42::Test {]
 warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
    ┌─ TEMPFILE1:18:28
    │
@@ -20,6 +20,5 @@ warning: Unused parameter `i`. Consider removing or prefixing with an underscore
    │                                                         ^
 
 
-
-task 2 'run'. lines 30-30:
+task 2 lines 30-30:  run 0x42::Test::test_shadowing
 return values: 5280

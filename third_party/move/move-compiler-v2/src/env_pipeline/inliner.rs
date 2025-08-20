@@ -854,13 +854,29 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|(_, para)| para)
             .collect_vec();
 
-        // Find free variables in lambda expr.  Perhaps we could minimize changes if we tracked each
-        // lambda arg individually in the inlined method and only rewrite the context of each
-        // inlined lambda, but that seems quite difficult.  Instead, just group all the free vars
-        // together and shadow them all.
+        // If a caller is provided, collect its parameter symbols.
+        let caller_param_symbols = target_qualified_fun_id_opt.map(|caller| {
+            env.get_function(caller)
+                .get_parameters()
+                .iter()
+                .map(|p| p.0)
+                .collect_vec()
+        });
+        // Find free variables across all lambda expr arguments.
+        // Perhaps we could minimize changes if we tracked each lambda arg individually in the inlined
+        // method and only rewrite the context of each inlined lambda, but that seems quite difficult.
+        // Instead, just group all the free vars together and shadow them all.
         let all_lambda_free_vars: BTreeSet<_> = lambda_args_matched
             .iter()
-            .flat_map(|(_, exp)| exp.free_vars().into_iter())
+            .flat_map(|(_, exp)| {
+                // If a caller is provided, compute free vars and used params.
+                if let Some(caller_param_symbols) = &caller_param_symbols {
+                    exp.free_vars_and_used_params(caller_param_symbols)
+                        .into_iter()
+                } else {
+                    exp.free_vars().into_iter()
+                }
+            })
             .collect();
 
         // While we're looking at the lambdas, check for Return in their bodies.

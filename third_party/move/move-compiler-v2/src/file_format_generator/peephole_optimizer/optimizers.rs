@@ -32,6 +32,13 @@ impl TransformedCodeChunk {
         Self::new(vec![], vec![])
     }
 
+    /// Extract a contiguous sub-chunk from this chunk,
+    pub fn extract(&self, start: CodeOffset, end: CodeOffset) -> TransformedCodeChunk {
+        let new_code = self.code[start as usize..=end as usize].to_vec();
+        let new_offsets = self.original_offsets[start as usize..=end as usize].to_vec();
+        TransformedCodeChunk::new(new_code, new_offsets)
+    }
+
     /// Extend this chunk with another `other` chunk.
     /// The `original_offsets` for the `other` chunk are incremented by `adjust`.
     pub fn extend(&mut self, other: TransformedCodeChunk, adjust: CodeOffset) {

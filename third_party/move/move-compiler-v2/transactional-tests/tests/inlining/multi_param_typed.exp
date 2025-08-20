@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-29:
+task 0 lines 1-29:  publish [module 0x42::Test {]
 Error: compilation errors:
  error: a reference is expected but `_` was provided
    ┌─ TEMPFILE:24:82
@@ -21,8 +20,7 @@ error: expected function type has argument of type `(&integer, &mut integer)` bu
    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-
-task 1 'run'. lines 31-31:
+task 1 lines 31-31:  run 0x42::Test::test
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

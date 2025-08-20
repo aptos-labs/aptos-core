@@ -1,6 +1,6 @@
 processed 9 tasks
-
-task 1 'run'. lines 19-24:
+task 0 lines 1-17:  publish [module 0x1.M {]
+task 1 lines 19-24:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -8,8 +8,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 2 'run'. lines 26-31:
+task 2 lines 26-31:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -17,8 +16,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 3 'run'. lines 33-38:
+task 3 lines 33-38:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -26,8 +24,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 4 'run'. lines 40-45:
+task 4 lines 40-45:  run --type-args 0x1::M::K --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -35,8 +32,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 5 'run'. lines 47-52:
+task 5 lines 47-52:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -44,8 +40,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 6 'run'. lines 54-59:
+task 6 lines 54-59:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -53,8 +48,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 7 'run'. lines 61-66:
+task 7 lines 61-66:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -62,8 +56,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 8 'run'. lines 68-73:
+task 8 lines 68-73:  run --type-args u64 --args false [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),

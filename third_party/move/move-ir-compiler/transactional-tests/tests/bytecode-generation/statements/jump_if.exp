@@ -1,110 +1,91 @@
 processed 4 tasks
-
-task 0 'print-bytecode'. lines 1-22:
-// Move bytecode v7
-script {
-
-
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(42)
-	1: LdU64(0)
-	2: Gt
-	3: BrTrue(5)
-B1:
-	4: Branch(8)
-B2:
-	5: LdU64(1)
-	6: StLoc[0](loc0: u64)
-	7: Branch(11)
-B3:
-	8: LdU64(2)
-	9: StLoc[0](loc0: u64)
-	10: Branch(11)
-B4:
-	11: Ret
-}
-}
-
-task 1 'print-bytecode'. lines 24-41:
-// Move bytecode v7
-script {
+task 0 lines 1-22:  print-bytecode [// This is roughly equivalent to the following Move program:]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 42
+    ld_u64 0
+    gt
+    br_true l0
+    branch l1
+    // @5
+l0: ld_u64 1
+    st_loc l0
+    branch l2
+l1: ld_u64 2
+    st_loc l0
+    // @10
+    branch l2
+l2: ret
 
 
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(42)
-	1: LdU64(0)
-	2: Gt
-	3: BrTrue(7)
-B1:
-	4: LdU64(2)
-	5: StLoc[0](loc0: u64)
-	6: Branch(9)
-B2:
-	7: LdU64(1)
-	8: StLoc[0](loc0: u64)
-B3:
-	9: Ret
-}
-}
-
-task 2 'print-bytecode'. lines 43-59:
-// Move bytecode v7
-script {
+task 1 lines 24-41:  print-bytecode [// This is roughly equivalent to the following Move program:]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 42
+    ld_u64 0
+    gt
+    br_true l0
+    ld_u64 2
+    // @5
+    st_loc l0
+    branch l1
+l0: ld_u64 1
+    st_loc l0
+l1: ret
 
 
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(0)
-	1: LdU64(1)
-	2: Lt
-	3: BrTrue(7)
-B1:
-	4: LdU64(0)
-	5: StLoc[0](loc0: u64)
-	6: Branch(16)
-B2:
-	7: LdU64(2)
-	8: LdU64(1)
-	9: Gt
-	10: BrTrue(14)
-B3:
-	11: LdU64(1)
-	12: StLoc[0](loc0: u64)
-	13: Branch(16)
-B4:
-	14: LdU64(2)
-	15: StLoc[0](loc0: u64)
-B5:
-	16: Ret
-}
-}
-
-task 3 'print-bytecode'. lines 61-74:
-// Move bytecode v7
-script {
+task 2 lines 43-59:  print-bytecode [// `jump_if` statements can be sequenced, akin to "nested" `if` statements in Move.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    ld_u64 1
+    lt
+    br_true l0
+    ld_u64 0
+    // @5
+    st_loc l0
+    branch l1
+l0: ld_u64 2
+    ld_u64 1
+    gt
+    // @10
+    br_true l2
+    ld_u64 1
+    st_loc l0
+    branch l1
+l2: ld_u64 2
+    // @15
+    st_loc l0
+l1: ret
 
 
-main() /* def_idx: 0 */ {
-L0:	loc0: u64
-B0:
-	0: LdU64(0)
-	1: LdU64(1)
-	2: Neq
-	3: BrTrue(7)
-B1:
-	4: LdU64(1)
-	5: StLoc[0](loc0: u64)
-	6: Branch(10)
-B2:
-	7: LdU64(2)
-	8: StLoc[0](loc0: u64)
-	9: Ret
-B3:
-	10: Ret
-}
-}
+task 3 lines 61-74:  print-bytecode [// `return` statements can appear anywhere, including within a jump destination's block.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    ld_u64 1
+    neq
+    br_true l0
+    ld_u64 1
+    // @5
+    st_loc l0
+    branch l1
+l0: ld_u64 2
+    st_loc l0
+    ret
+    // @10
+l1: ret
+
+

@@ -1,1 +1,5 @@
 processed 5 tasks
+task 1 lines 9-88:  publish [module 0x1.TestConditions {]
+task 2 lines 89-165:  publish [module 0x1.TestSpecExp {]
+task 3 lines 166-210:  publish [module 0x1.TestEnsuresAccessPath {]
+task 4 lines 212-265:  publish [module 0x1.TestBinaryOps {]

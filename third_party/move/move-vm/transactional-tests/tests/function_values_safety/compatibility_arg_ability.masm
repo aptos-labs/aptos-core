@@ -1,0 +1,15 @@
+//# publish
+module 0x66::incompatible_function_ability_since_public
+public fun foo(): |u64|u32 has store
+
+//# publish --verbose
+module 0x66::incompatible_function_ability_since_public
+public fun foo(): |bool|u32 has copy+store
+
+//# publish --verbose
+module 0x66::incompatible_function_ability2_since_public
+public fun foo(): |u64|u32 has store+copy
+
+//# publish --verbose
+module 0x66::incompatible_function_ability2_since_public
+public fun foo(): |bool|u32 has copy

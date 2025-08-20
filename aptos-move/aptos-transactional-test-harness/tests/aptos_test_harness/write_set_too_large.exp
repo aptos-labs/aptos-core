@@ -1,4 +1,4 @@
 processed 3 tasks
-
-task 2 'run'. lines 29-29:
+task 1 lines 5-27:  publish --private-key Alice [module Alice::Module {]
+task 2 lines 29-29:  run --signers Alice --show-events --gas-budget 2000000 -- Alice::Module::write_large_data
 Error: Failed to execute transaction. ExecutionStatus: ExecutionFailure { location: Script, function: 0, code_offset: 0 }

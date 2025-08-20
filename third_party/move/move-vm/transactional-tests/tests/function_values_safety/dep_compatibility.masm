@@ -71,7 +71,7 @@ public fun assert_eq(x: u32, y:u32)
     abort
  r: ret
 
-/// Execute again should cause dependency linking error, since `app` was deployed using
-/// different parameter type. In paranoid mode, type expectation should be violated.
+/// Execute again should cause paranoid mode failure, since `app` was deployed using
+/// different parameter type.
 
 //# run --verbose 0x66::app::run

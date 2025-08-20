@@ -521,11 +521,13 @@ impl StateMerkleDb {
         self.lru_cache.as_ref()
     }
 
-    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
-        self.state_merkle_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateMerklePrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+    pub(crate) fn write_pruner_progress(
+        &self,
+        progress_key: &DbMetadataKey,
+        version: Version,
+    ) -> Result<()> {
+        self.state_merkle_metadata_db
+            .put::<DbMetadataSchema>(progress_key, &DbMetadataValue::Version(version))
     }
 
     pub(crate) fn num_shards(&self) -> usize {

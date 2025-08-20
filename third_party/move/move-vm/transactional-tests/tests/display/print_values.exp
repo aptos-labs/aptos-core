@@ -1,5 +1,5 @@
 processed 17 tasks
-task 0 lines 1-86:  publish
+task 0 lines 1-86:  publish [module 0x42::print_values {]
 task 1 lines 88-88:  run 0x42::print_values::return_bool
 return values: true
 task 2 lines 90-90:  run 0x42::print_values::return_u8

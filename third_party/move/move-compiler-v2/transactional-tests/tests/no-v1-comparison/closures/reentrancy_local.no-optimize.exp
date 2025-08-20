@@ -1,6 +1,7 @@
 processed 3 tasks
-
-task 2 'run'. lines 20-20:
+task 0 lines 1-16:  publish [module 0x42::tests {]
+task 1 lines 18-18:  run 0x42::tests::init --signers 0x42
+task 2 lines 20-20:  run 0x42::tests::local_access_via_lambda_fails --verbose
 Error: Function execution failed with VMError: {
     message: Resource `0x42::tests::R` cannot be accessed because of active reentrancy of defining module.,
     major_status: RUNTIME_DISPATCH_ERROR,

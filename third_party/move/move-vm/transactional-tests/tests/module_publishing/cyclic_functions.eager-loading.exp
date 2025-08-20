@@ -1,0 +1,14 @@
+processed 4 tasks
+task 0 lines 1-4:  publish --verbose [module 0x66::a]
+task 1 lines 7-11:  publish --verbose [module 0x66::b]
+task 2 lines 14-18:  publish --verbose [module 0x66::c]
+task 3 lines 21-25:  publish --verbose [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    message: Module 0x0000000000000000000000000000000000000000000000000000000000000066::a forms a cyclic dependency,
+    major_status: CYCLIC_MODULE_DEPENDENCY,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

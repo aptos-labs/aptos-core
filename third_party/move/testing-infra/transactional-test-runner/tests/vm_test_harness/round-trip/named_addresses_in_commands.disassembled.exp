@@ -1,0 +1,8 @@
+processed 5 tasks
+task 1 lines 5-19:  run --signers A [// Bytecode version v8]
+task 2 lines 23-35:  publish [// Bytecode version v8]
+task 3 lines 39-47:  run --signers A [// Bytecode version v8]
+task 4 lines 51-51:  view --address A --resource 0x2a::M::Foo
+key 0x2a::M::Foo {
+    x: 500
+}

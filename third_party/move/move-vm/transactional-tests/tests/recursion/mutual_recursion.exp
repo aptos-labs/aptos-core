@@ -1,3 +1,3 @@
 processed 2 tasks
-task 0 lines 1-25:  publish
-task 1 lines 27-49:  run
+task 0 lines 1-25:  publish [module 0x42.Math {]
+task 1 lines 27-49:  run [import 0x42.Math;]

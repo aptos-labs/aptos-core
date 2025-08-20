@@ -1,0 +1,66 @@
+//# publish --skip-check-friend-linking
+module 0x66::a
+friend fun foo(x: u32, y: u64): bool
+    ld_true
+    ret
+
+
+//# publish --skip-check-friend-linking
+module 0x66::a
+friend fun foo(a: u32, b: u64): bool
+    ld_true
+    ret
+
+
+//# publish --skip-check-friend-linking
+module 0x66::a
+friend fun foo(x: u32): bool
+    ld_true
+    ret
+
+
+//# publish --skip-check-friend-linking
+module 0x66::a
+friend fun foo(x: u32, y: u64, z: bool): bool
+    ld_true
+    ret
+
+
+//# publish --skip-check-friend-linking
+module 0x66::a
+friend fun foo(x: u32, y: u64)
+    ret
+
+
+//# publish
+module 0x66::b
+friend fun foo(x: u32, y: u64): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::b
+friend fun foo(a: u32, b: u64): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::b
+friend fun foo(x: u32): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::b
+friend fun foo(x: u32, y: u64, z: bool): bool
+    ld_true
+    ret
+
+
+//# publish
+module 0x66::b
+friend fun foo(x: u32, y: u64)
+    ret

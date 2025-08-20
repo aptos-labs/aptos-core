@@ -10,12 +10,19 @@ use clap::*;
 use legacy_move_compiler::shared::NumericalAddress;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
+    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION, MOVE_IR_EXTENSION},
     types::{ParsedStructType, ParsedType},
     values::{ParsableValue, ParsedValue},
 };
 use move_core_types::identifier::Identifier;
-use std::{convert::TryInto, fmt::Debug, fs, path::Path, str::FromStr};
+use std::{
+    convert::TryInto,
+    fmt,
+    fmt::{Debug, Formatter},
+    fs,
+    path::Path,
+    str::FromStr,
+};
 use tempfile::NamedTempFile;
 
 #[derive(Debug)]
@@ -34,8 +41,8 @@ pub struct TaskInput<Command> {
 pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput<Command>>> {
     use regex::Regex;
     use std::io::Write;
-    // checks whether there is a macro header so we use Tera to expand file content
-    let re_is_tera = Regex::new(r"(?m)\s*\{%").unwrap();
+    // checks whether there is a tera statement or comment header
+    let re_is_tera = Regex::new(r"(?m)^\s*\{(%|#)").unwrap();
     // checks for lines that are entirely whitespace
     let re_whitespace = Regex::new(r"^\s*$").unwrap();
     // checks for lines that start with // comments
@@ -107,6 +114,12 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             command_source = format!("{} {}", command_source, text);
         }
         let command_text = format!("task {}", command_source);
+        if let Some((_, line)) = text.first() {
+            // Append first text line for better context
+            if !line.is_empty() {
+                command_source = format!("{} [{}]", command_source, line)
+            }
+        }
         let command_split = command_text.split_ascii_whitespace().collect::<Vec<_>>();
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
         let command = match Command::try_parse_from(command_split) {
@@ -192,7 +205,7 @@ impl<T> TaskInput<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxChoice {
     Source,
     IR,
@@ -393,6 +406,16 @@ fn parse_qualified_module_access(s: &str) -> Result<(ParsedAddress, Identifier, 
     Ok((addr, module, struct_))
 }
 
+impl fmt::Display for SyntaxChoice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            SyntaxChoice::Source => MOVE_EXTENSION,
+            SyntaxChoice::IR => MOVE_IR_EXTENSION,
+            SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
+        })
+    }
+}
+
 impl FromStr for SyntaxChoice {
     type Err = anyhow::Error;
 
@@ -400,10 +423,12 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_IR_EXTENSION => Ok(SyntaxChoice::IR),
+            MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
             _ => Err(anyhow!(
-                "Invalid syntax choice. Expected '{}' or '{}'",
+                "Invalid syntax choice. Expected '{}' or '{}' or '{}'",
                 MOVE_EXTENSION,
-                MOVE_IR_EXTENSION
+                MOVE_IR_EXTENSION,
+                MOVE_ASM_EXTENSION
             )),
         }
     }

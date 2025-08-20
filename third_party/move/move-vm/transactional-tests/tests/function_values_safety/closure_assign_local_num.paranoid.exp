@@ -1,7 +1,7 @@
 processed 108 tasks
-task 0 lines 4-16:  publish
-task 1 lines 18-38:  run --verbose
-task 2 lines 40-63:  run --verbose
+task 0 lines 4-16:  publish [module 0x66::helpers_u8_u8]
+task 1 lines 18-38:  run --verbose [script]
+task 2 lines 40-63:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u8 has copy + drop, got |u8|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -11,9 +11,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 3 lines 67-79:  publish
-task 4 lines 81-101:  run --verbose
-task 5 lines 103-126:  run --verbose
+task 3 lines 67-79:  publish [module 0x66::helpers_u8_u16]
+task 4 lines 81-101:  run --verbose [script]
+task 5 lines 103-126:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u16 has copy + drop, got |u8|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -23,9 +23,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 6 lines 130-142:  publish
-task 7 lines 144-164:  run --verbose
-task 8 lines 166-189:  run --verbose
+task 6 lines 130-142:  publish [module 0x66::helpers_u8_u32]
+task 7 lines 144-164:  run --verbose [script]
+task 8 lines 166-189:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u32 has copy + drop, got |u8|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -35,9 +35,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 9 lines 193-205:  publish
-task 10 lines 207-227:  run --verbose
-task 11 lines 229-252:  run --verbose
+task 9 lines 193-205:  publish [module 0x66::helpers_u8_u64]
+task 10 lines 207-227:  run --verbose [script]
+task 11 lines 229-252:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u64 has copy + drop, got |u8|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -47,9 +47,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 12 lines 256-268:  publish
-task 13 lines 270-290:  run --verbose
-task 14 lines 292-315:  run --verbose
+task 12 lines 256-268:  publish [module 0x66::helpers_u8_u128]
+task 13 lines 270-290:  run --verbose [script]
+task 14 lines 292-315:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u128 has copy + drop, got |u8|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -59,9 +59,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 15 lines 319-331:  publish
-task 16 lines 333-353:  run --verbose
-task 17 lines 355-378:  run --verbose
+task 15 lines 319-331:  publish [module 0x66::helpers_u8_u256]
+task 16 lines 333-353:  run --verbose [script]
+task 17 lines 355-378:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u8|u256 has copy + drop, got |u8|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -71,9 +71,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 18 lines 384-396:  publish
-task 19 lines 398-418:  run --verbose
-task 20 lines 420-443:  run --verbose
+task 18 lines 384-396:  publish [module 0x66::helpers_u16_u8]
+task 19 lines 398-418:  run --verbose [script]
+task 20 lines 420-443:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u8 has copy + drop, got |u16|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -83,9 +83,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 21 lines 447-459:  publish
-task 22 lines 461-481:  run --verbose
-task 23 lines 483-506:  run --verbose
+task 21 lines 447-459:  publish [module 0x66::helpers_u16_u16]
+task 22 lines 461-481:  run --verbose [script]
+task 23 lines 483-506:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u16 has copy + drop, got |u16|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -95,9 +95,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 24 lines 510-522:  publish
-task 25 lines 524-544:  run --verbose
-task 26 lines 546-569:  run --verbose
+task 24 lines 510-522:  publish [module 0x66::helpers_u16_u32]
+task 25 lines 524-544:  run --verbose [script]
+task 26 lines 546-569:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u32 has copy + drop, got |u16|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -107,9 +107,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 27 lines 573-585:  publish
-task 28 lines 587-607:  run --verbose
-task 29 lines 609-632:  run --verbose
+task 27 lines 573-585:  publish [module 0x66::helpers_u16_u64]
+task 28 lines 587-607:  run --verbose [script]
+task 29 lines 609-632:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u64 has copy + drop, got |u16|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -119,9 +119,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 30 lines 636-648:  publish
-task 31 lines 650-670:  run --verbose
-task 32 lines 672-695:  run --verbose
+task 30 lines 636-648:  publish [module 0x66::helpers_u16_u128]
+task 31 lines 650-670:  run --verbose [script]
+task 32 lines 672-695:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u128 has copy + drop, got |u16|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -131,9 +131,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 33 lines 699-711:  publish
-task 34 lines 713-733:  run --verbose
-task 35 lines 735-758:  run --verbose
+task 33 lines 699-711:  publish [module 0x66::helpers_u16_u256]
+task 34 lines 713-733:  run --verbose [script]
+task 35 lines 735-758:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u16|u256 has copy + drop, got |u16|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -143,9 +143,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 36 lines 764-776:  publish
-task 37 lines 778-798:  run --verbose
-task 38 lines 800-823:  run --verbose
+task 36 lines 764-776:  publish [module 0x66::helpers_u32_u8]
+task 37 lines 778-798:  run --verbose [script]
+task 38 lines 800-823:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u8 has copy + drop, got |u32|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -155,9 +155,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 39 lines 827-839:  publish
-task 40 lines 841-861:  run --verbose
-task 41 lines 863-886:  run --verbose
+task 39 lines 827-839:  publish [module 0x66::helpers_u32_u16]
+task 40 lines 841-861:  run --verbose [script]
+task 41 lines 863-886:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u16 has copy + drop, got |u32|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -167,9 +167,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 42 lines 890-902:  publish
-task 43 lines 904-924:  run --verbose
-task 44 lines 926-949:  run --verbose
+task 42 lines 890-902:  publish [module 0x66::helpers_u32_u32]
+task 43 lines 904-924:  run --verbose [script]
+task 44 lines 926-949:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u32 has copy + drop, got |u32|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -179,9 +179,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 45 lines 953-965:  publish
-task 46 lines 967-987:  run --verbose
-task 47 lines 989-1012:  run --verbose
+task 45 lines 953-965:  publish [module 0x66::helpers_u32_u64]
+task 46 lines 967-987:  run --verbose [script]
+task 47 lines 989-1012:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u64 has copy + drop, got |u32|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -191,9 +191,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 48 lines 1016-1028:  publish
-task 49 lines 1030-1050:  run --verbose
-task 50 lines 1052-1075:  run --verbose
+task 48 lines 1016-1028:  publish [module 0x66::helpers_u32_u128]
+task 49 lines 1030-1050:  run --verbose [script]
+task 50 lines 1052-1075:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u128 has copy + drop, got |u32|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -203,9 +203,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 51 lines 1079-1091:  publish
-task 52 lines 1093-1113:  run --verbose
-task 53 lines 1115-1138:  run --verbose
+task 51 lines 1079-1091:  publish [module 0x66::helpers_u32_u256]
+task 52 lines 1093-1113:  run --verbose [script]
+task 53 lines 1115-1138:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u32|u256 has copy + drop, got |u32|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -215,9 +215,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 54 lines 1144-1156:  publish
-task 55 lines 1158-1178:  run --verbose
-task 56 lines 1180-1203:  run --verbose
+task 54 lines 1144-1156:  publish [module 0x66::helpers_u64_u8]
+task 55 lines 1158-1178:  run --verbose [script]
+task 56 lines 1180-1203:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u8 has copy + drop, got |u64|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -227,9 +227,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 57 lines 1207-1219:  publish
-task 58 lines 1221-1241:  run --verbose
-task 59 lines 1243-1266:  run --verbose
+task 57 lines 1207-1219:  publish [module 0x66::helpers_u64_u16]
+task 58 lines 1221-1241:  run --verbose [script]
+task 59 lines 1243-1266:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u16 has copy + drop, got |u64|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -239,9 +239,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 60 lines 1270-1282:  publish
-task 61 lines 1284-1304:  run --verbose
-task 62 lines 1306-1329:  run --verbose
+task 60 lines 1270-1282:  publish [module 0x66::helpers_u64_u32]
+task 61 lines 1284-1304:  run --verbose [script]
+task 62 lines 1306-1329:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u32 has copy + drop, got |u64|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -251,9 +251,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 63 lines 1333-1345:  publish
-task 64 lines 1347-1367:  run --verbose
-task 65 lines 1369-1392:  run --verbose
+task 63 lines 1333-1345:  publish [module 0x66::helpers_u64_u64]
+task 64 lines 1347-1367:  run --verbose [script]
+task 65 lines 1369-1392:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u64 has copy + drop, got |u64|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -263,9 +263,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 66 lines 1396-1408:  publish
-task 67 lines 1410-1430:  run --verbose
-task 68 lines 1432-1455:  run --verbose
+task 66 lines 1396-1408:  publish [module 0x66::helpers_u64_u128]
+task 67 lines 1410-1430:  run --verbose [script]
+task 68 lines 1432-1455:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u128 has copy + drop, got |u64|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -275,9 +275,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 69 lines 1459-1471:  publish
-task 70 lines 1473-1493:  run --verbose
-task 71 lines 1495-1518:  run --verbose
+task 69 lines 1459-1471:  publish [module 0x66::helpers_u64_u256]
+task 70 lines 1473-1493:  run --verbose [script]
+task 71 lines 1495-1518:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u64|u256 has copy + drop, got |u64|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -287,9 +287,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 72 lines 1524-1536:  publish
-task 73 lines 1538-1558:  run --verbose
-task 74 lines 1560-1583:  run --verbose
+task 72 lines 1524-1536:  publish [module 0x66::helpers_u128_u8]
+task 73 lines 1538-1558:  run --verbose [script]
+task 74 lines 1560-1583:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u8 has copy + drop, got |u128|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -299,9 +299,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 75 lines 1587-1599:  publish
-task 76 lines 1601-1621:  run --verbose
-task 77 lines 1623-1646:  run --verbose
+task 75 lines 1587-1599:  publish [module 0x66::helpers_u128_u16]
+task 76 lines 1601-1621:  run --verbose [script]
+task 77 lines 1623-1646:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u16 has copy + drop, got |u128|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -311,9 +311,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 78 lines 1650-1662:  publish
-task 79 lines 1664-1684:  run --verbose
-task 80 lines 1686-1709:  run --verbose
+task 78 lines 1650-1662:  publish [module 0x66::helpers_u128_u32]
+task 79 lines 1664-1684:  run --verbose [script]
+task 80 lines 1686-1709:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u32 has copy + drop, got |u128|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -323,9 +323,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 81 lines 1713-1725:  publish
-task 82 lines 1727-1747:  run --verbose
-task 83 lines 1749-1772:  run --verbose
+task 81 lines 1713-1725:  publish [module 0x66::helpers_u128_u64]
+task 82 lines 1727-1747:  run --verbose [script]
+task 83 lines 1749-1772:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u64 has copy + drop, got |u128|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -335,9 +335,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 84 lines 1776-1788:  publish
-task 85 lines 1790-1810:  run --verbose
-task 86 lines 1812-1835:  run --verbose
+task 84 lines 1776-1788:  publish [module 0x66::helpers_u128_u128]
+task 85 lines 1790-1810:  run --verbose [script]
+task 86 lines 1812-1835:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u128 has copy + drop, got |u128|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -347,9 +347,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 87 lines 1839-1851:  publish
-task 88 lines 1853-1873:  run --verbose
-task 89 lines 1875-1898:  run --verbose
+task 87 lines 1839-1851:  publish [module 0x66::helpers_u128_u256]
+task 88 lines 1853-1873:  run --verbose [script]
+task 89 lines 1875-1898:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u128|u256 has copy + drop, got |u128|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -359,9 +359,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 90 lines 1904-1916:  publish
-task 91 lines 1918-1938:  run --verbose
-task 92 lines 1940-1963:  run --verbose
+task 90 lines 1904-1916:  publish [module 0x66::helpers_u256_u8]
+task 91 lines 1918-1938:  run --verbose [script]
+task 92 lines 1940-1963:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u8 has copy + drop, got |u256|u8 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -371,9 +371,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 93 lines 1967-1979:  publish
-task 94 lines 1981-2001:  run --verbose
-task 95 lines 2003-2026:  run --verbose
+task 93 lines 1967-1979:  publish [module 0x66::helpers_u256_u16]
+task 94 lines 1981-2001:  run --verbose [script]
+task 95 lines 2003-2026:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u16 has copy + drop, got |u256|u16 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -383,9 +383,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 96 lines 2030-2042:  publish
-task 97 lines 2044-2064:  run --verbose
-task 98 lines 2066-2089:  run --verbose
+task 96 lines 2030-2042:  publish [module 0x66::helpers_u256_u32]
+task 97 lines 2044-2064:  run --verbose [script]
+task 98 lines 2066-2089:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u32 has copy + drop, got |u256|u32 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -395,9 +395,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 99 lines 2093-2105:  publish
-task 100 lines 2107-2127:  run --verbose
-task 101 lines 2129-2152:  run --verbose
+task 99 lines 2093-2105:  publish [module 0x66::helpers_u256_u64]
+task 100 lines 2107-2127:  run --verbose [script]
+task 101 lines 2129-2152:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u64 has copy + drop, got |u256|u64 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -407,9 +407,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 102 lines 2156-2168:  publish
-task 103 lines 2170-2190:  run --verbose
-task 104 lines 2192-2215:  run --verbose
+task 102 lines 2156-2168:  publish [module 0x66::helpers_u256_u128]
+task 103 lines 2170-2190:  run --verbose [script]
+task 104 lines 2192-2215:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u128 has copy + drop, got |u256|u128 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -419,9 +419,9 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 3)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
-task 105 lines 2219-2231:  publish
-task 106 lines 2233-2253:  run --verbose
-task 107 lines 2255-2278:  run --verbose
+task 105 lines 2219-2231:  publish [module 0x66::helpers_u256_u256]
+task 106 lines 2233-2253:  run --verbose [script]
+task 107 lines 2255-2278:  run --verbose [script]
 Error: Script execution failed with VMError: {
     message: Expected type |u256|u256 has copy + drop, got |u256|u256 has drop which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,

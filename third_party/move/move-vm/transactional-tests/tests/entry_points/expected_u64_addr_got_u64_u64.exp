@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-5:  run --args 42 42
+task 0 lines 1-5:  run --args 42 42 [// should fail for mismatched types]
 Error: Script execution failed with VMError: {
     major_status: FAILED_TO_DESERIALIZE_ARGUMENT,
     sub_status: None,

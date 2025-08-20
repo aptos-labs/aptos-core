@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-8:
+task 0 lines 1-8:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: INVALID_FALL_THROUGH,
     sub_status: None,

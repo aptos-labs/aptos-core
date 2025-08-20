@@ -1,62 +1,61 @@
 processed 4 tasks
+task 1 lines 4-35:  print-bytecode --input=module [module Alice::game {]
+// Bytecode version v8
+module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::game
+use 0x1::signer
+use 0x1::debug
+struct InnerStruct has copy + store + key
+  amount: u64
 
-task 1 'print-bytecode'. lines 4-35:
-// Move bytecode v8
-module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.game {
-use 0000000000000000000000000000000000000000000000000000000000000001::signer;
-use 0000000000000000000000000000000000000000000000000000000000000001::debug;
+struct OuterStruct has key
+  any_field: vector<InnerStruct>
+
+// Function definition at index 0
+entry public fun test_upgrade(l0: &signer) acquires OuterStruct
+    local l1: &mut vector<InnerStruct>
+    local l2: u64
+    local l3: u64
+    copy_loc l0
+    call signer::address_of
+    move_loc l0
+    vec_pack <InnerStruct>, 0
+    pack OuterStruct
+    // @5
+    move_to OuterStruct
+    mut_borrow_global OuterStruct
+    mut_borrow_field OuterStruct, any_field
+    st_loc l1
+    ld_u64 0
+    // @10
+    st_loc l2
+    copy_loc l1
+    freeze_ref
+    vec_len <InnerStruct>
+    st_loc l3
+    // @15
+l1: copy_loc l2
+    copy_loc l3
+    lt
+    br_false l0
+    copy_loc l1
+    // @20
+    copy_loc l2
+    vec_mut_borrow <InnerStruct>
+    freeze_ref
+    call debug::print<InnerStruct>
+    move_loc l2
+    // @25
+    ld_u64 1
+    add
+    st_loc l2
+    branch l1
+l0: move_loc l1
+    // @30
+    pop
+    ret
 
 
-struct InnerStruct has copy, store, key {
-	amount: u64
-}
-struct OuterStruct has key {
-	any_field: vector<InnerStruct>
-}
-
-entry public test_upgrade(Arg0: &signer) /* def_idx: 0 */ {
-L1:	loc0: &mut vector<InnerStruct>
-L2:	loc1: u64
-L3:	loc2: u64
-B0:
-	0: CopyLoc[0](Arg0: &signer)
-	1: Call signer::address_of(&signer): address
-	2: MoveLoc[0](Arg0: &signer)
-	3: VecPack(3, 0)
-	4: Pack[1](OuterStruct)
-	5: MoveTo[1](OuterStruct)
-	6: MutBorrowGlobal[1](OuterStruct)
-	7: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
-	8: StLoc[1](loc0: &mut vector<InnerStruct>)
-	9: LdU64(0)
-	10: StLoc[2](loc1: u64)
-	11: CopyLoc[1](loc0: &mut vector<InnerStruct>)
-	12: FreezeRef
-	13: VecLen(3)
-	14: StLoc[3](loc2: u64)
-B1:
-	15: CopyLoc[2](loc1: u64)
-	16: CopyLoc[3](loc2: u64)
-	17: Lt
-	18: BrFalse(29)
-B2:
-	19: CopyLoc[1](loc0: &mut vector<InnerStruct>)
-	20: CopyLoc[2](loc1: u64)
-	21: VecMutBorrow(3)
-	22: FreezeRef
-	23: Call debug::print<InnerStruct>(&InnerStruct)
-	24: MoveLoc[2](loc1: u64)
-	25: LdU64(1)
-	26: Add
-	27: StLoc[2](loc1: u64)
-	28: Branch(15)
-B3:
-	29: MoveLoc[1](loc0: &mut vector<InnerStruct>)
-	30: Pop
-	31: Ret
-}
-}
-
-task 3 'run'. lines 70-70:
+task 2 lines 37-68:  publish --private-key Alice [module Alice::game {]
+task 3 lines 70-70:  run Alice::game::test_upgrade --signers Alice --private-key Alice
 mutable inputs after call: local#0: 0
 return values: 0

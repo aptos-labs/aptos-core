@@ -23,12 +23,12 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::state_key::StateKey,
     transaction::{
-        block_epilogue::BlockEndInfo, ChangeSet, EntryFunction, ExecutionStatus,
-        IndexedTransactionSummary, Module, Multisig, MultisigTransactionPayload, RawTransaction,
-        ReplayProtector, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionArgument, TransactionAuxiliaryData, TransactionExecutable,
-        TransactionExtraConfig, TransactionInfo, TransactionListWithProof, TransactionPayload,
-        TransactionPayloadInner, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        ChangeSet, EntryFunction, ExecutionStatus, IndexedTransactionSummary, Module, Multisig,
+        MultisigTransactionPayload, RawTransaction, ReplayProtector, Script,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        TransactionAuxiliaryData, TransactionExecutable, TransactionExtraConfig, TransactionInfo,
+        TransactionListWithProof, TransactionPayload, TransactionPayloadInner, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -1380,31 +1380,6 @@ impl Arbitrary for ValidatorTransaction {
                     transcript_bytes: payload,
                 })
             })
-            .boxed()
-    }
-}
-
-impl Arbitrary for BlockEndInfo {
-    type Parameters = SizeRange;
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        (any::<bool>(), any::<bool>(), any::<u64>(), any::<u64>())
-            .prop_map(
-                |(
-                    block_gas_limit_reached,
-                    block_output_limit_reached,
-                    block_effective_block_gas,
-                    block_approx_output_size,
-                )| {
-                    BlockEndInfo::V0 {
-                        block_gas_limit_reached,
-                        block_output_limit_reached,
-                        block_effective_block_gas_units: block_effective_block_gas,
-                        block_approx_output_size,
-                    }
-                },
-            )
             .boxed()
     }
 }

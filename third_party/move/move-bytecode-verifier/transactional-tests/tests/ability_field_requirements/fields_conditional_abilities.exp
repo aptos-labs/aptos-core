@@ -1,6 +1,6 @@
 processed 8 tasks
-
-task 1 'publish'. lines 11-19:
+task 0 lines 1-9:  publish [module 0x1.m1_good {]
+task 1 lines 11-19:  publish [module 0x1.m1_bad {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::m1_bad'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -8,8 +8,9 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 1)],
     offsets: [],
 }
-
-task 4 'publish'. lines 41-53:
+task 2 lines 21-27:  publish [module 0x1.m2 {]
+task 3 lines 29-39:  publish [module 0x1.m3 {]
+task 4 lines 41-53:  publish [module 0x1.m4 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::m4'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -17,8 +18,8 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 2)],
     offsets: [],
 }
-
-task 6 'publish'. lines 67-77:
+task 5 lines 55-65:  publish [module 0x1.m5_good {]
+task 6 lines 67-77:  publish [module 0x1.m5_bad {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::m5_bad'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,
@@ -26,8 +27,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 1)],
     offsets: [],
 }
-
-task 7 'publish'. lines 79-92:
+task 7 lines 79-92:  publish [module 0x1.m6 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::m6'. Got VMError: {
     major_status: FIELD_MISSING_TYPE_ABILITY,
     sub_status: None,

@@ -1,28 +1,20 @@
 processed 3 tasks
-
-task 0 'print-bytecode'. lines 1-6:
-// Move bytecode v7
-script {
-
-
-main() /* def_idx: 0 */ {
-B0:
-	0: Branch(0)
-}
-}
-
-task 1 'print-bytecode'. lines 8-15:
-// Move bytecode v7
-script {
+task 0 lines 1-6:  print-bytecode [// An endless loop is valid Move IR.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+l0: branch l0
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: Branch(1)
-B1:
-	1: Branch(0)
-}
-}
+task 1 lines 8-15:  print-bytecode [// Jumping to a label that is declared after the jump statement itself is valid.]
+// Bytecode version v7
+script
+// Function definition at index 0
+entry public fun main()
+l1: branch l0
+l0: branch l1
 
-task 2 'print-bytecode'. lines 17-28:
+
+task 2 lines 17-28:  print-bytecode --input=module [// Jumping to a label that isn't declared in the same function is invalid.]
 Error: Invalid block labels, labels were used without being declared (bar)

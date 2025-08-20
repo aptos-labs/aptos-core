@@ -1,7 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 17-17:
+task 0 lines 1-15:  publish [module 0x42::test {]
+task 1 lines 17-17:  run 0x42::test::nested --args 3
 return values: 4
-
-task 2 'run'. lines 19-19:
+task 2 lines 19-19:  run 0x42::test::nested_capture --args 4
 return values: 5

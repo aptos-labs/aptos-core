@@ -1,1 +1,9 @@
 processed 8 tasks
+task 0 lines 1-144:  publish [module 0xc0ffee::m {]
+task 1 lines 146-146:  run 0xc0ffee::m::main
+task 2 lines 148-162:  publish [module 0xCAFE::m1 {]
+task 3 lines 164-164:  run 0xCAFE::m1::main
+task 4 lines 166-183:  publish [module 0xCAFE::m2 {]
+task 5 lines 185-185:  run 0xCAFE::m2::main
+task 6 lines 187-201:  publish [module 0xc0ffee::m3 {]
+task 7 lines 203-203:  run 0xc0ffee::m3::main

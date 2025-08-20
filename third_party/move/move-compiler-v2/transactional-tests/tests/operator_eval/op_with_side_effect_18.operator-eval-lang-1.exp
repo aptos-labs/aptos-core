@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-7:
+task 0 lines 1-7:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: A sequence within an operand of binary operation `+` can obscure program logic and is not allowed by this compiler.
   ┌─ TEMPFILE:5:42
@@ -48,8 +47,7 @@ error: A sequence within an operand of binary operation `+` can obscure program 
   = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
 
 
-
-task 1 'run'. lines 9-9:
+task 1 lines 9-9:  run 0xc0ffee::m::test
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

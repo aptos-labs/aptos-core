@@ -1,12 +1,10 @@
 processed 5 tasks
-
-task 1 'run'. lines 37-37:
+task 0 lines 1-35:  publish [module 0x42::m {]
+task 1 lines 37-37:  run 0x42::m::test_get_x_v1
 return values: 43
-
-task 2 'run'. lines 39-39:
+task 2 lines 39-39:  run 0x42::m::test_get_x_v2
 return values: 43
-
-task 3 'run'. lines 41-41:
+task 3 lines 41-41:  run 0x42::m::test_get_y_v1
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(33),
@@ -14,6 +12,5 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 13)],
 }
-
-task 4 'run'. lines 43-43:
+task 4 lines 43-43:  run 0x42::m::test_get_y_v2
 return values: true

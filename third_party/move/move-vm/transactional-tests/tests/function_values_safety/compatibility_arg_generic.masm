@@ -1,0 +1,23 @@
+//# publish
+module 0x66::incompatible_generic_function
+public fun foo<A>(): |A|A
+
+//# publish --verbose
+module 0x66::incompatible_generic_function
+public fun foo<A>(): |A|u32
+
+//# publish --verbose
+module 0x66::incompatible_generic_function
+public fun foo<A, B>(): |A|B
+
+//# publish
+module 0x66::incompatible_generic_structure
+struct S<A>
+    x: A
+public fun foo<A>(): |S<A>|A
+
+//# publish --verbose
+module 0x66::incompatible_generic_structure
+struct S<A>
+    x: A
+public fun foo<A, B>(): |S<B>|A

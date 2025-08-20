@@ -1,7 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 21-21:
+task 0 lines 1-19:  publish [module 0x42::test {]
+task 1 lines 21-21:  run 0x42::test::test_u64 --args 3
 return values: false
-
-task 2 'run'. lines 23-23:
+task 2 lines 23-23:  run 0x42::test::test_S --args 2
 return values: true

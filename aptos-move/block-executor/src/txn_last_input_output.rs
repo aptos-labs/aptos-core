@@ -262,18 +262,51 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
-            .load_full()
+            .load()
+            .as_ref()
             .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
                         .map(|(k, _, _)| (k, false))
                         .chain(t.aggregator_v1_write_set().into_keys().map(|k| (k, true)))
-                        .chain(
-                            t.aggregator_v1_delta_set()
-                                .into_iter()
-                                .map(|(k, _)| (k, true)),
-                        ),
+                        .chain(t.aggregator_v1_delta_set().into_keys().map(|k| (k, true))),
+                ),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_resource_keys_no_aggregator_v1(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.resource_write_set().into_iter().map(|(k, _, _)| k))
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_aggregator_v1_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.aggregator_v1_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_delta_set().into_keys()),
                 ),
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
@@ -330,11 +363,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         forward_on_success_or_skip_rest!(self, txn_idx, group_reads_needing_delayed_field_exchange)
     }
 
-    pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
-        forward_on_success_or_skip_rest!(self, txn_idx, aggregator_v1_delta_set)
-            .into_iter()
-            .map(|(k, _)| k)
-            .collect()
+    pub(crate) fn aggregator_v1_delta_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.aggregator_v1_delta_set().into_keys())
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
     }
 
     pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {

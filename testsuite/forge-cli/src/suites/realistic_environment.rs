@@ -142,6 +142,7 @@ pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 SuccessCriteria::new(min_tps)
                     .add_max_expired_tps(max_expired as f64)
                     .add_max_failed_submission_tps(200.0)
+                    .add_no_restarts()
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (
                             LatencyBreakdownSlice::MempoolToBlockCreation,

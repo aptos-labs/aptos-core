@@ -1,5 +1,5 @@
 processed 17 tasks
-task 0 lines 1-23:  publish
+task 0 lines 1-23:  publish [module 0x42::Test {]
 task 1 lines 25-25:  run 0x42::Test::t1 --type-args u64 --args 0
 return values: 0
 task 2 lines 27-27:  run 0x42::Test::t1 --type-args u8 --args 0u8

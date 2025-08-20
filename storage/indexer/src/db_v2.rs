@@ -9,7 +9,7 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_logger::info;
+use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
@@ -160,12 +160,18 @@ impl IndexerAsyncV2 {
             if let Ok(Some(table_info)) = self.get_table_info(handle) {
                 return Ok(Some(table_info));
             }
+
+            // Log the first failure, and then sample subsequent failures to avoid log spam
+            if retried == 0 {
+                log_table_info_failure(handle, retried);
+            } else {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(1)),
+                    log_table_info_failure(handle, retried)
+                );
+            }
+
             retried += 1;
-            info!(
-                retry_count = retried,
-                table_handle = handle.0.to_canonical_string(),
-                "[DB] Failed to get table info",
-            );
             std::thread::sleep(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS));
         }
     }
@@ -192,6 +198,15 @@ impl IndexerAsyncV2 {
         fs::remove_dir_all(path).unwrap_or(());
         self.db.create_checkpoint(path)
     }
+}
+
+/// Logs a failure to retrieve table information
+fn log_table_info_failure(handle: TableHandle, retried: u64) {
+    info!(
+        retry_count = retried,
+        table_handle = handle.0.to_canonical_string(),
+        "[DB] Failed to get table info",
+    )
 }
 
 struct TableInfoParser<'a, R> {

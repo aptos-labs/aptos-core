@@ -540,7 +540,7 @@ impl Context {
                 if converter.is_resource_group(&tag) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
-                        .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())
+                        .map(|map| map.into_iter().collect::<Vec<_>>())
                         .map_err(|e| e.into())
                 } else {
                     Ok(vec![(tag, value)])

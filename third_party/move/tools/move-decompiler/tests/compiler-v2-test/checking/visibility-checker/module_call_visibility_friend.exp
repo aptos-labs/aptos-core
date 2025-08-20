@@ -1,0 +1,81 @@
+module 0x2::Y {
+    friend fun f_friend() {
+        ()
+    }
+}
+
+module 0x2::X {
+    public fun f_public() {
+        ()
+    }
+}
+
+module 0x2::M {
+    use 0x2::Y;
+    use 0x2::X;
+    friend fun f_friend() {
+        ()
+    }
+    public fun f_public() {
+        ()
+    }
+    friend fun f_friend_call_friend() {
+        Y::f_friend();
+    }
+    friend fun f_friend_call_public() {
+        X::f_public();
+    }
+    friend fun f_friend_call_self_friend() {
+        f_friend();
+    }
+    friend fun f_friend_call_self_private() {
+        f_private();
+    }
+    fun f_private() {
+        ()
+    }
+    friend fun f_friend_call_self_public() {
+        f_public();
+    }
+    fun f_private_call_friend() {
+        Y::f_friend();
+    }
+    fun f_private_call_self_friend() {
+        f_friend();
+    }
+    public fun f_public_call_friend() {
+        Y::f_friend();
+    }
+    public fun f_public_call_self_friend() {
+        f_friend();
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with env checking errors
+error: function `0x2::Y::f_friend` cannot be called from function `0x2::M::f_friend_call_friend` because module `0x2::M` is not a `friend` of `0x2::Y`
+   ┌─ module_call_visibility_friend.move:2:16
+   │
+ 2 │     friend fun f_friend() {
+   │                ^^^^^^^^ callee
+   ·
+23 │         Y::f_friend();
+   │         ------------- called here
+
+error: function `0x2::Y::f_friend` cannot be called from function `0x2::M::f_private_call_friend` because module `0x2::M` is not a `friend` of `0x2::Y`
+   ┌─ module_call_visibility_friend.move:2:16
+   │
+ 2 │     friend fun f_friend() {
+   │                ^^^^^^^^ callee
+   ·
+41 │         Y::f_friend();
+   │         ------------- called here
+
+error: function `0x2::Y::f_friend` cannot be called from function `0x2::M::f_public_call_friend` because module `0x2::M` is not a `friend` of `0x2::Y`
+   ┌─ module_call_visibility_friend.move:2:16
+   │
+ 2 │     friend fun f_friend() {
+   │                ^^^^^^^^ callee
+   ·
+47 │         Y::f_friend();
+   │         ------------- called here
