@@ -140,7 +140,7 @@ jobs:
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/test-improve-auto-image-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -151,7 +151,7 @@ jobs:
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/test-improve-auto-image-build
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -167,7 +167,7 @@ jobs:
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/test-improve-auto-image-build
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -185,7 +185,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/test-improve-auto-image-build
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
