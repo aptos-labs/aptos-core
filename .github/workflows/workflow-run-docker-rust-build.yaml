@@ -150,8 +150,8 @@ jobs:
             else
               echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
               echo "$output" | tee -a $GITHUB_STEP_SUMMARY
-              echo "Rerun again when the image is finished building" | tee -a $GITHUB_STEP_SUMMARY
-              exit 1
+              echo "Attempting to wait for build to finish ..." | tee -a $GITHUB_STEP_SUMMARY
+              echo "wait_images=true" >> $GITHUB_OUTPUT
             fi
           else
             echo "Lock file does not exist"
@@ -159,6 +159,17 @@ jobs:
             gcloud storage cp ${{ env.GIT_SHA }}.txt gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
             echo "Docker Build locked"
           fi
+      
+      - name: Wait for docker images to build
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        if: ${{ steps.lock.outputs.wait_images == 'true' }}
+        with:
+          GIT_SHA: ${{ env.GIT_SHA }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ env.GCP_DOCKER_ARTIFACT_REPO }}
+          WAIT_FOR_IMAGE_SECONDS: 1200 # 20 minutes
+          PROFILE_RELEASE : ${{ env.PROFILE_RELEASE }}
+          PROFILE_PERF: ${{ env.PROFILE_PERF }}
+          FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
 
       - name: Build and Push Rust images
         if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
