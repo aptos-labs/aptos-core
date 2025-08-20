@@ -138,7 +138,7 @@ jobs:
       
       - name: Lock Check and Creation
         id: lock
-        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' }} # && inputs.DRY_RUN == false }}
         run: |
           set +e
           output=$(gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt)
@@ -172,7 +172,7 @@ jobs:
           FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
 
       - name: Build and Push Rust images
-        if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' }} #&& inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
