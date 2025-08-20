@@ -5,7 +5,7 @@
 //! Contains types and related functions.
 
 use crate::{
-    ast::{ModuleName, QualifiedSymbol},
+    ast::{Address, ModuleName, QualifiedSymbol},
     builder::{ith_str, pluralize},
     model::{
         FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
@@ -29,9 +29,8 @@ use num_traits::identities::Zero;
 use std::{
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    fmt,
-    fmt::{Debug, Formatter},
-    iter,
+    fmt::{self, Debug, Formatter},
+    iter, str,
 };
 
 /// Represents a type.
@@ -3618,6 +3617,66 @@ impl<'a> TypeDisplayContext<'a> {
             ..self.clone()
         }
     }
+
+    /// Check if the given module has the same address as the current module
+    pub fn is_current_addr(&self, module_address: &Address) -> bool {
+        self.module_name
+            .as_ref()
+            .map_or(false, |ctx_module| ctx_module.addr() == module_address)
+    }
+
+    /// Check if the given module has the same string identifier as the current module
+    pub fn is_current_name(&self, module_name: &str) -> bool {
+        self.module_name.as_ref().map_or(false, |ctx_module| {
+            ctx_module
+                .name()
+                .display(self.env.symbol_pool())
+                .to_string()
+                == *module_name
+        })
+    }
+
+    /// Check if the given module is the current module
+    pub fn is_current_module(&self, module_name: &ModuleName) -> bool {
+        self.module_name.as_ref() == Some(module_name)
+    }
+
+    /// Check if the given module is used by the current module
+    pub fn is_imported_module(&self, module_id: &ModuleId) -> bool {
+        self.used_modules.contains(module_id) || {
+            // `used_modules` may not have been propagated yet, so let's check `use_decls` as a backup.
+            let imported_module_env = self.env.get_module(*module_id);
+            self.module_name.as_ref().map_or(false, |ctx_module| {
+                self.env.find_module(ctx_module).map_or(false, |m| {
+                    m.get_use_decls()
+                        .iter()
+                        .any(|use_| use_.module_name == *imported_module_env.get_name())
+                })
+            })
+        }
+    }
+
+    /// Check if the given name clashes with a type parameter
+    pub fn clash_with_ty_params(&self, name: Symbol) -> bool {
+        self.type_param_names
+            .as_ref()
+            .map(|tparams| tparams.contains(&name))
+            .unwrap_or(false)
+    }
+
+    /// Get an optional alias for the given module
+    pub fn get_alias(&self, module_name: &ModuleName) -> Option<Symbol> {
+        self.module_name
+            .as_ref()
+            .and_then(|ctx_module| self.env.find_module(ctx_module))
+            .and_then(|module| {
+                module
+                    .get_use_decls()
+                    .iter()
+                    .find(|use_| use_.module_name == *module_name)
+                    .and_then(|use_| use_.alias)
+            })
+    }
 }
 
 /// Helper for type displays.
@@ -3767,43 +3826,69 @@ impl TypeDisplay<'_> {
     #[allow(clippy::assigning_clones)]
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
-        let mut str = if let Some(builder_table) = self.context.builder_struct_table {
-            let qsym = builder_table.get(&(mid, sid)).expect("type known");
-            qsym.display(self.context.env).to_string()
-        } else {
-            let struct_env = env.get_module(mid).into_struct(sid);
-            let module_name = struct_env.module_env.get_name();
-            let module_str = if !self.context.display_module_addr
-                && (self.context.use_module_qualification
-                    || self.context.used_modules.contains(&mid)
-                    || Some(module_name) == self.context.module_name.as_ref())
-            {
-                module_name.display(env).to_string()
+        // Get the struct ModuleName and struct name
+        let (ty_available, struct_module_name, struct_symbol) =
+            if let Some(builder_table) = self.context.builder_struct_table {
+                let qsym = builder_table.get(&(mid, sid)).expect("type known");
+                (false, qsym.module_name.clone(), qsym.symbol)
             } else {
-                module_name.display_full(env).to_string()
+                let module_env = env.get_module(mid);
+                (
+                    true,
+                    module_env.get_name().clone(),
+                    module_env.into_struct(sid).get_name(),
+                )
             };
-            format!(
-                "{}::{}",
-                module_str,
-                struct_env.get_name().display(env.symbol_pool())
-            )
-        };
-        if !self.context.display_module_addr && !self.context.use_module_qualification {
-            if let Some(mname) = &self.context.module_name {
-                let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
-                if let Some(shortcut) = str.strip_prefix(&s) {
-                    if let Some(tparams) = &self.context.type_param_names {
-                        // Avoid name clash with type parameter
-                        if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
-                            str = shortcut.to_owned()
-                        }
-                    } else {
-                        str = shortcut.to_owned();
-                    }
-                }
+
+        let struct_module_addr = struct_module_name.addr().expect_numerical();
+        let struct_module_idstr = struct_module_name
+            .name()
+            .display(env.symbol_pool())
+            .to_string();
+        let struct_name = struct_symbol.display(env.symbol_pool()).to_string();
+
+        // If we are not able to get the type info, OR
+        // the type is not inside or the host module is not imported into the current module,
+        // let's do pattern matching!
+        if !ty_available
+            || (!self.context.is_current_module(&struct_module_name)
+                && !self.context.is_imported_module(&mid))
+        {
+            let mut result = String::new();
+            let show_addr = !self.context.is_current_addr(struct_module_name.addr());
+            let show_mod = show_addr
+                || !self.context.is_current_name(&struct_module_idstr)
+                || self.context.clash_with_ty_params(struct_symbol)
+                || self.context.use_module_qualification;
+
+            if show_addr {
+                result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
             }
+            if show_mod {
+                result.push_str(&format!("{}::", struct_module_idstr));
+            }
+            result.push_str(&struct_name);
+            return result;
         }
-        str
+
+        // If there's a module alias, use it
+        if let Some(alias) = self.context.get_alias(&struct_module_name) {
+            return format!("{}::{}", alias.display(env.symbol_pool()), struct_name);
+        }
+
+        // No alias, but the struct is inside or imported into the current module
+        let mut result = String::new();
+        if self.context.display_module_addr {
+            result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
+        }
+        if self.context.use_module_qualification
+            || !self.context.is_current_module(&struct_module_name)
+            || self.context.clash_with_ty_params(struct_symbol)
+        {
+            result.push_str(&format!("{}::", struct_module_idstr));
+        }
+        result.push_str(&struct_name);
+        result
     }
 }
 

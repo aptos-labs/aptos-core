@@ -45,9 +45,9 @@ module 0x815::m {
         match()
     }
     fun match(): bool {
-        let c = CommonFields::Foo{x: 0,y: 0u8};
+        let c = CommonFields::Foo{x: 0, y: 0u8};
         match (c) {
-            CommonFields::Foo{x: x,y: _} => x > 0,
+            CommonFields::Foo{x: x, y: _} => x > 0,
             _ => false,
         }
     }

@@ -1,0 +1,100 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/reentrancy_nested.move`
+
+//# publish
+module 0x42::worker1 {
+    struct R has key {
+        _0: u64,
+    }
+    public fun init(p0: &signer) {
+        let _t3 = R{_0: 0};
+        move_to<R>(p0, _t3);
+    }
+    public fun set(p0: u64)
+        acquires R
+    {
+        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_t1 = p0;
+    }
+    public fun work(p0: ||)
+        acquires R
+    {
+        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_t1 = *_t1 + 1;
+        p0();
+    }
+}
+
+
+//# publish
+module 0x42::worker2 {
+    use 0x42::worker1;
+    struct R has key {
+        _0: u64,
+    }
+    public fun init(p0: &signer) {
+        let _t3 = R{_0: 0};
+        move_to<R>(p0, _t3);
+    }
+    public fun set(p0: u64)
+        acquires R
+    {
+        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_t1 = p0;
+    }
+    public fun work(p0: ||)
+        acquires R
+    {
+        let _t1 = &mut borrow_global_mut<R>(@0x42)._0;
+        *_t1 = *_t1 + 1;
+        worker1::work(p0);
+    }
+}
+
+
+//# publish
+module 0x42::tests {
+    use 0x42::worker1;
+    use 0x42::worker2;
+    struct R has key {
+        _0: u64,
+    }
+    fun init(p0: &signer) {
+        worker1::init(p0);
+        worker2::init(p0);
+        let _t5 = R{_0: 0};
+        move_to<R>(p0, _t5);
+    }
+    fun direct_failure(): bool {
+        worker2::work(|| lambda__1__direct_failure());
+        false
+    }
+    fun lambda__1__direct_failure()
+        acquires R
+    {
+        let _t0 = &mut borrow_global_mut<R>(@0x2a)._0;
+        *_t0 = *_t0 + 1;
+    }
+    fun worker1_failure(): bool {
+        worker2::work(|| worker1::set(10));
+        false
+    }
+    fun worker2_failure(): bool {
+        worker2::work(|| worker2::set(10));
+        false
+    }
+    fun worker2_ok(): bool {
+        worker1::work(|| worker2::set(10));
+        true
+    }
+}
+
+
+//# run 0x42::tests::init --signers 0x42
+
+//# run 0x42::tests::direct_failure
+
+//# run 0x42::tests::worker1_failure
+
+//# run 0x42::tests::worker2_failure
+
+//# run 0x42::tests::worker2_ok

@@ -1,0 +1,48 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/bug_16408.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun make_func_1(): |u64|(|u64|(u64)) has copy + drop {
+        |arg0| lambda__2__make_func_1(arg0)
+    }
+    fun lambda__2__make_func_1(p0: u64): |u64|(u64) {
+        |arg0| lambda__1__make_func_1(p0, arg0)
+    }
+    fun make_func_2(): |u64, u64|(||(u64)) has copy + drop {
+        |arg0,arg1| lambda__2__make_func_2(arg0, arg1)
+    }
+    fun lambda__2__make_func_2(p0: u64, p1: u64): ||(u64) {
+        || lambda__1__make_func_2(p0, p1)
+    }
+    fun make_func_3(): |u64, u64|(||(u64, u64)) has copy + drop {
+        |arg0,arg1| lambda__2__make_func_3(arg0, arg1)
+    }
+    fun lambda__2__make_func_3(p0: u64, p1: u64): ||(u64, u64) {
+        || lambda__1__make_func_3(p0, p1)
+    }
+    fun test() {
+        let _t3 = make_func_1();
+        let _t4 = _t3(10);
+        if (!(_t4(20) == 30)) abort 14566554180833181696;
+        let _t10 = make_func_2();
+        let _t11 = _t10(10, 20);
+        if (!(_t11() == 200)) abort 14566554180833181696;
+        let _t17 = make_func_3();
+        let _t18 = _t17(10, 20);
+        let (_t19,_t20) = _t18();
+        if (!(_t19 == 10)) abort 14566554180833181696;
+        if (!(_t20 == 20)) abort 14566554180833181696;
+    }
+    fun lambda__1__make_func_1(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    fun lambda__1__make_func_2(p0: u64, p1: u64): u64 {
+        p0 * p1
+    }
+    fun lambda__1__make_func_3(p0: u64, p1: u64): (u64, u64) {
+        (p0, p1)
+    }
+}
+
+
+//# run 0xc0ffee::m::test

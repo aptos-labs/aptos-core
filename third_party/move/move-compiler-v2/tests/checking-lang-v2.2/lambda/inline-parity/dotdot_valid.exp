@@ -347,44 +347,44 @@ module 0x42::test {
         3: u64,
     }
     fun lambda_param(f: |S2|bool): bool {
-        let x = S2(true,S0{});
+        let x = S2(true, S0{});
         f(x)
     }
     fun nested1(x: S4<bool>) {
-        let S4<bool>{x: _x,y: _} = x;
-        let S4<bool>{x: _,y: _y} = x;
-        let S4<bool>{x: _,y: S3{x: _,y: _}} = x;
-        let S4<bool>{x: _,y: S3{x: _x,y: _}} = x;
-        let S4<bool>{x: _x2,y: S3{x: _x1,y: _}} = x;
-        let S4<bool>{x: _,y: S3{x: _,y: _y}} = x;
-        let S4<bool>{x: _x2,y: S3{x: _x1,y: _}} = x;
+        let S4<bool>{x: _x, y: _} = x;
+        let S4<bool>{x: _, y: _y} = x;
+        let S4<bool>{x: _, y: S3{x: _, y: _}} = x;
+        let S4<bool>{x: _, y: S3{x: _x, y: _}} = x;
+        let S4<bool>{x: _x2, y: S3{x: _x1, y: _}} = x;
+        let S4<bool>{x: _, y: S3{x: _, y: _y}} = x;
+        let S4<bool>{x: _x2, y: S3{x: _x1, y: _}} = x;
     }
     fun nested1_ref(x: &S4<bool>) {
-        let S4<bool>{x: _x,y: _} = x;
-        let S4<bool>{x: _,y: _y} = x;
-        let S4<bool>{x: _,y: S3{x: _,y: _}} = x;
-        let S4<bool>{x: _,y: S3{x: _x,y: _}} = x;
-        let S4<bool>{x: _x2,y: S3{x: _x1,y: _}} = x;
-        let S4<bool>{x: _,y: S3{x: _,y: _y}} = x;
-        let S4<bool>{x: _x2,y: S3{x: _x1,y: _}} = x;
+        let S4<bool>{x: _x, y: _} = x;
+        let S4<bool>{x: _, y: _y} = x;
+        let S4<bool>{x: _, y: S3{x: _, y: _}} = x;
+        let S4<bool>{x: _, y: S3{x: _x, y: _}} = x;
+        let S4<bool>{x: _x2, y: S3{x: _x1, y: _}} = x;
+        let S4<bool>{x: _, y: S3{x: _, y: _y}} = x;
+        let S4<bool>{x: _x2, y: S3{x: _x1, y: _}} = x;
     }
     fun nested2(x: S5<bool, S1>) {
-        let S5<bool,S1>(_,S1(_)) = x;
+        let S5<bool,S1>(_, S1(_)) = x;
     }
     fun nested2_ref(x: &S5<bool, S1>) {
-        let S5<bool,S1>(_,S1(_)) = x;
+        let S5<bool,S1>(_, S1(_)) = x;
     }
     fun nested3(x: S5<bool, S4<bool>>) {
-        let S5<bool,S4<bool>>(_,S4<bool>{x: _,y: _}) = x;
+        let S5<bool,S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
     }
     fun nested3_ref(x: &S5<bool, S4<bool>>) {
-        let S5<bool,S4<bool>>(_,S4<bool>{x: _,y: _}) = x;
+        let S5<bool,S4<bool>>(_, S4<bool>{x: _, y: _}) = x;
     }
     fun nested4(x: S4<S1>) {
-        let S4<S1>{x: S1(_),y: _} = x;
+        let S4<S1>{x: S1(_), y: _} = x;
     }
     fun nested4_ref(x: &S4<S1>) {
-        let S4<S1>{x: S1(_),y: _} = x;
+        let S4<S1>{x: S1(_), y: _} = x;
     }
     fun simple_0(x: S0) {
         let S0{} = x;
@@ -399,64 +399,64 @@ module 0x42::test {
         let S1(_) = x;
     }
     fun simple_2(x: S2) {
-        let S2(_,_) = x;
-        let S2(_x,_) = x;
-        let S2(_,_x) = x;
-        let S2(_,_) = x;
-        let S2(_,_) = x;
-        let S2(_x,_y) = x;
-        let S2(_x,_y) = x;
-        let S2(_x,_y) = x;
+        let S2(_, _) = x;
+        let S2(_x, _) = x;
+        let S2(_, _x) = x;
+        let S2(_, _) = x;
+        let S2(_, _) = x;
+        let S2(_x, _y) = x;
+        let S2(_x, _y) = x;
+        let S2(_x, _y) = x;
     }
     fun simple_2_ref(x: &S2) {
-        let S2(_,_) = x;
-        let S2(_x,_) = x;
-        let S2(_,_x) = x;
-        let S2(_,_) = x;
-        let S2(_,_) = x;
-        let S2(_x,_y) = x;
-        let S2(_x,_y) = x;
-        let S2(_x,_y) = x;
+        let S2(_, _) = x;
+        let S2(_x, _) = x;
+        let S2(_, _x) = x;
+        let S2(_, _) = x;
+        let S2(_, _) = x;
+        let S2(_x, _y) = x;
+        let S2(_x, _y) = x;
+        let S2(_x, _y) = x;
     }
     fun simple_3(x: S3) {
-        let S3{x: _,y: _} = x;
-        let S3{x: _x,y: _} = x;
-        let S3{x: _,y: _y} = x;
+        let S3{x: _, y: _} = x;
+        let S3{x: _x, y: _} = x;
+        let S3{x: _, y: _y} = x;
     }
     fun simple_3_ref(x: S3) {
-        let S3{x: _,y: _} = x;
-        let S3{x: _x,y: _} = x;
-        let S3{x: _,y: _y} = x;
+        let S3{x: _, y: _} = x;
+        let S3{x: _x, y: _} = x;
+        let S3{x: _, y: _y} = x;
     }
     fun simple_4(x: E1): u8 {
         match (x) {
-            E1::A(x,_) => x,
+            E1::A(x, _) => x,
             E1::B(x) => x,
-            E1::C{x: x,y: _} => x,
+            E1::C{x: x, y: _} => x,
         }
     }
     fun simple_4_ref(x: &E1): &u8 {
         match (x) {
-            E1::A(x,_) => x,
+            E1::A(x, _) => x,
             E1::B(x) => x,
         }
     }
     fun simple_5(x: E1): u8 {
         match (x) {
-            E1::A(_,y) => if (y) 1u8 else 0u8,
+            E1::A(_, y) => if (y) 1u8 else 0u8,
             E1::B(x) => x,
-            E1::C{x: _,y: S1(x)} => x,
+            E1::C{x: _, y: S1(x)} => x,
         }
     }
     fun simple_6(x: &S7) {
-        let S7(_w,_,_,_z) = x;
-        let S7(_w,_x,_y,_z) = x;
+        let S7(_w, _, _, _z) = x;
+        let S7(_w, _x, _y, _z) = x;
     }
     fun test_lambda_param(): bool {
         lambda_param(|arg0| lambda__1__test_lambda_param(arg0))
     }
     fun lambda__1__test_lambda_param(param_0: S2): bool {
-        let S2(x,_) = param_0;
+        let S2(x, _) = param_0;
         x
     }
 }

@@ -1,0 +1,46 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/struct_assign_swap.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S {
+        f: u32,
+        g: u32,
+    }
+    fun swap1(p0: u32, p1: u32): (u32, u32) {
+        let S{f: _t5, g: _t6} = S{f: p1, g: p0};
+        (_t5, _t6)
+    }
+    fun swap2(): (u32, u32) {
+        let S{f: _t3, g: _t4} = S{f: 55u32, g: 44u32};
+        (55u32, 44u32)
+    }
+    fun swap3(p0: u32, p1: u32): (u32, u32) {
+        let S{f: _t5, g: _t6} = S{f: p0, g: p1};
+        (_t6, _t5)
+    }
+    fun swap4(p0: u32, p1: u32): (u32, u32) {
+        let S{f: _t5, g: _t6} = S{f: p0, g: p1};
+        (_t6, _t5)
+    }
+    fun test1(): (u32, u32) {
+        let (_t2,_t3) = swap1(1u32, 2u32);
+        (_t2, _t3)
+    }
+    fun test3(): (u32, u32) {
+        let (_t2,_t3) = swap3(1u32, 2u32);
+        (_t2, _t3)
+    }
+    fun test4(): (u32, u32) {
+        let (_t2,_t3) = swap4(1u32, 2u32);
+        (_t2, _t3)
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::swap2
+
+//# run 0xc0ffee::m::test3
+
+//# run 0xc0ffee::m::test4

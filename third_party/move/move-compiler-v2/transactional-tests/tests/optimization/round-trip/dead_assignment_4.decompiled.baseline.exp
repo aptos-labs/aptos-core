@@ -1,0 +1,16 @@
+processed 2 tasks
+task 0 lines 3-23:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:17:22
+   │
+17 │     public fun test3(p0: u64): u64 {
+   │                      ^^
+
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:20:22
+   │
+20 │     public fun test4(p0: u64): u64 {
+   │                      ^^
+
+
+task 1 lines 26-26:  run 0xc0ffee::m::main
