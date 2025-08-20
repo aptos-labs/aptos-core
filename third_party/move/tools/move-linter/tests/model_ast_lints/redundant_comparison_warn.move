@@ -211,4 +211,35 @@ module 0xc0ffee::m {
         if (x != 5 && x != 5) { bar() };
     }
 
+    // Skip lint
+    #[lint::skip(redundant_comparison)]
+    public fun test23_warn(x: u64) {
+        if (x < 5 || x <= 10) { bar() };
+    }
+
+    // Redundant cases that are not detected
+
+    // Missed redundant case due to nesting on the left (And): x < 6 is implied by x <= 5
+    public fun and_nested_left(x: u64) {
+        let y = 100;
+        if ((x <= 5 && x < y) && x < 6) { bar() };
+    }
+
+    // Missed redundant case due to nesting on the right (And): x < 6 is implied by x <= 5
+    public fun and_nested_right(x: u64) {
+        let y = 100;
+        if (x < 6 && (x <= 5 && x < y)) { bar() };
+    }
+
+    // Missed redundant case due to nesting on the left (Or): x >= 5 is redundant given x > 10
+    public fun or_nested_left(x: u64) {
+        let y = 100;
+        if ((x > 10 || x > y) || x >= 5) { bar() };
+    }
+
+    // Missed redundant case due to nesting on the right (Or): x >= 5 is redundant given x > 10
+    public fun or_nested_right(x: u64) {
+        let y = 100;
+        if (x >= 5 || (x > 10 || x > y)) { bar() };
+    }
 }

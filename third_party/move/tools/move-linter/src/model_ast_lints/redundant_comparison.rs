@@ -3,16 +3,6 @@
 //! This module detects redundant, contradictory, and tautological
 //! numerical comparisons over the same variable in boolean expressions
 //! combined with `&&` and `||`.
-//!
-//! Examples (drawn from the rules in `COMPARISON_RULES`):
-//! - Redundant with `&&`:
-//! - Contradictory with `&&` (always false):
-//! - Redundant with `||`:
-//! - Tautology with `||` (always true):
-//!
-//! Notes:
-//! - Comparisons must be on the same variable (or the same field) to trigger.
-//! - Constants can appear on either side (e.g., `400 >= x && 300 > x`).
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
