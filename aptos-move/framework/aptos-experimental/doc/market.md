@@ -20,7 +20,7 @@ the position size of the user and does not do any validation.
 maker order in the order book. The clearinghouse can use this to track pending orders in the order book and perform
 any other book keeping operations.
 
-- cleanup_order(account, order_id, is_bid, remaining_size) -> Called by the market when an order is cancelled or fully filled
+- cleanup_order(account, order_id, is_bid, remaining_size, order_metadata) -> Called by the market when an order is cancelled or fully filled
 The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
 that passes the validate_order_placement check,
 the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
@@ -1526,7 +1526,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         self.<a href="order_book.md#0x7_order_book">order_book</a>.<a href="market.md#0x7_market_cancel_order">cancel_order</a>(maker_address, order_id);
     };
     callbacks.cleanup_order(
-        maker_address, order_id, maker_order.is_bid(), maker_cancel_size
+        maker_address, order_id, maker_order.is_bid(), maker_cancel_size, metadata
     );
 }
 </code></pre>
@@ -1586,7 +1586,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         callbacks
     );
     callbacks.cleanup_order(
-        user_addr, order_id, is_bid, size_delta
+        user_addr, order_id, is_bid, size_delta, metadata
     );
     <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
         order_id,
@@ -1768,7 +1768,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_account(),
             maker_order.<a href="market.md#0x7_market_get_order_id">get_order_id</a>(),
             !is_bid, // is_bid is inverted for maker orders
-            0 // 0 because the order is fully filled
+            0, // 0 because the order is fully filled
+            maker_order.get_metadata_from_order()
         );
     };
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -1998,7 +1999,7 @@ of fill limit violation  in the previous transaction and the order is just a con
         };
         <b>if</b> (remaining_size == 0) {
             callbacks.cleanup_order(
-                user_addr, order_id, is_bid, 0 // 0 because the order is fully filled
+                user_addr, order_id, is_bid, 0, metadata // 0 because the order is fully filled
             );
             <b>break</b>;
         };
@@ -2197,7 +2198,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
         metadata
     ) = order.destroy_order();
     callbacks.cleanup_order(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_bid, remaining_size
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, is_bid, remaining_size, metadata
     );
     self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
         order_id,

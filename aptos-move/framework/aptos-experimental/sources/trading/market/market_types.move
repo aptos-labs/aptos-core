@@ -69,8 +69,8 @@ module aptos_experimental::market_types {
             validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
             /// place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
             place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
-            /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size
-            cleanup_order_f: |address, OrderIdType, bool, u64| has drop + copy,
+            /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
+            cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
             /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
             decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
@@ -97,8 +97,8 @@ module aptos_experimental::market_types {
         validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
         // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
         place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
-        // cleanup_order_f arguments: account, order_id, is_bid, remaining_size
-        cleanup_order_f: |address, OrderIdType, bool, u64| has drop + copy,
+        // cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
+        cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
         /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
         decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
         /// get a string representation of order metadata to be used in events
@@ -170,8 +170,9 @@ module aptos_experimental::market_types {
         account: address,
         order_id: OrderIdType,
         is_bid: bool,
-        remaining_size: u64) {
-        (self.cleanup_order_f)(account, order_id, is_bid, remaining_size)
+        remaining_size: u64,
+        order_metadata: M) {
+        (self.cleanup_order_f)(account, order_id, is_bid, remaining_size, order_metadata)
     }
 
     public(friend) fun decrease_order_size<M: store + copy + drop>(
