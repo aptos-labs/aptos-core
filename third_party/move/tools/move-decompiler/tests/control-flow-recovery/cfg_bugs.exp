@@ -6,8 +6,11 @@ module 0x99::return_test {
         'l0: loop {
             loop {
                 if (!(_t2 < _t3)) break 'l0;
-                if (0x1::vector::borrow<u64>(&v, _t2) == &e) break;
-                _t2 = _t2 + 1
+                let _t14 = 0x1::vector::borrow<u64>(&v, _t2);
+                let _t15 = &e;
+                if (_t14 == _t15) break;
+                _t2 = _t2 + 1;
+                continue
             };
             _t4 = true;
             break

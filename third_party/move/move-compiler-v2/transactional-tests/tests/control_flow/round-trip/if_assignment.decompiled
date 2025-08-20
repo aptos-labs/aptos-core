@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/if_assignment.move`
+
+//# publish
+module 0x42::ReassignCond {
+    public fun reassign_cond(p0: address, p1: bool): address {
+        if (p1) p0 = @0x2;
+        p0
+    }
+}
+
+
+//# run
+script {
+    use 0x42::ReassignCond;
+    fun main() {
+        if (!(ReassignCond::reassign_cond(@0x1, false) == @0x1)) abort 42;
+    }
+}

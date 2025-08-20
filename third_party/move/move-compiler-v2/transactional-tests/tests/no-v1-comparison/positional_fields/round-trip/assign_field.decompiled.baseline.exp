@@ -1,0 +1,90 @@
+processed 8 tasks
+task 0 lines 3-133:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:68:28
+   │
+68 │             let _t8 = &mut p0._0;
+   │                            ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:73:28
+   │
+73 │             let _t4 = &mut p0._0;
+   │                            ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+
+task 1 lines 136-136:  run --verbose -- 0x42::test::test_simple
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 2 lines 138-138:  run --verbose -- 0x42::test::test_simple_ref
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 140-140:  run --verbose -- 0x42::test::test_assign0
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 142-142:  run --verbose -- 0x42::test::test_assign1
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 5 lines 144-144:  run --verbose -- 0x42::test::test_assign_chained
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 6 lines 146-146:  run --verbose -- 0x42::test::test_assign_enum_1
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 7 lines 148-148:  run --verbose -- 0x42::test::test_assign_enum_2
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

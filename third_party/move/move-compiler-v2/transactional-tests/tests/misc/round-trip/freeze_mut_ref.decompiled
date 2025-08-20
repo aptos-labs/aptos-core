@@ -1,0 +1,76 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/freeze_mut_ref.move`
+
+//# publish
+module 0x42::freeze_mut_ref {
+    struct G has drop {
+        f: u64,
+    }
+    public fun borrow_mut<T0>(p0: &mut vector<T0>): &T0 {
+        freeze(0x1::vector::borrow_mut<T0>(p0, 0))
+    }
+    public fun borrow_mut2<T0>(p0: &mut T0): &T0 {
+        freeze(p0)
+    }
+    fun t1(p0: &mut G): &G {
+        freeze(p0)
+    }
+    fun t2(p0: &mut u64, p1: &mut u64): (&mut u64, &mut u64) {
+        (p0, p1)
+    }
+    public fun t5(p0: &mut G): (u64, u64, u64) {
+        let _t1 = 0 + 1 + 1;
+        let _t2 = &mut p0.f;
+        let _t3 = 2;
+        let _t4 = &mut _t3;
+        *_t2 = 0;
+        let _t5 = freeze(_t4);
+        *_t2 = 2;
+        let _t24 = *_t5;
+        let _t26 = *_t2;
+        (_t24, _t26, _t1)
+    }
+    fun test_1() {
+        let _t0 = 0;
+        if (!(*freeze(&mut _t0) == 0)) abort 0;
+        let _t1 = G{f: 3};
+        if (!(*&t1(&mut _t1).f == 3)) abort 1;
+    }
+    fun test_2() {
+        let _t0 = G{f: 50};
+        let (_t6,_t7,_t8) = t5(&mut _t0);
+        if (!(_t6 == 2)) abort 0;
+        if (!(_t7 == 2)) abort 1;
+        if (!(_t8 == 2)) abort 2;
+    }
+    fun test_3() {
+        let _t0 = vector[0];
+        if (!(*borrow_mut<u64>(&mut _t0) == 0)) abort 0;
+    }
+    fun test_5() {
+        let _t0 = 3;
+        if (!(*borrow_mut2<u64>(&mut _t0) == 3)) abort 0;
+    }
+    fun test_6() {
+        let _t0 = G{f: 2};
+        let _t1 = G{f: 3};
+        if (!(*&(&_t0).f == 2)) abort 0;
+    }
+    fun test_7() {
+        let _t0 = G{f: 2};
+        let _t1 = G{f: 3};
+        if (!(*&(&_t0).f == 2)) abort 0;
+    }
+}
+
+
+//# run 0x42::freeze_mut_ref::test_1
+
+//# run 0x42::freeze_mut_ref::test_2
+
+//# run 0x42::freeze_mut_ref::test_3
+
+//# run 0x42::freeze_mut_ref::test_5
+
+//# run 0x42::freeze_mut_ref::test_6
+
+//# run 0x42::freeze_mut_ref::test_7

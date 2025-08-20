@@ -1,0 +1,17 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/branch_3.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun foo(p0: bool, p1: u64): u64 {
+        let _t2;
+        if (p0) _t2 = p1 else _t2 = p1;
+        _t2
+    }
+    public fun test() {
+        if (!(foo(true, 5) == 5)) abort 0;
+        if (!(foo(false, 5) == 5)) abort 2;
+    }
+}
+
+
+//# run 0xc0ffee::m::test

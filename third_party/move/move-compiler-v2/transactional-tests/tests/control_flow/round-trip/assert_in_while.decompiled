@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/assert_in_while.move`
+
+//# publish
+module 0x42::Test {
+    struct Tester has drop {
+        f: u64,
+    }
+    public fun len(p0: &Tester): u64 {
+        *&p0.f
+    }
+    public fun modify(p0: &mut Tester): u64 {
+        let _t5 = *&p0.f - 1;
+        let _t7 = &mut p0.f;
+        *_t7 = _t5;
+        let _t11 = *&p0.f;
+        9 - _t11
+    }
+    public fun new(): Tester {
+        Tester{f: 10}
+    }
+}
+
+
+//# run
+script {
+    use 0x42::Test;
+    fun main() {
+        let _t0 = Test::new();
+        if (!(Test::len(&_t0) == 10)) abort 70002;
+        let _t1 = 0;
+        'l0: loop {
+            loop {
+                let _t10 = Test::len(&_t0);
+                if (!(_t1 < _t10)) break 'l0;
+                if (!(Test::modify(&mut _t0) == _t1)) break;
+                _t1 = _t1 + 1;
+                continue
+            };
+            abort 70003
+        };
+    }
+}

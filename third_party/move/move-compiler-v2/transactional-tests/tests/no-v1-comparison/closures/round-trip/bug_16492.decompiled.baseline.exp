@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-8:  publish [module 0x66::work {]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::work'. Got VMError: {
+    major_status: TOO_MANY_PARAMETERS,
+    sub_status: None,
+    location: 0x66::work,
+    indices: [],
+    offsets: [],
+}

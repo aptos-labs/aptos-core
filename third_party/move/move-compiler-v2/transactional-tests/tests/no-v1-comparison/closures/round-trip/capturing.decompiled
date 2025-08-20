@@ -1,0 +1,40 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/capturing.move`
+
+//# publish
+module 0x42::test {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun one_captured(p0: u64): u64 {
+        let _t1 = |arg0| lambda__1__one_captured(p0, arg0);
+        _t1(2)
+    }
+    fun lambda__1__one_captured(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    public fun struct_captured(p0: u64): u64 {
+        struct_captured_helper(S{f: p0})
+    }
+    fun struct_captured_helper(p0: S): u64 {
+        let _t1 = |arg0| lambda__1__struct_captured_helper(p0, arg0);
+        _t1(4)
+    }
+    fun lambda__1__struct_captured_helper(p0: S, p1: u64): u64 {
+        *&(&p0).f + p1
+    }
+    public fun two_captured(p0: u64, p1: u8): u64 {
+        let _t2 = |arg0| lambda__1__two_captured(p0, p1, arg0);
+        _t2(3)
+    }
+    fun lambda__1__two_captured(p0: u64, p1: u8, p2: u64): u64 {
+        let _t5 = p1 as u64;
+        p0 + _t5 + p2
+    }
+}
+
+
+//# run 0x42::test::one_captured --args 3
+
+//# run 0x42::test::two_captured --args 3 2u8
+
+//# run 0x42::test::struct_captured --args 3

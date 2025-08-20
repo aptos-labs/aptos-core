@@ -111,7 +111,7 @@ module 0x8675309::M {
     fun t2() {
         let x = 0;
         loop {
-            let S{f: _,b: x} = S{f: 0,b: false};
+            let S{f: _, b: x} = S{f: 0, b: false};
             x;
             break
         };

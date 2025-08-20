@@ -89,6 +89,7 @@ module 0x42::mod2 {
     }
 }
 module 0x42::mod3 {
+    use std::signer;
     struct MyStruct1 has copy, store, key {
         x: u64,
     }
@@ -103,8 +104,8 @@ module 0x42::mod3 {
     }
     public fun test_items(owner: signer, use_1: bool) {
         let struct1 = MyStruct1{x: 3};
-        let f1 : |address|bool has copy + drop + store = |arg0| 0x42::mod2::item_exists(arg0);
-        let f2 : |address|bool has copy + drop + store = |arg0| 0x42::mod2::item_exists(arg0);
+        let f1: |address|bool has copy + drop + store = |arg0| 0x42::mod2::item_exists<MyStruct1>(arg0);
+        let f2: |address|bool has copy + drop + store = |arg0| 0x42::mod2::item_exists<MyStruct2>(arg0);
         let addr = 0x1::signer::address_of(&owner);
         0x42::mod2::save_item<MyStruct1>(&owner, struct1);
         move_to<MyStruct1>(struct1, &owner);
@@ -114,7 +115,7 @@ module 0x42::mod3 {
             0x42::mod2::save_item<|address|bool has copy + drop + store>(&owner, f2);
         };
         if (0x42::mod2::item_exists<|address|bool has copy + store>(addr)) () else abort 14566554180833181696;
-        let found_f : |address|bool has copy + store = 0x42::mod2::get_item<|address|bool has copy + store>(addr);
+        let found_f = 0x42::mod2::get_item<|address|bool has copy + store>(addr);
         if (use_1 == found_f(addr)) () else abort 14566554180833181696;
     }
 }

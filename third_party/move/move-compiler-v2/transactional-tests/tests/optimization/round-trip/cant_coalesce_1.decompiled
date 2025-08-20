@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/cant_coalesce_1.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        if (!(test(5) == 2)) abort 0;
+    }
+    public fun test(p0: u64): u64 {
+        let _t3 = p0 + p0;
+        2
+    }
+}
+
+
+//# run 0xc0ffee::m::main

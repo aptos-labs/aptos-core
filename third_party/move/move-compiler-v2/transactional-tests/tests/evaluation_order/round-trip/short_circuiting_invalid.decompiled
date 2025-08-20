@@ -1,0 +1,52 @@
+//**** Cross-compiled for `move` syntax from `tests/evaluation_order/short_circuiting_invalid.move`
+
+//# publish
+module 0x42::X {
+    public fun error(): bool {
+        abort 42
+    }
+}
+
+
+//# run
+script {
+    use 0x42::X;
+    fun main() {
+        let _t0 = X::error();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::X;
+    fun main() {
+        let _t0 = X::error();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::X;
+    fun main() {
+        if (!X::error()) ();
+    }
+}
+
+
+//# run
+script {
+    use 0x42::X;
+    fun main() {
+        if (!X::error()) ();
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        abort 0
+    }
+}

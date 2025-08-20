@@ -13,7 +13,7 @@ module 0xc0ffee::m {
 module 0xc0ffee::n {
     public fun test() {
         {
-          let l: 0xc0ffee::m::Lazy = m::make_lazy();
+          let l: m::Lazy = m::make_lazy();
           (l)();
           Tuple()
         }

@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/dead_assignment_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun dead(p0: u64): u64 {
+        p0
+    }
+}
+
+
+//# run 0xc0ffee::m::dead --args 53
