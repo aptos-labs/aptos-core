@@ -558,7 +558,10 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
             // No promotions except for block epilogue.
             state_by_version
                 .append_version(txn.writes.iter().map(|(k, v)| (k, v.as_ref())), vec![]);
-            op_accu.add_transaction(txn.writes.iter().map(|(k, _v)| k), txn.reads.iter());
+            op_accu.add_transaction(
+                txn.writes.iter().map(|(k, _v)| k).cloned(),
+                txn.reads.iter().cloned(),
+            );
             all_txns.push(Txn {
                 reads: txn.reads,
                 write_set: txn
