@@ -8,7 +8,7 @@ import os
 import tempfile
 import json
 import itertools
-from typing import Callable, Optional, Tuple, Mapping, Sequence, Any, List
+from typing import Callable, Optional, Tuple, Mapping, Sequence, Any, List, Dict
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass, field
@@ -35,6 +35,8 @@ class Flow(Flag):
     EXECUTORS = auto()
     # Test Order Book
     ORDER_BOOK = auto()
+    # Test Scheduled Transactions
+    SCHEDULED_TXNS = auto()
     # For when testing locally, quick inclusion of specific cases
     ADHOC = auto()
 
@@ -43,6 +45,8 @@ class Flow(Flag):
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
 SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
+
+CARGO_ARGS = os.environ.get("CARGO_ARGS", "")
 
 print(f"Executing flow: {SELECTED_FLOW}")
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
@@ -100,6 +104,8 @@ else:
     BUILD_FLAG = "--release"
     BUILD_FOLDER = "target/release"
 
+BUILD_ARGS = f"{BUILD_FLAG} {CARGO_ARGS}"
+
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
 else:
@@ -139,7 +145,10 @@ class RunGroupKeyExtra:
     skip_commit_override: bool = field(default=False)
     single_block_dst_working_set: bool = field(default=False)
     execution_sharding: bool = field(default=False)
+    run_scheduled_txns: bool = field(default=False)
+    ready_sched_txns_limit: Optional[int] = field(default=None)
     block_size_override: Optional[float] = field(default=None)
+    transaction_params: Optional[Dict[str, str]] = field(default=None)
 
 
 @dataclass
@@ -270,6 +279,30 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+
+    RunGroupConfig(
+        key=RunGroupKey("scheduled-txns-insert-perf"),
+        included_in=Flow.SCHEDULED_TXNS,
+        expected_tps=1000,  # estimated TPS value
+        key_extra=RunGroupKeyExtra(block_size_override=1000, transaction_params={"function_choice": "no_op"}),
+        waived=True        # waived since it's not calibrated
+    ),
+
+    RunGroupConfig(
+        key=RunGroupKey("scheduled-txns-insert-perf"),
+        included_in=Flow.SCHEDULED_TXNS,
+        expected_tps=1005,  # estimated TPS value
+        key_extra=RunGroupKeyExtra(run_scheduled_txns=True, block_size_override=1000, transaction_params={"function_choice": "no_op"}),  # Enable scheduled txns
+        waived=True        # waived since it's not calibrated
+    ),
+
+    RunGroupConfig(
+        key=RunGroupKey("scheduled-txns-insert-perf"),
+        included_in=Flow.SCHEDULED_TXNS,
+        expected_tps=805,  # estimated TPS value (lower due to compute intensity)
+        key_extra=RunGroupKeyExtra(run_scheduled_txns=True, block_size_override=1000, transaction_params={"function_choice": "compute_intense"}),  # Enable scheduled txns
+        waived=True        # waived since it's not calibrated
+    ),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -637,7 +670,7 @@ warnings = []
 with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
     if not SKIP_MOVE_E2E:
-        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        execute_command(f"cargo build {BUILD_ARGS} --package aptos-move-e2e-benchmark")
         move_e2e_flags = (
             "--only-landblocking" if SELECTED_FLOW == Flow.LAND_BLOCKING else ""
         )
@@ -672,7 +705,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     }
     print(calibrated_expected_tps)
 
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    execute_command(f"cargo build {BUILD_ARGS} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
@@ -796,6 +829,16 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             pipeline_extra_args.append(
                 f"--num-executor-shards {number_of_execution_threads}"
             )
+
+        if test.key_extra.run_scheduled_txns:
+            pipeline_extra_args.append("--run-scheduled-txns")
+        if test.key_extra.ready_sched_txns_limit:
+            pipeline_extra_args.append(
+                f"--ready-sched-txns-limit {test.key_extra.ready_sched_txns_limit}"
+            )
+        if test.key_extra.transaction_params:
+            for param_name, param_value in test.key_extra.transaction_params.items():
+                pipeline_extra_args.append(f"--transaction-param {param_name}={param_value}")
 
         if NUM_BLOCKS < 200:
             pipeline_extra_args.append("--generate-then-execute")

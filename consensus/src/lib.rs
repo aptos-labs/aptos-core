@@ -39,7 +39,7 @@ pub mod quorum_store;
 mod rand;
 mod recovery_manager;
 mod round_manager;
-mod scheduled_txns_handler;
+pub mod scheduled_txns_handler;
 mod state_computer;
 mod state_replication;
 #[cfg(any(test, feature = "fuzzing"))]

@@ -59,7 +59,9 @@ use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt as _};
 use once_cell::sync::Lazy;
 use std::{
-    self, env,
+    self,
+    collections::HashMap,
+    env,
     num::NonZeroUsize,
     ops::DerefMut as _,
     path::{Path, PathBuf},
@@ -593,6 +595,7 @@ pub fn mixed_emit_job() -> EmitJobRequest {
                     1,
                     true,
                     WorkflowProgress::when_done_default(),
+                    &HashMap::new(),
                 ),
                 100,
             ),
@@ -667,6 +670,7 @@ pub fn mixed_compatible_emit_job() -> EmitJobRequest {
                     1,
                     true,
                     WorkflowProgress::when_done_default(),
+                    &HashMap::new(),
                 ),
                 100,
             ),

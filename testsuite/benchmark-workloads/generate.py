@@ -7,10 +7,10 @@ import subprocess
 
 # Specifies directories and the latest (unstable) language version is needed when building the packages there.
 DIRECTORIES = [
-    ("packages", ""),
-    ("../../aptos-move/move-examples/token_objects/ambassador", ""),
-    ("../../aptos-move/move-examples/aggregator_examples", ""),
-    ("../../aptos-move/move-examples/bcs-stream", ""),
+    ("packages", " --latest-language"),
+    ("../../aptos-move/move-examples/token_objects/ambassador", " --latest-language"),
+    ("../../aptos-move/move-examples/aggregator_examples", " --latest-language"),
+    ("../../aptos-move/move-examples/bcs-stream", " --latest-language"),
     ("packages-experimental", " --latest-language"),
 ]
 # Directory where all binaries (package metadata, modules, scripts) are saved.

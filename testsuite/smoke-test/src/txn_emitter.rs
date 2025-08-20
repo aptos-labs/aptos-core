@@ -15,7 +15,7 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, SeedableRng};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 pub async fn generate_traffic(
     swarm: &mut dyn Swarm,
@@ -142,6 +142,7 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
                     100,
                     false,
                     WorkflowProgress::when_done_default(),
+                    &HashMap::new(),
                 ),
                 20,
             ),

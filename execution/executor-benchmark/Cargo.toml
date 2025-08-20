@@ -18,6 +18,7 @@ aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }

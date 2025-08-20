@@ -935,7 +935,7 @@ mod tests {
                 },
                 |t| {
                     BenchmarkWorkload::TransactionMix(vec![(
-                        t.materialize(1, true, WorkflowProgress::MoveByPhases),
+                        t.materialize(1, true, WorkflowProgress::MoveByPhases, &HashMap::new()),
                         1,
                     )])
                 },

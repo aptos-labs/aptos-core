@@ -14,7 +14,7 @@ use aptos_forge::{
 use async_trait::async_trait;
 use log::{error, info};
 use rand::SeedableRng;
-use std::{fmt::Debug, ops::DerefMut, time::Duration};
+use std::{collections::HashMap, fmt::Debug, ops::DerefMut, time::Duration};
 
 // add larger warmup, as when we are exceeding the max load,
 // it takes more time to fill mempool.
@@ -193,6 +193,7 @@ impl TransactionWorkload {
                 self.num_modules,
                 true,
                 WorkflowProgress::when_done_default(),
+                &HashMap::new(),
             );
             request.transaction_mix_per_phase(vec![
                 // warmup
@@ -207,6 +208,7 @@ impl TransactionWorkload {
                 self.num_modules,
                 false,
                 WorkflowProgress::when_done_default(),
+                &HashMap::new(),
             ))
         }
     }
