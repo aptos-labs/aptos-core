@@ -52,7 +52,7 @@ on:
 jobs:
   build-images:
     secrets: inherit
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/improve-auto-image-build
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@jkao97/test-improve-auto-image-build
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
