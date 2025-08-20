@@ -389,9 +389,11 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive {} ordered block ends with {}, the queue size is {}",
+            "Receive {} ordered block ends with [epoch: {}, round: {}, id: {}], the queue size is {}",
             ordered_blocks.len(),
-            ordered_proof.commit_info(),
+            ordered_proof.commit_info().epoch(),
+            ordered_proof.commit_info().round(),
+            ordered_proof.commit_info().id(),
             self.buffer.len() + 1,
         );
 

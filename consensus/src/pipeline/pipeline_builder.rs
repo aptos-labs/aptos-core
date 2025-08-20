@@ -29,7 +29,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, trace, warn};
+use aptos_logger::{error, info, trace, warn};
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
