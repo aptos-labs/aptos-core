@@ -14,7 +14,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView},
+    state_store::{state_key::StateKey, MoveResourceExt, StateView, StateViewId},
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
@@ -29,8 +29,8 @@ use move_binary_format::{
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
-    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache, WithHash},
-    module_storage_error, sha3_256,
+    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
+    module_storage_error,
 };
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
@@ -55,7 +55,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
 /// Represents the state used for validation. Stores raw data, module cache and the execution
 /// runtime environment. Note that the state can get out-of-date, and it is the responsibility of
 /// the owner of the struct to ensure it is up-to-date.
-struct ValidationState<S> {
+pub struct ValidationState<S> {
     /// The raw snapshot of the state used for validation.
     state_view: S,
     /// Stores configs needed for execution.
@@ -69,7 +69,7 @@ struct ValidationState<S> {
 impl<S: StateView> ValidationState<S> {
     /// Creates a new state based on the state view snapshot, with empty module cache and VM
     /// initialized based on configs from the state.
-    fn new(state_view: S) -> Self {
+    pub fn new(state_view: S) -> Self {
         info!(
             AdapterLogSchema::new(state_view.id(), 0),
             "Validation environment and module cache created"
@@ -84,13 +84,18 @@ impl<S: StateView> ValidationState<S> {
 
     /// Resets the state view snapshot to the new one. Does not invalidate the module cache, nor
     /// the VM.
-    fn reset_state_view(&mut self, state_view: S) {
+    pub fn reset_state_view(&mut self, state_view: S) {
         self.state_view = state_view;
+    }
+
+    ///  Returns the current state view ID for the caller to decide whether it's compatible with other state views.
+    pub fn state_view_id(&self) -> StateViewId {
+        self.state_view.id()
     }
 
     /// Resets the state to the new one, empties module cache, and resets the VM based on the new
     /// state view snapshot.
-    fn reset_all(&mut self, state_view: S) {
+    pub fn reset_all(&mut self, state_view: S) {
         self.state_view = state_view;
         self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
@@ -156,28 +161,25 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
         };
 
         // Get the state value that exists in the actual state and compute the hash.
-        let state_value = self
+        let state_slot = self
             .state_view
-            .get_state_value(&StateKey::module_id(key))
-            .map_err(|err| module_storage_error!(key.address(), key.name(), err))?
-            .ok_or_else(|| {
+            .get_state_slot(&StateKey::module_id(key))
+            .map_err(|err| module_storage_error!(key.address(), key.name(), err))?;
+        if state_slot.as_state_value_opt().is_none() {
+            return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!(
                         "Module {}::{} cannot be found in storage, but exists in cache",
                         key.address(),
                         key.name()
                     ))
-                    .finish(Location::Undefined)
-            })?;
-        let hash = sha3_256(state_value.bytes());
+                    .finish(Location::Undefined),
+            );
+        }
+        let value_version = state_slot.expect_value_version() as usize;
+        let state_value = state_slot.into_state_value_opt().unwrap();
 
-        // If hash is the same - we can use the same module from cache. If the hash is different,
-        // then the state contains a newer version of the code. We deserialize the state value and
-        // replace the old cache entry with the new code.
-        // TODO(loader_v2):
-        //   Ideally, commit notification should specify if new modules should be added to the
-        //   cache instead of checking the state view bytes. Revisit.
-        Ok(if module.extension().hash() == &hash {
+        Ok(if version == value_version {
             Some((module, version))
         } else {
             let compiled_module = self
@@ -186,7 +188,7 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
                 .deserialize_into_compiled_module(state_value.bytes())?;
             let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-            let new_version = version + 1;
+            let new_version = value_version;
             let new_module_code = self.module_cache.insert_deserialized_module(
                 key.clone(),
                 compiled_module,
