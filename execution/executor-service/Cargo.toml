@@ -41,4 +41,5 @@ thiserror = { workspace = true }
 [dev-dependencies]
 aptos-transaction-simulation = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
 aptos-vm = { workspace = true }
