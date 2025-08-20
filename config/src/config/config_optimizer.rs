@@ -352,7 +352,14 @@ mod tests {
         // Optimize the node config for mainnet VFNs and verify modifications are made
         let modified_config = NodeConfig::optimize(
             &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            &serde_yaml::from_str(
+                r#"
+            storage:
+              rocksdb_configs:
+                enable_storage_sharding: true
+            "#,
+            )
+            .unwrap(),
             NodeType::ValidatorFullnode,
             Some(ChainId::mainnet()),
         )
