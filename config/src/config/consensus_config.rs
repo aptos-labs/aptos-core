@@ -53,7 +53,8 @@ pub struct ConsensusConfig {
     // Only sync committed transactions but not vote for any pending blocks. This is useful when
     // validators coordinate on the latest version to apply a manual transaction.
     pub sync_only: bool,
-    pub channel_size: usize,
+    // The size of the round/recovery manager and proposal buffer channels.
+    pub internal_per_key_channel_size: usize,
     pub quorum_store_pull_timeout_ms: u64,
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     pub quorum_store_poll_time_ms: u64,
@@ -239,7 +240,7 @@ impl Default for ConsensusConfig {
             round_timeout_backoff_max_exponent: 6,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
-            channel_size: 30, // hard-coded
+            internal_per_key_channel_size: 10,
             quorum_store_pull_timeout_ms: 400,
             quorum_store_poll_time_ms: 300,
             // disable wait_for_full until fully tested
