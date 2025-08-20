@@ -8,15 +8,18 @@ use aptos_types::{
     state_store::{state_slot::StateSlot, TStateView},
     transaction::Version,
 };
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+    hash::Hash,
+};
 
 pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     first_version: Version,
     base_view: &'base_view BaseView,
-    /// Keys read but never written to across the entire block are to be made hot (or refreshed
-    /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
-    /// effect of the block epilogue (subject to per block limit)
-    to_make_hot: BTreeMap<Key, StateSlot>,
+    /// Keep track of all the keys that are read across the whole block. These keys are candidates
+    /// for hot state promotion (subject to rules such as refresh interval and per block limit).
+    reads: hashbrown::HashSet<Key>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
     /// so no need to issue separate HotStateOps to promote them to the hot state.
@@ -54,82 +57,71 @@ where
         Self {
             first_version: base_view.next_version(),
             base_view,
-            to_make_hot: BTreeMap::new(),
+            reads: hashbrown::HashSet::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
             _refresh_interval_versions: refresh_interval_versions,
         }
     }
 
-    pub fn add_transaction<'a>(
+    pub fn add_transaction(
         &mut self,
-        writes: impl Iterator<Item = &'a Key>,
-        reads: impl Iterator<Item = &'a Key>,
-    ) where
-        Key: 'a,
-    {
-        for key in writes {
-            if self.to_make_hot.remove(key).is_some() {
-                COUNTER.inc_with(&["promotion_removed_by_write"]);
-            }
-            self.writes.get_or_insert_owned(key);
-        }
-
-        for key in reads {
-            if self.to_make_hot.len() >= self.max_promotions_per_block {
-                COUNTER.inc_with(&["max_promotions_per_block_hit"]);
-                continue;
-            }
-            if self.to_make_hot.contains_key(key) {
-                continue;
-            }
-            if self.writes.contains(key) {
-                continue;
-            }
-            let slot = self
-                .base_view
-                .get_state_slot(key)
-                .expect("base_view.get_slot() failed.");
-            let make_hot = match slot {
-                StateSlot::ColdVacant => {
-                    COUNTER.inc_with(&["vacant_new"]);
-                    true
-                },
-                StateSlot::HotVacant {
-                    hot_since_version, ..
-                } => {
-                    if self.should_refresh(hot_since_version) {
-                        COUNTER.inc_with(&["vacant_refresh"]);
-                        true
-                    } else {
-                        COUNTER.inc_with(&["vacant_still_hot"]);
-                        false
-                    }
-                },
-                StateSlot::ColdOccupied { .. } => {
-                    COUNTER.inc_with(&["occupied_new"]);
-                    true
-                },
-                StateSlot::HotOccupied {
-                    hot_since_version, ..
-                } => {
-                    if self.should_refresh(hot_since_version) {
-                        COUNTER.inc_with(&["occupied_refresh"]);
-                        true
-                    } else {
-                        COUNTER.inc_with(&["occupied_still_hot"]);
-                        false
-                    }
-                },
-            };
-            if make_hot {
-                self.to_make_hot.insert(key.clone(), slot);
-            }
-        }
+        writes: impl IntoIterator<Item = Key>,
+        reads: impl IntoIterator<Item = Key>,
+    ) {
+        self.writes.extend(writes);
+        self.reads.extend(reads);
     }
 
     pub fn get_slots_to_make_hot(&self) -> BTreeMap<Key, StateSlot> {
-        self.to_make_hot.clone()
+        let read_only: BTreeSet<_> = self.reads.difference(&self.writes).collect();
+        let to_make_hot: BTreeMap<_, _> = read_only
+            .into_iter()
+            .filter_map(|key| self.maybe_make_hot(key).map(|slot| (key.clone(), slot)))
+            .take(self.max_promotions_per_block)
+            .collect();
+        COUNTER.inc_with_by(&["total_make_hot"], to_make_hot.len() as u64);
+        to_make_hot
+    }
+
+    fn maybe_make_hot(&self, key: &Key) -> Option<StateSlot> {
+        let slot = self
+            .base_view
+            .get_state_slot(key)
+            .expect("base_view.get_slot() failed.");
+
+        match &slot {
+            StateSlot::ColdVacant => {
+                COUNTER.inc_with(&["vacant_new"]);
+                Some(slot)
+            },
+            StateSlot::HotVacant {
+                hot_since_version, ..
+            } => {
+                if self.should_refresh(*hot_since_version) {
+                    COUNTER.inc_with(&["vacant_refresh"]);
+                    Some(slot)
+                } else {
+                    COUNTER.inc_with(&["vacant_still_hot"]);
+                    None
+                }
+            },
+            StateSlot::ColdOccupied { .. } => {
+                COUNTER.inc_with(&["occupied_new"]);
+                Some(slot)
+            },
+            StateSlot::HotOccupied {
+                hot_since_version, ..
+            } => {
+                if self.should_refresh(*hot_since_version) {
+                    COUNTER.inc_with(&["occupied_refresh"]);
+                    Some(slot)
+                } else {
+                    COUNTER.inc_with(&["occupied_still_hot"]);
+                    None
+                }
+            },
+        }
     }
 
     pub fn should_refresh(&self, hot_since_version: Version) -> bool {
