@@ -18,6 +18,7 @@ pub struct InspectionServiceConfig {
     pub address: String,
     pub port: u16,
     pub expose_configuration: bool,
+    pub expose_identity_information: bool,
     pub expose_peer_information: bool,
     pub expose_system_information: bool,
 }
@@ -28,6 +29,7 @@ impl Default for InspectionServiceConfig {
             address: "0.0.0.0".to_string(),
             port: 9101,
             expose_configuration: false,
+            expose_identity_information: true,
             expose_peer_information: true,
             expose_system_information: true,
         }
@@ -85,6 +87,11 @@ impl ConfigOptimizer for InspectionServiceConfig {
                     modified_config = true;
                 }
 
+                if local_inspection_config_yaml["expose_identity_information"].is_null() {
+                    inspection_service_config.expose_identity_information = true;
+                    modified_config = true;
+                }
+
                 if local_inspection_config_yaml["expose_peer_information"].is_null() {
                     inspection_service_config.expose_peer_information = true;
                     modified_config = true;
@@ -111,6 +118,7 @@ mod tests {
         let mut node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: false,
+                expose_identity_information: false,
                 expose_peer_information: false,
                 expose_system_information: false,
                 ..Default::default()
@@ -130,6 +138,7 @@ mod tests {
 
         // Verify all endpoints are still disabled
         assert!(!node_config.inspection_service.expose_configuration);
+        assert!(!node_config.inspection_service.expose_identity_information);
         assert!(!node_config.inspection_service.expose_peer_information);
         assert!(!node_config.inspection_service.expose_system_information);
     }
@@ -159,6 +168,7 @@ mod tests {
 
         // Verify all endpoints are now enabled
         assert!(node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_identity_information);
         assert!(node_config.inspection_service.expose_peer_information);
         assert!(node_config.inspection_service.expose_system_information);
     }
@@ -197,6 +207,7 @@ mod tests {
 
         // Verify only the system information endpoint is now enabled
         assert!(!node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_identity_information);
         assert!(node_config.inspection_service.expose_peer_information);
         assert!(node_config.inspection_service.expose_system_information);
     }
