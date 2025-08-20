@@ -601,7 +601,8 @@ impl StorageReader {
             .get_events_iterator(start_version, num_outputs_to_fetch)?;
         let transaction_auxiliary_data_iterator = self
             .storage
-            .get_auxiliary_data_iterator(start_version, num_outputs_to_fetch)?;
+            .get_auxiliary_data_iterator(start_version, num_outputs_to_fetch)?
+            .chain(std::iter::repeat(Ok(TransactionAuxiliaryData::default()))); // Use default auxiliary data if not present
         let persisted_auxiliary_info_iterator = self
             .storage
             .get_persisted_auxiliary_info_iterator(start_version, num_outputs_to_fetch as usize)?;
