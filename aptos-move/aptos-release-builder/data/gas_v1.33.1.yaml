@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "gas-v1.33.1"
+proposals:
+  - name: ad_hoc_gas_schedule_update
+    metadata:
+      title: "Gas schedule update v1.33.1"
+      description: "Ad-hoc gas schedule update to bump total dependency size allowed"
+    execution_mode: MultiStep
+    update_sequence:
+      - Gas:
+          old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/refs/heads/main/gas/v1.33.0.json
+          new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/refs/heads/main/gas/v1.33.1.json
