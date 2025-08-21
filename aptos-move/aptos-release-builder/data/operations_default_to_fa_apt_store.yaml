@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "Optimize APT PFS operations"
+proposals:
+  - name: operations_default_to_fa_apt_store
+    metadata:
+      title: "OPERATIONS_DEFAULT_TO_FA_APT_STORE"
+      description: "Enables the feature of AIP-85"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/13194"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-85.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - operations_default_to_fa_apt_store
+          disabled: [ ]
