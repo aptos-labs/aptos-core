@@ -119,7 +119,7 @@ jobs:
 
       - name: Check if docker images already exist
         id: check-images
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/test-improve-auto-image-build
         continue-on-error: true
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
@@ -138,7 +138,7 @@ jobs:
       
       - name: Lock Check and Creation
         id: lock
-        if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' }} # && inputs.DRY_RUN == false }}
         run: |
           set +e
           output=$(gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt)
@@ -161,7 +161,7 @@ jobs:
           fi
       
       - name: Wait for docker images to build
-        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@main
+        uses: aptos-labs/aptos-core/.github/actions/wait-images-ci@jkao97/test-improve-auto-image-build
         if: ${{ steps.lock.outputs.wait_images == 'true' }}
         with:
           GIT_SHA: ${{ env.GIT_SHA }}
@@ -172,7 +172,7 @@ jobs:
           FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
 
       - name: Build and Push Rust images
-        if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' && inputs.DRY_RUN == false }}
+        if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' }} #&& inputs.DRY_RUN == false }}
         run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
