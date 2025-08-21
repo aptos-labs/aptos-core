@@ -870,9 +870,7 @@ Destroys a storable permission handle. Clean up the permission stored in that ha
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permissions_storage_address">destroy_permissions_storage_address</a>(
-    permissions_storage_addr: <b>address</b>
-) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a> {
+<pre><code>inline <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_permissions_storage_address">destroy_permissions_storage_address</a>(permissions_storage_addr: <b>address</b>) {
     <b>if</b> (<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permissions_storage_addr)) {
         <b>let</b> PermissionStorage::V1 { perms } =
             <b>move_from</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permissions_storage_addr);
