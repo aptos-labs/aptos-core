@@ -1,12 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
+use aptos_api_types::{BlockMetadataTransaction, TransactionData};
 use aptos_rest_client::{
     aptos_api_types::{IdentifierWrapper, MoveResource, WriteSetChange},
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress, account_config::NewBlockEvent,
+    contract_event::TransactionEvent,
+};
 use std::str::FromStr;
 
 const MAX_FETCH_BATCH_SIZE: u16 = 1000;
@@ -135,32 +139,52 @@ impl FetchMetadata {
         start_epoch: Option<i64>,
         end_epoch: Option<i64>,
     ) -> Result<Vec<EpochInfo>> {
-        let (last_events, state) = client
-            .get_new_block_events_bcs(None, Some(1))
+        let state = client.get_ledger_information().await?.into_inner();
+
+        let oldest_block = client
+            .get_block_by_height(state.oldest_block_height, false)
             .await?
-            .into_parts();
-        let mut start_seq_num = state.oldest_block_height;
-        assert_eq!(last_events.len(), 1, "{:?}", last_events);
-        let last_event = last_events.first().unwrap();
-        let last_seq_num = last_event.sequence_number;
+            .into_inner();
+
+        let oldest_block_metadata_txn = client
+            .get_transaction_by_version(oldest_block.first_version.0)
+            .await?
+            .into_inner();
+
+        let newest_block = client
+            .get_block_by_height(state.block_height, false)
+            .await?
+            .into_inner();
+
+        let newest_block_metadata_txn = client
+            .get_transaction_by_version(newest_block.first_version.0)
+            .await?
+            .into_inner();
+
+        fn as_block_metadata_txn(txn: Transaction) -> Option<BlockMetadataTransaction> {
+            match txn {
+                Transaction::BlockMetadataTransaction(txn) => Some(txn),
+                _ => return None,
+            }
+        }
+
+        let latest_epoch = as_block_metadata_txn(newest_block_metadata_txn)
+            .map(|txn| txn.epoch.0)
+            .unwrap_or(0);
+        let oldest_epoch = as_block_metadata_txn(oldest_block_metadata_txn)
+            .map(|txn| txn.epoch.0)
+            .unwrap_or(0);
 
         let wanted_start_epoch = {
             let mut wanted_start_epoch = start_epoch.unwrap_or(2);
             if wanted_start_epoch < 0 {
-                wanted_start_epoch = last_event.event.epoch() as i64 + wanted_start_epoch + 1;
+                wanted_start_epoch = latest_epoch as i64 + wanted_start_epoch + 1;
             }
 
-            let oldest_event = client
-                .get_new_block_events_bcs(Some(start_seq_num), Some(1))
-                .await?
-                .into_inner()
-                .into_iter()
-                .next()
-                .ok_or_else(|| anyhow!("No blocks at oldest_block_height {}", start_seq_num))?;
-            let oldest_fetchable_epoch = std::cmp::max(oldest_event.event.epoch() + 1, 2);
+            let oldest_fetchable_epoch = std::cmp::max(oldest_epoch, 2);
             if oldest_fetchable_epoch > wanted_start_epoch as u64 {
                 println!(
-                    "Oldest full epoch that can be retreived is {} ",
+                    "Oldest full epoch that can be retrieved is {} ",
                     oldest_fetchable_epoch
                 );
                 oldest_fetchable_epoch
@@ -171,35 +195,35 @@ impl FetchMetadata {
         let wanted_end_epoch = {
             let mut wanted_end_epoch = end_epoch.unwrap_or(i64::MAX);
             if wanted_end_epoch < 0 {
-                wanted_end_epoch = last_event.event.epoch() as i64 + wanted_end_epoch + 1;
+                wanted_end_epoch = latest_epoch as i64 + wanted_end_epoch + 1;
             }
-            std::cmp::min(
-                last_event.event.epoch() + 1,
-                std::cmp::max(2, wanted_end_epoch) as u64,
-            )
+            std::cmp::min(latest_epoch + 1, std::cmp::max(2, wanted_end_epoch) as u64)
         };
 
+        let mut start_block_height = state.oldest_block_height;
+        let end_block_height = state.block_height;
         if wanted_start_epoch > 2 {
-            let mut search_end = last_seq_num;
+            let mut search_end = end_block_height;
 
             // Stop when search is close enough, and we can then linearly
             // proceed from there.
             // Since we are ignoring results we are fetching during binary search
             // we want to stop when we are close.
-            while start_seq_num + 20 < search_end {
-                let mid = (start_seq_num + search_end) / 2;
+            while start_block_height + 20 < search_end {
+                let mid = (start_block_height + search_end) / 2;
 
-                let mid_epoch = client
-                    .get_new_block_events_bcs(Some(mid), Some(1))
+                let block = client.get_block_by_height(mid, false).await?.into_inner();
+                let txn = client
+                    .get_transaction_by_version(block.first_version.0)
                     .await?
-                    .into_inner()
-                    .first()
-                    .unwrap()
-                    .event
-                    .epoch();
+                    .into_inner();
+
+                let mid_epoch = as_block_metadata_txn(txn)
+                    .map(|txn| txn.epoch.0)
+                    .unwrap_or(0);
 
                 if mid_epoch < wanted_start_epoch {
-                    start_seq_num = mid;
+                    start_block_height = mid;
                 } else {
                     search_end = mid;
                 }
@@ -209,8 +233,13 @@ impl FetchMetadata {
         let mut batch_index = 0;
 
         println!(
-            "Fetching {} to {} sequence number, wanting epochs [{}, {}), last version: {} and epoch: {}",
-            start_seq_num, last_seq_num, wanted_start_epoch, wanted_end_epoch, state.version, state.epoch,
+            "Fetching {} to {} versions, wanting epochs [{}, {}), last version: {} and epoch: {}",
+            start_block_height,
+            end_block_height,
+            wanted_start_epoch,
+            wanted_end_epoch,
+            state.version,
+            state.epoch,
         );
         let mut result: Vec<EpochInfo> = vec![];
         if wanted_start_epoch >= wanted_end_epoch {
@@ -221,15 +250,13 @@ impl FetchMetadata {
         let mut current: Vec<VersionedNewBlockEvent> = vec![];
         let mut epoch = 0;
 
-        let mut cursor = start_seq_num;
+        let mut cursor = start_block_height;
         loop {
-            let response = client
-                .get_new_block_events_bcs(Some(cursor), Some(MAX_FETCH_BATCH_SIZE))
-                .await;
+            let response = client.get_block_by_height(cursor, false).await;
 
             if response.is_err() {
                 println!(
-                    "Failed to read new_block_events beyond {}, stopping. {:?}",
+                    "Failed to read block beyond {}, stopping. {:?}",
                     cursor,
                     response.unwrap_err()
                 );
@@ -242,7 +269,31 @@ impl FetchMetadata {
                 });
                 return Ok(result);
             }
-            let events = response.unwrap().into_inner();
+            let block = response.unwrap().into_inner();
+
+            let response = client
+                .get_transaction_by_version_bcs(block.first_version.0)
+                .await;
+            if response.is_err() {
+                println!(
+                    "Failed to read block metadata transaction beyond {}, stopping. {:?}",
+                    cursor,
+                    response.unwrap_err()
+                );
+                assert!(!validators.is_empty());
+                result.push(EpochInfo {
+                    epoch,
+                    blocks: current,
+                    validators: validators.clone(),
+                    partial: true,
+                });
+                return Ok(result);
+            }
+
+            let TransactionData::OnChain(txn) = response.unwrap().into_inner() else {
+                bail!("Expected TransactionData::OnChain");
+            };
+            let events = txn.events;
 
             if events.is_empty() {
                 return Err(anyhow!(
@@ -252,13 +303,23 @@ impl FetchMetadata {
                 ));
             }
 
+            assert_eq!(events.len(), 1);
             cursor += events.len() as u64;
             batch_index += 1;
 
-            for event in events {
-                if event.event.epoch() > epoch {
+            for raw_event in events {
+                let new_block_event =
+                    bcs::from_bytes::<NewBlockEvent>(raw_event.get_event_data()).unwrap();
+                println!("processing event: {:?}", new_block_event);
+                let event_epoch = new_block_event.epoch;
+                let versioned_new_block_event = VersionedNewBlockEvent {
+                    event: new_block_event,
+                    version: block.first_version.0,
+                    sequence_number: raw_event.v1()?.sequence_number(),
+                };
+                if event_epoch > epoch {
                     if epoch == 0 {
-                        epoch = event.event.epoch();
+                        epoch = event_epoch;
                         current = vec![];
                     } else {
                         let last = current.last().cloned();
@@ -266,7 +327,7 @@ impl FetchMetadata {
                             let transactions = FetchMetadata::get_transactions_in_range(
                                 client,
                                 last.version,
-                                event.version,
+                                versioned_new_block_event.version,
                             )
                             .await?;
                             assert_eq!(
@@ -290,8 +351,8 @@ impl FetchMetadata {
 
                                     validators = new_validators;
                                     validators.sort_by_key(|v| v.validator_index);
-                                    assert_eq!(epoch + 1, event.event.epoch());
-                                    epoch = event.event.epoch();
+                                    assert_eq!(epoch + 1, event_epoch);
+                                    epoch = event_epoch;
                                     if epoch >= wanted_end_epoch {
                                         return Ok(result);
                                     }
@@ -302,13 +363,14 @@ impl FetchMetadata {
                                 current.is_empty(),
                                 "Couldn't find ValidatorSet change for transactions start={}, limit={} for epoch {}",
                                 last.version,
-                                event.version - last.version,
-                                event.event.epoch(),
+                                block.first_version.0 - last.version,
+                                event_epoch,
                             );
                         }
                     }
                 }
-                current.push(event);
+
+                current.push(versioned_new_block_event);
             }
 
             if batch_index % 100 == 0 {
@@ -321,7 +383,7 @@ impl FetchMetadata {
                 );
             }
 
-            if cursor > last_seq_num {
+            if cursor > end_block_height {
                 if !validators.is_empty() {
                     result.push(EpochInfo {
                         epoch,
