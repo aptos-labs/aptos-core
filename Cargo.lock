@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.7.0"
+version = "7.8.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -336,6 +336,8 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
+ "aptos-transaction-simulation",
+ "aptos-transaction-simulation-session",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -4574,6 +4576,31 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "serde",
+]
+
+[[package]]
+name = "aptos-transaction-simulation-session"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "hex",
+ "move-core-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
