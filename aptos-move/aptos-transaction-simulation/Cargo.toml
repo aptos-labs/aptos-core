@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
+aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }
 aptos-keygen = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-genesis = { workspace = true }
@@ -26,6 +26,3 @@ once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
-aptos-crypto = { workspace = true, features = ["cloneable-private-keys"] }
