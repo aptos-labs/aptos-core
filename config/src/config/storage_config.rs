@@ -152,12 +152,7 @@ pub struct RocksdbConfigs {
     pub state_merkle_db_config: RocksdbConfig,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
-    #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
-}
-
-fn default_to_true() -> bool {
-    true
 }
 
 impl Default for RocksdbConfigs {
@@ -170,7 +165,7 @@ impl Default for RocksdbConfigs {
                 max_open_files: 1000,
                 ..Default::default()
             },
-            enable_storage_sharding: true,
+            enable_storage_sharding: false,
         }
     }
 }
