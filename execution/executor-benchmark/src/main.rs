@@ -150,6 +150,11 @@ pub struct PipelineOpt {
     /// Sharding configuration.
     #[clap(flatten)]
     sharding_opt: ShardingOpt,
+    /// Set this flag to run (execute) scheduled transactions after they are scheduled.
+    #[clap(long)]
+    run_scheduled_txns: bool,
+    #[clap(long, default_value = "1000")]
+    ready_sched_txns_limit: usize,
 }
 
 impl PipelineOpt {
@@ -165,6 +170,8 @@ impl PipelineOpt {
             num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
             num_sig_verify_threads: self.num_sig_verify_threads,
+            run_scheduled_txns: self.run_scheduled_txns,
+            ready_sched_txns_limit: self.ready_sched_txns_limit,
             print_transactions: false,
         }
     }
@@ -323,6 +330,9 @@ struct Opt {
 
     #[clap(long)]
     skip_paranoid_checks: bool,
+
+    #[clap(long)]
+    transaction_param: Vec<String>,
 }
 
 impl Opt {
@@ -503,6 +513,20 @@ where
                     hotspot_probability: opt.hotspot_probability,
                 }
             } else {
+                // Parse transaction parameters from key=value format
+                let transaction_params: std::collections::HashMap<String, String> = opt
+                    .transaction_param
+                    .iter()
+                    .filter_map(|param| {
+                        let parts: Vec<&str> = param.splitn(2, '=').collect();
+                        if parts.len() == 2 {
+                            Some((parts[0].to_string(), parts[1].to_string()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
                 let mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
                     &transaction_type,
                     &transaction_weights,
@@ -510,6 +534,7 @@ where
                     module_working_set_size,
                     use_sender_account_pool,
                     WorkflowProgress::MoveByPhases,
+                    &transaction_params,
                 );
                 assert!(mix_per_phase.len() == 1);
                 BenchmarkWorkload::TransactionMix(mix_per_phase[0].clone())

@@ -9,6 +9,7 @@ use crate::{
     OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
+use aptos_consensus::scheduled_txns_handler::ScheduledTxnsHandler;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
@@ -16,11 +17,17 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
-    transaction::{Transaction, TransactionPayload, Version},
+    block_metadata::BlockMetadata,
+    transaction::{
+        scheduled_txn::SCHEDULED_TRANSACTIONS_MODULE_INFO, Transaction, TransactionPayload, Version,
+    },
 };
-use aptos_vm::VMBlockExecutor;
+use aptos_vm::{move_vm_ext::SessionId, AptosVM, VMBlockExecutor};
 use derivative::Derivative;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    language_storage::StructTag,
+    value::{serialize_values, MoveValue},
+};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -48,6 +55,9 @@ pub struct PipelineConfig {
     pub partitioner_config: PartitionerV2Config,
     #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
+    pub run_scheduled_txns: bool,
+    #[derivative(Default(value = "1000"))]
+    pub ready_sched_txns_limit: usize,
 
     pub print_transactions: bool,
 }
@@ -72,9 +82,12 @@ where
         num_blocks: Option<usize>,
     ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
+        let run_scheduled_txns = config.run_scheduled_txns;
+        let ready_sched_txns_limit = config.ready_sched_txns_limit;
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
         let executor_3 = executor_1.clone();
+        let executor_4 = executor_1.clone();
 
         let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.generate_then_execute {
@@ -121,6 +134,13 @@ where
 
         // signature verification and partitioning
         let mut preparation_stage = BlockPreparationStage::new(
+            std::cmp::min(config.num_sig_verify_threads, num_cpus::get()),
+            // Assume the distributed executor and the distributed partitioner share the same worker set.
+            config.num_executor_shards,
+            &config.partitioner_config,
+        );
+
+        let mut prepare_ready_txns = BlockPreparationStage::new(
             std::cmp::min(config.num_sig_verify_threads, num_cpus::get()),
             // Assume the distributed executor and the distributed partitioner share the same worker set.
             config.num_executor_shards,
@@ -174,12 +194,124 @@ where
             .expect("Failed to spawn block partitioner thread.");
         join_handles.push(preparation_thread);
 
+        fn create_mock_meta_data_txn(block_id: HashValue) -> BlockMetadata {
+            BlockMetadata::new(
+                block_id,
+                0,
+                0,
+                aptos_types::account_address::AccountAddress::ZERO,
+                vec![],
+                vec![],
+                0,
+            )
+        }
+
+        fn run_scheduled_transactions<V: VMBlockExecutor>(
+            total_scheduled_txns: u64,
+            parent_block_id: HashValue,
+            prepare_ready_txns: &mut BlockPreparationStage,
+            exe: &mut TransactionExecutor<V>,
+            executor: &BlockExecutor<V>,
+            ready_sched_txns_limit: usize,
+        ) -> u64 {
+            info!(
+                "Running scheduled transactions: {} total scheduled transactions; ready_sched_txns_limit: {}",
+                total_scheduled_txns,
+                ready_sched_txns_limit
+            );
+
+            let mut total_executed = 0;
+            let mut stage_index = 0;
+            let mut current_parent_id = parent_block_id;
+            // Note: This should be close to the time set in args.rs while scheduling txns,
+            //       otherwise txns could be considered as expired and ignored
+            let mock_block_time_ms = 4_000_000_000_001;
+
+            let overall_measuring = OverallMeasuring::start();
+
+            while total_executed < total_scheduled_txns {
+                let state_view = executor
+                    .state_view_ready_sched_txns(HashValue::zero(), current_parent_id)
+                    .unwrap();
+                let args = vec![
+                    MoveValue::U64(mock_block_time_ms + 1000),
+                    MoveValue::U64(ready_sched_txns_limit as u64),
+                ];
+                let res = AptosVM::execute_system_function_no_gas_meter(
+                    &state_view,
+                    &SCHEDULED_TRANSACTIONS_MODULE_INFO.module_id(),
+                    &SCHEDULED_TRANSACTIONS_MODULE_INFO.get_ready_transactions_with_limit_name,
+                    vec![],
+                    serialize_values(&args),
+                    SessionId::scheduled_txn_get_ready_txns(current_parent_id),
+                );
+                let mut current_block_txns = ScheduledTxnsHandler::handle_ready_txns_result(res)
+                    .into_iter()
+                    .map(Transaction::ScheduledTransaction)
+                    .collect::<Vec<Transaction>>();
+
+                if current_block_txns.is_empty() {
+                    break; // No more ready transactions available
+                }
+
+                // append a mock metadata transaction to the block; this cleans up the executed txns
+                // from the scheduled transactions queue
+                if !current_block_txns.is_empty() {
+                    let block_metadata_txn =
+                        Transaction::BlockMetadata(create_mock_meta_data_txn(current_parent_id));
+                    current_block_txns.push(block_metadata_txn);
+                }
+
+                if !current_block_txns.is_empty() {
+                    let ExecuteBlockMessage {
+                        current_block_start_time,
+                        partition_time,
+                        block,
+                    } = prepare_ready_txns.process(current_block_txns);
+
+                    current_parent_id = block.block_id;
+                    let block_size = block.transactions.num_transactions() as u64;
+                    total_executed += block_size;
+                    exe.execute_block(
+                        current_block_start_time,
+                        partition_time,
+                        block,
+                        stage_index,
+                        "run_scheduled",
+                    );
+                    stage_index += 1;
+
+                    info!(
+                        "Executed block {} with {} transactions. Total executed: {}/{}",
+                        stage_index, block_size, total_executed, total_scheduled_txns
+                    );
+                } else {
+                    info!("No more ready transactions available");
+                    break;
+                }
+            }
+
+            if total_executed > 0 {
+                overall_measuring
+                    .elapsed(
+                        "Overall scheduled txns execution".to_string(),
+                        format!("Executed {} transactions", total_executed),
+                        total_executed,
+                    )
+                    .print_end();
+            } else {
+                info!("No scheduled transactions executed");
+            }
+            total_executed
+        }
+
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
             .spawn(move || {
                 start_execution_rx.map(|rx| rx.recv());
                 let overall_measuring = OverallMeasuring::start();
                 let mut executed = 0;
+                let mut last_block_id = HashValue::zero();
 
                 let mut stage_index = 0;
                 let mut stage_overall_measuring = overall_measuring.clone();
@@ -193,6 +325,7 @@ where
                         block,
                     } = msg;
                     let block_size = block.transactions.num_transactions() as u64;
+                    last_block_id = block.block_id;
                     for txn in block.transactions.txns() {
                         if let Some(txn) = txn.borrow_into_inner().try_as_signed_user_txn() {
                             if let TransactionPayload::EntryFunction(entry) = txn.payload() {
@@ -213,7 +346,13 @@ where
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
-                    exe.execute_block(current_block_start_time, partition_time, block, stage_index);
+                    exe.execute_block(
+                        current_block_start_time,
+                        partition_time,
+                        block,
+                        stage_index,
+                        "execute",
+                    );
                     info!("Finished executing block");
 
                     // Empty blocks indicate the end of a stage.
@@ -260,6 +399,17 @@ where
                             executed,
                         )
                         .print_end();
+                }
+
+                if run_scheduled_txns {
+                    run_scheduled_transactions(
+                        executed,
+                        last_block_id,
+                        &mut prepare_ready_txns,
+                        &mut exe,
+                        executor_4.as_ref(),
+                        ready_sched_txns_limit,
+                    );
                 }
                 start_ledger_update_tx.map(|tx| tx.send(()));
                 executed

@@ -267,6 +267,13 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    ScheduledTxnsPerf {
+        /// schedule time
+        time_ms: u64,
+        /// whether to use compute_intense function (true) or no_op function (false)
+        use_compute_intense: bool,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -321,7 +328,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
-            | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
+            | EntryPoints::APTTransferWithMasterSigner
+            | EntryPoints::ScheduledTxnsPerf { .. } => "framework_usecases",
             EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
@@ -404,6 +412,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::ScheduledTxnsPerf { .. } => "scheduled_txns_perf",
         }
     }
 
@@ -871,6 +880,17 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::ScheduledTxnsPerf {
+                time_ms,
+                use_compute_intense,
+            } => get_payload(
+                module_id,
+                ident_str!("test_insert_transactions").to_owned(),
+                vec![
+                    bcs::to_bytes(time_ms).unwrap(),
+                    bcs::to_bytes(use_compute_intense).unwrap(),
+                ],
+            ),
         }
     }
 
@@ -992,6 +1012,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::ScheduledTxnsPerf { .. } => AutomaticArgs::Signer,
         }
     }
 }

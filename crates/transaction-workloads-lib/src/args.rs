@@ -99,11 +99,18 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    ScheduledTxnsInsertPerf,
 }
 
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
-        self.materialize(1, false, WorkflowProgress::when_done_default())
+        let empty_params = std::collections::HashMap::new();
+        self.materialize(
+            1,
+            false,
+            WorkflowProgress::when_done_default(),
+            &empty_params,
+        )
     }
 
     pub fn materialize(
@@ -111,6 +118,7 @@ impl TransactionTypeArg {
         module_working_set_size: usize,
         sender_use_account_pool: bool,
         workflow_progress_type: WorkflowProgress,
+        transaction_params: &std::collections::HashMap<String, String>,
     ) -> TransactionType {
         let call_custom_module = |entry_point: EntryPoints| -> TransactionType {
             TransactionType::CallCustomModules {
@@ -444,6 +452,35 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
+            TransactionTypeArg::ScheduledTxnsInsertPerf => {
+                let current_time_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                // Fixed timestamp for very far in the future, so that we can insert without having
+                // to worry about the current time.
+                let future_time_ms = 4_000_000_000_000; // 2096-10-02
+                                                        // Note: Use the corresponding future time in execution benchmark, otherwise txns
+                                                        //       can expire
+                                                        // Set sender_use_account_pool to true for unique senders
+                assert!(future_time_ms > current_time_ms);
+
+                let use_compute_intense = match transaction_params.get("function_choice") {
+                    Some(choice) if choice == "compute_intense" => true,
+                    Some(choice) if choice == "no_op" => false,
+                    None => false, // Default to no_op
+                    Some(other) => panic!("Invalid function_choice parameter: {}", other),
+                };
+
+                TransactionType::CallCustomModules {
+                    entry_point: Box::new(EntryPoints::ScheduledTxnsPerf {
+                        time_ms: future_time_ms,
+                        use_compute_intense,
+                    }),
+                    num_modules: module_working_set_size,
+                    use_account_pool: true, // Force this to true to use unique senders
+                }
+            },
         }
     }
 
@@ -454,6 +491,7 @@ impl TransactionTypeArg {
         module_working_set_size: usize,
         sender_use_account_pool: bool,
         workflow_progress_type: WorkflowProgress,
+        transaction_params: &std::collections::HashMap<String, String>,
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
@@ -462,6 +500,7 @@ impl TransactionTypeArg {
                     module_working_set_size,
                     sender_use_account_pool,
                     workflow_progress_type,
+                    transaction_params,
                 )
             })
             .collect::<Vec<_>>();
@@ -546,6 +585,7 @@ pub struct EmitWorkloadArgs {
 
 impl EmitWorkloadArgs {
     pub fn args_to_transaction_mix_per_phase(&self) -> Vec<Vec<(TransactionType, usize)>> {
+        let empty_params = std::collections::HashMap::new();
         TransactionTypeArg::args_to_transaction_mix_per_phase(
             &self.transaction_type,
             &self.transaction_weights,
@@ -553,6 +593,7 @@ impl EmitWorkloadArgs {
             self.module_working_set_size.unwrap_or(1),
             self.sender_use_account_pool.unwrap_or(false),
             WorkflowProgress::when_done_default(),
+            &empty_params, // No transaction parameters for this path
         )
     }
 }

@@ -2,7 +2,7 @@ name: "execution-performance"
 on:
   workflow_dispatch:
   pull_request:
-    types: [ labeled, opened, synchronize, reopened, auto_merge_enabled ]
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   schedule:
     - cron: "0 */4 * * *" # This runs every four hours
 
@@ -15,14 +15,15 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-scheduled-test') ||
         github.event.pull_request.auto_merge != null
       )
     uses: ./.github/workflows/workflow-run-execution-performance.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      RUNNER_NAME: benchmark-c3d-60
-      # Run all tests only on the scheduled cadence, or explicitly requested
-      FLOW: ${{ (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
+      RUNNER_NAME: executor-benchmark-runner
+       # Run all tests only on the scheduled cadence, or explicitly requested
+      FLOW: ${{ (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-scheduled-test') && 'SCHEDULED_TXNS' || 'LAND_BLOCKING' }}
       # Ignore target determination if on the scheduled cadence, or explicitly requested
       IGNORE_TARGET_DETERMINATION: ${{ github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}

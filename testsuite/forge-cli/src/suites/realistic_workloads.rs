@@ -16,7 +16,7 @@ use aptos_testcases::{
     performance_test::PerformanceBenchmark,
     CompositeNetworkTest,
 };
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
 pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
     let job = EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
@@ -64,6 +64,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                         1000,
                         false,
                         WorkflowProgress::when_done_default(),
+                        &HashMap::new(),
                     ),
                     _ => unreachable!("{}", test_name),
                 })

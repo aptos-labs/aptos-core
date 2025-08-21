@@ -80,7 +80,7 @@ on:
         - MAINNET
         - MAINNET_LARGE_DB
         - EXECUTORS
-        - ORDER_BOOK
+        - SCHEDULED_TXNS
         type: choice
         description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
       SKIP_MOVE_E2E:
@@ -135,6 +135,8 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
+        env:
+          PERFORMANCE_BUILD: ${{ inputs.FLOW == 'SCHEDULED_TXNS' && '1' || '' }}
         run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" DISABLE_FA_APT="${{ inputs.USE_COIN_APT && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
         if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
 
