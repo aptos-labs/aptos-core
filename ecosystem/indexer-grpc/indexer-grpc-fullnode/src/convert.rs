@@ -823,8 +823,7 @@ pub fn convert_transaction(
             transaction::transaction::TransactionType::Validator
         },
         Transaction::ScheduledTransaction(_) => {
-            // todo: will be implemented in a subsequent PR
-            panic!("[Indexer Fullnode] ScheduledTransaction is not yet supported")
+            transaction::transaction::TransactionType::Scheduled
         },
     };
 
@@ -897,9 +896,15 @@ pub fn convert_transaction(
         Transaction::ValidatorTransaction(api_validator_txn) => {
             convert_validator_transaction(api_validator_txn)
         },
-        Transaction::ScheduledTransaction(_) => {
-            // todo: will be implemented in a subsequent PR
-            panic!("[Indexer Fullnode] ScheduledTransaction is not yet supported")
+        Transaction::ScheduledTransaction(scheduled_txn) => {
+            transaction::transaction::TxnData::ScheduledTransaction(transaction::ScheduledTransaction {
+                sender: scheduled_txn.sender.to_string(),
+                max_gas_amount: scheduled_txn.max_gas_amount.0,
+                gas_unit_price: scheduled_txn.gas_unit_price.0,
+                schedule_time: scheduled_txn.schedule_time.0,
+                txn_id: scheduled_txn.txn_id.0.to_le_bytes().to_vec(),
+                events: convert_events(&scheduled_txn.events),
+            })
         },
     };
 

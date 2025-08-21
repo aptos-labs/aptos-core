@@ -6033,6 +6033,194 @@ impl<'de> serde::Deserialize<'de> for multisig_transaction_payload::Type {
         deserializer.deserialize_any(GeneratedVisitor)
     }
 }
+impl serde::Serialize for ScheduledTransaction {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.sender.is_empty() {
+            len += 1;
+        }
+        if self.max_gas_amount != 0 {
+            len += 1;
+        }
+        if self.gas_unit_price != 0 {
+            len += 1;
+        }
+        if self.schedule_time != 0 {
+            len += 1;
+        }
+        if !self.txn_id.is_empty() {
+            len += 1;
+        }
+        if !self.events.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ScheduledTransaction", len)?;
+        if !self.sender.is_empty() {
+            struct_ser.serialize_field("sender", &self.sender)?;
+        }
+        if self.max_gas_amount != 0 {
+            struct_ser.serialize_field("maxGasAmount", ToString::to_string(&self.max_gas_amount).as_str())?;
+        }
+        if self.gas_unit_price != 0 {
+            struct_ser.serialize_field("gasUnitPrice", ToString::to_string(&self.gas_unit_price).as_str())?;
+        }
+        if self.schedule_time != 0 {
+            struct_ser.serialize_field("scheduleTime", ToString::to_string(&self.schedule_time).as_str())?;
+        }
+        if !self.txn_id.is_empty() {
+            struct_ser.serialize_field("txnId", pbjson::private::base64::encode(&self.txn_id).as_str())?;
+        }
+        if !self.events.is_empty() {
+            struct_ser.serialize_field("events", &self.events)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ScheduledTransaction {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "sender",
+            "max_gas_amount",
+            "maxGasAmount",
+            "gas_unit_price",
+            "gasUnitPrice",
+            "schedule_time",
+            "scheduleTime",
+            "txn_id",
+            "txnId",
+            "events",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Sender,
+            MaxGasAmount,
+            GasUnitPrice,
+            ScheduleTime,
+            TxnId,
+            Events,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "sender" => Ok(GeneratedField::Sender),
+                            "maxGasAmount" | "max_gas_amount" => Ok(GeneratedField::MaxGasAmount),
+                            "gasUnitPrice" | "gas_unit_price" => Ok(GeneratedField::GasUnitPrice),
+                            "scheduleTime" | "schedule_time" => Ok(GeneratedField::ScheduleTime),
+                            "txnId" | "txn_id" => Ok(GeneratedField::TxnId),
+                            "events" => Ok(GeneratedField::Events),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ScheduledTransaction;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.ScheduledTransaction")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<ScheduledTransaction, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut sender__ = None;
+                let mut max_gas_amount__ = None;
+                let mut gas_unit_price__ = None;
+                let mut schedule_time__ = None;
+                let mut txn_id__ = None;
+                let mut events__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Sender => {
+                            if sender__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sender"));
+                            }
+                            sender__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::MaxGasAmount => {
+                            if max_gas_amount__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("maxGasAmount"));
+                            }
+                            max_gas_amount__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::GasUnitPrice => {
+                            if gas_unit_price__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("gasUnitPrice"));
+                            }
+                            gas_unit_price__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::ScheduleTime => {
+                            if schedule_time__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("scheduleTime"));
+                            }
+                            schedule_time__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::TxnId => {
+                            if txn_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("txnId"));
+                            }
+                            txn_id__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::Events => {
+                            if events__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("events"));
+                            }
+                            events__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(ScheduledTransaction {
+                    sender: sender__.unwrap_or_default(),
+                    max_gas_amount: max_gas_amount__.unwrap_or_default(),
+                    gas_unit_price: gas_unit_price__.unwrap_or_default(),
+                    schedule_time: schedule_time__.unwrap_or_default(),
+                    txn_id: txn_id__.unwrap_or_default(),
+                    events: events__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.ScheduledTransaction", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for ScriptPayload {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -6964,6 +7152,9 @@ impl serde::Serialize for Transaction {
                 transaction::TxnData::BlockEpilogue(v) => {
                     struct_ser.serialize_field("blockEpilogue", v)?;
                 }
+                transaction::TxnData::ScheduledTransaction(v) => {
+                    struct_ser.serialize_field("scheduledTransaction", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6994,6 +7185,8 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             "validator",
             "block_epilogue",
             "blockEpilogue",
+            "scheduled_transaction",
+            "scheduledTransaction",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -7011,6 +7204,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
             User,
             Validator,
             BlockEpilogue,
+            ScheduledTransaction,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -7045,6 +7239,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             "user" => Ok(GeneratedField::User),
                             "validator" => Ok(GeneratedField::Validator),
                             "blockEpilogue" | "block_epilogue" => Ok(GeneratedField::BlockEpilogue),
+                            "scheduledTransaction" | "scheduled_transaction" => Ok(GeneratedField::ScheduledTransaction),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -7164,6 +7359,13 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::BlockEpilogue)
 ;
                         }
+                        GeneratedField::ScheduledTransaction => {
+                            if txn_data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("scheduledTransaction"));
+                            }
+                            txn_data__ = map.next_value::<::std::option::Option<_>>()?.map(transaction::TxnData::ScheduledTransaction)
+;
+                        }
                     }
                 }
                 Ok(Transaction {
@@ -7195,6 +7397,7 @@ impl serde::Serialize for transaction::TransactionType {
             Self::User => "TRANSACTION_TYPE_USER",
             Self::Validator => "TRANSACTION_TYPE_VALIDATOR",
             Self::BlockEpilogue => "TRANSACTION_TYPE_BLOCK_EPILOGUE",
+            Self::Scheduled => "TRANSACTION_TYPE_SCHEDULED",
         };
         serializer.serialize_str(variant)
     }
@@ -7213,6 +7416,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
             "TRANSACTION_TYPE_USER",
             "TRANSACTION_TYPE_VALIDATOR",
             "TRANSACTION_TYPE_BLOCK_EPILOGUE",
+            "TRANSACTION_TYPE_SCHEDULED",
         ];
 
         struct GeneratedVisitor;
@@ -7262,6 +7466,7 @@ impl<'de> serde::Deserialize<'de> for transaction::TransactionType {
                     "TRANSACTION_TYPE_USER" => Ok(transaction::TransactionType::User),
                     "TRANSACTION_TYPE_VALIDATOR" => Ok(transaction::TransactionType::Validator),
                     "TRANSACTION_TYPE_BLOCK_EPILOGUE" => Ok(transaction::TransactionType::BlockEpilogue),
+                    "TRANSACTION_TYPE_SCHEDULED" => Ok(transaction::TransactionType::Scheduled),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

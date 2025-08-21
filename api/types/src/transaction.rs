@@ -459,6 +459,7 @@ pub struct ScheduledTransaction {
     pub schedule_time: U64,
     pub txn_id: U256,
     pub timestamp: U64,
+    pub events: Vec<Event>,
 }
 
 /// A request to submit a transaction

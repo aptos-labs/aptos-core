@@ -204,7 +204,8 @@ module aptos_framework::scheduled_txns {
         sender_addr: address,
         scheduled_time_ms: u64,
         max_gas_amount: u64,
-        gas_unit_price: u64
+        gas_unit_price: u64,
+        pass_signer: bool
     }
 
     #[event]
@@ -525,7 +526,8 @@ module aptos_framework::scheduled_txns {
                 sender_addr: txn.sender_addr,
                 scheduled_time_ms: txn.scheduled_time_ms,
                 max_gas_amount: txn.max_gas_amount,
-                gas_unit_price: txn.gas_unit_price
+                gas_unit_price: txn.gas_unit_price,
+                pass_signer: txn.pass_signer
             }
         );
 
@@ -790,19 +792,6 @@ module aptos_framework::scheduled_txns {
         //    proper refunding of storage gas fees to the user
         queue.txn_table.remove(txn_key.txn_id);
         true
-    }
-
-    public(friend) fun emit_transaction_failed_event(
-        key: ScheduleMapKey, sender_addr: address
-    ) {
-        event::emit(
-            TransactionFailedEvent {
-                scheduled_txn_time: key.time,
-                scheduled_txn_hash: key.txn_id,
-                sender_addr,
-                cancelled_txn_code: CancelledTxnCode::Failed
-            }
-        );
     }
 
     ////////////////////////// TESTS //////////////////////////

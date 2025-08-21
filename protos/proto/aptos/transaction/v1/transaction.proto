@@ -53,6 +53,7 @@ message Transaction {
     // values 5-19 skipped for no reason
     TRANSACTION_TYPE_VALIDATOR = 20;
     TRANSACTION_TYPE_BLOCK_EPILOGUE = 21;
+    TRANSACTION_TYPE_SCHEDULED = 22;
   }
 
   TransactionType type = 6;
@@ -66,6 +67,7 @@ message Transaction {
     ValidatorTransaction validator = 21;
     // value 22 is used up below (all Transaction fields have to have different index), so going to 23
     BlockEpilogueTransaction block_epilogue = 23;
+    ScheduledTransaction scheduled_transaction = 24;
   }
 
   TransactionSizeInfo size_info = 22;
@@ -156,6 +158,15 @@ message BlockEndInfo {
 message UserTransaction {
   UserTransactionRequest request = 1;
   repeated Event events = 2;
+}
+
+message ScheduledTransaction {
+  string sender = 1;
+  uint64 max_gas_amount = 2;
+  uint64 gas_unit_price = 3;
+  uint64 schedule_time = 4;
+  bytes txn_id = 5;  // U256 encoded as bytes
+  repeated Event events = 6;
 }
 
 message Event {
