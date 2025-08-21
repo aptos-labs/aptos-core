@@ -20,7 +20,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, Transaction, TransactionOutput, Version,
+        AuxiliaryInfo, BlockOutput, Transaction, TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -78,7 +78,7 @@ impl VMBlockExecutor for FakeVM {
 
     fn execute_block(
         &self,
-        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,

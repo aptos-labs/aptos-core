@@ -20,6 +20,7 @@ pub enum OnChainExecutionConfig {
     V4(ExecutionConfigV4),
     V5(ExecutionConfigV5),
     V6(ExecutionConfigV6),
+    V7(ExecutionConfigV7),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -34,6 +35,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V4(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V6(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V7(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -51,6 +53,7 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V4(config) => config.block_gas_limit_type.clone(),
             OnChainExecutionConfig::V5(config) => config.block_gas_limit_type.clone(),
             OnChainExecutionConfig::V6(config) => config.block_gas_limit_type.clone(),
+            OnChainExecutionConfig::V7(config) => config.block_gas_limit_type.clone(),
         }
     }
 
@@ -63,6 +66,7 @@ impl OnChainExecutionConfig {
             | OnChainExecutionConfig::V4(_) => false,
             OnChainExecutionConfig::V5(config) => config.enable_per_block_gas_limit,
             OnChainExecutionConfig::V6(config) => config.enable_per_block_gas_limit,
+            OnChainExecutionConfig::V7(config) => config.enable_per_block_gas_limit,
         }
     }
 
@@ -75,6 +79,20 @@ impl OnChainExecutionConfig {
             | OnChainExecutionConfig::V4(_)
             | OnChainExecutionConfig::V5(_) => None,
             OnChainExecutionConfig::V6(config) => Some(config.gas_price_to_burn),
+            OnChainExecutionConfig::V7(config) => Some(config.gas_price_to_burn),
+        }
+    }
+
+    pub fn persisted_auxiliary_info_version(&self) -> u8 {
+        match self {
+            OnChainExecutionConfig::Missing
+            | OnChainExecutionConfig::V1(_)
+            | OnChainExecutionConfig::V2(_)
+            | OnChainExecutionConfig::V3(_)
+            | OnChainExecutionConfig::V4(_)
+            | OnChainExecutionConfig::V5(_)
+            | OnChainExecutionConfig::V6(_) => 0,
+            OnChainExecutionConfig::V7(config) => config.persisted_auxiliary_info_version,
         }
     }
 
@@ -97,18 +115,20 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V4(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V5(config) => config.transaction_deduper_type.clone(),
             OnChainExecutionConfig::V6(config) => config.transaction_deduper_type.clone(),
+            OnChainExecutionConfig::V7(config) => config.transaction_deduper_type.clone(),
         }
     }
 
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V6(ExecutionConfigV6 {
+        OnChainExecutionConfig::V7(ExecutionConfigV7 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
             enable_per_block_gas_limit: false,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
             gas_price_to_burn: 90,
+            persisted_auxiliary_info_version: 1,
         })
     }
 
@@ -193,6 +213,16 @@ pub struct ExecutionConfigV6 {
     pub enable_per_block_gas_limit: bool,
     pub transaction_deduper_type: TransactionDeduperType,
     pub gas_price_to_burn: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV7 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit_type: BlockGasLimitType,
+    pub enable_per_block_gas_limit: bool,
+    pub transaction_deduper_type: TransactionDeduperType,
+    pub gas_price_to_burn: u64,
+    pub persisted_auxiliary_info_version: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
