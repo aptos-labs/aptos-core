@@ -230,6 +230,7 @@ export interface Transaction {
     | undefined;
   /** value 22 is used up below (all Transaction fields have to have different index), so going to 23 */
   blockEpilogue?: BlockEpilogueTransaction | undefined;
+  scheduledTransaction?: ScheduledTransaction | undefined;
   sizeInfo?: TransactionSizeInfo | undefined;
 }
 
@@ -242,6 +243,7 @@ export enum Transaction_TransactionType {
   /** TRANSACTION_TYPE_VALIDATOR - values 5-19 skipped for no reason */
   TRANSACTION_TYPE_VALIDATOR = 20,
   TRANSACTION_TYPE_BLOCK_EPILOGUE = 21,
+  TRANSACTION_TYPE_SCHEDULED = 22,
   UNRECOGNIZED = -1,
 }
 
@@ -268,6 +270,9 @@ export function transaction_TransactionTypeFromJSON(object: any): Transaction_Tr
     case 21:
     case "TRANSACTION_TYPE_BLOCK_EPILOGUE":
       return Transaction_TransactionType.TRANSACTION_TYPE_BLOCK_EPILOGUE;
+    case 22:
+    case "TRANSACTION_TYPE_SCHEDULED":
+      return Transaction_TransactionType.TRANSACTION_TYPE_SCHEDULED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -291,6 +296,8 @@ export function transaction_TransactionTypeToJSON(object: Transaction_Transactio
       return "TRANSACTION_TYPE_VALIDATOR";
     case Transaction_TransactionType.TRANSACTION_TYPE_BLOCK_EPILOGUE:
       return "TRANSACTION_TYPE_BLOCK_EPILOGUE";
+    case Transaction_TransactionType.TRANSACTION_TYPE_SCHEDULED:
+      return "TRANSACTION_TYPE_SCHEDULED";
     case Transaction_TransactionType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -385,6 +392,18 @@ export interface BlockEndInfo {
 
 export interface UserTransaction {
   request?: UserTransactionRequest | undefined;
+  events?: Event[] | undefined;
+}
+
+export interface ScheduledTransaction {
+  sender?: string | undefined;
+  maxGasAmount?: bigint | undefined;
+  gasUnitPrice?: bigint | undefined;
+  scheduleTime?:
+    | bigint
+    | undefined;
+  /** U256 encoded as bytes */
+  txnId?: Uint8Array | undefined;
   events?: Event[] | undefined;
 }
 
@@ -1369,6 +1388,7 @@ function createBaseTransaction(): Transaction {
     user: undefined,
     validator: undefined,
     blockEpilogue: undefined,
+    scheduledTransaction: undefined,
     sizeInfo: undefined,
   };
 }
@@ -1419,6 +1439,9 @@ export const Transaction = {
     }
     if (message.blockEpilogue !== undefined) {
       BlockEpilogueTransaction.encode(message.blockEpilogue, writer.uint32(186).fork()).ldelim();
+    }
+    if (message.scheduledTransaction !== undefined) {
+      ScheduledTransaction.encode(message.scheduledTransaction, writer.uint32(194).fork()).ldelim();
     }
     if (message.sizeInfo !== undefined) {
       TransactionSizeInfo.encode(message.sizeInfo, writer.uint32(178).fork()).ldelim();
@@ -1517,6 +1540,13 @@ export const Transaction = {
 
           message.blockEpilogue = BlockEpilogueTransaction.decode(reader, reader.uint32());
           continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.scheduledTransaction = ScheduledTransaction.decode(reader, reader.uint32());
+          continue;
         case 22:
           if (tag !== 178) {
             break;
@@ -1581,6 +1611,9 @@ export const Transaction = {
       user: isSet(object.user) ? UserTransaction.fromJSON(object.user) : undefined,
       validator: isSet(object.validator) ? ValidatorTransaction.fromJSON(object.validator) : undefined,
       blockEpilogue: isSet(object.blockEpilogue) ? BlockEpilogueTransaction.fromJSON(object.blockEpilogue) : undefined,
+      scheduledTransaction: isSet(object.scheduledTransaction)
+        ? ScheduledTransaction.fromJSON(object.scheduledTransaction)
+        : undefined,
       sizeInfo: isSet(object.sizeInfo) ? TransactionSizeInfo.fromJSON(object.sizeInfo) : undefined,
     };
   },
@@ -1623,6 +1656,9 @@ export const Transaction = {
     if (message.blockEpilogue !== undefined) {
       obj.blockEpilogue = BlockEpilogueTransaction.toJSON(message.blockEpilogue);
     }
+    if (message.scheduledTransaction !== undefined) {
+      obj.scheduledTransaction = ScheduledTransaction.toJSON(message.scheduledTransaction);
+    }
     if (message.sizeInfo !== undefined) {
       obj.sizeInfo = TransactionSizeInfo.toJSON(message.sizeInfo);
     }
@@ -1661,6 +1697,9 @@ export const Transaction = {
       : undefined;
     message.blockEpilogue = (object.blockEpilogue !== undefined && object.blockEpilogue !== null)
       ? BlockEpilogueTransaction.fromPartial(object.blockEpilogue)
+      : undefined;
+    message.scheduledTransaction = (object.scheduledTransaction !== undefined && object.scheduledTransaction !== null)
+      ? ScheduledTransaction.fromPartial(object.scheduledTransaction)
       : undefined;
     message.sizeInfo = (object.sizeInfo !== undefined && object.sizeInfo !== null)
       ? TransactionSizeInfo.fromPartial(object.sizeInfo)
@@ -3740,6 +3779,192 @@ export const UserTransaction = {
     message.request = (object.request !== undefined && object.request !== null)
       ? UserTransactionRequest.fromPartial(object.request)
       : undefined;
+    message.events = object.events?.map((e) => Event.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseScheduledTransaction(): ScheduledTransaction {
+  return {
+    sender: "",
+    maxGasAmount: BigInt("0"),
+    gasUnitPrice: BigInt("0"),
+    scheduleTime: BigInt("0"),
+    txnId: new Uint8Array(0),
+    events: [],
+  };
+}
+
+export const ScheduledTransaction = {
+  encode(message: ScheduledTransaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sender !== undefined && message.sender !== "") {
+      writer.uint32(10).string(message.sender);
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
+        throw new globalThis.Error("value provided for field message.maxGasAmount of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.maxGasAmount.toString());
+    }
+    if (message.gasUnitPrice !== undefined && message.gasUnitPrice !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.gasUnitPrice) !== message.gasUnitPrice) {
+        throw new globalThis.Error("value provided for field message.gasUnitPrice of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.gasUnitPrice.toString());
+    }
+    if (message.scheduleTime !== undefined && message.scheduleTime !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.scheduleTime) !== message.scheduleTime) {
+        throw new globalThis.Error("value provided for field message.scheduleTime of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.scheduleTime.toString());
+    }
+    if (message.txnId !== undefined && message.txnId.length !== 0) {
+      writer.uint32(42).bytes(message.txnId);
+    }
+    if (message.events !== undefined && message.events.length !== 0) {
+      for (const v of message.events) {
+        Event.encode(v!, writer.uint32(50).fork()).ldelim();
+      }
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ScheduledTransaction {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseScheduledTransaction();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sender = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.maxGasAmount = longToBigint(reader.uint64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.gasUnitPrice = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.scheduleTime = longToBigint(reader.uint64() as Long);
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.txnId = reader.bytes();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.events!.push(Event.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ScheduledTransaction, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<ScheduledTransaction | ScheduledTransaction[]>
+      | Iterable<ScheduledTransaction | ScheduledTransaction[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ScheduledTransaction.encode(p).finish()];
+        }
+      } else {
+        yield* [ScheduledTransaction.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ScheduledTransaction>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ScheduledTransaction> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ScheduledTransaction.decode(p)];
+        }
+      } else {
+        yield* [ScheduledTransaction.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ScheduledTransaction {
+    return {
+      sender: isSet(object.sender) ? globalThis.String(object.sender) : "",
+      maxGasAmount: isSet(object.maxGasAmount) ? BigInt(object.maxGasAmount) : BigInt("0"),
+      gasUnitPrice: isSet(object.gasUnitPrice) ? BigInt(object.gasUnitPrice) : BigInt("0"),
+      scheduleTime: isSet(object.scheduleTime) ? BigInt(object.scheduleTime) : BigInt("0"),
+      txnId: isSet(object.txnId) ? bytesFromBase64(object.txnId) : new Uint8Array(0),
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: ScheduledTransaction): unknown {
+    const obj: any = {};
+    if (message.sender !== undefined && message.sender !== "") {
+      obj.sender = message.sender;
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      obj.maxGasAmount = message.maxGasAmount.toString();
+    }
+    if (message.gasUnitPrice !== undefined && message.gasUnitPrice !== BigInt("0")) {
+      obj.gasUnitPrice = message.gasUnitPrice.toString();
+    }
+    if (message.scheduleTime !== undefined && message.scheduleTime !== BigInt("0")) {
+      obj.scheduleTime = message.scheduleTime.toString();
+    }
+    if (message.txnId !== undefined && message.txnId.length !== 0) {
+      obj.txnId = base64FromBytes(message.txnId);
+    }
+    if (message.events?.length) {
+      obj.events = message.events.map((e) => Event.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ScheduledTransaction>): ScheduledTransaction {
+    return ScheduledTransaction.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ScheduledTransaction>): ScheduledTransaction {
+    const message = createBaseScheduledTransaction();
+    message.sender = object.sender ?? "";
+    message.maxGasAmount = object.maxGasAmount ?? BigInt("0");
+    message.gasUnitPrice = object.gasUnitPrice ?? BigInt("0");
+    message.scheduleTime = object.scheduleTime ?? BigInt("0");
+    message.txnId = object.txnId ?? new Uint8Array(0);
     message.events = object.events?.map((e) => Event.fromPartial(e)) || [];
     return message;
   },

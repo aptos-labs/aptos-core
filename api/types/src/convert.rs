@@ -226,6 +226,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     schedule_time: txn.key.time.into(),
                     txn_id: txn.key.txn_id.into(),
                     timestamp: timestamp.into(),
+                    events: events.into(),
                 })
             },
             BlockEpilogue(block_epilogue_payload) => {

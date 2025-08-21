@@ -473,6 +473,7 @@ impl Filterable<Transaction> for APIFilter {
                         TxnData::User(u) => &u.events,
                         TxnData::Validator(_) => return false,
                         TxnData::BlockEpilogue(_) => return false,
+                        TxnData::ScheduledTransaction(s) => &s.events,
                     };
                     events_filter.matches_vec(events)
                 } else {
