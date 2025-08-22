@@ -47,10 +47,17 @@ pub(crate) struct Frame {
     call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
-    local_tys: Vec<Type>,
+    local_tys: LocalTysStorage,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
+}
+
+enum LocalTysStorage {
+    None,
+    BorrowFromFunction,
+    Instantiated(Vec<Type>),
+    Shared(Rc<[Type]>),
 }
 
 impl AccessSpecifierEnv for Frame {
@@ -78,9 +85,11 @@ macro_rules! build_loaded_function {
                     let handle = module.$get_function_handle(idx.0);
                     match handle {
                         FunctionHandle::Local(function) => {
+                            let ty_args_fingerprint = if verified_ty_args.is_empty() { None } else { Some(crate::caches::fingerprint_ty_args(&verified_ty_args)?) };
                             (Ok(LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module.clone()),
                                 ty_args: verified_ty_args,
+                                ty_args_fingerprint,
                                 function: function.clone(),
                             }))
                         },
@@ -140,24 +149,56 @@ impl Frame {
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
-        for ty in function.local_tys() {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-        }
-
         let ty_builder = vm_config.ty_builder.clone();
         let local_tys = if RTTCheck::should_perform_checks() {
             if ty_args.is_empty() {
-                function.local_tys().to_vec()
+                // Non-generic: charge using instantiated (original) types and borrow
+                for c in function.local_ty_counts() {
+                    gas_meter.charge_create_ty(NumTypeNodes::new(*c))?;
+                }
+                LocalTysStorage::BorrowFromFunction
             } else {
-                function
-                    .local_tys()
-                    .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?
+                // Try cached instantiated locals in frame cache
+                let mut cache_borrow = frame_cache.borrow_mut();
+                if let Some(shared) = cache_borrow.instantiated_local_tys.as_ref().cloned() {
+                    // Gas counts may be cached; if not, compute and cache them now
+                    if cache_borrow.instantiated_local_ty_counts.is_none() {
+                        let counts: Vec<NumTypeNodes> = shared
+                            .iter()
+                            .map(|t| NumTypeNodes::new(t.num_nodes() as u64))
+                            .collect();
+                        cache_borrow.instantiated_local_ty_counts = Some(Rc::from(counts));
+                    }
+                    for c in cache_borrow.instantiated_local_ty_counts.as_ref().unwrap().iter() {
+                        gas_meter.charge_create_ty(*c)?;
+                    }
+                    LocalTysStorage::Shared(shared)
+                } else {
+                    let instantiated: Vec<Type> = function
+                        .local_tys()
+                        .iter()
+                        .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+                        .collect::<PartialVMResult<Vec<_>>>()?;
+                    let counts: Vec<NumTypeNodes> = instantiated
+                        .iter()
+                        .map(|t| NumTypeNodes::new(t.num_nodes() as u64))
+                        .collect();
+                    let shared: Rc<[Type]> = Rc::from(instantiated);
+                    cache_borrow.instantiated_local_tys = Some(shared.clone());
+                    cache_borrow.instantiated_local_ty_counts = Some(Rc::from(counts));
+                    for c in cache_borrow.instantiated_local_ty_counts.as_ref().unwrap().iter() {
+                        gas_meter.charge_create_ty(*c)?;
+                    }
+                    LocalTysStorage::Shared(shared)
+                }
             }
         } else {
-            vec![]
+            for ty in function.local_tys() {
+                gas_meter
+                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+            }
+
+            LocalTysStorage::None
         };
 
         Ok(Frame {
@@ -171,6 +212,7 @@ impl Frame {
         })
     }
 
+    #[inline(always)]
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
         &self.ty_builder
     }
@@ -180,15 +222,39 @@ impl Frame {
     }
 
     pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
-        &self.local_tys[idx]
+        match &self.local_tys {
+            LocalTysStorage::None => unreachable!("local types queried with checks disabled"),
+            LocalTysStorage::BorrowFromFunction => &self.function.local_tys()[idx],
+            LocalTysStorage::Instantiated(v) => &v[idx],
+            LocalTysStorage::Shared(v) => &v[idx],
+        }
     }
 
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
-        for (idx, ty) in self.local_tys.iter().enumerate() {
-            if !self.locals.is_invalid(idx)? {
-                ty.paranoid_check_has_ability(Ability::Drop)?;
-            }
-        }
+        match &self.local_tys {
+            LocalTysStorage::None => return Ok(()),
+            LocalTysStorage::BorrowFromFunction => {
+                for (idx, ty) in self.function.local_tys().iter().enumerate() {
+                    if !self.locals.is_invalid(idx)? {
+                        ty.paranoid_check_has_ability(Ability::Drop)?;
+                    }
+                }
+            },
+            LocalTysStorage::Instantiated(v) => {
+                for (idx, ty) in v.iter().enumerate() {
+                    if !self.locals.is_invalid(idx)? {
+                        ty.paranoid_check_has_ability(Ability::Drop)?;
+                    }
+                }
+            },
+            LocalTysStorage::Shared(v) => {
+                for (idx, ty) in v.iter().enumerate() {
+                    if !self.locals.is_invalid(idx)? {
+                        ty.paranoid_check_has_ability(Ability::Drop)?;
+                    }
+                }
+            },
+        };
         Ok(())
     }
 
@@ -502,9 +568,17 @@ impl Frame {
         let (module, function) = loader
             .load_function_definition(gas_meter, traversal_context, module_id, function_name)
             .map_err(|err| err.to_partial())?;
+
+        let ty_args_fingerprint = if verified_ty_args.is_empty() {
+            None
+        } else {
+            Some(crate::caches::fingerprint_ty_args(&verified_ty_args)?)
+        };
+
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,
+            ty_args_fingerprint,
             function,
         })
     }

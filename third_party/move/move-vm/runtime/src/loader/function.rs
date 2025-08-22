@@ -35,6 +35,7 @@ use move_vm_types::{
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{cell::RefCell, cmp::Ordering, fmt::Debug, mem, rc::Rc, sync::Arc};
+use crate::caches::{TyArgsFingerprint, fingerprint_ty_args};
 
 /// A runtime function definition representation.
 pub struct Function {
@@ -50,6 +51,7 @@ pub struct Function {
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
+    pub(crate) local_num_tys: Option<Vec<u64>>,
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
@@ -71,6 +73,8 @@ pub struct LoadedFunction {
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
     pub ty_args: Vec<Type>,
+    // Precomputed fingerprint for generic instantiations; None for non-generic.
+    pub ty_args_fingerprint: Option<TyArgsFingerprint>,
     // Definition of the loaded function.
     pub function: Arc<Function>,
 }
@@ -450,6 +454,10 @@ impl LoadedFunction {
         self.function.local_tys()
     }
 
+    pub fn local_ty_counts(&self) -> &[u64] {
+        self.function.local_num_tys.as_ref().unwrap()
+    }
+
     /// Returns true if this function is a native function, i.e. which does not contain
     /// code and instead using the Rust implementation.
     pub fn is_native(&self) -> bool {
@@ -468,6 +476,7 @@ impl LoadedFunction {
         &self.function.code
     }
 
+    #[allow(dead_code)]
     pub(crate) fn code_size(&self) -> usize {
         self.function.code.len()
     }
@@ -534,6 +543,14 @@ impl Function {
         } else {
             vec![]
         };
+
+
+        let local_num_tys = if handle.type_parameters.is_empty() {
+            Some(local_tys.iter().map(|ty| ty.num_nodes() as u64).collect())
+        } else {
+            None
+        };
+
         let param_tys = signature_table[handle.parameters.0 as usize].clone();
 
         let access_specifier = load_access_specifier(
@@ -553,6 +570,7 @@ impl Function {
             visibility: def.visibility,
             is_entry: def.is_entry,
             name,
+            local_num_tys,
             local_tys,
             return_tys,
             param_tys,

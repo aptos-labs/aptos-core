@@ -100,6 +100,10 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    LoopIdU641k,
+    LoopIdU64Generic1k,
+    Fib10,
+    ChainCallOnce,
 }
 
 impl TransactionTypeArg {
@@ -446,6 +450,16 @@ impl TransactionTypeArg {
                     max_buy_size: 950,
                 })
             },
+            TransactionTypeArg::LoopIdU641k => call_custom_module(EntryPoints::LoopIdU64 {
+                generic: false,
+                n: 1000,
+            }),
+            TransactionTypeArg::LoopIdU64Generic1k => call_custom_module(EntryPoints::LoopIdU64 {
+                generic: true,
+                n: 1000,
+            }),
+            TransactionTypeArg::Fib10 => call_custom_module(EntryPoints::Fib { n: 10 }),
+            TransactionTypeArg::ChainCallOnce => call_custom_module(EntryPoints::ChainCallOnce),
         }
     }
 

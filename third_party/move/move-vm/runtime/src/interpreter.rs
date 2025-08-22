@@ -4,6 +4,7 @@
 
 use crate::{
     access_control::AccessControlState,
+    caches::InterpreterCaches,
     config::VMConfig,
     data_cache::{DataCacheEntry, TransactionDataCache},
     frame::Frame,
@@ -24,6 +25,8 @@ use crate::{
     },
     trace, LoadedFunction, RuntimeEnvironment,
 };
+use crate::runtime_type_checks::verify_pack;
+use move_core_types::ability::Ability;
 use fail::fail_point;
 use move_binary_format::{
     errors,
@@ -53,13 +56,7 @@ use move_vm_types::{
     },
     views::TypeView,
 };
-use std::{
-    cell::RefCell,
-    cmp::min,
-    collections::{btree_map, VecDeque},
-    fmt::Write,
-    rc::Rc,
-};
+use std::{cell::RefCell, cmp::min, collections::VecDeque, fmt::Write, rc::Rc};
 
 macro_rules! set_err_info {
     ($frame:ident, $e:expr) => {{
@@ -125,6 +122,7 @@ impl Interpreter {
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
+        caches: &mut InterpreterCaches,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -140,6 +138,7 @@ impl Interpreter {
             function,
             args,
             data_cache,
+            caches,
             loader,
             ty_depth_checker,
             layout_converter,
@@ -161,6 +160,7 @@ where
         function: LoadedFunction,
         args: Vec<Value>,
         data_cache: &mut TransactionDataCache,
+        caches: &mut InterpreterCaches,
         loader: &LoaderImpl,
         ty_depth_checker: &TypeDepthChecker<LoaderImpl>,
         layout_converter: &LayoutConverter<LoaderImpl>,
@@ -186,6 +186,7 @@ where
         if interpreter.vm_config.paranoid_type_checks {
             interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
                 data_cache,
+                caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -196,6 +197,7 @@ where
         } else {
             interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
                 data_cache,
+                caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -255,6 +257,7 @@ where
     fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
         self,
         data_cache: &mut TransactionDataCache,
+        caches: &mut InterpreterCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -265,6 +268,7 @@ where
         if self.vm_config.use_call_tree_and_instruction_cache {
             self.execute_main::<RTTCheck, AllRuntimeCaches>(
                 data_cache,
+                caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -275,6 +279,7 @@ where
         } else {
             self.execute_main::<RTTCheck, NoRuntimeCaches>(
                 data_cache,
+                caches,
                 resource_resolver,
                 gas_meter,
                 traversal_context,
@@ -294,6 +299,7 @@ where
     fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
         data_cache: &mut TransactionDataCache,
+        caches: &mut InterpreterCaches,
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
@@ -313,7 +319,13 @@ where
             .map_err(|e| self.set_location(e))?;
 
         let frame_cache = if RTCaches::caches_enabled() {
-            FrameTypeCache::make_rc_for_function(&function)
+            if function.ty_args().is_empty() {
+                caches.get_or_create_frame_cache(&function)
+            } else {
+                caches
+                    .get_or_create_frame_cache_generic(&function)
+                    .map_err(|e| self.set_location(e))?
+            }
         } else {
             FrameTypeCache::make_rc()
         };
@@ -381,46 +393,24 @@ where
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                    let (function, callee_frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
+                        if let PerInstructionCache::Call(ref function, ref fcache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            (Rc::clone(function), Rc::clone(fcache))
                         } else {
-                            match current_frame_cache.sub_frame_cache.entry(fh_idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] = PerInstructionCache::Call(
-                                        Rc::clone(&entry.0),
-                                        Rc::clone(&entry.1),
-                                    );
-
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            fh_idx,
-                                        )?);
-                                    let frame_cache =
-                                        FrameTypeCache::make_rc_for_function(&function);
-
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] = PerInstructionCache::Call(
-                                        Rc::clone(&function),
-                                        Rc::clone(&frame_cache),
-                                    );
-
-                                    (function, frame_cache)
-                                },
-                            }
+                            let function = Rc::new(self.load_function_no_visibility_checks(
+                                gas_meter,
+                                traversal_context,
+                                &current_frame,
+                                fh_idx,
+                            )?);
+                            let fcache = caches.get_or_create_frame_cache(&function);
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::Call(Rc::clone(&function), Rc::clone(&fcache));
+                            (function, fcache)
                         }
                     } else {
                         let function = Rc::new(self.load_function_no_visibility_checks(
@@ -429,8 +419,8 @@ where
                             &current_frame,
                             fh_idx,
                         )?);
-                        let frame_cache = FrameTypeCache::make_rc();
-                        (function, frame_cache)
+                        let fcache = FrameTypeCache::make_rc();
+                        (function, fcache)
                     };
 
                     RTTCheck::check_call_visibility(
@@ -459,6 +449,7 @@ where
                             resource_resolver,
                             gas_meter,
                             traversal_context,
+                            caches,
                             extensions,
                             &function,
                             ClosureMask::empty(),
@@ -472,53 +463,37 @@ where
                         gas_meter,
                         function,
                         CallType::Regular,
-                        frame_cache,
+                        callee_frame_cache,
                         ClosureMask::empty(),
                         vec![],
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                    let (function, callee_frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
+                        if let PerInstructionCache::CallGeneric(ref function, ref fcache) =
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize]
                         {
-                            (Rc::clone(function), Rc::clone(frame_cache))
+                            (Rc::clone(function), Rc::clone(fcache))
                         } else {
-                            match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                                btree_map::Entry::Occupied(entry) => {
-                                    let entry = entry.get();
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&entry.0),
-                                            Rc::clone(&entry.1),
-                                        );
+                            let function =
+                                Rc::new(self.load_generic_function_no_visibility_checks(
+                                    gas_meter,
+                                    traversal_context,
+                                    &current_frame,
+                                    idx,
+                                )?);
+                            let fcache = caches
+                                .get_or_create_frame_cache_generic(&function)
+                                .map_err(|e| set_err_info!(current_frame, e))?;
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                                PerInstructionCache::CallGeneric(
+                                    Rc::clone(&function),
+                                    Rc::clone(&fcache),
+                                );
 
-                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                                },
-                                btree_map::Entry::Vacant(entry) => {
-                                    let function =
-                                        Rc::new(self.load_generic_function_no_visibility_checks(
-                                            gas_meter,
-                                            traversal_context,
-                                            &current_frame,
-                                            idx,
-                                        )?);
-                                    let frame_cache =
-                                        FrameTypeCache::make_rc_for_function(&function);
-
-                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                    current_frame_cache.per_instruction_cache
-                                        [current_frame.pc as usize] =
-                                        PerInstructionCache::CallGeneric(
-                                            Rc::clone(&function),
-                                            Rc::clone(&frame_cache),
-                                        );
-                                    (function, frame_cache)
-                                },
-                            }
+                            (function, fcache)
                         }
                     } else {
                         let function = Rc::new(self.load_generic_function_no_visibility_checks(
@@ -527,8 +502,8 @@ where
                             &current_frame,
                             idx,
                         )?);
-                        let frame_cache = FrameTypeCache::make_rc();
-                        (function, frame_cache)
+                        let fcache = FrameTypeCache::make_rc();
+                        (function, fcache)
                     };
 
                     RTTCheck::check_call_visibility(
@@ -564,6 +539,7 @@ where
                             resource_resolver,
                             gas_meter,
                             traversal_context,
+                            caches,
                             extensions,
                             &function,
                             ClosureMask::empty(),
@@ -577,7 +553,7 @@ where
                         gas_meter,
                         function,
                         CallType::Regular,
-                        frame_cache,
+                        callee_frame_cache,
                         ClosureMask::empty(),
                         vec![],
                     )?;
@@ -651,6 +627,7 @@ where
                             resource_resolver,
                             gas_meter,
                             traversal_context,
+                            caches,
                             extensions,
                             &callee,
                             mask,
@@ -658,7 +635,13 @@ where
                         )?
                     } else {
                         let frame_cache = if RTCaches::caches_enabled() {
-                            FrameTypeCache::make_rc_for_function(&callee)
+                            if callee.ty_args().is_empty() {
+                                caches.get_or_create_frame_cache(&callee)
+                            } else {
+                                caches
+                                    .get_or_create_frame_cache_generic(&callee)
+                                    .map_err(|e| set_err_info!(current_frame, e))?
+                            }
                         } else {
                             FrameTypeCache::make_rc()
                         };
@@ -782,34 +765,29 @@ where
                 self.operand_stack.pop()?
             };
             locals.store_loc(i, value, self.vm_config.check_invariant_in_swap_loc)?;
-
-            let ty_args = function.ty_args();
-            if RTTCheck::should_perform_checks() && !is_captured {
-                // Only perform paranoid type check for actual operands on the stack.
-                // Captured arguments are already verified against function signature.
-                let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.local_tys()[i];
-                if !ty_args.is_empty() {
-                    let expected_ty = self
-                        .vm_config
-                        .ty_builder
-                        .create_ty_with_subst(expected_ty, ty_args)?;
-                    // For parameter to argument, use assignability
-                    ty.paranoid_check_assignable(&expected_ty)?;
-                } else {
-                    // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_assignable(expected_ty)?;
-                }
-            }
         }
-        Frame::make_new_frame::<RTTCheck>(
+
+        let frame = Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
             self.vm_config,
             function,
             locals,
             frame_cache,
-        )
+        )?;
+
+        if RTTCheck::should_perform_checks() {
+            for i in (0..num_param_tys).rev() {
+                let is_captured = mask.is_captured(i);
+                if !is_captured {
+                    let expected_ty = frame.local_ty_at(i);
+                    let ty = self.operand_stack.pop_ty()?;
+                    ty.paranoid_check_assignable(expected_ty)?;
+                }
+            }
+        }
+
+        Ok(frame)
     }
 
     /// Call a native functions.
@@ -820,6 +798,7 @@ where
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
+        caches: &mut InterpreterCaches,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
         mask: ClosureMask,
@@ -832,6 +811,7 @@ where
             resource_resolver,
             gas_meter,
             traversal_context,
+            caches,
             extensions,
             function,
             mask,
@@ -862,6 +842,7 @@ where
         resource_resolver: &impl ResourceResolver,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
+        caches: &mut InterpreterCaches,
         extensions: &mut NativeContextExtensions,
         function: &LoadedFunction,
         mask: ClosureMask,
@@ -947,9 +928,15 @@ where
                 }
 
                 if RTTCheck::should_perform_checks() {
-                    for ty in function.return_tys() {
-                        let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
-                        self.operand_stack.push_ty(ty)?;
+                    if function.ty_args().is_empty() {
+                        for ty in function.return_tys() {
+                            self.operand_stack.push_ty(ty.clone())?;
+                        }
+                    } else {
+                        for ty in function.return_tys() {
+                            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+                            self.operand_stack.push_ty(ty)?;
+                        }
                     }
                 }
 
@@ -1029,7 +1016,11 @@ where
                 }
 
                 let frame_cache = if RTCaches::caches_enabled() {
-                    FrameTypeCache::make_rc_for_function(&target_func)
+                    if target_func.ty_args().is_empty() {
+                        caches.get_or_create_frame_cache(&target_func)
+                    } else {
+                        caches.get_or_create_frame_cache_generic(&target_func)?
+                    }
                 } else {
                     FrameTypeCache::make_rc()
                 };
@@ -1812,24 +1803,30 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
-                RTTCheck::pre_execution_type_stack_transition(
-                    self,
-                    &mut interpreter.operand_stack,
-                    instruction,
-                    frame_cache,
-                )?;
+                // RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                // Pre-exec checks are inlined per opcode arms below
 
                 match instruction {
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ty = interpreter.operand_stack.pop_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Drop)?;
+                        }
                     },
                     Bytecode::Ret => {
+                        if RTTCheck::should_perform_checks() {
+                            self.check_local_tys_have_drop_ability()?;
+                        }
                         gas_meter.charge_simple_instr(S::Ret)?;
                         return Ok(ExitCode::Return);
                     },
                     Bytecode::BrTrue(offset) => {
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                        }
                         if interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_true(Some(*offset))?;
                             self.pc = *offset;
@@ -1839,6 +1836,9 @@ impl Frame {
                         }
                     },
                     Bytecode::BrFalse(offset) => {
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                        }
                         if !interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_false(Some(*offset))?;
                             self.pc = *offset;
@@ -1855,26 +1855,50 @@ impl Frame {
                     Bytecode::LdU8(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU8)?;
                         interpreter.operand_stack.push(Value::u8(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u8_ty = self.ty_builder().create_u8_ty();
+                            interpreter.operand_stack.push_ty(u8_ty)?
+                        }
                     },
                     Bytecode::LdU16(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU16)?;
                         interpreter.operand_stack.push(Value::u16(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u16_ty = self.ty_builder().create_u16_ty();
+                            interpreter.operand_stack.push_ty(u16_ty)?
+                        }
                     },
                     Bytecode::LdU32(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU32)?;
                         interpreter.operand_stack.push(Value::u32(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u32_ty = self.ty_builder().create_u32_ty();
+                            interpreter.operand_stack.push_ty(u32_ty)?
+                        }
                     },
                     Bytecode::LdU64(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU64)?;
                         interpreter.operand_stack.push(Value::u64(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u64_ty = self.ty_builder().create_u64_ty();
+                            interpreter.operand_stack.push_ty(u64_ty)?
+                        }
                     },
                     Bytecode::LdU128(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU128)?;
                         interpreter.operand_stack.push(Value::u128(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u128_ty = self.ty_builder().create_u128_ty();
+                            interpreter.operand_stack.push_ty(u128_ty)?
+                        }
                     },
                     Bytecode::LdU256(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU256)?;
                         interpreter.operand_stack.push(Value::u256(*int_const))?;
+                        if RTTCheck::should_perform_checks() {
+                            let u256_ty = self.ty_builder().create_u256_ty();
+                            interpreter.operand_stack.push_ty(u256_ty)?
+                        }
                     },
                     Bytecode::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
@@ -1896,20 +1920,37 @@ impl Frame {
                         gas_meter.charge_ld_const_after_deserialization(&val)?;
 
                         interpreter.operand_stack.push(val)?;
+                        if RTTCheck::should_perform_checks() {
+                            let ty = self.ty_builder().create_constant_ty(&constant.type_)?;
+                            interpreter.operand_stack.push_ty(ty)?;
+                        }
                     },
                     Bytecode::LdTrue => {
                         gas_meter.charge_simple_instr(S::LdTrue)?;
                         interpreter.operand_stack.push(Value::bool(true))?;
+                        if RTTCheck::should_perform_checks() {
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?
+                        }
                     },
                     Bytecode::LdFalse => {
                         gas_meter.charge_simple_instr(S::LdFalse)?;
                         interpreter.operand_stack.push(Value::bool(false))?;
+                        if RTTCheck::should_perform_checks() {
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?
+                        }
                     },
                     Bytecode::CopyLoc(idx) => {
                         // TODO(Gas): We should charge gas before copying the value.
                         let local = self.locals.copy_loc(*idx as usize)?;
                         gas_meter.charge_copy_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
+                        if RTTCheck::should_perform_checks() {
+                            let ty = self.local_ty_at(*idx as usize).clone();
+                            ty.paranoid_check_has_ability(Ability::Copy)?;
+                            interpreter.operand_stack.push_ty(ty)?
+                        }
                     },
                     Bytecode::MoveLoc(idx) => {
                         let local = self.locals.move_loc(
@@ -1919,8 +1960,20 @@ impl Frame {
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
+                        if RTTCheck::should_perform_checks() {
+                            let ty = self.local_ty_at(*idx as usize).clone();
+                            interpreter.operand_stack.push_ty(ty)?;
+                        }
                     },
                     Bytecode::StLoc(idx) => {
+                        if RTTCheck::should_perform_checks() {
+                            let expected_ty = self.local_ty_at(*idx as usize);
+                            let val_ty = interpreter.operand_stack.pop_ty()?;
+                            val_ty.paranoid_check_assignable(expected_ty)?;
+                            if !self.locals.is_invalid(*idx as usize)? {
+                                expected_ty.paranoid_check_has_ability(Ability::Drop)?;
+                            }
+                        }
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
                         self.locals.store_loc(
@@ -1935,62 +1988,118 @@ impl Frame {
                     Bytecode::CallGeneric(idx) => {
                         return Ok(ExitCode::CallGeneric(*idx));
                     },
-                    Bytecode::CallClosure(idx) => return Ok(ExitCode::CallClosure(*idx)),
-                    Bytecode::MutBorrowLoc(idx) | Bytecode::ImmBorrowLoc(idx) => {
-                        let instr = match instruction {
-                            Bytecode::MutBorrowLoc(_) => S::MutBorrowLoc,
-                            _ => S::ImmBorrowLoc,
-                        };
-                        gas_meter.charge_simple_instr(instr)?;
+                    Bytecode::CallClosure(idx) => {
+                        if RTTCheck::should_perform_checks() {
+                            let (expected_ty, _) = frame_cache.get_signature_index_type(*idx, self)?;
+                            let given_ty = interpreter.operand_stack.pop_ty()?;
+                            given_ty.paranoid_check_assignable(expected_ty)?;
+                        }
+                        return Ok(ExitCode::CallClosure(*idx))
+                    },
+                    Bytecode::MutBorrowLoc(idx) => {
+                        gas_meter.charge_simple_instr(S::MutBorrowLoc)?;
                         interpreter
                             .operand_stack
                             .push(self.locals.borrow_loc(*idx as usize)?)?;
+                        if RTTCheck::should_perform_checks() {
+                            let ty = self.local_ty_at(*idx as usize);
+                            let mut_ref_ty = self.ty_builder().create_ref_ty(ty, true)?;
+                            interpreter.operand_stack.push_ty(mut_ref_ty)?;
+                        }
                     },
-                    Bytecode::ImmBorrowField(fh_idx) | Bytecode::MutBorrowField(fh_idx) => {
-                        let instr = match instruction {
-                            Bytecode::MutBorrowField(_) => S::MutBorrowField,
-                            _ => S::ImmBorrowField,
-                        };
-                        gas_meter.charge_simple_instr(instr)?;
+                    Bytecode::ImmBorrowLoc(idx) => {
+                        gas_meter.charge_simple_instr(S::ImmBorrowLoc)?;
+                        interpreter
+                            .operand_stack
+                            .push(self.locals.borrow_loc(*idx as usize)?)?;
+                        if RTTCheck::should_perform_checks() {
+                            let ty = self.local_ty_at(*idx as usize);
+                            let ref_ty = self.ty_builder().create_ref_ty(ty, false)?;
+                            interpreter.operand_stack.push_ty(ref_ty)?;
+                        }
+                    },
+                    Bytecode::ImmBorrowField(fh_idx) => {
+                        gas_meter.charge_simple_instr(S::ImmBorrowField)?;
 
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
 
                         let offset = self.field_offset(*fh_idx);
                         let field_ref = reference.borrow_field(offset)?;
                         interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ty = interpreter.operand_stack.pop_ty()?;
+                            let expected_ty = self.field_handle_to_struct(*fh_idx);
+                            ty.paranoid_check_ref_eq(&expected_ty, false)?;
+
+                            let field_ty = self.get_field_ty(*fh_idx)?;
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, false)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
                     },
-                    Bytecode::ImmBorrowFieldGeneric(fi_idx)
-                    | Bytecode::MutBorrowFieldGeneric(fi_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
+                    Bytecode::MutBorrowField(fh_idx) => {
+                        gas_meter.charge_simple_instr(S::MutBorrowField)?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+
+                        let offset = self.field_offset(*fh_idx);
+                        let field_ref = reference.borrow_field(offset)?;
+                        interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ref_ty = interpreter.operand_stack.pop_ty()?;
+                            let expected_inner_ty = self.field_handle_to_struct(*fh_idx);
+                            ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
+
+                            let field_ty = self.get_field_ty(*fh_idx)?;
+                            let field_mut_ref_ty = self.ty_builder().create_ref_ty(field_ty, true)?;
+                            interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
+                        }
+                    },
+                    Bytecode::ImmBorrowFieldGeneric(fi_idx) => {
+                        let ((field_ty, field_ty_count), (expected_struct_ty, struct_ty_count)) =
                             frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
                         gas_meter.charge_create_ty(field_ty_count)?;
-
-                        let instr = if matches!(instruction, Bytecode::MutBorrowFieldGeneric(_)) {
-                            S::MutBorrowFieldGeneric
-                        } else {
-                            S::ImmBorrowFieldGeneric
-                        };
-                        gas_meter.charge_simple_instr(instr)?;
+                        gas_meter.charge_simple_instr(S::ImmBorrowFieldGeneric)?;
 
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
 
                         let offset = self.field_instantiation_offset(*fi_idx);
                         let field_ref = reference.borrow_field(offset)?;
                         interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, false)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
                     },
-                    Bytecode::ImmBorrowVariantField(idx) | Bytecode::MutBorrowVariantField(idx) => {
-                        let instr = if matches!(instruction, Bytecode::MutBorrowVariantField(_)) {
-                            S::MutBorrowVariantField
-                        } else {
-                            S::ImmBorrowVariantField
-                        };
-                        gas_meter.charge_simple_instr(instr)?;
+                    Bytecode::MutBorrowFieldGeneric(fi_idx) => {
+                        let ((field_ty, field_ty_count), (expected_struct_ty, struct_ty_count)) =
+                            frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
+                        gas_meter.charge_create_ty(struct_ty_count)?;
+                        gas_meter.charge_create_ty(field_ty_count)?;
+                        gas_meter.charge_simple_instr( S::MutBorrowFieldGeneric)?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+
+                        let offset = self.field_instantiation_offset(*fi_idx);
+                        let field_ref = reference.borrow_field(offset)?;
+                        interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
+
+                            let field_mut_ref_ty = self.ty_builder().create_ref_ty(field_ty, true)?;
+                            interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
+                        }
+                    },
+                    Bytecode::MutBorrowVariantField(idx) => {
+                        gas_meter.charge_simple_instr(S::MutBorrowVariantField)?;
 
                         let field_info = self.variant_field_info_at(*idx);
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
@@ -2004,26 +2113,22 @@ impl Frame {
                             },
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ty = interpreter.operand_stack.pop_ty()?;
+                            let expected_ty = self.create_struct_ty(&field_info.definition_struct_type);
+                            ty.paranoid_check_ref_eq(&expected_ty, true)?;
+                            let field_ty = &field_info.uninstantiated_field_ty;
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, true)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
                     },
-                    Bytecode::ImmBorrowVariantFieldGeneric(fi_idx)
-                    | Bytecode::MutBorrowVariantFieldGeneric(fi_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
-                            frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
+                    Bytecode::ImmBorrowVariantFieldGeneric(fi_idx) => {
+                        let ((field_ty, field_ty_count), (expected_struct_ty, struct_ty_count)) =
+                        frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
                         gas_meter.charge_create_ty(field_ty_count)?;
-
-                        let instr = match instruction {
-                            Bytecode::MutBorrowVariantFieldGeneric(_) => {
-                                S::MutBorrowVariantFieldGeneric
-                            },
-                            _ => S::ImmBorrowVariantFieldGeneric,
-                        };
-                        gas_meter.charge_simple_instr(instr)?;
+                        gas_meter.charge_simple_instr(S::MutBorrowVariantFieldGeneric)?;
 
                         let field_info = self.variant_field_instantiation_info_at(*fi_idx);
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
@@ -2037,6 +2142,65 @@ impl Frame {
                             },
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, false)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
+                    },
+                    Bytecode::ImmBorrowVariantField(idx) => {
+                        gas_meter.charge_simple_instr(S::ImmBorrowVariantField)?;
+
+                        let field_info = self.variant_field_info_at(*idx);
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &field_info.variants,
+                            field_info.offset,
+                            &|v| {
+                                field_info
+                                    .definition_struct_type
+                                    .variant_name_for_message(v)
+                            },
+                        )?;
+                        interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ty = interpreter.operand_stack.pop_ty()?;
+                            let expected_ty = self.create_struct_ty(&field_info.definition_struct_type);
+                            ty.paranoid_check_ref_eq(&expected_ty, false)?;
+                            let field_ty = &field_info.uninstantiated_field_ty;
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, false)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
+                    },
+                    Bytecode::MutBorrowVariantFieldGeneric(fi_idx) => {
+                        let ((field_ty, field_ty_count), (expected_struct_ty, struct_ty_count)) =
+                            frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
+                        gas_meter.charge_create_ty(struct_ty_count)?;
+                        gas_meter.charge_create_ty(field_ty_count)?;
+                        gas_meter.charge_simple_instr(S::ImmBorrowVariantFieldGeneric)?;
+
+                        let field_info = self.variant_field_instantiation_info_at(*fi_idx);
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &field_info.variants,
+                            field_info.offset,
+                            &|v| {
+                                field_info
+                                    .definition_struct_type
+                                    .variant_name_for_message(v)
+                            },
+                        )?;
+                        interpreter.operand_stack.push(field_ref)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
+                            let field_ref_ty = self.ty_builder().create_ref_ty(field_ty, true)?;
+                            interpreter.operand_stack.push_ty(field_ref_ty)?;
+                        }
                     },
                     Bytecode::Pack(sd_idx) => {
                         let mut get_field_count_charge_gas_and_check_depth =
@@ -2074,9 +2238,16 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let args_ty = self.get_struct(*sd_idx);
+                            let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
+                            let output_ty = self.get_struct_ty(*sd_idx);
+                            verify_pack(&mut interpreter.operand_stack, field_count, field_tys, output_ty)?;
+                        }
                     },
-                    Bytecode::PackVariant(idx) => {
-                        let info = self.get_struct_variant_at(*idx);
+                    Bytecode::PackVariant(sd_idx) => {
+                        let info = self.get_struct_variant_at(*sd_idx);
                         let struct_type = self.create_struct_ty(&info.definition_struct_type);
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
@@ -2093,14 +2264,71 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let field_tys = info
+                                .definition_struct_type
+                                .fields(Some(info.variant))?
+                                .iter()
+                                .map(|(_, ty)| ty);
+                            verify_pack(&mut interpreter.operand_stack, info.field_count, field_tys, struct_type)?;
+                        }
+                    },
+                    Bytecode::PackVariantGeneric(si_idx) => {
+                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        gas_meter.charge_create_ty(ty_count)?;
+                        interpreter.ty_depth_checker.check_depth_of_type(
+                            gas_meter,
+                            traversal_context,
+                            ty,
+                        )?;
+                        let ty = ty.clone();
+
+                        let field_tys =
+                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+
+                        for (_, ty_count) in field_tys {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
+
+                        let info = self.get_struct_variant_instantiation_at(*si_idx);
+                        gas_meter.charge_pack_variant(
+                            true,
+                            interpreter
+                                .operand_stack
+                                .last_n(info.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(info.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            verify_pack(
+                                &mut interpreter.operand_stack,
+                                info.field_count,
+                                field_tys.iter().map(|(ty, _)| ty),
+                                ty,
+                            )?;
+                        }
+                    },
+                    Bytecode::Unpack(idx) => {
+                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
+                        gas_meter.charge_unpack(false, struct_value.field_views())?;
+                        for value in struct_value.unpack()? {
+                            interpreter.operand_stack.push(value)?;
+                        }
+
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_eq(&self.get_struct_ty(*idx))?;
+                            let struct_decl = self.get_struct(*idx);
+                            for (_, ty) in struct_decl.fields(None)?.iter() {
+                                interpreter.operand_stack.push_ty(ty.clone())?;
+                            }
+                        }
                     },
                     Bytecode::PackGeneric(si_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
-
                         let mut get_field_count_charge_gas_and_check_depth =
                             |frame_cache: &mut FrameTypeCache| -> PartialVMResult<u16> {
                                 let field_tys =
@@ -2147,42 +2375,27 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
-                    },
-                    Bytecode::PackVariantGeneric(si_idx) => {
-                        let field_tys =
-                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
 
-                        for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                        if RTTCheck::should_perform_checks() {
+                            let output_ty = frame_cache.get_struct_type(*si_idx, self)?.0.clone();
+                            let args_ty = frame_cache.get_struct_fields_types(*si_idx, self)?;
+                            if field_count as usize != args_ty.len() {
+                                // This is an inconsistency between the cache and the actual
+                                // type declaration. We would crash if for some reason this invariant does
+                                // not hold. It seems impossible to hit, but we keep it here for safety
+                                // reasons, as a previous version of this code had this too.
+                                return Err(
+                                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                        .with_message("Args count mismatch".to_string()),
+                                );
+                            }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
-
-                        let info = self.get_struct_variant_instantiation_at(*si_idx);
-                        gas_meter.charge_pack_variant(
-                            true,
-                            interpreter
-                                .operand_stack
-                                .last_n(info.field_count as usize)?,
-                        )?;
-                        let args = interpreter.operand_stack.popn(info.field_count)?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
-                    },
-                    Bytecode::Unpack(_sd_idx) => {
-                        let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
-
-                        gas_meter.charge_unpack(false, struct_value.field_views())?;
-
-                        for value in struct_value.unpack()? {
-                            interpreter.operand_stack.push(value)?;
+                            verify_pack(
+                                &mut interpreter.operand_stack,
+                                field_count,
+                                args_ty.iter().map(|(ty, _)| ty),
+                                output_ty,
+                            )?;
                         }
                     },
                     Bytecode::UnpackVariant(sd_idx) => {
@@ -2196,27 +2409,38 @@ impl Frame {
                         })? {
                             interpreter.operand_stack.push(value)?;
                         }
+
+                        if RTTCheck::should_perform_checks() {
+                            let expected_struct_ty = self.create_struct_ty(&info.definition_struct_type);
+                            let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                            actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
+                            for (_, ty) in info
+                                .definition_struct_type
+                                .fields(Some(info.variant))?
+                                .iter()
+                            {
+                                interpreter.operand_stack.push_ty(ty.clone())?;
+                            }
+                        }
                     },
                     Bytecode::UnpackGeneric(si_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
-                        let ty_and_field_counts =
-                            frame_cache.get_struct_fields_types(*si_idx, self)?;
-                        for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
-
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-
+                        if RTTCheck::should_perform_checks() {
+                            let struct_ty = interpreter.operand_stack.pop_ty()?;
+                            struct_ty.paranoid_check_eq(ty)?;
+                        }
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
                             traversal_context,
                             ty,
                         )?;
+
+                        let ty_and_field_counts =
+                            frame_cache.get_struct_fields_types(*si_idx, self)?;
+                        for (_, ty_count) in ty_and_field_counts {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2228,22 +2452,32 @@ impl Frame {
                         for value in struct_.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
+
+                        if RTTCheck::should_perform_checks() {
+                            for (ty, _) in ty_and_field_counts {
+                                interpreter.operand_stack.push_ty(ty.clone())?;
+                            }
+                        }
                     },
                     Bytecode::UnpackVariantGeneric(si_idx) => {
-                        let ty_and_field_counts =
-                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
-                        for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
-
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
+                        if RTTCheck::should_perform_checks() {
+                            let actual_struct_type = interpreter.operand_stack.pop_ty()?;
+                            actual_struct_type.paranoid_check_eq(ty)?;
+                        }
 
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
                             traversal_context,
                             ty,
                         )?;
+
+                        let ty_and_field_counts =
+                            frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+                        for (_, ty_count) in ty_and_field_counts {
+                            gas_meter.charge_create_ty(*ty_count)?;
+                        }
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2255,6 +2489,12 @@ impl Frame {
                         })? {
                             interpreter.operand_stack.push(value)?;
                         }
+
+                        if RTTCheck::should_perform_checks() {
+                            for (ty, _) in ty_and_field_counts {
+                                interpreter.operand_stack.push_ty(ty.clone())?;
+                            }
+                        }
                     },
                     Bytecode::TestVariant(sd_idx) => {
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
@@ -2263,14 +2503,15 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(reference.test_variant(info.variant)?)?;
+                        if RTTCheck::should_perform_checks() {
+                            let expected_struct_ty = self.create_struct_ty(&info.definition_struct_type);
+                            let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                            actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
+                            interpreter.operand_stack.push_ty(self.ty_builder().create_bool_ty())?;
+                        }
                     },
                     Bytecode::TestVariantGeneric(sd_idx) => {
-                        // TODO: Even though the types are not needed for execution, we still
-                        //       instantiate them for gas metering.
-                        //
-                        //       This is a bit wasteful since the newly created types are
-                        //       dropped immediately.
-                        let (_, struct_ty_count) =
+                        let (expected_struct_ty, struct_ty_count) =
                             frame_cache.get_struct_variant_type(*sd_idx, self)?;
                         gas_meter.charge_create_ty(struct_ty_count)?;
 
@@ -2280,6 +2521,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(reference.test_variant(info.variant)?)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let actual_struct_ty = interpreter.operand_stack.pop_ty()?;
+                            actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                            interpreter.operand_stack.push_ty(self.ty_builder().create_bool_ty())?;
+                        }
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2366,12 +2613,24 @@ impl Frame {
                         gas_meter.charge_read_ref(reference.value_view())?;
                         let value = reference.read_ref()?;
                         interpreter.operand_stack.push(value)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let ref_ty = interpreter.operand_stack.pop_ty()?;
+                            let inner_ty = ref_ty.paranoid_read_ref()?;
+                            interpreter.operand_stack.push_ty(inner_ty)?;
+                        }
                     },
                     Bytecode::WriteRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         let value = interpreter.operand_stack.pop()?;
                         gas_meter.charge_write_ref(&value, reference.value_view())?;
                         reference.write_ref(value)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let mut_ref_ty = interpreter.operand_stack.pop_ty()?;
+                            let val_ty = interpreter.operand_stack.pop_ty()?;
+                            mut_ref_ty.paranoid_write_ref(&val_ty)?;
+                        }
                     },
                     Bytecode::CastU8 => {
                         gas_meter.charge_simple_instr(S::CastU8)?;
@@ -2379,6 +2638,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u8(integer_value.cast_u8()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u8_ty = self.ty_builder().create_u8_ty();
+                            interpreter.operand_stack.push_ty(u8_ty)?;
+                        }
                     },
                     Bytecode::CastU16 => {
                         gas_meter.charge_simple_instr(S::CastU16)?;
@@ -2386,6 +2651,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u16(integer_value.cast_u16()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u16_ty = self.ty_builder().create_u16_ty();
+                            interpreter.operand_stack.push_ty(u16_ty)?;
+                        }
                     },
                     Bytecode::CastU32 => {
                         gas_meter.charge_simple_instr(S::CastU32)?;
@@ -2393,6 +2664,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u32(integer_value.cast_u32()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u32_ty = self.ty_builder().create_u32_ty();
+                            interpreter.operand_stack.push_ty(u32_ty)?;
+                        }
                     },
                     Bytecode::CastU64 => {
                         gas_meter.charge_simple_instr(S::CastU64)?;
@@ -2400,6 +2677,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u64(integer_value.cast_u64()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u64_ty = self.ty_builder().create_u64_ty();
+                            interpreter.operand_stack.push_ty(u64_ty)?;
+                        }
                     },
                     Bytecode::CastU128 => {
                         gas_meter.charge_simple_instr(S::CastU128)?;
@@ -2407,6 +2690,12 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u128(integer_value.cast_u128()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u128_ty = self.ty_builder().create_u128_ty();
+                            interpreter.operand_stack.push_ty(u128_ty)?;
+                        }
                     },
                     Bytecode::CastU256 => {
                         gas_meter.charge_simple_instr(S::CastU256)?;
@@ -2414,39 +2703,77 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u256(integer_value.cast_u256()?))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                            let u256_ty = self.ty_builder().create_u256_ty();
+                            interpreter.operand_stack.push_ty(u256_ty)?;
+                        }
                     },
                     // Arithmetic Operations
                     Bytecode::Add => {
                         gas_meter.charge_simple_instr(S::Add)?;
-                        interpreter.binop_int(IntegerValue::add_checked)?
+                        interpreter.binop_int(IntegerValue::add_checked)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Sub => {
                         gas_meter.charge_simple_instr(S::Sub)?;
-                        interpreter.binop_int(IntegerValue::sub_checked)?
+                        interpreter.binop_int(IntegerValue::sub_checked)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Mul => {
                         gas_meter.charge_simple_instr(S::Mul)?;
-                        interpreter.binop_int(IntegerValue::mul_checked)?
+                        interpreter.binop_int(IntegerValue::mul_checked)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Mod => {
                         gas_meter.charge_simple_instr(S::Mod)?;
-                        interpreter.binop_int(IntegerValue::rem_checked)?
+                        interpreter.binop_int(IntegerValue::rem_checked)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Div => {
                         gas_meter.charge_simple_instr(S::Div)?;
-                        interpreter.binop_int(IntegerValue::div_checked)?
+                        interpreter.binop_int(IntegerValue::div_checked)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::BitOr => {
                         gas_meter.charge_simple_instr(S::BitOr)?;
-                        interpreter.binop_int(IntegerValue::bit_or)?
+                        interpreter.binop_int(IntegerValue::bit_or)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::BitAnd => {
                         gas_meter.charge_simple_instr(S::BitAnd)?;
-                        interpreter.binop_int(IntegerValue::bit_and)?
+                        interpreter.binop_int(IntegerValue::bit_and)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Xor => {
                         gas_meter.charge_simple_instr(S::Xor)?;
-                        interpreter.binop_int(IntegerValue::bit_xor)?
+                        interpreter.binop_int(IntegerValue::bit_xor)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Shl => {
                         gas_meter.charge_simple_instr(S::Shl)?;
@@ -2455,6 +2782,9 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(lhs.shl_checked(rhs)?.into_value())?;
+                        if RTTCheck::should_perform_checks() {
+                            let _rhs_ty = interpreter.operand_stack.pop_ty()?;
+                        }
                     },
                     Bytecode::Shr => {
                         gas_meter.charge_simple_instr(S::Shr)?;
@@ -2463,32 +2793,78 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(lhs.shr_checked(rhs)?.into_value())?;
+                        if RTTCheck::should_perform_checks() {
+                            let _rhs_ty = interpreter.operand_stack.pop_ty()?;
+                        }
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
-                        interpreter.binop_bool(|l, r| Ok(l || r))?
+                        interpreter.binop_bool(|l, r| Ok(l || r))?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::And => {
                         gas_meter.charge_simple_instr(S::And)?;
-                        interpreter.binop_bool(|l, r| Ok(l && r))?
+                        interpreter.binop_bool(|l, r| Ok(l && r))?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(interpreter.operand_stack.top_ty()?)?;
+                        }
                     },
                     Bytecode::Lt => {
                         gas_meter.charge_simple_instr(S::Lt)?;
-                        interpreter.binop_bool(IntegerValue::lt)?
+                        interpreter.binop_bool(IntegerValue::lt)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::Gt => {
                         gas_meter.charge_simple_instr(S::Gt)?;
-                        interpreter.binop_bool(IntegerValue::gt)?
+                        interpreter.binop_bool(IntegerValue::gt)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::Le => {
                         gas_meter.charge_simple_instr(S::Le)?;
-                        interpreter.binop_bool(IntegerValue::le)?
+                        interpreter.binop_bool(IntegerValue::le)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::Ge => {
                         gas_meter.charge_simple_instr(S::Ge)?;
-                        interpreter.binop_bool(IntegerValue::ge)?
+                        interpreter.binop_bool(IntegerValue::ge)?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::Abort => {
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?;
+                        }
                         gas_meter.charge_simple_instr(S::Abort)?;
                         let error_code = interpreter.operand_stack.pop_as::<u64>()?;
                         let error = PartialVMError::new(StatusCode::ABORTED)
@@ -2507,6 +2883,15 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::bool(lhs.equals(&rhs)?))?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                            rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::Neq => {
                         let lhs = interpreter.operand_stack.pop()?;
@@ -2515,13 +2900,21 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::bool(!lhs.equals(&rhs)?))?;
+                        if RTTCheck::should_perform_checks() {
+                            let rhs_ty = interpreter.operand_stack.pop_ty()?;
+                            let lhs_ty = interpreter.operand_stack.pop_ty()?;
+                            rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                            rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
-                    Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
-                        let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
+                    Bytecode::MutBorrowGlobal(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
                         interpreter.borrow_global(
-                            is_mut,
+                            true,
                             false,
                             data_cache,
                             resource_resolver,
@@ -2530,15 +2923,43 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+
+                            let struct_mut_ref_ty = self.ty_builder().create_ref_ty(&ty, true)?;
+                            interpreter.operand_stack.push_ty(struct_mut_ref_ty)?;
+                        }
                     },
-                    Bytecode::MutBorrowGlobalGeneric(si_idx)
-                    | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
-                        let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
+                    Bytecode::ImmBorrowGlobal(sd_idx) => {
+                        let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
+                        let ty = self.get_struct_ty(*sd_idx);
+                        interpreter.borrow_global(
+                            false,
+                            false,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                            addr,
+                            &ty,
+                        )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+
+                            let struct_ref_ty = self.ty_builder().create_ref_ty(&ty, false)?;
+                            interpreter.operand_stack.push_ty(struct_ref_ty)?;
+                        }
+                    },
+                    Bytecode::MutBorrowGlobalGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.borrow_global(
-                            is_mut,
+                            true,
                             true,
                             data_cache,
                             resource_resolver,
@@ -2547,6 +2968,37 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+
+                            let struct_mut_ref_ty = self.ty_builder().create_ref_ty(ty, true)?;
+                            interpreter.operand_stack.push_ty(struct_mut_ref_ty)?;
+                        }
+                    },
+                    Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
+                        let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
+                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        gas_meter.charge_create_ty(ty_count)?;
+                        interpreter.borrow_global(
+                            false,
+                            true,
+                            data_cache,
+                            resource_resolver,
+                            gas_meter,
+                            traversal_context,
+                            addr,
+                            ty,
+                        )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+
+                            let struct_ref_ty = self.ty_builder().create_ref_ty(ty, false)?;
+                            interpreter.operand_stack.push_ty(struct_ref_ty)?;
+                        }
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2560,6 +3012,13 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2574,6 +3033,13 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+
+                            let bool_ty = self.ty_builder().create_bool_ty();
+                            interpreter.operand_stack.push_ty(bool_ty)?;
+                        }
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2587,6 +3053,11 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+                            interpreter.operand_stack.push_ty(ty)?;
+                        }
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2601,6 +3072,12 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                            ty.paranoid_check_has_ability(Ability::Key)?;
+                            interpreter.operand_stack.push_ty(ty.clone())?;
+                        }
                     },
                     Bytecode::MoveTo(sd_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
@@ -2621,6 +3098,13 @@ impl Frame {
                             &ty,
                             resource,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let stack_ty = interpreter.operand_stack.pop_ty()?;
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
+                            stack_ty.paranoid_check_eq(&ty)?;
+                            stack_ty.paranoid_check_has_ability(Ability::Key)?;
+                        }
                     },
                     Bytecode::MoveToGeneric(si_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
@@ -2642,16 +3126,30 @@ impl Frame {
                             ty,
                             resource,
                         )?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let stack_ty = interpreter.operand_stack.pop_ty()?;
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
+                            stack_ty.paranoid_check_eq(ty)?;
+                            stack_ty.paranoid_check_has_ability(Ability::Key)?;
+                        }
                     },
                     Bytecode::FreezeRef => {
                         gas_meter.charge_simple_instr(S::FreezeRef)?;
-                        // FreezeRef should just be a null op as we don't distinguish between mut
-                        // and immut ref at runtime.
+                        if RTTCheck::should_perform_checks() {
+                            let mut_ref_ty =interpreter.operand_stack.pop_ty()?;
+                            let ref_ty = mut_ref_ty.paranoid_freeze_ref_ty()?;
+                            interpreter.operand_stack.push_ty(ref_ty)?;
+                        }
                     },
                     Bytecode::Not => {
                         gas_meter.charge_simple_instr(S::Not)?;
                         let value = !interpreter.operand_stack.pop_as::<bool>()?;
                         interpreter.operand_stack.push(Value::bool(value))?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
+                        }
                     },
                     Bytecode::Nop => {
                         gas_meter.charge_simple_instr(S::Nop)?;
@@ -2671,6 +3169,17 @@ impl Frame {
                         let elements = interpreter.operand_stack.popn(*num as u16)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let elem_tys = interpreter.operand_stack.popn_tys(*num as u16)?;
+                            for elem_ty in elem_tys.iter() {
+                                // For vector element types, use assignability
+                                elem_ty.paranoid_check_assignable(ty)?;
+                            }
+
+                            let vec_ty = self.ty_builder().create_vec_ty(ty)?;
+                            interpreter.operand_stack.push_ty(vec_ty)?;
+                        }
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
@@ -2679,6 +3188,14 @@ impl Frame {
                         gas_meter.charge_vec_len(make_ty!(ty))?;
                         let value = vec_ref.len(ty)?;
                         interpreter.operand_stack.push(value)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_is_vec_ref_ty::<false>(ty)?;
+                            let u64_ty = self.ty_builder().create_u64_ty();
+                            interpreter.operand_stack.push_ty(u64_ty)?;
+                        }
                     },
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2688,6 +3205,15 @@ impl Frame {
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(false, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                            let elem_ref_ty =interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
+
+                                interpreter.operand_stack.push_ty(elem_ref_ty)?;
+                        }
                     },
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2697,6 +3223,14 @@ impl Frame {
                         let res = vec_ref.borrow_elem(idx, ty);
                         gas_meter.charge_vec_borrow(true, make_ty!(ty), res.is_ok())?;
                         interpreter.operand_stack.push(res?)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                            let elem_ref_ty = interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
+                            interpreter.operand_stack.push_ty(elem_ref_ty)?;
+                        }
                     },
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
@@ -2705,6 +3239,13 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(make_ty!(ty), &elem)?;
                         vec_ref.push_back(elem, ty)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
+                            interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                        }
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
@@ -2713,6 +3254,13 @@ impl Frame {
                         let res = vec_ref.pop(ty);
                         gas_meter.charge_vec_pop_back(make_ty!(ty), res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            let elem_ty = interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
+                            interpreter.operand_stack.push_ty(elem_ty)?;
+                        }
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
@@ -2727,6 +3275,14 @@ impl Frame {
                         for value in elements {
                             interpreter.operand_stack.push(value)?;
                         }
+
+                        if RTTCheck::should_perform_checks() {
+                            let vec_ty = interpreter.operand_stack.pop_ty()?;
+                            vec_ty.paranoid_check_is_vec_ty(ty)?;
+                            for _ in 0..*num {
+                                interpreter.operand_stack.push_ty(ty.clone())?;
+                            }
+                        }
                     },
                     Bytecode::VecSwap(si) => {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2736,16 +3292,24 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap(make_ty!(ty))?;
                         vec_ref.swap(idx1, idx2, ty)?;
+
+                        if RTTCheck::should_perform_checks() {
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                            interpreter.operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                            interpreter.operand_stack
+                                .pop_ty()?
+                                .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                        }
                     },
                 }
 
-                RTTCheck::post_execution_type_stack_transition(
-                    self,
-                    &mut interpreter.operand_stack,
-                    instruction,
-                    frame_cache,
-                )?;
-                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                // RTTCheck::post_execution_type_stack_transition(
+                //     self,
+                //     &mut interpreter.operand_stack,
+                //     instruction,
+                //     frame_cache,
+                // )?;
+                // RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
 
                 // invariant: advance to pc +1 is iff instruction at pc executed without aborting
                 self.pc += 1;
