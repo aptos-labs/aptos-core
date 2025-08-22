@@ -21,6 +21,8 @@ mod configuration;
 mod identity_information;
 mod index;
 mod json_encoder;
+#[cfg(unix)]
+mod malloc;
 mod metrics;
 mod peer_information;
 mod system_information;
@@ -32,10 +34,12 @@ mod tests;
 // The list of endpoints offered by the inspection service
 pub const CONFIGURATION_PATH: &str = "/configuration";
 pub const CONSENSUS_HEALTH_CHECK_PATH: &str = "/consensus_health_check";
+pub const DUMP_HEAP_PROFILE_PATH: &str = "/dump_heap_profile";
 pub const FORGE_METRICS_PATH: &str = "/forge_metrics";
 pub const IDENTITY_INFORMATION_PATH: &str = "/identity_information";
 pub const INDEX_PATH: &str = "/";
 pub const JSON_METRICS_PATH: &str = "/json_metrics";
+pub const MALLOC_STATS_PATH: &str = "/malloc_stats";
 pub const METRICS_PATH: &str = "/metrics";
 pub const PEER_INFORMATION_PATH: &str = "/peer_information";
 pub const SYSTEM_INFORMATION_PATH: &str = "/system_information";
@@ -119,6 +123,17 @@ async fn serve_requests(
             // Exposes the consensus health check
             metrics::handle_consensus_health_check(&node_config).await
         },
+        DUMP_HEAP_PROFILE_PATH => {
+            if cfg!(unix) {
+                malloc::handle_dump_profile_request()
+            } else {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Body::from("jemalloc not available"),
+                    CONTENT_TYPE_TEXT.into(),
+                )
+            }
+        },
         FORGE_METRICS_PATH => {
             // /forge_metrics
             // Exposes forge encoded metrics
@@ -138,6 +153,19 @@ async fn serve_requests(
             // /json_metrics
             // Exposes JSON encoded metrics
             metrics::handle_json_metrics_request()
+        },
+        MALLOC_STATS_PATH => {
+            if cfg!(unix) {
+                malloc::handle_malloc_stats_request(
+                    node_config.inspection_service.malloc_stats_max_len,
+                )
+            } else {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Body::from("jemalloc not available"),
+                    CONTENT_TYPE_TEXT.into(),
+                )
+            }
         },
         METRICS_PATH => {
             // /metrics
