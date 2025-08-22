@@ -6,6 +6,7 @@
 //! The lint checks also assume that all the correctness checks have already been performed.
 
 mod avoid_copy_on_identity_comparison;
+mod needless_loops;
 mod needless_mutable_reference;
 
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
@@ -18,6 +19,7 @@ pub fn get_default_linter_pipeline(
     // Start with the default set of checks.
     let checks: Vec<Box<dyn StacklessBytecodeChecker>> = vec![
         Box::new(avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison {}),
+        Box::new(needless_loops::NeedlessLoops {}),
         Box::new(needless_mutable_reference::NeedlessMutableReference {}),
     ];
     let checks_category = config.get("checks").map_or("default", |s| s.as_str());
