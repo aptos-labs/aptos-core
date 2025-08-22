@@ -2643,6 +2643,8 @@ dependencies = [
  "assert_approx_eq",
  "futures",
  "hyper 0.14.28",
+ "jemalloc-ctl",
+ "jemalloc-sys",
  "once_cell",
  "prometheus",
  "reqwest 0.11.23",
@@ -10830,6 +10832,17 @@ name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
+
+[[package]]
+name = "jemalloc-ctl"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cffc705424a344c054e135d12ee591402f4539245e8bbd64e6c9eaa9458b63c"
+dependencies = [
+ "jemalloc-sys",
+ "libc",
+ "paste",
+]
 
 [[package]]
 name = "jemalloc-sys"
