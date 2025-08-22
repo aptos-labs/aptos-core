@@ -20,6 +20,7 @@ use move_vm_types::{
     },
 };
 use std::{rc::Rc, sync::Arc};
+use crate::caches::fingerprint_ty_args;
 
 /// Provides access to struct definitions.
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {
@@ -133,9 +134,19 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module.self_id().clone())))?;
 
+        let ty_args_fingerprint = if ty_args.is_empty() {
+            None
+        } else {
+            Some(
+                fingerprint_ty_args(&ty_args)
+                    .map_err(|e| e.finish(Location::Module(module.self_id().clone())))?,
+            )
+        };
+
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
+            ty_args_fingerprint,
             function,
         })
     }
@@ -158,9 +169,19 @@ pub(crate) trait InstantiatedFunctionLoaderHelper {
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|err| err.finish(Location::Script))?;
 
+        let ty_args_fingerprint = if ty_args.is_empty() {
+            None
+        } else {
+            Some(
+                fingerprint_ty_args(&ty_args)
+                    .map_err(|e| e.finish(Location::Script))?,
+            )
+        };
+
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Script(script),
             ty_args,
+            ty_args_fingerprint,
             function: main,
         })
     }

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    caches::InterpreterCaches,
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     module_traversal::TraversalContext,
@@ -101,6 +102,7 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
+                &mut InterpreterCaches::new(),
                 loader,
                 &ty_depth_checker,
                 &layout_converter,

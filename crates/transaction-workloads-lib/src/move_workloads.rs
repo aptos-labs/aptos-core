@@ -269,6 +269,17 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+    LoopIdU64 {
+        generic: bool,
+        n: u64,
+    },
+    LoopBorrowHeavyGeneric {
+        n: u64,
+    },
+    Fib {
+        n: u64,
+    },
+    ChainCallOnce,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -339,6 +350,10 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::LoopIdU64 { .. }
+            | EntryPoints::LoopBorrowHeavyGeneric { .. }
+            | EntryPoints::Fib { .. }
+            | EntryPoints::ChainCallOnce => "function_calls",
         }
     }
 
@@ -408,6 +423,10 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::LoopIdU64 { .. }
+            | EntryPoints::LoopBorrowHeavyGeneric { .. }
+            | EntryPoints::Fib { .. }
+            | EntryPoints::ChainCallOnce => "function_calls",
         }
     }
 
@@ -879,6 +898,30 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::LoopIdU64 { generic, n } => {
+                if *generic {
+                    get_payload(
+                        module_id,
+                        ident_str!("loop_id_generic_u64").to_owned(),
+                        vec![bcs::to_bytes(n).unwrap()],
+                    )
+                } else {
+                    get_payload(module_id, ident_str!("loop_id_u64").to_owned(), vec![
+                        bcs::to_bytes(n).unwrap(),
+                    ])
+                }
+            },
+            EntryPoints::LoopBorrowHeavyGeneric { n } => get_payload(
+                module_id,
+                ident_str!("loop_borrow_heavy_generic").to_owned(),
+                vec![bcs::to_bytes(n).unwrap()],
+            ),
+            EntryPoints::Fib { n } => get_payload(module_id, ident_str!("fib").to_owned(), vec![
+                bcs::to_bytes(n).unwrap(),
+            ]),
+            EntryPoints::ChainCallOnce => {
+                get_payload(module_id, ident_str!("chain_call_once").to_owned(), vec![])
+            },
         }
     }
 
@@ -1001,6 +1044,10 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::LoopIdU64 { .. }
+            | EntryPoints::LoopBorrowHeavyGeneric { .. }
+            | EntryPoints::Fib { .. }
+            | EntryPoints::ChainCallOnce => AutomaticArgs::None,
         }
     }
 }

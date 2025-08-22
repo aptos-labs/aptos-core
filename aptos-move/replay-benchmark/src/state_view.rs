@@ -1,9 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    StateView, StateViewResult, TStateView,
+use aptos_types::{
+    state_store::{
+        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateView, StateViewResult, TStateView,
+    },
+    transaction::Version,
 };
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -18,8 +21,21 @@ pub(crate) struct ReadSet {
 impl TStateView for ReadSet {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
-        Ok(self.data.get(state_key).cloned())
+    fn next_version(&self) -> Version {
+        // Should be irrelevant?
+        0
+    }
+
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
+        let slot = match self.data.get(state_key) {
+            Some(state_value) => StateSlot::ColdOccupied {
+                // Should be irrelevant?
+                value_version: 0,
+                value: state_value.clone(),
+            },
+            None => StateSlot::ColdVacant,
+        };
+        Ok(slot)
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
@@ -75,30 +91,39 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
 impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
+    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
         // Check the read-set first.
         if let Some(state_value) = self.captured_reads.lock().get(state_key) {
-            return Ok(Some(state_value.clone()));
+            return Ok(StateSlot::ColdOccupied {
+                // Version should be irrelevant?
+                value_version: 0,
+                value: state_value.clone(),
+            });
         }
 
         // We do not allow failures because then benchmarking will not be correct (we miss a read).
         // Plus, these failures should not happen when replaying past transactions.
-        let maybe_state_value = self
+        let slot = self
             .state_view
-            .get_state_value(state_key)
+            .get_state_slot(state_key)
             .unwrap_or_else(|err| {
                 panic!("Failed to fetch state value for {:?}: {:?}", state_key, err)
             });
 
         // Capture the read on first access.
-        if let Some(state_value) = &maybe_state_value {
+        if let Some(state_value) = slot.as_state_value_opt() {
             let mut captured_reads = self.captured_reads.lock();
             if !captured_reads.contains_key(state_key) {
                 captured_reads.insert(state_key.clone(), state_value.clone());
             }
         }
 
-        Ok(maybe_state_value)
+        Ok(slot)
+    }
+
+    fn next_version(&self) -> Version {
+        // Version should be irrelevant?
+        0
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

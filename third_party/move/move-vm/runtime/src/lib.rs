@@ -24,6 +24,7 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+pub mod caches;
 mod frame;
 mod frame_type_cache;
 mod reentrancy_checker;

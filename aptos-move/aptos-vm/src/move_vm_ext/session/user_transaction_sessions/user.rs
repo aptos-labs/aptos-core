@@ -155,6 +155,7 @@ impl<'r> UserSession<'r> {
                             let loaded_function = LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module),
                                 ty_args: vec![],
+                                ty_args_fingerprint: None,
                                 function,
                             };
                             session.execute_loaded_function(

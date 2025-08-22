@@ -100,7 +100,8 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
-fn verify_pack<'a>(
+#[inline(always)]
+pub fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
     field_tys: impl Iterator<Item = &'a Type>,
@@ -405,265 +406,234 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 unreachable!("control flow instruction encountered during type check")
             },
             Bytecode::Pop => {
-                let ty = operand_stack.pop_ty()?;
-                ty.paranoid_check_has_ability(Ability::Drop)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU8(_) => {
-                let u8_ty = ty_builder.create_u8_ty();
-                operand_stack.push_ty(u8_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU16(_) => {
-                let u16_ty = ty_builder.create_u16_ty();
-                operand_stack.push_ty(u16_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU32(_) => {
-                let u32_ty = ty_builder.create_u32_ty();
-                operand_stack.push_ty(u32_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU64(_) => {
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU128(_) => {
-                let u128_ty = ty_builder.create_u128_ty();
-                operand_stack.push_ty(u128_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdU256(_) => {
-                let u256_ty = ty_builder.create_u256_ty();
-                operand_stack.push_ty(u256_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdTrue | Bytecode::LdFalse => {
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::LdConst(i) => {
-                let constant = frame.constant_at(*i);
-                let ty = ty_builder.create_constant_ty(&constant.type_)?;
-                operand_stack.push_ty(ty)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::CopyLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize).clone();
-                ty.paranoid_check_has_ability(Ability::Copy)?;
-                operand_stack.push_ty(ty)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::MoveLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize).clone();
-                operand_stack.push_ty(ty)?;
+                // Skip
             },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize);
-                let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
-                operand_stack.push_ty(mut_ref_ty)?;
+                // let ty = frame.local_ty_at(*idx as usize);
+                // let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
+                // operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize);
-                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
-                operand_stack.push_ty(ref_ty)?;
+                // let ty = frame.local_ty_at(*idx as usize);
+                // let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                // operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
-                let ty = operand_stack.pop_ty()?;
-                let expected_ty = frame.field_handle_to_struct(*fh_idx);
-                ty.paranoid_check_ref_eq(&expected_ty, false)?;
+                // let ty = operand_stack.pop_ty()?;
+                // let expected_ty = frame.field_handle_to_struct(*fh_idx);
+                // ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
-                let field_ty = frame.get_field_ty(*fh_idx)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
-                operand_stack.push_ty(field_ref_ty)?;
+                // let field_ty = frame.get_field_ty(*fh_idx)?;
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                // operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
-                let ref_ty = operand_stack.pop_ty()?;
-                let expected_inner_ty = frame.field_handle_to_struct(*fh_idx);
-                ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
+                // let ref_ty = operand_stack.pop_ty()?;
+                // let expected_inner_ty = frame.field_handle_to_struct(*fh_idx);
+                // ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
 
-                let field_ty = frame.get_field_ty(*fh_idx)?;
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
-                operand_stack.push_ty(field_mut_ref_ty)?;
+                // let field_ty = frame.get_field_ty(*fh_idx)?;
+                // let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                // operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
-                let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
-
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
-                operand_stack.push_ty(field_ref_ty)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
-                let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
-
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
-                operand_stack.push_ty(field_mut_ref_ty)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
-                let field_info = frame.variant_field_info_at(*fh_idx);
-                let ty = operand_stack.pop_ty()?;
-                let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
-                ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
-                let field_ty = &field_info.uninstantiated_field_ty;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
-                operand_stack.push_ty(field_ref_ty)?;
+                // let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
+                // let field_info = frame.variant_field_info_at(*fh_idx);
+                // let ty = operand_stack.pop_ty()?;
+                // let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
+                // ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
+                // let field_ty = &field_info.uninstantiated_field_ty;
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                // operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::ImmBorrowVariantFieldGeneric(idx)
             | Bytecode::MutBorrowVariantFieldGeneric(idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
-                let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
-                    ty_cache.get_variant_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
-                operand_stack.push_ty(field_ref_ty)?;
+                // Skip: runtime checks are implemented in interpreter loop!
             },
             Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
                 // Skip: runtime checks are implemented in interpreter loop!
             },
 
             Bytecode::Pack(idx) => {
-                let field_count = frame.field_count(*idx);
-                let args_ty = frame.get_struct(*idx);
-                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
-                let output_ty = frame.get_struct_ty(*idx);
-                verify_pack(operand_stack, field_count, field_tys, output_ty)?;
+                // let field_count = frame.field_count(*idx);
+                // let args_ty = frame.get_struct(*idx);
+                // let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
+                // let output_ty = frame.get_struct_ty(*idx);
+                // verify_pack(operand_stack, field_count, field_tys, output_ty)?;
             },
             Bytecode::PackGeneric(idx) => {
-                let field_count = frame.field_instantiation_count(*idx);
-                let output_ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
-                let args_ty = ty_cache.get_struct_fields_types(*idx, frame)?;
+                // let field_count = frame.field_instantiation_count(*idx);
+                // let output_ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
+                // let args_ty = ty_cache.get_struct_fields_types(*idx, frame)?;
 
-                if field_count as usize != args_ty.len() {
-                    // This is an inconsistency between the cache and the actual
-                    // type declaration. We would crash if for some reason this invariant does
-                    // not hold. It seems impossible to hit, but we keep it here for safety
-                    // reasons, as a previous version of this code had this too.
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message("Args count mismatch".to_string()),
-                    );
-                }
+                // if field_count as usize != args_ty.len() {
+                //     // This is an inconsistency between the cache and the actual
+                //     // type declaration. We would crash if for some reason this invariant does
+                //     // not hold. It seems impossible to hit, but we keep it here for safety
+                //     // reasons, as a previous version of this code had this too.
+                //     return Err(
+                //         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                //             .with_message("Args count mismatch".to_string()),
+                //     );
+                // }
 
-                verify_pack(
-                    operand_stack,
-                    field_count,
-                    args_ty.iter().map(|(ty, _)| ty),
-                    output_ty,
-                )?;
+                // verify_pack(
+                //     operand_stack,
+                //     field_count,
+                //     args_ty.iter().map(|(ty, _)| ty),
+                //     output_ty,
+                // )?;
             },
             Bytecode::Unpack(idx) => {
-                let struct_ty = operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
-                let struct_decl = frame.get_struct(*idx);
-                for (_name, ty) in struct_decl.fields(None)?.iter() {
-                    operand_stack.push_ty(ty.clone())?;
-                }
+                // let struct_ty = operand_stack.pop_ty()?;
+                // struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
+                // let struct_decl = frame.get_struct(*idx);
+                // for (_name, ty) in struct_decl.fields(None)?.iter() {
+                //     operand_stack.push_ty(ty.clone())?;
+                // }
             },
             Bytecode::UnpackGeneric(idx) => {
-                let struct_ty = operand_stack.pop_ty()?;
+                // let struct_ty = operand_stack.pop_ty()?;
 
-                struct_ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
+                // struct_ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
 
-                let struct_fields_types = ty_cache.get_struct_fields_types(*idx, frame)?;
-                for (ty, _) in struct_fields_types {
-                    operand_stack.push_ty(ty.clone())?;
-                }
+                // let struct_fields_types = ty_cache.get_struct_fields_types(*idx, frame)?;
+                // for (ty, _) in struct_fields_types {
+                //     operand_stack.push_ty(ty.clone())?;
+                // }
             },
             Bytecode::PackVariant(idx) => {
-                let info = frame.get_struct_variant_at(*idx);
-                let field_tys = info
-                    .definition_struct_type
-                    .fields(Some(info.variant))?
-                    .iter()
-                    .map(|(_, ty)| ty);
-                let output_ty = frame.create_struct_ty(&info.definition_struct_type);
-                verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
+                // let info = frame.get_struct_variant_at(*idx);
+                // let field_tys = info
+                //     .definition_struct_type
+                //     .fields(Some(info.variant))?
+                //     .iter()
+                //     .map(|(_, ty)| ty);
+                // let output_ty = frame.create_struct_ty(&info.definition_struct_type);
+                // verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
             },
             Bytecode::PackVariantGeneric(idx) => {
-                let info = frame.get_struct_variant_instantiation_at(*idx);
-                let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0.clone();
-                let args_ty = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
-                verify_pack(
-                    operand_stack,
-                    info.field_count,
-                    args_ty.iter().map(|(ty, _)| ty),
-                    output_ty,
-                )?;
+                // let info = frame.get_struct_variant_instantiation_at(*idx);
+                // let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0.clone();
+                // let args_ty = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
+                // verify_pack(
+                //     operand_stack,
+                //     info.field_count,
+                //     args_ty.iter().map(|(ty, _)| ty),
+                //     output_ty,
+                // )?;
             },
             Bytecode::UnpackVariant(idx) => {
-                let info = frame.get_struct_variant_at(*idx);
-                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
-                let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
-                for (_name, ty) in info
-                    .definition_struct_type
-                    .fields(Some(info.variant))?
-                    .iter()
-                {
-                    operand_stack.push_ty(ty.clone())?;
-                }
+                // let info = frame.get_struct_variant_at(*idx);
+                // let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
+                // let actual_struct_ty = operand_stack.pop_ty()?;
+                // actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
+                // for (_name, ty) in info
+                //     .definition_struct_type
+                //     .fields(Some(info.variant))?
+                //     .iter()
+                // {
+                //     operand_stack.push_ty(ty.clone())?;
+                // }
             },
             Bytecode::UnpackVariantGeneric(idx) => {
-                let expected_struct_type = ty_cache.get_struct_variant_type(*idx, frame)?.0;
-                let actual_struct_type = operand_stack.pop_ty()?;
-                actual_struct_type.paranoid_check_eq(expected_struct_type)?;
-                let struct_fields_types = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
-                for (ty, _) in struct_fields_types {
-                    operand_stack.push_ty(ty.clone())?;
-                }
+                // let expected_struct_type = ty_cache.get_struct_variant_type(*idx, frame)?.0;
+                // let actual_struct_type = operand_stack.pop_ty()?;
+                // actual_struct_type.paranoid_check_eq(expected_struct_type)?;
+                // let struct_fields_types = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
+                // for (ty, _) in struct_fields_types {
+                //     operand_stack.push_ty(ty.clone())?;
+                // }
             },
             Bytecode::TestVariant(idx) => {
-                let info = frame.get_struct_variant_at(*idx);
-                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
-                let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
-                operand_stack.push_ty(ty_builder.create_bool_ty())?;
+                // let info = frame.get_struct_variant_at(*idx);
+                // let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
+                // let actual_struct_ty = operand_stack.pop_ty()?;
+                // actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
+                // operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::TestVariantGeneric(idx) => {
-                let expected_struct_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
-                let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
-                operand_stack.push_ty(ty_builder.create_bool_ty())?;
+                // let expected_struct_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
+                // let actual_struct_ty = operand_stack.pop_ty()?;
+                // actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                // operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
             Bytecode::ReadRef => {
-                let ref_ty = operand_stack.pop_ty()?;
-                let inner_ty = ref_ty.paranoid_read_ref()?;
-                operand_stack.push_ty(inner_ty)?;
+                // let ref_ty = operand_stack.pop_ty()?;
+                // let inner_ty = ref_ty.paranoid_read_ref()?;
+                // operand_stack.push_ty(inner_ty)?;
             },
             Bytecode::WriteRef => {
-                let mut_ref_ty = operand_stack.pop_ty()?;
-                let val_ty = operand_stack.pop_ty()?;
-                mut_ref_ty.paranoid_write_ref(&val_ty)?;
+                // let mut_ref_ty = operand_stack.pop_ty()?;
+                // let val_ty = operand_stack.pop_ty()?;
+                // mut_ref_ty.paranoid_write_ref(&val_ty)?;
             },
             Bytecode::CastU8 => {
-                operand_stack.pop_ty()?;
-                let u8_ty = ty_builder.create_u8_ty();
-                operand_stack.push_ty(u8_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u8_ty = ty_builder.create_u8_ty();
+                // operand_stack.push_ty(u8_ty)?;
             },
             Bytecode::CastU16 => {
-                operand_stack.pop_ty()?;
-                let u16_ty = ty_builder.create_u16_ty();
-                operand_stack.push_ty(u16_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u16_ty = ty_builder.create_u16_ty();
+                // operand_stack.push_ty(u16_ty)?;
             },
             Bytecode::CastU32 => {
-                operand_stack.pop_ty()?;
-                let u32_ty = ty_builder.create_u32_ty();
-                operand_stack.push_ty(u32_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u32_ty = ty_builder.create_u32_ty();
+                // operand_stack.push_ty(u32_ty)?;
             },
             Bytecode::CastU64 => {
-                operand_stack.pop_ty()?;
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u64_ty = ty_builder.create_u64_ty();
+                // operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::CastU128 => {
-                operand_stack.pop_ty()?;
-                let u128_ty = ty_builder.create_u128_ty();
-                operand_stack.push_ty(u128_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u128_ty = ty_builder.create_u128_ty();
+                // operand_stack.push_ty(u128_ty)?;
             },
             Bytecode::CastU256 => {
-                operand_stack.pop_ty()?;
-                let u256_ty = ty_builder.create_u256_ty();
-                operand_stack.push_ty(u256_ty)?;
+                // operand_stack.pop_ty()?;
+                // let u256_ty = ty_builder.create_u256_ty();
+                // operand_stack.push_ty(u256_ty)?;
             },
             Bytecode::Add
             | Bytecode::Sub
@@ -675,176 +645,176 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::Xor
             | Bytecode::Or
             | Bytecode::And => {
-                let rhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
+                // let rhs_ty = operand_stack.pop_ty()?;
+                // rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
                 // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Shl | Bytecode::Shr => {
-                let _rhs = operand_stack.pop_ty()?;
+                // let _rhs = operand_stack.pop_ty()?;
                 // NO-OP, same as the two lines below:
                 // let lhs = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(lhs)?;
             },
             Bytecode::Lt | Bytecode::Le | Bytecode::Gt | Bytecode::Ge => {
-                let rhs_ty = operand_stack.pop_ty()?;
-                let lhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                // let rhs_ty = operand_stack.pop_ty()?;
+                // let lhs_ty = operand_stack.pop_ty()?;
+                // rhs_ty.paranoid_check_eq(&lhs_ty)?;
 
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                // let bool_ty = ty_builder.create_bool_ty();
+                // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::Eq | Bytecode::Neq => {
-                let rhs_ty = operand_stack.pop_ty()?;
-                let lhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(&lhs_ty)?;
-                rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
+                // let rhs_ty = operand_stack.pop_ty()?;
+                // let lhs_ty = operand_stack.pop_ty()?;
+                // rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                // rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
 
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                // let bool_ty = ty_builder.create_bool_ty();
+                // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = frame.get_struct_ty(*idx);
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let struct_ty = frame.get_struct_ty(*idx);
+                // struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
-                operand_stack.push_ty(struct_mut_ref_ty)?;
+                // let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
+                // operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = frame.get_struct_ty(*idx);
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let struct_ty = frame.get_struct_ty(*idx);
+                // struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
-                operand_stack.push_ty(struct_ref_ty)?;
+                // let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
+                // operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
+                // struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
-                operand_stack.push_ty(struct_mut_ref_ty)?;
+                // let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
+                // operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
+                // struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
-                operand_stack.push_ty(struct_ref_ty)?;
+                // let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
+                // operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
 
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                // let bool_ty = ty_builder.create_bool_ty();
+                // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::MoveTo(idx) => {
-                let ty = operand_stack.pop_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                // let ty = operand_stack.pop_ty()?;
+                // operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
+                // ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
+                // ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveToGeneric(idx) => {
-                let ty = operand_stack.pop_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                // let ty = operand_stack.pop_ty()?;
+                // operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
+                // ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
+                // ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveFrom(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let ty = frame.get_struct_ty(*idx);
-                ty.paranoid_check_has_ability(Ability::Key)?;
-                operand_stack.push_ty(ty)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let ty = frame.get_struct_ty(*idx);
+                // ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
-                ty.paranoid_check_has_ability(Ability::Key)?;
-                operand_stack.push_ty(ty)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // let ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
+                // ty.paranoid_check_has_ability(Ability::Key)?;
+                // operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
-                let mut_ref_ty = operand_stack.pop_ty()?;
-                let ref_ty = mut_ref_ty.paranoid_freeze_ref_ty()?;
-                operand_stack.push_ty(ref_ty)?;
+                // let mut_ref_ty = operand_stack.pop_ty()?;
+                // let ref_ty = mut_ref_ty.paranoid_freeze_ref_ty()?;
+                // operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::Nop => (),
             Bytecode::Not => {
-                operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
+                // operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
                 // NO-OP,  same as the two lines below:
                 // let bool_ty = ty_builder.create_bool_ty();
                 // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                let elem_tys = operand_stack.popn_tys(*num as u16)?;
-                for elem_ty in elem_tys.iter() {
-                    // For vector element types, use assignability
-                    elem_ty.paranoid_check_assignable(ty)?;
-                }
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // let elem_tys = operand_stack.popn_tys(*num as u16)?;
+                // for elem_ty in elem_tys.iter() {
+                //     // For vector element types, use assignability
+                //     elem_ty.paranoid_check_assignable(ty)?;
+                // }
 
-                let vec_ty = ty_builder.create_vec_ty(ty)?;
-                operand_stack.push_ty(vec_ty)?;
+                // let vec_ty = ty_builder.create_vec_ty(ty)?;
+                // operand_stack.push_ty(vec_ty)?;
             },
             Bytecode::VecLen(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<false>(ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_is_vec_ref_ty::<false>(ty)?;
 
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?;
+                // let u64_ty = ty_builder.create_u64_ty();
+                // operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::VecImmBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                let elem_ref_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                // let elem_ref_ty = operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
 
-                operand_stack.push_ty(elem_ref_ty)?;
+                // operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecMutBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                let elem_ref_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
-                operand_stack.push_ty(elem_ref_ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                // let elem_ref_ty = operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
+                // operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                // For pushing an element to a vector, use assignability
-                operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // // For pushing an element to a vector, use assignability
+                // operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
+                // operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
             Bytecode::VecPopBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                let elem_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
-                operand_stack.push_ty(elem_ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // let elem_ty = operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
+                // operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
-                let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                let vec_ty = operand_stack.pop_ty()?;
-                vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
-                for _ in 0..*num {
-                    operand_stack.push_ty(expected_elem_ty.clone())?;
-                }
+                // let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // let vec_ty = operand_stack.pop_ty()?;
+                // vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
+                // for _ in 0..*num {
+                //     operand_stack.push_ty(expected_elem_ty.clone())?;
+                // }
             },
             Bytecode::VecSwap(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                // let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                // operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                // operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                // operand_stack
+                //     .pop_ty()?
+                //     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
         }
         Ok(())

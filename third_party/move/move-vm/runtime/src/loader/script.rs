@@ -111,6 +111,12 @@ impl Script {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
 
+        let local_num_tys = if script.type_parameters.is_empty() {
+            Some(local_tys.iter().map(|ty| ty.num_nodes() as u64).collect())
+        } else {
+            None
+        };
+
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
@@ -124,6 +130,7 @@ impl Script {
             name: ident_str!("main").to_owned(),
             // Script must not return values.
             return_tys: vec![],
+            local_num_tys,
             local_tys,
             param_tys,
             access_specifier: AccessSpecifier::Any,

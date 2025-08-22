@@ -612,9 +612,16 @@ fn load_constructor_function(
     Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
         .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
+    let ty_args_fingerprint = if ty_args.is_empty() {
+        None
+    } else {
+        Some(move_vm_runtime::caches::fingerprint_ty_args(&ty_args).map_err(|e| e.finish(Location::Undefined))?)
+    };
+
     Ok(LoadedFunction {
         owner: LoadedFunctionOwner::Module(module),
         ty_args,
+        ty_args_fingerprint,
         function,
     })
 }
