@@ -220,7 +220,7 @@ impl DoGetExecutionOutput {
             auxiliary_info,
             parent_state,
             state_view,
-            true,  // prime state cache
+            false,  // prime state cache
             false, // is_block
         )?;
 
