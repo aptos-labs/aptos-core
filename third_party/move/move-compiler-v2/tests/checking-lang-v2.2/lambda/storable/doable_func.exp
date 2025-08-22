@@ -79,7 +79,7 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 = closure#0mod3::multiply();
+                                    let g: |u64, u64|u64 = closure#0mod3::multiply();
                                     closure#1test::__lambda__2__choose_function1(g)
                                   }
                                 } else {
@@ -96,7 +96,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 = closure#0test::__lambda__5__choose_function1();
+                                        let i: |u64, u64|u64 = closure#0test::__lambda__5__choose_function1();
                                         closure#1test::__lambda__6__choose_function1(i)
                                       }
                                     }
@@ -162,7 +162,7 @@ module 0x42::test {
     private fun __lambda__1__choose_function1(x: u64,y: u64,z: u64): u64 {
         test::multiply3(Add<u64>(x, 1), y, z)
     }
-    private fun __lambda__2__choose_function1(g: |(u64, u64)|u64,x: u64): u64 {
+    private fun __lambda__2__choose_function1(g: |u64, u64|u64,x: u64): u64 {
         (g)(11, x)
     }
     private fun __lambda__3__choose_function1(h: |u64|u64,x: u64): u64 {
@@ -177,7 +177,7 @@ module 0x42::test {
           mod3::multiply(x, Add<u64>(q, 1))
         }
     }
-    private fun __lambda__6__choose_function1(i: |(u64, u64)|u64,x: u64): u64 {
+    private fun __lambda__6__choose_function1(i: |u64, u64|u64,x: u64): u64 {
         (i)(15, x)
     }
 } // end 0x42::test
@@ -223,22 +223,22 @@ module 0x42::test {
         } else if (key == 5) |arg0| multiply3(3, 2, arg0) else if (key == 6) |arg0| mod3::multiply(7, arg0) else if (key == 7) |arg0| multiply3(4, 2, arg0) else if (key == 8) |arg0| multiply3(3, 3, arg0) else if (key == 9) {
             let x = 2;
             let y = 5;
-            |arg0| __lambda__1__choose_function1(x, y, arg0)
+            |arg0| lambda__1__choose_function1(x, y, arg0)
         } else if (key == 10) {
             let z = 11;
             |arg0| mod4::alt_multiply(z, arg0)
         } else if (key == 11) {
-            let g = |(arg0,arg1)| mod3::multiply(arg0, arg1);
-            |arg0| __lambda__2__choose_function1(g, arg0)
+            let g = |arg0,arg1| mod3::multiply(arg0, arg1);
+            |arg0| lambda__2__choose_function1(g, arg0)
         } else if (key == 12) {
             let h = |arg0| mod3::multiply(12, arg0);
-            |arg0| __lambda__3__choose_function1(h, arg0)
+            |arg0| lambda__3__choose_function1(h, arg0)
         } else if (key == 14) {
             let i = |arg0| multiply3(2, 2, arg0);
-            |arg0| __lambda__4__choose_function1(i, arg0)
+            |arg0| lambda__4__choose_function1(i, arg0)
         } else {
-            let i = |(arg0,arg1)| __lambda__5__choose_function1(arg0, arg1);
-            |arg0| __lambda__6__choose_function1(i, arg0)
+            let i = |arg0,arg1| lambda__5__choose_function1(arg0, arg1);
+            |arg0| lambda__6__choose_function1(i, arg0)
         };
         f(x)
     }
@@ -258,23 +258,23 @@ module 0x42::test {
             } else break;
         };
     }
-    fun __lambda__1__choose_function1(x: u64, y: u64, z: u64): u64 {
+    fun lambda__1__choose_function1(x: u64, y: u64, z: u64): u64 {
         multiply3(x + 1, y, z)
     }
-    fun __lambda__2__choose_function1(g: |(u64, u64)|u64, x: u64): u64 {
+    fun lambda__2__choose_function1(g: |u64, u64|u64, x: u64): u64 {
         g(11, x)
     }
-    fun __lambda__3__choose_function1(h: |u64|u64, x: u64): u64 {
+    fun lambda__3__choose_function1(h: |u64|u64, x: u64): u64 {
         h(x)
     }
-    fun __lambda__4__choose_function1(i: |u64|u64, z: u64): u64 {
+    fun lambda__4__choose_function1(i: |u64|u64, z: u64): u64 {
         i(z)
     }
-    fun __lambda__5__choose_function1(x: u64, y: u64): u64 {
+    fun lambda__5__choose_function1(x: u64, y: u64): u64 {
         let q = y - 1;
         mod3::multiply(x, q + 1)
     }
-    fun __lambda__6__choose_function1(i: |(u64, u64)|u64, x: u64): u64 {
+    fun lambda__6__choose_function1(i: |u64, u64|u64, x: u64): u64 {
         i(15, x)
     }
 }

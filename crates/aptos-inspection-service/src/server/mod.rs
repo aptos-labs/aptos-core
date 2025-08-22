@@ -21,6 +21,8 @@ mod configuration;
 mod identity_information;
 mod index;
 mod json_encoder;
+#[cfg(unix)]
+mod malloc_stats;
 mod metrics;
 mod peer_information;
 mod system_information;
@@ -36,6 +38,7 @@ pub const FORGE_METRICS_PATH: &str = "/forge_metrics";
 pub const IDENTITY_INFORMATION_PATH: &str = "/identity_information";
 pub const INDEX_PATH: &str = "/";
 pub const JSON_METRICS_PATH: &str = "/json_metrics";
+pub const MALLOC_STATS_PATH: &str = "/malloc_stats";
 pub const METRICS_PATH: &str = "/metrics";
 pub const PEER_INFORMATION_PATH: &str = "/peer_information";
 pub const SYSTEM_INFORMATION_PATH: &str = "/system_information";
@@ -138,6 +141,19 @@ async fn serve_requests(
             // /json_metrics
             // Exposes JSON encoded metrics
             metrics::handle_json_metrics_request()
+        },
+        MALLOC_STATS_PATH => {
+            if cfg!(unix) {
+                malloc_stats::handle_malloc_stats_request(
+                    node_config.inspection_service.malloc_stats_max_len,
+                )
+            } else {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Body::from("jemalloc not available"),
+                    CONTENT_TYPE_TEXT.into(),
+                )
+            }
         },
         METRICS_PATH => {
             // /metrics

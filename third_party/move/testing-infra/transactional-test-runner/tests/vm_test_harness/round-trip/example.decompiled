@@ -4,7 +4,7 @@
 
 //# run
 script {
-    entry fun main() {
+    fun main() {
         ()
     }
 }
@@ -22,10 +22,12 @@ module 0x42::N {
         abort 0
     }
     public fun give(p0: &signer) {
-        move_to<u64>(R<u64>{v: 0}, p0);
+        let _t3 = R<u64>{v: 0};
+        move_to<R<u64>>(p0, _t3);
     }
     public fun take(p0: &signer): u64 {
-        let R<u64>{v: _t4} = move_from<u64>(signer::address_of(p0));
+        let _t2 = signer::address_of(p0);
+        let R<u64>{v: _t4} = move_from<R<u64>>(_t2);
         _t4
     }
 }
@@ -36,7 +38,7 @@ module 0x42::N {
 //# run --signers 0x1
 script {
     use 0x42::N;
-    entry fun main(p0: signer) {
+    fun main(p0: signer) {
         N::give(&p0);
     }
 }
@@ -47,8 +49,8 @@ script {
 //# run --signers 0x1 
 script {
     use 0x42::N;
-    entry fun main(p0: signer) {
-        N::take(&p0);
+    fun main(p0: signer) {
+        let _t2 = N::take(&p0);
     }
 }
 

@@ -1,36 +1,8 @@
 processed 5 tasks
 task 1 lines 5-11:  run --signers A [script {]
-Error: compilation errors:
- error: cannot use `integer` with an operator which expects a value of type `address`
-  ┌─ TEMPFILE:9:42
-  │
-9 │         if (!(signer::address_of(&p0) == 0x2a)) abort 1000;
-  │                                          ^^^^
-
-
-task 2 lines 14-22:  publish [module 0x2a::M {]
-Error: compilation errors:
- error: cannot use `Foo` with an operator which expects a value of type `&signer`
-   ┌─ TEMPFILE1:20:17
-   │
-20 │         move_to(Foo{x: 500}, p0);
-   │                 ^^^^^^^^^^^
-
-
-task 3 lines 25-31:  run --signers A [script {]
-Error: compilation errors:
- error: unbound module
-   ┌─ TEMPFILE2:27:9
-   │
-27 │     use 0x2a::M;
-   │         ^^^^^^^ Invalid 'use'. Unbound module: '0x2A::M'
-
-error: unbound module
-   ┌─ TEMPFILE2:29:9
-   │
-29 │         M::publish_foo(&p0);
-   │         ^ Unbound module or type alias 'M'
-
-
-task 4 lines 34-34:  view --address A --resource 0x2a::M::Foo
-[No Resource Exists]
+task 2 lines 14-23:  publish [module 0x2a::M {]
+task 3 lines 26-32:  run --signers A [script {]
+task 4 lines 35-35:  view --address A --resource 0x2a::M::Foo
+key 0x2a::M::Foo {
+    x: 500
+}

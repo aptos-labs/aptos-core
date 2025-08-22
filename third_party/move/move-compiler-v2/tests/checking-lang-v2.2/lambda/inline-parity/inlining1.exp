@@ -31,10 +31,10 @@ module 0x42::Test {
         if (test() == 3) () else abort 5;
     }
     public fun test(): u64 {
-        foo(|arg0| __lambda__1__test(arg0), 10)
+        foo(|arg0| lambda__1__test(arg0), 10)
     }
-    fun __lambda__1__test(param$0: u64): u64 {
-        let _ = param$0;
+    fun lambda__1__test(param_0: u64): u64 {
+        let _ = param_0;
         3
     }
 }
