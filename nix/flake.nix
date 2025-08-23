@@ -51,6 +51,7 @@
               clang
               rocksdb
               protobuf
+              pkgs.udev
 
               # Development tools
               git
