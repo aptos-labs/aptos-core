@@ -63,6 +63,7 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.block-cache-capacity",
         "rocksdb.block-cache-usage",
         "rocksdb.block-cache-pinned-usage",
+        "rocksdb.num-open-files",
     ]
     .iter()
     .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
