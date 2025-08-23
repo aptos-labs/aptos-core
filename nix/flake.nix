@@ -15,7 +15,7 @@
           inherit system overlays;
         };
 
-        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml;
 
       in
       {
