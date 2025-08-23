@@ -165,7 +165,10 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            state_kv_db_config: RocksdbConfig::default(),
+            state_kv_db_config: RocksdbConfig {
+                max_open_files: 1000,
+                ..Default::default()
+            },
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
