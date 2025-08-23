@@ -1,0 +1,11 @@
+---
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+name: "keyless_config_update"
+proposals:
+  - name: keyless_config_update
+    metadata:
+      title: "Update to circuit release circuit-v1.0.1 + training-wheel key ID 2025.01.07"
+      description: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/keyless-config-update.move
