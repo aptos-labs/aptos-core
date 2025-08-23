@@ -1,5 +1,5 @@
 { pkgs ? import <nixpkgs> { }
-, aptos-core
+, aptos-node
 }:
 
 pkgs.dockerTools.buildLayeredImage {
@@ -9,7 +9,7 @@ pkgs.dockerTools.buildLayeredImage {
   contents = [
     pkgs.caCertificates
     pkgs.tzdata
-    aptos-core
+    aptos-node
   ];
 
   config = {

@@ -35,7 +35,7 @@ The modern approach leverages Nix Flakes to provide superior dependency manageme
 
 ### 3. Package Definition
 
-The `pkgs/aptos-core.nix` file is central to the build system, defining the main `aptos-core` package with meticulous detail:
+The `pkgs/aptos-node.nix` file is central to the build system, defining the main `aptos-core` package with meticulous detail:
 
 - **Source handling**: Specifies how the source code is fetched and prepared for building, typically using the local source directory.
 - **Cargo lock handling**: Integrates with Rust's `Cargo.lock` to manage Rust dependencies, ensuring proper hash verification and consistent Rust builds.
@@ -135,7 +135,7 @@ Maintaining the Nix expressions is straightforward:
 
 1. **Update dependencies**: Regularly run `nix flake update` to refresh and lock all input dependencies to their latest versions.
 2. **Update Rust toolchain**: The flake automatically respects the `rust-toolchain.toml` file, simplifying Rust toolchain management.
-3. **Add new system dependencies**: New system-level dependencies should be added to both the package definition (`pkgs/aptos-core.nix`) and the development environment (`shell.nix`).
+3. **Add new system dependencies**: New system-level dependencies should be added to both the package definition (`pkgs/aptos-node.nix`) and the development environment (`shell.nix`).
 4. **Update documentation**: Keep the `README.md` and `ARCHITECTURE.md` documents current to reflect any changes in the Nix build system.
 
 ## Troubleshooting
@@ -144,7 +144,7 @@ Common issues and their solutions within the Nix environment:
 
 1. **RocksDB compilation errors**: These are largely mitigated by Nix. If encountered, verify your Nix environment setup and ensure all relevant environment variables are correctly managed by Nix.
 2. **OpenSSL issues**: Similar to RocksDB, OpenSSL issues are typically handled by the Nix environment. Confirm `OPENSSL_NO_VENDOR` is set and `OPENSSL_DIR` points to the correct Nix-managed location.
-3. **Missing dependencies**: If a dependency is missing, add it to both the package definition (`pkgs/aptos-core.nix`) and the development environment (`shell.nix`).
+3. **Missing dependencies**: If a dependency is missing, add it to both the package definition (`pkgs/aptos-node.nix`) and the development environment (`shell.nix`).
 4. **Hash mismatches**: When updating dependencies, `flake.lock` might require updates. Run `nix flake update` to resolve hash mismatches.
 
 This architecture provides a robust, reproducible build system for Aptos Core that addresses the specific requirements and challenges outlined in the project documentation, ensuring a consistent and efficient development and deployment workflow.

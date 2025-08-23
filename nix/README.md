@@ -22,7 +22,7 @@ nix/
 ├── build-aptos.sh    # Convenience script for building Aptos Core using Nix
 ├── README.md         # This file
 └── pkgs/
-    └── aptos-core.nix # Aptos Core package definition
+    └── aptos-node.nix # Aptos Core package definition
 ```
 
 ## Usage

@@ -9,7 +9,7 @@ default: build
 # Build the project using Nix
 build:
     @echo "Building Aptos Core with Nix..."
-    nix build .#aptos-core
+    nix build .#aptos-node
 
 # Enter the development environment
 dev:
@@ -44,19 +44,19 @@ update:
 # Build aptos-node binary
 aptos-node:
     @echo "Building aptos-node with Nix..."
-    nix build .#aptos-core
+    nix build .#aptos-node
     @echo "Binary available at result/bin/aptos-node"
 
 # Build Docker image using Nix
 docker-nix:
     @echo "Building Docker image with Nix..."
-    nix build .#aptos-core-docker
+    nix build .#aptos-node-docker
     @echo "Docker image available as result.tar.gz"
 
 # Build Docker image
 docker:
     @echo "Building Docker image..."
-    docker build -f nix/Dockerfile.nix -t aptos-core .
+    docker build -f nix/Dockerfile.nix -t aptos-node .
 
 # Help - list available recipes
 help:

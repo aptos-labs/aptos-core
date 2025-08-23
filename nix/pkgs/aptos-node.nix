@@ -4,7 +4,7 @@
 , pkg-config
 , cmake
 , clang
-, RocksDB
+, rocksdb
 , protobuf
 , ...
 }:
@@ -13,13 +13,11 @@ rustPlatform.buildRustPackage rec {
   pname = "aptos-node";
   version = "main";
 
-  src = ../..;
+  # Use an explicit source path
+  src = lib.cleanSource ../..;
 
   cargoLock = {
     lockFile = ../../Cargo.lock;
-    outputHashes = {
-      "rocksdb-0.22.0" = "sha256-7c42i0S9X7f85C/1j7DlYQvZv5UQZ3n3z3n3z3n3z3n=";
-    };
   };
 
   # Only build the aptos-node package, not the entire workspace
@@ -35,11 +33,11 @@ rustPlatform.buildRustPackage rec {
 
   buildInputs = [
     openssl
-    RocksDB
+    rocksdb
   ];
 
   # Fix RocksDB compilation issues
-  ROCKSDB_LIB_DIR = "${RocksDB}/lib";
+  ROCKSDB_LIB_DIR = "${rocksdb}/lib";
   ROCKSDB_STATIC = "true";
 
   # Additional environment variables for RocksDB

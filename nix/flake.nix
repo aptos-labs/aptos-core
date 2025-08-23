@@ -17,18 +17,23 @@
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml;
 
+        # Create a custom rustPlatform with the specified toolchain
+        customRustPlatform = pkgs.makeRustPlatform {
+          rustc = rustToolchain;
+          cargo = rustToolchain;
+        };
+
       in
       {
         packages = {
-          aptos-core = pkgs.callPackage ./nix/pkgs/aptos-core.nix {
-            rustPlatform = pkgs.rustPlatform.override {
-              rustc = rustToolchain;
-              cargo = rustToolchain;
-            };
+          aptos-node = pkgs.callPackage (import "${self}/nix/pkgs/aptos-node.nix") {
+            rustPlatform = customRustPlatform;
+            inherit (pkgs) openssl pkg-config cmake clang protobuf;
+            RocksDB = pkgs.rocksdb;
           };
 
-          aptos-core-docker = pkgs.callPackage ./nix/pkgs/aptos-core-docker.nix {
-            aptos-core = self.packages.${system}.aptos-core;
+          aptos-node-docker = pkgs.callPackage (import "${self}/nix/pkgs/aptos-core-docker.nix") {
+            aptos-node = self.packages.${system}.aptos-node;
           };
 
           default = self.packages.${system}.aptos-core;
@@ -36,7 +41,7 @@
 
         devShells = {
           default = pkgs.mkShell {
-            name = "aptos-core-dev";
+            name = "aptos-node-dev";
 
             buildInputs = with pkgs; [
               rustToolchain
@@ -51,7 +56,12 @@
               clang
               rocksdb
               protobuf
+              libclang
+              llvm
+              elfutils
+              zlib  # Added zlib library
               pkgs.udev
+              jemalloc  # Added jemalloc for jemalloc-sys override
 
               # Development tools
               git
@@ -60,14 +70,33 @@
               nodejs
             ];
 
-            # Environment variables
+            # Environment variables for library paths
+            LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+            BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.libclang.dev}/include";
+            
+            # Add PKG_CONFIG_PATH to help find libraries
+            PKG_CONFIG_PATH = "${pkgs.elfutils}/lib/pkgconfig:${pkgs.zlib}/lib/pkgconfig:$PKG_CONFIG_PATH";
+            
+            # Additional library paths
+            LD_LIBRARY_PATH = "${pkgs.libclang.lib}/lib:${pkgs.llvm.lib}/lib:${pkgs.elfutils}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH";
+
+            # Environment variables for build configuration
+            CARGO_BUILD_RUSTFLAGS = "-C target-feature=+sse4.2 -C opt-level=3";
             RUST_BACKTRACE = 1;
             ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+            
+            # Fix jemalloc-sys build issues with strerror_r
+            JEMALLOC_SYS_WITH_MALLOC_CONF = "";
+            # Override jemalloc-sys to use system jemalloc instead of building from source
+            JEMALLOC_OVERRIDE = "${pkgs.jemalloc}/lib/libjemalloc.so";
 
-            # Shell hooks
+            # Shell hooks to ensure correct toolchain is used
             shellHook = ''
-              echo "Welcome to the Aptos Core development environment"
+              echo "Welcome to the Aptos Node development environment"
               echo "Run 'cargo build' to build the project"
+              
+              # Ensure Nix-provided Clang and LLVM are used
+              export PATH="${pkgs.clang}/bin:${pkgs.llvm}/bin:$PATH"
             '';
           };
         };
@@ -75,7 +104,7 @@
         apps = {
           aptos-node = {
             type = "app";
-            program = "${self.packages.${system}.aptos-core}/bin/aptos-node";
+            program = "${self.packages.${system}.aptos-node}/bin/aptos-node";
           };
         };
       });
