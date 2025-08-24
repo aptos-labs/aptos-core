@@ -28,10 +28,6 @@ jobs:
         binary:
           - name: "aptos-node"
             package: "aptos-node"
-          - name: "aptos-cli"
-            package: "crates/aptos"
-          - name: "l1-migration"
-            package: "l1-migration"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
