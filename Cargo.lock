@@ -2783,9 +2783,12 @@ dependencies = [
  "ark-bls12-381",
  "ark-serialize",
  "bcs 0.1.4",
+ "clap 4.5.21",
  "firestore",
  "hex",
+ "rand 0.7.3",
  "reqwest 0.11.23",
+ "serde",
  "serde_json",
  "tokio",
 ]
