@@ -62,7 +62,7 @@ jobs:
       - name: Build ${{ matrix.binary.name }}
         run: |
           echo "Building ${{ matrix.binary.name }} with Nix development shell..."
-          just build ${{ matrix.binary.package }}
+          nix develop -c cargo build --release -p ${{ matrix.binary.package }}
           echo "Binary available at target/release/${{ matrix.binary.name }}"
 
       - name: Verify binary
