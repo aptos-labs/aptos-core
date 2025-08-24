@@ -69,7 +69,7 @@ jobs:
           echo "Building ${{ matrix.binary.name }} with Nix development shell..."
           nix develop -c cargo build -p ${{ matrix.binary.package }}
           echo "Binary available at target/debug/${{ matrix.binary.name }}"
-          ls -al
+          ls -al target
 
       # - name: Verify binary
       #   run: |
