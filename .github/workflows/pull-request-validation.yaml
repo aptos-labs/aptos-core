@@ -15,9 +15,9 @@ env:
   GIT_BRANCH: ${{ github.ref_name }}
   BUILD_DATE: ${{ github.event.head_commit.timestamp }}
   BUILT_VIA_BUILDKIT: "true"
-  PROFILE: "release"
+  PROFILE: "debug"
   FEATURES: ""
-  CARGO_TARGET_DIR: "target/release"
+  CARGO_TARGET_DIR: "target/debug"
 
 jobs:
   build-binaries:
@@ -69,22 +69,21 @@ jobs:
           echo "Building ${{ matrix.binary.name }} with Nix development shell..."
           nix develop -c cargo build -p ${{ matrix.binary.package }}
           echo "Binary available at target/debug/${{ matrix.binary.name }}"
-          ls -al target
 
-      # - name: Verify binary
-      #   run: |
-      #     if [ -f "target/debug/${{ matrix.binary.name }}" ]; then
-      #       echo "✅ Binary ${{ matrix.binary.name }} built successfully"
-      #       ls -la target/debug/${{ matrix.binary.name }}
-      #       file target/debug/${{ matrix.binary.name }}
-      #     else
-      #       echo "❌ Binary ${{ matrix.binary.name }} not found"
-      #       exit 1
-      #     fi
+      - name: Verify binary
+        run: |
+          if [ -f "target/debug/${{ matrix.binary.name }}" ]; then
+            echo "✅ Binary ${{ matrix.binary.name }} built successfully"
+            ls -la target/debug/${{ matrix.binary.name }}
+            file target/debug/${{ matrix.binary.name }}
+          else
+            echo "❌ Binary ${{ matrix.binary.name }} not found"
+            exit 1
+          fi
 
-      # - name: Upload binary artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: ${{ matrix.binary.name }}-${{ github.sha }}
-      #     path: target/debug/${{ matrix.binary.name }}
-      #     retention-days: 7
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary.name }}-${{ github.sha }}
+          path: target/debug/${{ matrix.binary.name }}
+          retention-days: 7
