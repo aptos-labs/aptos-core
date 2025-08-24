@@ -26,17 +26,8 @@
       in
       {
         packages = {
-          aptos-node = pkgs.callPackage (import "${self}/nix/pkgs/aptos-node.nix") {
-            rustPlatform = customRustPlatform;
-            inherit (pkgs) openssl pkg-config cmake clang protobuf;
-            RocksDB = pkgs.rocksdb;
-          };
-
-          aptos-node-docker = pkgs.callPackage (import "${self}/nix/pkgs/aptos-core-docker.nix") {
-            aptos-node = self.packages.${system}.aptos-node;
-          };
-
-          default = self.packages.${system}.aptos-core;
+          # Packages removed - using development shell approach instead
+          # Use 'just build' or 'just aptos-node' for building
         };
 
         devShells = {
