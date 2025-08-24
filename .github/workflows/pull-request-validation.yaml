@@ -17,7 +17,6 @@ env:
   BUILT_VIA_BUILDKIT: "true"
   PROFILE: "debug"
   FEATURES: ""
-  CARGO_TARGET_DIR: "target/debug"
 
 jobs:
   build-binaries:
