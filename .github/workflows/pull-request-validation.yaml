@@ -1,0 +1,88 @@
+---
+name: "Binary and Docker Build"
+
+on:
+  pull_request:
+    branches:
+      - movement
+      - l1-migration
+  push:
+    branches:
+      - feat/binary-builds
+
+env:
+  GIT_SHA: ${{ github.sha }}
+  GIT_BRANCH: ${{ github.ref_name }}
+  BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+  BUILT_VIA_BUILDKIT: "true"
+  PROFILE: "release"
+  FEATURES: ""
+  CARGO_TARGET_DIR: "target/release"
+
+jobs:
+  build-binaries:
+    name: "Build Binaries with Nix"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        binary:
+          - name: "aptos-node"
+            package: "aptos-node"
+          - name: "aptos-cli"
+            package: "crates/aptos"
+          - name: "l1-migration"
+            package: "l1-migration"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('nix/flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: ${{ runner.os }}-nix-${{ hashFiles('nix/flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nix-
+
+      - name: Build ${{ matrix.binary.name }}
+        run: |
+          echo "Building ${{ matrix.binary.name }} with Nix development shell..."
+          nix develop -c cargo build --release -p ${{ matrix.binary.package }}
+          echo "Binary available at target/release/${{ matrix.binary.name }}"
+
+      - name: Verify binary
+        run: |
+          if [ -f "target/release/${{ matrix.binary.name }}" ]; then
+            echo "✅ Binary ${{ matrix.binary.name }} built successfully"
+            ls -la target/release/${{ matrix.binary.name }}
+            file target/release/${{ matrix.binary.name }}
+          else
+            echo "❌ Binary ${{ matrix.binary.name }} not found"
+            exit 1
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary.name }}-${{ github.sha }}
+          path: target/release/${{ matrix.binary.name }}
+          retention-days: 7
