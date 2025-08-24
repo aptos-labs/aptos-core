@@ -27,6 +27,10 @@ jobs:
         binary:
           - name: "aptos-node"
             package: "aptos-node"
+          - name: "aptos-cli"
+            package: "aptos-cli"
+          # - name: "l1-migration"
+          #   package: "l1-migration"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,7 +78,6 @@ jobs:
           if [ -f "target/debug/${{ matrix.binary.name }}" ]; then
             echo "✅ Binary ${{ matrix.binary.name }} built successfully"
             ls -la target/debug/${{ matrix.binary.name }}
-            file target/debug/${{ matrix.binary.name }}
           else
             echo "❌ Binary ${{ matrix.binary.name }} not found"
             exit 1
