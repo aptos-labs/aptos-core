@@ -49,6 +49,7 @@
               protobuf
               libclang
               llvm
+              lld  # Add lld linker for Rust builds
               elfutils
               zlib  # Added zlib library
               pkgs.udev
