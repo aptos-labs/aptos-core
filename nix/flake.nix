@@ -51,6 +51,8 @@
               llvm
               lld  # Add lld linker for Rust builds
               elfutils
+              elfutils.dev  # Add elfutils dev package for headers
+              elfutils.out  # Add elfutils main package for libdw.so.1
               zlib  # Added zlib library
               pkgs.udev
               jemalloc  # Added jemalloc for jemalloc-sys override
@@ -67,10 +69,10 @@
             BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.libclang.dev}/include";
             
             # Add PKG_CONFIG_PATH to help find libraries
-            PKG_CONFIG_PATH = "${pkgs.elfutils}/lib/pkgconfig:${pkgs.zlib}/lib/pkgconfig:$PKG_CONFIG_PATH";
+            PKG_CONFIG_PATH = "${pkgs.elfutils.dev}/lib/pkgconfig:${pkgs.zlib}/lib/pkgconfig:$PKG_CONFIG_PATH";
             
             # Additional library paths
-            LD_LIBRARY_PATH = "${pkgs.libclang.lib}/lib:${pkgs.llvm.lib}/lib:${pkgs.elfutils}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH";
+            LD_LIBRARY_PATH = "${pkgs.libclang.lib}/lib:${pkgs.llvm.lib}/lib:${pkgs.elfutils}/lib:${pkgs.elfutils.out}/lib:${pkgs.zlib}/lib:${pkgs.jemalloc}/lib:${pkgs.rocksdb}/lib:${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH";
 
             # Environment variables for build configuration
             CARGO_BUILD_RUSTFLAGS = "-C target-feature=+sse4.2 -C opt-level=3";

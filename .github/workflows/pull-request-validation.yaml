@@ -62,15 +62,15 @@ jobs:
       - name: Build ${{ matrix.binary.name }}
         run: |
           echo "Building ${{ matrix.binary.name }} with Nix development shell..."
-          nix develop -c cargo build --release -p ${{ matrix.binary.package }}
-          echo "Binary available at target/release/${{ matrix.binary.name }}"
+          nix develop -c cargo build -p ${{ matrix.binary.package }}
+          echo "Binary available at target/debug/${{ matrix.binary.name }}"
 
       - name: Verify binary
         run: |
-          if [ -f "target/release/${{ matrix.binary.name }}" ]; then
+          if [ -f "target/debug/${{ matrix.binary.name }}" ]; then
             echo "✅ Binary ${{ matrix.binary.name }} built successfully"
-            ls -la target/release/${{ matrix.binary.name }}
-            file target/release/${{ matrix.binary.name }}
+            ls -la target/debug/${{ matrix.binary.name }}
+            file target/debug/${{ matrix.binary.name }}
           else
             echo "❌ Binary ${{ matrix.binary.name }} not found"
             exit 1
@@ -80,5 +80,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.binary.name }}-${{ github.sha }}
-          path: target/release/${{ matrix.binary.name }}
+          path: target/debug/${{ matrix.binary.name }}
           retention-days: 7
