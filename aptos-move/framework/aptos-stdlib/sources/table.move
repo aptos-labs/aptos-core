@@ -37,10 +37,10 @@ module aptos_std::table {
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
     public fun borrow_with_default<K: copy + drop, V>(self: &Table<K, V>, key: K, default: &V): &V {
-        if (!self.contains(copy key)) {
+        if (!contains_box<K, V, Box<V>>(self, key)) {
             default
         } else {
-            self.borrow(copy key)
+            &borrow_box<K, V, Box<V>>(self, key).val
         }
     }
 
@@ -53,20 +53,19 @@ module aptos_std::table {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
     public fun borrow_mut_with_default<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, default: V): &mut V {
-        if (!self.contains(copy key)) {
-            self.add(copy key, default)
+        if (!contains_box<K, V, Box<V>>(self, key)) {
+            add_box<K, V, Box<V>>(self, key, Box { val: default })
         };
-        self.borrow_mut(key)
+        &mut borrow_box_mut<K, V, Box<V>>(self, key).val
     }
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
     public fun upsert<K: copy + drop, V: drop>(self: &mut Table<K, V>, key: K, value: V) {
-        if (!self.contains(copy key)) {
-            self.add(copy key, value)
+        if (!contains_box<K, V, Box<V>>(self, key)) {
+            add_box<K, V, Box<V>>(self, key, Box { val: value })
         } else {
-            let ref = self.borrow_mut(key);
-            *ref = value;
+            borrow_box_mut<K, V, Box<V>>(self, key).val = value;
         };
     }
 
