@@ -147,7 +147,9 @@ enum ExecutionStatus {
     // it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
-    ExecutionHalted,
+    // The bool in the ExecutionHalted tracks an useful invariant for block epilogue txn:
+    // if the txn status when halted was Executing or Suspended.
+    ExecutionHalted(bool),
 }
 
 impl PartialEq for ExecutionStatus {
@@ -412,6 +414,48 @@ impl Scheduler {
     pub fn commit_state(&self) -> (TxnIndex, u32) {
         let commit_state = self.commit_state.dereference();
         (commit_state.0, commit_state.1)
+    }
+
+    pub(crate) fn must_finish_execution_if_halted(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<(), PanicError> {
+        let mut status = self.txn_status[txn_idx as usize].0.write();
+        if let ExecutionStatus::ExecutionHalted(safely_finished) = &mut *status {
+            // Even though the status is halted at txn_idx, the work to process and apply the outputs
+            // must complete (to guarantee update to the shared data structures are applied correctly).
+            // Hence, finish_execution must be called on the txn_idx, or prepare_for_block_epilogue
+            // will return a PanicError.
+            *safely_finished = false;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn prepare_for_block_epilogue(
+        &self,
+        block_epilogue_idx: TxnIndex,
+    ) -> Result<Incarnation, PanicError> {
+        if block_epilogue_idx == self.num_txns {
+            return Ok(0);
+        }
+
+        let mut status = self.txn_status[block_epilogue_idx as usize].0.write();
+        if let ExecutionStatus::ExecutionHalted(safely_finished) = *status {
+            if !safely_finished {
+                return Err(code_invariant_error(format!(
+                    "Status at block epilogue txn {} not safely finished after ExecutionHalted but not finished",
+                    block_epilogue_idx
+                )));
+            }
+        } else {
+            return Err(code_invariant_error(format!(
+                "Status {:?} at block epilogue txn {} not ExecutionHalted",
+                &*status, block_epilogue_idx
+            )));
+        }
+
+        *status = ExecutionStatus::Ready(1, ExecutionTaskType::Execution);
+        Ok(1)
     }
 
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
@@ -733,7 +777,7 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
 
         // Always replace the status.
-        match std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted) {
+        match std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted(true)) {
             ExecutionStatus::Suspended(_, condvar)
             | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar))
             | ExecutionStatus::Executing(_, ExecutionTaskType::Wakeup(condvar)) => {
@@ -743,6 +787,9 @@ impl Scheduler {
                 let mut lock = lock.lock();
                 *lock = DependencyStatus::ExecutionHalted;
                 cvar.notify_one();
+            },
+            ExecutionStatus::Executing(_, _) | ExecutionStatus::Aborting(_) => {
+                *status = ExecutionStatus::ExecutionHalted(false);
             },
             _ => (),
         }
@@ -937,7 +984,7 @@ impl Scheduler {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
                 Ok(true)
             },
-            ExecutionStatus::ExecutionHalted => Ok(false),
+            ExecutionStatus::ExecutionHalted(_) => Ok(false),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
                 &*status,
@@ -957,7 +1004,7 @@ impl Scheduler {
                 );
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => Ok(()),
+            ExecutionStatus::ExecutionHalted(_) => Ok(()),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in resume",
                 &*status,
@@ -972,14 +1019,15 @@ impl Scheduler {
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        match *status {
+        match &mut *status {
             ExecutionStatus::Executing(stored_incarnation, _)
-                if stored_incarnation == incarnation =>
+                if *stored_incarnation == incarnation =>
             {
                 *status = ExecutionStatus::Executed(incarnation);
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => {
+            ExecutionStatus::ExecutionHalted(safely_finished) => {
+                *safely_finished = true;
                 // The execution is already halted.
                 Ok(())
             },
@@ -998,12 +1046,13 @@ impl Scheduler {
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        match *status {
-            ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation => {
+        match &mut *status {
+            ExecutionStatus::Aborting(stored_incarnation) if *stored_incarnation == incarnation => {
                 *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => {
+            ExecutionStatus::ExecutionHalted(safely_finished) => {
+                *safely_finished = true;
                 // The execution is already halted.
                 Ok(())
             },

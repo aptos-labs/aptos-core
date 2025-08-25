@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::scheduler_v2::ExecutionQueueManager;
+use crate::{counters, scheduler_v2::ExecutionQueueManager};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::error::{code_invariant_error, PanicError};
+use aptos_vm_logging::clear_speculative_txn_logs;
 use crossbeam::utils::CachePadded;
 use move_core_types::language_storage::ModuleId;
 use std::{
@@ -459,6 +460,42 @@ impl ExecutionStatuses {
         Ok(false)
     }
 
+    pub(crate) fn prepare_for_block_epilogue(
+        &self,
+        block_epilogue_idx: TxnIndex,
+    ) -> Result<Incarnation, PanicError> {
+        let status = &self.statuses[block_epilogue_idx as usize];
+        let status_guard = &mut *status.status_with_incarnation.lock();
+        let incarnation = status_guard.incarnation();
+
+        match status_guard.status {
+            SchedulingStatus::Executing(_) => {
+                return Err(code_invariant_error(
+                    "Block epilogue txn must not be executing",
+                ));
+            },
+            SchedulingStatus::Aborted | SchedulingStatus::Executed => {
+                // Start abort is idempotent for the same incarnation.
+                self.start_abort(block_epilogue_idx, incarnation)?;
+                self.to_pending_scheduling(
+                    block_epilogue_idx,
+                    status_guard,
+                    incarnation + 1,
+                    false,
+                );
+            },
+            SchedulingStatus::PendingScheduling => {},
+        }
+
+        self.to_executing(block_epilogue_idx, status_guard)?
+            .ok_or_else(|| {
+                code_invariant_error(format!(
+                    "Expected PendingScheduling Status for block epilogue idx {}",
+                    block_epilogue_idx
+                ))
+            })
+    }
+
     /// Attempts to transition a transaction from PendingScheduling to Executing state.
     ///
     /// This method is called by the scheduler when it selects a transaction for execution.
@@ -501,7 +538,13 @@ impl ExecutionStatuses {
             .fetch_max(incarnation + 1, Ordering::Relaxed);
         match incarnation.cmp(&prev_value) {
             cmp::Ordering::Less => Ok(false),
-            cmp::Ordering::Equal => Ok(true),
+            cmp::Ordering::Equal => {
+                // Increment the counter and clear speculative logs (from the aborted execution).
+                counters::SPECULATIVE_ABORT_COUNT.inc();
+                clear_speculative_txn_logs(txn_idx as usize);
+
+                Ok(true)
+            },
             cmp::Ordering::Greater => Err(code_invariant_error(format!(
                 "Try abort incarnation {} > self.next_incarnation_to_abort = {}",
                 incarnation, prev_value,
