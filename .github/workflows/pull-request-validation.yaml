@@ -91,5 +91,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.binary.package }}-${{ github.sha }}
-          path: target/${{ matrix.binary.output }}/${{ matrix.binary.package }}
+          path: target/${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
           retention-days: 7
