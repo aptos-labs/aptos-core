@@ -53,6 +53,8 @@ mod state_sync_utils;
 #[cfg(test)]
 mod storage;
 #[cfg(test)]
+mod sui_derivable_account;
+#[cfg(test)]
 mod test_smoke_tests;
 #[cfg(test)]
 mod transaction;
