@@ -61,6 +61,30 @@ spec:
         {{- include "testnet-addons.selectorLabels" . | nindent 8 }}
         app: {{ include "testnet-addons.fullname" . }}-waypoint
     spec:
+      initContainers:
+        - name: fetch-genesis
+          image: {{ $.Values.tools.image.repo }}:{{ $.Values.tools.image.tag | default $.Values.imageTag }}
+          command:
+            - bash
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /srv/http
+              if [[ ! -f /srv/http/genesis.blob ]]; then
+                gcloud storage cp "{{ $.Values.genesis_bucket_path }}/genesis.blob" /srv/http/genesis.blob
+              else
+                echo "genesis.blob found locally"
+              fi
+              ls -l /srv/http
+          workingDir: /tmp
+          env:
+          - name: HOME
+            value: /tmp
+          volumeMounts:
+            - name: genesis-secret
+              mountPath: /opt/aptos/genesis_readonly
+            - name: httpdata
+              mountPath: /srv/http
       containers:
       - name: http
         resources:
@@ -71,7 +95,9 @@ spec:
         ports:
         - containerPort: 8080
         volumeMounts:
-        - name: genesis
+        - name: genesis-secret
+          mountPath: /opt/aptos/genesis_readonly
+        - name: httpdata
           mountPath: /srv/http
         securityContext:
           readOnlyRootFilesystem: true
@@ -98,7 +124,9 @@ spec:
         runAsUser: 65534
         runAsGroup: 65534
       volumes:
-      - name: genesis
+      - name: httpdata
+        emptyDir: {}
+      - name: genesis-secret
         secret:
           # all validator genesis secrets will have waypoint.txt and genesis.blob
           secretName: {{ .Values.genesis.username_prefix }}-0-genesis-e{{ .Values.genesis.era }}
