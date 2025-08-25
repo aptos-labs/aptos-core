@@ -219,6 +219,14 @@ impl TDelayedFieldView for ExecutorViewWithChangeSet<'_> {
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 
+    fn get_read_needing_exchange(
+        &self,
+        _key: &Self::ResourceKey,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        unreachable!("Not used by the legacy session")
+    }
+
     fn get_group_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
@@ -226,6 +234,14 @@ impl TDelayedFieldView for ExecutorViewWithChangeSet<'_> {
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
+
+    fn get_group_read_needing_exchange(
+        &self,
+        _key: &Self::ResourceKey,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        unreachable!("Not used by the legacy session")
     }
 }
 

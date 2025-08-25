@@ -185,6 +185,12 @@ pub trait TDelayedFieldView {
         PanicError,
     >;
 
+    fn get_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError>;
+
     /// Returns the list of resource groups that satisfy all the following conditions:
     /// 1. At least one of the resource in the group is read during the transaction execution.
     /// 2. The resource group is not present in the write set of the VM Change Set.
@@ -198,6 +204,12 @@ pub trait TDelayedFieldView {
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>>;
+
+    fn get_group_read_needing_exchange(
+        &self,
+        key: &Self::ResourceKey,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>>;
 }
 
 pub trait DelayedFieldResolver:
@@ -266,11 +278,27 @@ where
         unimplemented!("get_reads_needing_exchange not implemented")
     }
 
+    fn get_read_needing_exchange(
+        &self,
+        _key: &Self::ResourceKey,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> Result<Option<(StateValueMetadata, u64)>, PanicError> {
+        Ok(None)
+    }
+
     fn get_group_reads_needing_exchange(
         &self,
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!("get_group_reads_needing_exchange not implemented")
+    }
+
+    fn get_group_read_needing_exchange(
+        &self,
+        _key: &Self::ResourceKey,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
+    ) -> PartialVMResult<Option<(StateValueMetadata, u64)>> {
+        Ok(None)
     }
 }

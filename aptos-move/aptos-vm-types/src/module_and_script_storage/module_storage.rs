@@ -4,7 +4,8 @@
 use aptos_types::state_store::state_value::StateValueMetadata;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
-use move_vm_runtime::ModuleStorage;
+use move_vm_runtime::{ModuleStorage, UnsyncModuleStorage, WithRuntimeEnvironment};
+use move_vm_types::code::ModuleBytesStorage;
 
 /// Represents module storage used by the Aptos blockchain.
 pub trait AptosModuleStorage: ModuleStorage {
@@ -17,4 +18,17 @@ pub trait AptosModuleStorage: ModuleStorage {
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>>;
+}
+
+impl<'a, T> AptosModuleStorage for UnsyncModuleStorage<'a, T>
+where
+    T: ModuleBytesStorage + WithRuntimeEnvironment,
+{
+    fn unmetered_get_module_state_value_metadata(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
+        unreachable!()
+    }
 }

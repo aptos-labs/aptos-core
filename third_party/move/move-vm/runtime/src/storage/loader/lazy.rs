@@ -5,8 +5,8 @@ use crate::{
     module_traversal::TraversalContext,
     storage::loader::traits::{
         FunctionDefinitionLoader, InstantiatedFunctionLoader, InstantiatedFunctionLoaderHelper,
-        LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
-        StructDefinitionLoader,
+        LegacyLoaderConfig, Loader, ModuleLoader, ModuleMetadataLoader, NativeModuleLoader,
+        ScriptLoader, StructDefinitionLoader,
     },
     Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script,
     WithRuntimeEnvironment,
@@ -48,6 +48,10 @@ where
     /// Returns a new lazy loader.
     pub fn new(module_storage: &'a T) -> Self {
         Self { module_storage }
+    }
+
+    pub fn as_unmetered_module_storage(&self) -> &T {
+        self.module_storage
     }
 
     /// Charges gas for the module load if the module has not been loaded already.
@@ -162,6 +166,40 @@ where
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.module_storage.runtime_environment()
+    }
+}
+
+impl<'a, T> ModuleLoader for LazyLoader<'a, T>
+where
+    T: ModuleStorage,
+{
+    fn load_module(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        id: &ModuleId,
+    ) -> VMResult<Option<Arc<Module>>> {
+        if traversal_context.visit_if_not_special_module_id(id) {
+            let addr = id.address();
+            let name = id.name();
+            let size_if_exists = self.module_storage.unmetered_get_module_size(addr, name)?;
+            match size_if_exists {
+                None => Ok(None),
+                Some(size) => {
+                    gas_meter
+                        .charge_dependency(
+                            DependencyKind::Existing,
+                            addr,
+                            name,
+                            NumBytes::new(size as u64),
+                        )
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                    self.module_storage.unmetered_get_lazily_verified_module(id)
+                },
+            }
+        } else {
+            self.module_storage.unmetered_get_lazily_verified_module(id)
+        }
     }
 }
 

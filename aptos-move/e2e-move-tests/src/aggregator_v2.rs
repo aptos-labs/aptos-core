@@ -92,10 +92,11 @@ fn initialize_harness(
                 FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
             ]]
             .concat(),
-            vec![],
+            vec![FeatureFlag::APTOS_VM_V2],
         );
     } else {
         harness.enable_features(common_features, vec![
+            FeatureFlag::APTOS_VM_V2,
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
