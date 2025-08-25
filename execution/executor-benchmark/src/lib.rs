@@ -983,6 +983,18 @@ mod tests {
     }
 
     #[test]
+    fn test_benchmark_orderless_transaction() {
+        AptosVM::set_num_shards_once(4);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        NativeConfig::set_concurrency_level_once(4);
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::NoOpOrderless),
+            true,
+        );
+    }
+
+    #[test]
     fn test_native_vm_benchmark_transaction() {
         test_generic_benchmark::<NativeVMBlockExecutor>(
             Some(TransactionTypeArg::AptFaTransfer),

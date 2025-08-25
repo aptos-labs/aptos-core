@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicUsize, mpsc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub struct DbReliableTransactionSubmitter {
@@ -56,10 +56,31 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
                 .collect(),
         )?;
 
+        let start = Instant::now();
         for txn in txns {
-            // Pipeline commit makes sure all initialization transactions
-            // get committed succesfully on-chain
-            while txn.sequence_number() >= self.query_sequence_number(txn.sender()).await? {
+            loop {
+                if let Some(txn_output) = self
+                    .db
+                    .reader
+                    .get_transaction_by_hash(
+                        txn.committed_hash(),
+                        self.db.reader.get_latest_ledger_info_version().unwrap(),
+                        false,
+                    )
+                    .unwrap()
+                {
+                    if txn_output.proof.transaction_info().status().is_success() {
+                        break;
+                    } else {
+                        panic!(
+                            "Transaction failed: {:?}",
+                            txn_output.proof.transaction_info()
+                        );
+                    }
+                }
+                if start.elapsed().as_secs() > 30 {
+                    panic!("Transaction timed out");
+                }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         }

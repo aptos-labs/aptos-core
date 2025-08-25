@@ -84,7 +84,7 @@ async fn test_account_abstraction_single_signer(
         factory
             .account_transfer(other.address(), 1)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -115,7 +115,7 @@ async fn test_account_abstraction_single_signer(
         factory
             .account_transfer(other.address(), 4)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -212,7 +212,7 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender(
                 vec![bcs::to_bytes(&d.address()).unwrap()],
             ))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,

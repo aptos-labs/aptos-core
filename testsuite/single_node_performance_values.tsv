@@ -1,4 +1,5 @@
 no-op	1	VM	6	0.975	1.007	35206.7
+no-op-orderless	1	VM	1	0.7	1.3	35206.7
 no-op	1000	VM	6	0.982	1.022	32347.9
 apt-fa-transfer	1	VM	6	0.993	1.012	25008.6
 apt-fa-transfer	1	NativeVM	6	0.956	1.021	40094.5
