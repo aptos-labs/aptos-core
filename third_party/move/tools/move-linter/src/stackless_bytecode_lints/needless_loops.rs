@@ -142,27 +142,14 @@ impl<'a> NeedlessLoopAnalyzer<'a> {
                     break;
                 },
                 Bytecode::Branch(attr_id, first_label, second_label, _) => {
-                    let first_exit =
-                        self.immediate_exit_at_label_in_loop(loop_header, *first_label);
-                    let second_exit =
-                        self.immediate_exit_at_label_in_loop(loop_header, *second_label);
+                    let first_exit = self.deep_exit_analysis(loop_header, *first_label);
+                    let second_exit = self.deep_exit_analysis(loop_header, *second_label);
+
                     match (first_exit, second_exit) {
-                        (Some(ImmediateExit::Returns), Some(ImmediateExit::Returns)) => {
+                        (Some(exit1), Some(exit2)) if exit1 == exit2 => {
                             return Some(LoopInfo {
                                 attr_id: *attr_id,
-                                reason: "returns".to_string(),
-                            });
-                        },
-                        (Some(ImmediateExit::Aborts), Some(ImmediateExit::Aborts)) => {
-                            return Some(LoopInfo {
-                                attr_id: *attr_id,
-                                reason: "aborts".to_string(),
-                            });
-                        },
-                        (Some(ImmediateExit::Breaks), Some(ImmediateExit::Breaks)) => {
-                            return Some(LoopInfo {
-                                attr_id: *attr_id,
-                                reason: "breaks".to_string(),
+                                reason: exit1.to_string(),
                             });
                         },
                         _ => break,
@@ -178,25 +165,61 @@ impl<'a> NeedlessLoopAnalyzer<'a> {
         None
     }
 
-    fn immediate_exit_at_label_in_loop(
-        &self,
-        loop_header: Label,
-        start_label: Label,
-    ) -> Option<ImmediateExit> {
-        match self.first_meaningful_instruction_at_label(start_label)? {
-            Bytecode::Ret(_, _) => Some(ImmediateExit::Returns),
-            Bytecode::Abort(_, _) => Some(ImmediateExit::Aborts),
-            Bytecode::Jump(_, target_label) => self
-                .is_definite_loop_exit(loop_header, *target_label)
-                .then_some(ImmediateExit::Breaks),
-            _ => None,
-        }
+    fn deep_exit_analysis(&self, loop_header: Label, start_label: Label) -> Option<ImmediateExit> {
+        let mut visited_labels = HashSet::new();
+        self.follow_path_to_exit(loop_header, start_label, &mut visited_labels)
     }
 
-    fn first_meaningful_instruction_at_label(&self, start_label: Label) -> Option<&Bytecode> {
-        let mut pc = *self.label_positions.get(&start_label)?;
+    fn follow_path_to_exit(
+        &self,
+        loop_header: Label,
+        current_label: Label,
+        visited: &mut HashSet<Label>,
+    ) -> Option<ImmediateExit> {
+        if !visited.insert(current_label) {
+            return None;
+        }
+
+        let mut pc = *self.label_positions.get(&current_label)?;
+
         pc = self.advance_to_meaningful(pc);
-        self.code.get(pc)
+
+        while pc < self.code.len() {
+            match &self.code[pc] {
+                Bytecode::Label(_, _) => {
+                    return None;
+                },
+                Bytecode::Ret(_, _) => {
+                    return Some(ImmediateExit::Returns);
+                },
+                Bytecode::Abort(_, _) => {
+                    return Some(ImmediateExit::Aborts);
+                },
+                Bytecode::Jump(_, target_label) => {
+                    if self.is_definite_loop_exit(loop_header, *target_label) {
+                        return Some(ImmediateExit::Breaks);
+                    }
+                    return None;
+                },
+                Bytecode::Branch(_, first_label, second_label, _) => {
+                    let first_exit = self.follow_path_to_exit(loop_header, *first_label, visited);
+                    let second_exit = self.follow_path_to_exit(loop_header, *second_label, visited);
+
+                    match (first_exit, second_exit) {
+                        (Some(exit1), Some(exit2)) if exit1 == exit2 => {
+                            return Some(exit1);
+                        },
+                        _ => return None,
+                    }
+                },
+                _ => {
+                    pc += 1;
+                    continue;
+                },
+            }
+        }
+
+        None
     }
 
     fn advance_to_meaningful(&self, mut pc: usize) -> usize {
@@ -266,4 +289,14 @@ enum ImmediateExit {
     Returns,
     Aborts,
     Breaks,
+}
+
+impl std::fmt::Display for ImmediateExit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ImmediateExit::Returns => write!(f, "returns"),
+            ImmediateExit::Aborts => write!(f, "aborts"),
+            ImmediateExit::Breaks => write!(f, "breaks"),
+        }
+    }
 }
