@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, trace, warn};
+use aptos_logger::{debug, error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -197,7 +197,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_randomness(&mut self, randomness: Randomness) {
         let rand = hex::encode(randomness.randomness());
-        info!(
+        debug!(
             metadata = randomness.metadata(),
             rand = rand,
             "Processing decisioned randomness."
