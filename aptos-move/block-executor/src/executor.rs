@@ -196,7 +196,7 @@ where
                                 incarnation,
                                 Arc::new(group_metadata_op),
                                 None,
-                            ),
+                            )?,
                         )?;
                         abort_manager.invalidate_dependencies(
                             versioned_cache.group_data().write_v2(
@@ -241,7 +241,7 @@ where
                     incarnation,
                     Arc::new(group_metadata_op),
                     None,
-                ),
+                )?,
             )?;
             abort_manager.invalidate_dependencies(versioned_cache.group_data().write_v2(
                 group_key,
@@ -393,13 +393,15 @@ where
             resource_write_set = output.resource_write_set();
             for (key, value, maybe_layout) in resource_write_set.clone().into_iter() {
                 prev_modified_resource_keys.remove(&key);
-                abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
-                    key,
-                    idx_to_execute,
-                    incarnation,
-                    value,
-                    maybe_layout,
-                ))?;
+                abort_manager.invalidate_dependencies(
+                    versioned_cache.data().write_v2::<false>(
+                        key,
+                        idx_to_execute,
+                        incarnation,
+                        value,
+                        maybe_layout,
+                    )?,
+                )?;
             }
 
             // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
