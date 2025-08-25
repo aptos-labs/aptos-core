@@ -8,6 +8,7 @@ mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
 mod cyclomatic_complexity;
+mod empty_range;
 mod equal_operands_in_bin_op;
 mod known_to_abort;
 mod needless_bool;
@@ -35,6 +36,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
+        Box::<empty_range::EmptyRange>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
