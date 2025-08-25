@@ -84,8 +84,8 @@ pub trait TStateView {
         false
     }
 
-    /// Number of free slots in hot state.
-    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
+    /// Number of items in hot state.
+    fn num_hot_items(&self) -> [usize; NUM_STATE_SHARDS] {
         [0; NUM_STATE_SHARDS]
     }
 
@@ -163,8 +163,8 @@ where
         self.deref().contains_hot_state_value(state_key)
     }
 
-    fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
-        self.deref().num_free_hot_slots()
+    fn num_hot_items(&self) -> [usize; NUM_STATE_SHARDS] {
+        self.deref().num_hot_items()
     }
 
     fn get_shard_id(&self, state_key: &Self::Key) -> usize {

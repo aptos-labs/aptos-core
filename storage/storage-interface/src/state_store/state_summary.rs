@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
@@ -79,6 +80,13 @@ impl StateSummary {
         assert!(persisted.next_version() <= self.next_version());
         // Updates must start at exactly my version.
         assert_eq!(updates.first_version(), self.next_version());
+
+        for i in 0..16 {
+            info!(
+                "summary shard_id: {}, state summary updates: {:?}",
+                i, updates.shards[i]
+            );
+        }
 
         let smt_updates = updates
             .shards
