@@ -1,6 +1,6 @@
 ---
-name: "Binary and Docker Build"
-
+name: "✅ PR Checks"
+run-name: "Running Checks for ${{ github.ref_name }}"
 on:
   pull_request:
     branches:
@@ -15,7 +15,6 @@ env:
   GIT_BRANCH: ${{ github.ref_name }}
   BUILD_DATE: ${{ github.event.head_commit.timestamp }}
   BUILT_VIA_BUILDKIT: "true"
-  PROFILE: "debug"
   FEATURES: ""
 
 jobs:
@@ -27,8 +26,10 @@ jobs:
         binary:
           - name: "aptos-node"
             package: "aptos-node"
+            profile: "debug"
           - name: "aptos-cli"
             package: "aptos-cli"
+            profile: "cli"
           # - name: "l1-migration"
           #   package: "l1-migration"
     steps:
@@ -70,14 +71,14 @@ jobs:
       - name: Build ${{ matrix.binary.name }}
         run: |
           echo "Building ${{ matrix.binary.name }} with Nix development shell..."
-          nix develop -c cargo build -p ${{ matrix.binary.package }}
-          echo "Binary available at target/debug/${{ matrix.binary.name }}"
+          nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
+          echo "Binary available at target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}"
 
       - name: Verify binary
         run: |
-          if [ -f "target/debug/${{ matrix.binary.name }}" ]; then
+          if [ -f "target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}" ]; then
             echo "✅ Binary ${{ matrix.binary.name }} built successfully"
-            ls -la target/debug/${{ matrix.binary.name }}
+            ls -la target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}
           else
             echo "❌ Binary ${{ matrix.binary.name }} not found"
             exit 1
@@ -87,5 +88,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.binary.name }}-${{ github.sha }}
-          path: target/debug/${{ matrix.binary.name }}
+          path: target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}
           retention-days: 7
