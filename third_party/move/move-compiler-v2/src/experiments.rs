@@ -276,6 +276,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::SECURITY_CHECKS.to_string(),
+            description: "Whether to run various security checks"
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -313,6 +319,7 @@ impl Experiment {
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
+    pub const SECURITY_CHECKS: &'static str = "security-checks";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SKIP_BAILOUT_ON_EXTENDED_CHECKS: &'static str = "skip-bailout-on-extended-checks";
     pub const SKIP_INLINING_INLINE_FUNS: &'static str = "skip-inlining-inline-funs";
