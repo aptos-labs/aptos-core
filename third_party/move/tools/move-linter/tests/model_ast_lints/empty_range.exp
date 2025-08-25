@@ -1,0 +1,54 @@
+
+Diagnostics:
+warning: [lint] This range is empty, as 10 is greater than 0
+  ┌─ tests/model_ast_lints/empty_range.move:7:5
+  │
+7 │ ╭     for (i in 10..0) {
+8 │ │       v += i;
+9 │ │     };
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_range)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_range.
+
+warning: [lint] This range is empty, as 10 is equal to 10
+   ┌─ tests/model_ast_lints/empty_range.move:15:5
+   │
+15 │ ╭     for (j in 10..10) {
+16 │ │       v += j;
+17 │ │     };
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_range)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_range.
+
+warning: [lint] This range is empty, as 10 is greater than 0
+   ┌─ tests/model_ast_lints/empty_range.move:24:5
+   │
+24 │ ╭     for (i in 10..0) {
+25 │ │       for (j in 0..10) {
+26 │ │         for (k in 0..10) {
+27 │ │           v += i;
+28 │ │         };
+29 │ │       };
+30 │ │     };
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_range)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_range.
+
+warning: [lint] This range is empty, as 10 is equal to 10
+   ┌─ tests/model_ast_lints/empty_range.move:35:30
+   │
+35 │     public fun desugared_for() {
+   │ ╭──────────────────────────────^
+36 │ │     let i = 10;
+37 │ │     let __update_iter_flag: bool = false;
+38 │ │     let __upper_bound_value: u64 = 10;
+   · │
+52 │ │     }
+53 │ │   }
+   │ ╰───^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_range)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_range.
