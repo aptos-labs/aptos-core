@@ -42,6 +42,7 @@ deserialize-u256	1	VM	6	0.998	1.019	33394.0
 no-op-fee-payer	1	VM	6	0.986	1.004	2317.1
 no-op-fee-payer	100	VM	6	0.986	1.017	27943.9
 simple-script	1	VM	6	0.991	1.012	35002.7
+read-enum-variants	1	VM	3	0.930	1.163	10549.8
 vector-trim-append-len3000-size1	1	VM	6	0.974	1.012	812.7
 vector-remove-insert-len3000-size1	1	VM	6	0.986	1.013	939.9
 order-book-no-matches1-market	1	VM	6	0.963	1.029	1811.3
