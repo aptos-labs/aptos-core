@@ -8,11 +8,6 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-// Useful constants for enabling consensus observer on different node types
-const ENABLE_ON_VALIDATORS: bool = true;
-const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
-const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
-
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusObserverConfig {
@@ -91,49 +86,13 @@ impl ConsensusObserverConfig {
 impl ConfigOptimizer for ConsensusObserverConfig {
     fn optimize(
         node_config: &mut NodeConfig,
-        local_config_yaml: &Value,
-        node_type: NodeType,
+        _local_config_yaml: &Value,
+        _node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let consensus_observer_config = &mut node_config.consensus_observer;
-        let local_observer_config_yaml = &local_config_yaml["consensus_observer"];
-
-        // Check if the observer configs are manually set in the local config.
-        // If they are, we don't want to override them.
-        let observer_manually_set = !local_observer_config_yaml["observer_enabled"].is_null();
-        let publisher_manually_set = !local_observer_config_yaml["publisher_enabled"].is_null();
-
-        // Enable the consensus observer and publisher based on the node type
-        let mut modified_config = false;
-        match node_type {
-            NodeType::Validator => {
-                if ENABLE_ON_VALIDATORS && !publisher_manually_set {
-                    // Only enable the publisher for validators
-                    consensus_observer_config.publisher_enabled = true;
-                    modified_config = true;
-                }
-            },
-            NodeType::ValidatorFullnode => {
-                if ENABLE_ON_VALIDATOR_FULLNODES
-                    && !observer_manually_set
-                    && !publisher_manually_set
-                {
-                    // Enable both the observer and the publisher for VFNs
-                    consensus_observer_config.observer_enabled = true;
-                    consensus_observer_config.publisher_enabled = true;
-                    modified_config = true;
-                }
-            },
-            NodeType::PublicFullnode => {
-                if ENABLE_ON_PUBLIC_FULLNODES && !observer_manually_set && !publisher_manually_set {
-                    // Enable both the observer and the publisher for PFNs
-                    consensus_observer_config.observer_enabled = true;
-                    consensus_observer_config.publisher_enabled = true;
-                    modified_config = true;
-                }
-            },
-        }
-
-        Ok(modified_config)
+        consensus_observer_config.observer_enabled = false;
+        consensus_observer_config.publisher_enabled = false;
+        Ok(true)
     }
 }
