@@ -162,7 +162,7 @@ spec aptos_framework::transaction_validation {
             !account::spec_exists_at(secondary_signer_addresses[i]);
         aborts_if exists i in 0..num_secondary_signers:
             !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
-                option::spec_is_some(secondary_signer_public_key_hashes[i]) && option::spec_borrow(
+                option::is_some(secondary_signer_public_key_hashes[i]) && option::spec_borrow(
                 secondary_signer_public_key_hashes[i]
             ) !=
                     account::spec_get_authentication_key(secondary_signer_addresses[i]);
@@ -170,7 +170,7 @@ spec aptos_framework::transaction_validation {
         ensures forall i in 0..num_secondary_signers:
             account::spec_exists_at(secondary_signer_addresses[i]);
         ensures forall i in 0..num_secondary_signers:
-            option::spec_is_none(secondary_signer_public_key_hashes[i]) || option::spec_borrow(
+            option::is_none(secondary_signer_public_key_hashes[i]) || option::spec_borrow(
                 secondary_signer_public_key_hashes[i]
             ) ==
                 account::spec_get_authentication_key(secondary_signer_addresses[i])
@@ -178,7 +178,7 @@ spec aptos_framework::transaction_validation {
     }
 
     spec fun can_skip(feature_flag: bool, is_simulation: bool, auth_key: Option<vector<u8>>): bool {
-        features::spec_simulation_enhancement_enabled() && is_simulation && option::spec_is_none(auth_key)
+        features::spec_simulation_enhancement_enabled() && is_simulation && option::is_none(auth_key)
     }
 
     spec multi_agent_common_prologue(
@@ -486,7 +486,7 @@ spec aptos_framework::transaction_validation {
         let amount_to_burn = transaction_fee_amount - storage_fee_refunded;
         let apt_addr = type_info::type_of<AptosCoin>().account_address;
         let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let total_supply_enabled = option::spec_is_some(maybe_apt_supply);
+        let total_supply_enabled = option::is_some(maybe_apt_supply);
         let apt_supply = option::spec_borrow(maybe_apt_supply);
         let apt_supply_value = optional_aggregator::optional_aggregator_value(apt_supply);
         let post post_maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;

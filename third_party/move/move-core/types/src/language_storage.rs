@@ -5,6 +5,7 @@
 use crate::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::FunctionParamOrReturnTag::{MutableReference, Reference, Value},
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
@@ -28,6 +29,18 @@ pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
 pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
 pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
 pub const EXPERIMENTAL_CODE_ADDRESS: AccountAddress = AccountAddress::SEVEN;
+
+pub const OPTION_NONE_TAG: u16 = 0;
+pub const OPTION_SOME_TAG: u16 = 1;
+// field "vec" of the old representation of option
+pub const LEGACY_OPTION_VEC: &str = "vec";
+
+pub static OPTION_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
+pub static OPTION_STRUCT_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::from(ident_str!("Option")));
+pub static MEM_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("mem"))));
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
@@ -245,6 +258,12 @@ impl StructTag {
             generics
         )
     }
+
+    /// Returns true if this is a `StructTag` for an `Option` struct defined in the
+    /// standard library at address `0x1`.
+    pub fn is_option(&self) -> bool {
+        self.is_std_option(OPTION_MODULE_ID.address())
+    }
 }
 
 impl FromStr for StructTag {
@@ -401,6 +420,11 @@ impl ModuleId {
 
     pub fn as_refs(&self) -> (&AccountAddress, &IdentStr) {
         (&self.address, self.name.as_ident_str())
+    }
+
+    pub fn is_option(&self) -> bool {
+        self.address == *OPTION_MODULE_ID.address()
+            && self.name.as_ident_str() == OPTION_MODULE_ID.name()
     }
 }
 
