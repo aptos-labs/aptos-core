@@ -112,7 +112,7 @@ jobs:
     outputs:
       run_execution_performance_test: ${{ steps.determine_test_targets.outputs.run_execution_performance_test }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run the test target determinator
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
@@ -123,7 +123,7 @@ jobs:
     timeout-minutes: 120
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}

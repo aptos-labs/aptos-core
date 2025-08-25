@@ -203,7 +203,7 @@ jobs:
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
       BRANCH_HASH: ${{ steps.hash-branch.outputs.BRANCH_HASH }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Determine branch based on cadence
         id: determine-test-branch

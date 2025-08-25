@@ -138,7 +138,7 @@ jobs:
     runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}

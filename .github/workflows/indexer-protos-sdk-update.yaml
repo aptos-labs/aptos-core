@@ -11,7 +11,7 @@ jobs:
   check-protos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
         uses: bufbuild/buf-setup-action@v1.24.0
@@ -61,7 +61,7 @@ jobs:
       )
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf

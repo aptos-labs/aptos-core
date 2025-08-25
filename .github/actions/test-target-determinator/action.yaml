@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     # Checkout the repository and setup the rust toolchain
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0 # Fetch all git history for accurate target determination
