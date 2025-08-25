@@ -1275,6 +1275,16 @@ where
 
         ret
     }
+
+    pub(crate) fn get_storage_key_read(&self) -> BTreeSet<T::Key> {
+        self.get_read_summary()
+            .into_iter()
+            .filter_map(|k| match k {
+                InputOutputKey::Resource(key) | InputOutputKey::Group(key, _) => Some(key),
+                InputOutputKey::DelayedField(_) => None,
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
