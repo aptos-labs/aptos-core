@@ -191,6 +191,14 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+        fn charge_load_resource_bytes(
+            &mut self,
+            addr: AccountAddress,
+            ty: &impl TypeView,
+            resource_exists: bool,
+            bytes_loaded: NumBytes,
+        ) -> PartialVMResult<()>;
     }
 
     #[inline]
@@ -264,26 +272,22 @@ where
     }
 
     #[inline]
-    fn charge_load_resource(
+    fn charge_deserialize_resource(
         &mut self,
         addr: AccountAddress,
-        ty: impl TypeView,
-        val: Option<impl ValueView>,
-        bytes_loaded: NumBytes,
+        ty: &impl TypeView,
+        val: impl ValueView,
     ) -> PartialVMResult<()> {
         if self.feature_version() != 0 {
             // TODO(Gas): Rewrite this in a better way.
-            if let Some(val) = &val {
-                self.use_heap_memory(
-                    self.vm_gas_params()
-                        .misc
-                        .abs_val
-                        .abstract_heap_size(val, self.feature_version())?,
-                )?;
-            }
+            self.use_heap_memory(
+                self.vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_heap_size(&val, self.feature_version())?,
+            )?;
         }
-
-        self.base.charge_load_resource(addr, ty, val, bytes_loaded)
+        self.base.charge_deserialize_resource(addr, ty, val)
     }
 
     #[inline]

@@ -4,7 +4,7 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::{CachedInformation, DataCacheGasMeterWrapper, TransactionDataCache},
     dispatch_loader,
     interpreter::InterpreterDebugInterface,
     loader::{LazyLoadedFunction, LazyLoadedFunctionState},
@@ -33,7 +33,10 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
+    gas::{
+        ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter,
+        UnmeteredGasMeter,
+    },
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     resolver::ResourceResolver,
@@ -154,21 +157,18 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         address: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)> {
-        // TODO(#16516):
-        //   Propagate exists call all the way to resolver, because we can implement the check more
-        //   efficiently, without the need to actually load bytes, deserialize the value and cache
-        //   it in the data cache.
-        Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (entry, bytes_loaded) =
-                self.loader_context().create_data_cache_entry(address, ty)?;
-            let exists = entry.value().exists()?;
-            self.data_store
-                .insert_resource(address, ty.clone(), entry)?;
-            (exists, Some(bytes_loaded))
-        } else {
-            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
-            (exists, None)
-        })
+        Ok(
+            if !self.data_store.contains_resource_existence(&address, ty) {
+                let (mut context, data_store) = self.load_context_and_data_store();
+                let (entry, bytes_loaded) =
+                    context.create_data_cache_entry(data_store, address, ty, false)?;
+                let exists = entry.exists()?;
+                (exists, Some(bytes_loaded))
+            } else {
+                let exists = self.data_store.get_resource_existence(&address, ty)?;
+                (exists, None)
+            },
+        )
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
@@ -278,6 +278,20 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         )
     }
 
+    pub fn load_context_and_data_store(
+        &mut self,
+    ) -> (LoaderContext<'_, 'c>, &mut TransactionDataCache) {
+        (
+            LoaderContext::new(
+                self.resource_resolver,
+                self.module_storage,
+                self.gas_meter,
+                self.traversal_context,
+            ),
+            self.data_store,
+        )
+    }
+
     pub fn traversal_context(&self) -> &TraversalContext<'c> {
         self.traversal_context
     }
@@ -384,21 +398,26 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 
     /// Creates a new [DataCacheEntry], loading its layout, deserializing it and recording its
     /// size in bytes.
-    fn create_data_cache_entry(
-        &mut self,
+    fn create_data_cache_entry<'c>(
+        &'c mut self,
+        data_store: &'c mut TransactionDataCache,
         address: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        load_data: bool,
+    ) -> PartialVMResult<(&'c CachedInformation, NumBytes)> {
         dispatch_loader!(&self.module_storage, loader, {
-            TransactionDataCache::create_data_cache_entry(
+            data_store.create_and_insert_or_upgrade_and_charge_data_cache_entry(
                 &loader,
                 &LayoutConverter::new(&loader),
-                &mut self.gas_meter,
+                DataCacheGasMeterWrapper::DependencyOnly::<UnmeteredGasMeter>(
+                    self.gas_meter.inner_mut(),
+                ),
                 self.traversal_context,
                 &self.module_storage,
                 self.resource_resolver,
                 &address,
                 ty,
+                load_data,
             )
         })
     }

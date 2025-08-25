@@ -99,6 +99,16 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    /// A set of workloads where X% of transactions modify a resource and other trnasactions just check its existence
+    /// All modifications are strictly serialized but existence checks should be perfectly parallelizable
+    ExistenceCheck0Pct,
+    ExistenceCheck5Pct,
+    ExistenceCheck10Pct,
+    ExistenceCheck20Pct,
+    ExistenceCheck50Pct,
+    ExistenceCheck80Pct,
+    ExistenceCheck100Pct,
+    CheckAndModify,
 }
 
 impl TransactionTypeArg {
@@ -443,6 +453,44 @@ impl TransactionTypeArg {
                     max_sell_size: 50,
                     max_buy_size: 950,
                 })
+            },
+            TransactionTypeArg::ExistenceCheck0Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.0,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck5Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.05,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck10Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.1,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck20Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.2,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck50Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.5,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck80Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 0.8,
+                })
+            },
+            TransactionTypeArg::ExistenceCheck100Pct => {
+                call_custom_module(EntryPoints::ExistenceModificationConflicts {
+                    modify_frequency: 1.0,
+                })
+            },
+            TransactionTypeArg::CheckAndModify => {
+                call_custom_module(EntryPoints::CheckExistsAndModify)
             },
         }
     }
