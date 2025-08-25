@@ -20,6 +20,7 @@ pub struct AdminServiceConfig {
     pub port: u16,
     // If empty, will allow all requests without authentication. (Not allowed on mainnet.)
     pub authentication_configs: Vec<AuthenticationConfig>,
+    pub malloc_stats_max_len: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -44,6 +45,7 @@ impl Default for AdminServiceConfig {
             address: "0.0.0.0".to_string(),
             port: 9102,
             authentication_configs: vec![],
+            malloc_stats_max_len: 2 * 1024 * 1024,
         }
     }
 }
