@@ -124,6 +124,7 @@ fn test_string_utils() {
         "0x1::runtime_checks::test_to_string_with_canonical_addresses_with_aggregators",
         "0x1::runtime_checks::test_to_string_with_integer_types_with_aggregators",
         "0x1::runtime_checks::test_debug_string_with_aggregators",
+        "0x1::runtime_checks::test_to_string_with_option_aggregators",
         // Snapshots.
         "0x1::runtime_checks::test_to_string_with_snapshots",
         "0x1::runtime_checks::test_to_string_with_canonical_addresses_with_snapshots",

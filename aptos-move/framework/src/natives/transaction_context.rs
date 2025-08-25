@@ -28,6 +28,8 @@ pub mod abort_codes {
     pub const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 2;
 }
 
+use move_core_types::language_storage::{OPTION_NONE_TAG, OPTION_SOME_TAG};
+
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so it
 /// is accessible from natives of this extension.
@@ -292,12 +294,28 @@ fn native_chain_id_internal(
     }
 }
 
-fn create_option_some_value(value: Value) -> Value {
-    Value::struct_(Struct::pack(vec![create_singleton_vector(value)]))
+fn create_option_some_value(enum_option_enabled: bool, value: Value) -> Value {
+    if enum_option_enabled {
+        Value::struct_(Struct::pack_variant(OPTION_SOME_TAG, vec![value]))
+    } else {
+        Value::struct_(Struct::pack(vec![create_singleton_vector(value)]))
+    }
 }
 
-fn create_option_none() -> Value {
-    Value::struct_(Struct::pack(vec![create_empty_vector()]))
+fn create_option_none(enum_option_enabled: bool) -> Value {
+    if enum_option_enabled {
+        Value::struct_(Struct::pack_variant(OPTION_NONE_TAG, vec![]))
+    } else {
+        Value::struct_(Struct::pack(vec![create_empty_vector()]))
+    }
+}
+
+fn create_singleton_vector(v: Value) -> Value {
+    create_vector_value(vec![v])
+}
+
+fn create_empty_vector() -> Value {
+    create_vector_value(vec![])
 }
 
 fn create_string_value(s: String) -> Value {
@@ -307,14 +325,6 @@ fn create_string_value(s: String) -> Value {
 fn create_vector_value(vv: Vec<Value>) -> Value {
     // This is safe because this function is only used to create vectors of homogenous values.
     Value::vector_for_testing_only(vv)
-}
-
-fn create_singleton_vector(v: Value) -> Value {
-    create_vector_value(vec![v])
-}
-
-fn create_empty_vector() -> Value {
-    create_vector_value(vec![])
 }
 
 fn num_bytes_from_entry_function_payload(entry_function_payload: &EntryFunctionPayload) -> usize {
@@ -363,7 +373,7 @@ fn native_entry_function_payload_internal(
     context.charge(TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_BASE)?;
 
     let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
-
+    let enum_option_enabled = context.get_feature_flags().is_enum_option_enabled();
     if let Some(transaction_context) = user_transaction_context_opt {
         if let Some(entry_function_payload) = transaction_context.entry_function_payload() {
             let num_bytes = num_bytes_from_entry_function_payload(&entry_function_payload);
@@ -372,9 +382,12 @@ fn native_entry_function_payload_internal(
                     * NumBytes::new(num_bytes as u64),
             )?;
             let payload = create_entry_function_payload(entry_function_payload);
-            Ok(smallvec![create_option_some_value(payload)])
+            Ok(smallvec![create_option_some_value(
+                enum_option_enabled,
+                payload
+            )])
         } else {
-            Ok(smallvec![create_option_none()])
+            Ok(smallvec![create_option_none(enum_option_enabled)])
         }
     } else {
         Err(SafeNativeError::Abort {
@@ -391,7 +404,7 @@ fn native_multisig_payload_internal(
     context.charge(TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_BASE)?;
 
     let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
-
+    let enum_option_enabled = context.get_feature_flags().is_enum_option_enabled();
     if let Some(transaction_context) = user_transaction_context_opt {
         if let Some(multisig_payload) = transaction_context.multisig_payload() {
             if let Some(entry_function_payload) = multisig_payload.entry_function_payload {
@@ -403,18 +416,24 @@ fn native_multisig_payload_internal(
                 let inner_entry_fun_payload = create_entry_function_payload(entry_function_payload);
                 let multisig_payload = Value::struct_(Struct::pack(vec![
                     Value::address(multisig_payload.multisig_address),
-                    create_option_some_value(inner_entry_fun_payload),
+                    create_option_some_value(enum_option_enabled, inner_entry_fun_payload),
                 ]));
-                Ok(smallvec![create_option_some_value(multisig_payload)])
+                Ok(smallvec![create_option_some_value(
+                    enum_option_enabled,
+                    multisig_payload
+                )])
             } else {
                 let multisig_payload = Value::struct_(Struct::pack(vec![
                     Value::address(multisig_payload.multisig_address),
-                    create_option_none(),
+                    create_option_none(enum_option_enabled),
                 ]));
-                Ok(smallvec![create_option_some_value(multisig_payload)])
+                Ok(smallvec![create_option_some_value(
+                    enum_option_enabled,
+                    multisig_payload
+                )])
             }
         } else {
-            Ok(smallvec![create_option_none()])
+            Ok(smallvec![create_option_none(enum_option_enabled)])
         }
     } else {
         Err(SafeNativeError::Abort {
