@@ -25,6 +25,7 @@ ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 arr_macro = { workspace = true }
+alloy-rlp = { version = "0.3.12", optional = true, features = ["derive"] }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -36,7 +37,7 @@ itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
-move-core-types = { workspace = true }
+move-core-types = { workspace = true, features = ["rlp_encoding"] }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
@@ -88,7 +89,13 @@ url = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+fuzzing = [
+  "proptest",
+  "proptest-derive",
+  "aptos-crypto/fuzzing",
+  "move-core-types/fuzzing",
+]
+rlp_encoding = ["alloy-rlp"]
 
 [[bench]]
 name = "keyless"

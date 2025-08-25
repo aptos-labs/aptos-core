@@ -11,7 +11,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-arbitrary = { workspace = true, features = ["derive_arbitrary"], optional = true }
+arbitrary = { workspace = true, features = [
+  "derive_arbitrary",
+], optional = true }
+alloy-rlp = { version = "0.3.12", optional = true, features = ["derive"] }
 bcs = { workspace = true }
 bytes = { workspace = true }
 ethnum = { workspace = true }
@@ -41,3 +44,4 @@ serde_json = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "arbitrary"]
+rlp_encoding = ["alloy-rlp"]

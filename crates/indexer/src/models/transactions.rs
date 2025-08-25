@@ -247,6 +247,7 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            APITransaction::AutomatedTransaction(_) => (unimplemented!()),
         }
     }
 

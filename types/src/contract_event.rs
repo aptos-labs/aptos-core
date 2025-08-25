@@ -169,6 +169,7 @@ impl ContractEvent {
 
 /// Entry produced via a call to the `emit_event` builtin.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+#[cfg_attr(feature = "rlp_encoding", derive(alloy_rlp::RlpEncodable))]
 pub struct ContractEventV1 {
     /// The unique key that the event was emitted to
     key: EventKey,
@@ -232,6 +233,7 @@ impl std::fmt::Debug for ContractEventV1 {
 
 /// Entry produced via a call to the `emit` builtin.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+#[cfg_attr(feature = "rlp_encoding", derive(alloy_rlp::RlpEncodable))]
 pub struct ContractEventV2 {
     /// The type of the data
     type_tag: TypeTag,
@@ -437,6 +439,21 @@ impl EventWithVersion {
         Self {
             transaction_version,
             event,
+        }
+    }
+}
+
+#[cfg(feature = "rlp_encoding")]
+mod rlp_encodable {
+    use crate::contract_event::ContractEvent;
+    use alloy_rlp::Encodable;
+
+    impl Encodable for ContractEvent {
+        fn encode(&self, out: &mut dyn bytes::BufMut) {
+            match self {
+                ContractEvent::V1(contract_event_v1) => contract_event_v1.encode(out),
+                ContractEvent::V2(contract_event_v2) => contract_event_v2.encode(out),
+            }
         }
     }
 }

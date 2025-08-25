@@ -877,22 +877,40 @@ pub struct Event {
     pub typ: MoveType,
     /// The JSON representation of the event
     pub data: serde_json::Value,
+    #[cfg(feature = "rlp_encoding")]
+    /// Supra hash of the event - RLP + keccak256
+    pub hash: HashValue,
 }
 
 impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
+        #[cfg(feature = "rlp_encoding")]
+        let hash = {
+            use alloy::primitives::Keccak256;
+            use alloy_rlp::Encodable;
+
+            let mut buf = Vec::new();
+            Encodable::encode(&event, &mut buf);
+            let mut hasher = Keccak256::new();
+            hasher.update(buf);
+            HashValue(aptos_crypto::hash::HashValue::new(*hasher.finalize()))
+        };
         match event {
             ContractEvent::V1(v1) => Self {
                 guid: (*v1.key()).into(),
                 sequence_number: v1.sequence_number().into(),
                 typ: v1.type_tag().clone().into(),
                 data,
+                #[cfg(feature = "rlp_encoding")]
+                hash,
             },
             ContractEvent::V2(v2) => Self {
                 guid: *DUMMY_GUID,
                 sequence_number: *DUMMY_SEQUENCE_NUMBER,
                 typ: v2.type_tag().clone().into(),
                 data,
+                #[cfg(feature = "rlp_encoding")]
+                hash,
             },
         }
     }
@@ -1073,8 +1091,8 @@ impl VerifyInput for MultisigPayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
-pub enum  AutomationRegistrationParams {
-    V1(AutomationRegistrationParamsV1)
+pub enum AutomationRegistrationParams {
+    V1(AutomationRegistrationParamsV1),
 }
 
 impl AutomationRegistrationParams {

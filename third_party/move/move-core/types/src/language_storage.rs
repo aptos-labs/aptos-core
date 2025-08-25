@@ -442,3 +442,15 @@ mod tests {
         }
     }
 }
+
+#[cfg(feature = "rlp_encoding")]
+mod rlp_encodable {
+    use crate::language_storage::TypeTag;
+    use alloy_rlp::Encodable;
+
+    impl Encodable for TypeTag {
+        fn encode(&self, out: &mut dyn bytes::BufMut) {
+            out.put_slice(self.to_canonical_string().as_bytes());
+        }
+    }
+}

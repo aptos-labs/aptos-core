@@ -51,6 +51,33 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `get_signer`](#0x1_supra_governance_get_signer)
 -  [Function `create_proposal_metadata`](#0x1_supra_governance_create_proposal_metadata)
 -  [Function `initialize_for_verification`](#0x1_supra_governance_initialize_for_verification)
+-  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
+    -  [Function `store_signer_cap`](#@Specification_1_store_signer_cap)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `update_supra_governance_config`](#@Specification_1_update_supra_governance_config)
+    -  [Function `get_voting_duration_secs`](#@Specification_1_get_voting_duration_secs)
+    -  [Function `get_min_voting_threshold`](#@Specification_1_get_min_voting_threshold)
+    -  [Function `get_voters_list`](#@Specification_1_get_voters_list)
+    -  [Function `supra_create_proposal`](#@Specification_1_supra_create_proposal)
+    -  [Function `supra_create_proposal_v2`](#@Specification_1_supra_create_proposal_v2)
+    -  [Function `supra_create_proposal_v2_impl`](#@Specification_1_supra_create_proposal_v2_impl)
+    -  [Function `supra_vote`](#@Specification_1_supra_vote)
+    -  [Function `supra_vote_internal`](#@Specification_1_supra_vote_internal)
+    -  [Function `add_supra_approved_script_hash_script`](#@Specification_1_add_supra_approved_script_hash_script)
+    -  [Function `add_supra_approved_script_hash`](#@Specification_1_add_supra_approved_script_hash)
+    -  [Function `supra_resolve`](#@Specification_1_supra_resolve)
+    -  [Function `resolve_supra_multi_step_proposal`](#@Specification_1_resolve_supra_multi_step_proposal)
+    -  [Function `remove_supra_approved_hash`](#@Specification_1_remove_supra_approved_hash)
+    -  [Function `reconfigure`](#@Specification_1_reconfigure)
+    -  [Function `force_end_epoch`](#@Specification_1_force_end_epoch)
+    -  [Function `force_end_epoch_test_only`](#@Specification_1_force_end_epoch_test_only)
+    -  [Function `toggle_features`](#@Specification_1_toggle_features)
+    -  [Function `get_signer_testnet_only`](#@Specification_1_get_signer_testnet_only)
+    -  [Function `get_signer`](#@Specification_1_get_signer)
+    -  [Function `create_proposal_metadata`](#@Specification_1_create_proposal_metadata)
+    -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1475,6 +1502,808 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The create proposal function calls create proposal v2.</td>
+<td>Low</td>
+<td>The create_proposal function internally calls create_proposal_v2.</td>
+<td>This is manually audited to ensure create_proposal_v2 is called in create_proposal.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The Approved execution hashes resources that exist when the vote function is called.</td>
+<td>Low</td>
+<td>The Vote function acquires the Approved execution hashes resources.</td>
+<td>Formally verified in <a href="#high-level-req-2">VoteAbortIf</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The execution script hash of a successful governance proposal is added to the approved list if the proposal can be resolved.</td>
+<td>Medium</td>
+<td>The add_approved_script_hash function asserts that proposal_state == PROPOSAL_STATE_SUCCEEDED.</td>
+<td>Formally verified in <a href="#high-level-req-3">AddApprovedScriptHash</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
+<a id="@Specification_1_store_signer_cap"></a>
+
+### Function `store_signer_cap`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_store_signer_cap">store_signer_cap</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signer_address: <b>address</b>, signer_cap: <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework));
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_framework_reserved_address">system_addresses::is_framework_reserved_address</a>(signer_address);
+<b>let</b> signer_caps = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework).signer_caps;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework) &&
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(signer_caps, signer_address);
+<b>ensures</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework);
+<b>let</b> <b>post</b> post_signer_caps = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework).signer_caps;
+<b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_signer_caps, signer_address);
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>fun</b> <a href="supra_governance.md#0x1_supra_governance_initialize">initialize</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, voting_duration_secs: u64, min_voting_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+Signer address must be @supra_framework.
+The signer does not allow these resources (GovernanceProposal, GovernanceConfig, GovernanceEvents, VotingRecords, ApprovedExecutionHashes) to exist.
+The signer must have an Account.
+Limit addition overflow.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
+<b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(addr);
+<b>aborts_if</b> min_voting_threshold &lt;= 1;
+<b>aborts_if</b> !(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) &gt;= min_voting_threshold && min_voting_threshold &gt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) / 2);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> register_account.guid_creation_num + 7 &gt; MAX_U64;
+<b>aborts_if</b> register_account.guid_creation_num + 7 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;GovernanceProposal&gt;();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_InitializeAbortIf">InitializeAbortIf</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;<a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a>&gt;&gt;(addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceEvents">SupraGovernanceEvents</a>&gt;(addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(addr);
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_InitializeAbortIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_InitializeAbortIf">InitializeAbortIf</a> {
+    supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    min_voting_threshold: u128;
+    voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
+    voting_duration_secs: u64;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
+    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;<a href="governance_proposal.md#0x1_governance_proposal_GovernanceProposal">governance_proposal::GovernanceProposal</a>&gt;&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceEvents">SupraGovernanceEvents</a>&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(addr);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_update_supra_governance_config"></a>
+
+### Function `update_supra_governance_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_update_supra_governance_config">update_supra_governance_config</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, voting_duration_secs: u64, min_voting_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+Signer address must be @supra_framework.
+Address @supra_framework must exist GovernanceConfig and GovernanceEvents.
+
+
+<pre><code><b>aborts_if</b> min_voting_threshold &lt;= 1;
+<b>aborts_if</b> !(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) &gt;= min_voting_threshold && min_voting_threshold &gt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) / 2);
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
+<b>let</b> governance_config = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework);
+<b>let</b> <b>post</b> new_governance_config = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework);
+<b>aborts_if</b> addr != @supra_framework;
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) &lt; min_voting_threshold || min_voting_threshold &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(voters) / 2);
+<b>aborts_if</b> min_voting_threshold &lt;= 1;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceEvents">SupraGovernanceEvents</a>&gt;(@supra_framework);
+<b>modifies</b> <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(addr);
+<b>ensures</b> new_governance_config.voting_duration_secs == voting_duration_secs;
+<b>ensures</b> new_governance_config.min_voting_threshold == min_voting_threshold;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_voting_duration_secs"></a>
+
+### Function `get_voting_duration_secs`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voting_duration_secs">get_voting_duration_secs</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="supra_governance.md#0x1_supra_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_min_voting_threshold"></a>
+
+### Function `get_min_voting_threshold`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_min_voting_threshold">get_min_voting_threshold</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="supra_governance.md#0x1_supra_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_voters_list"></a>
+
+### Function `get_voters_list`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_voters_list">get_voters_list</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="supra_governance.md#0x1_supra_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_AbortsIfNotGovernanceConfig"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a> {
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_create_proposal"></a>
+
+### Function `supra_create_proposal`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_create_proposal">supra_create_proposal</a>(proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+The same as spec of <code>create_proposal_v2()</code>.
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 60;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_create_proposal_v2"></a>
+
+### Function `supra_create_proposal_v2`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_create_proposal_v2">supra_create_proposal_v2</a>(proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_multi_step_proposal: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 60;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_create_proposal_v2_impl"></a>
+
+### Function `supra_create_proposal_v2_impl`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_create_proposal_v2_impl">supra_create_proposal_v2_impl</a>(proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_multi_step_proposal: bool): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 60;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a>;
+</code></pre>
+
+
+<code>stake_pool</code> must exist StakePool.
+The delegated voter under the resource StakePool of the stake_pool must be the proposer address.
+Address @supra_framework must exist GovernanceEvents.
+
+
+<a id="0x1_supra_governance_CreateProposalAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalAbortsIf">CreateProposalAbortsIf</a> {
+    proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>include</b> <a href="supra_governance.md#0x1_supra_governance_VotingGetDelegatedVoterAbortsIf">VotingGetDelegatedVoterAbortsIf</a> { sign: proposer };
+    <b>include</b> <a href="supra_governance.md#0x1_supra_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
+    <b>let</b> governance_config = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceConfig">SupraGovernanceConfig</a>&gt;(@supra_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@supra_framework);
+    <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
+    <b>let</b> proposal_expiration = current_time + governance_config.voting_duration_secs;
+    <b>include</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a>;
+    <b>aborts_if</b> len(execution_hash) == 0;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> proposal_id = voting_forum.next_proposal_id;
+    <b>aborts_if</b> proposal_id + 1 &gt; MAX_U64;
+    <b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> <b>post</b> post_next_proposal_id = post_voting_forum.next_proposal_id;
+    <b>ensures</b> post_next_proposal_id == proposal_id + 1;
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(post_voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceEvents">SupraGovernanceEvents</a>&gt;(@supra_framework);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_VotingGetDelegatedVoterAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_VotingGetDelegatedVoterAbortsIf">VotingGetDelegatedVoterAbortsIf</a> {
+    sign: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sign);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_vote"></a>
+
+### Function `supra_vote`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_vote">supra_vote</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+stake_pool must exist StakePool.
+The delegated voter under the resource StakePool of the stake_pool must be the voter address.
+Address @supra_framework must exist VotingRecords and GovernanceProposal.
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 60;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_VoteAbortIf">VoteAbortIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_vote_internal"></a>
+
+### Function `supra_vote_internal`
+
+
+<pre><code><b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_vote_internal">supra_vote_internal</a>(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 60;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_SupraVoteAbortIf">SupraVoteAbortIf</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_SupraVoteAbortIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_SupraVoteAbortIf">SupraVoteAbortIf</a> {
+    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    proposal_id: u64;
+    should_pass: bool;
+    <b>aborts_if</b> spec_proposal_expiration &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@supra_framework);
+    <b>let</b> spec_proposal_expiration = <a href="multisig_voting.md#0x1_multisig_voting_spec_get_proposal_expiration_secs">multisig_voting::spec_get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@supra_framework, proposal_id);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_VoteAbortIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_VoteAbortIf">VoteAbortIf</a> {
+    voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    proposal_id: u64;
+    should_pass: bool;
+    <b>include</b> <a href="supra_governance.md#0x1_supra_governance_VotingGetDelegatedVoterAbortsIf">VotingGetDelegatedVoterAbortsIf</a> { sign: voter };
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+    <b>let</b> proposal_expiration = proposal.expiration_secs;
+    <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration;
+    <b>aborts_if</b> proposal.is_resolved;
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>let</b> execution_key = utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, execution_key) &&
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, execution_key) != std::bcs::to_bytes(<b>false</b>);
+    <b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>);
+    <b>let</b> key = utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>);
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_proposal.metadata, key);
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, key) == std::bcs::to_bytes(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_SupraGovernanceEvents">SupraGovernanceEvents</a>&gt;(@supra_framework);
+    <b>let</b> execution_hash = proposal.execution_hash;
+    <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes.hashes, proposal_id) &&
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_approved_hashes.hashes, proposal_id) == execution_hash;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_add_supra_approved_script_hash_script"></a>
+
+### Function `add_supra_approved_script_hash_script`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_add_supra_approved_script_hash_script">add_supra_approved_script_hash_script</a>(proposal_id: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_AddApprovedScriptHash">AddApprovedScriptHash</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_AddApprovedScriptHash"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_AddApprovedScriptHash">AddApprovedScriptHash</a> {
+    proposal_id: u64;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+    <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes.hashes, proposal_id) &&
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_approved_hashes.hashes, proposal_id) == proposal.execution_hash;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_add_supra_approved_script_hash"></a>
+
+### Function `add_supra_approved_script_hash`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_add_supra_approved_script_hash">add_supra_approved_script_hash</a>(proposal_id: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_AddApprovedScriptHash">AddApprovedScriptHash</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_supra_resolve"></a>
+
+### Function `supra_resolve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_supra_resolve">supra_resolve</a>(proposal_id: u64, signer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+Address @supra_framework must exist ApprovedExecutionHashes and GovernanceProposal and GovernanceResponsbility.
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a>;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>let</b> multi_step_key = utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>let</b> has_multi_step_key = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key);
+<b>let</b> is_multi_step_proposal = aptos_std::from_bcs::deserialize&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>aborts_if</b> has_multi_step_key && !aptos_std::from_bcs::deserializable&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>aborts_if</b> has_multi_step_key && is_multi_step_proposal;
+<b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+<b>ensures</b> post_proposal.is_resolved == <b>true</b> && post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(proposal.execution_content);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+<b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework).hashes;
+<b>ensures</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes, proposal_id);
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_GetSignerAbortsIf">GetSignerAbortsIf</a>;
+<b>let</b> governance_responsibility = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework);
+<b>let</b> signer_cap = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(governance_responsibility.signer_caps, signer_address);
+<b>let</b> addr = signer_cap.<a href="account.md#0x1_account">account</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == addr;
+</code></pre>
+
+
+
+<a id="@Specification_1_resolve_supra_multi_step_proposal"></a>
+
+### Function `resolve_supra_multi_step_proposal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_resolve_supra_multi_step_proposal">resolve_supra_multi_step_proposal</a>(proposal_id: u64, signer_address: <b>address</b>, next_execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a>;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>let</b> multi_step_in_execution_key = utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>let</b> <b>post</b> is_multi_step_proposal_in_execution_value = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, multi_step_in_execution_key);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>let</b> multi_step_key = utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">multisig_voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key) &&
+    !aptos_std::from_bcs::deserializable&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>let</b> is_multi_step = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key) &&
+    aptos_std::from_bcs::deserialize&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>let</b> next_execution_hash_is_empty = len(next_execution_hash) == 0;
+<b>aborts_if</b> !is_multi_step && !next_execution_hash_is_empty;
+<b>aborts_if</b> next_execution_hash_is_empty && is_multi_step && !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_in_execution_key);
+<b>ensures</b> next_execution_hash_is_empty ==&gt; post_proposal.is_resolved == <b>true</b> && post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &&
+    <b>if</b> (is_multi_step) {
+        is_multi_step_proposal_in_execution_value == std::bcs::serialize(<b>false</b>)
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_in_execution_key) ==&gt;
+            is_multi_step_proposal_in_execution_value == std::bcs::serialize(<b>true</b>)
+    };
+<b>ensures</b> !next_execution_hash_is_empty ==&gt; post_proposal.execution_hash == next_execution_hash;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+<b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework).hashes;
+<b>ensures</b> next_execution_hash_is_empty ==&gt; !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes, proposal_id);
+<b>ensures</b> !next_execution_hash_is_empty ==&gt;
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_approved_hashes, proposal_id) == next_execution_hash;
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_GetSignerAbortsIf">GetSignerAbortsIf</a>;
+<b>let</b> governance_responsibility = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework);
+<b>let</b> signer_cap = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(governance_responsibility.signer_caps, signer_address);
+<b>let</b> addr = signer_cap.<a href="account.md#0x1_account">account</a>;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == addr;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_VotingIsProposalResolvableAbortsif"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a> {
+    proposal_id: u64;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+    <b>let</b> voting_period_over = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal.expiration_secs;
+    <b>aborts_if</b> proposal.is_resolved;
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>));
+    <b>let</b> resolvable_time = aptos_std::from_bcs::deserialize&lt;u64&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>)));
+    <b>aborts_if</b> !aptos_std::from_bcs::deserializable&lt;u64&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">multisig_voting::RESOLVABLE_TIME_METADATA_KEY</a>)));
+    <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= resolvable_time;
+    <b>aborts_if</b> supra_framework::transaction_context::spec_get_script_hash() != proposal.execution_hash;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_supra_approved_hash"></a>
+
+### Function `remove_supra_approved_hash`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_remove_supra_approved_hash">remove_supra_approved_hash</a>(proposal_id: u64)
+</code></pre>
+
+
+Address @supra_framework must exist ApprovedExecutionHashes and GovernanceProposal.
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework);
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">multisig_voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@supra_framework);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !proposal.is_resolved;
+<b>let</b> <b>post</b> approved_hashes = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@supra_framework).hashes;
+<b>ensures</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(approved_hashes, proposal_id);
+</code></pre>
+
+
+
+<a id="@Specification_1_reconfigure"></a>
+
+### Function `reconfigure`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_reconfigure">reconfigure</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_supra_framework_address">system_addresses::is_supra_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework));
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    framework: supra_framework
+};
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(@supra_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_force_end_epoch"></a>
+
+### Function `force_end_epoch`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_force_end_epoch">force_end_epoch</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> <b>address</b> = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    framework: supra_framework
+};
+</code></pre>
+
+
+
+<a id="@Specification_1_force_end_epoch_test_only"></a>
+
+### Function `force_end_epoch_test_only`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_force_end_epoch_test_only">force_end_epoch_test_only</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_toggle_features"></a>
+
+### Function `toggle_features`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_toggle_features">toggle_features</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, enable: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+Signer address must be @supra_framework.
+Address @supra_framework must exist GovernanceConfig and GovernanceEvents.
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(supra_framework);
+<b>aborts_if</b> addr != @supra_framework;
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    framework: supra_framework
+};
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;SupraCoin&gt;&gt;(@supra_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_signer_testnet_only"></a>
+
+### Function `get_signer_testnet_only`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_signer_testnet_only">get_signer_testnet_only</a>(core_resources: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, signer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+Signer address must be @core_resources.
+signer must exist in MintCapStore.
+Address @supra_framework must exist GovernanceResponsbility.
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(core_resources) != @core_resources;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_coin.md#0x1_supra_coin_MintCapStore">supra_coin::MintCapStore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(core_resources));
+<b>include</b> <a href="supra_governance.md#0x1_supra_governance_GetSignerAbortsIf">GetSignerAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_signer"></a>
+
+### Function `get_signer`
+
+
+<pre><code><b>fun</b> <a href="supra_governance.md#0x1_supra_governance_get_signer">get_signer</a>(signer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="supra_governance.md#0x1_supra_governance_GetSignerAbortsIf">GetSignerAbortsIf</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_GetSignerAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_GetSignerAbortsIf">GetSignerAbortsIf</a> {
+    signer_address: <b>address</b>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework);
+    <b>let</b> cap_map = <b>global</b>&lt;<a href="supra_governance.md#0x1_supra_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@supra_framework).signer_caps;
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(cap_map, signer_address);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_create_proposal_metadata"></a>
+
+### Function `create_proposal_metadata`
+
+
+<pre><code><b>fun</b> <a href="supra_governance.md#0x1_supra_governance_create_proposal_metadata">create_proposal_metadata</a>(metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_supra_governance_CreateProposalMetadataAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="supra_governance.md#0x1_supra_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a> {
+    metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_location)) &gt; 256;
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(utf8(metadata_hash)) &gt; 256;
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_location);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(metadata_hash);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="supra_governance.md#0x1_supra_governance_METADATA_LOCATION_KEY">METADATA_LOCATION_KEY</a>);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="supra_governance.md#0x1_supra_governance_METADATA_HASH_KEY">METADATA_HASH_KEY</a>);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_for_verification"></a>
+
+### Function `initialize_for_verification`
+
+
+<pre><code>#[verify_only]
+<b>public</b> <b>fun</b> <a href="supra_governance.md#0x1_supra_governance_initialize_for_verification">initialize_for_verification</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, voting_duration_secs: u64, supra_min_voting_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+verify_only
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -1150,7 +1150,6 @@ Can only be called as part of the Supra governance proposal process established 
 
 <pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@supra_framework);
 <b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
 

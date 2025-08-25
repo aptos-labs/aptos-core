@@ -52,6 +52,7 @@ requirements:
 -  [Function `upsert_committee_member_bulk`](#0x1_committee_map_upsert_committee_member_bulk)
 -  [Function `remove_committee_member`](#0x1_committee_map_remove_committee_member)
 -  [Function `find_node_in_committee`](#0x1_committee_map_find_node_in_committee)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1778,6 +1779,15 @@ Find the node in the committee
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

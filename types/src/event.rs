@@ -11,6 +11,7 @@ use std::fmt;
 /// A struct that represents a globally unique id for an Event stream that a user can listen to.
 /// By design, the lower part of EventKey is the same as account address.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[cfg_attr(feature = "rlp_encoding", derive(alloy_rlp::RlpEncodable))]
 pub struct EventKey {
     creation_number: u64,
     account_address: AccountAddress,

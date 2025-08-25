@@ -24,10 +24,13 @@
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
     -  [Function `script_prologue`](#@Specification_1_script_prologue)
+    -  [Function `automated_transaction_prologue`](#@Specification_1_automated_transaction_prologue)
     -  [Function `multi_agent_script_prologue`](#@Specification_1_multi_agent_script_prologue)
     -  [Function `multi_agent_common_prologue`](#@Specification_1_multi_agent_common_prologue)
     -  [Function `fee_payer_script_prologue`](#@Specification_1_fee_payer_script_prologue)
     -  [Function `epilogue`](#@Specification_1_epilogue)
+    -  [Function `automated_transaction_epilogue`](#@Specification_1_automated_transaction_epilogue)
+    -  [Function `epilogue_gas_payer_only`](#@Specification_1_epilogue_gas_payer_only)
     -  [Function `epilogue_gas_payer`](#@Specification_1_epilogue_gas_payer)
 
 
@@ -981,6 +984,22 @@ Give some constraints that may abort according to the conditions.
 
 
 
+<a id="@Specification_1_automated_transaction_prologue"></a>
+
+### Function `automated_transaction_prologue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_automated_transaction_prologue">automated_transaction_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, task_index: u64, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_multi_agent_script_prologue"></a>
 
 ### Function `multi_agent_script_prologue`
@@ -1075,6 +1094,38 @@ Skip transaction_fee::burn_fee verification.
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_EpilogueGasPayerAbortsIf">EpilogueGasPayerAbortsIf</a> { gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) };
+</code></pre>
+
+
+
+<a id="@Specification_1_automated_transaction_epilogue"></a>
+
+### Function `automated_transaction_epilogue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_automated_transaction_epilogue">automated_transaction_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_epilogue_gas_payer_only"></a>
+
+### Function `epilogue_gas_payer_only`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer_only">epilogue_gas_payer_only</a>(gas_payer: <b>address</b>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

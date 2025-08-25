@@ -273,6 +273,7 @@ impl Filterable<Transaction> for APIFilter {
                         TxnData::User(u) => &u.events,
                         TxnData::Validator(_) => return false,
                         TxnData::BlockEpilogue(_) => return false,
+                        TxnData::Automated(automated_transaction) => &automated_transaction.events,
                     };
                     events_filter.is_allowed_vec(events)
                 } else {

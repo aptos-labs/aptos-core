@@ -296,6 +296,9 @@ async fn fetch_nexts(
                         info.block_height = Some(block_height_bcs);
                         info.epoch = Some(epoch_bcs);
                     },
+                    Transaction::AutomatedTransaction(_) => {
+                        unimplemented!()
+                    },
                 };
                 txn
             });

@@ -34,6 +34,8 @@ rustflags = [
   "--cfg",
   "tokio_unstable",
   "-C",
+  "linker=clang",
+  "-C",
   "link-arg=-fuse-ld=lld",
   "-C",
   "force-frame-pointers=yes",
@@ -55,3 +57,7 @@ rustflags = [
   "-C",
   "link-arg=/STACK:8000000",  # Set stack to 8 MB
 ]
+
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"
+CXXFLAGS = "-include cstdint"        # Needed for `librocksdb-sys` build

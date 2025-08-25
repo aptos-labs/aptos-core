@@ -49,6 +49,8 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `get_registry_total_locked_balance`](#0x1_automation_registry_get_registry_total_locked_balance)
 -  [Function `get_active_task_ids`](#0x1_automation_registry_get_active_task_ids)
 -  [Function `get_task_details`](#0x1_automation_registry_get_task_details)
+-  [Function `deconstruct_task_metadata`](#0x1_automation_registry_deconstruct_task_metadata)
+-  [Function `get_task_owner`](#0x1_automation_registry_get_task_owner)
 -  [Function `get_task_details_bulk`](#0x1_automation_registry_get_task_details_bulk)
 -  [Function `has_sender_active_task_with_id`](#0x1_automation_registry_has_sender_active_task_with_id)
 -  [Function `get_registry_fee_address`](#0x1_automation_registry_get_registry_fee_address)
@@ -101,6 +103,7 @@ This contract is part of the Supra Framework and is designed to manage automated
 -  [Function `upscale_from_u256`](#0x1_automation_registry_upscale_from_u256)
 -  [Function `downscale_to_u64`](#0x1_automation_registry_downscale_to_u64)
 -  [Function `downscale_to_u256`](#0x1_automation_registry_downscale_to_u256)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -2109,6 +2112,86 @@ Error will be returned if entry with specified task index does not exist.
     <b>let</b> automation_task_metadata = <b>borrow_global</b>&lt;<a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a>&gt;(@supra_framework);
     <b>assert</b>!(<a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_contains">enumerable_map::contains</a>(&automation_task_metadata.tasks, task_index), <a href="automation_registry.md#0x1_automation_registry_EAUTOMATION_TASK_NOT_FOUND">EAUTOMATION_TASK_NOT_FOUND</a>);
     <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value">enumerable_map::get_value</a>(&automation_task_metadata.tasks, task_index)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_automation_registry_deconstruct_task_metadata"></a>
+
+## Function `deconstruct_task_metadata`
+
+Retrieves specific metadata details of an automation task entry by its task index.
+
+1. <code><b>address</b></code>                 - The owner of the task.
+2. <code><a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>              - The payload transaction (encoded).
+3. <code>u64</code>                     - The expiry time of the task (timestamp).
+4. <code><a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>              - The hash of the transaction.
+5. <code>u64</code>                     - The maximum gas amount allowed for the task.
+6. <code>u64</code>                     - The gas price cap for executing the task.
+7. <code>u64</code>                     - The automation fee cap for the current epoch.
+8. <code><a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>      - Auxiliary data related to the task (can be multiple items).
+9. <code>u64</code>                     - The time at which the task was registered (timestamp).
+10. <code>u8</code>                     - The state of the task (e.g., active, cancelled, completed).
+11. <code>u64</code>                    - The locked fee reserved for the next epoch execution.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_deconstruct_task_metadata">deconstruct_task_metadata</a>(task_metadata: &<a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">automation_registry::AutomationTaskMetaData</a>): (<b>address</b>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u64, u64, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, u64, u8, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_deconstruct_task_metadata">deconstruct_task_metadata</a>(
+    task_metadata: &<a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">AutomationTaskMetaData</a>
+): (<b>address</b>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, u64, u64, u64, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, u64, u8, u64) {
+    (
+        task_metadata.owner,
+        task_metadata.payload_tx,
+        task_metadata.expiry_time,
+        task_metadata.tx_hash,
+        task_metadata.max_gas_amount,
+        task_metadata.gas_price_cap,
+        task_metadata.automation_fee_cap_for_epoch,
+        task_metadata.aux_data,
+        task_metadata.registration_time,
+        task_metadata.state,
+        task_metadata.locked_fee_for_next_epoch
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_automation_registry_get_task_owner"></a>
+
+## Function `get_task_owner`
+
+Retrieves the owner address of a task by its task index.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_get_task_owner">get_task_owner</a>(task_index: u64): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="automation_registry.md#0x1_automation_registry_get_task_owner">get_task_owner</a>(task_index: u64): <b>address</b> <b>acquires</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a> {
+    <b>let</b> automation_task_metadata = <b>borrow_global</b>&lt;<a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">AutomationRegistry</a>&gt;(@supra_framework);
+    <b>assert</b>!(<a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_contains">enumerable_map::contains</a>(&automation_task_metadata.tasks, task_index), <a href="automation_registry.md#0x1_automation_registry_EAUTOMATION_TASK_NOT_FOUND">EAUTOMATION_TASK_NOT_FOUND</a>);
+    <b>let</b> task_metadata = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value">enumerable_map::get_value</a>(&automation_task_metadata.tasks, task_index);
+    task_metadata.owner
 }
 </code></pre>
 
@@ -4462,6 +4545,15 @@ Insertion sort implementation for vector
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

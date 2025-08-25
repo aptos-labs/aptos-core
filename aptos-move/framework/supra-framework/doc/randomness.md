@@ -1068,7 +1068,7 @@ function as its payload.
 
 
 <pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
-<b>let</b> input = b"APTOS_RANDOMNESS";
+<b>let</b> input = b"SUPRA_RANDOMNESS";
 <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@supra_framework);
 <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
 <b>let</b> txn_hash = <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">transaction_context::spec_get_txn_hash</a>();

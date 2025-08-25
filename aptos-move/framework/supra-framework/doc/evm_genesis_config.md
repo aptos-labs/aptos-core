@@ -12,6 +12,7 @@
 -  [Function `set_for_next_epoch`](#0x1_evm_genesis_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_evm_genesis_config_on_new_epoch)
 -  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
@@ -57,6 +58,7 @@ The struct stores the on-chain EVM genesis configuration.
 
 ## Struct `EvmGenesisEvent`
 
+Event to signal EVM genesis config has been initialized or updated.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
@@ -200,6 +202,22 @@ Otherwise, move the new config to supra_framework.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="evm_genesis_config.md#0x1_evm_genesis_config_initialize">initialize</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
 </code></pre>
 
 
