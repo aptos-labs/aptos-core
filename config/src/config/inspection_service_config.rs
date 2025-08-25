@@ -21,6 +21,7 @@ pub struct InspectionServiceConfig {
     pub expose_identity_information: bool,
     pub expose_peer_information: bool,
     pub expose_system_information: bool,
+    pub malloc_stats_max_len: usize,
 }
 
 impl Default for InspectionServiceConfig {
@@ -32,6 +33,7 @@ impl Default for InspectionServiceConfig {
             expose_identity_information: true,
             expose_peer_information: true,
             expose_system_information: true,
+            malloc_stats_max_len: 2 * 1024 * 1024,
         }
     }
 }

@@ -25,6 +25,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
+use aptos_inspection_service::{DUMP_HEAP_PROFILE_PATH, MALLOC_STATS_PATH, METRICS_PATH};
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{
@@ -358,8 +359,16 @@ pub fn start_test_environment_node(
     println!("\tChainId: {}", ChainId::test().id());
     println!("\tREST API endpoint: http://{}", &config.api.address);
     println!(
-        "\tMetrics endpoint: http://{}:{}/metrics",
-        &config.inspection_service.address, &config.inspection_service.port
+        "\tMetrics endpoint: http://{}:{}{}",
+        &config.inspection_service.address, &config.inspection_service.port, METRICS_PATH
+    );
+    println!(
+        "\tMalloc stats endpoint: http://{}:{}{}",
+        &config.inspection_service.address, &config.inspection_service.port, MALLOC_STATS_PATH
+    );
+    println!(
+        "\tDump heap profile endpoint: http://{}:{}{}",
+        &config.inspection_service.address, &config.inspection_service.port, DUMP_HEAP_PROFILE_PATH
     );
     println!(
         "\tAptosnet fullnode network endpoint: {}",
