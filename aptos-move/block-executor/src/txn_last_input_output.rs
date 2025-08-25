@@ -32,7 +32,10 @@ use std::{
     collections::HashSet,
     fmt::Debug,
     iter::{empty, Iterator},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
@@ -62,6 +65,9 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,
+    // Used to record if the latest incarnation of a txn was a failure due to the
+    // speculative nature of parallel execution.
+    speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
@@ -80,6 +86,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             arced_resource_writes: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
+            speculative_failures: (0..num_txns)
+                .map(|_| CachePadded::new(AtomicBool::new(false)))
+                .collect(),
         }
     }
 
@@ -91,8 +100,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) {
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
+        self.speculative_failures[txn_idx as usize].store(false, Ordering::Relaxed);
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
+    }
+
+    pub(crate) fn record_speculative_failure(&self, txn_idx: TxnIndex) {
+        self.speculative_failures[txn_idx as usize].store(true, Ordering::Relaxed);
     }
 
     pub fn fetch_exchanged_data(
@@ -120,8 +134,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
-        self.inputs[txn_idx as usize].load_full()
+    // Alongside the latest read set, returns the indicator of whether the latest
+    // incarnation of the txn resulted in a speculative failure.
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<(Arc<TxnInput<T>>, bool)> {
+        let input = self.inputs[txn_idx as usize].load_full()?;
+        let speculative_failure =
+            self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed);
+        Some((input, speculative_failure))
     }
 
     // Should be called when txn_idx is committed, while holding commit lock.
@@ -491,7 +510,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {
-        let read_set = self.read_set(txn_idx).expect("Read set must be recorded");
+        let read_set = self.read_set(txn_idx).expect("Read set must be recorded").0;
 
         let reads = read_set.get_read_summary();
         let writes = self.get_write_summary(txn_idx);
