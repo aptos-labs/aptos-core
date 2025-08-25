@@ -19,7 +19,7 @@ env:
 
 jobs:
   build-binaries:
-    name: "Build Binaries with Nix"
+    name: "Build ${{ matrix.binary.name }} with Nix"
     runs-on: k8s-movement-labs
     strategy:
       matrix:
@@ -28,7 +28,7 @@ jobs:
             package: "aptos-node"
             profile: "debug"
           - name: "aptos-cli"
-            package: "aptos-cli"
+            package: "aptos"
             profile: "cli"
           # - name: "l1-migration"
           #   package: "l1-migration"
@@ -68,25 +68,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nix-
 
-      - name: Build ${{ matrix.binary.name }}
+      - name: Build ${{ matrix.binary.package }}
         run: |
-          echo "Building ${{ matrix.binary.name }} with Nix development shell..."
+          echo "Building ${{ matrix.binary.package }} with Nix development shell..."
           nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
-          echo "Binary available at target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}"
+          echo "Binary available at target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}"
 
       - name: Verify binary
         run: |
-          if [ -f "target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}" ]; then
-            echo "✅ Binary ${{ matrix.binary.name }} built successfully"
-            ls -la target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}
+          if [ -f "target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}" ]; then
+            echo "✅ Binary ${{ matrix.binary.package }} built successfully"
+            ls -la target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}
           else
-            echo "❌ Binary ${{ matrix.binary.name }} not found"
+            echo "❌ Binary ${{ matrix.binary.package }} not found"
             exit 1
           fi
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.binary.name }}-${{ github.sha }}
-          path: target/${{ matrix.binary.profile }}/${{ matrix.binary.name }}
+          name: ${{ matrix.binary.package }}-${{ github.sha }}
+          path: target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}
           retention-days: 7
