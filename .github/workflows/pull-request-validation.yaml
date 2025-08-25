@@ -29,9 +29,11 @@ jobs:
             profile: "dev"
           - name: "aptos-cli"
             package: "aptos"
-            profile: "cli"
+            profile: "dev"
           # - name: "l1-migration"
           #   package: "l1-migration"
+    env:
+      TARGET_FOLDER: target/debug
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,13 +74,13 @@ jobs:
         run: |
           echo "Building ${{ matrix.binary.package }} with Nix development shell..."
           nix develop -c cargo build -p ${{ matrix.binary.package }} --profile ${{ matrix.binary.profile }} --features "${{ env.FEATURES }}"
-          echo "Binary available at target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}"
+          echo "Binary available at ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
 
       - name: Verify binary
         run: |
-          if [ -f "target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}" ]; then
+          if [ -f "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}" ]; then
             echo "✅ Binary ${{ matrix.binary.package }} built successfully"
-            ls -la target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}
+            ls -la "${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}"
           else
             echo "❌ Binary ${{ matrix.binary.package }} not found"
             exit 1
@@ -88,5 +90,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.binary.package }}-${{ github.sha }}
-          path: target/${{ matrix.binary.profile }}/${{ matrix.binary.package }}
+          path: target/${{ matrix.binary.output }}/${{ matrix.binary.package }}
           retention-days: 7
