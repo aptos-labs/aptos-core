@@ -119,7 +119,6 @@ impl<'a> NeedlessLoopAnalyzer<'a> {
             let instr = &self.code[pc];
 
             match instr {
-                Bytecode::Label(_, _) => {},
                 Bytecode::Ret(attr_id, _) => {
                     return Some(LoopInfo {
                         attr_id: *attr_id,
@@ -133,10 +132,10 @@ impl<'a> NeedlessLoopAnalyzer<'a> {
                     });
                 },
                 Bytecode::Jump(attr_id, target_label) => {
-                    if self.is_definite_loop_exit(loop_header, *target_label) {
+                    if let Some(exit) = self.deep_exit_analysis(loop_header, *target_label) {
                         return Some(LoopInfo {
                             attr_id: *attr_id,
-                            reason: "breaks".to_string(),
+                            reason: exit.to_string(),
                         });
                     }
                     break;
@@ -146,18 +145,21 @@ impl<'a> NeedlessLoopAnalyzer<'a> {
                     let second_exit = self.deep_exit_analysis(loop_header, *second_label);
 
                     match (first_exit, second_exit) {
-                        (Some(exit1), Some(exit2)) if exit1 == exit2 => {
+                        (Some(exit1), Some(exit2)) => {
+                            let reason = if exit1 == exit2 {
+                                exit1.to_string()
+                            } else {
+                                "exits".to_string() // Generic message for mixed exit types
+                            };
                             return Some(LoopInfo {
                                 attr_id: *attr_id,
-                                reason: exit1.to_string(),
+                                reason,
                             });
                         },
                         _ => break,
                     }
                 },
-                _ => {
-                    break;
-                },
+                _ => {},
             }
             pc += 1;
         }
