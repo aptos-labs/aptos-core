@@ -371,6 +371,12 @@ pub fn start_test_environment_node(
             config.indexer_grpc.address
         );
     }
+    if config.admin_service.enabled.unwrap_or(false) {
+        println!(
+            "\tAdmin service: http://{}:{}/",
+            config.admin_service.address, config.admin_service.port
+        );
+    }
     if enable_lazy_mode {
         println!("\tLazy mode is enabled");
     }
