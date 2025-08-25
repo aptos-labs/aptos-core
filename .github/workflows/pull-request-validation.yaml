@@ -30,8 +30,9 @@ jobs:
           - name: "aptos-cli"
             package: "aptos"
             profile: "dev"
-          # - name: "l1-migration"
-          #   package: "l1-migration"
+          - name: "l1-migration"
+            package: "l1-migration"
+            profile: "dev"
     env:
       TARGET_FOLDER: target/debug
     steps:
