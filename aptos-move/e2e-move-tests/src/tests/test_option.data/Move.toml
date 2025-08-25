@@ -1,0 +1,9 @@
+[package]
+name = "test_option"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+
+[addresses]
+account = "0x3f9e0589ca0668a5273b86bfcb5f357164408a889bc733b309cf1901098c8ce5"

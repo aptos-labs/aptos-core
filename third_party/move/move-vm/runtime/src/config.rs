@@ -43,6 +43,8 @@ pub struct VMConfig {
     /// reference safety is maintained during execution.
     pub paranoid_ref_checks: bool,
     pub enable_capture_option: bool,
+    pub enable_enum_option: bool,
+    pub new_option_module: bool,
 }
 
 impl Default for VMConfig {
@@ -66,6 +68,8 @@ impl Default for VMConfig {
             optimize_trusted_code: false,
             paranoid_ref_checks: false,
             enable_capture_option: false,
+            enable_enum_option: true,
+            new_option_module: true,
         }
     }
 }
