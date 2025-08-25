@@ -30,8 +30,9 @@ use std::{
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
 /// TODO: move this elsewhere for reuse?
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct MoveOption<T> {
-    pub value: Vec<T>,
+pub enum MoveOption<T> {
+    None,
+    Some(T),
 }
 
 impl<T> Default for MoveOption<T> {
@@ -42,19 +43,19 @@ impl<T> Default for MoveOption<T> {
 
 impl<T> MoveOption<T> {
     pub fn none() -> Self {
-        Self { value: vec![] }
+        Self::None
     }
 
     pub fn some(x: T) -> Self {
-        Self { value: vec![x] }
+        Self::Some(x)
     }
 
     pub fn is_none(&self) -> bool {
-        self.value.is_empty()
+        matches!(self, Self::None)
     }
 
     pub fn is_some(&self) -> bool {
-        !self.value.is_empty()
+        !self.is_none()
     }
 }
 

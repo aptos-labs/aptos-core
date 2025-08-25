@@ -26,7 +26,7 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, fmt::format};
 
 /// Return values from function execution in [MoveVm].
 #[derive(Debug)]
@@ -161,9 +161,9 @@ fn deserialize_arg(
     ty: &Type,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
-    let deserialization_error = || -> PartialVMError {
+    let deserialization_error = |msg: &str| -> PartialVMError {
         PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
-            .with_message("[VM] failed to deserialize argument".to_string())
+            .with_message(format!("[VM] failed to deserialize argument: {}", msg))
     };
 
     // Make sure we do not construct values which might have delayed fields inside. This should be
@@ -173,7 +173,7 @@ fn deserialize_arg(
         .type_to_type_layout_with_delayed_fields(gas_meter, traversal_context, ty)
         .map_err(|err| {
             if layout_converter.is_lazy_loading_enabled() {
-                err
+                panic!("failed to get layout from type (LL): {:?}", err);
             } else {
                 // Note: for backwards compatibility, the error code is remapped to this error. We
                 // no longer should do it because layout construction may return useful errors such
@@ -183,13 +183,13 @@ fn deserialize_arg(
             }
         })?
         .into_layout_when_has_no_delayed_fields()
-        .ok_or_else(deserialization_error)?;
+        .expect("contains fields?");
 
     let max_value_nest_depth = function_value_extension.max_value_nest_depth();
     ValueSerDeContext::new(max_value_nest_depth)
         .with_func_args_deserialization(function_value_extension)
-        .deserialize(arg.borrow(), &layout)
-        .ok_or_else(deserialization_error)
+        .deserialize_or_err(arg.borrow(), &layout)
+        .map_err(|e| deserialization_error(&format!("Failed to deserialize arg: {:?}", e)))
 }
 
 fn deserialize_args(
