@@ -1,0 +1,20 @@
+processed 2 tasks
+task 0 lines 3-98:  publish [module 0xc0ffee::m {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE:33:27
+   │
+33 │         let Func{_0: _t43 : ||(||(u64)) has copy + drop} = Func{_0: || lambda__19__test(p0)};
+   │                 -         ^ Expected '}'
+   │                 │          
+   │                 To match this '{'
+
+
+task 1 lines 101-101:  run 0xc0ffee::m::test --args 42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

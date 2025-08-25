@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-61:  publish [// Bytecode version v8]
+task 1 lines 65-65:  run 0xc0ffee::m::test --args true
+return values: 6
+task 2 lines 67-67:  run 0xc0ffee::m::test --args false
+return values: 6

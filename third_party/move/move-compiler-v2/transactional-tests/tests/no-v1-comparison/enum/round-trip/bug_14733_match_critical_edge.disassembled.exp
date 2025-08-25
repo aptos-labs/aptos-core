@@ -1,0 +1,16 @@
+processed 8 tasks
+task 0 lines 3-499:  publish [// Bytecode version v8]
+task 1 lines 503-503:  run 0x815::m::test1
+return values: 22
+task 2 lines 505-505:  run 0x815::m::test2
+return values: 0
+task 3 lines 507-507:  run 0x815::m::test3
+return values: 10
+task 4 lines 509-509:  run 0x815::m::test4
+return values: 21
+task 5 lines 511-511:  run 0x815::m::test5
+return values: 43
+task 6 lines 513-513:  run 0x815::m::test6
+return values: 25
+task 7 lines 515-515:  run 0x815::m::test7
+return values: 15

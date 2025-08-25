@@ -1,0 +1,28 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/positional_fields/common_access.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+enum Foo has drop
+  A
+    _0: u8
+  B
+    _0: u8
+
+// Function definition at index 0
+fun common_access(l0: Foo): u8
+    borrow_loc l0
+    borrow_variant_field Foo, A::_0, B::_0
+    read_ref
+    ret
+
+// Function definition at index 1
+fun test_common_access(): u8
+    ld_u8 42
+    pack_variant Foo, A
+    call common_access
+    ret
+
+
+
+//# run --verbose -- 0x42::test::test_common_access

@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-22:  publish [// Bytecode version v8]
+task 1 lines 26-26:  run 0xc0ffee::m::large_vec_1
+return values: 1027
+task 2 lines 28-28:  run 0xc0ffee::m::large_vec_2
+return values: 1025

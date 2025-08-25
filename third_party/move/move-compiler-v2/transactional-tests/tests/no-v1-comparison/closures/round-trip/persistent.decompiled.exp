@@ -1,0 +1,28 @@
+processed 3 tasks
+task 0 lines 3-24:  publish [module 0x66::test {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE:13:26
+   │
+13 │         let Work{_0: _t4 : ||(u64) has store} = move_from<Work>(_t2);
+   │                 -        ^ Expected '}'
+   │                 │         
+   │                 To match this '{'
+
+
+task 1 lines 27-27:  run 0x66::test::store --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 29-29:  run 0x66::test::exec --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

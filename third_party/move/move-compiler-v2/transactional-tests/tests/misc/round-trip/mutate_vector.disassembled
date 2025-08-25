@@ -1,0 +1,33 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/mutate_vector.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct Scalar has copy + drop + store
+  data: vector<u8>
+
+// Function definition at index 0
+#[persistent] public fun new_scalar_from_u8(l0: u8): Scalar
+    local l1: Scalar
+    local l2: &mut u8
+    call scalar_zero
+    st_loc l1
+    mut_borrow_loc l1
+    mut_borrow_field Scalar, data
+    ld_u64 0
+    // @5
+    vec_mut_borrow <u8>
+    st_loc l2
+    move_loc l0
+    move_loc l2
+    write_ref
+    // @10
+    move_loc l1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun scalar_zero(): Scalar
+    ld_const<vector<u8>> [0]
+    pack Scalar
+    ret
+

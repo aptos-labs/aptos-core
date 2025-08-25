@@ -1,0 +1,10 @@
+processed 6 tasks
+task 0 lines 3-38:  publish [// Bytecode version v8]
+task 1 lines 42-95:  publish [// Bytecode version v8]
+task 2 lines 99-99:  run 0x66::app::init_module --signers 0x66
+task 3 lines 101-101:  run 0x66::app::increment --signers 0x66
+return values: 0
+task 4 lines 103-103:  run 0x66::app::increment --signers 0x66
+return values: 1
+task 5 lines 105-105:  run 0x66::app::view --signers 0x66
+return values: 2

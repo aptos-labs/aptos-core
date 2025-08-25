@@ -1,0 +1,8 @@
+processed 7 tasks
+task 0 lines 3-239:  publish [// Bytecode version v8]
+task 1 lines 243-243:  run 0x42::freeze_mut_ref::test_1
+task 2 lines 245-245:  run 0x42::freeze_mut_ref::test_2
+task 3 lines 247-247:  run 0x42::freeze_mut_ref::test_3
+task 4 lines 249-249:  run 0x42::freeze_mut_ref::test_5
+task 5 lines 251-251:  run 0x42::freeze_mut_ref::test_6
+task 6 lines 253-253:  run 0x42::freeze_mut_ref::test_7

@@ -70,36 +70,36 @@ module 0xc0ffee::m {
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::price($t0: &0xc0ffee::m::TestOrder): u64 {
+fun m::price($t0: &TestOrder): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.price($t0)
+  0: $t2 := borrow_field<TestOrder>.price($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
 
 
 [variant baseline]
-fun m::size($t0: &0xc0ffee::m::TestOrder): u64 {
+fun m::size($t0: &TestOrder): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.size($t0)
+  0: $t2 := borrow_field<TestOrder>.size($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
 
 
 [variant baseline]
-fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
-     var $t1: &vector<0xc0ffee::m::TestOrder>
-     var $t2: &vector<0xc0ffee::m::TestOrder>
+fun m::test_self($t0: vector<TestOrder>) {
+     var $t1: &vector<TestOrder>
+     var $t2: &vector<TestOrder>
      var $t3: u64
      var $t4: bool
      var $t5: u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::TestOrder
-     var $t8: &0xc0ffee::m::TestOrder
-     var $t9: &vector<0xc0ffee::m::TestOrder>
+     var $t7: &TestOrder
+     var $t8: &TestOrder
+     var $t9: &vector<TestOrder>
      var $t10: u64
      var $t11: u64
      var $t12: u64
@@ -110,12 +110,12 @@ fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
   2: $t3 := 0
   3: label L0
   4: $t5 := infer($t3)
-  5: $t6 := vector::length<0xc0ffee::m::TestOrder>($t1)
+  5: $t6 := vector::length<TestOrder>($t1)
   6: $t4 := <($t5, $t6)
   7: if ($t4) goto 8 else goto 19
   8: label L2
   9: $t9 := infer($t1)
- 10: $t8 := vector::borrow<0xc0ffee::m::TestOrder>($t9, $t3)
+ 10: $t8 := vector::borrow<TestOrder>($t9, $t3)
  11: $t7 := infer($t8)
  12: $t10 := m::price($t7)
  13: $t11 := m::size($t7)
@@ -176,36 +176,36 @@ module 0xc0ffee::m {
 ============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::price($t0: &0xc0ffee::m::TestOrder): u64 {
+fun m::price($t0: &TestOrder): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.price($t0)
+  0: $t2 := borrow_field<TestOrder>.price($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
 
 
 [variant baseline]
-fun m::size($t0: &0xc0ffee::m::TestOrder): u64 {
+fun m::size($t0: &TestOrder): u64 {
      var $t1: u64
      var $t2: &u64
-  0: $t2 := borrow_field<0xc0ffee::m::TestOrder>.size($t0)
+  0: $t2 := borrow_field<TestOrder>.size($t0)
   1: $t1 := read_ref($t2)
   2: return $t1
 }
 
 
 [variant baseline]
-fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
-     var $t1: &vector<0xc0ffee::m::TestOrder>
-     var $t2: &vector<0xc0ffee::m::TestOrder>
+fun m::test_self($t0: vector<TestOrder>) {
+     var $t1: &vector<TestOrder>
+     var $t2: &vector<TestOrder>
      var $t3: u64
      var $t4: bool
      var $t5: u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::TestOrder
-     var $t8: &0xc0ffee::m::TestOrder
-     var $t9: &vector<0xc0ffee::m::TestOrder>
+     var $t7: &TestOrder
+     var $t8: &TestOrder
+     var $t9: &vector<TestOrder>
      var $t10: u64
      var $t11: u64
      var $t12: u64
@@ -216,12 +216,12 @@ fun m::test_self($t0: vector<0xc0ffee::m::TestOrder>) {
   2: $t3 := 0
   3: label L0
   4: $t5 := infer($t3)
-  5: $t6 := vector::length<0xc0ffee::m::TestOrder>($t1)
+  5: $t6 := vector::length<TestOrder>($t1)
   6: $t4 := <($t5, $t6)
   7: if ($t4) goto 8 else goto 19
   8: label L2
   9: $t9 := infer($t1)
- 10: $t8 := vector::borrow<0xc0ffee::m::TestOrder>($t9, $t3)
+ 10: $t8 := vector::borrow<TestOrder>($t9, $t3)
  11: $t7 := infer($t8)
  12: $t10 := m::price($t7)
  13: $t11 := m::size($t7)

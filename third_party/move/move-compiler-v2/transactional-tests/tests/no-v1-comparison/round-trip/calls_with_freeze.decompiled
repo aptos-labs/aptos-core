@@ -1,0 +1,34 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/calls_with_freeze.move`
+
+//# publish
+module 0x42::m {
+    struct S has drop {
+        x: u64,
+    }
+    fun sum(p0: &S, p1: &S): u64 {
+        let _t4 = *&p0.x;
+        let _t7 = *&p1.x;
+        _t4 + _t7
+    }
+    fun test(): u64 {
+        test_arg_freeze(S{x: 2})
+    }
+    fun test_arg_freeze(p0: S): u64 {
+        let _t1 = &mut p0;
+        let _t2 = S{x: 4};
+        let _t3 = &mut _t2;
+        let _t12 = freeze(_t1);
+        let _t14 = freeze(_t3);
+        let _t15 = sum(_t12, _t14);
+        let _t17 = freeze(_t1);
+        let _t19 = freeze(_t1);
+        let _t20 = sum(_t17, _t19);
+        let _t21 = &p0;
+        let _t23 = freeze(_t3);
+        let _t4 = sum(_t21, _t23);
+        _t15 + _t20 + _t4
+    }
+}
+
+
+//# run 0x42::m::test

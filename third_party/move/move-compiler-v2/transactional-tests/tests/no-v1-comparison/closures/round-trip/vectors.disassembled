@@ -1,0 +1,69 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/vectors.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+use 0x1::vector
+// Function definition at index 0
+#[persistent] public fun eval(l0: u64): u64
+    local l1: u64
+    local l2: vector<|u64|u64 has drop>
+    local l3: |u64|u64 has drop
+    call make
+    ld_u64 0
+    st_loc l1
+    st_loc l2
+    mut_borrow_loc l2
+    // @5
+    call vector::reverse<|u64|u64 has drop>
+l1: borrow_loc l2
+    call vector::is_empty<|u64|u64 has drop>
+    br_true l0
+    mut_borrow_loc l2
+    // @10
+    vec_pop_back <|u64|u64 has drop>
+    st_loc l3
+    move_loc l1
+    copy_loc l0
+    move_loc l3
+    // @15
+    call_closure <|u64|u64 has drop>
+    add
+    st_loc l1
+    branch l1
+l0: move_loc l1
+    // @20
+    ret
+
+// Function definition at index 1
+fun make(): vector<|u64|u64 has drop>
+    pack_closure __lambda__1__make, 0
+    pack_closure __lambda__2__make, 0
+    pack_closure __lambda__3__make, 0
+    vec_pack <|u64|u64 has drop>, 3
+    ret
+
+// Function definition at index 2
+fun __lambda__1__make(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun __lambda__2__make(l0: u64): u64
+    move_loc l0
+    ld_u64 2
+    add
+    ret
+
+// Function definition at index 4
+fun __lambda__3__make(l0: u64): u64
+    move_loc l0
+    ld_u64 3
+    add
+    ret
+
+
+
+//# run 0x42::test::eval --args 2

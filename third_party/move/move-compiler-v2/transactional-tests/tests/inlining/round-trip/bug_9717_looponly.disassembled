@@ -1,0 +1,257 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/bug_9717_looponly.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::vectors
+// Function definition at index 0
+#[persistent] entry public fun entry_test_guess_flips_abort()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_abort
+    ret
+
+// Function definition at index 1
+#[persistent] entry public fun entry_test_guess_flips_break()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_break
+    ret
+
+// Function definition at index 2
+#[persistent] entry public fun entry_test_guess_flips_break2()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_break2
+    ret
+
+// Function definition at index 3
+#[persistent] entry public fun entry_test_guess_flips_continue()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_continue
+    ret
+
+// Function definition at index 4
+#[persistent] entry public fun entry_test_guess_flips_nocheck()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_nocheck
+    ret
+
+// Function definition at index 5
+#[persistent] entry public fun guess_flips_abort(l0: vector<u8>)
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l2: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l2
+    // @10
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    eq
+    // @15
+    br_false l1
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    // @20
+    branch l2
+l1: move_loc l2
+    pop
+    ld_u64 3
+    abort
+    // @25
+l0: move_loc l2
+    pop
+    ret
+
+// Function definition at index 6
+#[persistent] entry public fun guess_flips_break(l0: vector<u8>)
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l2: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l2
+    // @10
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    neq
+    // @15
+    br_false l1
+    move_loc l2
+    pop
+l3: ret
+l1: move_loc l1
+    // @20
+    ld_u64 1
+    add
+    st_loc l1
+    branch l2
+l0: move_loc l2
+    // @25
+    pop
+    branch l3
+
+// Function definition at index 7
+#[persistent] entry public fun guess_flips_break2(l0: vector<u8>)
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l3: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l2
+    // @10
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    neq
+    // @15
+    br_false l1
+    move_loc l2
+    pop
+l4: ret
+l1: move_loc l1
+    // @20
+    ld_u64 1
+    add
+    st_loc l1
+    copy_loc l2
+    copy_loc l1
+    // @25
+    vec_borrow <u8>
+    read_ref
+    ld_u8 5
+    eq
+    br_true l2
+    // @30
+    branch l3
+l2: move_loc l2
+    pop
+    branch l4
+l0: move_loc l2
+    // @35
+    pop
+    branch l4
+
+// Function definition at index 8
+#[persistent] entry public fun guess_flips_continue(l0: vector<u8>)
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l2: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l2
+    // @10
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    neq
+    // @15
+    br_false l1
+    branch l2
+l1: move_loc l1
+    ld_u64 1
+    add
+    // @20
+    st_loc l1
+    branch l2
+l0: move_loc l2
+    pop
+    ret
+
+// Function definition at index 9
+#[persistent] entry public fun guess_flips_nocheck(l0: vector<u8>)
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l1: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_false l0
+    move_loc l1
+    // @10
+    ld_u64 1
+    add
+    st_loc l1
+    branch l1
+l0: move_loc l2
+    // @15
+    pop
+    ret
+
+// Function definition at index 10
+fun test_guess_flips_abort()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_abort
+    ret
+
+// Function definition at index 11
+fun test_guess_flips_break()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_break
+    ret
+
+// Function definition at index 12
+fun test_guess_flips_break2()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_break2
+    ret
+
+// Function definition at index 13
+fun test_guess_flips_continue()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_continue
+    ret
+
+// Function definition at index 14
+fun test_guess_flips_nocheck()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_nocheck
+    ret
+
+
+
+//# run 0xcafe::vectors::test_guess_flips_break
+
+//# run 0xcafe::vectors::test_guess_flips_abort
+
+//# run 0xcafe::vectors::test_guess_flips_nocheck
+
+//# run 0xcafe::vectors::test_guess_flips_continue

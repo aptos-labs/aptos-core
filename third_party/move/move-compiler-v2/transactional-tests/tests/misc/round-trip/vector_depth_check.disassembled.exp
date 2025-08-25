@@ -1,0 +1,12 @@
+processed 3 tasks
+task 0 lines 3-13:  publish [// Bytecode version v8]
+task 1 lines 17-17:  run 0xc0ffee::m::test
+return values: 0
+task 2 lines 19-29:  publish [// Bytecode version v8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::n'. Got VMError: {
+    major_status: TOO_MANY_TYPE_NODES,
+    sub_status: None,
+    location: 0xc0ffee::n,
+    indices: [],
+    offsets: [],
+}

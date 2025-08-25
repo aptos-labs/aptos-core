@@ -1,0 +1,32 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/op_with_side_effect_24.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test(l0: u64): u64
+    copy_loc l0
+    ld_u64 1
+    add
+    move_loc l0
+    ld_u64 1
+    // @5
+    add
+    st_loc l0
+    copy_loc l0
+    ld_u64 1
+    add
+    // @10
+    add
+    move_loc l0
+    ld_u64 1
+    add
+    ld_u64 1
+    // @15
+    add
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test --args 54

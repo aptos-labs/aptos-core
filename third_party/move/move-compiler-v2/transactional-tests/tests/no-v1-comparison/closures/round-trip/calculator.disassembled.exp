@@ -1,0 +1,10 @@
+processed 8 tasks
+task 0 lines 3-246:  publish [// Bytecode version v8]
+task 1 lines 250-250:  run 0x66::calculator::init_module --signers 0x66
+task 2 lines 252-252:  run 0x66::calculator::number --signers 0x66 --args 10
+task 3 lines 254-254:  run 0x66::calculator::add --signers 0x66
+task 4 lines 256-256:  run 0x66::calculator::number --signers 0x66 --args 20
+task 5 lines 258-258:  run 0x66::calculator::sub --signers 0x66
+task 6 lines 260-260:  run 0x66::calculator::number --signers 0x66 --args 5
+task 7 lines 262-262:  run 0x66::calculator::view --signers 0x66
+return values: 25

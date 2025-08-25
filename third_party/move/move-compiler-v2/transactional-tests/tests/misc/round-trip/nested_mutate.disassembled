@@ -1,0 +1,66 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/nested_mutate.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct T has copy + drop
+  y: u64
+
+struct S has copy + drop
+  x: T
+
+// Function definition at index 0
+fun foo(l0: S, l1: S): S
+    local l2: u64
+    ld_u64 1
+    borrow_loc l1
+    borrow_field S, x
+    borrow_field T, y
+    read_ref
+    // @5
+    mut_borrow_loc l0
+    mut_borrow_field S, x
+    mut_borrow_field T, y
+    write_ref
+    borrow_loc l0
+    // @10
+    borrow_field S, x
+    borrow_field T, y
+    read_ref
+    st_loc l2
+    mut_borrow_loc l2
+    // @15
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test()
+    local l0: S
+    local l1: S
+    local l2: S
+    ld_u64 42
+    pack T
+    pack S
+    ld_u64 43
+    pack T
+    // @5
+    pack S
+    call foo
+    st_loc l2
+    borrow_loc l2
+    borrow_field S, x
+    // @10
+    borrow_field T, y
+    read_ref
+    ld_u64 43
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0xc0ffee::m::test

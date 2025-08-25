@@ -1,0 +1,16 @@
+//**** Cross-compiled for `masm` syntax from `tests/more-v1/parser/hex_and_decimal_address.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @5
+    ld_u64 42
+    abort
+

@@ -1,0 +1,57 @@
+processed 7 tasks
+task 0 lines 3-74:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `drop`
+   ┌─ test:28:22
+   │
+28 │     local l0: || has drop
+   │                      ^^^^
+
+
+task 1 lines 78-78:  run 0xc0ffee::m::test1
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 80-80:  run 0xc0ffee::m::test2
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 82-82:  run 0xc0ffee::m::test3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 84-196:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `|`
+    ┌─ test:114:28
+    │
+114 │ fun __lambda__3__test(): |||u64|u64
+    │                            ^
+
+
+task 5 lines 200-200:  run 0xc0ffee::n::test --args 42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 202-1820:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `|`
+    ┌─ test:232:28
+    │
+232 │ fun __lambda__3__test(): |||u64|u64
+    │                            ^
+
+

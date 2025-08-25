@@ -1,0 +1,50 @@
+processed 7 tasks
+task 0 lines 3-169:  publish [// Bytecode version v8]
+task 1 lines 173-180:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+}
+task 2 lines 184-191:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 2)],
+}
+task 3 lines 195-202:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+}
+task 4 lines 206-213:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+}
+task 5 lines 217-224:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
+}
+task 6 lines 228-236:  run --signers 0x1 [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: RESOURCE_ALREADY_EXISTS,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 9)],
+}

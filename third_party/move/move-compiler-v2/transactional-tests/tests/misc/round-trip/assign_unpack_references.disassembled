@@ -1,0 +1,139 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/assign_unpack_references.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct R has drop
+  s1: S
+  s2: S
+
+struct S has drop
+  f: u64
+
+// Function definition at index 0
+fun t1()
+    local l0: R
+    local l1: &R
+    local l2: &S
+    ld_u64 0
+    pack S
+    ld_u64 1
+    pack S
+    pack R
+    // @5
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    borrow_field R, s1
+    // @10
+    move_loc l1
+    borrow_field R, s2
+    st_loc l2
+    borrow_field S, f
+    read_ref
+    // @15
+    ld_u64 0
+    eq
+    br_false l0
+    move_loc l2
+    borrow_field S, f
+    // @20
+    read_ref
+    ld_u64 1
+    eq
+    br_false l1
+    ret
+    // @25
+l1: ld_u64 1
+    abort
+l0: move_loc l2
+    pop
+    ld_u64 0
+    // @30
+    abort
+
+// Function definition at index 1
+fun t2()
+    local l0: R
+    local l1: &mut R
+    local l2: &mut S
+    local l3: &mut S
+    local l4: &mut u64
+    local l5: &mut u64
+    local l6: u64
+    local l7: S
+    ld_u64 0
+    pack S
+    ld_u64 1
+    pack S
+    pack R
+    // @5
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    mut_borrow_field R, s1
+    // @10
+    st_loc l2
+    move_loc l1
+    mut_borrow_field R, s2
+    st_loc l3
+    move_loc l2
+    // @15
+    mut_borrow_field S, f
+    read_ref
+    ld_u64 0
+    eq
+    br_false l0
+    // @20
+    move_loc l3
+    borrow_field S, f
+    read_ref
+    ld_u64 1
+    eq
+    // @25
+    br_false l1
+    ld_u64 5
+    st_loc l6
+    mut_borrow_loc l6
+    ld_u64 0
+    // @30
+    pack S
+    st_loc l7
+    mut_borrow_loc l7
+    st_loc l3
+    read_ref
+    // @35
+    ld_u64 5
+    eq
+    br_false l2
+    move_loc l3
+    borrow_field S, f
+    // @40
+    read_ref
+    ld_u64 0
+    eq
+    br_false l3
+    ret
+    // @45
+l3: ld_u64 1
+    abort
+l2: move_loc l3
+    pop
+    ld_u64 0
+    // @50
+    abort
+l1: ld_u64 1
+    abort
+l0: move_loc l3
+    pop
+    // @55
+    ld_u64 0
+    abort
+
+
+
+//# run 0x42::m::t1
+
+//# run 0x42::m::t2

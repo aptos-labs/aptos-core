@@ -1,0 +1,41 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/bug_16335_split.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::Test
+// Function definition at index 0
+fun f3()
+    pack_closure __lambda__1__f3, 0
+    pack_closure __lambda__3__f3, 1
+    call_closure <||>
+    pack_closure __lambda__4__f3, 0
+    call_closure <|| has copy + drop>
+    // @5
+    ret
+
+// Function definition at index 1
+fun __lambda__1__f3()
+    ret
+
+// Function definition at index 2
+fun __lambda__2__f3()
+    ret
+
+// Function definition at index 3
+fun __lambda__3__f3(l0: || has drop)
+    local l1: || has drop
+    pack_closure __lambda__2__f3, 0
+    move_loc l0
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    // @5
+    ret
+
+// Function definition at index 4
+fun __lambda__4__f3()
+    ret
+
+
+
+//# run --verbose 0x42::Test::f3

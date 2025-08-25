@@ -1,0 +1,5 @@
+processed 3 tasks
+task 0 lines 3-26:  publish [// Bytecode version v8]
+task 1 lines 30-38:  publish [// Bytecode version v8]
+task 2 lines 42-42:  run 0xc0ffee::n::test
+return values: 42

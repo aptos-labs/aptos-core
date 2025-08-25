@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 3-20:  publish [module 0xcafe::m {]
+task 1 lines 23-23:  run 0xCAFE::m::main

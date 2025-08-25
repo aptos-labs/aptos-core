@@ -1,0 +1,45 @@
+processed 6 tasks
+task 0 lines 3-20:  publish [module 0x66::registry {]
+task 1 lines 23-49:  publish [module 0x66::delayed_work {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE1:35:26
+   │
+35 │         let Work{_0: _t5 : |u64|(u64) has store} = p0;
+   │                 -        ^ Expected '}'
+   │                 │         
+   │                 To match this '{'
+
+
+task 2 lines 52-52:  run 0x66::delayed_work::initialize --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 54-54:  run 0x66::delayed_work::add --signers 0x66 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 56-56:  run 0x66::delayed_work::add --signers 0x66 --args 7
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 58-58:  run 0x66::delayed_work::eval --signers 0x66 --args 3 15
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

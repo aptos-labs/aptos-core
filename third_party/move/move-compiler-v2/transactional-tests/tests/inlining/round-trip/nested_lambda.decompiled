@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/nested_lambda.move`
+
+//# publish
+module 0x42::Test {
+    public fun test(): u64 {
+        3
+    }
+}
+
+
+//# run 0x42::Test::test

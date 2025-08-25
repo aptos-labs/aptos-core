@@ -1,0 +1,49 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/access_control/generic.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+struct R<T0> has drop + key
+  value: T0
+
+// Function definition at index 0
+fun init(l0: &signer)
+    move_loc l0
+    ld_true
+    pack R<bool>
+    move_to R<bool>
+    ret
+
+// Function definition at index 1
+fun fail1(): bool acquires R
+    ld_const<address> 1
+    borrow_global R<bool>
+    borrow_field R<bool>, value
+    read_ref
+    ret
+
+// Function definition at index 2
+fun ok1(): bool acquires R
+    ld_const<address> 1
+    borrow_global R<bool>
+    borrow_field R<bool>, value
+    read_ref
+    ret
+
+// Function definition at index 3
+fun ok2(): bool acquires R
+    ld_const<address> 1
+    borrow_global R<bool>
+    borrow_field R<bool>, value
+    read_ref
+    ret
+
+
+
+//# run --verbose --signers 0x1 -- 0x42::test::init
+
+//# run --verbose -- 0x42::test::ok1
+
+//# run --verbose -- 0x42::test::ok2
+
+//# run --verbose -- 0x42::test::fail1

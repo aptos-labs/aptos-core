@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot return nothing from a function with result type `X::R`
+error: cannot return nothing from a function with result type `R`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:11:9
    │
 11 │         loop { if (false) break }

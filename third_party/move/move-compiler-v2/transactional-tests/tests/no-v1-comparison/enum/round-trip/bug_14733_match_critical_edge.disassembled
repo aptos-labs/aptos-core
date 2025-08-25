@@ -1,0 +1,515 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/bug_14733_match_critical_edge.move`
+
+//# publish
+// Bytecode version v8
+module 0x815::m
+enum Admin has drop
+  Superuser
+  User
+    _0: u64
+
+enum Entity has drop
+  Person
+    id: u64
+  Institution
+    id: u64
+    admin: Admin
+
+// Function definition at index 0
+fun admin_id(l0: &Entity): u64
+    local l1: &Entity
+    local l2: &u64
+    local l3: u64
+    local l4: &Entity
+    local l5: &Admin
+    local l6: u64
+    local l7: u64
+    local l8: u64
+    local l9: u64
+    copy_loc l0
+    test_variant Entity, Institution
+    br_true l0
+    branch l1
+l1: copy_loc l0
+    // @5
+    test_variant Entity, Institution
+    br_true l2
+    branch l3
+l3: copy_loc l0
+    test_variant Entity, Institution
+    // @10
+    br_true l4
+    branch l5
+l5: move_loc l0
+    st_loc l1
+    copy_loc l1
+    // @15
+    test_variant Entity, Person
+    br_true l6
+    branch l7
+l7: copy_loc l1
+    test_variant Entity, Institution
+    // @20
+    br_false l8
+    move_loc l1
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    st_loc l3
+    // @25
+l9: move_loc l3
+    ret
+l8: move_loc l1
+    pop
+    ld_u64 0
+    // @30
+    st_loc l3
+    branch l9
+l6: copy_loc l1
+    borrow_variant_field Entity, Person::id
+    st_loc l2
+    // @35
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    gt
+    br_true l10
+    // @40
+    move_loc l2
+    pop
+    branch l7
+l10: move_loc l1
+    pop
+    // @45
+    move_loc l2
+    read_ref
+    st_loc l3
+    branch l9
+l4: copy_loc l0
+    // @50
+    borrow_variant_field Entity, Institution::admin
+    st_loc l5
+    copy_loc l5
+    test_variant Admin, User
+    br_true l11
+    // @55
+    move_loc l5
+    pop
+    branch l5
+l11: move_loc l5
+    borrow_variant_field Admin, User::_0
+    // @60
+    read_ref
+    ld_u64 10
+    le
+    br_true l12
+    branch l5
+    // @65
+l12: move_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Entity, Person
+    br_true l13
+    // @70
+    branch l14
+l14: copy_loc l1
+    test_variant Entity, Institution
+    br_false l15
+    move_loc l1
+    // @75
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    st_loc l6
+l16: move_loc l6
+    ld_u64 5
+    // @80
+    add
+    st_loc l3
+    branch l9
+l15: move_loc l1
+    pop
+    // @85
+    ld_u64 0
+    st_loc l6
+    branch l16
+l13: copy_loc l1
+    borrow_variant_field Entity, Person::id
+    // @90
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    gt
+    // @95
+    br_true l17
+    move_loc l2
+    pop
+    branch l14
+l17: move_loc l1
+    // @100
+    pop
+    move_loc l2
+    read_ref
+    st_loc l6
+    branch l16
+    // @105
+l2: copy_loc l0
+    borrow_variant_field Entity, Institution::admin
+    st_loc l5
+    copy_loc l5
+    test_variant Admin, User
+    // @110
+    br_true l18
+    move_loc l5
+    pop
+    branch l3
+l18: move_loc l5
+    // @115
+    borrow_variant_field Admin, User::_0
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    // @120
+    gt
+    br_true l19
+    move_loc l2
+    pop
+    branch l3
+    // @125
+l19: move_loc l2
+    read_ref
+    st_loc l8
+    move_loc l0
+    st_loc l1
+    // @130
+    copy_loc l1
+    test_variant Entity, Person
+    br_true l20
+    branch l21
+l21: copy_loc l1
+    // @135
+    test_variant Entity, Institution
+    br_false l22
+    move_loc l1
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    // @140
+    st_loc l6
+l23: move_loc l8
+    move_loc l6
+    add
+    st_loc l3
+    // @145
+    branch l9
+l22: move_loc l1
+    pop
+    ld_u64 0
+    st_loc l6
+    // @150
+    branch l23
+l20: copy_loc l1
+    borrow_variant_field Entity, Person::id
+    st_loc l2
+    copy_loc l2
+    // @155
+    read_ref
+    ld_u64 10
+    gt
+    br_true l24
+    move_loc l2
+    // @160
+    pop
+    branch l21
+l24: move_loc l1
+    pop
+    move_loc l2
+    // @165
+    read_ref
+    st_loc l6
+    branch l23
+l0: copy_loc l0
+    borrow_variant_field Entity, Institution::admin
+    // @170
+    test_variant Admin, Superuser
+    br_true l25
+    branch l1
+l25: ld_u64 1
+    st_loc l9
+    // @175
+    copy_loc l0
+    test_variant Entity, Person
+    br_true l26
+    branch l27
+l27: copy_loc l0
+    // @180
+    test_variant Entity, Institution
+    br_false l28
+    move_loc l0
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    // @185
+    st_loc l8
+l29: move_loc l9
+    move_loc l8
+    add
+    st_loc l3
+    // @190
+    branch l9
+l28: move_loc l0
+    pop
+    ld_u64 0
+    st_loc l8
+    // @195
+    branch l29
+l26: copy_loc l0
+    borrow_variant_field Entity, Person::id
+    st_loc l2
+    copy_loc l2
+    // @200
+    read_ref
+    ld_u64 10
+    gt
+    br_true l30
+    move_loc l2
+    // @205
+    pop
+    branch l27
+l30: move_loc l0
+    pop
+    move_loc l2
+    // @210
+    read_ref
+    st_loc l8
+    branch l29
+
+// Function definition at index 1
+fun test1(): u64
+    local l0: Entity
+    local l1: &Entity
+    local l2: &u64
+    local l3: u64
+    local l4: &Entity
+    ld_u64 22
+    pack_variant Entity, Person
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    test_variant Entity, Person
+    br_true l0
+    branch l1
+l1: copy_loc l1
+    // @10
+    test_variant Entity, Institution
+    br_false l2
+    move_loc l1
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    // @15
+    st_loc l3
+l3: move_loc l3
+    ret
+l2: move_loc l1
+    pop
+    // @20
+    ld_u64 0
+    st_loc l3
+    branch l3
+l0: copy_loc l1
+    borrow_variant_field Entity, Person::id
+    // @25
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    gt
+    // @30
+    br_true l4
+    move_loc l2
+    pop
+    branch l1
+l4: move_loc l1
+    // @35
+    pop
+    move_loc l2
+    read_ref
+    st_loc l3
+    branch l3
+
+// Function definition at index 2
+fun test2(): u64
+    local l0: Entity
+    local l1: &Entity
+    local l2: &u64
+    local l3: u64
+    local l4: &Entity
+    ld_u64 10
+    pack_variant Entity, Person
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    test_variant Entity, Person
+    br_true l0
+    branch l1
+l1: copy_loc l1
+    // @10
+    test_variant Entity, Institution
+    br_false l2
+    move_loc l1
+    borrow_variant_field Entity, Institution::id
+    read_ref
+    // @15
+    st_loc l3
+l3: move_loc l3
+    ret
+l2: move_loc l1
+    pop
+    // @20
+    ld_u64 0
+    st_loc l3
+    branch l3
+l0: copy_loc l1
+    borrow_variant_field Entity, Person::id
+    // @25
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    gt
+    // @30
+    br_true l4
+    move_loc l2
+    pop
+    branch l1
+l4: move_loc l1
+    // @35
+    pop
+    move_loc l2
+    read_ref
+    st_loc l3
+    branch l3
+
+// Function definition at index 3
+fun test3(): u64
+    local l0: Entity
+    local l1: &Entity
+    local l2: &u64
+    local l3: u64
+    local l4: &Entity
+    ld_u64 10
+    pack_variant Admin, Superuser
+    pack_variant Entity, Institution
+    st_loc l0
+    borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    test_variant Entity, Person
+    br_true l0
+    branch l1
+    // @10
+l1: copy_loc l1
+    test_variant Entity, Institution
+    br_false l2
+    move_loc l1
+    borrow_variant_field Entity, Institution::id
+    // @15
+    read_ref
+    st_loc l3
+l3: move_loc l3
+    ret
+l2: move_loc l1
+    // @20
+    pop
+    ld_u64 0
+    st_loc l3
+    branch l3
+l0: copy_loc l1
+    // @25
+    borrow_variant_field Entity, Person::id
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u64 10
+    // @30
+    gt
+    br_true l4
+    move_loc l2
+    pop
+    branch l1
+    // @35
+l4: move_loc l1
+    pop
+    move_loc l2
+    read_ref
+    st_loc l3
+    // @40
+    branch l3
+
+// Function definition at index 4
+fun test4(): u64
+    local l0: Entity
+    ld_u64 20
+    pack_variant Admin, Superuser
+    pack_variant Entity, Institution
+    st_loc l0
+    borrow_loc l0
+    // @5
+    call admin_id
+    ret
+
+// Function definition at index 5
+fun test5(): u64
+    local l0: Entity
+    ld_u64 20
+    ld_u64 23
+    pack_variant Admin, User
+    pack_variant Entity, Institution
+    st_loc l0
+    // @5
+    borrow_loc l0
+    call admin_id
+    ret
+
+// Function definition at index 6
+fun test6(): u64
+    local l0: Entity
+    ld_u64 20
+    ld_u64 8
+    pack_variant Admin, User
+    pack_variant Entity, Institution
+    st_loc l0
+    // @5
+    borrow_loc l0
+    call admin_id
+    ret
+
+// Function definition at index 7
+fun test7(): u64
+    local l0: Entity
+    ld_u64 15
+    pack_variant Entity, Person
+    st_loc l0
+    borrow_loc l0
+    call admin_id
+    // @5
+    ret
+
+
+
+//# run 0x815::m::test1
+
+//# run 0x815::m::test2
+
+//# run 0x815::m::test3
+
+//# run 0x815::m::test4
+
+//# run 0x815::m::test5
+
+//# run 0x815::m::test6
+
+//# run 0x815::m::test7

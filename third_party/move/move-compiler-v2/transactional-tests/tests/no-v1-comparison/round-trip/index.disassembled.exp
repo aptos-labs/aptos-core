@@ -1,0 +1,30 @@
+processed 29 tasks
+task 0 lines 3-1184:  publish [// Bytecode version v8]
+task 1 lines 1188-1188:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 1190-1190:  run --verbose -- 0x42::test::test_resource_1
+task 3 lines 1192-1192:  run --verbose -- 0x42::test::test_resource_2
+task 4 lines 1194-1194:  run --verbose -- 0x42::test::test_vector
+task 5 lines 1196-1196:  run --verbose -- 0x42::test::test_two_dimension
+task 6 lines 1198-1198:  run --verbose -- 0x42::test::test_vector_borrow
+task 7 lines 1200-1200:  run --verbose -- 0x42::test::test_vector_borrow_freeze
+task 8 lines 1202-1202:  run --verbose -- 0x42::test::test_vector_borrow_mut
+task 9 lines 1204-1204:  run --verbose --signers 0x1 -- 0x42::test::init_2
+task 10 lines 1206-1206:  run --verbose -- 0x42::test::test_resource_3
+task 11 lines 1208-1208:  run --verbose -- 0x42::test::test_resource_freeze
+task 12 lines 1210-1210:  run --verbose -- 0x42::test::test_resource_4
+task 13 lines 1212-1212:  run --verbose -- 0x42::test::test_resource_5
+task 14 lines 1214-1214:  run --verbose -- 0x42::test::test_vector_const
+task 15 lines 1216-1216:  run --verbose -- 0x42::test::test_vector_in_struct
+task 16 lines 1218-1218:  run --verbose -- 0x42::test::test_vector_in_struct_2
+task 17 lines 1220-1220:  run --verbose -- 0x42::test::test_vector_in_struct_3
+task 18 lines 1222-1222:  run --verbose --signers 0x2 -- 0x42::test::init_3
+task 19 lines 1224-1224:  run --verbose -- 0x42::test::test_resource_with_vector
+task 20 lines 1226-1226:  run --verbose -- 0x42::test::call_sort
+task 21 lines 1228-1228:  run --verbose -- 0x42::test::test_index_then_field_select_1
+task 22 lines 1230-1230:  run --verbose -- 0x42::test::test_index_then_field_select_2
+task 23 lines 1232-1232:  run --verbose -- 0x42::test::test_index_then_field_select_3
+task 24 lines 1234-1234:  run --verbose -- 0x42::test::inc_vec_new_test
+task 25 lines 1236-1236:  run --verbose --signers 0x1 -- 0x42::test::init_receiver
+task 26 lines 1238-1238:  run --verbose -- 0x42::test::test_receiver
+task 27 lines 1240-1240:  run --verbose --signers 0x1 -- 0x42::test::init_receiver_2
+task 28 lines 1242-1242:  run --verbose -- 0x42::test::test_receiver_2

@@ -1,0 +1,42 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/cross_module_unwrap.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct Wrapper
+  _0: u64
+
+// Function definition at index 0
+#[persistent] public fun apply(l0: |Wrapper|u64): u64
+    ld_u64 42
+    pack Wrapper
+    move_loc l0
+    call_closure <|Wrapper|u64>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun unwrap_maker(): |Wrapper|u64
+    pack_closure __lambda__1__unwrap_maker, 0
+    ret
+
+// Function definition at index 2
+fun __lambda__1__unwrap_maker(l0: Wrapper): u64
+    move_loc l0
+    unpack Wrapper
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::n
+use 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test(): u64
+    call m::unwrap_maker
+    call m::apply
+    ret
+
+
+
+//# run 0xc0ffee::n::test

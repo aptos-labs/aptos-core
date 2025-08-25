@@ -1,0 +1,16 @@
+processed 8 tasks
+task 0 lines 3-37:  publish [// Bytecode version v8]
+task 1 lines 41-41:  run 0x42::M::empty_struct_vec
+return values: []
+task 2 lines 43-43:  run 0x42::M::empty_struct_vec
+return values: []
+task 3 lines 45-45:  run 0x42::M::empty_signer_vec
+return values: []
+task 4 lines 47-47:  run 0x42::M::empty_generic_vec --type-args 0x42::M::S
+return values: []
+task 5 lines 49-49:  run 0x42::M::empty_struct_vec_vec
+return values: []
+task 6 lines 51-51:  run 0x42::M::empty_signer_vec_vec
+return values: []
+task 7 lines 53-53:  run 0x42::M::empty_generic_vec_vec --type-args 0x42::M::S
+return values: []

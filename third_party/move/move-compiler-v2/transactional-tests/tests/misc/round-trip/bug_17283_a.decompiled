@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_17283_a.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S has copy, drop {
+        x: u64,
+    }
+    fun foo(p0: &mut S): u64 {
+        let _t1 = S{x: 0};
+        let _t8 = &mut (&mut _t1).x;
+        *_t8 = 12;
+        mod(&mut p0.x);
+        *&p0.x
+    }
+    fun mod(p0: &mut u64) {
+        *p0 = 42;
+    }
+    public fun test(): u64 {
+        let _t0 = S{x: 0};
+        foo(&mut _t0)
+    }
+}
+
+
+//# run 0xc0ffee::m::test

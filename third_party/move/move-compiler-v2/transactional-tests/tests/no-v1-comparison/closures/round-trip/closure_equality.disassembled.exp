@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-37:  publish [// Bytecode version v8]
+task 1 lines 41-41:  run 0xc0ffee::m::init --signers 0xc0ffee
+task 2 lines 43-56:  run --signers 0xc0ffee [// Bytecode version v8]

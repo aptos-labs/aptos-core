@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/bug_11112.move`
+
+//# publish
+module 0xcafe::vectors {
+    fun test_for_each_mut() {
+        let _t0 = vector[1, 2, 3];
+        let _t1 = 2;
+        let _t2 = &mut _t0;
+        let _t3 = 0;
+        loop {
+            let _t12 = 0x1::vector::length<u64>(freeze(_t2));
+            if (!(_t3 < _t12)) break;
+            let _t4 = 0x1::vector::borrow_mut<u64>(_t2, _t3);
+            *_t4 = _t1;
+            _t1 = _t1 + 1;
+            _t3 = _t3 + 1;
+            continue
+        };
+        if (!(_t0 == vector[2, 3, 4])) abort 0;
+    }
+}
+
+
+//# run 0xcafe::vectors::test_for_each_mut

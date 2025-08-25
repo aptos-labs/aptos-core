@@ -1,0 +1,109 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/nested_for_while_loops.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    local l1: u64
+    local l2: bool
+    local l3: u64
+    local l4: u64
+    local l5: bool
+    ld_u64 0
+    st_loc l0
+    ld_u64 0
+    st_loc l1
+    ld_false
+    // @5
+    st_loc l2
+l5: branch l0
+    branch l1
+l0: copy_loc l2
+    br_false l2
+    // @10
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+l16: copy_loc l1
+    // @15
+    ld_u64 5
+    lt
+    br_true l3
+    branch l1
+l3: move_loc l0
+    // @20
+    ld_u64 1
+    add
+    st_loc l0
+l6: copy_loc l0
+    ld_u64 5
+    // @25
+    lt
+    br_true l4
+    branch l5
+l4: move_loc l0
+    ld_u64 10
+    // @30
+    add
+    st_loc l0
+    branch l6
+l1: move_loc l0
+    ld_u64 15
+    // @35
+    eq
+    br_false l7
+    ld_u64 0
+    st_loc l3
+l10: copy_loc l3
+    // @40
+    ld_u64 6
+    lt
+    br_false l8
+    ld_u64 0
+    st_loc l4
+    // @45
+    ld_false
+    st_loc l5
+l13: branch l9
+    branch l10
+l9: copy_loc l5
+    // @50
+    br_false l11
+    move_loc l4
+    ld_u64 1
+    add
+    st_loc l4
+    // @55
+l14: copy_loc l4
+    ld_u64 5
+    lt
+    br_true l12
+    branch l10
+    // @60
+l12: move_loc l3
+    ld_u64 1
+    add
+    st_loc l3
+    branch l13
+    // @65
+l11: ld_true
+    st_loc l5
+    branch l14
+l8: move_loc l3
+    ld_u64 10
+    // @70
+    eq
+    br_false l15
+    ret
+l15: ld_u64 43
+    abort
+    // @75
+l7: ld_u64 42
+    abort
+l2: ld_true
+    st_loc l2
+    branch l16
+

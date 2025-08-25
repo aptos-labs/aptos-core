@@ -12,7 +12,7 @@ error: native struct `C::T` has no fields
 12 │         let C::T {} = c;
    │             ^^^^
 
-error: field `f` not declared in struct `C::T`
+error: field `f` not declared in struct `T`
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17
    │
 15 │         let f = c.f;

@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-58:  publish [// Bytecode version v8]
+task 1 lines 62-62:  run 0x42::test::nested --args 3
+return values: 4
+task 2 lines 64-64:  run 0x42::test::nested_capture --args 4
+return values: 5

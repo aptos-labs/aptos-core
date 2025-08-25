@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-23:  publish [// Bytecode version v8]
+Error: error: expected `)`, found `drop`
+  ┌─ test:7:356
+  │
+7 │ #[persistent] public fun f1(l0: &|(|&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop)| has drop)
+  │                                                                                                                                                                                                                                                                                                                                                                    ^^^^
+
+

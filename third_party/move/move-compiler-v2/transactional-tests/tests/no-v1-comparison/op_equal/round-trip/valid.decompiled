@@ -1,0 +1,178 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/op_equal/valid.move`
+
+//# publish
+module 0x42::test {
+    struct Coin has drop {
+        _0: u256,
+    }
+    struct Wrapper<T0> has drop {
+        _0: T0,
+    }
+    fun add1_new(p0: u256): u256 {
+        p0 + 1u256
+    }
+    fun add1_old(p0: u256): u256 {
+        p0 + 1u256
+    }
+    fun coin_inc_new_1(p0: &mut Coin) {
+        let _t1 = &mut p0._0;
+        *_t1 = *_t1 + 1u256;
+    }
+    fun coin_inc_new_2(p0: &mut Coin) {
+        let _t1 = &mut p0._0;
+        *_t1 = *_t1 + 1u256;
+    }
+    fun coin_inc_old_1(p0: &mut Coin) {
+        let _t5 = *&p0._0 + 1u256;
+        let _t7 = &mut p0._0;
+        *_t7 = _t5;
+    }
+    fun coin_inc_old_2(p0: &mut Coin) {
+        let _t1 = &mut p0._0;
+        *_t1 = *_t1 + 1u256;
+    }
+    fun inc_new(p0: &mut u256) {
+        *p0 = *p0 + 1u256;
+    }
+    fun inc_old(p0: &mut u256) {
+        *p0 = *p0 + 1u256;
+    }
+    fun inc_vec_coin_new(p0: vector<Coin>, p1: u64): vector<Coin> {
+        let _t2 = &mut 0x1::vector::borrow_mut<Coin>(&mut p0, p1)._0;
+        *_t2 = *_t2 + 1u256;
+        p0
+    }
+    fun inc_vec_coin_old(p0: vector<Coin>, p1: u64): vector<Coin> {
+        let _t8 = *&0x1::vector::borrow<Coin>(&p0, p1)._0 + 1u256;
+        let _t12 = &mut 0x1::vector::borrow_mut<Coin>(&mut p0, p1)._0;
+        *_t12 = _t8;
+        p0
+    }
+    fun inc_vec_new(p0: &mut vector<u256>, p1: u64) {
+        let _t2 = 0x1::vector::borrow_mut<u256>(p0, p1);
+        *_t2 = *_t2 + 1u256;
+    }
+    fun inc_vec_old(p0: &mut vector<u256>, p1: u64) {
+        let _t8 = *0x1::vector::borrow<u256>(freeze(p0), p1) + 1u256;
+        let _t11 = 0x1::vector::borrow_mut<u256>(p0, p1);
+        *_t11 = _t8;
+    }
+    fun inc_vec_wrapped_coin_new(p0: vector<Wrapper<Coin>>, p1: u64): vector<Wrapper<Coin>> {
+        let _t2 = &mut (&mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut p0, p1)._0)._0;
+        *_t2 = *_t2 + 1u256;
+        p0
+    }
+    fun inc_vec_wrapped_coin_old(p0: vector<Wrapper<Coin>>, p1: u64): vector<Wrapper<Coin>> {
+        let _t9 = *&(&0x1::vector::borrow<Wrapper<Coin>>(&p0, p1)._0)._0 + 1u256;
+        let _t14 = &mut (&mut 0x1::vector::borrow_mut<Wrapper<Coin>>(&mut p0, p1)._0)._0;
+        *_t14 = _t9;
+        p0
+    }
+    fun inc_wrapped_coin_new(p0: &mut Wrapper<Coin>) {
+        let _t1 = &mut (&mut p0._0)._0;
+        *_t1 = *_t1 + 1u256;
+    }
+    fun inc_wrapped_coin_old(p0: &mut Wrapper<Coin>) {
+        let _t6 = *&(&p0._0)._0 + 1u256;
+        let _t9 = &mut (&mut p0._0)._0;
+        *_t9 = _t6;
+    }
+    fun test1() {
+        let _t1 = add1_old(42u256);
+        let _t3 = add1_new(42u256);
+        if (!(_t1 == _t3)) abort 14566554180833181696;
+    }
+    fun test2() {
+        let _t0 = 42u256;
+        let _t1 = _t0;
+        inc_new(&mut _t0);
+        inc_old(&mut _t1);
+        if (!(_t0 == _t1)) abort 14566554180833181696;
+    }
+    fun test3() {
+        let _t0 = Coin{_0: 42u256};
+        let _t1 = Coin{_0: 42u256};
+        let _t2 = Coin{_0: 42u256};
+        let _t3 = Coin{_0: 42u256};
+        coin_inc_new_1(&mut _t0);
+        coin_inc_new_2(&mut _t1);
+        coin_inc_old_1(&mut _t2);
+        coin_inc_old_2(&mut _t3);
+        let _t16 = &_t0;
+        let _t17 = &_t1;
+        if (!(_t16 == _t17)) abort 14566554180833181696;
+        let _t19 = &_t0;
+        let _t20 = &_t2;
+        if (!(_t19 == _t20)) abort 14566554180833181696;
+        let _t22 = &_t0;
+        let _t23 = &_t3;
+        if (!(_t22 == _t23)) abort 14566554180833181696;
+    }
+    fun test4() {
+        let _t0 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
+        let _t1 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
+        inc_wrapped_coin_new(&mut _t0);
+        inc_wrapped_coin_old(&mut _t1);
+        if (!(_t0 == _t1)) abort 14566554180833181696;
+    }
+    fun test5() {
+        let _t0 = vector[42u256];
+        let _t1 = vector[42u256];
+        inc_vec_new(&mut _t0, 0);
+        inc_vec_old(&mut _t1, 0);
+        if (!(_t0 == _t1)) abort 14566554180833181696;
+    }
+    fun test6() {
+        let _t3 = Coin{_0: 42u256};
+        let _t4 = 0x1::vector::empty<Coin>();
+        0x1::vector::push_back<Coin>(&mut _t4, _t3);
+        let _t7 = Coin{_0: 42u256};
+        let _t8 = 0x1::vector::empty<Coin>();
+        0x1::vector::push_back<Coin>(&mut _t8, _t7);
+        let _t11 = inc_vec_coin_new(_t4, 0);
+        let _t14 = inc_vec_coin_old(_t8, 0);
+        if (!(_t11 == _t14)) abort 14566554180833181696;
+    }
+    fun test7() {
+        let _t4 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
+        let _t5 = 0x1::vector::empty<Wrapper<Coin>>();
+        0x1::vector::push_back<Wrapper<Coin>>(&mut _t5, _t4);
+        let _t9 = Wrapper<Coin>{_0: Coin{_0: 42u256}};
+        let _t10 = 0x1::vector::empty<Wrapper<Coin>>();
+        0x1::vector::push_back<Wrapper<Coin>>(&mut _t10, _t9);
+        let _t13 = inc_vec_wrapped_coin_new(_t5, 0);
+        let _t16 = inc_vec_wrapped_coin_old(_t10, 0);
+        if (!(_t13 == _t16)) abort 14566554180833181696;
+    }
+    fun test8() {
+        let _t0 = 0;
+        let _t1 = vector[0u256, 1u256];
+        let _t5 = &mut _t1;
+        let _t7 = x_plusplus(&mut _t0);
+        let _t2 = 0x1::vector::borrow_mut<u256>(_t5, _t7);
+        *_t2 = *_t2 + 1u256;
+        if (!(_t1 == vector[1u256, 1u256])) abort 14566554180833181696;
+    }
+    fun x_plusplus(p0: &mut u64): u64 {
+        let _t2 = *p0;
+        *p0 = *p0 + 1;
+        _t2
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test1
+
+//# run --verbose -- 0x42::test::test2
+
+//# run --verbose -- 0x42::test::test3
+
+//# run --verbose -- 0x42::test::test4
+
+//# run --verbose -- 0x42::test::test5
+
+//# run --verbose -- 0x42::test::test6
+
+//# run --verbose -- 0x42::test::test7
+
+//# run --verbose -- 0x42::test::test8

@@ -1,0 +1,16 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/while_nested_return.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 42
+    abort
+    branch l0
+    ret
+    // @5
+l0: ld_u64 42
+    abort
+

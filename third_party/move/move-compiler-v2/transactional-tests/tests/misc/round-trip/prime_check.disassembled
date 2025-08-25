@@ -1,0 +1,134 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/prime_check.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::prime
+// Function definition at index 0
+#[persistent] public fun is_prime(l0: u64): bool
+    local l1: u64
+    copy_loc l0
+    ld_u64 2
+    lt
+    br_false l0
+    ld_false
+    // @5
+    ret
+l0: ld_u64 2
+    st_loc l1
+l3: copy_loc l1
+    copy_loc l0
+    // @10
+    ld_u64 2
+    div
+    le
+    br_false l1
+    copy_loc l0
+    // @15
+    copy_loc l1
+    mod
+    ld_u64 0
+    eq
+    br_false l2
+    // @20
+    ld_false
+    ret
+l2: move_loc l1
+    ld_u64 1
+    add
+    // @25
+    st_loc l1
+    branch l3
+l1: ld_true
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_is_prime()
+    ld_u64 0
+    call is_prime
+    br_true l0
+    ld_u64 1
+    call is_prime
+    // @5
+    br_true l1
+    ld_u64 2
+    call is_prime
+    br_false l2
+    ld_u64 3
+    // @10
+    call is_prime
+    br_false l3
+    ld_u64 4
+    call is_prime
+    br_true l4
+    // @15
+    ld_u64 5
+    call is_prime
+    br_false l5
+    ld_u64 6
+    call is_prime
+    // @20
+    br_true l6
+    ld_u64 7
+    call is_prime
+    br_false l7
+    ld_u64 8
+    // @25
+    call is_prime
+    br_true l8
+    ld_u64 9
+    call is_prime
+    br_true l9
+    // @30
+    ld_u64 10
+    call is_prime
+    br_true l10
+    ld_u64 11
+    call is_prime
+    // @35
+    br_false l11
+    ld_u64 12
+    call is_prime
+    br_true l12
+    ld_u64 13
+    // @40
+    call is_prime
+    br_false l13
+    ret
+l13: ld_u64 13
+    abort
+    // @45
+l12: ld_u64 12
+    abort
+l11: ld_u64 11
+    abort
+l10: ld_u64 10
+    // @50
+    abort
+l9: ld_u64 9
+    abort
+l8: ld_u64 8
+    abort
+    // @55
+l7: ld_u64 7
+    abort
+l6: ld_u64 6
+    abort
+l5: ld_u64 5
+    // @60
+    abort
+l4: ld_u64 4
+    abort
+l3: ld_u64 3
+    abort
+    // @65
+l2: ld_u64 2
+    abort
+l1: ld_u64 1
+    abort
+l0: ld_u64 0
+    // @70
+    abort
+
+
+
+//# run 0xc0ffee::prime::test_is_prime

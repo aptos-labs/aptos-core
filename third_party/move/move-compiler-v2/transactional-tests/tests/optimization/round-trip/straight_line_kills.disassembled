@@ -1,0 +1,35 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/straight_line_kills.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun copy_kill(l0: u64): u64
+    local l1: u64
+    copy_loc l0
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    ld_u64 1
+    // @5
+    add
+    pop
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] public fun main()
+    ld_u64 10
+    call copy_kill
+    ld_u64 20
+    eq
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0xc0ffee::m::main

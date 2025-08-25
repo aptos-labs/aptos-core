@@ -1,0 +1,30 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/cant_coalesce_1.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun main()
+    ld_u64 5
+    call test
+    ld_u64 2
+    eq
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 1
+#[persistent] public fun test(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    add
+    pop
+    ld_u64 2
+    // @5
+    ret
+
+
+
+//# run 0xc0ffee::m::main

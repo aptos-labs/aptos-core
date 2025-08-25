@@ -1,0 +1,36 @@
+processed 4 tasks
+task 0 lines 3-106:  publish [module 0x66::fv_enum_basic {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE:47:38
+   │
+47 │             let Action::Call{_0: _t9 : |u64|(u64) has drop} = _t1;
+   │                             -        ^ Expected '}'
+   │                             │         
+   │                             To match this '{'
+
+
+task 1 lines 109-109:  run 0x66::fv_enum_basic::call_square --args 7
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 111-111:  run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 113-113:  run 0x66::fv_enum_basic::test_fun_vec --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

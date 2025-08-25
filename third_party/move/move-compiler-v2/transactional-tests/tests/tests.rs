@@ -8,7 +8,9 @@ use itertools::Itertools;
 use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::{logging, Experiment};
 use move_model::metadata::LanguageVersion;
-use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
+use move_transactional_test_runner::{
+    tasks::SyntaxChoice, vm_test_harness, vm_test_harness::TestRunConfig,
+};
 use std::{
     path::{Path, PathBuf},
     string::ToString,
@@ -171,8 +173,9 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    let vm_test_config = TestRunConfig::new(language_version, experiments);
-
+    let vm_test_config = TestRunConfig::new(language_version, experiments)
+        .cross_compile_into(SyntaxChoice::ASM, true)
+        .cross_compile_into(SyntaxChoice::Source, true);
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 

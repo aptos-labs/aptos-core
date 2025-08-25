@@ -1,0 +1,241 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/sorter.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::heap
+// Function definition at index 0
+fun array_equals(l0: &vector<u64>, l1: &vector<u64>): bool
+    local l2: u64
+    local l3: u64
+    copy_loc l0
+    vec_len <u64>
+    st_loc l2
+    copy_loc l1
+    vec_len <u64>
+    // @5
+    st_loc l3
+    copy_loc l2
+    move_loc l3
+    neq
+    br_false l0
+    // @10
+    move_loc l0
+    pop
+    move_loc l1
+    pop
+    ld_false
+    // @15
+    ret
+l0: ld_u64 0
+    st_loc l3
+l3: copy_loc l3
+    copy_loc l2
+    // @20
+    lt
+    br_false l1
+    copy_loc l0
+    copy_loc l3
+    vec_borrow <u64>
+    // @25
+    read_ref
+    copy_loc l1
+    copy_loc l3
+    vec_borrow <u64>
+    read_ref
+    // @30
+    neq
+    br_false l2
+    move_loc l0
+    pop
+    move_loc l1
+    // @35
+    pop
+    ld_false
+    ret
+l2: move_loc l3
+    ld_u64 1
+    // @40
+    add
+    st_loc l3
+    branch l3
+l1: move_loc l0
+    pop
+    // @45
+    move_loc l1
+    pop
+    ld_true
+    ret
+
+// Function definition at index 1
+fun create1(): vector<u64>
+    ld_const<vector<u64>> [3, 2, 1, 5, 8, 4]
+    ret
+
+// Function definition at index 2
+fun create2(): vector<u64>
+    ld_const<vector<u64>> [1, 2, 3, 4, 5, 8]
+    ret
+
+// Function definition at index 3
+#[persistent] public fun main()
+    local l0: vector<u64>
+    local l1: vector<u64>
+    local l2: vector<u64>
+    call create1
+    st_loc l0
+    call create2
+    st_loc l1
+    borrow_loc l0
+    // @5
+    call vcopy
+    st_loc l2
+    borrow_loc l0
+    borrow_loc l2
+    call array_equals
+    // @10
+    br_false l0
+    borrow_loc l1
+    borrow_loc l1
+    call array_equals
+    br_false l1
+    // @15
+    mut_borrow_loc l0
+    call sort
+    borrow_loc l1
+    borrow_loc l0
+    call array_equals
+    // @20
+    br_false l2
+    borrow_loc l0
+    borrow_loc l1
+    call array_equals
+    br_false l3
+    // @25
+    borrow_loc l0
+    borrow_loc l2
+    call array_equals
+    br_true l4
+    ret
+    // @30
+l4: ld_u64 31
+    abort
+l3: ld_u64 29
+    abort
+l2: ld_u64 31
+    // @35
+    abort
+l1: ld_u64 29
+    abort
+l0: ld_u64 23
+    abort
+
+// Function definition at index 4
+fun sort(l0: &mut vector<u64>)
+    local l1: u64
+    local l2: u64
+    ld_u64 0
+    st_loc l1
+l5: copy_loc l1
+    copy_loc l0
+    freeze_ref
+    // @5
+    vec_len <u64>
+    lt
+    br_false l0
+    copy_loc l1
+    ld_u64 1
+    // @10
+    add
+    st_loc l2
+l4: copy_loc l2
+    copy_loc l0
+    freeze_ref
+    // @15
+    vec_len <u64>
+    lt
+    br_false l1
+    copy_loc l0
+    freeze_ref
+    // @20
+    copy_loc l1
+    vec_borrow <u64>
+    read_ref
+    copy_loc l0
+    freeze_ref
+    // @25
+    copy_loc l2
+    vec_borrow <u64>
+    read_ref
+    gt
+    br_true l2
+    // @30
+    branch l3
+l2: copy_loc l0
+    copy_loc l1
+    copy_loc l2
+    vec_swap <u64>
+    // @35
+l3: move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    branch l4
+    // @40
+l1: move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    branch l5
+    // @45
+l0: move_loc l0
+    pop
+    ret
+
+// Function definition at index 5
+fun vcopy(l0: &vector<u64>): vector<u64>
+    local l1: vector<u64>
+    local l2: u64
+    local l3: u64
+    vec_pack <u64>, 0
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+    copy_loc l0
+    // @5
+    vec_len <u64>
+    st_loc l3
+l1: copy_loc l2
+    copy_loc l3
+    lt
+    // @10
+    br_false l0
+    mut_borrow_loc l1
+    copy_loc l0
+    copy_loc l2
+    vec_borrow <u64>
+    // @15
+    read_ref
+    vec_push_back <u64>
+    move_loc l2
+    ld_u64 1
+    add
+    // @20
+    st_loc l2
+    branch l1
+l0: move_loc l0
+    pop
+    move_loc l1
+    // @25
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0x42::heap
+// Function definition at index 0
+entry public fun main()
+    call heap::main
+    ret
+

@@ -1,0 +1,278 @@
+//**** Cross-compiled for `masm` syntax from `tests/operators/arithmetic_operators_u256.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1202
+    abort
+    ld_u64 1201
+    abort
+    // @5
+    ld_u64 1200
+    abort
+    ld_u64 1101
+    abort
+    ld_u64 1100
+    // @10
+    abort
+    ld_u64 1002
+    abort
+    ld_u64 1001
+    abort
+    // @15
+    ld_u64 1000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 1
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    add
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 105792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 105792089237316195423570985008687907853269984665640564039457584007913129639935
+    add
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 2201
+    abort
+    ld_u64 2200
+    abort
+    // @5
+    ld_u64 2101
+    abort
+    ld_u64 2100
+    abort
+    ld_u64 2002
+    // @10
+    abort
+    ld_u64 2001
+    abort
+    ld_u64 2000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 0
+    ld_u256 1
+    sub
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 54
+    ld_u256 100
+    sub
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 3200
+    abort
+    ld_u64 3101
+    abort
+    // @5
+    ld_u64 3100
+    abort
+    ld_u64 3002
+    abort
+    ld_u64 3001
+    // @10
+    abort
+    ld_u64 3000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 578960446186580977117853953926634992332820282019728792003956564819967
+    ld_u256 57896044618343953926634992332820282019728792003956564819967
+    mul
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 4201
+    abort
+    ld_u64 4200
+    abort
+    // @5
+    ld_u64 4101
+    abort
+    ld_u64 4100
+    abort
+    ld_u64 4002
+    // @10
+    abort
+    ld_u64 4001
+    abort
+    ld_u64 4000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 1
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 5201
+    abort
+    ld_u64 5200
+    abort
+    // @5
+    ld_u64 5101
+    abort
+    ld_u64 5100
+    abort
+    ld_u64 5002
+    // @10
+    abort
+    ld_u64 5001
+    abort
+    ld_u64 5000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 0
+    ld_u256 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 1
+    ld_u256 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u256 4294967294
+    ld_u256 0
+    mod
+    pop
+    ret
+

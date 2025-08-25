@@ -1,0 +1,28 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/nested_loops.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::M
+// Function definition at index 0
+#[persistent] public fun foobar(l0: bool)
+l1: copy_loc l0
+    br_true l0
+    branch l1
+l0: copy_loc l0
+    br_true l2
+    // @5
+    branch l1
+l2: ret
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0x42::M
+// Function definition at index 0
+entry public fun main()
+    ld_true
+    call M::foobar
+    ret
+

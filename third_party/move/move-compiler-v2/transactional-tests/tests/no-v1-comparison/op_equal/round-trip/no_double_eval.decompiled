@@ -1,0 +1,37 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/op_equal/no_double_eval.move`
+
+//# publish
+module 0xc0ffee::m1 {
+    fun foo(p0: &mut u64): &mut u64 {
+        let _t1 = p0;
+        *_t1 = *_t1 + 1;
+        p0
+    }
+    public fun test() {
+        let _t0 = 1;
+        let _t1 = foo(&mut _t0);
+        *_t1 = *_t1 + 1;
+        if (!(_t0 == 3)) abort 14566554180833181696;
+    }
+}
+
+
+//# publish
+module 0xc0ffee::m2 {
+    fun foo(p0: &mut u64) {
+        *p0 = *p0 + 2;
+    }
+    public fun test() {
+        let _t0 = 1;
+        foo(&mut _t0);
+        foo(&mut _t0);
+        let _t1 = &mut _t0;
+        *_t1 = *_t1 + 1;
+        if (!(_t0 == 6)) abort 14566554180833181696;
+    }
+}
+
+
+//# run --verbose -- 0xc0ffee::m1::test
+
+//# run --verbose -- 0xc0ffee::m2::test

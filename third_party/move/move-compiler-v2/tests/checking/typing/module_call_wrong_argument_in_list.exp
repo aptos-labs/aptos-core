@@ -48,7 +48,7 @@ error: cannot pass `bool` to a function which expects argument of type `u64`
 30 │         X::foo(@0x0, false, X::s());
    │                      ^^^^^
 
-error: cannot pass `S` to a function which expects argument of type `X::S`
+error: cannot pass `S` to a function which expects argument of type `S`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:31:25
    │
 31 │         X::foo(@0x0, 0, S{});

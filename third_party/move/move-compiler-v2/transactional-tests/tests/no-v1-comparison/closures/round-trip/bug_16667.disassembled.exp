@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-7:  publish [// Bytecode version v8]
+task 1 lines 11-28:  publish [// Bytecode version v8]
+Error: error: expected `)`, found `drop`
+   ┌─ test:19:34
+   │
+19 │     call_closure <|(|M0::S1| has drop)|>
+   │                                  ^^^^
+
+

@@ -1,0 +1,49 @@
+//**** Cross-compiled for `masm` syntax from `tests/more-v1/parser/expr_binary_operators.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 117
+    abort
+    ld_u64 116
+    abort
+    // @5
+    ld_u64 115
+    abort
+    ld_u64 114
+    abort
+    ld_u64 113
+    // @10
+    abort
+    ld_u64 112
+    abort
+    ld_u64 111
+    abort
+    // @15
+    ld_u64 110
+    abort
+    ld_u64 109
+    abort
+    ld_u64 108
+    // @20
+    abort
+    ld_u64 107
+    abort
+    ld_u64 106
+    abort
+    // @25
+    ld_u64 105
+    abort
+    ld_u64 104
+    abort
+    ld_u64 103
+    // @30
+    abort
+    ld_u64 102
+    abort
+    ld_u64 101
+    abort
+

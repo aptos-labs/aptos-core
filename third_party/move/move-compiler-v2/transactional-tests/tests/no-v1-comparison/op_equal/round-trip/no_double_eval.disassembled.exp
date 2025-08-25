@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 3-45:  publish [// Bytecode version v8]
+task 1 lines 49-91:  publish [// Bytecode version v8]
+task 2 lines 95-95:  run --verbose -- 0xc0ffee::m1::test
+task 3 lines 97-97:  run --verbose -- 0xc0ffee::m2::test

@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-49:  publish [// Bytecode version v8]
+task 1 lines 53-53:  run 0x42::Test::test
+return values: 6

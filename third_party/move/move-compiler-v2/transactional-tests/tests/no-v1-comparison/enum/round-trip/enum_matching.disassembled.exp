@@ -1,0 +1,30 @@
+processed 15 tasks
+task 0 lines 3-623:  publish [// Bytecode version v8]
+task 1 lines 627-627:  run 0x42::m::t1_is_inner1
+return values: true
+task 2 lines 629-629:  run 0x42::m::t2_is_inner1
+return values: false
+task 3 lines 631-631:  run 0x42::m::t1_inner_value
+return values: 7
+task 4 lines 633-633:  run 0x42::m::t1_outer_value
+return values: 0
+task 5 lines 635-635:  run 0x42::m::t2_outer_value
+return values: 3
+task 6 lines 637-637:  run 0x42::m::t3_outer_value
+return values: 8
+task 7 lines 639-639:  run 0x42::m::t1_outer_value_nested
+return values: 27
+task 8 lines 641-641:  run 0x42::m::t2_outer_value_nested
+return values: 12
+task 9 lines 643-643:  run 0x42::m::t1_outer_value_with_cond
+return values: 1
+task 10 lines 645-645:  run 0x42::m::t1_outer_value_with_cond_ref
+return values: true
+task 11 lines 647-647:  run 0x42::m::t1_is_some
+return values: false
+task 12 lines 649-649:  run 0x42::m::t2_is_some
+return values: true
+task 13 lines 651-651:  run 0x42::m::t1_is_some_specialized
+return values: false
+task 14 lines 653-653:  run 0x42::m::t2_is_some_specialized
+return values: true

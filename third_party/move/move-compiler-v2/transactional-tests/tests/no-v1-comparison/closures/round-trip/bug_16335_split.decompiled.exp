@@ -1,0 +1,20 @@
+processed 2 tasks
+task 0 lines 3-27:  publish [module 0x42::Test {]
+Error: compilation errors:
+ error: cannot assign `&mut || has copy + drop` to left-hand side of type `&mut || has drop`
+   ┌─ TEMPFILE:19:10
+   │
+19 │         *_t4 = _t2;
+   │          ^^^
+
+
+task 1 lines 30-30:  run --verbose 0x42::Test::f3
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::Test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

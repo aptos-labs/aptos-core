@@ -1,0 +1,20 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/bug_14223_unused_non_droppable.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m
+struct S
+  dummy_field: bool
+
+// Function definition at index 0
+#[persistent] public fun f()
+    local l0: S
+    ld_false
+    pack S
+    st_loc l0
+    ld_u64 1
+    abort
+
+
+
+//# run 0xCAFE::m::f

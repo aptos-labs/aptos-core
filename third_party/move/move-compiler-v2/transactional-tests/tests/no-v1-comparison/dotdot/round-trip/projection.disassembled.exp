@@ -1,0 +1,14 @@
+processed 7 tasks
+task 0 lines 3-127:  publish [// Bytecode version v8]
+task 1 lines 131-131:  run --verbose -- 0x42::test::test_proj_0
+return values: 42
+task 2 lines 133-133:  run --verbose -- 0x42::test::test_proj_0_ref
+return values: 42
+task 3 lines 135-135:  run --verbose -- 0x42::test::test_proj_2
+return values: true
+task 4 lines 137-137:  run --verbose -- 0x42::test::test_proj_2_ref
+return values: true
+task 5 lines 139-139:  run --verbose -- 0x42::test::test_get_x
+return values: 42
+task 6 lines 141-141:  run --verbose -- 0x42::test::test_get_x_ref
+return values: 42

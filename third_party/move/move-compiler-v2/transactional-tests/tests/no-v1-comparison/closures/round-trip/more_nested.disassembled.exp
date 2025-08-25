@@ -1,0 +1,25 @@
+processed 3 tasks
+task 0 lines 3-217:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `|`
+  ┌─ test:7:33
+  │
+7 │ fun create_adder(l0: u64): |u64||u64|u64 has copy
+  │                                 ^
+
+
+task 1 lines 221-221:  run 0xc0ffee::n::test_nested_functions
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 223-223:  run 0xc0ffee::n::test_composed_captures
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

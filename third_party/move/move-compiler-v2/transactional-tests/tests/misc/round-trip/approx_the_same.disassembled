@@ -1,0 +1,78 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/approx_the_same.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+// Function definition at index 0
+fun assert_approx_the_same(l0: u256, l1: u256, l2: u128)
+    local l3: u256
+    local l4: u256
+    copy_loc l0
+    copy_loc l1
+    lt
+    br_true l0
+    branch l1
+    // @5
+l0: move_loc l0
+    move_loc l1
+    st_loc l0
+    st_loc l1
+l1: ld_u256 1
+    // @10
+    st_loc l3
+    ld_u256 10
+    st_loc l4
+l5: copy_loc l2
+    ld_u128 0
+    // @15
+    gt
+    br_false l2
+    copy_loc l2
+    ld_u128 2
+    mod
+    // @20
+    ld_u128 1
+    eq
+    br_true l3
+    branch l4
+l3: move_loc l3
+    // @25
+    copy_loc l4
+    mul
+    st_loc l3
+l4: move_loc l2
+    ld_u128 2
+    // @30
+    div
+    st_loc l2
+    copy_loc l4
+    move_loc l4
+    mul
+    // @35
+    st_loc l4
+    branch l5
+l2: copy_loc l0
+    move_loc l1
+    sub
+    // @40
+    move_loc l3
+    mul
+    move_loc l0
+    lt
+    br_false l6
+    // @45
+    ret
+l6: ld_u64 0
+    abort
+
+// Function definition at index 1
+fun exec()
+    ld_u256 5672
+    ld_u256 5672
+    ld_u128 0
+    call assert_approx_the_same
+    ret
+
+
+
+//# run 0x42::m::exec

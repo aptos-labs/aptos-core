@@ -1,0 +1,312 @@
+//**** Cross-compiled for `masm` syntax from `tests/operators/comparison_operators.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1205
+    abort
+    ld_u64 1204
+    abort
+    // @5
+    ld_u64 1203
+    abort
+    ld_u64 1202
+    abort
+    ld_u64 1201
+    // @10
+    abort
+    ld_u64 1200
+    abort
+    ld_u64 1105
+    abort
+    // @15
+    ld_u64 1104
+    abort
+    ld_u64 1103
+    abort
+    ld_u64 1102
+    // @20
+    abort
+    ld_u64 1101
+    abort
+    ld_u64 1100
+    abort
+    // @25
+    ld_u64 1005
+    abort
+    ld_u64 1004
+    abort
+    ld_u64 1003
+    // @30
+    abort
+    ld_u64 1002
+    abort
+    ld_u64 1001
+    abort
+    // @35
+    ld_u64 1000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 2201
+    abort
+    ld_u64 2201
+    abort
+    // @5
+    ld_u64 2200
+    abort
+    ld_u64 2101
+    abort
+    ld_u64 2101
+    // @10
+    abort
+    ld_u64 2100
+    abort
+    ld_u64 2001
+    abort
+    // @15
+    ld_u64 2001
+    abort
+    ld_u64 2000
+    abort
+    ld_u64 2201
+    // @20
+    abort
+    ld_u64 2201
+    abort
+    ld_u64 2200
+    abort
+    // @25
+    ld_u64 2101
+    abort
+    ld_u64 2101
+    abort
+    ld_u64 2100
+    // @30
+    abort
+    ld_u64 2001
+    abort
+    ld_u64 2001
+    abort
+    // @35
+    ld_u64 2000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 3202
+    abort
+    ld_u64 3201
+    abort
+    // @5
+    ld_u64 3200
+    abort
+    ld_u64 3102
+    abort
+    ld_u64 3101
+    // @10
+    abort
+    ld_u64 3100
+    abort
+    ld_u64 3002
+    abort
+    // @15
+    ld_u64 3001
+    abort
+    ld_u64 3000
+    abort
+    ld_u64 3202
+    // @20
+    abort
+    ld_u64 3201
+    abort
+    ld_u64 3200
+    abort
+    // @25
+    ld_u64 3102
+    abort
+    ld_u64 3101
+    abort
+    ld_u64 3100
+    // @30
+    abort
+    ld_u64 3002
+    abort
+    ld_u64 3001
+    abort
+    // @35
+    ld_u64 3000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 4202
+    abort
+    ld_u64 4201
+    abort
+    // @5
+    ld_u64 4200
+    abort
+    ld_u64 4102
+    abort
+    ld_u64 4101
+    // @10
+    abort
+    ld_u64 4100
+    abort
+    ld_u64 4002
+    abort
+    // @15
+    ld_u64 4001
+    abort
+    ld_u64 4000
+    abort
+    ld_u64 4202
+    // @20
+    abort
+    ld_u64 4201
+    abort
+    ld_u64 4200
+    abort
+    // @25
+    ld_u64 4102
+    abort
+    ld_u64 4101
+    abort
+    ld_u64 4100
+    // @30
+    abort
+    ld_u64 4002
+    abort
+    ld_u64 4001
+    abort
+    // @35
+    ld_u64 4000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 5202
+    abort
+    ld_u64 5201
+    abort
+    // @5
+    ld_u64 5200
+    abort
+    ld_u64 5102
+    abort
+    ld_u64 5101
+    // @10
+    abort
+    ld_u64 5100
+    abort
+    ld_u64 5002
+    abort
+    // @15
+    ld_u64 5001
+    abort
+    ld_u64 5000
+    abort
+    ld_u64 5202
+    // @20
+    abort
+    ld_u64 5201
+    abort
+    ld_u64 5200
+    abort
+    // @25
+    ld_u64 5102
+    abort
+    ld_u64 5101
+    abort
+    ld_u64 5100
+    // @30
+    abort
+    ld_u64 5002
+    abort
+    ld_u64 5001
+    abort
+    // @35
+    ld_u64 5000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 6202
+    abort
+    ld_u64 6201
+    abort
+    // @5
+    ld_u64 6200
+    abort
+    ld_u64 6102
+    abort
+    ld_u64 6101
+    // @10
+    abort
+    ld_u64 6100
+    abort
+    ld_u64 6002
+    abort
+    // @15
+    ld_u64 6001
+    abort
+    ld_u64 6000
+    abort
+    ld_u64 6202
+    // @20
+    abort
+    ld_u64 6201
+    abort
+    ld_u64 6200
+    abort
+    // @25
+    ld_u64 6102
+    abort
+    ld_u64 6101
+    abort
+    ld_u64 6100
+    // @30
+    abort
+    ld_u64 6002
+    abort
+    ld_u64 6001
+    abort
+    // @35
+    ld_u64 6000
+    abort
+

@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/no-access-check/pack_private_function.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S {
+        _0: u64,
+    }
+    fun inaccessible() {
+        ()
+    }
+}
+
+
+//# publish
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    public fun test() {
+        let _t0 : || has copy + drop = || m::inaccessible();
+        _t0();
+    }
+}

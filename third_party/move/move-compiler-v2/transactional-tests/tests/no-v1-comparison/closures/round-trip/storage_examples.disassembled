@@ -1,0 +1,48 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/storage_examples.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+use 0x1::signer
+struct Wrapper has copy + drop + store + key
+  _0: |&signer|u64 has copy + drop + store
+
+// Function definition at index 0
+#[persistent] public fun init(l0: &signer)
+    local l1: Wrapper
+    pack_closure foo, 0
+    pack Wrapper
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    move_to Wrapper
+    ret
+
+// Function definition at index 1
+#[persistent] public fun fetch_and_run(l0: &signer): u64 acquires Wrapper
+    local l1: |&signer|u64 has copy + drop + store
+    copy_loc l0
+    call signer::address_of
+    borrow_global Wrapper
+    borrow_field Wrapper, _0
+    read_ref
+    // @5
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    call_closure <|&signer|u64 has copy + drop + store>
+    ret
+
+// Function definition at index 2
+#[persistent] fun foo(l0: &signer): u64
+    ld_u64 7
+    move_loc l0
+    pop
+    ret
+
+
+
+//# run 0xc0ffee::m::init --signers 0xc0ffee
+
+//# run 0xc0ffee::m::fetch_and_run --signers 0xc0ffee

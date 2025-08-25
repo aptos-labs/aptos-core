@@ -1,0 +1,37 @@
+processed 11 tasks
+task 0 lines 3-107:  publish [// Bytecode version v8]
+task 1 lines 111-111:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 113-113:  run --verbose -- 0x42::test::ok1
+return values: true
+task 3 lines 115-115:  run --verbose -- 0x42::test::ok2
+return values: true
+task 4 lines 117-117:  run --verbose --signers 0x2 -- 0x42::test::ok3
+return values: true
+task 5 lines 119-119:  run --verbose -- 0x42::test::ok4
+return values: true
+task 6 lines 121-121:  run --verbose -- 0x42::test::fail1
+return values: true
+task 7 lines 123-123:  run --verbose -- 0x42::test::fail2
+return values: false
+task 8 lines 125-125:  run --verbose -- 0x42::test::fail3
+return values: true
+task 9 lines 127-127:  run --verbose -- 0x42::test::fail4
+Error: Function execution failed with VMError: {
+    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 10 lines 129-129:  run --verbose -- 0x42::test::fail5
+Error: Function execution failed with VMError: {
+    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("test") }), FunctionDefinitionIndex(5), 0)] }),
+}

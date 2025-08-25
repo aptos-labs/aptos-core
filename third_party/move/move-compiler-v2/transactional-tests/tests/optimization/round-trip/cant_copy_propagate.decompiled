@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/cant_copy_propagate.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun consume(p0: u64) {
+        ()
+    }
+    public fun main() {
+        test(42, true);
+        test(42, false);
+    }
+    fun test(p0: u64, p1: bool) {
+        let _t6;
+        if (p1) consume(p0) else _t6 = p0 + 1;
+    }
+}
+
+
+//# run 0xc0ffee::m::main

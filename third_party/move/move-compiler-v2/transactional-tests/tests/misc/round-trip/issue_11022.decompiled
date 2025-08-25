@@ -1,0 +1,13 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/issue_11022.move`
+
+//# publish
+module 0xc0ffee::dummy1 {
+}
+
+
+//# publish
+module 0xc0ffee::dummy2 {
+    public fun main(): u64 {
+        1
+    }
+}

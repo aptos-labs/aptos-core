@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/bitwise_operators.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}

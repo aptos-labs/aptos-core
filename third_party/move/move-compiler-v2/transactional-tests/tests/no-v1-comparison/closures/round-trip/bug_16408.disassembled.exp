@@ -1,0 +1,17 @@
+processed 2 tasks
+task 0 lines 3-108:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `|`
+  ┌─ test:7:25
+  │
+7 │ fun make_func_1(): |u64||u64|u64 has copy + drop
+  │                         ^
+
+
+task 1 lines 112-112:  run 0xc0ffee::m::test
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

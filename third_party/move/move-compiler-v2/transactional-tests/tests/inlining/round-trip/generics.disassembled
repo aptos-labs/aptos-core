@@ -1,0 +1,53 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/generics.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::Test
+// Function definition at index 0
+#[persistent] public fun test(): u64
+    local l0: u64
+    local l1: vector<u64>
+    local l2: &vector<u64>
+    local l3: u64
+    local l4: &u64
+    ld_u64 0
+    st_loc l0
+    ld_const<vector<u64>> [1, 2, 3]
+    st_loc l1
+    borrow_loc l1
+    // @5
+    st_loc l2
+    ld_u64 0
+    st_loc l3
+l1: copy_loc l3
+    copy_loc l2
+    // @10
+    vec_len <u64>
+    lt
+    br_false l0
+    copy_loc l2
+    copy_loc l3
+    // @15
+    vec_borrow <u64>
+    st_loc l4
+    move_loc l0
+    move_loc l4
+    read_ref
+    // @20
+    add
+    st_loc l0
+    move_loc l3
+    ld_u64 1
+    add
+    // @25
+    st_loc l3
+    branch l1
+l0: move_loc l2
+    pop
+    move_loc l0
+    // @30
+    ret
+
+
+
+//# run 0x42::Test::test

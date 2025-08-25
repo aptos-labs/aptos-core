@@ -1,0 +1,1242 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/index.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+struct T has copy + drop + store + key
+  w: W
+
+struct M has copy + drop
+  vec: vector<u8>
+
+struct R has drop + key
+  value: bool
+
+struct S has copy + drop + key
+  t: T
+
+struct W has copy + drop + store + key
+  x: u64
+
+struct Wrapper<T0: copy> has copy + drop + store + key
+  inner: T0
+
+struct X<T0> has copy + drop + store
+  value: T0
+
+struct Y<T0> has copy + drop + key
+  field: T0
+
+// Function definition at index 0
+fun init(l0: &signer)
+    move_loc l0
+    ld_true
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+fun boo_1(l0: vector<S>, l1: W): u64
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <S>
+    mut_borrow_field S, t
+    mut_borrow_field T, w
+    // @5
+    move_loc l1
+    call merge
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <S>
+    // @10
+    borrow_field S, t
+    borrow_field T, w
+    borrow_field W, x
+    read_ref
+    ret
+
+// Function definition at index 2
+fun boo_2(l0: vector<W>, l1: W)
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <W>
+    move_loc l1
+    call merge
+    // @5
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <W>
+    borrow_field W, x
+    read_ref
+    // @10
+    ld_u64 8
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    // @15
+    abort
+
+// Function definition at index 3
+fun bubble_sort(l0: vector<u64>)
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+    // @5
+l5: copy_loc l2
+    copy_loc l1
+    lt
+    br_false l0
+    ld_u64 0
+    // @10
+    st_loc l3
+l4: copy_loc l3
+    copy_loc l1
+    copy_loc l2
+    sub
+    // @15
+    ld_u64 1
+    sub
+    lt
+    br_false l1
+    borrow_loc l0
+    // @20
+    copy_loc l3
+    vec_borrow <u64>
+    read_ref
+    borrow_loc l0
+    copy_loc l3
+    // @25
+    ld_u64 1
+    add
+    vec_borrow <u64>
+    read_ref
+    gt
+    // @30
+    br_true l2
+    branch l3
+l2: borrow_loc l0
+    copy_loc l3
+    vec_borrow <u64>
+    // @35
+    read_ref
+    borrow_loc l0
+    copy_loc l3
+    ld_u64 1
+    add
+    // @40
+    vec_borrow <u64>
+    read_ref
+    mut_borrow_loc l0
+    copy_loc l3
+    vec_mut_borrow <u64>
+    // @45
+    write_ref
+    mut_borrow_loc l0
+    copy_loc l3
+    ld_u64 1
+    add
+    // @50
+    vec_mut_borrow <u64>
+    write_ref
+l3: move_loc l3
+    ld_u64 1
+    add
+    // @55
+    st_loc l3
+    branch l4
+l1: move_loc l2
+    ld_u64 1
+    add
+    // @60
+    st_loc l2
+    branch l5
+l0: borrow_loc l0
+    ld_u64 0
+    vec_borrow <u64>
+    // @65
+    read_ref
+    ld_u64 1
+    eq
+    br_false l6
+    ret
+    // @70
+l6: ld_u64 0
+    abort
+
+// Function definition at index 4
+fun call_sort()
+    ld_const<vector<u64>> [3, 1, 2]
+    call bubble_sort
+    ret
+
+// Function definition at index 5
+fun dispatch<T0: copy + store>(l0: address): T0 acquires Wrapper
+    move_loc l0
+    borrow_global Wrapper<T0>
+    call unwrap<T0>
+    ret
+
+// Function definition at index 6
+fun foo(l0: &Y<X<bool>>)
+    move_loc l0
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    ld_true
+    // @5
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 7
+fun foo_1(l0: address, l1: W) acquires S
+    move_loc l0
+    mut_borrow_global S
+    mut_borrow_field S, t
+    mut_borrow_field T, w
+    move_loc l1
+    // @5
+    call merge
+    ret
+
+// Function definition at index 8
+fun foo_2(l0: address, l1: W) acquires W
+    move_loc l0
+    mut_borrow_global W
+    move_loc l1
+    call merge
+    ret
+
+// Function definition at index 9
+fun greater(l0: &W, l1: W): bool
+    move_loc l0
+    borrow_field W, x
+    read_ref
+    borrow_loc l1
+    borrow_field W, x
+    // @5
+    read_ref
+    gt
+    ret
+
+// Function definition at index 10
+fun inc_vec_new(l0: &mut vector<u256>, l1: u64)
+    copy_loc l0
+    freeze_ref
+    copy_loc l1
+    vec_borrow <u256>
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    move_loc l0
+    move_loc l1
+    vec_mut_borrow <u256>
+    // @10
+    write_ref
+    ret
+
+// Function definition at index 11
+fun inc_vec_new_test()
+    local l0: vector<u256>
+    local l1: &mut vector<u256>
+    ld_const<vector<u256>> [0]
+    st_loc l0
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <u256>
+    // @5
+    read_ref
+    ld_u256 1
+    add
+    mut_borrow_loc l0
+    ld_u64 0
+    // @10
+    vec_mut_borrow <u256>
+    write_ref
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <u256>
+    // @15
+    read_ref
+    ld_u256 1
+    eq
+    br_false l0
+    mut_borrow_loc l0
+    // @20
+    st_loc l1
+    copy_loc l1
+    ld_u64 0
+    call inc_vec_new
+    move_loc l1
+    // @25
+    freeze_ref
+    ld_u64 0
+    vec_borrow <u256>
+    read_ref
+    ld_u256 2
+    // @30
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    abort
+    // @35
+l0: ld_u64 0
+    abort
+
+// Function definition at index 12
+fun init_2(l0: &signer)
+    local l1: Y<X<bool>>
+    ld_true
+    pack X<bool>
+    pack Y<X<bool>>
+    st_loc l1
+    move_loc l0
+    // @5
+    move_loc l1
+    move_to Y<X<bool>>
+    ret
+
+// Function definition at index 13
+fun init_3(l0: &signer)
+    local l1: Y<vector<u8>>
+    ld_const<vector<u8>> [1, 2, 3]
+    pack Y<vector<u8>>
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    move_to Y<vector<u8>>
+    ret
+
+// Function definition at index 14
+fun init_receiver(l0: &signer)
+    local l1: W
+    local l2: S
+    ld_u64 2
+    pack W
+    st_loc l1
+    copy_loc l1
+    pack T
+    // @5
+    pack S
+    st_loc l2
+    copy_loc l0
+    move_loc l1
+    move_to W
+    // @10
+    move_loc l0
+    move_loc l2
+    move_to S
+    ret
+
+// Function definition at index 15
+fun init_receiver_2(l0: &signer)
+    local l1: Wrapper<u64>
+    ld_u64 2
+    pack Wrapper<u64>
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    move_to Wrapper<u64>
+    ret
+
+// Function definition at index 16
+fun merge(l0: &mut W, l1: W)
+    local l2: u64
+    local l3: &mut u64
+    borrow_loc l1
+    borrow_field W, x
+    read_ref
+    st_loc l2
+    move_loc l0
+    // @5
+    mut_borrow_field W, x
+    st_loc l3
+    copy_loc l3
+    read_ref
+    move_loc l2
+    // @10
+    add
+    move_loc l3
+    write_ref
+    ret
+
+// Function definition at index 17
+fun test_index_then_field_select_1()
+    local l0: vector<X<bool>>
+    local l1: bool
+    local l2: &mut bool
+    ld_true
+    pack X<bool>
+    vec_pack <X<bool>>, 1
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    ld_u64 0
+    vec_mut_borrow <X<bool>>
+    mut_borrow_field X<bool>, value
+    st_loc l2
+    ld_false
+    // @10
+    move_loc l2
+    write_ref
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <X<bool>>
+    // @15
+    borrow_field X<bool>, value
+    read_ref
+    ld_false
+    eq
+    br_false l0
+    // @20
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 18
+fun test_index_then_field_select_2()
+    local l0: vector<X<bool>>
+    local l1: &mut vector<X<bool>>
+    local l2: bool
+    local l3: &mut bool
+    ld_true
+    pack X<bool>
+    vec_pack <X<bool>>, 1
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    ld_u64 0
+    vec_mut_borrow <X<bool>>
+    mut_borrow_field X<bool>, value
+    // @10
+    st_loc l3
+    ld_false
+    move_loc l3
+    write_ref
+    move_loc l1
+    // @15
+    freeze_ref
+    ld_u64 0
+    vec_borrow <X<bool>>
+    borrow_field X<bool>, value
+    read_ref
+    // @20
+    ld_false
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    // @25
+    abort
+
+// Function definition at index 19
+fun test_index_then_field_select_3()
+    local l0: vector<X<bool>>
+    ld_true
+    pack X<bool>
+    vec_pack <X<bool>>, 1
+    st_loc l0
+    borrow_loc l0
+    // @5
+    ld_u64 0
+    vec_borrow <X<bool>>
+    borrow_field X<bool>, value
+    read_ref
+    ld_true
+    // @10
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 20
+fun test_receiver() acquires S, W
+    local l0: W
+    ld_u64 3
+    pack W
+    st_loc l0
+    ld_const<address> 1
+    borrow_global W
+    // @5
+    copy_loc l0
+    call greater
+    br_true l0
+    ld_const<address> 1
+    copy_loc l0
+    // @10
+    call foo_1
+    ld_const<address> 1
+    borrow_global S
+    borrow_field S, t
+    borrow_field T, w
+    // @15
+    borrow_field W, x
+    read_ref
+    ld_u64 5
+    eq
+    br_false l1
+    // @20
+    ld_const<address> 1
+    borrow_global S
+    read_ref
+    vec_pack <S>, 1
+    copy_loc l0
+    // @25
+    call boo_1
+    ld_u64 8
+    eq
+    br_false l2
+    ld_const<address> 1
+    // @30
+    copy_loc l0
+    call foo_2
+    ld_const<address> 1
+    borrow_global W
+    borrow_field W, x
+    // @35
+    read_ref
+    ld_u64 5
+    eq
+    br_false l3
+    ld_const<address> 1
+    // @40
+    borrow_global W
+    read_ref
+    vec_pack <W>, 1
+    move_loc l0
+    call boo_2
+    // @45
+    ret
+l3: ld_u64 0
+    abort
+l2: ld_u64 1
+    abort
+    // @50
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 21
+fun test_receiver_2() acquires Wrapper
+    local l0: vector<Wrapper<u64>>
+    ld_const<address> 1
+    call dispatch<u64>
+    ld_u64 2
+    eq
+    br_false l0
+    // @5
+    ld_u64 2
+    pack Wrapper<u64>
+    vec_pack <Wrapper<u64>>, 1
+    st_loc l0
+    borrow_loc l0
+    // @10
+    ld_u64 0
+    vec_borrow <Wrapper<u64>>
+    call unwrap<u64>
+    ld_u64 2
+    eq
+    // @15
+    br_false l1
+    ret
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    // @20
+    abort
+
+// Function definition at index 22
+fun test_resource_1() acquires R
+    ld_const<address> 1
+    borrow_global R
+    borrow_field R, value
+    read_ref
+    ld_true
+    // @5
+    eq
+    br_false l0
+    ld_false
+    pack R
+    ld_const<address> 1
+    // @10
+    mut_borrow_global R
+    write_ref
+    ld_const<address> 1
+    borrow_global R
+    borrow_field R, value
+    // @15
+    read_ref
+    ld_false
+    eq
+    br_false l1
+    ret
+    // @20
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 23
+fun test_resource_2() acquires R
+    local l0: &mut R
+    ld_const<address> 1
+    mut_borrow_global R
+    st_loc l0
+    ld_false
+    move_loc l0
+    // @5
+    mut_borrow_field R, value
+    write_ref
+    ld_const<address> 1
+    borrow_global R
+    borrow_field R, value
+    // @10
+    read_ref
+    ld_false
+    eq
+    br_false l0
+    ret
+    // @15
+l0: ld_u64 1
+    abort
+
+// Function definition at index 24
+fun test_resource_3() acquires Y
+    ld_const<address> 1
+    borrow_global Y<X<bool>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    // @5
+    ld_true
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    // @10
+    abort
+
+// Function definition at index 25
+fun test_resource_4() acquires Y
+    local l0: &mut Y<X<bool>>
+    ld_const<address> 1
+    mut_borrow_global Y<X<bool>>
+    st_loc l0
+    ld_false
+    move_loc l0
+    // @5
+    mut_borrow_field Y<X<bool>>, field
+    mut_borrow_field X<bool>, value
+    write_ref
+    nop
+    ld_const<address> 1
+    // @10
+    borrow_global Y<X<bool>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    ld_false
+    // @15
+    eq
+    br_false l0
+    ret
+l0: ld_u64 1
+    abort
+
+// Function definition at index 26
+fun test_resource_5() acquires Y
+    local l0: Y<X<bool>>
+    ld_false
+    ld_const<address> 1
+    mut_borrow_global Y<X<bool>>
+    mut_borrow_field Y<X<bool>>, field
+    mut_borrow_field X<bool>, value
+    // @5
+    write_ref
+    nop
+    ld_const<address> 1
+    borrow_global Y<X<bool>>
+    read_ref
+    // @10
+    st_loc l0
+    borrow_loc l0
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    // @15
+    ld_false
+    eq
+    br_false l0
+    ret
+l0: ld_u64 1
+    // @20
+    abort
+
+// Function definition at index 27
+fun test_resource_freeze() acquires Y
+    ld_const<address> 1
+    mut_borrow_global Y<X<bool>>
+    freeze_ref
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    // @5
+    read_ref
+    ld_true
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 0
+    abort
+
+// Function definition at index 28
+fun test_resource_with_vector() acquires Y
+    ld_const<address> 2
+    borrow_global Y<vector<u8>>
+    borrow_field Y<vector<u8>>, field
+    ld_u64 0
+    vec_borrow <u8>
+    // @5
+    read_ref
+    ld_u8 1
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 0
+    abort
+
+// Function definition at index 29
+fun test_two_dimension()
+    local l0: vector<vector<u64>>
+    local l1: vector<vector<u64>>
+    local l2: &vector<vector<u64>>
+    local l3: u64
+    local l4: u64
+    ld_const<vector<vector<u64>>> [[1, 2], [3, 4]]
+    st_loc l0
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <vector<u64>>
+    // @5
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ld_u64 1
+    eq
+    // @10
+    br_false l0
+    ld_const<vector<u64>> [2, 3, 4]
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <vector<u64>>
+    // @15
+    write_ref
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <vector<u64>>
+    ld_u64 0
+    // @20
+    vec_borrow <u64>
+    read_ref
+    ld_u64 2
+    eq
+    br_false l1
+    // @25
+    ld_u64 4
+    mut_borrow_loc l0
+    ld_u64 0
+    vec_mut_borrow <vector<u64>>
+    ld_u64 1
+    // @30
+    vec_mut_borrow <u64>
+    write_ref
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <vector<u64>>
+    // @35
+    ld_u64 1
+    vec_borrow <u64>
+    read_ref
+    ld_u64 4
+    eq
+    // @40
+    br_false l2
+    ld_u64 0
+    ld_const<vector<vector<u64>>> [[1, 2], [3, 4]]
+    st_loc l1
+    borrow_loc l1
+    // @45
+    st_loc l2
+    ld_u64 1
+    add
+    st_loc l3
+    copy_loc l3
+    // @50
+    st_loc l4
+    move_loc l2
+    move_loc l4
+    vec_borrow <vector<u64>>
+    move_loc l3
+    // @55
+    ld_u64 1
+    sub
+    vec_borrow <u64>
+    read_ref
+    ld_u64 3
+    // @60
+    eq
+    br_false l3
+    ret
+l3: ld_u64 0
+    abort
+    // @65
+l2: ld_u64 0
+    abort
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    // @70
+    abort
+
+// Function definition at index 30
+fun test_vector()
+    local l0: X<u64>
+    local l1: vector<X<u64>>
+    ld_u64 2
+    pack X<u64>
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    // @5
+    vec_pack <X<u64>>, 2
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <X<u64>>
+    // @10
+    borrow_field X<u64>, value
+    read_ref
+    ld_u64 2
+    eq
+    br_false l0
+    // @15
+    ld_u64 3
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <X<u64>>
+    mut_borrow_field X<u64>, value
+    // @20
+    write_ref
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <X<u64>>
+    borrow_field X<u64>, value
+    // @25
+    read_ref
+    ld_u64 3
+    eq
+    br_false l1
+    ret
+    // @30
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 31
+fun test_vector_borrow()
+    local l0: X<bool>
+    local l1: Y<X<bool>>
+    local l2: Y<X<bool>>
+    local l3: vector<Y<X<bool>>>
+    ld_true
+    pack X<bool>
+    ld_false
+    pack X<bool>
+    st_loc l0
+    // @5
+    pack Y<X<bool>>
+    move_loc l0
+    pack Y<X<bool>>
+    vec_pack <Y<X<bool>>>, 2
+    st_loc l3
+    // @10
+    borrow_loc l3
+    ld_u64 0
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    // @15
+    read_ref
+    ld_true
+    eq
+    br_false l0
+    borrow_loc l3
+    // @20
+    ld_u64 1
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    // @25
+    ld_false
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    // @30
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 32
+fun test_vector_borrow_freeze()
+    local l0: X<bool>
+    local l1: Y<X<bool>>
+    local l2: Y<X<bool>>
+    local l3: vector<Y<X<bool>>>
+    ld_true
+    pack X<bool>
+    ld_false
+    pack X<bool>
+    st_loc l0
+    // @5
+    pack Y<X<bool>>
+    move_loc l0
+    pack Y<X<bool>>
+    vec_pack <Y<X<bool>>>, 2
+    st_loc l3
+    // @10
+    mut_borrow_loc l3
+    ld_u64 0
+    vec_mut_borrow <Y<X<bool>>>
+    freeze_ref
+    borrow_field Y<X<bool>>, field
+    // @15
+    borrow_field X<bool>, value
+    read_ref
+    ld_true
+    eq
+    br_false l0
+    // @20
+    borrow_loc l3
+    ld_u64 0
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    // @25
+    read_ref
+    ld_true
+    eq
+    br_false l1
+    borrow_loc l3
+    // @30
+    ld_u64 1
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    // @35
+    ld_false
+    eq
+    br_false l2
+    mut_borrow_loc l3
+    ld_u64 0
+    // @40
+    vec_mut_borrow <Y<X<bool>>>
+    freeze_ref
+    call foo
+    ret
+l2: ld_u64 0
+    // @45
+    abort
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 33
+fun test_vector_borrow_mut()
+    local l0: X<bool>
+    local l1: Y<X<bool>>
+    local l2: Y<X<bool>>
+    local l3: vector<Y<X<bool>>>
+    ld_true
+    pack X<bool>
+    ld_false
+    pack X<bool>
+    st_loc l0
+    // @5
+    pack Y<X<bool>>
+    move_loc l0
+    pack Y<X<bool>>
+    vec_pack <Y<X<bool>>>, 2
+    st_loc l3
+    // @10
+    borrow_loc l3
+    ld_u64 0
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    // @15
+    read_ref
+    ld_true
+    eq
+    br_false l0
+    borrow_loc l3
+    // @20
+    ld_u64 1
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    // @25
+    ld_false
+    eq
+    br_false l1
+    ld_false
+    mut_borrow_loc l3
+    // @30
+    ld_u64 0
+    vec_mut_borrow <Y<X<bool>>>
+    mut_borrow_field Y<X<bool>>, field
+    mut_borrow_field X<bool>, value
+    write_ref
+    // @35
+    ld_true
+    mut_borrow_loc l3
+    ld_u64 1
+    vec_mut_borrow <Y<X<bool>>>
+    mut_borrow_field Y<X<bool>>, field
+    // @40
+    mut_borrow_field X<bool>, value
+    write_ref
+    borrow_loc l3
+    ld_u64 0
+    vec_borrow <Y<X<bool>>>
+    // @45
+    borrow_field Y<X<bool>>, field
+    borrow_field X<bool>, value
+    read_ref
+    ld_false
+    eq
+    // @50
+    br_false l2
+    borrow_loc l3
+    ld_u64 1
+    vec_borrow <Y<X<bool>>>
+    borrow_field Y<X<bool>>, field
+    // @55
+    borrow_field X<bool>, value
+    read_ref
+    ld_true
+    eq
+    br_false l3
+    // @60
+    ret
+l3: ld_u64 0
+    abort
+l2: ld_u64 0
+    abort
+    // @65
+l1: ld_u64 0
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 34
+fun test_vector_const()
+    local l0: vector<u8>
+    ld_const<vector<u8>> [1, 2, 3]
+    st_loc l0
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <u8>
+    // @5
+    read_ref
+    ld_u8 1
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 0
+    abort
+
+// Function definition at index 35
+fun test_vector_in_struct()
+    local l0: M
+    local l1: vector<M>
+    ld_const<vector<u8>> [1, 2, 3]
+    pack M
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    // @5
+    vec_pack <M>, 2
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <M>
+    // @10
+    borrow_field M, vec
+    read_ref
+    ld_const<vector<u8>> [1, 2, 3]
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 36
+fun test_vector_in_struct_2()
+    local l0: M
+    local l1: vector<M>
+    ld_const<vector<u8>> [1, 2, 3]
+    pack M
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    // @5
+    vec_pack <M>, 2
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <M>
+    // @10
+    borrow_field M, vec
+    ld_u64 0
+    vec_borrow <u8>
+    read_ref
+    ld_u8 1
+    // @15
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 37
+fun test_vector_in_struct_3()
+    local l0: M
+    local l1: vector<M>
+    ld_const<vector<u8>> [1, 2, 3]
+    pack M
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    // @5
+    vec_pack <M>, 2
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <M>
+    // @10
+    borrow_field M, vec
+    ld_u64 2
+    vec_borrow <u8>
+    read_ref
+    ld_u8 3
+    // @15
+    eq
+    br_false l0
+    borrow_loc l1
+    ld_u64 1
+    vec_borrow <M>
+    // @20
+    borrow_field M, vec
+    ld_u64 0
+    vec_borrow <u8>
+    read_ref
+    ld_u8 1
+    // @25
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    abort
+    // @30
+l0: ld_u64 0
+    abort
+
+// Function definition at index 38
+fun unwrap<T0: copy>(l0: &Wrapper<T0>): T0
+    move_loc l0
+    borrow_field Wrapper<T0>, inner
+    read_ref
+    ret
+
+
+
+//# run --verbose --signers 0x1 -- 0x42::test::init
+
+//# run --verbose -- 0x42::test::test_resource_1
+
+//# run --verbose -- 0x42::test::test_resource_2
+
+//# run --verbose -- 0x42::test::test_vector
+
+//# run --verbose -- 0x42::test::test_two_dimension
+
+//# run --verbose -- 0x42::test::test_vector_borrow
+
+//# run --verbose -- 0x42::test::test_vector_borrow_freeze
+
+//# run --verbose -- 0x42::test::test_vector_borrow_mut
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_2
+
+//# run --verbose -- 0x42::test::test_resource_3
+
+//# run --verbose -- 0x42::test::test_resource_freeze
+
+//# run --verbose -- 0x42::test::test_resource_4
+
+//# run --verbose -- 0x42::test::test_resource_5
+
+//# run --verbose -- 0x42::test::test_vector_const
+
+//# run --verbose -- 0x42::test::test_vector_in_struct
+
+//# run --verbose -- 0x42::test::test_vector_in_struct_2
+
+//# run --verbose -- 0x42::test::test_vector_in_struct_3
+
+//# run --verbose --signers 0x2 -- 0x42::test::init_3
+
+//# run --verbose -- 0x42::test::test_resource_with_vector
+
+//# run --verbose -- 0x42::test::call_sort
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_1
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_2
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_3
+
+//# run --verbose -- 0x42::test::inc_vec_new_test
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_receiver
+
+//# run --verbose -- 0x42::test::test_receiver
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_receiver_2
+
+//# run --verbose -- 0x42::test::test_receiver_2

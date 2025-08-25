@@ -1,0 +1,10 @@
+processed 7 tasks
+task 0 lines 3-7:  publish [// Bytecode version v8]
+task 1 lines 11-31:  publish [// Bytecode version v8]
+task 2 lines 35-56:  publish [// Bytecode version v8]
+task 3 lines 60-77:  publish [// Bytecode version v8]
+task 4 lines 81-81:  run 0x42::poc::run --signers 0x42
+task 5 lines 83-83:  run 0x42::bar::dummy_bar_exists --signers 0x42
+return values: true
+task 6 lines 85-85:  run 0x42::foo::foo_exists --signers 0x42 --type-args 0x42::dummy::Dummy
+return values: false

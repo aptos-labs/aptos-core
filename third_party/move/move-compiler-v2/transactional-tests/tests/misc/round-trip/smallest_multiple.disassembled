@@ -1,0 +1,84 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/smallest_multiple.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::smallest_multiple
+// Function definition at index 0
+#[persistent] public fun smallest_multiple(l0: u64): u64
+    local l1: u64
+    local l2: u64
+    ld_u64 1
+    st_loc l1
+    ld_u64 1
+    st_loc l2
+l1: copy_loc l2
+    // @5
+    copy_loc l0
+    le
+    br_false l0
+    move_loc l1
+    copy_loc l2
+    // @10
+    call lcm
+    st_loc l1
+    move_loc l2
+    ld_u64 1
+    add
+    // @15
+    st_loc l2
+    branch l1
+l0: move_loc l1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun gcd(l0: u64, l1: u64): u64
+    copy_loc l1
+    ld_u64 0
+    eq
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: copy_loc l1
+    move_loc l0
+    move_loc l1
+    mod
+    // @10
+    call gcd
+    ret
+
+// Function definition at index 2
+#[persistent] public fun lcm(l0: u64, l1: u64): u64
+    copy_loc l0
+    copy_loc l1
+    mul
+    move_loc l0
+    move_loc l1
+    // @5
+    call gcd
+    div
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test_smallest_multiple()
+    ld_u64 10
+    call smallest_multiple
+    ld_u64 2520
+    eq
+    br_false l0
+    // @5
+    ld_u64 20
+    call smallest_multiple
+    ld_u64 232792560
+    eq
+    br_false l1
+    // @10
+    ret
+l1: ld_u64 1
+    abort
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0xc0ffee::smallest_multiple::test_smallest_multiple

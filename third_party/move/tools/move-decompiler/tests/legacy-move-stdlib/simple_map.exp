@@ -60,7 +60,8 @@ module 0x1::simple_map {
     public fun add<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: Key, value: Value) {
         let _t5 = freeze(self);
         let _t6 = &key;
-        if (!option::is_none<u64>(&find<Key,Value>(_t5, _t6))) {
+        let _t3 = find<Key,Value>(_t5, _t6);
+        if (!option::is_none<u64>(&_t3)) {
             let _t17 = error::invalid_argument(1);
             abort _t17
         };
@@ -76,7 +77,8 @@ module 0x1::simple_map {
         let _t5 = _t3;
         let _t6 = _t4;
         let _t7 = vector::length<Key>(&_t5);
-        if (!(_t7 == vector::length<Value>(&_t6))) abort 131074;
+        let _t20 = vector::length<Value>(&_t6);
+        if (!(_t7 == _t20)) abort 131074;
         while (_t7 > 0) {
             let _t8 = vector::pop_back<Key>(&mut _t5);
             let _t9 = vector::pop_back<Value>(&mut _t6);
@@ -118,7 +120,8 @@ module 0x1::simple_map {
         _t2
     }
     public fun contains_key<Key: store, Value: store>(self: &SimpleMap<Key, Value>, key: &Key): bool {
-        option::is_some<u64>(&find<Key,Value>(self, key))
+        let _t2 = find<Key,Value>(self, key);
+        option::is_some<u64>(&_t2)
     }
     public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
         new<Key,Value>()
@@ -156,8 +159,11 @@ module 0x1::simple_map {
         'l0: loop {
             loop {
                 if (!(_t5 < _t4)) break 'l0;
-                if (&vector::borrow<Element<Key, Value>>(freeze(_t3), _t5).key == &key) break;
-                _t5 = _t5 + 1
+                let _t21 = &vector::borrow<Element<Key, Value>>(freeze(_t3), _t5).key;
+                let _t22 = &key;
+                if (_t21 == _t22) break;
+                _t5 = _t5 + 1;
+                continue
             };
             let _t28 = Element<Key,Value>{key: key,value: value};
             vector::push_back<Element<Key, Value>>(_t3, _t28);

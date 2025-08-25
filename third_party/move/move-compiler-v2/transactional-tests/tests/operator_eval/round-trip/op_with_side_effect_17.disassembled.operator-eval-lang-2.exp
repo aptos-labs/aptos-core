@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-11:  publish [// Bytecode version v8]
+task 1 lines 15-15:  run 0xc0ffee::m::test
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+}

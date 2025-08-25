@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-133:  publish [// Bytecode version v8]
+task 1 lines 137-137:  run 0x42::m::t1
+task 2 lines 139-139:  run 0x42::m::t2

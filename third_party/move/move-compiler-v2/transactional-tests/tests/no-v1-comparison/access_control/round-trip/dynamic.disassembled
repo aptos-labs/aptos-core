@@ -1,0 +1,65 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/access_control/dynamic.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+use 0x1::signer
+struct R has drop + key
+  value: bool
+
+// Function definition at index 0
+fun init(l0: &signer)
+    move_loc l0
+    ld_true
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+fun fail1(l0: address): bool acquires R
+    ld_const<address> 2
+    borrow_global R
+    borrow_field R, value
+    read_ref
+    ret
+
+// Function definition at index 2
+fun fail2(l0: &signer): bool acquires R
+    ld_const<address> 2
+    move_loc l0
+    pop
+    borrow_global R
+    borrow_field R, value
+    // @5
+    read_ref
+    ret
+
+// Function definition at index 3
+fun ok1(l0: address): bool acquires R
+    move_loc l0
+    borrow_global R
+    borrow_field R, value
+    read_ref
+    ret
+
+// Function definition at index 4
+fun ok2(l0: &signer): bool acquires R
+    move_loc l0
+    call signer::address_of
+    borrow_global R
+    borrow_field R, value
+    read_ref
+    // @5
+    ret
+
+
+
+//# run --verbose --signers 0x1 -- 0x42::test::init
+
+//# run --verbose --args @0x1 -- 0x42::test::ok1
+
+//# run --verbose --signers 0x1 -- 0x42::test::ok2
+
+//# run --verbose --args @0x1 -- 0x42::test::fail1
+
+//# run --verbose --signers 0x1 -- 0x42::test::fail2

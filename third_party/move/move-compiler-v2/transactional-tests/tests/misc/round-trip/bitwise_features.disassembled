@@ -1,0 +1,205 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bitwise_features.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::TestFeatures
+struct Features has key
+  features: vector<u8>
+
+// Function definition at index 0
+fun contains(l0: &vector<u8>, l1: u64): bool
+    local l2: u64
+    local l3: u8
+    local l4: bool
+    copy_loc l1
+    ld_u64 8
+    div
+    st_loc l2
+    ld_u8 1
+    // @5
+    move_loc l1
+    ld_u64 8
+    mod
+    cast_u8
+    shl
+    // @10
+    st_loc l3
+    copy_loc l2
+    copy_loc l0
+    vec_len <u8>
+    lt
+    // @15
+    br_false l0
+    move_loc l0
+    move_loc l2
+    vec_borrow <u8>
+    read_ref
+    // @20
+    move_loc l3
+    bit_and
+    ld_u8 0
+    neq
+    st_loc l4
+    // @25
+l1: move_loc l4
+    ret
+l0: move_loc l0
+    pop
+    ld_false
+    // @30
+    st_loc l4
+    branch l1
+
+// Function definition at index 1
+#[persistent] public fun enable_feature_flags(l0: vector<u64>) acquires Features
+    local l1: &mut vector<u8>
+    local l2: u64
+    local l3: u64
+    ld_const<address> 48879
+    mut_borrow_global Features
+    mut_borrow_field Features, features
+    st_loc l1
+    ld_u64 0
+    // @5
+    st_loc l2
+    borrow_loc l0
+    vec_len <u64>
+    st_loc l3
+l1: copy_loc l2
+    // @10
+    copy_loc l3
+    lt
+    br_false l0
+    copy_loc l1
+    borrow_loc l0
+    // @15
+    copy_loc l2
+    vec_borrow <u64>
+    read_ref
+    ld_true
+    call set
+    // @20
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    branch l1
+    // @25
+l0: move_loc l1
+    pop
+    ret
+
+// Function definition at index 2
+fun set(l0: &mut vector<u8>, l1: u64, l2: bool)
+    local l3: u64
+    local l4: u64
+    local l5: u8
+    local l6: &mut u8
+    copy_loc l0
+    freeze_ref
+    vec_len <u8>
+    st_loc l3
+    copy_loc l0
+    // @5
+    read_ref
+    pop
+    copy_loc l1
+    ld_u64 8
+    div
+    // @10
+    st_loc l4
+    ld_u8 1
+    move_loc l1
+    ld_u64 8
+    mod
+    // @15
+    cast_u8
+    shl
+    st_loc l5
+l1: copy_loc l0
+    freeze_ref
+    // @20
+    vec_len <u8>
+    copy_loc l4
+    le
+    br_false l0
+    copy_loc l0
+    // @25
+    ld_u8 0
+    vec_push_back <u8>
+    move_loc l3
+    ld_u64 1
+    add
+    // @30
+    st_loc l3
+    branch l1
+l0: move_loc l0
+    move_loc l4
+    vec_mut_borrow <u8>
+    // @35
+    st_loc l6
+    move_loc l2
+    br_false l2
+    copy_loc l6
+    read_ref
+    // @40
+    move_loc l5
+    bit_or
+    move_loc l6
+    write_ref
+l3: ret
+    // @45
+l2: copy_loc l6
+    read_ref
+    ld_u8 255
+    move_loc l5
+    xor
+    // @50
+    bit_and
+    move_loc l6
+    write_ref
+    branch l3
+
+// Function definition at index 3
+#[persistent] public fun test(l0: signer) acquires Features
+    borrow_loc l0
+    ld_const<vector<u8>> [1, 2, 3]
+    pack Features
+    move_to Features
+    ld_const<vector<u64>> [2]
+    // @5
+    call enable_feature_flags
+    ld_const<address> 48879
+    borrow_global Features
+    borrow_field Features, features
+    ld_u64 2
+    // @10
+    call contains
+    br_false l0
+    ld_const<address> 48879
+    borrow_global Features
+    borrow_field Features, features
+    // @15
+    ld_u64 1
+    call contains
+    br_true l1
+    ld_const<address> 48879
+    borrow_global Features
+    // @20
+    borrow_field Features, features
+    ld_u64 3
+    call contains
+    br_true l2
+    ret
+    // @25
+l2: ld_u64 2
+    abort
+l1: ld_u64 1
+    abort
+l0: ld_u64 0
+    // @30
+    abort
+
+
+
+//# run 0x42::TestFeatures::test --signers 0xbeef

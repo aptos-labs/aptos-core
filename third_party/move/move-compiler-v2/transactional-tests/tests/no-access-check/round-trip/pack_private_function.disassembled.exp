@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-11:  publish [// Bytecode version v8]
+task 1 lines 15-23:  publish [// Bytecode version v8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::n'. Got VMError: {
+    major_status: LOOKUP_FAILED,
+    sub_status: None,
+    location: 0xc0ffee::n,
+    indices: [(FunctionHandle, 1)],
+    offsets: [],
+}

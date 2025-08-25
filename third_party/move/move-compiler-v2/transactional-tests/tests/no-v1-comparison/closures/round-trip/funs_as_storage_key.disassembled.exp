@@ -1,0 +1,37 @@
+processed 13 tasks
+task 0 lines 3-36:  publish [// Bytecode version v8]
+task 1 lines 40-123:  publish [// Bytecode version v8]
+task 2 lines 127-158:  publish [// Bytecode version v8]
+task 3 lines 162-195:  publish [// Bytecode version v8]
+task 4 lines 199-312:  publish [// Bytecode version v8]
+Error: error: expected `>`, found `copy`
+    ┌─ test:207:37
+    │
+207 │     local l2: &vector<|&mut u8| has copy + drop + store>
+    │                                     ^^^^
+
+
+task 5 lines 316-316:  run 0x42::mod3::test_items --signers 0x42 --args true
+return values: true
+task 6 lines 318-318:  run 0x42::mod3::test_items --signers 0x42 --args false
+return values: true
+task 7 lines 320-320:  run 0x42::mod4::initialize --signers 0x42
+task 8 lines 322-322:  run 0x42::mod4::check_exists --signers 0x42
+task 9 lines 324-324:  run 0x42::mod5::initialize --signers 0x42
+task 10 lines 326-326:  run 0x42::mod5::check_exists --signers 0x42
+task 11 lines 328-328:  run 0x42::mod6::initialize --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 12 lines 330-330:  run 0x42::mod6::compute --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

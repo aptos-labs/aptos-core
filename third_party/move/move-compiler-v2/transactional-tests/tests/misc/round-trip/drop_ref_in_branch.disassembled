@@ -1,0 +1,51 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/drop_ref_in_branch.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct R has key
+  v: u64
+
+// Function definition at index 0
+fun do() acquires R
+    local l0: &mut R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    st_loc l0
+    copy_loc l0
+    call get_vmut
+    // @5
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 0
+    gt
+    // @10
+    br_false l0
+    move_loc l0
+    pop
+    ld_u64 0
+    move_loc l1
+    // @15
+    write_ref
+l1: ret
+l0: move_loc l1
+    pop
+    move_loc l0
+    // @20
+    call some
+    branch l1
+
+// Function definition at index 1
+fun get_vmut(l0: &mut R): &mut u64
+    move_loc l0
+    mut_borrow_field R, v
+    ret
+
+// Function definition at index 2
+fun some(l0: &mut R)
+    move_loc l0
+    pop
+    ret
+

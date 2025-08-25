@@ -1,0 +1,49 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/capturing_generic.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+struct S has copy + drop
+  f: u64
+
+// Function definition at index 0
+fun eq_with<T0: drop>(l0: T0): |T0|bool
+    move_loc l0
+    pack_closure __lambda__1__eq_with<T0>, 1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_S(l0: u64): bool
+    move_loc l0
+    pack S
+    ld_u64 2
+    pack S
+    call eq_with<S>
+    // @5
+    call_closure <|S|bool>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test_u64(l0: u64): bool
+    local l1: |u64|bool
+    ld_u64 2
+    call eq_with<u64>
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    call_closure <|u64|bool>
+    ret
+
+// Function definition at index 3
+fun __lambda__1__eq_with<T0: drop>(l0: T0, l1: T0): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+
+
+//# run 0x42::test::test_u64 --args 3
+
+//# run 0x42::test::test_S --args 2

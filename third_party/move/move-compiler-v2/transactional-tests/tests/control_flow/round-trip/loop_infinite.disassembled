@@ -1,0 +1,9 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/loop_infinite.move`
+
+//# run --gas-budget 700
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+l0: branch l0
+

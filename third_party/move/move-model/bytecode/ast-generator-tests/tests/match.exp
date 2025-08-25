@@ -9,27 +9,27 @@ fun id(self: &Entity): u64 {
     }
 
 --- Stackless Bytecode
-fun m::id($t0|self: &0x815::m::Entity): u64 {
+fun m::id($t0|self: &Entity): u64 {
      var $t1|return: u64
-     var $t2: &0x815::m::Entity
+     var $t2: &Entity
      var $t3: bool
-     var $t4: &0x815::m::Entity
+     var $t4: &Entity
      var $t5: &u64
      var $t6: u64
      var $t7: u64
-     var $t8: &0x815::m::Entity
+     var $t8: &Entity
      var $t9: bool
-     var $t10: &0x815::m::Entity
+     var $t10: &Entity
      var $t11: &u64
      var $t12: u64
-     var $t13: &0x815::m::Entity
+     var $t13: &Entity
      var $t14: u64
   0: $t2 := copy($t0)
-  1: $t3 := test_variant 0x815::m::Entity::Person($t2)
+  1: $t3 := test_variant Entity::Person($t2)
   2: if ($t3) goto 3 else goto 12
   3: label L1
   4: $t4 := move($t0)
-  5: $t5 := borrow_variant_field<0x815::m::Entity::Person>.id($t4)
+  5: $t5 := borrow_variant_field<Entity::Person>.id($t4)
   6: $t6 := read_ref($t5)
   7: $t1 := $t6
   8: goto 9
@@ -38,11 +38,11 @@ fun m::id($t0|self: &0x815::m::Entity): u64 {
  11: return $t7
  12: label L0
  13: $t8 := copy($t0)
- 14: $t9 := test_variant 0x815::m::Entity::Institution($t8)
+ 14: $t9 := test_variant Entity::Institution($t8)
  15: if ($t9) goto 16 else goto 22
  16: label L3
  17: $t10 := move($t0)
- 18: $t11 := borrow_variant_field<0x815::m::Entity::Institution>.id($t10)
+ 18: $t11 := borrow_variant_field<Entity::Institution>.id($t10)
  19: $t12 := read_ref($t11)
  20: $t1 := $t12
  21: goto 9
@@ -137,39 +137,39 @@ fun id2(self: Entity): u64 {
     }
 
 --- Stackless Bytecode
-fun m::id2($t0|self: 0x815::m::Entity): u64 {
-     var $t1|$t2: &0x815::m::Entity
+fun m::id2($t0|self: Entity): u64 {
+     var $t1|$t2: &Entity
      var $t2|id: u64
-     var $t3: &0x815::m::Entity
-     var $t4: &0x815::m::Entity
+     var $t3: &Entity
+     var $t4: &Entity
      var $t5: bool
-     var $t6: &0x815::m::Entity
+     var $t6: &Entity
      var $t7: bool
-     var $t8: 0x815::m::Entity
+     var $t8: Entity
      var $t9: u64
      var $t10: u64
      var $t11: u64
      var $t12: u64
-     var $t13: &0x815::m::Entity
+     var $t13: &Entity
      var $t14: &u64
      var $t15: u64
      var $t16: u64
      var $t17: bool
-     var $t18: &0x815::m::Entity
-     var $t19: 0x815::m::Entity
+     var $t18: &Entity
+     var $t19: Entity
      var $t20: u64
   0: $t3 := borrow_local($t0)
   1: $t1 := $t3
   2: $t4 := copy($t1)
-  3: $t5 := test_variant 0x815::m::Entity::Person($t4)
+  3: $t5 := test_variant Entity::Person($t4)
   4: if ($t5) goto 22 else goto 5
   5: label L2
   6: $t6 := move($t1)
-  7: $t7 := test_variant 0x815::m::Entity::Institution($t6)
+  7: $t7 := test_variant Entity::Institution($t6)
   8: if ($t7) goto 9 else goto 18
   9: label L4
  10: $t8 := move($t0)
- 11: ($t9, $t10) := unpack_variant 0x815::m::Entity::Institution($t8)
+ 11: ($t9, $t10) := unpack_variant Entity::Institution($t8)
  12: drop($t10)
  13: $t2 := $t9
  14: goto 15
@@ -182,7 +182,7 @@ fun m::id2($t0|self: 0x815::m::Entity): u64 {
  21: goto 15
  22: label L0
  23: $t13 := copy($t1)
- 24: $t14 := borrow_variant_field<0x815::m::Entity::Person>.id($t13)
+ 24: $t14 := borrow_variant_field<Entity::Person>.id($t13)
  25: $t15 := read_ref($t14)
  26: $t16 := 0
  27: $t17 := >($t15, $t16)
@@ -191,7 +191,7 @@ fun m::id2($t0|self: 0x815::m::Entity): u64 {
  30: $t18 := move($t1)
  31: drop($t18)
  32: $t19 := move($t0)
- 33: $t20 := unpack_variant 0x815::m::Entity::Person($t19)
+ 33: $t20 := unpack_variant Entity::Person($t19)
  34: $t2 := $t20
  35: goto 15
 }

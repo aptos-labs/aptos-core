@@ -1,0 +1,33 @@
+processed 4 tasks
+task 0 lines 3-79:  publish [// Bytecode version v8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::test'. Got VMError: {
+    major_status: INVALID_CLOSURE_MASK,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 2)],
+}
+task 1 lines 83-83:  run 0x42::test::one_captured --args 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 85-85:  run 0x42::test::two_captured --args 3 2u8
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 87-87:  run 0x42::test::struct_captured --args 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

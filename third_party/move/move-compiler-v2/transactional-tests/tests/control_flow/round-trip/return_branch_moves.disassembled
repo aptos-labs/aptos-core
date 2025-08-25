@@ -1,0 +1,22 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/return_branch_moves.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+    branch l0
+    ret
+l0: move_loc l0
+    // @5
+    ld_u64 0
+    eq
+    br_false l1
+    ret
+l1: ld_u64 42
+    // @10
+    abort
+

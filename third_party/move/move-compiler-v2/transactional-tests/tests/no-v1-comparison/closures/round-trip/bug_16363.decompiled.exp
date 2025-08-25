@@ -1,0 +1,11 @@
+processed 2 tasks
+task 0 lines 3-13:  publish [module 0x42::foo {]
+task 1 lines 16-23:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: unable to infer instantiation of type `store` (consider providing type arguments or annotating the type)
+   ┌─ TEMPFILE1:20:26
+   │
+20 │         let _t1 = |arg0| foo::make_foo(arg0);
+   │                          ^^^^^^^^^^^^^^^^^^^
+
+

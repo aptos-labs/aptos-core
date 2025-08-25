@@ -1,0 +1,44 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/sequential_assign_struct.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct Foo has copy + drop
+  a: u64
+  b: u64
+  c: u64
+  d: u64
+  e: u64
+
+// Function definition at index 0
+#[persistent] public fun main()
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ld_u64 4
+    ld_u64 5
+    // @5
+    pack Foo
+    call sequential
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    // @10
+    ld_u64 4
+    ld_u64 5
+    pack Foo
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 1
+fun sequential(l0: Foo): Foo
+    move_loc l0
+    ret
+
+
+
+//# run 0xc0ffee::m::main

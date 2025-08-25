@@ -1,0 +1,23 @@
+processed 8 tasks
+task 0 lines 3-12:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+}
+task 1 lines 16-25:  run [// Bytecode version v8]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+}
+task 2 lines 29-38:  run [// Bytecode version v8]
+task 3 lines 42-73:  run [// Bytecode version v8]
+task 4 lines 77-110:  run [// Bytecode version v8]
+task 5 lines 114-133:  run [// Bytecode version v8]
+task 6 lines 137-199:  run [// Bytecode version v8]
+task 7 lines 203-337:  run [// Bytecode version v8]

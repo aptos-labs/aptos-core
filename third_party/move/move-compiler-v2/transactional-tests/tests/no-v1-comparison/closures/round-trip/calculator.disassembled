@@ -1,0 +1,262 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/calculator.move`
+
+//# publish
+// Bytecode version v8
+module 0x66::calculator
+use 0x1::signer
+enum Input
+  Number
+    _0: u64
+  Add
+  Sub
+
+enum State has copy + drop + key
+  Empty
+  Value
+    _0: u64
+  Continuation
+    _0: |u64|u64 has copy + drop + store
+
+// Function definition at index 0
+entry fun add(l0: &signer) acquires State
+    move_loc l0
+    pack_variant Input, Add
+    call process
+    ret
+
+// Function definition at index 1
+fun init_module(l0: &signer)
+    move_loc l0
+    pack_variant State, Empty
+    move_to State
+    ret
+
+// Function definition at index 2
+entry fun number(l0: &signer, l1: u64) acquires State
+    move_loc l0
+    move_loc l1
+    pack_variant Input, Number
+    call process
+    ret
+
+// Function definition at index 3
+fun process(l0: &signer, l1: Input) acquires State
+    local l2: State
+    local l3: &State
+    local l4: &Input
+    local l5: |u64|u64 has copy + drop + store
+    local l6: &signer
+    local l7: u64
+    local l8: State
+    copy_loc l0
+    call signer::address_of
+    move_from State
+    st_loc l2
+    borrow_loc l2
+    // @5
+    st_loc l3
+    borrow_loc l1
+    st_loc l4
+    copy_loc l3
+    test_variant State, Empty
+    // @10
+    br_true l0
+    branch l1
+l1: copy_loc l3
+    test_variant State, Value
+    br_true l2
+    // @15
+    branch l3
+l3: copy_loc l3
+    test_variant State, Value
+    br_true l4
+    branch l5
+    // @20
+l5: copy_loc l3
+    test_variant State, Value
+    br_true l6
+    branch l7
+l7: move_loc l3
+    // @25
+    test_variant State, Continuation
+    br_true l8
+    move_loc l0
+    pop
+    move_loc l4
+    // @30
+    pop
+l10: ld_u64 1
+    abort
+l8: move_loc l4
+    test_variant Input, Number
+    // @35
+    br_true l9
+    move_loc l0
+    pop
+    branch l10
+l9: move_loc l2
+    // @40
+    unpack_variant State, Continuation
+    st_loc l5
+    move_loc l1
+    unpack_variant Input, Number
+    move_loc l0
+    // @45
+    st_loc l6
+    move_loc l5
+    call_closure <|u64|u64 has copy + drop + store>
+    pack_variant State, Value
+    st_loc l8
+    // @50
+    move_loc l6
+    move_loc l8
+    move_to State
+l12: ret
+l6: copy_loc l4
+    // @55
+    test_variant Input, Sub
+    br_true l11
+    branch l7
+l11: move_loc l3
+    pop
+    // @60
+    move_loc l4
+    pop
+    move_loc l2
+    unpack_variant State, Value
+    st_loc l7
+    // @65
+    move_loc l1
+    unpack_variant Input, Sub
+    move_loc l0
+    move_loc l7
+    pack_closure storable_sub, 1
+    // @70
+    pack_variant State, Continuation
+    move_to State
+    branch l12
+l4: copy_loc l4
+    test_variant Input, Add
+    // @75
+    br_true l13
+    branch l5
+l13: move_loc l3
+    pop
+    move_loc l4
+    // @80
+    pop
+    move_loc l2
+    unpack_variant State, Value
+    st_loc l7
+    move_loc l1
+    // @85
+    unpack_variant Input, Add
+    move_loc l0
+    move_loc l7
+    pack_closure storable_add, 1
+    pack_variant State, Continuation
+    // @90
+    move_to State
+    branch l12
+l2: copy_loc l4
+    test_variant Input, Number
+    br_true l14
+    // @95
+    branch l3
+l14: move_loc l3
+    pop
+    move_loc l4
+    pop
+    // @100
+    move_loc l2
+    unpack_variant State, Value
+    pop
+    move_loc l1
+    unpack_variant Input, Number
+    // @105
+    st_loc l7
+    move_loc l0
+    move_loc l7
+    pack_variant State, Value
+    move_to State
+    // @110
+    branch l12
+l0: copy_loc l4
+    test_variant Input, Number
+    br_true l15
+    branch l1
+    // @115
+l15: move_loc l3
+    pop
+    move_loc l4
+    pop
+    move_loc l2
+    // @120
+    unpack_variant State, Empty
+    move_loc l1
+    unpack_variant Input, Number
+    pack_variant State, Value
+    st_loc l8
+    // @125
+    move_loc l0
+    move_loc l8
+    move_to State
+    branch l12
+
+// Function definition at index 4
+#[persistent] fun storable_add(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 5
+#[persistent] fun storable_sub(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    sub
+    ret
+
+// Function definition at index 6
+entry fun sub(l0: &signer) acquires State
+    move_loc l0
+    pack_variant Input, Sub
+    call process
+    ret
+
+// Function definition at index 7
+fun view(l0: &signer): u64 acquires State
+    local l1: &State
+    move_loc l0
+    call signer::address_of
+    borrow_global State
+    st_loc l1
+    copy_loc l1
+    // @5
+    test_variant State, Value
+    br_false l0
+    move_loc l1
+    borrow_variant_field State, Value::_0
+    read_ref
+    // @10
+    ret
+l0: move_loc l1
+    pop
+    ld_u64 1
+    abort
+
+
+
+//# run 0x66::calculator::init_module --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 10
+
+//# run 0x66::calculator::add --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 20
+
+//# run 0x66::calculator::sub --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 5
+
+//# run 0x66::calculator::view --signers 0x66

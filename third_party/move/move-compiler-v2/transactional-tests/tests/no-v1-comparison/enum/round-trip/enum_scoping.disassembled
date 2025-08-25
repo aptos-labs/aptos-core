@@ -1,0 +1,96 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/enum_scoping.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct Box has drop
+  x: u64
+
+enum Inner has drop
+  Inner1
+    x: u64
+  Inner2
+    x: u64
+    y: u64
+
+enum Outer has drop
+  None
+  One
+    i: Inner
+  Two
+    i: Inner
+    b: Box
+
+// Function definition at index 0
+#[persistent] public fun check_scoping(l0: &Inner): u64
+    copy_loc l0
+    test_variant Inner, Inner1
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+l1: ld_u64 3
+    ret
+l0: move_loc l0
+    pop
+    branch l1
+
+// Function definition at index 1
+fun t1_check_scoping(): u64
+    local l0: Outer
+    local l1: &Outer
+    local l2: u64
+    local l3: Inner
+    ld_u64 43
+    pack_variant Inner, Inner1
+    pack_variant Outer, One
+    st_loc l0
+    borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    test_variant Outer, None
+    br_false l0
+    move_loc l1
+    // @10
+    pop
+    move_loc l0
+    unpack_variant Outer, None
+    ld_u64 0
+    st_loc l2
+    // @15
+l2: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Outer, One
+    br_false l1
+    // @20
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, One
+    st_loc l3
+    // @25
+    borrow_loc l3
+    call check_scoping
+    st_loc l2
+    branch l2
+l1: move_loc l1
+    // @30
+    test_variant Outer, Two
+    br_false l3
+    move_loc l0
+    unpack_variant Outer, Two
+    pop
+    // @35
+    pop
+    ld_u64 3
+    st_loc l2
+    branch l2
+l3: ld_u64 14566554180833181697
+    // @40
+    abort
+
+
+
+//# run 0x42::m::t1_check_scoping

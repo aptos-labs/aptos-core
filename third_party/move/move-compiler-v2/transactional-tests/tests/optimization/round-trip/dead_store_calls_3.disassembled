@@ -1,0 +1,20 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/dead_store_calls_3.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun one(): u64
+    ld_u64 1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test(l0: u64): u64
+    call one
+    pop
+    move_loc l0
+    ret
+
+
+
+//# run 0xc0ffee::m::test --args 42

@@ -1,0 +1,39 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/func_ref_param.move`
+
+//# publish
+// Bytecode version v8
+module 0x77::m
+struct Func has drop
+  _0: |&u64|bool has drop
+
+// Function definition at index 0
+fun test()
+    local l0: Func
+    local l1: u64
+    pack_closure __lambda__1__test, 0
+    pack Func
+    st_loc l0
+    ld_u64 1
+    st_loc l1
+    // @5
+    borrow_loc l1
+    move_loc l0
+    unpack Func
+    call_closure <|&u64|bool has drop>
+    br_false l0
+    // @10
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 1
+fun __lambda__1__test(l0: &u64): bool
+    move_loc l0
+    read_ref
+    ld_u64 0
+    gt
+    ret
+
+
+
+//# run 0x77::m::test

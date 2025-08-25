@@ -1,0 +1,45 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/scripts.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun foo()
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0xc0ffee::m
+// Function definition at index 0
+entry public fun main()
+    pack_closure m::foo, 0
+    call_closure <||>
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0xc0ffee::m
+// Function definition at index 0
+entry public fun main()
+    pack_closure m::foo, 0
+    call_closure <||>
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0xc0ffee::m
+// Function definition at index 0
+entry public fun main()
+    pack_closure m::foo, 0
+    call_closure <||>
+    ret
+

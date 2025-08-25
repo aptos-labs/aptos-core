@@ -1,0 +1,43 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/persistent.move`
+
+//# publish
+// Bytecode version v8
+module 0x66::test
+use 0x1::signer
+struct Work has store + key
+  _0: ||u64 has store
+
+// Function definition at index 0
+entry fun exec(l0: &signer) acquires Work
+    move_loc l0
+    call signer::address_of
+    move_from Work
+    unpack Work
+    call_closure <||u64 has store>
+    // @5
+    ld_u64 3
+    eq
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    // @10
+    abort
+
+// Function definition at index 1
+#[persistent] fun should_be_storable(): u64
+    ld_u64 3
+    ret
+
+// Function definition at index 2
+entry fun store(l0: &signer)
+    move_loc l0
+    pack_closure should_be_storable, 0
+    pack Work
+    move_to Work
+    ret
+
+
+
+//# run 0x66::test::store --signers 0x66
+
+//# run 0x66::test::exec --signers 0x66

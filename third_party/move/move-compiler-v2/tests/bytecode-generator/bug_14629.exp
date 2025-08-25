@@ -48,32 +48,32 @@ module 0x8675309::M {
 
 [variant baseline]
 fun M::t0() {
-     var $t0: 0x8675309::M::R<0x8675309::M::X<u64>>
-     var $t1: 0x8675309::M::X<u64>
+     var $t0: R<X<u64>>
+     var $t1: X<u64>
      var $t2: u64
-     var $t3: 0x8675309::M::X<u64>
+     var $t3: X<u64>
   0: $t2 := 0
-  1: $t1 := pack 0x8675309::M::X<u64>($t2)
-  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u64>>($t1)
-  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u64>>($t0)
+  1: $t1 := pack X<u64>($t2)
+  2: $t0 := pack R<X<u64>>($t1)
+  3: $t3 := unpack R<X<u64>>($t0)
   4: return ()
 }
 
 
 [variant baseline]
 fun M::t0_u128() {
-     var $t0: 0x8675309::M::R<0x8675309::M::X<u128>>
-     var $t1: 0x8675309::M::X<u128>
+     var $t0: R<X<u128>>
+     var $t1: X<u128>
      var $t2: u128
      var $t3: u128
      var $t4: u128
-     var $t5: 0x8675309::M::X<u128>
+     var $t5: X<u128>
   0: $t3 := 18446744073709551615
   1: $t4 := 1
   2: $t2 := +($t3, $t4)
-  3: $t1 := pack 0x8675309::M::X<u128>($t2)
-  4: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u128>>($t1)
-  5: $t5 := unpack 0x8675309::M::R<0x8675309::M::X<u128>>($t0)
+  3: $t1 := pack X<u128>($t2)
+  4: $t0 := pack R<X<u128>>($t1)
+  5: $t5 := unpack R<X<u128>>($t0)
   6: return ()
 }
 
@@ -109,28 +109,28 @@ module 0x8675309::M {
 
 [variant baseline]
 fun M::t0() {
-     var $t0: 0x8675309::M::R<0x8675309::M::X<u64>>
-     var $t1: 0x8675309::M::X<u64>
+     var $t0: R<X<u64>>
+     var $t1: X<u64>
      var $t2: u64
-     var $t3: 0x8675309::M::X<u64>
+     var $t3: X<u64>
   0: $t2 := 0
-  1: $t1 := pack 0x8675309::M::X<u64>($t2)
-  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u64>>($t1)
-  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u64>>($t0)
+  1: $t1 := pack X<u64>($t2)
+  2: $t0 := pack R<X<u64>>($t1)
+  3: $t3 := unpack R<X<u64>>($t0)
   4: return ()
 }
 
 
 [variant baseline]
 fun M::t0_u128() {
-     var $t0: 0x8675309::M::R<0x8675309::M::X<u128>>
-     var $t1: 0x8675309::M::X<u128>
+     var $t0: R<X<u128>>
+     var $t1: X<u128>
      var $t2: u128
-     var $t3: 0x8675309::M::X<u128>
+     var $t3: X<u128>
   0: $t2 := 18446744073709551616
-  1: $t1 := pack 0x8675309::M::X<u128>($t2)
-  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u128>>($t1)
-  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u128>>($t0)
+  1: $t1 := pack X<u128>($t2)
+  2: $t0 := pack R<X<u128>>($t1)
+  3: $t3 := unpack R<X<u128>>($t0)
   4: return ()
 }
 

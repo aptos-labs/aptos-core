@@ -1,0 +1,9 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/loop_nested_breaks.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+

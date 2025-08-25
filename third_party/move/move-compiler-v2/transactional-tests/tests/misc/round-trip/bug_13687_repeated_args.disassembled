@@ -1,0 +1,26 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_13687_repeated_args.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::Module1
+struct Struct3 has copy + drop
+  var32: u16
+  var33: u32
+  var34: u8
+  var35: u32
+  var36: u32
+
+// Function definition at index 0
+#[persistent] public fun function6(): Struct3
+    ld_u16 21859
+    ld_u32 1399722001
+    ld_u8 154
+    ld_u32 1399722001
+    ld_u32 1399722001
+    // @5
+    pack Struct3
+    ret
+
+
+
+//# run 0xCAFE::Module1::function6

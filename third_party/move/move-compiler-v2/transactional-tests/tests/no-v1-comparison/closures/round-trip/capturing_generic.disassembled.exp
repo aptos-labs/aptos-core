@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-43:  publish [// Bytecode version v8]
+task 1 lines 47-47:  run 0x42::test::test_u64 --args 3
+return values: false
+task 2 lines 49-49:  run 0x42::test::test_S --args 2
+return values: true

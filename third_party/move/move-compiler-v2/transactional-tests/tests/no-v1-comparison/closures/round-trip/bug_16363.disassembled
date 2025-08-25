@@ -1,0 +1,38 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/bug_16363.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::foo
+use 0x1::vector
+struct Foo<T0: store> has drop + key
+  f: |T0|vector<T0> has drop + store
+
+// Function definition at index 0
+#[persistent] public fun make_foo<T0: store>(l0: &signer)
+    local l1: |T0|vector<T0> has drop + store
+    pack_closure vector::singleton<T0>, 0
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    pack Foo<T0>
+    // @5
+    move_to Foo<T0>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+use 0x42::foo
+// Function definition at index 0
+fun run<T0: store>(l0: &signer)
+    local l1: |&signer|
+    pack_closure foo::make_foo<T0>, 0
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    call_closure <|&signer|>
+    // @5
+    ret
+

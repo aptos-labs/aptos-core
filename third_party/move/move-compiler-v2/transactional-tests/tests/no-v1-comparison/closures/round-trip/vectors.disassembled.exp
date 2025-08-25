@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-65:  publish [// Bytecode version v8]
+task 1 lines 69-69:  run 0x42::test::eval --args 2
+return values: 12

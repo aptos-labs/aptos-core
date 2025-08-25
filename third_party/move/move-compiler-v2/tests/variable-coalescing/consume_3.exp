@@ -7,7 +7,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
   0: return ()
 }
 
@@ -23,8 +23,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)
@@ -40,7 +40,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
   0: return ()
 }
 
@@ -56,8 +56,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)
@@ -73,7 +73,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
   0: return ()
 }
 
@@ -89,8 +89,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)
@@ -108,7 +108,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
      # live vars: $t0
      # events: b:$t0, e:$t0
   0: return ()
@@ -133,8 +133,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
      # live vars: $t0
      # events: b:$t0, b:$t1
   0: $t1 := copy($t0)
@@ -157,7 +157,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
   0: return ()
 }
 
@@ -173,8 +173,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)
@@ -190,7 +190,7 @@ fun m::consume($t0: u32) {
 
 
 [variant baseline]
-fun m::consume_($t0: 0xc0ffee::m::W) {
+fun m::consume_($t0: W) {
   0: return ()
 }
 
@@ -206,8 +206,8 @@ public fun m::test($t0: u32) {
 
 
 [variant baseline]
-public fun m::test_($t0: 0xc0ffee::m::W) {
-     var $t1: 0xc0ffee::m::W
+public fun m::test_($t0: W) {
+     var $t1: W
   0: $t1 := copy($t0)
   1: m::consume_($t1)
   2: m::consume_($t0)

@@ -232,8 +232,8 @@ fun freeze_mut_ref::t0() {
 
 
 [variant baseline]
-fun freeze_mut_ref::t1($t0: &mut 0x42::freeze_mut_ref::S): &0x42::freeze_mut_ref::S {
-     var $t1: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t1($t0: &mut S): &S {
+     var $t1: &S
   0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
 }
@@ -272,15 +272,15 @@ public fun freeze_mut_ref::t4() {
 
 
 [variant baseline]
-public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
+public fun freeze_mut_ref::t5($t0: &mut G) {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut 0x42::freeze_mut_ref::G
+     var $t3: &mut G
      var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: &mut u64
-     var $t8: &mut 0x42::freeze_mut_ref::G
+     var $t8: &mut G
      var $t9: u64
      var $t10: u64
      var $t11: u64
@@ -297,13 +297,13 @@ public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
   3: $t4 := +($t5, $t6)
   4: $t1 := infer($t4)
   5: $t3 := infer($t0)
-  6: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
+  6: $t2 := borrow_field<G>.f($t3)
   7: $t10 := infer($t1)
   8: $t11 := 1
   9: $t9 := +($t10, $t11)
  10: $t1 := infer($t9)
  11: $t8 := infer($t0)
- 12: $t7 := borrow_field<0x42::freeze_mut_ref::G>.f($t8)
+ 12: $t7 := borrow_field<G>.f($t8)
  13: $t13 := 2
  14: $t12 := borrow_local($t13)
  15: $t15 := 2
@@ -318,10 +318,10 @@ public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
 
 
 [variant baseline]
-fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
-     var $t4: &0x42::freeze_mut_ref::S
-     var $t5: &mut 0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t6($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
+     var $t4: &S
+     var $t5: &mut S
   0: if ($t0) goto 1 else goto 6
   1: label L0
   2: $t5 := copy($t1)
@@ -336,9 +336,9 @@ fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 [variant baseline]
-fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
-     var $t4: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t7($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
+     var $t4: &S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t4 := freeze_ref(implicit)($t1)
@@ -352,8 +352,8 @@ fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 [variant baseline]
-fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t8($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t3 := freeze_ref(implicit)($t1)
@@ -571,8 +571,8 @@ fun freeze_mut_ref::t0() {
 
 
 [variant baseline]
-fun freeze_mut_ref::t1($t0: &mut 0x42::freeze_mut_ref::S): &0x42::freeze_mut_ref::S {
-     var $t1: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t1($t0: &mut S): &S {
+     var $t1: &S
   0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
 }
@@ -611,15 +611,15 @@ public fun freeze_mut_ref::t4() {
 
 
 [variant baseline]
-public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
+public fun freeze_mut_ref::t5($t0: &mut G) {
      var $t1: u64
      var $t2: &mut u64
-     var $t3: &mut 0x42::freeze_mut_ref::G
+     var $t3: &mut G
      var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: &mut u64
-     var $t8: &mut 0x42::freeze_mut_ref::G
+     var $t8: &mut G
      var $t9: u64
      var $t10: u64
      var $t11: u64
@@ -636,13 +636,13 @@ public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
   3: $t4 := +($t5, $t6)
   4: $t1 := infer($t4)
   5: $t3 := infer($t0)
-  6: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
+  6: $t2 := borrow_field<G>.f($t3)
   7: $t10 := infer($t1)
   8: $t11 := 1
   9: $t9 := +($t10, $t11)
  10: $t1 := infer($t9)
  11: $t8 := infer($t0)
- 12: $t7 := borrow_field<0x42::freeze_mut_ref::G>.f($t8)
+ 12: $t7 := borrow_field<G>.f($t8)
  13: $t13 := 2
  14: $t12 := borrow_local($t13)
  15: $t15 := 2
@@ -657,10 +657,10 @@ public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
 
 
 [variant baseline]
-fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
-     var $t4: &0x42::freeze_mut_ref::S
-     var $t5: &mut 0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t6($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
+     var $t4: &S
+     var $t5: &mut S
   0: if ($t0) goto 1 else goto 6
   1: label L0
   2: $t5 := copy($t1)
@@ -675,9 +675,9 @@ fun freeze_mut_ref::t6($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 [variant baseline]
-fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
-     var $t4: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t7($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
+     var $t4: &S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t4 := freeze_ref(implicit)($t1)
@@ -691,8 +691,8 @@ fun freeze_mut_ref::t7($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 [variant baseline]
-fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42::freeze_mut_ref::S) {
-     var $t3: &0x42::freeze_mut_ref::S
+fun freeze_mut_ref::t8($t0: bool, $t1: &mut S, $t2: &S) {
+     var $t3: &S
   0: if ($t0) goto 1 else goto 4
   1: label L0
   2: $t3 := freeze_ref(implicit)($t1)

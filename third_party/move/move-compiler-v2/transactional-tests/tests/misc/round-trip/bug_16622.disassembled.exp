@@ -1,0 +1,10 @@
+processed 9 tasks
+task 0 lines 3-53:  publish [// Bytecode version v8]
+task 1 lines 57-57:  run 0xCAFE::m0::f0
+task 2 lines 59-184:  publish [// Bytecode version v8]
+task 3 lines 188-188:  run 0xCAFE::m1::f0
+task 4 lines 190-190:  run 0xCAFE::m1::f1
+task 5 lines 192-274:  publish [// Bytecode version v8]
+task 6 lines 278-278:  run 0xCAFE::m2::f0
+task 7 lines 280-336:  publish [// Bytecode version v8]
+task 8 lines 340-340:  run 0xCAFE::m3::test

@@ -1,0 +1,133 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/fibonacci.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::fibonacci
+// Function definition at index 0
+#[persistent] public fun fib(l0: u64): u64
+    copy_loc l0
+    ld_u64 0
+    eq
+    br_false l0
+    ld_u64 0
+    // @5
+    ret
+l0: copy_loc l0
+    ld_u64 1
+    eq
+    br_false l1
+    // @10
+    ld_u64 1
+    ret
+l1: copy_loc l0
+    ld_u64 1
+    sub
+    // @15
+    call fib
+    move_loc l0
+    ld_u64 2
+    sub
+    call fib
+    // @20
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_fib()
+    ld_u64 0
+    call fib
+    ld_u64 0
+    eq
+    br_false l0
+    // @5
+    ld_u64 1
+    call fib
+    ld_u64 1
+    eq
+    br_false l1
+    // @10
+    ld_u64 2
+    call fib
+    ld_u64 1
+    eq
+    br_false l2
+    // @15
+    ld_u64 3
+    call fib
+    ld_u64 2
+    eq
+    br_false l3
+    // @20
+    ld_u64 4
+    call fib
+    ld_u64 3
+    eq
+    br_false l4
+    // @25
+    ld_u64 5
+    call fib
+    ld_u64 5
+    eq
+    br_false l5
+    // @30
+    ld_u64 6
+    call fib
+    ld_u64 8
+    eq
+    br_false l6
+    // @35
+    ld_u64 7
+    call fib
+    ld_u64 13
+    eq
+    br_false l7
+    // @40
+    ld_u64 8
+    call fib
+    ld_u64 21
+    eq
+    br_false l8
+    // @45
+    ld_u64 9
+    call fib
+    ld_u64 34
+    eq
+    br_false l9
+    // @50
+    ld_u64 10
+    call fib
+    ld_u64 55
+    eq
+    br_false l10
+    // @55
+    ret
+l10: ld_u64 10
+    abort
+l9: ld_u64 9
+    abort
+    // @60
+l8: ld_u64 8
+    abort
+l7: ld_u64 7
+    abort
+l6: ld_u64 6
+    // @65
+    abort
+l5: ld_u64 5
+    abort
+l4: ld_u64 4
+    abort
+    // @70
+l3: ld_u64 3
+    abort
+l2: ld_u64 2
+    abort
+l1: ld_u64 1
+    // @75
+    abort
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0x42::fibonacci::test_fib

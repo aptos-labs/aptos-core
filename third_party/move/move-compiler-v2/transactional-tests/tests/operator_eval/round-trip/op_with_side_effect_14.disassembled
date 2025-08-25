@@ -1,0 +1,124 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/op_with_side_effect_14.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct S has drop
+  x: u64
+  y: u64
+  z: u64
+
+// Function definition at index 0
+fun inc_x(l0: &mut S, l1: u64)
+    copy_loc l0
+    borrow_field S, x
+    read_ref
+    move_loc l1
+    add
+    // @5
+    move_loc l0
+    mut_borrow_field S, x
+    write_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test1(): u64
+    local l0: S
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    pack S
+    st_loc l0
+    // @5
+    mut_borrow_loc l0
+    ld_u64 6
+    call inc_x
+    borrow_loc l0
+    borrow_field S, x
+    // @10
+    read_ref
+    mut_borrow_loc l0
+    ld_u64 47
+    call inc_x
+    borrow_loc l0
+    // @15
+    borrow_field S, x
+    read_ref
+    add
+    mut_borrow_loc l0
+    ld_u64 117
+    // @20
+    call inc_x
+    borrow_loc l0
+    borrow_field S, x
+    read_ref
+    add
+    // @25
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test2(): u64
+    local l0: S
+    local l1: &mut S
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    pack S
+    st_loc l0
+    // @5
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    borrow_field S, x
+    read_ref
+    // @10
+    ld_u64 6
+    add
+    move_loc l1
+    mut_borrow_field S, x
+    write_ref
+    // @15
+    borrow_loc l0
+    borrow_field S, x
+    read_ref
+    mut_borrow_loc l0
+    st_loc l1
+    // @20
+    copy_loc l1
+    borrow_field S, x
+    read_ref
+    ld_u64 47
+    add
+    // @25
+    move_loc l1
+    mut_borrow_field S, x
+    write_ref
+    borrow_loc l0
+    borrow_field S, x
+    // @30
+    read_ref
+    add
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    // @35
+    borrow_field S, x
+    read_ref
+    ld_u64 117
+    add
+    move_loc l1
+    // @40
+    mut_borrow_field S, x
+    write_ref
+    borrow_loc l0
+    borrow_field S, x
+    read_ref
+    // @45
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

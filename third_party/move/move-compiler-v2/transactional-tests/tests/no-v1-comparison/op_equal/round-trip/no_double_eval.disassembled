@@ -1,0 +1,97 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/op_equal/no_double_eval.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m1
+// Function definition at index 0
+fun foo(l0: &mut u64): &mut u64
+    local l1: &mut u64
+    copy_loc l0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 1
+    // @5
+    add
+    move_loc l1
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 1
+    st_loc l0
+    mut_borrow_loc l0
+    call foo
+    st_loc l1
+    // @5
+    copy_loc l1
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    // @10
+    write_ref
+    move_loc l0
+    ld_u64 3
+    eq
+    br_false l0
+    // @15
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m2
+// Function definition at index 0
+fun foo(l0: &mut u64)
+    copy_loc l0
+    read_ref
+    ld_u64 2
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 1
+    st_loc l0
+    mut_borrow_loc l0
+    call foo
+    mut_borrow_loc l0
+    // @5
+    call foo
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @10
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    move_loc l0
+    // @15
+    ld_u64 6
+    eq
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    // @20
+    abort
+
+
+
+//# run --verbose -- 0xc0ffee::m1::test
+
+//# run --verbose -- 0xc0ffee::m2::test

@@ -1,0 +1,24 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/dead_assignment_2.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun foo(): u64
+    ld_u64 2
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test()
+    call foo
+    ld_u64 2
+    eq
+    br_false l0
+    ret
+    // @5
+l0: ld_u64 45
+    abort
+
+
+
+//# run 0xc0ffee::m::test

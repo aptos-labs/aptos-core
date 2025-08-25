@@ -1,0 +1,268 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/folding_numeric.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @5
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @10
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @15
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @20
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @25
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @30
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @35
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @40
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @45
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @50
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @55
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @60
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @65
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @70
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @75
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @80
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @85
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @90
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @95
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @100
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @105
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @110
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @115
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @120
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @125
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @130
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @135
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @140
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @145
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @150
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @155
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @160
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @165
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @170
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @175
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @180
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @185
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @190
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @195
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @200
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @205
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @210
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    // @215
+    ld_u64 42
+    abort
+

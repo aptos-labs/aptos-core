@@ -19,7 +19,7 @@ public fun Module0::test_2() {
      var $t0: u64
      var $t1: u64
   0: spec {
-  update select Module0::Ghost$y.v(global<0xcafe::Module0::Ghost$y>(0x0)) = $t0;
+  update select Module0::Ghost$y.v(global<Ghost$y>(0x0)) = $t0;
 }
 
   1: $t1 := 2
@@ -71,7 +71,7 @@ public fun Module0::test_2() {
      var $t1: u64
      # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
   0: spec {
-  update select Module0::Ghost$y.v(global<0xcafe::Module0::Ghost$y>(0x0)) = $t0;
+  update select Module0::Ghost$y.v(global<Ghost$y>(0x0)) = $t0;
 }
 
      # before: { no: $t0, $t1 }, after: { no: $t0 }

@@ -1,0 +1,498 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/closures_in_enums.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+enum Function has copy + drop
+  NoParam
+    _0: ||u64 has copy + drop
+  OneParam
+    _0: |u64|u64 has copy + drop
+  TwoParam
+    _0: |u64, u64|u64 has copy + drop
+
+// Function definition at index 0
+fun get_func(l0: &Function): &||u64 has copy
+    copy_loc l0
+    test_variant Function, NoParam
+    br_false l0
+    move_loc l0
+    borrow_variant_field Function, NoParam::_0
+    // @5
+    ret
+l0: move_loc l0
+    pop
+    ld_u64 42
+    abort
+
+// Function definition at index 1
+fun get_func_recursive(l0: Function): ||u64
+    local l1: &Function
+    local l2: ||u64
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Function, NoParam
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, NoParam
+    st_loc l2
+    // @10
+l2: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Function, OneParam
+    br_false l1
+    // @15
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, OneParam
+    pack_closure __lambda__1__get_func_recursive, 1
+    // @20
+    pack_variant Function, NoParam
+    call get_func_recursive
+    st_loc l2
+    branch l2
+l1: move_loc l1
+    // @25
+    test_variant Function, TwoParam
+    br_false l3
+    move_loc l0
+    unpack_variant Function, TwoParam
+    pack_closure __lambda__2__get_func_recursive, 1
+    // @30
+    pack_variant Function, OneParam
+    call get_func_recursive
+    st_loc l2
+    branch l2
+l3: ld_u64 14566554180833181697
+    // @35
+    abort
+
+// Function definition at index 2
+fun runner_1(l0: Function): u64
+    local l1: &Function
+    local l2: u64
+    local l3: |u64|u64 has copy + drop
+    local l4: |u64, u64|u64 has copy + drop
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Function, NoParam
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, NoParam
+    call_closure <||u64 has copy + drop>
+    // @10
+    st_loc l2
+l2: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Function, OneParam
+    // @15
+    br_false l1
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, OneParam
+    // @20
+    st_loc l3
+    ld_u64 0
+    move_loc l3
+    call_closure <|u64|u64 has copy + drop>
+    st_loc l2
+    // @25
+    branch l2
+l1: move_loc l1
+    test_variant Function, TwoParam
+    br_false l3
+    move_loc l0
+    // @30
+    unpack_variant Function, TwoParam
+    st_loc l4
+    ld_u64 0
+    ld_u64 0
+    move_loc l4
+    // @35
+    call_closure <|u64, u64|u64 has copy + drop>
+    st_loc l2
+    branch l2
+l3: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 3
+fun runner_2(l0: Function): u64
+    local l1: &Function
+    local l2: ||u64 has copy + drop
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Function, NoParam
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, NoParam
+    st_loc l2
+    // @10
+l2: move_loc l2
+    call_closure <||u64 has copy + drop>
+    ret
+l0: copy_loc l1
+    test_variant Function, OneParam
+    // @15
+    br_false l1
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Function, OneParam
+    // @20
+    pack_closure __lambda__1__runner_2, 1
+    st_loc l2
+    branch l2
+l1: move_loc l1
+    test_variant Function, TwoParam
+    // @25
+    br_false l3
+    move_loc l0
+    unpack_variant Function, TwoParam
+    pack_closure __lambda__2__runner_2, 1
+    st_loc l2
+    // @30
+    branch l2
+l3: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 4
+fun runner_3(l0: &Function): u64
+    move_loc l0
+    call get_func
+    read_ref
+    call_closure <||u64 has copy>
+    ret
+
+// Function definition at index 5
+fun runner_4(l0: Function): u64
+    move_loc l0
+    call get_func_recursive
+    call_closure <||u64>
+    ret
+
+// Function definition at index 6
+#[persistent] public fun test_1()
+    pack_closure __lambda__1__test_1, 0
+    pack_variant Function, NoParam
+    call runner_1
+    ld_u64 0
+    eq
+    // @5
+    br_false l0
+    pack_closure __lambda__2__test_1, 0
+    pack_variant Function, OneParam
+    call runner_1
+    ld_u64 0
+    // @10
+    eq
+    br_false l1
+    pack_closure __lambda__3__test_1, 0
+    pack_variant Function, TwoParam
+    call runner_1
+    // @15
+    ld_u64 0
+    eq
+    br_false l2
+    ld_u64 1
+    pack_closure __lambda__4__test_1, 1
+    // @20
+    pack_variant Function, NoParam
+    call runner_1
+    ld_u64 1
+    eq
+    br_false l3
+    // @25
+    ld_u64 1
+    pack_closure __lambda__5__test_1, 1
+    pack_variant Function, OneParam
+    call runner_1
+    ld_u64 1
+    // @30
+    eq
+    br_false l4
+    ret
+l4: ld_u64 14566554180833181696
+    abort
+    // @35
+l3: ld_u64 14566554180833181696
+    abort
+l2: ld_u64 14566554180833181696
+    abort
+l1: ld_u64 14566554180833181696
+    // @40
+    abort
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 7
+#[persistent] public fun test_2()
+    pack_closure __lambda__1__test_2, 0
+    pack_variant Function, NoParam
+    call runner_2
+    ld_u64 0
+    eq
+    // @5
+    br_false l0
+    pack_closure __lambda__2__test_2, 0
+    pack_variant Function, OneParam
+    call runner_2
+    ld_u64 0
+    // @10
+    eq
+    br_false l1
+    pack_closure __lambda__3__test_2, 0
+    pack_variant Function, TwoParam
+    call runner_2
+    // @15
+    ld_u64 0
+    eq
+    br_false l2
+    ld_u64 1
+    pack_closure __lambda__4__test_2, 1
+    // @20
+    pack_variant Function, NoParam
+    call runner_2
+    ld_u64 1
+    eq
+    br_false l3
+    // @25
+    ld_u64 1
+    pack_closure __lambda__5__test_2, 1
+    pack_variant Function, OneParam
+    call runner_2
+    ld_u64 1
+    // @30
+    eq
+    br_false l4
+    ret
+l4: ld_u64 14566554180833181696
+    abort
+    // @35
+l3: ld_u64 14566554180833181696
+    abort
+l2: ld_u64 14566554180833181696
+    abort
+l1: ld_u64 14566554180833181696
+    // @40
+    abort
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 8
+fun test_3()
+    local l0: Function
+    pack_closure __lambda__1__test_3, 0
+    pack_variant Function, NoParam
+    st_loc l0
+    borrow_loc l0
+    call runner_3
+    // @5
+    ld_u64 0
+    eq
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    // @10
+    abort
+
+// Function definition at index 9
+#[persistent] public fun test_4()
+    pack_closure __lambda__1__test_4, 0
+    pack_variant Function, NoParam
+    call runner_4
+    ld_u64 0
+    eq
+    // @5
+    br_false l0
+    pack_closure __lambda__2__test_4, 0
+    pack_variant Function, OneParam
+    call runner_4
+    ld_u64 0
+    // @10
+    eq
+    br_false l1
+    pack_closure __lambda__3__test_4, 0
+    pack_variant Function, TwoParam
+    call runner_4
+    // @15
+    ld_u64 0
+    eq
+    br_false l2
+    ld_u64 1
+    pack_closure __lambda__4__test_4, 1
+    // @20
+    pack_variant Function, NoParam
+    call runner_4
+    ld_u64 1
+    eq
+    br_false l3
+    // @25
+    ld_u64 1
+    pack_closure __lambda__5__test_4, 1
+    pack_variant Function, OneParam
+    call runner_4
+    ld_u64 1
+    // @30
+    eq
+    br_false l4
+    ret
+l4: ld_u64 14566554180833181696
+    abort
+    // @35
+l3: ld_u64 14566554180833181696
+    abort
+l2: ld_u64 14566554180833181696
+    abort
+l1: ld_u64 14566554180833181696
+    // @40
+    abort
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 10
+fun __lambda__1__get_func_recursive(l0: |u64|u64 has copy + drop): u64
+    ld_u64 0
+    move_loc l0
+    call_closure <|u64|u64 has copy + drop>
+    ret
+
+// Function definition at index 11
+fun __lambda__2__get_func_recursive(l0: |u64, u64|u64 has copy + drop, l1: u64): u64
+    ld_u64 0
+    move_loc l1
+    move_loc l0
+    call_closure <|u64, u64|u64 has copy + drop>
+    ret
+
+// Function definition at index 12
+fun __lambda__1__runner_2(l0: |u64|u64 has copy + drop): u64
+    ld_u64 0
+    move_loc l0
+    call_closure <|u64|u64 has copy + drop>
+    ret
+
+// Function definition at index 13
+fun __lambda__2__runner_2(l0: |u64, u64|u64 has copy + drop): u64
+    ld_u64 0
+    ld_u64 0
+    move_loc l0
+    call_closure <|u64, u64|u64 has copy + drop>
+    ret
+
+// Function definition at index 14
+fun __lambda__1__test_1(): u64
+    ld_u64 0
+    ret
+
+// Function definition at index 15
+fun __lambda__2__test_1(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 16
+fun __lambda__3__test_1(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 17
+fun __lambda__4__test_1(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 18
+fun __lambda__5__test_1(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 19
+fun __lambda__1__test_2(): u64
+    ld_u64 0
+    ret
+
+// Function definition at index 20
+fun __lambda__2__test_2(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 21
+fun __lambda__3__test_2(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 22
+fun __lambda__4__test_2(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 23
+fun __lambda__5__test_2(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 24
+fun __lambda__1__test_3(): u64
+    ld_u64 0
+    ret
+
+// Function definition at index 25
+fun __lambda__1__test_4(): u64
+    ld_u64 0
+    ret
+
+// Function definition at index 26
+fun __lambda__2__test_4(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 27
+fun __lambda__3__test_4(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 28
+fun __lambda__4__test_4(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 29
+fun __lambda__5__test_4(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test_1
+
+//# run 0xc0ffee::m::test_2
+
+//# run 0xc0ffee::m::test_3
+
+//# run 0xc0ffee::m::test_4

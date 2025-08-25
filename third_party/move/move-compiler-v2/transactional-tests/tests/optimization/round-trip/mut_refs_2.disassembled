@@ -1,0 +1,49 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/mut_refs_2.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct S has copy + drop
+  a: u64
+  b: u64
+
+// Function definition at index 0
+#[persistent] public fun main()
+    ld_u64 1
+    ld_u64 2
+    pack S
+    call test
+    ld_u64 1
+    // @5
+    eq
+    br_false l0
+    ret
+l0: ld_u64 5
+    abort
+
+// Function definition at index 1
+fun test(l0: S): u64
+    local l1: S
+    local l2: S
+    local l3: u64
+    local l4: &mut u64
+    move_loc l0
+    st_loc l1
+    copy_loc l1
+    st_loc l2
+    mut_borrow_loc l1
+    // @5
+    mut_borrow_field S, a
+    st_loc l4
+    ld_u64 0
+    move_loc l4
+    write_ref
+    // @10
+    borrow_loc l2
+    borrow_field S, a
+    read_ref
+    ret
+
+
+
+//# run 0xc0ffee::m::main

@@ -1,0 +1,13 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/folding_complex.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 42
+    abort
+    ld_u64 41
+    abort
+

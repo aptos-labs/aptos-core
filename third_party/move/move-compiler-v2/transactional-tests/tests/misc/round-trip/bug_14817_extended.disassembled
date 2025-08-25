@@ -1,0 +1,511 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_14817_extended.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct P has copy + drop
+  q: Q
+
+struct Q has copy + drop
+  r: u64
+
+// Function definition at index 0
+#[persistent] public fun main()
+    local l0: P
+    local l1: P
+    local l2: P
+    local l3: P
+    local l4: P
+    local l5: P
+    local l6: P
+    local l7: P
+    local l8: P
+    local l9: P
+    local l10: P
+    call new_p
+    call test_01
+    st_loc l0
+    borrow_loc l0
+    borrow_field P, q
+    // @5
+    borrow_field Q, r
+    read_ref
+    ld_u64 1
+    eq
+    br_false l0
+    // @10
+    call new_p
+    call test_02
+    ld_u64 10
+    eq
+    br_false l1
+    // @15
+    call new_p
+    st_loc l1
+    mut_borrow_loc l1
+    call test_03
+    borrow_loc l1
+    // @20
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 12
+    eq
+    // @25
+    br_false l2
+    call new_p
+    call test_04
+    st_loc l2
+    borrow_loc l2
+    // @30
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 14
+    eq
+    // @35
+    br_false l3
+    call new_p
+    call test_05
+    st_loc l3
+    borrow_loc l3
+    // @40
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 15
+    eq
+    // @45
+    br_false l4
+    call new_p
+    call test_06
+    st_loc l4
+    borrow_loc l4
+    // @50
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 16
+    eq
+    // @55
+    br_false l5
+    call new_p
+    call test_07
+    st_loc l5
+    borrow_loc l5
+    // @60
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 0
+    eq
+    // @65
+    br_false l6
+    ld_u64 1
+    call test_08
+    ld_u64 1
+    eq
+    // @70
+    br_false l7
+    ld_u64 3
+    call test_09
+    br_false l8
+    call new_p
+    // @75
+    call test_10
+    st_loc l6
+    borrow_loc l6
+    borrow_field P, q
+    borrow_field Q, r
+    // @80
+    read_ref
+    ld_u64 20
+    eq
+    br_false l9
+    call new_p
+    // @85
+    call test_11
+    st_loc l7
+    borrow_loc l7
+    borrow_field P, q
+    borrow_field Q, r
+    // @90
+    read_ref
+    ld_u64 0
+    eq
+    br_false l10
+    call new_p
+    // @95
+    call test_12
+    st_loc l8
+    borrow_loc l8
+    borrow_field P, q
+    borrow_field Q, r
+    // @100
+    read_ref
+    ld_u64 5
+    eq
+    br_false l11
+    call new_p
+    // @105
+    call test_13
+    st_loc l9
+    borrow_loc l9
+    borrow_field P, q
+    borrow_field Q, r
+    // @110
+    read_ref
+    ld_u64 0
+    eq
+    br_false l12
+    call new_p
+    // @115
+    call test_14
+    st_loc l10
+    borrow_loc l10
+    borrow_field P, q
+    borrow_field Q, r
+    // @120
+    read_ref
+    ld_u64 24
+    eq
+    br_false l13
+    ret
+    // @125
+l13: ld_u64 0
+    abort
+l12: ld_u64 0
+    abort
+l11: ld_u64 0
+    // @130
+    abort
+l10: ld_u64 0
+    abort
+l9: ld_u64 0
+    abort
+    // @135
+l8: ld_u64 0
+    abort
+l7: ld_u64 0
+    abort
+l6: ld_u64 0
+    // @140
+    abort
+l5: ld_u64 0
+    abort
+l4: ld_u64 0
+    abort
+    // @145
+l3: ld_u64 0
+    abort
+l2: ld_u64 0
+    abort
+l1: ld_u64 0
+    // @150
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 1
+fun new_p(): P
+    ld_u64 0
+    pack Q
+    pack P
+    ret
+
+// Function definition at index 2
+fun test_01(l0: P): P
+    ld_u64 1
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 3
+fun test_02(l0: P): u64
+    borrow_loc l0
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    ld_u64 10
+    // @5
+    add
+    ret
+
+// Function definition at index 4
+fun test_03(l0: &mut P)
+    ld_u64 12
+    move_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    // @5
+    ret
+
+// Function definition at index 5
+fun test_04(l0: P): P
+    ld_u64 14
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 6
+fun test_05(l0: P): P
+    ld_u64 15
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 7
+fun test_06(l0: P): P
+    local l1: &mut Q
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    st_loc l1
+    ld_u64 16
+    move_loc l1
+    // @5
+    mut_borrow_field Q, r
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 8
+fun test_07(l0: P): P
+    local l1: u64
+    ld_u64 17
+    borrow_loc l0
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 9
+fun test_08(l0: u64): u64
+    local l1: u64
+    ld_u64 18
+    copy_loc l0
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 10
+fun test_09(l0: u64): bool
+    local l1: u64
+    mut_borrow_loc l0
+    freeze_ref
+    ld_u64 3
+    st_loc l1
+    mut_borrow_loc l1
+    // @5
+    freeze_ref
+    eq
+    ret
+
+// Function definition at index 11
+fun test_10(l0: P): P
+    ld_u64 20
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    write_ref
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 12
+fun test_11(l0: P): P
+    local l1: P
+    ld_u64 21
+    copy_loc l0
+    st_loc l1
+    mut_borrow_loc l1
+    mut_borrow_field P, q
+    // @5
+    mut_borrow_field Q, r
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 13
+fun test_12(l0: P): P
+    local l1: u64
+    ld_u64 22
+    ld_u64 5
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    mut_borrow_field Q, r
+    // @5
+    write_ref
+    borrow_loc l0
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    // @10
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 14
+fun test_13(l0: P): P
+    local l1: u64
+    ld_u64 23
+    borrow_loc l0
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 15
+fun test_14(l0: P): P
+    local l1: u64
+    ld_u64 12
+    ld_u64 24
+    pack Q
+    mut_borrow_loc l0
+    mut_borrow_field P, q
+    // @5
+    write_ref
+    borrow_loc l0
+    borrow_field P, q
+    borrow_field Q, r
+    read_ref
+    // @10
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    move_loc l0
+    ret
+
+
+
+//# run 0xc0ffee::m::main
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m1
+struct Struct0 has copy + drop
+  x: bool
+
+// Function definition at index 0
+fun f(l0: Struct0)
+    local l1: bool
+    ld_true
+    borrow_loc l0
+    borrow_field Struct0, x
+    read_ref
+    st_loc l1
+    // @5
+    mut_borrow_loc l1
+    write_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun main()
+    ld_true
+    pack Struct0
+    call f
+    ret
+
+
+
+//# run 0xCAFE::m1::main
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m2
+struct S has copy + drop
+  x: bool
+
+// Function definition at index 0
+fun f(l0: S)
+    local l1: bool
+    local l2: u8
+    ld_u8 123
+    borrow_loc l0
+    borrow_field S, x
+    read_ref
+    ld_true
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    ld_u8 0
+    st_loc l2
+    // @10
+    mut_borrow_loc l2
+    write_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun main()
+    ld_true
+    pack S
+    call f
+    ret
+
+
+
+//# run 0xCAFE::m2::main
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m3
+struct S has copy + drop
+  f: ||u8 has copy + drop
+
+// Function definition at index 0
+#[persistent] public fun main()
+    pack_closure __lambda__1__main, 0
+    pack S
+    call test
+    ret
+
+// Function definition at index 1
+fun test(l0: S)
+    local l1: u8
+    ld_u8 1
+    borrow_loc l0
+    borrow_field S, f
+    read_ref
+    call_closure <||u8 has copy + drop>
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    ret
+
+// Function definition at index 2
+fun __lambda__1__main(): u8
+    ld_u8 42
+    ret
+
+
+
+//# run 0xc0ffee::m3::main

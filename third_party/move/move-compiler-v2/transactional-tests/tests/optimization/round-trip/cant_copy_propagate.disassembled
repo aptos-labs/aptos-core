@@ -1,0 +1,37 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/cant_copy_propagate.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun consume(l0: u64)
+    ret
+
+// Function definition at index 1
+#[persistent] public fun main()
+    ld_u64 42
+    ld_true
+    call test
+    ld_u64 42
+    ld_false
+    // @5
+    call test
+    ret
+
+// Function definition at index 2
+fun test(l0: u64, l1: bool)
+    move_loc l1
+    br_false l0
+    move_loc l0
+    call consume
+l1: ret
+    // @5
+l0: move_loc l0
+    ld_u64 1
+    add
+    pop
+    branch l1
+
+
+
+//# run 0xc0ffee::m::main

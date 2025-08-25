@@ -1,0 +1,47 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/resolve_from_storage.move`
+
+//# publish
+// Bytecode version v8
+module 0x66::test
+struct Func has key
+  f: ||u64 has copy + store
+
+// Function definition at index 0
+#[persistent] public fun init(l0: &signer)
+    local l1: ||u64 has copy + store
+    ld_u64 23
+    pack_closure identity<u64>, 1
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    pack Func
+    move_to Func
+    ret
+
+// Function definition at index 1
+#[persistent] public fun call(l0: address) acquires Func
+    move_loc l0
+    borrow_global Func
+    borrow_field Func, f
+    read_ref
+    call_closure <||u64 has copy + store>
+    // @5
+    ld_u64 23
+    eq
+    br_false l0
+    ret
+l0: ld_u64 777
+    // @10
+    abort
+
+// Function definition at index 2
+#[persistent] public fun identity<T0>(l0: T0): T0
+    move_loc l0
+    ret
+
+
+
+//# run 0x66::test::init --signers 0x66
+
+//# run 0x66::test::call --args @0x66

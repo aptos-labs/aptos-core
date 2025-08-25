@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-52:  publish [// Bytecode version v8]
+Error: error: expected `<newline>`, found `copy`
+   ┌─ test:13:22
+   │
+13 │     local l1: || has copy + drop
+   │                      ^^^^
+
+

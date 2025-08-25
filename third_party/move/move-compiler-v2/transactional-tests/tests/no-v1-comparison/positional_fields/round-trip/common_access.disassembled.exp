@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-24:  publish [// Bytecode version v8]
+task 1 lines 28-28:  run --verbose -- 0x42::test::test_common_access
+return values: 42

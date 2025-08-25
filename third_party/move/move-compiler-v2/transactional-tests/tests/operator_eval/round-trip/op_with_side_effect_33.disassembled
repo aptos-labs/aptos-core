@@ -1,0 +1,44 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/op_with_side_effect_33.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun inc(l0: &mut u64): u64
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test(): u64
+    local l0: u64
+    ld_u64 1
+    st_loc l0
+    mut_borrow_loc l0
+    call inc
+    ld_u64 1
+    // @5
+    add
+    st_loc l0
+    copy_loc l0
+    copy_loc l0
+    add
+    // @10
+    mut_borrow_loc l0
+    call inc
+    ld_u64 1
+    add
+    add
+    // @15
+    ret
+
+
+
+//# run 0xc0ffee::m::test

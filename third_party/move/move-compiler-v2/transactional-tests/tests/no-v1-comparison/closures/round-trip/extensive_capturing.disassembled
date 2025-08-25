@@ -1,0 +1,157 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/extensive_capturing.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun add3(l0: u8, l1: u8, l2: u8): u8
+    move_loc l0
+    move_loc l1
+    add
+    move_loc l2
+    add
+    // @5
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test()
+    local l0: |u8|u8
+    local l1: |u8, u8|u8
+    local l2: |u8, u8, u8|u8
+    ld_u8 0
+    ld_u8 1
+    ld_u8 2
+    pack_closure add3, 111
+    call_closure <||u8>
+    // @5
+    ld_u8 3
+    eq
+    br_false l0
+    ld_u8 0
+    ld_u8 1
+    // @10
+    pack_closure add3, 110
+    st_loc l0
+    ld_u8 2
+    move_loc l0
+    call_closure <|u8|u8>
+    // @15
+    ld_u8 3
+    eq
+    br_false l1
+    ld_u8 0
+    ld_u8 1
+    // @20
+    pack_closure add3, 101
+    st_loc l0
+    ld_u8 2
+    move_loc l0
+    call_closure <|u8|u8>
+    // @25
+    ld_u8 3
+    eq
+    br_false l2
+    ld_u8 0
+    ld_u8 1
+    // @30
+    pack_closure add3, 11
+    st_loc l0
+    ld_u8 2
+    move_loc l0
+    call_closure <|u8|u8>
+    // @35
+    ld_u8 3
+    eq
+    br_false l3
+    ld_u8 0
+    pack_closure add3, 1
+    // @40
+    st_loc l1
+    ld_u8 2
+    ld_u8 1
+    move_loc l1
+    call_closure <|u8, u8|u8>
+    // @45
+    ld_u8 3
+    eq
+    br_false l4
+    ld_u8 0
+    pack_closure add3, 100
+    // @50
+    st_loc l1
+    ld_u8 2
+    ld_u8 1
+    move_loc l1
+    call_closure <|u8, u8|u8>
+    // @55
+    ld_u8 3
+    eq
+    br_false l5
+    ld_u8 0
+    pack_closure add3, 10
+    // @60
+    st_loc l1
+    ld_u8 2
+    ld_u8 1
+    move_loc l1
+    call_closure <|u8, u8|u8>
+    // @65
+    ld_u8 3
+    eq
+    br_false l6
+    pack_closure add3, 0
+    st_loc l2
+    // @70
+    ld_u8 2
+    ld_u8 0
+    ld_u8 1
+    move_loc l2
+    call_closure <|u8, u8, u8|u8>
+    // @75
+    ld_u8 3
+    eq
+    br_false l7
+    pack_closure __lambda__1__test, 0
+    st_loc l0
+    // @80
+    ld_u8 2
+    move_loc l0
+    call_closure <|u8|u8>
+    ld_u8 4
+    eq
+    // @85
+    br_false l8
+    ret
+l8: ld_u64 14566554180833181696
+    abort
+l7: ld_u64 14566554180833181696
+    // @90
+    abort
+l6: ld_u64 14566554180833181696
+    abort
+l5: ld_u64 14566554180833181696
+    abort
+    // @95
+l4: ld_u64 14566554180833181696
+    abort
+l3: ld_u64 14566554180833181696
+    abort
+l2: ld_u64 14566554180833181696
+    // @100
+    abort
+l1: ld_u64 14566554180833181696
+    abort
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 2
+fun __lambda__1__test(l0: u8): u8
+    copy_loc l0
+    ld_u8 0
+    move_loc l0
+    call add3
+    ret
+
+
+
+//# run 0xc0ffee::m::test

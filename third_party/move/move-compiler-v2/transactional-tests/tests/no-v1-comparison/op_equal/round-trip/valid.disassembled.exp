@@ -1,0 +1,10 @@
+processed 9 tasks
+task 0 lines 3-488:  publish [// Bytecode version v8]
+task 1 lines 492-492:  run --verbose -- 0x42::test::test1
+task 2 lines 494-494:  run --verbose -- 0x42::test::test2
+task 3 lines 496-496:  run --verbose -- 0x42::test::test3
+task 4 lines 498-498:  run --verbose -- 0x42::test::test4
+task 5 lines 500-500:  run --verbose -- 0x42::test::test5
+task 6 lines 502-502:  run --verbose -- 0x42::test::test6
+task 7 lines 504-504:  run --verbose -- 0x42::test::test7
+task 8 lines 506-506:  run --verbose -- 0x42::test::test8

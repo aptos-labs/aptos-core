@@ -1,0 +1,72 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/nonempty_vectors.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+use 0x1::vector
+// Function definition at index 0
+#[persistent] entry public fun init()
+    local l0: vector<u64>
+    local l1: vector<vector<u8>>
+    local l2: &mut vector<u64>
+    local l3: vector<u8>
+    local l4: vector<u8>
+    local l5: u64
+    local l6: vector<u64>
+    local l7: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l0
+    ld_const<vector<vector<u8>>> [[1]]
+    st_loc l1
+    mut_borrow_loc l1
+    // @5
+    call vector::reverse<vector<u8>>
+l1: borrow_loc l1
+    call vector::is_empty<vector<u8>>
+    br_true l0
+    mut_borrow_loc l1
+    // @10
+    vec_pop_back <vector<u8>>
+    mut_borrow_loc l0
+    st_loc l2
+    st_loc l4
+    borrow_loc l4
+    // @15
+    vec_len <u8>
+    ld_u64 2
+    add
+    st_loc l5
+    move_loc l2
+    // @20
+    move_loc l5
+    vec_push_back <u64>
+    branch l1
+l0: vec_pack <u64>, 0
+    st_loc l6
+    // @25
+    ld_const<vector<u64>> [3]
+    st_loc l7
+    mut_borrow_loc l7
+    call vector::reverse<u64>
+l3: borrow_loc l7
+    // @30
+    call vector::is_empty<u64>
+    br_true l2
+    mut_borrow_loc l7
+    vec_pop_back <u64>
+    mut_borrow_loc l6
+    // @35
+    st_loc l2
+    ld_u64 3
+    add
+    st_loc l5
+    move_loc l2
+    // @40
+    move_loc l5
+    vec_push_back <u64>
+    branch l3
+l2: ret
+
+
+
+//# run 0x42::m::init

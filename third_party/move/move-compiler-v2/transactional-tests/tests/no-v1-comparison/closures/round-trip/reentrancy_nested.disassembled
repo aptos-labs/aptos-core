@@ -1,0 +1,179 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/reentrancy_nested.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::worker1
+struct R has key
+  _0: u64
+
+// Function definition at index 0
+#[persistent] public fun init(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+#[persistent] public fun set(l0: u64) acquires R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l1
+    move_loc l0
+    // @5
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 2
+#[persistent] public fun work(l0: ||) acquires R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    // @10
+    move_loc l0
+    call_closure <||>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::worker2
+use 0x42::worker1
+struct R has key
+  _0: u64
+
+// Function definition at index 0
+#[persistent] public fun init(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+#[persistent] public fun set(l0: u64) acquires R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l1
+    move_loc l0
+    // @5
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 2
+#[persistent] public fun work(l0: ||) acquires R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    // @10
+    move_loc l0
+    call worker1::work
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::tests
+use 0x42::worker1
+use 0x42::worker2
+struct R has key
+  _0: u64
+
+// Function definition at index 0
+fun init(l0: &signer)
+    copy_loc l0
+    call worker1::init
+    copy_loc l0
+    call worker2::init
+    move_loc l0
+    // @5
+    ld_u64 0
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+fun direct_failure(): bool
+    pack_closure __lambda__1__direct_failure, 0
+    call worker2::work
+    ld_false
+    ret
+
+// Function definition at index 2
+fun worker1_failure(): bool
+    ld_u64 10
+    pack_closure worker1::set, 1
+    call worker2::work
+    ld_false
+    ret
+
+// Function definition at index 3
+fun worker2_failure(): bool
+    ld_u64 10
+    pack_closure worker2::set, 1
+    call worker2::work
+    ld_false
+    ret
+
+// Function definition at index 4
+fun worker2_ok(): bool
+    ld_u64 10
+    pack_closure worker2::set, 1
+    call worker1::work
+    ld_true
+    ret
+
+// Function definition at index 5
+fun __lambda__1__direct_failure() acquires R
+    local l0: &mut u64
+    ld_const<address> 42
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l0
+    copy_loc l0
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    move_loc l0
+    write_ref
+    // @10
+    ret
+
+
+
+//# run 0x42::tests::init --signers 0x42
+
+//# run 0x42::tests::direct_failure
+
+//# run 0x42::tests::worker1_failure
+
+//# run 0x42::tests::worker2_failure
+
+//# run 0x42::tests::worker2_ok

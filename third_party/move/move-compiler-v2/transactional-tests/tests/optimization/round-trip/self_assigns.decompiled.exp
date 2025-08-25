@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-26:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:23:22
+   │
+23 │     public fun test1(p0: u64) {
+   │                      ^^
+
+
+task 1 lines 29-29:  run 0xc0ffee::m::main

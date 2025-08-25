@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-41:  publish [// Bytecode version v8]
+task 1 lines 45-45:  run 0x66::test::init --signers 0x66
+task 2 lines 47-47:  run 0x66::test::call --args @0x66

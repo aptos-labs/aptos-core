@@ -19,7 +19,7 @@ use crate::{
 };
 use itertools::Itertools;
 use move_binary_format::access::ModuleAccess;
-use move_core_types::ability::AbilitySet;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::collections::{BTreeMap, BTreeSet};
 //
 // ========================================================================================
@@ -61,6 +61,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a module.
     pub fn print_module(&self, module_id: ModuleId) {
         let module_env = self.env().get_module(module_id);
+        let mut aliases: BTreeMap<String, BTreeMap<AccountAddress, String>> = BTreeMap::new();
         if module_env.is_script_module() {
             emitln!(self.writer, "script {")
         } else {
@@ -73,11 +74,15 @@ impl<'a> Sourcifier<'a> {
         // `ModuleEnv` may be incomplete.
         if let Some(module) = &module_env.data.compiled_module {
             for use_ in module.immediate_dependencies() {
+                let module_alias =
+                    Self::add_alias(&mut aliases, *use_.address(), use_.name().to_string());
                 emitln!(
                     self.writer,
-                    "use 0x{}::{};",
+                    "use 0x{}::{}{};",
                     use_.address().short_str_lossless(),
-                    use_.name()
+                    use_.name(),
+                    module_alias
+                        .map_or_else(|| "".to_string(), |alias| " as ".to_string() + &alias)
                 )
             }
             for friend in &module.friend_decls {
@@ -91,10 +96,19 @@ impl<'a> Sourcifier<'a> {
             }
         } else {
             for use_ in module_env.get_used_modules(false) {
+                let module = self.env().get_module(use_);
+                let module_name = module.get_name();
+                let module_alias = Self::add_alias(
+                    &mut aliases,
+                    module_name.addr().expect_numerical(),
+                    self.sym(module_name.name()),
+                );
                 emitln!(
                     self.writer,
-                    "use {};",
-                    self.env().get_module(use_).get_full_name_str()
+                    "use {}{};",
+                    module.get_full_name_str(),
+                    module_alias
+                        .map_or_else(|| "".to_string(), |alias| " as ".to_string() + &alias)
                 )
             }
             for friend in module_env.get_friend_modules() {
@@ -108,12 +122,16 @@ impl<'a> Sourcifier<'a> {
 
         if module_env.get_struct_count() > 0 {
             for struct_env in module_env.get_structs() {
-                self.print_struct(struct_env.get_qualified_id())
+                self.print_struct(struct_env.get_qualified_id(), aliases.clone());
             }
         }
         if module_env.get_function_count() > 0 {
             for fun_env in module_env.get_functions() {
-                self.print_fun(fun_env.get_qualified_id(), fun_env.get_def())
+                self.print_fun(
+                    fun_env.get_qualified_id(),
+                    fun_env.get_def(),
+                    aliases.clone(),
+                )
             }
         }
         self.writer.unindent();
@@ -122,7 +140,12 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a function definition, where the defining expression is passed
     /// as a parameter.
-    pub fn print_fun(&self, fun_id: QualifiedId<FunId>, def: Option<&Exp>) {
+    pub fn print_fun(
+        &self,
+        fun_id: QualifiedId<FunId>,
+        def: Option<&Exp>,
+        aliases: BTreeMap<String, BTreeMap<AccountAddress, String>>,
+    ) {
         let fun_env = self.env().get_function(fun_id);
         if !fun_env.module_env.is_script_module() {
             // Print attributes, visibility, and other modifiers
@@ -158,7 +181,8 @@ impl<'a> Sourcifier<'a> {
             Self::amend_fun_name(self.env(), self.sym(fun_env.get_name()), self.amend),
             self.type_params(fun_env.get_type_parameters_ref())
         );
-        let tctx = fun_env.get_type_display_ctx();
+        let mut tctx = fun_env.get_type_display_ctx();
+        tctx.aliases = aliases;
         let params = fun_env
             .get_parameters()
             .into_iter()
@@ -181,7 +205,7 @@ impl<'a> Sourcifier<'a> {
         if let Some(def) = def {
             // A sequence or block is already automatically printed in braces with indent
             let requires_braces = !Self::is_braced(def);
-            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, def, self.amend);
+            let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, tctx, def, self.amend);
             if requires_braces {
                 self.print_block(|| {
                     if !def.is_unit_exp() {
@@ -338,9 +362,14 @@ impl<'a> Sourcifier<'a> {
     }
 
     /// Prints a struct (or enum) declaration.
-    pub fn print_struct(&self, struct_id: QualifiedId<StructId>) {
+    pub fn print_struct(
+        &self,
+        struct_id: QualifiedId<StructId>,
+        aliases: BTreeMap<String, BTreeMap<AccountAddress, String>>,
+    ) {
         let struct_env = self.env().get_struct(struct_id);
-        let type_display_ctx = struct_env.get_type_display_ctx();
+        let mut type_display_ctx = struct_env.get_type_display_ctx();
+        type_display_ctx.aliases = aliases;
         let ability_str = if !struct_env.get_abilities().is_empty() {
             format!(" has {}", self.abilities(", ", struct_env.get_abilities()))
         } else {
@@ -526,17 +555,24 @@ impl<'a> Sourcifier<'a> {
 
     fn module_qualifier(&self, tctx: &TypeDisplayContext, mid: ModuleId) -> String {
         let module_env = self.env().get_module(mid);
-        if tctx.module_name.as_ref() == Some(module_env.get_name()) {
+        let module_name = module_env.get_name();
+        if tctx.module_name.as_ref() == Some(module_name) {
             // Current module, no qualification needed
             "".to_string()
         } else {
             format!(
                 "{}::",
-                if tctx.used_modules.contains(&mid) {
-                    self.sym(module_env.get_name().name())
-                } else {
-                    module_env.get_full_name_str()
-                }
+                tctx.get_alias(
+                    module_name.addr().expect_numerical(),
+                    self.sym(module_name.name())
+                )
+                .unwrap_or(
+                    if tctx.used_modules.contains(&mid) {
+                        self.sym(module_env.get_name().name())
+                    } else {
+                        module_env.get_full_name_str()
+                    }
+                )
             )
         }
     }
@@ -557,6 +593,28 @@ impl<'a> Sourcifier<'a> {
         }
         // Give up after too many attempts
         panic!("too many fruitless attempts to generate unique name")
+    }
+
+    fn add_alias(
+        aliases: &mut BTreeMap<String, BTreeMap<AccountAddress, String>>,
+        address: AccountAddress,
+        module_name: String,
+    ) -> Option<String> {
+        // If the module name never exists, crate a new entry with the given address and name
+        // We use the original name to work as the alias (i.e., no alias is needed)
+        let alias_map = aliases.entry(module_name.clone()).or_insert_with(|| {
+            let mut inner_map = BTreeMap::new();
+            inner_map.insert(address, module_name.clone());
+            inner_map
+        });
+
+        // The module name exists and the address has not been recorded, we need to make an alias for this module name at this address
+        if alias_map.get(&address).is_none() {
+            let module_alias = format!("{}_{}", module_name.as_str(), alias_map.len());
+            alias_map.insert(address, module_alias.clone());
+            return Some(module_alias);
+        }
+        None
     }
 }
 
@@ -614,14 +672,14 @@ impl<'a> ExpSourcifier<'a> {
     pub fn for_fun(
         parent: &'a Sourcifier<'a>,
         fun_env: &'a FunctionEnv,
+        tctx: TypeDisplayContext<'a>,
         exp: &Exp,
         amend: bool,
     ) -> Self {
-        let type_display_context = fun_env.get_type_display_ctx();
         let temp_names = (0..fun_env.get_parameter_count())
             .map(|i| (i, fun_env.get_local_name(i)))
             .collect();
-        Self::new(parent, type_display_context, temp_names, exp, amend)
+        Self::new(parent, tctx, temp_names, exp, amend)
     }
 
     fn new(

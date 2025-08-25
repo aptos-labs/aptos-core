@@ -1,0 +1,786 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/match_cover.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+enum A has drop
+  V1
+    a: Q
+    b: R
+
+enum Q has drop
+  Q1
+  Q2
+
+enum R has drop
+  R1
+  R2
+
+// Function definition at index 0
+#[persistent] public fun test1(l0: A)
+    local l1: &A
+    local l2: &R
+    local l3: R
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    branch l3
+    // @10
+l3: copy_loc l1
+    test_variant A, V1
+    br_true l4
+    move_loc l1
+    pop
+    // @15
+l6: ld_u64 14566554180833181697
+    abort
+l4: copy_loc l1
+    borrow_variant_field A, V1::a
+    move_loc l1
+    // @20
+    borrow_variant_field A, V1::b
+    st_loc l2
+    test_variant Q, Q2
+    br_true l5
+    move_loc l2
+    // @25
+    pop
+    branch l6
+l5: move_loc l2
+    test_variant R, R2
+    br_true l7
+    // @30
+    branch l6
+l7: move_loc l0
+    unpack_variant A, V1
+    st_loc l3
+    unpack_variant Q, Q2
+    // @35
+    move_loc l3
+    unpack_variant R, R2
+l9: ret
+l2: copy_loc l1
+    borrow_variant_field A, V1::b
+    // @40
+    test_variant R, R1
+    br_true l8
+    branch l3
+l8: move_loc l1
+    pop
+    // @45
+    move_loc l0
+    unpack_variant A, V1
+    unpack_variant R, R1
+    pop
+    branch l9
+    // @50
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    test_variant Q, Q1
+    br_true l10
+    branch l1
+    // @55
+l10: move_loc l1
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    pop
+    // @60
+    unpack_variant Q, Q1
+    branch l9
+
+// Function definition at index 1
+#[persistent] public fun test2(l0: A)
+    local l1: &A
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    branch l3
+    // @10
+l3: move_loc l1
+    test_variant A, V1
+    br_false l4
+    move_loc l0
+    unpack_variant A, V1
+    // @15
+    pop
+    pop
+l6: ret
+l4: ld_u64 14566554180833181697
+    abort
+    // @20
+l2: copy_loc l1
+    borrow_variant_field A, V1::b
+    test_variant R, R1
+    br_true l5
+    branch l3
+    // @25
+l5: move_loc l1
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    unpack_variant R, R1
+    // @30
+    pop
+    branch l6
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    test_variant Q, Q1
+    // @35
+    br_true l7
+    branch l1
+l7: move_loc l1
+    pop
+    move_loc l0
+    // @40
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q1
+    branch l6
+
+// Function definition at index 2
+#[persistent] public fun test3(l0: A)
+    local l1: &A
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    move_loc l1
+    // @10
+    pop
+l4: ret
+l2: move_loc l1
+    borrow_variant_field A, V1::b
+    test_variant R, R1
+    // @15
+    br_true l3
+    branch l4
+l3: move_loc l0
+    unpack_variant A, V1
+    unpack_variant R, R1
+    // @20
+    pop
+    branch l4
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    test_variant Q, Q1
+    // @25
+    br_true l5
+    branch l1
+l5: move_loc l1
+    pop
+    move_loc l0
+    // @30
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q1
+    branch l4
+
+// Function definition at index 3
+#[persistent] public fun test4(l0: A)
+    local l1: &A
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: move_loc l1
+    test_variant A, V1
+    br_false l2
+    move_loc l0
+    // @10
+    unpack_variant A, V1
+    pop
+    pop
+l4: ret
+l2: ld_u64 14566554180833181697
+    // @15
+    abort
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    test_variant Q, Q1
+    br_true l3
+    // @20
+    branch l1
+l3: move_loc l1
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    // @25
+    pop
+    unpack_variant Q, Q1
+    branch l4
+
+// Function definition at index 4
+#[persistent] public fun test5(l0: A)
+    local l1: &A
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    move_loc l1
+    // @10
+    pop
+l4: ld_u64 14566554180833181697
+    abort
+l2: move_loc l1
+    borrow_variant_field A, V1::a
+    // @15
+    test_variant Q, Q2
+    br_true l3
+    branch l4
+l3: move_loc l0
+    unpack_variant A, V1
+    // @20
+    pop
+    unpack_variant Q, Q2
+l6: ret
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    // @25
+    test_variant Q, Q1
+    br_true l5
+    branch l1
+l5: move_loc l1
+    pop
+    // @30
+    move_loc l0
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q1
+    branch l6
+
+// Function definition at index 5
+#[persistent] public fun test6(l0: A)
+    local l1: &A
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    move_loc l1
+    // @10
+    pop
+l4: ret
+l2: move_loc l1
+    borrow_variant_field A, V1::a
+    test_variant Q, Q2
+    // @15
+    br_true l3
+    branch l4
+l3: branch l5
+    branch l4
+l5: move_loc l0
+    // @20
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q2
+    branch l4
+l0: copy_loc l1
+    // @25
+    borrow_variant_field A, V1::a
+    test_variant Q, Q1
+    br_true l6
+    branch l1
+l6: move_loc l1
+    // @30
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q1
+    // @35
+    branch l4
+
+
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::n
+enum A has drop
+  V1
+    a: P
+    b: Q
+    c: R
+
+enum P has drop
+  P1
+  P2
+
+enum Q has drop
+  Q1
+  Q2
+
+enum R has drop
+  R1
+  R2
+
+// Function definition at index 0
+#[persistent] public fun test(l0: A)
+    local l1: &A
+    local l2: &Q
+    local l3: &R
+    local l4: R
+    local l5: Q
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant A, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant A, V1
+    br_true l2
+    branch l3
+    // @10
+l3: copy_loc l1
+    test_variant A, V1
+    br_true l4
+    branch l5
+l5: copy_loc l1
+    // @15
+    test_variant A, V1
+    br_true l6
+    move_loc l1
+    pop
+l8: ld_u64 14566554180833181697
+    // @20
+    abort
+l6: copy_loc l1
+    borrow_variant_field A, V1::a
+    copy_loc l1
+    borrow_variant_field A, V1::b
+    // @25
+    st_loc l2
+    move_loc l1
+    borrow_variant_field A, V1::c
+    st_loc l3
+    test_variant P, P2
+    // @30
+    br_true l7
+    move_loc l2
+    pop
+    move_loc l3
+    pop
+    // @35
+    branch l8
+l7: move_loc l2
+    test_variant Q, Q2
+    br_true l9
+    move_loc l3
+    // @40
+    pop
+    branch l8
+l9: move_loc l3
+    test_variant R, R2
+    br_true l10
+    // @45
+    branch l8
+l10: move_loc l0
+    unpack_variant A, V1
+    st_loc l4
+    st_loc l5
+    // @50
+    unpack_variant P, P2
+    move_loc l5
+    unpack_variant Q, Q2
+    move_loc l4
+    unpack_variant R, R2
+    // @55
+l12: ret
+l4: copy_loc l1
+    borrow_variant_field A, V1::c
+    test_variant R, R1
+    br_true l11
+    // @60
+    branch l5
+l11: move_loc l1
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    // @65
+    unpack_variant R, R1
+    pop
+    pop
+    branch l12
+l2: copy_loc l1
+    // @70
+    borrow_variant_field A, V1::b
+    test_variant Q, Q1
+    br_true l13
+    branch l3
+l13: move_loc l1
+    // @75
+    pop
+    move_loc l0
+    unpack_variant A, V1
+    pop
+    unpack_variant Q, Q1
+    // @80
+    pop
+    branch l12
+l0: copy_loc l1
+    borrow_variant_field A, V1::a
+    test_variant P, P1
+    // @85
+    br_true l14
+    branch l1
+l14: move_loc l1
+    pop
+    move_loc l0
+    // @90
+    unpack_variant A, V1
+    pop
+    pop
+    unpack_variant P, P1
+    branch l12
+
+
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::o
+enum E has drop
+  V1
+    a: F
+    b: G
+  V2
+    a: F
+    b: G
+    c: H
+
+enum F has drop
+  F1
+  F2
+    a: G
+
+enum G has drop
+  G1
+    a: H
+    b: H
+  G2
+    a: H
+
+enum H has drop
+  H1
+    a: u64
+  H2
+    b: u64
+
+// Function definition at index 0
+#[persistent] public fun test1(l0: E)
+    local l1: &E
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant E, V1
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant E, V1
+    pop
+    // @10
+    pop
+l2: ret
+l0: move_loc l1
+    test_variant E, V2
+    br_false l1
+    // @15
+    move_loc l0
+    unpack_variant E, V2
+    pop
+    pop
+    pop
+    // @20
+    branch l2
+l1: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 1
+#[persistent] public fun test2(l0: E)
+    local l1: &E
+    local l2: &G
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant E, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant E, V1
+    br_true l2
+    branch l3
+    // @10
+l3: copy_loc l1
+    test_variant E, V1
+    br_true l4
+    branch l5
+l5: copy_loc l1
+    // @15
+    test_variant E, V1
+    br_true l6
+    branch l7
+l7: move_loc l1
+    test_variant E, V2
+    // @20
+    br_false l8
+    move_loc l0
+    unpack_variant E, V2
+    pop
+    pop
+    // @25
+    pop
+l10: ret
+l8: ld_u64 14566554180833181697
+    abort
+l6: copy_loc l1
+    // @30
+    borrow_variant_field E, V1::a
+    test_variant F, F2
+    br_true l9
+    branch l7
+l9: move_loc l1
+    // @35
+    pop
+    move_loc l0
+    unpack_variant E, V1
+    pop
+    unpack_variant F, F2
+    // @40
+    pop
+    branch l10
+l4: copy_loc l1
+    borrow_variant_field E, V1::a
+    test_variant F, F1
+    // @45
+    br_true l11
+    branch l5
+l11: move_loc l1
+    pop
+    move_loc l0
+    // @50
+    unpack_variant E, V1
+    pop
+    unpack_variant F, F1
+    branch l10
+l2: copy_loc l1
+    // @55
+    borrow_variant_field E, V1::b
+    st_loc l2
+    copy_loc l2
+    test_variant G, G1
+    br_true l12
+    // @60
+    move_loc l2
+    pop
+    branch l3
+l12: move_loc l2
+    borrow_variant_field G, G1::b
+    // @65
+    test_variant H, H1
+    br_true l13
+    branch l3
+l13: move_loc l1
+    pop
+    // @70
+    move_loc l0
+    unpack_variant E, V1
+    unpack_variant G, G1
+    unpack_variant H, H1
+    pop
+    // @75
+    pop
+    pop
+    branch l10
+l0: copy_loc l1
+    borrow_variant_field E, V1::b
+    // @80
+    st_loc l2
+    copy_loc l2
+    test_variant G, G1
+    br_true l14
+    move_loc l2
+    // @85
+    pop
+    branch l1
+l14: move_loc l2
+    borrow_variant_field G, G1::a
+    test_variant H, H1
+    // @90
+    br_true l15
+    branch l1
+l15: move_loc l1
+    pop
+    move_loc l0
+    // @95
+    unpack_variant E, V1
+    unpack_variant G, G1
+    pop
+    unpack_variant H, H1
+    pop
+    // @100
+    pop
+    branch l10
+
+// Function definition at index 2
+#[persistent] public fun test3(l0: E)
+    local l1: &E
+    local l2: &G
+    local l3: G
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant E, V1
+    br_true l0
+    // @5
+    branch l1
+l1: copy_loc l1
+    test_variant E, V1
+    br_true l2
+    branch l3
+    // @10
+l3: copy_loc l1
+    test_variant E, V1
+    br_true l4
+    branch l5
+l5: copy_loc l1
+    // @15
+    test_variant E, V1
+    br_true l6
+    branch l7
+l7: move_loc l1
+    test_variant E, V2
+    // @20
+    br_false l8
+    move_loc l0
+    unpack_variant E, V2
+    pop
+    pop
+    // @25
+    pop
+l10: ret
+l8: ld_u64 14566554180833181697
+    abort
+l6: copy_loc l1
+    // @30
+    borrow_variant_field E, V1::a
+    test_variant F, F1
+    br_true l9
+    branch l7
+l9: move_loc l1
+    // @35
+    pop
+    move_loc l0
+    unpack_variant E, V1
+    pop
+    unpack_variant F, F1
+    // @40
+    branch l10
+l4: copy_loc l1
+    borrow_variant_field E, V1::a
+    copy_loc l1
+    borrow_variant_field E, V1::b
+    // @45
+    st_loc l2
+    test_variant F, F1
+    br_true l11
+    move_loc l2
+    pop
+    // @50
+    branch l5
+l11: copy_loc l2
+    test_variant G, G2
+    br_true l12
+    move_loc l2
+    // @55
+    pop
+    branch l5
+l12: move_loc l2
+    borrow_variant_field G, G2::a
+    test_variant H, H2
+    // @60
+    br_true l13
+    branch l5
+l13: move_loc l1
+    pop
+    move_loc l0
+    // @65
+    unpack_variant E, V1
+    st_loc l3
+    unpack_variant F, F1
+    move_loc l3
+    unpack_variant G, G2
+    // @70
+    unpack_variant H, H2
+    pop
+    branch l10
+l2: copy_loc l1
+    borrow_variant_field E, V1::a
+    // @75
+    test_variant F, F2
+    br_true l14
+    branch l3
+l14: move_loc l1
+    pop
+    // @80
+    move_loc l0
+    unpack_variant E, V1
+    pop
+    unpack_variant F, F2
+    pop
+    // @85
+    branch l10
+l0: copy_loc l1
+    borrow_variant_field E, V1::b
+    test_variant G, G1
+    br_true l15
+    // @90
+    branch l1
+l15: move_loc l1
+    pop
+    move_loc l0
+    unpack_variant E, V1
+    // @95
+    unpack_variant G, G1
+    pop
+    pop
+    pop
+    branch l10
+

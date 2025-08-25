@@ -1,0 +1,338 @@
+//**** Cross-compiled for `masm` syntax from `tests/operators/shift_operators.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u8 0
+    ld_u8 8
+    shl
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u8 0
+    ld_u8 8
+    shr
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1100
+    abort
+    ld_u64 1000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 2105
+    abort
+    ld_u64 2104
+    abort
+    // @5
+    ld_u64 2103
+    abort
+    ld_u64 2101
+    abort
+    ld_u64 2100
+    // @10
+    abort
+    ld_u64 2005
+    abort
+    ld_u64 2004
+    abort
+    // @15
+    ld_u64 2003
+    abort
+    ld_u64 2002
+    abort
+    ld_u64 2001
+    // @20
+    abort
+    ld_u64 2000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 3105
+    abort
+    ld_u64 3104
+    abort
+    // @5
+    ld_u64 3103
+    abort
+    ld_u64 3102
+    abort
+    ld_u64 3101
+    // @10
+    abort
+    ld_u64 3100
+    abort
+    ld_u64 3005
+    abort
+    // @15
+    ld_u64 3004
+    abort
+    ld_u64 3003
+    abort
+    ld_u64 3002
+    // @20
+    abort
+    ld_u64 3001
+    abort
+    ld_u64 3000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 4005
+    abort
+    ld_u64 4004
+    abort
+    // @5
+    ld_u64 4003
+    abort
+    ld_u64 4002
+    abort
+    ld_u64 4001
+    // @10
+    abort
+    ld_u64 4000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u8 7
+    ld_u8 7
+    shl
+    ld_u8 128
+    eq
+    // @5
+    br_false l0
+    ld_u64 7
+    ld_u8 62
+    shl
+    ld_u64 13835058055282163712
+    // @10
+    eq
+    br_false l1
+    ld_u128 2
+    ld_u8 127
+    shl
+    // @15
+    ld_u128 0
+    eq
+    br_false l2
+    ld_u16 7
+    ld_u8 15
+    // @20
+    shl
+    ld_u16 32768
+    eq
+    br_false l3
+    ld_u32 17
+    // @25
+    ld_u8 30
+    shl
+    ld_u32 1073741824
+    eq
+    br_false l4
+    // @30
+    ld_u256 7
+    ld_u8 254
+    shl
+    ld_u256 86844066927987146567678238756515930889952488499230423029593188005934847229952
+    eq
+    // @35
+    br_false l5
+    ret
+l5: ld_u64 5005
+    abort
+l4: ld_u64 5004
+    // @40
+    abort
+l3: ld_u64 5003
+    abort
+l2: ld_u64 5002
+    abort
+    // @45
+l1: ld_u64 5001
+    abort
+l0: ld_u64 5000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u8 54
+    ld_u8 3
+    shl
+    ld_u8 176
+    eq
+    // @5
+    br_false l0
+    ld_u8 124
+    ld_u8 5
+    shl
+    ld_u8 128
+    // @10
+    eq
+    br_false l1
+    ld_u64 345325745376476456
+    ld_u8 47
+    shl
+    // @15
+    ld_u64 2203386117691015168
+    eq
+    br_false l2
+    ld_u128 8629035907847368941279654523567912314
+    ld_u8 77
+    // @20
+    shl
+    ld_u128 317056859699765342273530379836650946560
+    eq
+    br_false l3
+    ld_u128 295429678238907658936718926478967892769
+    // @25
+    ld_u8 83
+    shl
+    ld_u128 78660438169199498567214234129963941888
+    eq
+    br_false l4
+    // @30
+    ld_u16 1234
+    ld_u8 12
+    shl
+    ld_u16 8192
+    eq
+    // @35
+    br_false l5
+    ld_u16 6553
+    ld_u8 15
+    shl
+    ld_u16 32768
+    // @40
+    eq
+    br_false l6
+    ld_u32 1234567
+    ld_u8 12
+    shl
+    // @45
+    ld_u32 761819136
+    eq
+    br_false l7
+    ld_u32 1234567
+    ld_u8 17
+    // @50
+    shl
+    ld_u32 2903375872
+    eq
+    br_false l8
+    ld_u32 12345671
+    // @55
+    ld_u8 27
+    shl
+    ld_u32 939524096
+    eq
+    br_false l9
+    // @60
+    ld_u256 1234536789093546757803786604381691994985672142341299639418
+    ld_u8 202
+    shl
+    ld_u256 33658913632735705985908889087832028406806276615240336691180752852867975479296
+    eq
+    // @65
+    br_false l10
+    ret
+l10: ld_u64 6504
+    abort
+    ld_u64 6503
+    // @70
+    abort
+    ld_u64 6502
+    abort
+    ld_u64 6501
+    abort
+    // @75
+    ld_u64 6500
+    abort
+l9: ld_u64 6402
+    abort
+l8: ld_u64 6401
+    // @80
+    abort
+l7: ld_u64 6400
+    abort
+l6: ld_u64 6302
+    abort
+    // @85
+l5: ld_u64 6301
+    abort
+    ld_u64 6300
+    abort
+l4: ld_u64 6203
+    // @90
+    abort
+    ld_u64 6202
+    abort
+l3: ld_u64 6201
+    abort
+    // @95
+    ld_u64 6200
+    abort
+l2: ld_u64 6102
+    abort
+    ld_u64 6101
+    // @100
+    abort
+    ld_u64 6100
+    abort
+l1: ld_u64 6002
+    abort
+    // @105
+    ld_u64 6001
+    abort
+l0: ld_u64 6000
+    abort
+

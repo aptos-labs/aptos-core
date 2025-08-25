@@ -1,0 +1,11 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/if_without_braces_4.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    branch l0
+    branch l0
+l0: ret
+

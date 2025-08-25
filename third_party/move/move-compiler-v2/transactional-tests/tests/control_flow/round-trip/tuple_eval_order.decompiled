@@ -1,0 +1,17 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/tuple_eval_order.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun foo(): (u64, u64) {
+        let _t0 = 1;
+        let _t5 = _t0 + 1;
+        (_t0, _t5)
+    }
+    public fun test(): u64 {
+        let (_t2,_t3) = foo();
+        _t2 + _t3
+    }
+}
+
+
+//# run 0xc0ffee::m::test

@@ -1,0 +1,17 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/if_branch_diverges_7.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    branch l0
+l0: branch l1
+    branch l0
+l1: ret
+    branch l2
+    // @5
+    ret
+l2: ld_u64 42
+    abort
+

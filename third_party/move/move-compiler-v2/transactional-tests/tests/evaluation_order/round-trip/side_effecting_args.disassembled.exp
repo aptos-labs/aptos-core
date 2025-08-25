@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-98:  publish [// Bytecode version v8]
+task 1 lines 102-102:  run 0xdeadbeef::test::test1
+return values: 6
+task 2 lines 104-104:  run 0xdeadbeef::test::test2
+return values: 8
+task 3 lines 106-106:  run 0xdeadbeef::test::test3
+return values: 7
+task 4 lines 108-108:  run 0xdeadbeef::test::test4
+return values: 9

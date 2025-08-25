@@ -1,0 +1,91 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/op_with_side_effect_21.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun inc(l0: &mut u64): u64
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test1(): u64
+    local l0: u64
+    ld_u64 1
+    st_loc l0
+    mut_borrow_loc l0
+    call inc
+    mut_borrow_loc l0
+    // @5
+    call inc
+    pop
+    mut_borrow_loc l0
+    call inc
+    mut_borrow_loc l0
+    // @10
+    call inc
+    add
+    add
+    mut_borrow_loc l0
+    call inc
+    // @15
+    pop
+    mut_borrow_loc l0
+    call inc
+    pop
+    mut_borrow_loc l0
+    // @20
+    call inc
+    add
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test2(): u64
+    local l0: u64
+    local l1: u64
+    ld_u64 1
+    ld_u64 1
+    add
+    st_loc l0
+    copy_loc l0
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    call inc
+    mut_borrow_loc l0
+    call inc
+    // @10
+    pop
+    mut_borrow_loc l0
+    call inc
+    mut_borrow_loc l0
+    call inc
+    // @15
+    add
+    add
+    mut_borrow_loc l0
+    call inc
+    pop
+    // @20
+    mut_borrow_loc l0
+    call inc
+    pop
+    mut_borrow_loc l0
+    call inc
+    // @25
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

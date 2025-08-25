@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-18:  run --gas-budget 700 [script {]
+Error: Script execution failed with VMError: {
+    major_status: OUT_OF_GAS,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 6)],
+}

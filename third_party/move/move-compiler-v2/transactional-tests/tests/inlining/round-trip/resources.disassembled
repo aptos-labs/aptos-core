@@ -1,0 +1,39 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/resources.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::M
+struct R has key
+  f: u64
+
+// Function definition at index 0
+#[persistent] public fun test_resource(l0: &signer) acquires R
+    move_loc l0
+    ld_u64 1
+    pack R
+    move_to R
+    ld_const<address> 66
+    // @5
+    borrow_global R
+    borrow_field R, f
+    read_ref
+    ld_u64 1
+    eq
+    // @10
+    br_false l0
+    ret
+l0: ld_u64 1
+    abort
+
+
+
+//# run --signers 0x42
+// Bytecode version v8
+script
+use 0x42::M
+// Function definition at index 0
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::test_resource
+    ret
+

@@ -1,0 +1,45 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/bug-14296.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+enum E has drop
+  V1
+    x: u8
+    y: S1<u8, bool>
+  V2
+    x: u8
+    y: S0
+
+struct S0 has drop
+  dummy_field: bool
+
+struct S1<T0, T1> has drop
+  x: T0
+  y: T1
+
+// Function definition at index 0
+fun extract_last_u8(l0: &E): u8
+    local l1: u8
+    copy_loc l0
+    test_variant E, V1
+    br_false l0
+    move_loc l0
+    borrow_variant_field E, V1::y
+    // @5
+    borrow_field S1<u8, bool>, x
+    read_ref
+    st_loc l1
+l2: move_loc l1
+    ret
+    // @10
+l0: move_loc l0
+    test_variant E, V2
+    br_false l1
+    ld_u8 1
+    st_loc l1
+    // @15
+    branch l2
+l1: ld_u64 14566554180833181697
+    abort
+

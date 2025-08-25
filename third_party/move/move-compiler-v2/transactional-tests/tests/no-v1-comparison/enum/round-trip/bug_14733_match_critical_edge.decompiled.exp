@@ -1,0 +1,16 @@
+processed 8 tasks
+task 0 lines 3-200:  publish [module 0x815::m {]
+task 1 lines 203-203:  run 0x815::m::test1
+return values: 22
+task 2 lines 205-205:  run 0x815::m::test2
+return values: 0
+task 3 lines 207-207:  run 0x815::m::test3
+return values: 10
+task 4 lines 209-209:  run 0x815::m::test4
+return values: 21
+task 5 lines 211-211:  run 0x815::m::test5
+return values: 43
+task 6 lines 213-213:  run 0x815::m::test6
+return values: 25
+task 7 lines 215-215:  run 0x815::m::test7
+return values: 15

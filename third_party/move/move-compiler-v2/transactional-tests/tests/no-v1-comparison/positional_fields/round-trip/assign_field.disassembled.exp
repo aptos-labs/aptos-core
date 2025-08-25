@@ -1,0 +1,16 @@
+processed 8 tasks
+task 0 lines 3-367:  publish [// Bytecode version v8]
+task 1 lines 371-371:  run --verbose -- 0x42::test::test_simple
+return values: { 42, true }
+task 2 lines 373-373:  run --verbose -- 0x42::test::test_simple_ref
+return values: { 42, true }
+task 3 lines 375-375:  run --verbose -- 0x42::test::test_assign0
+return values: { 0, false }
+task 4 lines 377-377:  run --verbose -- 0x42::test::test_assign1
+return values: 4
+task 5 lines 379-379:  run --verbose -- 0x42::test::test_assign_chained
+return values: { { { 0 }, 42 }, { 1 }, { { 2 }, 42 } }
+task 6 lines 381-381:  run --verbose -- 0x42::test::test_assign_enum_1
+return values: true
+task 7 lines 383-383:  run --verbose -- 0x42::test::test_assign_enum_2
+return values: true

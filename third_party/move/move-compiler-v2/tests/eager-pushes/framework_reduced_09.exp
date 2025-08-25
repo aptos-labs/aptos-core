@@ -25,7 +25,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -37,18 +37,18 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t10: &u64
      var $t11: &mut u64
      var $t12: &mut u64
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
   1: $t2 := m::foo($t3)
-  2: $t6 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t6 := borrow_field<S>.x($t0)
   3: $t5 := read_ref($t6)
   4: $t8 := infer($t2)
-  5: $t10 := borrow_field<0xc0ffee::m::S>.y($t0)
+  5: $t10 := borrow_field<S>.y($t0)
   6: $t9 := read_ref($t10)
   7: $t7 := *($t8, $t9)
   8: $t4 := ==($t5, $t7)
   9: if ($t4) goto 10 else goto 15
  10: label L0
- 11: $t12 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 11: $t12 := borrow_field<S>.x($t0)
  12: $t11 := m::bar($t12, $t2)
  13: m::baz($t11, $t1)
  14: goto 16
@@ -132,7 +132,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -152,7 +152,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # #root
      #   <no edges>
      #
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t3
      # refs: [$t0 => #0, $t3 => #3]
@@ -172,7 +172,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # #root
      #   <no edges>
      #
-  2: $t6 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t6 := borrow_field<S>.x($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t6
      # refs: [$t0 => #0, $t6 => #6]
@@ -201,7 +201,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # #root
      #   <no edges>
      #
-  5: $t10 := borrow_field<0xc0ffee::m::S>.y($t0)
+  5: $t10 := borrow_field<S>.y($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2, $t5, $t8, $t10
      # refs: [$t0 => #0, $t10 => #10]
@@ -257,7 +257,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # #root
      #   <no edges>
      #
- 11: $t12 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 11: $t12 := borrow_field<S>.x($t0)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t12
      # refs: [$t12 => #12]
@@ -329,7 +329,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -341,18 +341,18 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t10: &u64
      var $t11: &mut u64
      var $t12: &mut u64
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
   1: $t2 := m::foo($t3)
-  2: $t6 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t6 := borrow_field<S>.x($t0)
   3: $t5 := read_ref($t6)
   4: $t8 := infer($t2)
-  5: $t10 := borrow_field<0xc0ffee::m::S>.y($t0)
+  5: $t10 := borrow_field<S>.y($t0)
   6: $t9 := read_ref($t10)
   7: $t7 := *($t8, $t9)
   8: $t4 := ==($t5, $t7)
   9: if ($t4) goto 10 else goto 15
  10: label L0
- 11: $t12 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 11: $t12 := borrow_field<S>.x($t0)
  12: $t11 := m::bar($t12, $t2)
  13: m::baz($t11, $t1)
  14: goto 16
@@ -393,7 +393,7 @@ fun m::foo($t0: &u64): u64 {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+public fun m::test($t0: &mut S, $t1: u64) {
      var $t2: u64
      var $t3: &u64
      var $t4: bool
@@ -406,17 +406,17 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      var $t11: &mut u64 [unused]
      var $t12: &mut u64
      # live vars: $t0, $t1
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
      # live vars: $t0, $t1, $t3
   1: $t2 := m::foo($t3)
      # live vars: $t0, $t1, $t2
-  2: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  2: $t3 := borrow_field<S>.x($t0)
      # live vars: $t0, $t1, $t2, $t3
   3: $t5 := read_ref($t3)
      # live vars: $t0, $t1, $t2, $t5
   4: $t8 := copy($t2)
      # live vars: $t0, $t1, $t2, $t5, $t8
-  5: $t3 := borrow_field<0xc0ffee::m::S>.y($t0)
+  5: $t3 := borrow_field<S>.y($t0)
      # live vars: $t0, $t1, $t2, $t3, $t5, $t8
   6: $t9 := read_ref($t3)
      # live vars: $t0, $t1, $t2, $t5, $t8, $t9
@@ -428,7 +428,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # live vars: $t0, $t1, $t2
  10: label L0
      # live vars: $t0, $t1, $t2
- 11: $t12 := borrow_field<0xc0ffee::m::S>.x($t0)
+ 11: $t12 := borrow_field<S>.x($t0)
      # live vars: $t1, $t2, $t12
  12: $t12 := m::bar($t12, $t2)
      # live vars: $t1, $t12

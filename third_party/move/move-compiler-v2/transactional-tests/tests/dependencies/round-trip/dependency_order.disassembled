@@ -1,0 +1,47 @@
+//**** Cross-compiled for `masm` syntax from `tests/dependencies/dependency_order.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::C
+struct T
+  dummy_field: bool
+
+// Function definition at index 0
+#[persistent] public fun foo(): T
+    ld_false
+    pack T
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::B
+use 0x42::C
+// Function definition at index 0
+#[persistent] public fun foo(): C::T
+    call C::foo
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::A
+use 0x42::C
+use 0x42::B
+struct T
+  t_b: C::T
+  t_c: C::T
+
+// Function definition at index 0
+#[persistent] public fun foo(): T
+    local l0: C::T
+    call C::foo
+    st_loc l0
+    call B::foo
+    move_loc l0
+    pack T
+    // @5
+    ret
+

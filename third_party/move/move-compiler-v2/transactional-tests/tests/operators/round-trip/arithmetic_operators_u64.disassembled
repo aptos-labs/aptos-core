@@ -1,0 +1,282 @@
+//**** Cross-compiled for `masm` syntax from `tests/operators/arithmetic_operators_u64.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1202
+    abort
+    ld_u64 1201
+    abort
+    // @5
+    ld_u64 1200
+    abort
+    ld_u64 1101
+    abort
+    ld_u64 1100
+    // @10
+    abort
+    ld_u64 1002
+    abort
+    ld_u64 1001
+    abort
+    // @15
+    ld_u64 1000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 1
+    ld_u64 18446744073709551615
+    add
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 12000000000000000000
+    ld_u64 10000000000000000000
+    add
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 2201
+    abort
+    ld_u64 2200
+    abort
+    // @5
+    ld_u64 2101
+    abort
+    ld_u64 2100
+    abort
+    ld_u64 2002
+    // @10
+    abort
+    ld_u64 2001
+    abort
+    ld_u64 2000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 0
+    ld_u64 1
+    sub
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 54
+    ld_u64 100
+    sub
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 3200
+    abort
+    ld_u64 3101
+    abort
+    // @5
+    ld_u64 3100
+    abort
+    ld_u64 3002
+    abort
+    ld_u64 3001
+    // @10
+    abort
+    ld_u64 3000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 4294967296
+    ld_u64 4294967296
+    mul
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 9223372036854775808
+    ld_u64 2
+    mul
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 4201
+    abort
+    ld_u64 4200
+    abort
+    // @5
+    ld_u64 4101
+    abort
+    ld_u64 4100
+    abort
+    ld_u64 4002
+    // @10
+    abort
+    ld_u64 4001
+    abort
+    ld_u64 4000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 0
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 1
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 18446744073709551615
+    ld_u64 0
+    div
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 5201
+    abort
+    ld_u64 5200
+    abort
+    // @5
+    ld_u64 5101
+    abort
+    ld_u64 5100
+    abort
+    ld_u64 5002
+    // @10
+    abort
+    ld_u64 5001
+    abort
+    ld_u64 5000
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 0
+    ld_u64 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 1
+    ld_u64 0
+    mod
+    pop
+    ret
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ld_u64 18446744073709551615
+    ld_u64 0
+    mod
+    pop
+    ret
+

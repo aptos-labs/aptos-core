@@ -1,0 +1,73 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/by_reference.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    local l1: &mut u64
+    local l2: vector<u8>
+    local l3: &mut vector<u8>
+    ld_u64 0
+    ld_u64 0
+    eq
+    br_false l0
+    ld_const<vector<u8>> [104, 101, 108, 108, 111]
+    // @5
+    ld_const<vector<u8>> [104, 101, 108, 108, 111]
+    eq
+    br_false l1
+    ld_u64 0
+    st_loc l0
+    // @10
+    mut_borrow_loc l0
+    st_loc l1
+    ld_u64 1
+    copy_loc l1
+    write_ref
+    // @15
+    ld_const<vector<u8>> [104, 101, 108, 108, 111]
+    st_loc l2
+    mut_borrow_loc l2
+    st_loc l3
+    ld_const<vector<u8>> [98, 121, 101]
+    // @20
+    copy_loc l3
+    write_ref
+    move_loc l1
+    read_ref
+    ld_u64 1
+    // @25
+    eq
+    br_false l2
+    move_loc l3
+    read_ref
+    ld_const<vector<u8>> [98, 121, 101]
+    // @30
+    eq
+    br_false l3
+    ret
+    ld_u64 42
+    abort
+    // @35
+    ld_u64 42
+    abort
+l3: ld_u64 42
+    abort
+l2: move_loc l3
+    // @40
+    pop
+    ld_u64 42
+    abort
+l1: ld_u64 42
+    abort
+    // @45
+l0: ld_u64 42
+    abort
+    ld_u64 42
+    abort
+    ld_u64 42
+    // @50
+    abort
+

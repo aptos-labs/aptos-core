@@ -1,0 +1,184 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/objects.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::objects
+struct OwnerRef has drop
+  addr: address
+
+struct ReaderRef<phantom T0: key> has drop + store
+  addr: address
+
+struct WriterRef<phantom T0: key> has drop + store
+  addr: address
+
+// Function definition at index 0
+#[persistent] public fun make_owner_ref(l0: address): OwnerRef
+    move_loc l0
+    pack OwnerRef
+    ret
+
+// Function definition at index 1
+#[persistent] public fun make_reader_ref<T0: key>(l0: address): ReaderRef<T0>
+    move_loc l0
+    pack ReaderRef<T0>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun make_writer_ref<T0: key>(l0: address): WriterRef<T0>
+    move_loc l0
+    pack WriterRef<T0>
+    ret
+
+// Function definition at index 3
+#[persistent] public fun owner_addr_of(l0: &OwnerRef): address
+    move_loc l0
+    borrow_field OwnerRef, addr
+    read_ref
+    ret
+
+// Function definition at index 4
+#[persistent] public fun reader_addr_of<T0: key>(l0: &ReaderRef<T0>): address
+    move_loc l0
+    borrow_field ReaderRef<T0>, addr
+    read_ref
+    ret
+
+// Function definition at index 5
+#[persistent] public fun writer_addr_of<T0: key>(l0: &WriterRef<T0>): address
+    move_loc l0
+    borrow_field WriterRef<T0>, addr
+    read_ref
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::token
+use 0x42::objects
+struct Token has key
+  val: u64
+
+// Function definition at index 0
+#[persistent] public fun create(l0: &signer, l1: &objects::OwnerRef, l2: u64)
+    local l3: Token
+    move_loc l1
+    pop
+    move_loc l2
+    pack Token
+    st_loc l3
+    // @5
+    move_loc l0
+    move_loc l3
+    move_to Token
+    ret
+
+// Function definition at index 1
+#[persistent] public fun reader_ref(l0: &objects::OwnerRef): objects::ReaderRef<Token>
+    local l1: address
+    move_loc l0
+    call objects::owner_addr_of
+    st_loc l1
+    copy_loc l1
+    exists Token
+    // @5
+    br_false l0
+    move_loc l1
+    call objects::make_reader_ref<Token>
+    ret
+l0: ld_u64 22
+    // @10
+    abort
+
+// Function definition at index 2
+#[persistent] public fun writer_ref(l0: &objects::OwnerRef): objects::WriterRef<Token>
+    local l1: address
+    move_loc l0
+    call objects::owner_addr_of
+    st_loc l1
+    copy_loc l1
+    exists Token
+    // @5
+    br_false l0
+    move_loc l1
+    call objects::make_writer_ref<Token>
+    ret
+l0: ld_u64 23
+    // @10
+    abort
+
+// Function definition at index 3
+#[persistent] public fun get_value(l0: &objects::ReaderRef<Token>): u64 acquires Token
+    move_loc l0
+    call objects::reader_addr_of<Token>
+    borrow_global Token
+    borrow_field Token, val
+    read_ref
+    // @5
+    ret
+
+// Function definition at index 4
+#[persistent] public fun set_value(l0: &objects::WriterRef<Token>, l1: u64) acquires Token
+    local l2: &mut u64
+    move_loc l0
+    call objects::writer_addr_of<Token>
+    mut_borrow_global Token
+    mut_borrow_field Token, val
+    st_loc l2
+    // @5
+    move_loc l1
+    move_loc l2
+    write_ref
+    ret
+
+
+
+//# run --signers 0x42
+// Bytecode version v8
+script
+use 0x42::objects
+use 0x42::token
+// Function definition at index 0
+entry public fun main(l0: signer)
+    local l1: objects::OwnerRef
+    local l2: objects::ReaderRef<token::Token>
+    local l3: objects::WriterRef<token::Token>
+    ld_const<address> 66
+    call objects::make_owner_ref
+    st_loc l1
+    borrow_loc l0
+    borrow_loc l1
+    // @5
+    ld_u64 22
+    call token::create
+    borrow_loc l1
+    call token::reader_ref
+    st_loc l2
+    // @10
+    borrow_loc l1
+    call token::writer_ref
+    st_loc l3
+    borrow_loc l2
+    call token::get_value
+    // @15
+    ld_u64 22
+    eq
+    br_false l0
+    borrow_loc l3
+    ld_u64 23
+    // @20
+    call token::set_value
+    borrow_loc l2
+    call token::get_value
+    ld_u64 23
+    eq
+    // @25
+    br_false l1
+    ret
+l1: ld_u64 1
+    abort
+l0: ld_u64 0
+    // @30
+    abort
+

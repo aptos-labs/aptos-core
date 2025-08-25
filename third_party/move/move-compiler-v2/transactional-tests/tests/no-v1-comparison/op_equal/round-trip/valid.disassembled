@@ -1,0 +1,506 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/op_equal/valid.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+struct Coin has drop
+  _0: u256
+
+struct Wrapper<T0> has drop
+  _0: T0
+
+// Function definition at index 0
+fun add1_new(l0: u256): u256
+    move_loc l0
+    ld_u256 1
+    add
+    ret
+
+// Function definition at index 1
+fun add1_old(l0: u256): u256
+    move_loc l0
+    ld_u256 1
+    add
+    ret
+
+// Function definition at index 2
+fun coin_inc_new_1(l0: &mut Coin)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 3
+fun coin_inc_new_2(l0: &mut Coin)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 4
+fun coin_inc_old_1(l0: &mut Coin)
+    copy_loc l0
+    borrow_field Coin, _0
+    read_ref
+    ld_u256 1
+    add
+    // @5
+    move_loc l0
+    mut_borrow_field Coin, _0
+    write_ref
+    ret
+
+// Function definition at index 5
+fun coin_inc_old_2(l0: &mut Coin)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 6
+fun inc_new(l0: &mut u256)
+    copy_loc l0
+    read_ref
+    ld_u256 1
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 7
+fun inc_old(l0: &mut u256)
+    copy_loc l0
+    read_ref
+    ld_u256 1
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 8
+fun inc_vec_coin_new(l0: vector<Coin>, l1: u64): vector<Coin>
+    local l2: &mut u256
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Coin>
+    mut_borrow_field Coin, _0
+    st_loc l2
+    // @5
+    copy_loc l2
+    read_ref
+    ld_u256 1
+    add
+    move_loc l2
+    // @10
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 9
+fun inc_vec_coin_old(l0: vector<Coin>, l1: u64): vector<Coin>
+    borrow_loc l0
+    copy_loc l1
+    vec_borrow <Coin>
+    borrow_field Coin, _0
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Coin>
+    // @10
+    mut_borrow_field Coin, _0
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 10
+fun inc_vec_new(l0: &mut vector<u256>, l1: u64)
+    local l2: &mut u256
+    move_loc l0
+    move_loc l1
+    vec_mut_borrow <u256>
+    st_loc l2
+    copy_loc l2
+    // @5
+    read_ref
+    ld_u256 1
+    add
+    move_loc l2
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 11
+fun inc_vec_old(l0: &mut vector<u256>, l1: u64)
+    copy_loc l0
+    freeze_ref
+    copy_loc l1
+    vec_borrow <u256>
+    read_ref
+    // @5
+    ld_u256 1
+    add
+    move_loc l0
+    move_loc l1
+    vec_mut_borrow <u256>
+    // @10
+    write_ref
+    ret
+
+// Function definition at index 12
+fun inc_vec_wrapped_coin_new(l0: vector<Wrapper<Coin>>, l1: u64): vector<Wrapper<Coin>>
+    local l2: &mut u256
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Wrapper<Coin>>
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    // @5
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u256 1
+    add
+    // @10
+    move_loc l2
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 13
+fun inc_vec_wrapped_coin_old(l0: vector<Wrapper<Coin>>, l1: u64): vector<Wrapper<Coin>>
+    borrow_loc l0
+    copy_loc l1
+    vec_borrow <Wrapper<Coin>>
+    borrow_field Wrapper<Coin>, _0
+    borrow_field Coin, _0
+    // @5
+    read_ref
+    ld_u256 1
+    add
+    mut_borrow_loc l0
+    move_loc l1
+    // @10
+    vec_mut_borrow <Wrapper<Coin>>
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    write_ref
+    move_loc l0
+    // @15
+    ret
+
+// Function definition at index 14
+fun inc_wrapped_coin_new(l0: &mut Wrapper<Coin>)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u256 1
+    add
+    move_loc l1
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 15
+fun inc_wrapped_coin_old(l0: &mut Wrapper<Coin>)
+    copy_loc l0
+    borrow_field Wrapper<Coin>, _0
+    borrow_field Coin, _0
+    read_ref
+    ld_u256 1
+    // @5
+    add
+    move_loc l0
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 16
+fun test1()
+    ld_u256 42
+    call add1_old
+    ld_u256 42
+    call add1_new
+    eq
+    // @5
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 17
+fun test2()
+    local l0: u256
+    local l1: u256
+    ld_u256 42
+    st_loc l0
+    copy_loc l0
+    st_loc l1
+    mut_borrow_loc l0
+    // @5
+    call inc_new
+    mut_borrow_loc l1
+    call inc_old
+    move_loc l0
+    move_loc l1
+    // @10
+    eq
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 18
+fun test3()
+    local l0: Coin
+    local l1: Coin
+    local l2: Coin
+    local l3: Coin
+    ld_u256 42
+    pack Coin
+    st_loc l0
+    ld_u256 42
+    pack Coin
+    // @5
+    st_loc l1
+    ld_u256 42
+    pack Coin
+    st_loc l2
+    ld_u256 42
+    // @10
+    pack Coin
+    st_loc l3
+    mut_borrow_loc l0
+    call coin_inc_new_1
+    mut_borrow_loc l1
+    // @15
+    call coin_inc_new_2
+    mut_borrow_loc l2
+    call coin_inc_old_1
+    mut_borrow_loc l3
+    call coin_inc_old_2
+    // @20
+    borrow_loc l0
+    borrow_loc l1
+    eq
+    br_false l0
+    borrow_loc l0
+    // @25
+    borrow_loc l2
+    eq
+    br_false l1
+    borrow_loc l0
+    borrow_loc l3
+    // @30
+    eq
+    br_false l2
+    ret
+l2: ld_u64 14566554180833181696
+    abort
+    // @35
+l1: ld_u64 14566554180833181696
+    abort
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 19
+fun test4()
+    local l0: Wrapper<Coin>
+    local l1: Wrapper<Coin>
+    ld_u256 42
+    pack Coin
+    pack Wrapper<Coin>
+    st_loc l0
+    ld_u256 42
+    // @5
+    pack Coin
+    pack Wrapper<Coin>
+    st_loc l1
+    mut_borrow_loc l0
+    call inc_wrapped_coin_new
+    // @10
+    mut_borrow_loc l1
+    call inc_wrapped_coin_old
+    move_loc l0
+    move_loc l1
+    eq
+    // @15
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 20
+fun test5()
+    local l0: vector<u256>
+    local l1: vector<u256>
+    ld_const<vector<u256>> [42]
+    st_loc l0
+    ld_const<vector<u256>> [42]
+    st_loc l1
+    mut_borrow_loc l0
+    // @5
+    ld_u64 0
+    call inc_vec_new
+    mut_borrow_loc l1
+    ld_u64 0
+    call inc_vec_old
+    // @10
+    move_loc l0
+    move_loc l1
+    eq
+    br_false l0
+    ret
+    // @15
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 21
+fun test6()
+    local l0: vector<Coin>
+    local l1: vector<Coin>
+    ld_u256 42
+    pack Coin
+    vec_pack <Coin>, 1
+    ld_u256 42
+    pack Coin
+    // @5
+    vec_pack <Coin>, 1
+    st_loc l0
+    ld_u64 0
+    call inc_vec_coin_new
+    move_loc l0
+    // @10
+    ld_u64 0
+    call inc_vec_coin_old
+    eq
+    br_false l0
+    ret
+    // @15
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 22
+fun test7()
+    local l0: vector<Wrapper<Coin>>
+    local l1: vector<Wrapper<Coin>>
+    ld_u256 42
+    pack Coin
+    pack Wrapper<Coin>
+    vec_pack <Wrapper<Coin>>, 1
+    ld_u256 42
+    // @5
+    pack Coin
+    pack Wrapper<Coin>
+    vec_pack <Wrapper<Coin>>, 1
+    st_loc l0
+    ld_u64 0
+    // @10
+    call inc_vec_wrapped_coin_new
+    move_loc l0
+    ld_u64 0
+    call inc_vec_wrapped_coin_old
+    eq
+    // @15
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 23
+fun test8()
+    local l0: u64
+    local l1: vector<u256>
+    local l2: &mut u256
+    ld_u64 0
+    st_loc l0
+    ld_const<vector<u256>> [0, 1]
+    st_loc l1
+    mut_borrow_loc l1
+    // @5
+    mut_borrow_loc l0
+    call x_plusplus
+    vec_mut_borrow <u256>
+    st_loc l2
+    copy_loc l2
+    // @10
+    read_ref
+    ld_u256 1
+    add
+    move_loc l2
+    write_ref
+    // @15
+    move_loc l1
+    ld_const<vector<u256>> [1, 1]
+    eq
+    br_false l0
+    ret
+    // @20
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 24
+fun x_plusplus(l0: &mut u64): u64
+    copy_loc l0
+    read_ref
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    // @5
+    add
+    move_loc l0
+    write_ref
+    ret
+
+
+
+//# run --verbose -- 0x42::test::test1
+
+//# run --verbose -- 0x42::test::test2
+
+//# run --verbose -- 0x42::test::test3
+
+//# run --verbose -- 0x42::test::test4
+
+//# run --verbose -- 0x42::test::test5
+
+//# run --verbose -- 0x42::test::test6
+
+//# run --verbose -- 0x42::test::test7
+
+//# run --verbose -- 0x42::test::test8

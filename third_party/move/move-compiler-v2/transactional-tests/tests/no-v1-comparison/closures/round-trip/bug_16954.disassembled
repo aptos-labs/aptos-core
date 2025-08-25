@@ -1,0 +1,341 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/bug_16954.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun call(l0: ||u64): u64
+    move_loc l0
+    call_closure <||u64>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test1(): u8
+    local l0: |u8|u8
+    ld_u8 1
+    pack_closure __lambda__3__test1, 1
+    st_loc l0
+    ld_u8 7
+    move_loc l0
+    // @5
+    call_closure <|u8|u8>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test10(): u8
+    local l0: |u8|u8
+    ld_u8 2
+    pack_closure __lambda__1__test10, 1
+    st_loc l0
+    ld_u8 3
+    move_loc l0
+    // @5
+    call_closure <|u8|u8>
+    ld_u8 0
+    add
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test11(): u64
+    ld_u64 1
+    ld_u64 1
+    pack_closure __lambda__1__test11, 1
+    call call
+    add
+    // @5
+    ld_u64 1
+    pack_closure __lambda__2__test11, 1
+    call call
+    add
+    ret
+
+// Function definition at index 4
+#[persistent] public fun test2(): u64
+    ld_u64 1
+    pack_closure __lambda__2__test2, 1
+    call_closure <||||u64>
+    call_closure <||u64>
+    ret
+
+// Function definition at index 5
+#[persistent] public fun test3(): u64
+    local l0: |u64|u64
+    pack_closure __lambda__2__test3, 0
+    st_loc l0
+    ld_u64 1
+    move_loc l0
+    call_closure <|u64|u64>
+    // @5
+    ret
+
+// Function definition at index 6
+#[persistent] public fun test4(l0: u64): u64
+    move_loc l0
+    pack_closure __lambda__2__test4, 1
+    call_closure <||||u64>
+    call_closure <||u64>
+    ret
+
+// Function definition at index 7
+#[persistent] public fun test5(): u8
+    local l0: |u8|u8
+    pack_closure __lambda__2__test5, 0
+    st_loc l0
+    ld_u8 7
+    move_loc l0
+    call_closure <|u8|u8>
+    // @5
+    ld_u8 2
+    add
+    ret
+
+// Function definition at index 8
+#[persistent] public fun test6(): u64
+    local l0: |u64|u64
+    pack_closure __lambda__2__test6, 0
+    st_loc l0
+    ld_u64 10
+    move_loc l0
+    call_closure <|u64|u64>
+    // @5
+    ld_u64 5
+    add
+    ret
+
+// Function definition at index 9
+#[persistent] public fun test7(): u8
+    local l0: |u8|u8
+    pack_closure __lambda__2__test7, 0
+    st_loc l0
+    ld_u8 3
+    move_loc l0
+    call_closure <|u8|u8>
+    // @5
+    ret
+
+// Function definition at index 10
+#[persistent] public fun test8(): u64
+    pack_closure __lambda__2__test8, 0
+    call_closure <||u64>
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 11
+#[persistent] public fun test9(): u8
+    local l0: |u8|u8
+    pack_closure __lambda__2__test9, 0
+    st_loc l0
+    ld_u8 4
+    move_loc l0
+    call_closure <|u8|u8>
+    // @5
+    ld_u8 0
+    add
+    ret
+
+// Function definition at index 12
+fun __lambda__1__test1(l0: u8, l1: u8): u8
+    move_loc l1
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 13
+fun __lambda__2__test1(l0: u8, l1: u8): u8
+    move_loc l0
+    move_loc l1
+    sub
+    ret
+
+// Function definition at index 14
+fun __lambda__3__test1(l0: u8, l1: u8): u8
+    local l2: |u8|u8
+    move_loc l0
+    move_loc l1
+    add
+    st_loc l0
+    copy_loc l0
+    // @5
+    pack_closure __lambda__1__test1, 1
+    st_loc l2
+    ld_u8 3
+    move_loc l2
+    call_closure <|u8|u8>
+    // @10
+    move_loc l0
+    pack_closure __lambda__2__test1, 1
+    st_loc l2
+    ld_u8 4
+    move_loc l2
+    // @15
+    call_closure <|u8|u8>
+    mul
+    ret
+
+// Function definition at index 15
+fun __lambda__1__test10(l0: u8, l1: u8): u8
+    move_loc l1
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 16
+fun __lambda__1__test11(l0: u64): u64
+    move_loc l0
+    ld_u64 2
+    add
+    ret
+
+// Function definition at index 17
+fun __lambda__2__test11(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    sub
+    ret
+
+// Function definition at index 18
+fun __lambda__1__test2(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 19
+fun __lambda__2__test2(l0: u64): ||u64
+    move_loc l0
+    pack_closure __lambda__1__test2, 1
+    ret
+
+// Function definition at index 20
+fun __lambda__1__test3(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    sub
+    ret
+
+// Function definition at index 21
+fun __lambda__2__test3(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    pack_closure __lambda__1__test3, 0
+    call_closure <|u64|u64>
+    // @5
+    ret
+
+// Function definition at index 22
+fun __lambda__1__test4(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 23
+fun __lambda__2__test4(l0: u64): ||u64
+    move_loc l0
+    pack_closure __lambda__1__test4, 1
+    ret
+
+// Function definition at index 24
+fun __lambda__1__test5(l0: u8): u8
+    move_loc l0
+    ld_u8 1
+    add
+    ret
+
+// Function definition at index 25
+fun __lambda__2__test5(l0: u8): u8
+    move_loc l0
+    pack_closure __lambda__1__test5, 1
+    call_closure <||u8>
+    ret
+
+// Function definition at index 26
+fun __lambda__1__test6(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 27
+fun __lambda__2__test6(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    pack_closure __lambda__1__test6, 1
+    call_closure <||u64>
+    // @5
+    ret
+
+// Function definition at index 28
+fun __lambda__1__test7(l0: u8, l1: u8): u8
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 29
+fun __lambda__2__test7(l0: u8): u8
+    local l1: |u8|u8
+    move_loc l0
+    ld_u8 2
+    add
+    pack_closure __lambda__1__test7, 1
+    st_loc l1
+    // @5
+    ld_u8 4
+    move_loc l1
+    call_closure <|u8|u8>
+    ret
+
+// Function definition at index 30
+fun __lambda__1__test8(): u64
+    ld_u64 3
+    ret
+
+// Function definition at index 31
+fun __lambda__2__test8(): u64
+    pack_closure __lambda__1__test8, 0
+    call_closure <||u64>
+    ld_u64 2
+    add
+    ret
+
+// Function definition at index 32
+fun __lambda__1__test9(l0: u8): u8
+    move_loc l0
+    ret
+
+// Function definition at index 33
+fun __lambda__2__test9(l0: u8): u8
+    local l1: |u8|u8
+    pack_closure __lambda__1__test9, 0
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    call_closure <|u8|u8>
+    // @5
+    ret
+
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::test3
+
+//# run 0xc0ffee::m::test4 --args 42
+
+//# run 0xc0ffee::m::test5
+
+//# run 0xc0ffee::m::test6
+
+//# run 0xc0ffee::m::test7
+
+//# run 0xc0ffee::m::test8
+
+//# run 0xc0ffee::m::test9
+
+//# run 0xc0ffee::m::test10
+
+//# run 0xc0ffee::m::test11

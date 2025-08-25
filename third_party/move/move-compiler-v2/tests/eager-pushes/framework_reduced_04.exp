@@ -1,7 +1,7 @@
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: Wrap) {
   0: return ()
 }
 
@@ -9,23 +9,23 @@ fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
 [variant baseline]
 public fun m::test($t0: signer, $t1: address) {
      var $t2: u64
-     var $t3: &mut 0xc0ffee::m::Wrap
+     var $t3: &mut Wrap
      var $t4: &signer
      var $t5: &mut u64
-     var $t6: 0xc0ffee::m::Wrap
+     var $t6: Wrap
      var $t7: u64
      var $t8: u64
      var $t9: u64
      var $t10: u64
   0: $t2 := 0
-  1: $t3 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  1: $t3 := borrow_global<Wrap>($t1)
   2: $t4 := borrow_local($t0)
-  3: $t5 := borrow_field<0xc0ffee::m::Wrap>.a($t3)
+  3: $t5 := borrow_field<Wrap>.a($t3)
   4: $t7 := infer($t2)
   5: $t8 := 0
   6: $t9 := m::zero($t2)
   7: $t10 := 0
-  8: $t6 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10)
+  8: $t6 := pack Wrap($t7, $t8, $t9, $t10)
   9: m::bar($t4, $t5, $t6)
  10: return ()
 }
@@ -41,7 +41,7 @@ fun m::zero($t0: u64): u64 {
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: Wrap) {
      # abort state: {returns}
      # live vars: $t0, $t1, $t2
      # refs: [$t0 => #0, $t1 => #1]
@@ -59,10 +59,10 @@ fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
 [variant baseline]
 public fun m::test($t0: signer, $t1: address) {
      var $t2: u64
-     var $t3: &mut 0xc0ffee::m::Wrap
+     var $t3: &mut Wrap
      var $t4: &signer
      var $t5: &mut u64
-     var $t6: 0xc0ffee::m::Wrap
+     var $t6: Wrap
      var $t7: u64
      var $t8: u64
      var $t9: u64
@@ -76,7 +76,7 @@ public fun m::test($t0: signer, $t1: address) {
      # live vars: $t0, $t1, $t2
      # refs: []
      #
-  1: $t3 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  1: $t3 := borrow_global<Wrap>($t1)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t3
      # refs: [$t3 => #3]
@@ -97,7 +97,7 @@ public fun m::test($t0: signer, $t1: address) {
      #   -> (mut) #3 via [struct `m::Wrap`] at line 17
      #   => #4 via [local `x`] at line 18
      #
-  3: $t5 := borrow_field<0xc0ffee::m::Wrap>.a($t3)
+  3: $t5 := borrow_field<Wrap>.a($t3)
      # abort state: {returns,aborts}
      # live vars: $t2, $t4, $t5
      # refs: [$t4 => #4, $t5 => #5]
@@ -157,7 +157,7 @@ public fun m::test($t0: signer, $t1: address) {
      #   => #4 via [local `x`] at line 18
      #   -> (mut) #5 via [struct `m::Wrap`] at line 18
      #
-  8: $t6 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10)
+  8: $t6 := pack Wrap($t7, $t8, $t9, $t10)
      # abort state: {returns,aborts}
      # live vars: $t4, $t5, $t6
      # refs: [$t4 => #4, $t5 => #5]
@@ -196,31 +196,31 @@ fun m::zero($t0: u64): u64 {
 ============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: Wrap) {
   0: return ()
 }
 
 
 [variant baseline]
 public fun m::test($t0: signer, $t1: address) {
-     var $t2: &mut 0xc0ffee::m::Wrap
+     var $t2: &mut Wrap
      var $t3: &signer
      var $t4: &mut u64
-     var $t5: 0xc0ffee::m::Wrap
+     var $t5: Wrap
      var $t6: u64
      var $t7: u64
      var $t8: u64
      var $t9: u64
      var $t10: u64
-  0: $t2 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  0: $t2 := borrow_global<Wrap>($t1)
   1: $t3 := borrow_local($t0)
-  2: $t4 := borrow_field<0xc0ffee::m::Wrap>.a($t2)
+  2: $t4 := borrow_field<Wrap>.a($t2)
   3: $t6 := 0
   4: $t7 := 0
   5: $t9 := 0
   6: $t8 := m::zero($t9)
   7: $t10 := 0
-  8: $t5 := pack 0xc0ffee::m::Wrap($t6, $t7, $t8, $t10)
+  8: $t5 := pack Wrap($t6, $t7, $t8, $t10)
   9: m::bar($t3, $t4, $t5)
  10: return ()
 }
@@ -236,7 +236,7 @@ fun m::zero($t0: u64): u64 {
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
+fun m::bar($t0: &signer, $t1: &mut u64, $t2: Wrap) {
      # live vars: $t0, $t1, $t2
   0: drop($t0)
      # live vars: $t1
@@ -248,21 +248,21 @@ fun m::bar($t0: &signer, $t1: &mut u64, $t2: 0xc0ffee::m::Wrap) {
 
 [variant baseline]
 public fun m::test($t0: signer, $t1: address) {
-     var $t2: &mut 0xc0ffee::m::Wrap
+     var $t2: &mut Wrap
      var $t3: &signer
      var $t4: &mut u64
-     var $t5: 0xc0ffee::m::Wrap
+     var $t5: Wrap
      var $t6: u64
      var $t7: u64
      var $t8: u64 [unused]
      var $t9: u64
      var $t10: u64
      # live vars: $t0, $t1
-  0: $t2 := borrow_global<0xc0ffee::m::Wrap>($t1)
+  0: $t2 := borrow_global<Wrap>($t1)
      # live vars: $t0, $t2
   1: $t3 := borrow_local($t0)
      # live vars: $t2, $t3
-  2: $t4 := borrow_field<0xc0ffee::m::Wrap>.a($t2)
+  2: $t4 := borrow_field<Wrap>.a($t2)
      # live vars: $t3, $t4
   3: $t6 := 0
      # live vars: $t3, $t4, $t6
@@ -274,7 +274,7 @@ public fun m::test($t0: signer, $t1: address) {
      # live vars: $t3, $t4, $t6, $t7, $t9
   7: $t10 := 0
      # live vars: $t3, $t4, $t6, $t7, $t9, $t10
-  8: $t5 := pack 0xc0ffee::m::Wrap($t6, $t7, $t9, $t10)
+  8: $t5 := pack Wrap($t6, $t7, $t9, $t10)
      # live vars: $t3, $t4, $t5
   9: m::bar($t3, $t4, $t5)
      # live vars:

@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-21:  publish [module 0x42::Test {]
+task 1 lines 24-44:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(14566554180833181696),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 27)],
+}

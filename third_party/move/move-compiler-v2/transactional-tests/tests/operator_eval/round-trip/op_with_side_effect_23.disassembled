@@ -1,0 +1,13 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/op_with_side_effect_23.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test(): u64
+    ld_u64 0
+    abort
+
+
+
+//# run 0xc0ffee::m::test

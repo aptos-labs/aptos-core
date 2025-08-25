@@ -1,0 +1,330 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/funs_as_storage_key.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::mod2
+struct Registry<T0: copy + store> has store + key
+  func: T0
+
+// Function definition at index 0
+#[persistent] public fun get_item<T0: copy + store>(l0: address): T0 acquires Registry
+    move_loc l0
+    borrow_global Registry<T0>
+    borrow_field Registry<T0>, func
+    read_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun item_exists<T0: copy + store>(l0: address): bool
+    move_loc l0
+    exists Registry<T0>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun remove_item<T0: copy + store>(l0: address): T0 acquires Registry
+    move_loc l0
+    move_from Registry<T0>
+    unpack Registry<T0>
+    ret
+
+// Function definition at index 3
+#[persistent] public fun save_item<T0: copy + store>(l0: &signer, l1: T0)
+    move_loc l0
+    move_loc l1
+    pack Registry<T0>
+    move_to Registry<T0>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::mod3
+use 0x42::mod2
+use 0x1::signer
+struct MyStruct1 has copy + store + key
+  x: u64
+
+struct MyStruct2 has copy + store + key
+  y: u8
+
+// Function definition at index 0
+#[persistent] public fun test_items(l0: signer, l1: bool): bool
+    local l2: |address|bool has copy + drop + store
+    local l3: |address|bool has copy + drop + store
+    local l4: address
+    local l5: MyStruct1
+    local l6: bool
+    local l7: |address|bool has copy + drop + store
+    local l8: bool
+    pack_closure mod2::item_exists<MyStruct1>, 0
+    st_loc l2
+    pack_closure mod2::item_exists<MyStruct2>, 0
+    st_loc l3
+    borrow_loc l0
+    // @5
+    call signer::address_of
+    st_loc l4
+    copy_loc l4
+    exists MyStruct1
+    br_false l0
+    // @10
+    branch l1
+l0: ld_u64 3
+    pack MyStruct1
+    st_loc l5
+    borrow_loc l0
+    // @15
+    copy_loc l5
+    call mod2::save_item<MyStruct1>
+    borrow_loc l0
+    move_loc l5
+    move_to MyStruct1
+    // @20
+l1: copy_loc l1
+    br_false l2
+    borrow_loc l0
+    move_loc l2
+    call mod2::save_item<|address|bool has copy + drop + store>
+    // @25
+l5: copy_loc l4
+    call mod2::item_exists<|address|bool has copy + drop + store>
+    br_false l3
+    copy_loc l4
+    call mod2::get_item<|address|bool has copy + drop + store>
+    // @30
+    move_loc l1
+    st_loc l6
+    st_loc l7
+    copy_loc l4
+    move_loc l7
+    // @35
+    call_closure <|address|bool has copy + drop + store>
+    st_loc l8
+    move_loc l6
+    move_loc l8
+    eq
+    // @40
+    br_false l4
+    move_loc l4
+    call mod2::remove_item<|address|bool has copy + drop + store>
+    pop
+    ld_true
+    // @45
+    ret
+l4: ld_u64 14566554180833181696
+    abort
+l3: ld_u64 14566554180833181696
+    abort
+    // @50
+l2: borrow_loc l0
+    move_loc l3
+    call mod2::save_item<|address|bool has copy + drop + store>
+    branch l5
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::mod4
+struct Wrapper<T0> has key
+  fv: T0
+
+// Function definition at index 0
+fun check_exists(l0: &signer)
+    ld_const<address> 66
+    move_loc l0
+    pop
+    exists Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 404
+    abort
+
+// Function definition at index 1
+fun initialize(l0: &signer)
+    move_loc l0
+    pack_closure test, 0
+    pack Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    move_to Wrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    ret
+
+// Function definition at index 2
+#[persistent] fun test(l0: &u64, l1: &mut u8): &u64
+    move_loc l1
+    pop
+    move_loc l0
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::mod5
+struct VecWrapper<T0> has key
+  fvs: vector<T0>
+
+// Function definition at index 0
+fun check_exists(l0: &signer)
+    ld_const<address> 66
+    move_loc l0
+    pop
+    exists VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 404
+    abort
+
+// Function definition at index 1
+fun initialize(l0: &signer)
+    move_loc l0
+    pack_closure test, 0
+    vec_pack <|&u64, &mut u8|&u64 has copy + drop + store>, 1
+    pack VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    move_to VecWrapper<|&u64, &mut u8|&u64 has copy + drop + store>
+    // @5
+    ret
+
+// Function definition at index 2
+#[persistent] fun test(l0: &u64, l1: &mut u8): &u64
+    move_loc l1
+    pop
+    move_loc l0
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::mod6
+struct VecWrapper<T0> has key
+  fvs: vector<T0>
+
+// Function definition at index 0
+fun compute(l0: &signer): u8 acquires VecWrapper
+    local l1: bool
+    local l2: &vector<|&mut u8| has copy + drop + store>
+    local l3: u8
+    local l4: u64
+    local l5: &|&mut u8| has copy + drop + store
+    ld_const<address> 66
+    move_loc l0
+    pop
+    exists VecWrapper<|&mut u8| has drop + store>
+    br_true l0
+    // @5
+    ld_const<address> 66
+    exists VecWrapper<|&mut u8| has store>
+    not
+    st_loc l1
+l4: move_loc l1
+    // @10
+    br_false l1
+    ld_const<address> 66
+    borrow_global VecWrapper<|&mut u8| has copy + drop + store>
+    borrow_field VecWrapper<|&mut u8| has copy + drop + store>, fvs
+    st_loc l2
+    // @15
+    ld_u8 0
+    st_loc l3
+    ld_u64 0
+    st_loc l4
+l3: copy_loc l4
+    // @20
+    ld_u64 3
+    lt
+    br_false l2
+    copy_loc l2
+    copy_loc l4
+    // @25
+    vec_borrow <|&mut u8| has copy + drop + store>
+    st_loc l5
+    mut_borrow_loc l3
+    move_loc l5
+    read_ref
+    // @30
+    call_closure <|&mut u8| has copy + drop + store>
+    move_loc l4
+    ld_u64 1
+    add
+    st_loc l4
+    // @35
+    branch l3
+l2: move_loc l2
+    pop
+    move_loc l3
+    ret
+    // @40
+l1: ld_u64 404
+    abort
+l0: ld_false
+    st_loc l1
+    branch l4
+
+// Function definition at index 1
+fun initialize(l0: &signer)
+    local l1: vector<|&mut u8| has copy + drop + store>
+    pack_closure test1, 0
+    pack_closure test2, 0
+    pack_closure test3, 0
+    vec_pack <|&mut u8| has copy + drop + store>, 3
+    st_loc l1
+    // @5
+    move_loc l0
+    move_loc l1
+    pack VecWrapper<|&mut u8| has copy + drop + store>
+    move_to VecWrapper<|&mut u8| has copy + drop + store>
+    ret
+
+// Function definition at index 2
+#[persistent] fun test1(l0: &mut u8)
+    copy_loc l0
+    read_ref
+    ld_u8 1
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 3
+#[persistent] fun test2(l0: &mut u8)
+    copy_loc l0
+    read_ref
+    ld_u8 2
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 4
+#[persistent] fun test3(l0: &mut u8)
+    copy_loc l0
+    read_ref
+    ld_u8 3
+    add
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+
+
+//# run 0x42::mod3::test_items --signers 0x42 --args true
+
+//# run 0x42::mod3::test_items --signers 0x42 --args false
+
+//# run 0x42::mod4::initialize --signers 0x42
+
+//# run 0x42::mod4::check_exists --signers 0x42
+
+//# run 0x42::mod5::initialize --signers 0x42
+
+//# run 0x42::mod5::check_exists --signers 0x42
+
+//# run 0x42::mod6::initialize --signers 0x42
+
+//# run 0x42::mod6::compute --signers 0x42

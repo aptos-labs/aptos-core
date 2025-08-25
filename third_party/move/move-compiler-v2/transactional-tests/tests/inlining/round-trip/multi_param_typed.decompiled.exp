@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-3:  run 0x42::Test::test
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

@@ -65,7 +65,7 @@ module 0x42::m {
         And(Eq<vector<u8>>(select m::T.issuer<&T>(obj), issuer), Gt<u64>(x, 0))
     }
     spec fun $inline___lambda__1_inline_1_956__test(issuer: vector<u8>,x: u64,obj: T): bool {
-        And(Eq<vector<u8>>(select m::T.issuer<0x42::m::T>(obj), issuer), Gt<u64>(x, 0))
+        And(Eq<vector<u8>>(select m::T.issuer<T>(obj), issuer), Gt<u64>(x, 0))
     }
 } // end 0x42::m
 
@@ -121,13 +121,13 @@ module 0x42::m {
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
+fun m::test($t0: &mut S, $t1: vector<u8>) {
      var $t2: u64
-     var $t3: &vector<0x42::m::T>
+     var $t3: &vector<T>
      var $t4: bool
      var $t5: u64
-     var $t6: &vector<0x42::m::T>
-     var $t7: &vector<0x42::m::T>
+     var $t6: &vector<T>
+     var $t7: &vector<T>
      var $t8: bool
      var $t9: u64
      var $t10: u64
@@ -138,20 +138,20 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t15: bool
      var $t16: vector<u8>
      var $t17: u64
-     var $t18: &0x42::m::T
-     var $t19: &vector<0x42::m::T>
+     var $t18: &T
+     var $t19: &vector<T>
      var $t20: bool
      var $t21: u64
      var $t22: u64
-  0: $t3 := borrow_field<0x42::m::S>.entries($t0)
-  1: $t2 := vector::length<0x42::m::T>($t3)
-  2: $t7 := borrow_field<0x42::m::S>.entries($t0)
+  0: $t3 := borrow_field<S>.entries($t0)
+  1: $t2 := vector::length<T>($t3)
+  2: $t7 := borrow_field<S>.entries($t0)
   3: $t6 := infer($t7)
   4: $t8 := false
   5: $t9 := 0
   6: $t10 := 0
-  7: $t11 := vector::length<0x42::m::T>($t6)
-  8: $t12 := vector::length<0x42::m::T>($t6)
+  7: $t11 := vector::length<T>($t6)
+  8: $t12 := vector::length<T>($t6)
   9: label L0
  10: $t14 := infer($t10)
  11: $t13 := <($t14, $t12)
@@ -160,7 +160,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
  14: $t16 := infer($t1)
  15: $t17 := infer($t2)
  16: $t19 := infer($t6)
- 17: $t18 := vector::borrow<0x42::m::T>($t19, $t10)
+ 17: $t18 := vector::borrow<T>($t19, $t10)
  18: $t15 := m::__lambda__1_inline_1_956__test($t16, $t17, $t18)
  19: if ($t15) goto 20 else goto 26
  20: label L5
@@ -191,7 +191,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 
 
 [variant baseline]
-fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
+fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &T): bool {
      var $t3: bool
      var $t4: bool
      var $t5: vector<u8>
@@ -202,7 +202,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
   assume Gt(Len<u8>($t0), 0);
 }
 
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
+  1: $t6 := borrow_field<T>.issuer($t2)
   2: $t5 := read_ref($t6)
   3: $t4 := ==($t5, $t0)
   4: if ($t4) goto 5 else goto 10
@@ -220,13 +220,13 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
+fun m::test($t0: &mut S, $t1: vector<u8>) {
      var $t2: u64
-     var $t3: &vector<0x42::m::T>
+     var $t3: &vector<T>
      var $t4: bool
      var $t5: u64
-     var $t6: &vector<0x42::m::T>
-     var $t7: &vector<0x42::m::T>
+     var $t6: &vector<T>
+     var $t7: &vector<T>
      var $t8: bool
      var $t9: u64
      var $t10: u64
@@ -237,8 +237,8 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t15: bool
      var $t16: vector<u8>
      var $t17: u64
-     var $t18: &0x42::m::T
-     var $t19: &vector<0x42::m::T>
+     var $t18: &T
+     var $t19: &vector<T>
      var $t20: bool
      var $t21: u64
      var $t22: u64
@@ -250,7 +250,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
-  0: $t3 := borrow_field<0x42::m::S>.entries($t0)
+  0: $t3 := borrow_field<S>.entries($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t3
      # refs: [$t0 => #0, $t3 => #3]
@@ -261,7 +261,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
-  1: $t2 := vector::length<0x42::m::T>($t3)
+  1: $t2 := vector::length<T>($t3)
      # abort state: {returns,aborts}
      # live vars: $t0, $t1, $t2
      # refs: [$t0 => #0]
@@ -270,7 +270,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
-  2: $t7 := borrow_field<0x42::m::S>.entries($t0)
+  2: $t7 := borrow_field<S>.entries($t0)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t7
      # refs: [$t7 => #7]
@@ -315,7 +315,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
-  7: $t11 := vector::length<0x42::m::T>($t6)
+  7: $t11 := vector::length<T>($t6)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11
      # refs: [$t6 => #6]
@@ -324,7 +324,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
-  8: $t12 := vector::length<0x42::m::T>($t6)
+  8: $t12 := vector::length<T>($t6)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
      # refs: [$t6 => #6]
@@ -407,7 +407,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # #root
      #   <no edges>
      #
- 17: $t18 := vector::borrow<0x42::m::T>($t19, $t10)
+ 17: $t18 := vector::borrow<T>($t19, $t10)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t16, $t17, $t18
      # refs: [$t6 => #6, $t18 => #18]
@@ -606,7 +606,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 
 
 [variant baseline]
-fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
+fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &T): bool {
      var $t3: bool
      var $t4: bool
      var $t5: vector<u8>
@@ -633,7 +633,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # #root
      #   <no edges>
      #
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
+  1: $t6 := borrow_field<T>.issuer($t2)
      # abort state: {returns}
      # live vars: $t0, $t1, $t6
      # refs: [$t6 => #6]
@@ -767,20 +767,20 @@ module 0x42::m {
         And(Eq<vector<u8>>(select m::T.issuer<&T>(obj), issuer), Gt<u64>(x, 0))
     }
     spec fun $inline___lambda__1_inline_1_956__test(issuer: vector<u8>,x: u64,obj: T): bool {
-        And(Eq<vector<u8>>(select m::T.issuer<0x42::m::T>(obj), issuer), Gt<u64>(x, 0))
+        And(Eq<vector<u8>>(select m::T.issuer<T>(obj), issuer), Gt<u64>(x, 0))
     }
 } // end 0x42::m
 
 ============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
+fun m::test($t0: &mut S, $t1: vector<u8>) {
      var $t2: u64
-     var $t3: &vector<0x42::m::T>
+     var $t3: &vector<T>
      var $t4: bool
      var $t5: u64
-     var $t6: &vector<0x42::m::T>
-     var $t7: &vector<0x42::m::T>
+     var $t6: &vector<T>
+     var $t7: &vector<T>
      var $t8: bool
      var $t9: u64
      var $t10: u64
@@ -791,20 +791,20 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t15: bool
      var $t16: vector<u8>
      var $t17: u64
-     var $t18: &0x42::m::T
-     var $t19: &vector<0x42::m::T>
+     var $t18: &T
+     var $t19: &vector<T>
      var $t20: bool
      var $t21: u64
      var $t22: u64
-  0: $t3 := borrow_field<0x42::m::S>.entries($t0)
-  1: $t2 := vector::length<0x42::m::T>($t3)
-  2: $t7 := borrow_field<0x42::m::S>.entries($t0)
+  0: $t3 := borrow_field<S>.entries($t0)
+  1: $t2 := vector::length<T>($t3)
+  2: $t7 := borrow_field<S>.entries($t0)
   3: $t6 := infer($t7)
   4: $t8 := false
   5: $t9 := 0
   6: $t10 := 0
-  7: $t11 := vector::length<0x42::m::T>($t6)
-  8: $t12 := vector::length<0x42::m::T>($t6)
+  7: $t11 := vector::length<T>($t6)
+  8: $t12 := vector::length<T>($t6)
   9: label L0
  10: $t14 := infer($t10)
  11: $t13 := <($t14, $t12)
@@ -813,7 +813,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
  14: $t16 := infer($t1)
  15: $t17 := infer($t2)
  16: $t19 := infer($t6)
- 17: $t18 := vector::borrow<0x42::m::T>($t19, $t10)
+ 17: $t18 := vector::borrow<T>($t19, $t10)
  18: $t15 := m::__lambda__1_inline_1_956__test($t16, $t17, $t18)
  19: if ($t15) goto 20 else goto 26
  20: label L5
@@ -844,7 +844,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 
 
 [variant baseline]
-fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
+fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &T): bool {
      var $t3: bool
      var $t4: bool
      var $t5: vector<u8>
@@ -855,7 +855,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
   assume Gt(Len<u8>($t0), 0);
 }
 
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
+  1: $t6 := borrow_field<T>.issuer($t2)
   2: $t5 := read_ref($t6)
   3: $t4 := ==($t5, $t0)
   4: if ($t4) goto 5 else goto 10
@@ -873,13 +873,13 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
+fun m::test($t0: &mut S, $t1: vector<u8>) {
      var $t2: u64
-     var $t3: &vector<0x42::m::T>
+     var $t3: &vector<T>
      var $t4: bool [unused]
      var $t5: u64 [unused]
-     var $t6: &vector<0x42::m::T>
-     var $t7: &vector<0x42::m::T> [unused]
+     var $t6: &vector<T>
+     var $t7: &vector<T> [unused]
      var $t8: bool
      var $t9: u64
      var $t10: u64
@@ -890,17 +890,17 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      var $t15: bool [unused]
      var $t16: vector<u8>
      var $t17: u64 [unused]
-     var $t18: &0x42::m::T
-     var $t19: &vector<0x42::m::T> [unused]
+     var $t18: &T
+     var $t19: &vector<T> [unused]
      var $t20: bool [unused]
      var $t21: u64 [unused]
      var $t22: u64 [unused]
      # live vars: $t0, $t1
-  0: $t3 := borrow_field<0x42::m::S>.entries($t0)
+  0: $t3 := borrow_field<S>.entries($t0)
      # live vars: $t0, $t1, $t3
-  1: $t2 := vector::length<0x42::m::T>($t3)
+  1: $t2 := vector::length<T>($t3)
      # live vars: $t0, $t1, $t2
-  2: $t3 := borrow_field<0x42::m::S>.entries($t0)
+  2: $t3 := borrow_field<S>.entries($t0)
      # live vars: $t1, $t2, $t3
   3: $t6 := move($t3)
      # live vars: $t1, $t2, $t6
@@ -910,9 +910,9 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # live vars: $t1, $t2, $t6, $t8, $t9
   6: $t10 := 0
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10
-  7: $t11 := vector::length<0x42::m::T>($t6)
+  7: $t11 := vector::length<T>($t6)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11
-  8: $t12 := vector::length<0x42::m::T>($t6)
+  8: $t12 := vector::length<T>($t6)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
   9: label L0
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
@@ -934,7 +934,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16
  18: $t3 := copy($t6)
      # live vars: $t1, $t2, $t3, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16
- 19: $t18 := vector::borrow<0x42::m::T>($t3, $t10)
+ 19: $t18 := vector::borrow<T>($t3, $t10)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t14, $t16, $t18
  20: $t13 := m::__lambda__1_inline_1_956__test($t16, $t14, $t18)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12, $t13
@@ -972,7 +972,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
 
 
 [variant baseline]
-fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::T): bool {
+fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &T): bool {
      var $t3: bool [unused]
      var $t4: bool
      var $t5: vector<u8>
@@ -985,7 +985,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
 }
 
      # live vars: $t0, $t1, $t2
-  1: $t6 := borrow_field<0x42::m::T>.issuer($t2)
+  1: $t6 := borrow_field<T>.issuer($t2)
      # live vars: $t0, $t1, $t6
   2: $t5 := read_ref($t6)
      # live vars: $t0, $t1, $t5

@@ -1,0 +1,14 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/folding_vector.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::M
+// Function definition at index 0
+fun foo()
+    ret
+    ld_u64 0
+    abort
+
+
+
+//# run 0x42::M::foo

@@ -1,0 +1,136 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/arithmetic_operators_u128.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u128 + 340282366920938463463374607431768211455u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 264235234643575437864589745863652363451u128 + 98731747836156137656137643716471364731u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u128 - 1u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 54u128 - 100u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 18446744073709551616u128 * 18446744073709551616u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 170141183460469231731687303715884105728u128 * 2u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u128 / 0u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u128 / 0u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 340282366920938463463374607431768211455u128 / 0u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 0u128 % 0u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 1u128 % 0u128;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _t2 = 340282366920938463463374607431768211455u128 % 0u128;
+    }
+}

@@ -1,0 +1,383 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/positional_fields/assign_field.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+enum E has drop
+  V1
+    _0: u8
+    _1: bool
+  V2
+    _0: S3
+
+struct S0 has copy + drop
+  x: u8
+
+struct S1 has drop
+  _0: u64
+  _1: bool
+
+struct S2 has copy + drop
+  _0: S0
+  _1: u8
+
+struct S3 has drop
+  _0: S2
+  _1: S0
+  _2: S2
+
+// Function definition at index 0
+fun assign0(l0: u64, l1: bool): S1
+    local l2: S1
+    move_loc l0
+    move_loc l1
+    pack S1
+    st_loc l2
+l1: borrow_loc l2
+    // @5
+    borrow_field S1, _1
+    read_ref
+    br_false l0
+    borrow_loc l2
+    borrow_field S1, _0
+    // @10
+    read_ref
+    ld_u64 1
+    sub
+    borrow_loc l2
+    borrow_field S1, _0
+    // @15
+    read_ref
+    ld_u64 2
+    ge
+    pack S1
+    st_loc l2
+    // @20
+    branch l1
+l0: move_loc l2
+    ret
+
+// Function definition at index 1
+fun assign1(l0: S1): u64
+    local l1: u64
+    local l2: u64
+    ld_u64 0
+    st_loc l1
+l2: borrow_loc l0
+    borrow_field S1, _1
+    read_ref
+    // @5
+    br_false l0
+    borrow_loc l0
+    borrow_field S1, _0
+    read_ref
+    ld_u64 0
+    // @10
+    gt
+    br_false l1
+    borrow_loc l0
+    borrow_field S1, _0
+    read_ref
+    // @15
+    ld_u64 1
+    sub
+    st_loc l2
+l3: copy_loc l2
+    move_loc l2
+    // @20
+    ld_u64 1
+    ge
+    pack S1
+    st_loc l0
+    move_loc l1
+    // @25
+    ld_u64 1
+    add
+    st_loc l1
+    branch l2
+l1: ld_u64 0
+    // @30
+    st_loc l2
+    branch l3
+l0: move_loc l1
+    ret
+
+// Function definition at index 2
+fun assign_chained(l0: S3): S3
+    borrow_loc l0
+    borrow_field S3, _0
+    borrow_field S2, _0
+    borrow_field S0, x
+    read_ref
+    // @5
+    borrow_loc l0
+    borrow_field S3, _1
+    borrow_field S0, x
+    read_ref
+    add
+    // @10
+    borrow_loc l0
+    borrow_field S3, _2
+    borrow_field S2, _0
+    borrow_field S0, x
+    read_ref
+    // @15
+    add
+    pop
+    ld_u8 0
+    mut_borrow_loc l0
+    mut_borrow_field S3, _0
+    // @20
+    mut_borrow_field S2, _0
+    mut_borrow_field S0, x
+    write_ref
+    ld_u8 1
+    mut_borrow_loc l0
+    // @25
+    mut_borrow_field S3, _1
+    mut_borrow_field S0, x
+    write_ref
+    ld_u8 2
+    mut_borrow_loc l0
+    // @30
+    mut_borrow_field S3, _2
+    mut_borrow_field S2, _0
+    mut_borrow_field S0, x
+    write_ref
+    move_loc l0
+    // @35
+    ret
+
+// Function definition at index 3
+fun assign_enum(l0: &mut E)
+    local l1: u8
+    local l2: &mut bool
+    local l3: &mut u8
+    local l4: &mut S3
+    copy_loc l0
+    test_variant E, V1
+    br_false l0
+    copy_loc l0
+    mut_borrow_variant_field E, V1::_0
+    // @5
+    move_loc l0
+    mut_borrow_variant_field E, V1::_1
+    st_loc l2
+    st_loc l3
+    ld_u8 42
+    // @10
+    move_loc l3
+    write_ref
+    ld_true
+    move_loc l2
+    write_ref
+    // @15
+l2: ret
+l0: copy_loc l0
+    test_variant E, V2
+    br_false l1
+    move_loc l0
+    // @20
+    mut_borrow_variant_field E, V2::_0
+    st_loc l4
+    ld_u8 0
+    copy_loc l4
+    mut_borrow_field S3, _0
+    // @25
+    mut_borrow_field S2, _0
+    mut_borrow_field S0, x
+    write_ref
+    ld_u8 1
+    copy_loc l4
+    // @30
+    mut_borrow_field S3, _1
+    mut_borrow_field S0, x
+    write_ref
+    ld_u8 2
+    move_loc l4
+    // @35
+    mut_borrow_field S3, _2
+    mut_borrow_field S2, _0
+    mut_borrow_field S0, x
+    write_ref
+    branch l2
+    // @40
+l1: move_loc l0
+    pop
+    ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 4
+fun simple(l0: S1): S1
+    ld_u64 42
+    mut_borrow_loc l0
+    mut_borrow_field S1, _0
+    write_ref
+    ld_true
+    // @5
+    mut_borrow_loc l0
+    mut_borrow_field S1, _1
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 5
+fun simple_ref(l0: &mut S1)
+    ld_u64 42
+    copy_loc l0
+    mut_borrow_field S1, _0
+    write_ref
+    ld_true
+    // @5
+    move_loc l0
+    mut_borrow_field S1, _1
+    write_ref
+    ret
+
+// Function definition at index 6
+fun test_assign0(): S1
+    ld_u64 4
+    ld_true
+    call assign0
+    ret
+
+// Function definition at index 7
+fun test_assign1(): u64
+    ld_u64 4
+    ld_true
+    pack S1
+    call assign1
+    ret
+
+// Function definition at index 8
+fun test_assign_chained(): S3
+    local l0: S0
+    local l1: S2
+    ld_u8 42
+    pack S0
+    st_loc l0
+    copy_loc l0
+    ld_u8 42
+    // @5
+    pack S2
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    move_loc l1
+    // @10
+    pack S3
+    call assign_chained
+    ret
+
+// Function definition at index 9
+fun test_assign_enum_1(): bool
+    local l0: S0
+    local l1: S2
+    local l2: E
+    local l3: S0
+    local l4: S0
+    local l5: S2
+    local l6: E
+    ld_u8 43
+    pack S0
+    st_loc l0
+    copy_loc l0
+    ld_u8 42
+    // @5
+    pack S2
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    move_loc l1
+    // @10
+    pack S3
+    pack_variant E, V2
+    st_loc l2
+    mut_borrow_loc l2
+    call assign_enum
+    // @15
+    ld_u8 0
+    pack S0
+    ld_u8 1
+    pack S0
+    st_loc l3
+    // @20
+    ld_u8 2
+    pack S0
+    st_loc l4
+    ld_u8 42
+    pack S2
+    // @25
+    move_loc l4
+    ld_u8 42
+    pack S2
+    st_loc l5
+    move_loc l3
+    // @30
+    move_loc l5
+    pack S3
+    pack_variant E, V2
+    st_loc l6
+    move_loc l2
+    // @35
+    move_loc l6
+    eq
+    ret
+
+// Function definition at index 10
+fun test_assign_enum_2(): bool
+    local l0: E
+    local l1: E
+    ld_u8 0
+    ld_false
+    pack_variant E, V1
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    call assign_enum
+    ld_u8 42
+    ld_true
+    pack_variant E, V1
+    st_loc l1
+    // @10
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+// Function definition at index 11
+fun test_simple(): S1
+    ld_u64 0
+    ld_false
+    pack S1
+    call simple
+    ret
+
+// Function definition at index 12
+fun test_simple_ref(): S1
+    local l0: S1
+    ld_u64 0
+    ld_false
+    pack S1
+    st_loc l0
+    mut_borrow_loc l0
+    // @5
+    call simple_ref
+    move_loc l0
+    ret
+
+
+
+//# run --verbose -- 0x42::test::test_simple
+
+//# run --verbose -- 0x42::test::test_simple_ref
+
+//# run --verbose -- 0x42::test::test_assign0
+
+//# run --verbose -- 0x42::test::test_assign1
+
+//# run --verbose -- 0x42::test::test_assign_chained
+
+//# run --verbose -- 0x42::test::test_assign_enum_1
+
+//# run --verbose -- 0x42::test::test_assign_enum_2

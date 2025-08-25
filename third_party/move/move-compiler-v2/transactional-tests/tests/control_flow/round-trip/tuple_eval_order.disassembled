@@ -1,0 +1,28 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/tuple_eval_order.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun foo(): (u64, u64)
+    local l0: u64
+    ld_u64 1
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    ld_u64 1
+    // @5
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test(): u64
+    local l0: u64
+    local l1: u64
+    call foo
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test

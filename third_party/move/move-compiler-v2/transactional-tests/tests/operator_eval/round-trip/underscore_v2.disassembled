@@ -1,0 +1,40 @@
+//**** Cross-compiled for `masm` syntax from `tests/operator_eval/underscore_v2.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test10b(): u64
+    ld_u64 7
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test10c(): u64
+    ld_u64 7
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test11(): u64
+    ld_u64 1
+    ret
+
+// Function definition at index 3
+fun test2(): (u32, u64)
+    ld_u32 1
+    ld_u64 2
+    ret
+
+// Function definition at index 4
+#[persistent] public fun test9(): u64
+    ld_u64 7
+    ret
+
+
+
+//# run 0xc0ffee::m::test9
+
+//# run 0xc0ffee::m::test10b
+
+//# run 0xc0ffee::m::test10c
+
+//# run 0xc0ffee::m::test11

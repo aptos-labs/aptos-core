@@ -1,0 +1,53 @@
+//**** Cross-compiled for `masm` syntax from `tests/constants/non_constant_empty_vec.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::M
+struct S
+  dummy_field: bool
+
+// Function definition at index 0
+#[persistent] public fun empty_generic_vec<T0>(): vector<T0>
+    vec_pack <T0>, 0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun empty_generic_vec_vec<T0>(): vector<vector<T0>>
+    vec_pack <vector<T0>>, 0
+    ret
+
+// Function definition at index 2
+#[persistent] public fun empty_signer_vec(): vector<signer>
+    vec_pack <signer>, 0
+    ret
+
+// Function definition at index 3
+#[persistent] public fun empty_signer_vec_vec(): vector<vector<signer>>
+    vec_pack <vector<signer>>, 0
+    ret
+
+// Function definition at index 4
+#[persistent] public fun empty_struct_vec(): vector<S>
+    vec_pack <S>, 0
+    ret
+
+// Function definition at index 5
+#[persistent] public fun empty_struct_vec_vec(): vector<vector<S>>
+    vec_pack <vector<S>>, 0
+    ret
+
+
+
+//# run 0x42::M::empty_struct_vec
+
+//# run 0x42::M::empty_struct_vec
+
+//# run 0x42::M::empty_signer_vec
+
+//# run 0x42::M::empty_generic_vec --type-args 0x42::M::S
+
+//# run 0x42::M::empty_struct_vec_vec
+
+//# run 0x42::M::empty_signer_vec_vec
+
+//# run 0x42::M::empty_generic_vec_vec --type-args 0x42::M::S

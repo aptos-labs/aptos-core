@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_29.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(p0: u64): vector<u64> {
+        let _t1 = p0;
+        p0 = p0 + 1;
+        let _t8 = p0 + 1;
+        let _t9 = 0x1::vector::empty<u64>();
+        let _t10 = &mut _t9;
+        0x1::vector::push_back<u64>(_t10, _t1);
+        0x1::vector::push_back<u64>(_t10, p0);
+        0x1::vector::push_back<u64>(_t10, _t8);
+        _t9
+    }
+}
+
+
+//# run 0xc0ffee::m::test --args 55

@@ -1,0 +1,37 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_16625.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m
+struct S has copy + drop
+  f: ||u8 has copy + drop
+
+// Function definition at index 0
+fun foo(l0: S)
+    local l1: u8
+    ld_u8 1
+    borrow_loc l0
+    borrow_field S, f
+    read_ref
+    call_closure <||u8 has copy + drop>
+    // @5
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    ret
+
+// Function definition at index 1
+#[persistent] public fun main()
+    pack_closure __lambda__1__main, 0
+    pack S
+    call foo
+    ret
+
+// Function definition at index 2
+fun __lambda__1__main(): u8
+    ld_u8 42
+    ret
+
+
+
+//# run 0xCAFE::m::main

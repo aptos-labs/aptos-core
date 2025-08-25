@@ -1,0 +1,257 @@
+//**** Cross-compiled for `masm` syntax from `tests/operators/bitwise_operators.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1302
+    abort
+    ld_u64 1301
+    abort
+    // @5
+    ld_u64 1300
+    abort
+    ld_u64 1302
+    abort
+    ld_u64 1301
+    // @10
+    abort
+    ld_u64 1300
+    abort
+    ld_u64 1202
+    abort
+    // @15
+    ld_u64 1201
+    abort
+    ld_u64 1200
+    abort
+    ld_u64 1202
+    // @20
+    abort
+    ld_u64 1201
+    abort
+    ld_u64 1200
+    abort
+    // @25
+    ld_u64 1102
+    abort
+    ld_u64 1101
+    abort
+    ld_u64 1100
+    // @30
+    abort
+    ld_u64 1102
+    abort
+    ld_u64 1101
+    abort
+    // @35
+    ld_u64 1100
+    abort
+    ld_u64 1005
+    abort
+    ld_u64 1004
+    // @40
+    abort
+    ld_u64 1003
+    abort
+    ld_u64 1002
+    abort
+    // @45
+    ld_u64 1001
+    abort
+    ld_u64 1000
+    abort
+    ld_u64 1005
+    // @50
+    abort
+    ld_u64 1004
+    abort
+    ld_u64 1003
+    abort
+    // @55
+    ld_u64 1002
+    abort
+    ld_u64 1001
+    abort
+    ld_u64 1000
+    // @60
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 1302
+    abort
+    ld_u64 1301
+    abort
+    // @5
+    ld_u64 1300
+    abort
+    ld_u64 2302
+    abort
+    ld_u64 2301
+    // @10
+    abort
+    ld_u64 2300
+    abort
+    ld_u64 1202
+    abort
+    // @15
+    ld_u64 1201
+    abort
+    ld_u64 1200
+    abort
+    ld_u64 2202
+    // @20
+    abort
+    ld_u64 2201
+    abort
+    ld_u64 2200
+    abort
+    // @25
+    ld_u64 1102
+    abort
+    ld_u64 1101
+    abort
+    ld_u64 1100
+    // @30
+    abort
+    ld_u64 2102
+    abort
+    ld_u64 2101
+    abort
+    // @35
+    ld_u64 2100
+    abort
+    ld_u64 1005
+    abort
+    ld_u64 1004
+    // @40
+    abort
+    ld_u64 1003
+    abort
+    ld_u64 1002
+    abort
+    // @45
+    ld_u64 1001
+    abort
+    ld_u64 1000
+    abort
+    ld_u64 2005
+    // @50
+    abort
+    ld_u64 2004
+    abort
+    ld_u64 2003
+    abort
+    // @55
+    ld_u64 2002
+    abort
+    ld_u64 2001
+    abort
+    ld_u64 2000
+    // @60
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 3402
+    abort
+    ld_u64 3401
+    abort
+    // @5
+    ld_u64 3400
+    abort
+    ld_u64 3402
+    abort
+    ld_u64 3401
+    // @10
+    abort
+    ld_u64 3400
+    abort
+    ld_u64 1302
+    abort
+    // @15
+    ld_u64 1301
+    abort
+    ld_u64 1300
+    abort
+    ld_u64 3302
+    // @20
+    abort
+    ld_u64 3301
+    abort
+    ld_u64 3300
+    abort
+    // @25
+    ld_u64 1202
+    abort
+    ld_u64 1201
+    abort
+    ld_u64 1200
+    // @30
+    abort
+    ld_u64 3202
+    abort
+    ld_u64 3201
+    abort
+    // @35
+    ld_u64 3200
+    abort
+    ld_u64 1102
+    abort
+    ld_u64 1101
+    // @40
+    abort
+    ld_u64 1100
+    abort
+    ld_u64 3102
+    abort
+    // @45
+    ld_u64 3101
+    abort
+    ld_u64 3100
+    abort
+    ld_u64 3005
+    // @50
+    abort
+    ld_u64 3004
+    abort
+    ld_u64 3003
+    abort
+    // @55
+    ld_u64 3002
+    abort
+    ld_u64 3001
+    abort
+    ld_u64 3000
+    // @60
+    abort
+    ld_u64 3005
+    abort
+    ld_u64 3004
+    abort
+    // @65
+    ld_u64 3003
+    abort
+    ld_u64 3002
+    abort
+    ld_u64 3001
+    // @70
+    abort
+    ld_u64 3000
+    abort
+

@@ -1,0 +1,85 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/frame_cache.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::dummy
+struct Dummy has key
+  dummy_field: bool
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::foo
+use 0x1::signer
+struct Foo<phantom T0> has store + key
+  value: u64
+
+// Function definition at index 0
+#[persistent] public fun foo_exists<T0>(l0: &signer): bool
+    move_loc l0
+    call signer::address_of
+    exists Foo<T0>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun foo_roundtrip<T0>()
+    ld_u64 0
+    pack Foo<T0>
+    unpack Foo<T0>
+    pop
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::bar
+use 0x1::signer
+use 0x42::dummy
+struct Bar<phantom T0> has key
+  value: u64
+
+// Function definition at index 0
+#[persistent] public fun dummy_bar_exists(l0: &signer): bool
+    move_loc l0
+    call signer::address_of
+    exists Bar<dummy::Dummy>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun make_dummy_bar(l0: &signer)
+    move_loc l0
+    ld_u64 10
+    pack Bar<dummy::Dummy>
+    move_to Bar<dummy::Dummy>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::poc
+use 0x42::dummy
+use 0x42::foo
+use 0x42::bar
+// Function definition at index 0
+fun run(l0: &signer)
+    local l1: |&signer|
+    pack_closure foo::foo_roundtrip<dummy::Dummy>, 0
+    call_closure <||>
+    pack_closure bar::make_dummy_bar, 0
+    st_loc l1
+    move_loc l0
+    // @5
+    move_loc l1
+    call_closure <|&signer|>
+    ret
+
+
+
+//# run 0x42::poc::run --signers 0x42
+
+//# run 0x42::bar::dummy_bar_exists --signers 0x42
+
+//# run 0x42::foo::foo_exists --signers 0x42 --type-args 0x42::dummy::Dummy

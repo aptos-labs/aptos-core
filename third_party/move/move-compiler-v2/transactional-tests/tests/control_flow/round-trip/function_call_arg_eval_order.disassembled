@@ -1,0 +1,79 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/function_call_arg_eval_order.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun bar(l0: &u64, l1: &u64): u64
+    move_loc l1
+    read_ref
+    move_loc l0
+    read_ref
+    sub
+    // @5
+    ret
+
+// Function definition at index 1
+fun foo(l0: u64, l1: u64): u64
+    move_loc l1
+    move_loc l0
+    sub
+    ret
+
+// Function definition at index 2
+#[persistent] public fun g(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    ld_u64 1
+    add
+    call test3
+    // @5
+    ret
+
+// Function definition at index 3
+#[persistent] public fun main(): u64
+    ld_u64 1
+    call g
+    ret
+
+// Function definition at index 4
+#[persistent] public fun test1(): u64
+    local l0: u64
+    ld_u64 1
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    ld_u64 1
+    // @5
+    add
+    call foo
+    ret
+
+// Function definition at index 5
+#[persistent] public fun test2(): u64
+    local l0: u64
+    local l1: u64
+    ld_u64 1
+    st_loc l0
+    borrow_loc l0
+    ld_u64 10
+    st_loc l1
+    // @5
+    borrow_loc l1
+    call bar
+    ret
+
+// Function definition at index 6
+#[persistent] public fun test3(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2
+
+//# run 0xc0ffee::m::main

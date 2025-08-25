@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/shadowing_renamed_param.move`
+
+//# publish
+module 0x42::Test {
+    public fun test_shadowing(p0: u64) {
+        if (!(3 == 3)) abort 0;
+        if (!(5 == 5)) abort 0;
+    }
+    public fun test_shadowing2(p0: u64) {
+        if (!(3 == 3)) abort 0;
+        if (!(5 == 5)) abort 0;
+    }
+    fun test_shadowing_entry() {
+        test_shadowing(1);
+        test_shadowing2(1);
+    }
+}
+
+
+//# run 0x42::Test::test_shadowing_entry

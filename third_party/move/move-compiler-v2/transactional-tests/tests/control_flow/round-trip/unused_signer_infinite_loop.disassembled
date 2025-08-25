@@ -1,0 +1,9 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/unused_signer_infinite_loop.move`
+
+//# run --gas-budget 700 --signers 0x1
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main(l0: signer)
+l0: branch l0
+

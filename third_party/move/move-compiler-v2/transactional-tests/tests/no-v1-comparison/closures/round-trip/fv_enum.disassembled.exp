@@ -1,0 +1,33 @@
+processed 4 tasks
+task 0 lines 3-263:  publish [// Bytecode version v8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::fv_enum_basic'. Got VMError: {
+    major_status: INVALID_CLOSURE_MASK,
+    sub_status: None,
+    location: 0x66::fv_enum_basic,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 1)],
+}
+task 1 lines 267-267:  run 0x66::fv_enum_basic::call_square --args 7
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 269-269:  run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 271-271:  run 0x66::fv_enum_basic::test_fun_vec --signers 0x66
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

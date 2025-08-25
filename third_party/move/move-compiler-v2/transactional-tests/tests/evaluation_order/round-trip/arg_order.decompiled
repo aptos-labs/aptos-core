@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/evaluation_order/arg_order.move`
+
+//# publish
+module 0x42::test {
+    public fun two_args(p0: u64, p1: bool): u64 {
+        let _t2;
+        if (p1) _t2 = p0 else _t2 = 0;
+        _t2
+    }
+}
+
+
+//# run
+script {
+    use 0x42::test;
+    fun main() {
+        if (!(test::two_args(42, true) == 42)) abort 1;
+    }
+}

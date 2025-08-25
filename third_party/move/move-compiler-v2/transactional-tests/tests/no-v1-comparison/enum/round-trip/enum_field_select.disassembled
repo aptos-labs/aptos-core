@@ -1,0 +1,85 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/enum_field_select.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+enum Data has drop
+  V1
+    x: u64
+  V2
+    x: u64
+    y: bool
+
+// Function definition at index 0
+fun get_y(l0: &Data): bool
+    copy_loc l0
+    test_variant Data, V2
+    br_false l0
+    move_loc l0
+    borrow_variant_field Data, V2::y
+    // @5
+    read_ref
+    ret
+l0: move_loc l0
+    pop
+    ld_u64 33
+    // @10
+    abort
+
+// Function definition at index 1
+fun test_get_x_v1(): u64
+    local l0: Data
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    borrow_variant_field Data, V1::x, V2::x
+    // @5
+    read_ref
+    ret
+
+// Function definition at index 2
+fun test_get_x_v2(): u64
+    local l0: Data
+    ld_u64 43
+    ld_false
+    pack_variant Data, V2
+    st_loc l0
+    borrow_loc l0
+    // @5
+    borrow_variant_field Data, V1::x, V2::x
+    read_ref
+    ret
+
+// Function definition at index 3
+fun test_get_y_v1(): bool
+    local l0: Data
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    call get_y
+    // @5
+    ret
+
+// Function definition at index 4
+fun test_get_y_v2(): bool
+    local l0: Data
+    ld_u64 43
+    ld_true
+    pack_variant Data, V2
+    st_loc l0
+    borrow_loc l0
+    // @5
+    call get_y
+    ret
+
+
+
+//# run 0x42::m::test_get_x_v1
+
+//# run 0x42::m::test_get_x_v2
+
+//# run 0x42::m::test_get_y_v1
+
+//# run 0x42::m::test_get_y_v2

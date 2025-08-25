@@ -1,0 +1,20 @@
+processed 2 tasks
+task 0 lines 3-18:  publish [module 0x77::m {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE:12:26
+   │
+12 │         let Func{_0: _t7 : |&u64|(bool) has drop} = _t0;
+   │                 -        ^ Expected '}'
+   │                 │         
+   │                 To match this '{'
+
+
+task 1 lines 21-21:  run 0x77::m::test
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

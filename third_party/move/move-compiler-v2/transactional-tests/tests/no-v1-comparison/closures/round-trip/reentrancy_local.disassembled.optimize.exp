@@ -1,0 +1,13 @@
+processed 3 tasks
+task 0 lines 3-56:  publish [// Bytecode version v8]
+task 1 lines 60-60:  run 0x42::tests::init --signers 0x42
+task 2 lines 62-62:  run 0x42::tests::local_access_via_lambda_fails --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x42::tests::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::tests,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("tests") }), FunctionDefinitionIndex(1), 4)] }),
+}

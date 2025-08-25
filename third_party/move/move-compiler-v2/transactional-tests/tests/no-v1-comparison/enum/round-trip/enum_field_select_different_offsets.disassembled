@@ -1,0 +1,167 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/enum_field_select_different_offsets.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+enum Data has drop
+  V1
+    x: u64
+  V2
+    y: bool
+    x: u64
+  V3
+    z: u8
+    x: u64
+
+// Function definition at index 0
+fun test_get_x_v1(): u64
+    local l0: Data
+    local l1: &Data
+    local l2: &u64
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    test_variant Data, V2
+    br_false l0
+    branch l1
+l1: move_loc l1
+    // @10
+    borrow_variant_field Data, V2::x, V3::x
+    st_loc l2
+l3: move_loc l2
+    read_ref
+    ret
+    // @15
+l0: copy_loc l1
+    test_variant Data, V3
+    br_false l2
+    branch l1
+l2: move_loc l1
+    // @20
+    borrow_variant_field Data, V1::x
+    st_loc l2
+    branch l3
+
+// Function definition at index 1
+fun test_get_x_v2(): u64
+    local l0: Data
+    local l1: &Data
+    local l2: &u64
+    ld_false
+    ld_u64 43
+    pack_variant Data, V2
+    st_loc l0
+    borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    test_variant Data, V2
+    br_false l0
+    branch l1
+    // @10
+l1: move_loc l1
+    borrow_variant_field Data, V2::x, V3::x
+    st_loc l2
+l3: move_loc l2
+    read_ref
+    // @15
+    ret
+l0: copy_loc l1
+    test_variant Data, V3
+    br_false l2
+    branch l1
+    // @20
+l2: move_loc l1
+    borrow_variant_field Data, V1::x
+    st_loc l2
+    branch l3
+
+// Function definition at index 2
+fun test_get_x_v3(): u64
+    local l0: Data
+    local l1: &Data
+    local l2: &u64
+    ld_u8 1
+    ld_u64 43
+    pack_variant Data, V3
+    st_loc l0
+    borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    test_variant Data, V2
+    br_false l0
+    branch l1
+    // @10
+l1: move_loc l1
+    borrow_variant_field Data, V2::x, V3::x
+    st_loc l2
+l3: move_loc l2
+    read_ref
+    // @15
+    ret
+l0: copy_loc l1
+    test_variant Data, V3
+    br_false l2
+    branch l1
+    // @20
+l2: move_loc l1
+    borrow_variant_field Data, V1::x
+    st_loc l2
+    branch l3
+
+// Function definition at index 3
+fun test_get_y_v1(): bool
+    local l0: Data
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    borrow_variant_field Data, V2::y
+    // @5
+    read_ref
+    ret
+
+// Function definition at index 4
+fun test_get_y_v2(): bool
+    local l0: Data
+    ld_true
+    ld_u64 43
+    pack_variant Data, V2
+    st_loc l0
+    borrow_loc l0
+    // @5
+    borrow_variant_field Data, V2::y
+    read_ref
+    ret
+
+// Function definition at index 5
+fun test_get_y_v3(): bool
+    local l0: Data
+    ld_u8 1
+    ld_u64 43
+    pack_variant Data, V3
+    st_loc l0
+    borrow_loc l0
+    // @5
+    borrow_variant_field Data, V2::y
+    read_ref
+    ret
+
+
+
+//# run 0x42::m::test_get_x_v1
+
+//# run 0x42::m::test_get_x_v2
+
+//# run 0x42::m::test_get_x_v3
+
+//# run 0x42::m::test_get_y_v1
+
+//# run 0x42::m::test_get_y_v2
+
+//# run 0x42::m::test_get_y_v3

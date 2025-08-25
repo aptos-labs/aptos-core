@@ -1,0 +1,209 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/pack_unpack_ref.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::pack_unpack_ref
+struct G has drop
+  x1: u64
+  x2: u64
+  s: S
+
+struct S has drop
+  f: u64
+  g: u64
+
+// Function definition at index 0
+fun unpack_ref_G()
+    local l0: S
+    local l1: G
+    local l2: &mut G
+    local l3: &mut u64
+    local l4: &mut u64
+    local l5: &mut S
+    local l6: &mut u64
+    local l7: &mut u64
+    ld_u64 0
+    ld_u64 1
+    pack S
+    st_loc l0
+    ld_u64 2
+    // @5
+    ld_u64 3
+    move_loc l0
+    pack G
+    st_loc l1
+    mut_borrow_loc l1
+    // @10
+    st_loc l2
+    copy_loc l2
+    mut_borrow_field G, x1
+    st_loc l3
+    copy_loc l2
+    // @15
+    mut_borrow_field G, x2
+    st_loc l4
+    move_loc l2
+    mut_borrow_field G, s
+    st_loc l5
+    // @20
+    copy_loc l5
+    mut_borrow_field S, f
+    st_loc l6
+    move_loc l5
+    mut_borrow_field S, g
+    // @25
+    st_loc l7
+    copy_loc l6
+    read_ref
+    ld_u64 0
+    eq
+    // @30
+    br_false l0
+    copy_loc l7
+    read_ref
+    ld_u64 1
+    eq
+    // @35
+    br_false l1
+    copy_loc l3
+    read_ref
+    ld_u64 2
+    eq
+    // @40
+    br_false l2
+    copy_loc l4
+    read_ref
+    ld_u64 3
+    eq
+    // @45
+    br_false l3
+    copy_loc l3
+    read_ref
+    ld_u64 1
+    add
+    // @50
+    copy_loc l3
+    write_ref
+    copy_loc l4
+    read_ref
+    ld_u64 1
+    // @55
+    add
+    copy_loc l4
+    write_ref
+    copy_loc l6
+    read_ref
+    // @60
+    ld_u64 1
+    add
+    copy_loc l6
+    write_ref
+    copy_loc l7
+    // @65
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l7
+    write_ref
+    // @70
+    move_loc l6
+    read_ref
+    ld_u64 1
+    eq
+    br_false l4
+    // @75
+    move_loc l7
+    read_ref
+    ld_u64 2
+    eq
+    br_false l5
+    // @80
+    move_loc l3
+    read_ref
+    ld_u64 3
+    eq
+    br_false l6
+    // @85
+    move_loc l4
+    read_ref
+    ld_u64 4
+    eq
+    br_false l7
+    // @90
+    ret
+l7: ld_u64 3
+    abort
+l6: move_loc l4
+    pop
+    // @95
+    ld_u64 2
+    abort
+l5: move_loc l3
+    pop
+    move_loc l4
+    // @100
+    pop
+    ld_u64 1
+    abort
+l4: move_loc l3
+    pop
+    // @105
+    move_loc l4
+    pop
+    move_loc l7
+    pop
+    ld_u64 0
+    // @110
+    abort
+l3: move_loc l3
+    pop
+    move_loc l4
+    pop
+    // @115
+    move_loc l6
+    pop
+    move_loc l7
+    pop
+    ld_u64 3
+    // @120
+    abort
+l2: move_loc l3
+    pop
+    move_loc l4
+    pop
+    // @125
+    move_loc l6
+    pop
+    move_loc l7
+    pop
+    ld_u64 2
+    // @130
+    abort
+l1: move_loc l3
+    pop
+    move_loc l4
+    pop
+    // @135
+    move_loc l6
+    pop
+    move_loc l7
+    pop
+    ld_u64 1
+    // @140
+    abort
+l0: move_loc l3
+    pop
+    move_loc l4
+    pop
+    // @145
+    move_loc l6
+    pop
+    move_loc l7
+    pop
+    ld_u64 0
+    // @150
+    abort
+
+
+
+//# run  0x42::pack_unpack_ref::unpack_ref_G

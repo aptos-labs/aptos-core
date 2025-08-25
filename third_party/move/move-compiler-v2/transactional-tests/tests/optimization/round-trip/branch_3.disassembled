@@ -1,0 +1,45 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/branch_3.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun foo(l0: bool, l1: u64): u64
+    local l2: u64
+    move_loc l0
+    br_false l0
+    move_loc l1
+    st_loc l2
+l1: move_loc l2
+    // @5
+    ret
+l0: move_loc l1
+    st_loc l2
+    branch l1
+
+// Function definition at index 1
+#[persistent] public fun test()
+    ld_true
+    ld_u64 5
+    call foo
+    ld_u64 5
+    eq
+    // @5
+    br_false l0
+    ld_false
+    ld_u64 5
+    call foo
+    ld_u64 5
+    // @10
+    eq
+    br_false l1
+    ret
+l1: ld_u64 2
+    abort
+    // @15
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0xc0ffee::m::test

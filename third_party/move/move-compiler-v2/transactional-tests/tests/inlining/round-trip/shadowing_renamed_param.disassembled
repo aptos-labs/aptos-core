@@ -1,0 +1,52 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/shadowing_renamed_param.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::Test
+// Function definition at index 0
+#[persistent] public fun test_shadowing(l0: u64)
+    ld_u64 3
+    ld_u64 3
+    eq
+    br_false l0
+    ld_u64 5
+    // @5
+    ld_u64 5
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    // @10
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 1
+#[persistent] public fun test_shadowing2(l0: u64)
+    ld_u64 3
+    ld_u64 3
+    eq
+    br_false l0
+    ld_u64 5
+    // @5
+    ld_u64 5
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    // @10
+    abort
+l0: ld_u64 0
+    abort
+
+// Function definition at index 2
+fun test_shadowing_entry()
+    ld_u64 1
+    call test_shadowing
+    ld_u64 1
+    call test_shadowing2
+    ret
+
+
+
+//# run 0x42::Test::test_shadowing_entry

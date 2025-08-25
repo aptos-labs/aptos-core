@@ -1,0 +1,45 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/consume_4.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct W has copy + drop
+  m: u32
+
+// Function definition at index 0
+fun consume(l0: u32)
+    ret
+
+// Function definition at index 1
+fun consume_(l0: W)
+    ret
+
+// Function definition at index 2
+#[persistent] public fun main()
+    ld_u32 42
+    call test
+    ld_u32 45
+    pack W
+    call test_struct
+    // @5
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test(l0: u32)
+    copy_loc l0
+    call consume
+    move_loc l0
+    call consume
+    ret
+
+// Function definition at index 4
+#[persistent] public fun test_struct(l0: W)
+    copy_loc l0
+    call consume_
+    move_loc l0
+    call consume_
+    ret
+
+
+
+//# run 0xc0ffee::m::main

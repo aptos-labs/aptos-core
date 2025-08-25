@@ -1,0 +1,33 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/call_1.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun id(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 1
+#[persistent] public fun run()
+    ld_u64 50
+    call test
+    ld_u64 50
+    eq
+    br_false l0
+    // @5
+    ret
+l0: ld_u64 0
+    abort
+
+// Function definition at index 2
+fun test(l0: u64): u64
+    move_loc l0
+    call id
+    call id
+    call id
+    ret
+
+
+
+//# run 0xc0ffee::m::run

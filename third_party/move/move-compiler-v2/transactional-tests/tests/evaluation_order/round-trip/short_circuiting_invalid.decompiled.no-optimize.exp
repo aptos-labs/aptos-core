@@ -1,0 +1,42 @@
+processed 6 tasks
+task 0 lines 3-8:  publish [module 0x42::X {]
+task 1 lines 11-18:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(42),
+    location: 0x42::X,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 2 lines 21-28:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(42),
+    location: 0x42::X,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 3 lines 31-37:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(42),
+    location: 0x42::X,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 4 lines 40-46:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(42),
+    location: 0x42::X,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 5 lines 49-54:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(0),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+}

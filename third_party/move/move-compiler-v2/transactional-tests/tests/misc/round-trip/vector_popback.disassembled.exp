@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-130:  publish [// Bytecode version v8]
+task 1 lines 134-134:  run 0x42::vector::test_fold
+task 2 lines 136-136:  run 0x42::vector::test_remove

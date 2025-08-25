@@ -1,0 +1,45 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/write_ref_dest.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+// Function definition at index 0
+fun foo(l0: &vector<u64>): (vector<u64>, u64)
+    move_loc l0
+    read_ref
+    ld_u64 0
+    ret
+
+// Function definition at index 1
+fun test_assign()
+    ld_const<vector<u64>> [1]
+    ld_const<vector<u64>> [1]
+    eq
+    br_false l0
+    ret
+    // @5
+l0: ld_u64 0
+    abort
+
+// Function definition at index 2
+fun test_call()
+    local l0: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l0
+    borrow_loc l0
+    call foo
+    pop
+    // @5
+    vec_pack <u64>, 0
+    eq
+    br_false l0
+    ret
+l0: ld_u64 0
+    // @10
+    abort
+
+
+
+//# run 0x42::m::test_call
+
+//# run 0x42::m::test_assign

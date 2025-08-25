@@ -1,0 +1,62 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/reentrancy_local.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::tests
+struct R has key
+  _0: u64
+
+// Function definition at index 0
+#[persistent] public fun init(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+#[persistent] public fun local_access_via_lambda_fails(): bool acquires R
+    local l0: &mut R
+    local l1: &mut u64
+    pack_closure __lambda__1__local_access_via_lambda_fails, 0
+    ld_const<address> 66
+    mut_borrow_global R
+    st_loc l0
+    call_closure <||>
+    // @5
+    move_loc l0
+    mut_borrow_field R, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @10
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    ld_false
+    // @15
+    ret
+
+// Function definition at index 2
+fun __lambda__1__local_access_via_lambda_fails() acquires R
+    local l0: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, _0
+    st_loc l0
+    copy_loc l0
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    move_loc l0
+    write_ref
+    // @10
+    ret
+
+
+
+//# run 0x42::tests::init --signers 0x42
+
+//# run 0x42::tests::local_access_via_lambda_fails --verbose

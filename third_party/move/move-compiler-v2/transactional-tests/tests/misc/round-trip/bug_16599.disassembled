@@ -1,0 +1,113 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_16599.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m0
+enum E has copy + drop
+  E1
+
+struct S has copy + drop
+  x: bool
+
+// Function definition at index 0
+fun f(l0: S)
+    local l1: u8
+    local l2: E
+    local l3: bool
+    local l4: u8
+    local l5: &mut u8
+    ld_u8 123
+    st_loc l1
+    pack_variant E, E1
+    st_loc l2
+    borrow_loc l2
+    // @5
+    test_variant E, E1
+    br_false l0
+    move_loc l2
+    unpack_variant E, E1
+    borrow_loc l0
+    // @10
+    borrow_field S, x
+    read_ref
+    ld_true
+    st_loc l3
+    mut_borrow_loc l3
+    // @15
+    write_ref
+    ld_u8 0
+    st_loc l4
+    mut_borrow_loc l4
+    st_loc l5
+    // @20
+    move_loc l1
+    move_loc l5
+    write_ref
+    ret
+l0: ld_u64 14566554180833181697
+    // @25
+    abort
+
+// Function definition at index 1
+fun test()
+    ld_true
+    pack S
+    call f
+    ret
+
+
+
+//# run 0xCAFE::m0::test
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m1
+enum E has copy + drop
+  E1
+
+struct S has copy + drop
+  x: bool
+
+// Function definition at index 0
+fun f(l0: S, l1: u64)
+    local l2: u8
+    local l3: u8
+    local l4: &mut u8
+    ld_u8 123
+    st_loc l2
+    move_loc l1
+    ld_u64 10
+    eq
+    // @5
+    br_false l0
+    ld_u64 0
+    abort
+l0: borrow_loc l0
+    borrow_field S, x
+    // @10
+    read_ref
+    mut_borrow_loc l0
+    mut_borrow_field S, x
+    write_ref
+    ld_u8 3
+    // @15
+    st_loc l3
+    mut_borrow_loc l3
+    st_loc l4
+    move_loc l2
+    move_loc l4
+    // @20
+    write_ref
+    ret
+
+// Function definition at index 1
+fun test()
+    ld_true
+    pack S
+    ld_u64 20
+    call f
+    ret
+
+
+
+//# run 0xCAFE::m1::test

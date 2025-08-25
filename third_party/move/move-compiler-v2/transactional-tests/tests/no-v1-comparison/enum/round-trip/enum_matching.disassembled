@@ -1,0 +1,653 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/enum/enum_matching.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct Box has drop
+  x: u64
+
+enum CommonFields
+  Foo
+    x: u64
+    y: u64
+  Bar
+    z: u64
+    x: u64
+
+enum Inner has drop
+  Inner1
+    x: u64
+  Inner2
+    x: u64
+    y: u64
+
+enum Option<T0> has drop
+  None
+  Some
+    value: T0
+
+enum Outer has drop
+  None
+  One
+    i: Inner
+  Two
+    i: Inner
+    b: Box
+
+// Function definition at index 0
+#[persistent] public fun inner_value(l0: Inner): u64
+    local l1: &Inner
+    local l2: u64
+    local l3: u64
+    local l4: u64
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Inner, Inner1
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Inner, Inner1
+    st_loc l2
+    // @10
+l2: move_loc l2
+    ret
+l0: move_loc l1
+    test_variant Inner, Inner2
+    br_false l1
+    // @15
+    move_loc l0
+    unpack_variant Inner, Inner2
+    add
+    st_loc l2
+    branch l2
+    // @20
+l1: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 1
+#[persistent] public fun is_inner1(l0: &Inner): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Inner, Inner1
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_true
+    st_loc l1
+l1: move_loc l1
+    ret
+l0: move_loc l0
+    // @10
+    pop
+    ld_false
+    st_loc l1
+    branch l1
+
+// Function definition at index 2
+#[persistent] public fun is_some<T0>(l0: &Option<T0>): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Option<T0>, None
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_false
+    st_loc l1
+l2: move_loc l1
+    ret
+l0: move_loc l0
+    // @10
+    test_variant Option<T0>, Some
+    br_false l1
+    ld_true
+    st_loc l1
+    branch l2
+    // @15
+l1: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 3
+#[persistent] public fun is_some_dropped<T0: drop>(l0: Option<T0>): bool
+    local l1: bool
+    borrow_loc l0
+    test_variant Option<T0>, None
+    br_false l0
+    move_loc l0
+    unpack_variant Option<T0>, None
+    // @5
+    ld_false
+    st_loc l1
+l1: move_loc l1
+    ret
+l0: ld_true
+    // @10
+    st_loc l1
+    branch l1
+
+// Function definition at index 4
+#[persistent] public fun is_some_specialized(l0: &Option<Option<u64>>): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Option<Option<u64>>, None
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_false
+    st_loc l1
+l6: move_loc l1
+    ret
+l0: copy_loc l0
+    // @10
+    test_variant Option<Option<u64>>, Some
+    br_true l1
+    branch l2
+l2: copy_loc l0
+    test_variant Option<Option<u64>>, Some
+    // @15
+    br_true l3
+    move_loc l0
+    pop
+l5: ld_u64 14566554180833181697
+    abort
+    // @20
+l3: move_loc l0
+    borrow_variant_field Option<Option<u64>>, Some::value
+    test_variant Option<u64>, Some
+    br_true l4
+    branch l5
+    // @25
+l4: ld_true
+    st_loc l1
+    branch l6
+l1: copy_loc l0
+    borrow_variant_field Option<Option<u64>>, Some::value
+    // @30
+    test_variant Option<u64>, None
+    br_true l7
+    branch l2
+l7: move_loc l0
+    pop
+    // @35
+    ld_false
+    st_loc l1
+    branch l6
+
+// Function definition at index 5
+#[persistent] public fun outer_value(l0: Outer): u64
+    local l1: &Outer
+    local l2: u64
+    local l3: Box
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Outer, None
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, None
+    ld_u64 0
+    // @10
+    st_loc l2
+l2: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Outer, One
+    // @15
+    br_false l1
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, One
+    // @20
+    call inner_value
+    st_loc l2
+    branch l2
+l1: move_loc l1
+    test_variant Outer, Two
+    // @25
+    br_false l3
+    move_loc l0
+    unpack_variant Outer, Two
+    st_loc l3
+    call inner_value
+    // @30
+    borrow_loc l3
+    borrow_field Box, x
+    read_ref
+    add
+    st_loc l2
+    // @35
+    branch l2
+l3: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 6
+#[persistent] public fun outer_value_nested(l0: Outer): u64
+    local l1: &Outer
+    local l2: u64
+    local l3: Box
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Outer, None
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, None
+    ld_u64 0
+    // @10
+    st_loc l2
+l4: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Outer, One
+    // @15
+    br_true l1
+    branch l2
+l2: copy_loc l1
+    test_variant Outer, One
+    br_false l3
+    // @20
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, One
+    call inner_value
+    // @25
+    st_loc l2
+    branch l4
+l3: move_loc l1
+    test_variant Outer, Two
+    br_false l5
+    // @30
+    move_loc l0
+    unpack_variant Outer, Two
+    st_loc l3
+    call inner_value
+    borrow_loc l3
+    // @35
+    borrow_field Box, x
+    read_ref
+    add
+    st_loc l2
+    branch l4
+    // @40
+l5: ld_u64 14566554180833181697
+    abort
+l1: copy_loc l1
+    borrow_variant_field Outer, One::i
+    test_variant Inner, Inner1
+    // @45
+    br_true l6
+    branch l2
+l6: move_loc l1
+    pop
+    move_loc l0
+    // @50
+    unpack_variant Outer, One
+    unpack_variant Inner, Inner1
+    st_loc l2
+    branch l4
+
+// Function definition at index 7
+#[persistent] public fun outer_value_with_cond(l0: Outer): u64
+    local l1: &Outer
+    local l2: u64
+    local l3: Box
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Outer, None
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, None
+    ld_u64 0
+    // @10
+    st_loc l2
+l4: move_loc l2
+    ret
+l0: copy_loc l1
+    test_variant Outer, One
+    // @15
+    br_true l1
+    branch l2
+l2: copy_loc l1
+    test_variant Outer, One
+    br_false l3
+    // @20
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Outer, One
+    call inner_value
+    // @25
+    st_loc l2
+    branch l4
+l3: move_loc l1
+    test_variant Outer, Two
+    br_false l5
+    // @30
+    move_loc l0
+    unpack_variant Outer, Two
+    st_loc l3
+    call inner_value
+    borrow_loc l3
+    // @35
+    borrow_field Box, x
+    read_ref
+    add
+    st_loc l2
+    branch l4
+    // @40
+l5: ld_u64 14566554180833181697
+    abort
+l1: copy_loc l1
+    borrow_variant_field Outer, One::i
+    call is_inner1
+    // @45
+    br_true l6
+    branch l2
+l6: move_loc l1
+    pop
+    move_loc l0
+    // @50
+    unpack_variant Outer, One
+    call inner_value
+    ld_u64 2
+    mod
+    st_loc l2
+    // @55
+    branch l4
+
+// Function definition at index 8
+#[persistent] public fun outer_value_with_cond_ref(l0: &Outer): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Outer, None
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_false
+    st_loc l1
+l4: move_loc l1
+    ret
+l0: copy_loc l0
+    // @10
+    test_variant Outer, One
+    br_true l1
+    branch l2
+l2: copy_loc l0
+    test_variant Outer, One
+    // @15
+    br_false l3
+    move_loc l0
+    borrow_variant_field Outer, One::i
+    call is_inner1
+    st_loc l1
+    // @20
+    branch l4
+l3: copy_loc l0
+    test_variant Outer, Two
+    br_false l5
+    move_loc l0
+    // @25
+    borrow_variant_field Outer, Two::i
+    call is_inner1
+    st_loc l1
+    branch l4
+l5: move_loc l0
+    // @30
+    pop
+    ld_u64 14566554180833181697
+    abort
+l1: copy_loc l0
+    borrow_variant_field Outer, One::i
+    // @35
+    call is_inner1
+    br_true l6
+    branch l2
+l6: move_loc l0
+    pop
+    // @40
+    ld_true
+    st_loc l1
+    branch l4
+
+// Function definition at index 9
+fun select_common_fields(l0: CommonFields): u64
+    local l1: &CommonFields
+    local l2: &u64
+    local l3: u64
+    local l4: &CommonFields
+    local l5: u64
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant CommonFields, Bar
+    br_true l0
+    // @5
+    move_loc l1
+    borrow_variant_field CommonFields, Foo::x
+    st_loc l2
+l4: move_loc l2
+    read_ref
+    // @10
+    st_loc l3
+    borrow_loc l0
+    st_loc l4
+    copy_loc l4
+    test_variant CommonFields, Foo
+    // @15
+    br_false l1
+    move_loc l4
+    pop
+    move_loc l0
+    unpack_variant CommonFields, Foo
+    // @20
+    st_loc l5
+    pop
+l3: move_loc l3
+    move_loc l5
+    add
+    // @25
+    ret
+l1: move_loc l4
+    test_variant CommonFields, Bar
+    br_false l2
+    move_loc l0
+    // @30
+    unpack_variant CommonFields, Bar
+    pop
+    st_loc l5
+    branch l3
+l2: ld_u64 14566554180833181697
+    // @35
+    abort
+l0: move_loc l1
+    borrow_variant_field CommonFields, Bar::x
+    st_loc l2
+    branch l4
+
+// Function definition at index 10
+fun t1_inner_value(): u64
+    ld_u64 2
+    ld_u64 5
+    pack_variant Inner, Inner2
+    call inner_value
+    ret
+
+// Function definition at index 11
+fun t1_is_inner1(): bool
+    local l0: Inner
+    ld_u64 2
+    pack_variant Inner, Inner1
+    st_loc l0
+    borrow_loc l0
+    call is_inner1
+    // @5
+    ret
+
+// Function definition at index 12
+fun t1_is_some(): bool
+    local l0: Option<u64>
+    pack_variant Option<u64>, None
+    st_loc l0
+    borrow_loc l0
+    call is_some<u64>
+    ret
+
+// Function definition at index 13
+fun t1_is_some_specialized(): bool
+    local l0: Option<Option<u64>>
+    pack_variant Option<u64>, None
+    pack_variant Option<Option<u64>>, Some
+    st_loc l0
+    borrow_loc l0
+    call is_some_specialized
+    // @5
+    ret
+
+// Function definition at index 14
+fun t1_outer_value(): u64
+    pack_variant Outer, None
+    call outer_value
+    ret
+
+// Function definition at index 15
+fun t1_outer_value_nested(): u64
+    ld_u64 27
+    pack_variant Inner, Inner1
+    pack_variant Outer, One
+    call outer_value_nested
+    ret
+
+// Function definition at index 16
+fun t1_outer_value_with_cond(): u64
+    ld_u64 43
+    pack_variant Inner, Inner1
+    pack_variant Outer, One
+    call outer_value_with_cond
+    ret
+
+// Function definition at index 17
+fun t1_outer_value_with_cond_ref(): bool
+    local l0: Outer
+    ld_u64 43
+    pack_variant Inner, Inner1
+    pack_variant Outer, One
+    st_loc l0
+    borrow_loc l0
+    // @5
+    call outer_value_with_cond_ref
+    ret
+
+// Function definition at index 18
+fun t2_is_inner1(): bool
+    local l0: Inner
+    ld_u64 2
+    ld_u64 3
+    pack_variant Inner, Inner2
+    st_loc l0
+    borrow_loc l0
+    // @5
+    call is_inner1
+    ret
+
+// Function definition at index 19
+fun t2_is_some(): bool
+    local l0: Option<u64>
+    ld_u64 3
+    pack_variant Option<u64>, Some
+    st_loc l0
+    borrow_loc l0
+    call is_some<u64>
+    // @5
+    ret
+
+// Function definition at index 20
+fun t2_is_some_specialized(): bool
+    local l0: Option<Option<u64>>
+    ld_u64 1
+    pack_variant Option<u64>, Some
+    pack_variant Option<Option<u64>>, Some
+    st_loc l0
+    borrow_loc l0
+    // @5
+    call is_some_specialized
+    ret
+
+// Function definition at index 21
+fun t2_outer_value(): u64
+    ld_u64 1
+    ld_u64 2
+    pack_variant Inner, Inner2
+    pack_variant Outer, One
+    call outer_value
+    // @5
+    ret
+
+// Function definition at index 22
+fun t2_outer_value_nested(): u64
+    ld_u64 5
+    pack_variant Inner, Inner1
+    ld_u64 7
+    pack Box
+    pack_variant Outer, Two
+    // @5
+    call outer_value_nested
+    ret
+
+// Function definition at index 23
+fun t3_outer_value(): u64
+    ld_u64 1
+    pack_variant Inner, Inner1
+    ld_u64 7
+    pack Box
+    pack_variant Outer, Two
+    // @5
+    call outer_value
+    ret
+
+
+
+//# run 0x42::m::t1_is_inner1
+
+//# run 0x42::m::t2_is_inner1
+
+//# run 0x42::m::t1_inner_value
+
+//# run 0x42::m::t1_outer_value
+
+//# run 0x42::m::t2_outer_value
+
+//# run 0x42::m::t3_outer_value
+
+//# run 0x42::m::t1_outer_value_nested
+
+//# run 0x42::m::t2_outer_value_nested
+
+//# run 0x42::m::t1_outer_value_with_cond
+
+//# run 0x42::m::t1_outer_value_with_cond_ref
+
+//# run 0x42::m::t1_is_some
+
+//# run 0x42::m::t2_is_some
+
+//# run 0x42::m::t1_is_some_specialized
+
+//# run 0x42::m::t2_is_some_specialized

@@ -1,0 +1,340 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_16622.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m0
+enum Enum0 has copy + drop
+  Variant0
+  Variant1
+    field1: bool
+
+struct S has copy + drop
+  field2: Enum0
+
+// Function definition at index 0
+#[persistent] public fun f0()
+    local l0: S
+    local l1: bool
+    local l2: Enum0
+    local l3: bool
+    local l4: &mut bool
+    ld_false
+    pack_variant Enum0, Variant1
+    pack S
+    st_loc l0
+    ld_true
+    // @5
+    st_loc l1
+    borrow_loc l0
+    borrow_field S, field2
+    read_ref
+    st_loc l2
+    // @10
+    borrow_loc l2
+    test_variant Enum0, Variant0
+    br_false l0
+    move_loc l2
+    unpack_variant Enum0, Variant0
+    // @15
+    ld_true
+    st_loc l3
+    mut_borrow_loc l3
+    st_loc l4
+l1: move_loc l1
+    // @20
+    move_loc l4
+    write_ref
+    ret
+l0: mut_borrow_loc l0
+    mut_borrow_field S, field2
+    // @25
+    mut_borrow_variant_field Enum0, Variant1::field1
+    st_loc l4
+    branch l1
+
+
+
+//# run 0xCAFE::m0::f0
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m1
+enum Enum0 has copy + drop
+  Variant0
+  Variant1
+
+struct S has copy + drop
+  field: Enum0
+
+// Function definition at index 0
+#[persistent] public fun f0()
+    local l0: S
+    local l1: bool
+    local l2: Enum0
+    local l3: bool
+    local l4: &mut bool
+    local l5: S
+    local l6: bool
+    pack_variant Enum0, Variant1
+    pack S
+    st_loc l0
+    ld_true
+    st_loc l1
+    // @5
+    borrow_loc l0
+    borrow_field S, field
+    read_ref
+    st_loc l2
+    borrow_loc l2
+    // @10
+    test_variant Enum0, Variant1
+    br_false l0
+    move_loc l2
+    unpack_variant Enum0, Variant1
+    ld_true
+    // @15
+    st_loc l3
+    mut_borrow_loc l3
+    st_loc l4
+l1: move_loc l1
+    move_loc l4
+    // @20
+    write_ref
+    ret
+l0: move_loc l0
+    st_loc l5
+    borrow_loc l5
+    // @25
+    borrow_field S, field
+    read_ref
+    pop
+    ld_true
+    st_loc l6
+    // @30
+    mut_borrow_loc l6
+    st_loc l4
+    branch l1
+
+// Function definition at index 1
+#[persistent] public fun f1()
+    local l0: S
+    local l1: bool
+    local l2: Enum0
+    local l3: Enum0
+    local l4: &Enum0
+    local l5: S
+    local l6: bool
+    local l7: &mut bool
+    local l8: bool
+    pack_variant Enum0, Variant1
+    pack S
+    st_loc l0
+    ld_true
+    st_loc l1
+    // @5
+    borrow_loc l0
+    borrow_field S, field
+    read_ref
+    st_loc l2
+    borrow_loc l0
+    // @10
+    borrow_field S, field
+    read_ref
+    st_loc l3
+    borrow_loc l2
+    borrow_loc l3
+    // @15
+    st_loc l4
+    test_variant Enum0, Variant1
+    br_true l0
+    move_loc l4
+    pop
+    // @20
+l2: move_loc l0
+    st_loc l5
+    borrow_loc l5
+    borrow_field S, field
+    read_ref
+    // @25
+    pop
+    ld_true
+    st_loc l6
+    mut_borrow_loc l6
+    st_loc l7
+    // @30
+l3: move_loc l1
+    move_loc l7
+    write_ref
+    ret
+l0: move_loc l4
+    // @35
+    test_variant Enum0, Variant1
+    br_true l1
+    branch l2
+l1: move_loc l2
+    unpack_variant Enum0, Variant1
+    // @40
+    move_loc l3
+    unpack_variant Enum0, Variant1
+    ld_true
+    st_loc l8
+    mut_borrow_loc l8
+    // @45
+    st_loc l7
+    branch l3
+
+
+
+//# run 0xCAFE::m1::f0
+
+//# run 0xCAFE::m1::f1
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m2
+enum Enum0 has copy + drop
+  Variant0
+  Variant1
+    field1: bool
+
+enum Enum1 has copy + drop
+  Variant2
+    field2: Enum0
+
+struct Struct1 has copy + drop
+  _0: bool
+
+// Function definition at index 0
+#[persistent] public fun f0()
+    local l0: Enum1
+    local l1: bool
+    local l2: Enum0
+    local l3: Struct1
+    local l4: Struct1
+    local l5: &mut Struct1
+    local l6: bool
+    local l7: &mut bool
+    local l8: Enum1
+    ld_false
+    pack_variant Enum0, Variant1
+    pack_variant Enum1, Variant2
+    st_loc l0
+    ld_true
+    // @5
+    st_loc l1
+    borrow_loc l0
+    borrow_variant_field Enum1, Variant2::field2
+    read_ref
+    st_loc l2
+    // @10
+    borrow_loc l2
+    test_variant Enum0, Variant1
+    br_false l0
+    move_loc l2
+    unpack_variant Enum0, Variant1
+    // @15
+    pop
+    ld_true
+    pack Struct1
+    st_loc l3
+l1: borrow_loc l0
+    // @20
+    borrow_variant_field Enum1, Variant2::field2
+    borrow_variant_field Enum0, Variant1::field1
+    read_ref
+    pack Struct1
+    st_loc l4
+    // @25
+    mut_borrow_loc l4
+    st_loc l5
+    move_loc l3
+    move_loc l5
+    write_ref
+    // @30
+    ld_true
+    st_loc l6
+    mut_borrow_loc l6
+    st_loc l7
+    move_loc l1
+    // @35
+    move_loc l7
+    write_ref
+    ret
+l0: copy_loc l0
+    st_loc l8
+    // @40
+    borrow_loc l8
+    borrow_variant_field Enum1, Variant2::field2
+    read_ref
+    pop
+    ld_true
+    // @45
+    pack Struct1
+    st_loc l3
+    branch l1
+
+
+
+//# run 0xCAFE::m2::f0
+
+//# publish
+// Bytecode version v8
+module 0xcafe::m3
+enum Enum0 has copy + drop
+  Variant0
+  Variant1
+
+struct S has copy + drop
+  field: Enum0
+
+// Function definition at index 0
+fun f0(l0: S)
+    local l1: u8
+    local l2: Enum0
+    local l3: u8
+    local l4: &mut u8
+    local l5: u8
+    ld_u8 1
+    st_loc l1
+    borrow_loc l0
+    borrow_field S, field
+    read_ref
+    // @5
+    st_loc l2
+    borrow_loc l2
+    test_variant Enum0, Variant0
+    br_false l0
+    move_loc l2
+    // @10
+    unpack_variant Enum0, Variant0
+    ld_u8 1
+    st_loc l3
+    mut_borrow_loc l3
+    st_loc l4
+    // @15
+l1: move_loc l1
+    move_loc l4
+    write_ref
+    ret
+l0: borrow_loc l0
+    // @20
+    borrow_field S, field
+    read_ref
+    pop
+    ld_u8 1
+    st_loc l5
+    // @25
+    mut_borrow_loc l5
+    st_loc l4
+    branch l1
+
+// Function definition at index 1
+#[persistent] public fun test()
+    pack_variant Enum0, Variant1
+    pack S
+    call f0
+    ret
+
+
+
+//# run 0xCAFE::m3::test

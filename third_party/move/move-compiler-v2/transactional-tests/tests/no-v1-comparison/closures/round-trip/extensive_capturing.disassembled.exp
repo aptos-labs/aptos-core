@@ -1,0 +1,17 @@
+processed 2 tasks
+task 0 lines 3-153:  publish [// Bytecode version v8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::m'. Got VMError: {
+    major_status: INVALID_CLOSURE_MASK,
+    sub_status: None,
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 3)],
+}
+task 1 lines 157-157:  run 0xc0ffee::m::test
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

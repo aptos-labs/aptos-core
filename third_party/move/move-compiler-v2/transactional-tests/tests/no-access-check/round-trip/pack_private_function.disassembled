@@ -1,0 +1,24 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-access-check/pack_private_function.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct S
+  _0: u64
+
+// Function definition at index 0
+fun inaccessible()
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::n
+use 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test()
+    pack_closure m::inaccessible, 0
+    call_closure <||>
+    ret
+

@@ -1,0 +1,14 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/bug_10991.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::Test
+// Function definition at index 0
+#[persistent] public fun test()
+    ret
+    ld_u64 0
+    abort
+
+
+
+//# run 0x42::Test::test

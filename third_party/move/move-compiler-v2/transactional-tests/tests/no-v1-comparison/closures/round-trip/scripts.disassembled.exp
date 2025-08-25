@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 3-8:  publish [// Bytecode version v8]
+task 1 lines 12-20:  run [// Bytecode version v8]
+task 2 lines 24-32:  run [// Bytecode version v8]
+task 3 lines 36-44:  run [// Bytecode version v8]

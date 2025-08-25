@@ -1,0 +1,31 @@
+processed 16 tasks
+task 0 lines 3-242:  publish [// Bytecode version v8]
+task 1 lines 246-246:  run 0xc0ffee::m::test1a
+return values: []
+task 2 lines 248-248:  run 0xc0ffee::m::test1b
+return values: []
+task 3 lines 250-250:  run 0xc0ffee::m::test2a
+return values: []
+task 4 lines 252-252:  run 0xc0ffee::m::test2b
+return values: []
+task 5 lines 254-254:  run 0xc0ffee::m::test3a --type-args u64
+return values: []
+task 6 lines 256-256:  run 0xc0ffee::m::test3b --type-args u16
+return values: []
+task 7 lines 258-258:  run 0xc0ffee::m::test4a --type-args u32
+return values: []
+task 8 lines 260-260:  run 0xc0ffee::m::test4b --type-args u128
+return values: []
+task 9 lines 262-262:  run 0xc0ffee::m::test5
+return values: []
+task 10 lines 264-264:  run 0xc0ffee::m::test6
+return values: [42]
+task 11 lines 266-266:  run 0xc0ffee::m::test7
+task 12 lines 268-268:  run 0xc0ffee::m::test8
+return values: 3
+task 13 lines 270-270:  run 0xc0ffee::m::test9a
+return values: [3, 2, 1]
+task 14 lines 272-272:  run 0xc0ffee::m::test9b
+return values: [3, 2, 1]
+task 15 lines 274-274:  run 0xc0ffee::m::test10
+return values: [1, 2, 3, 4]

@@ -1,0 +1,30 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/vector_depth_check.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test(): u64
+    local l0: vector<vector<vector<vector<vector<u64>>>>>
+    vec_pack <vector<vector<vector<vector<u64>>>>>, 0
+    st_loc l0
+    borrow_loc l0
+    vec_len <vector<vector<vector<vector<u64>>>>>
+    ret
+
+
+
+//# run 0xc0ffee::m::test
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::n
+// Function definition at index 0
+#[persistent] public fun test(): u64
+    local l0: vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    vec_pack <vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>, 0
+    st_loc l0
+    borrow_loc l0
+    vec_len <vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u64>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ret
+

@@ -1,0 +1,138 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/reentrancy.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::callee
+// Function definition at index 0
+#[persistent] public fun call_me<T0>(l0: &mut T0, l1: |&mut T0|)
+    move_loc l0
+    move_loc l1
+    call_closure <|&mut T0|>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::caller
+use 0x42::callee
+struct R has copy + drop + key
+  count: u64
+
+// Function definition at index 0
+fun init(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack R
+    move_to R
+    ret
+
+// Function definition at index 1
+fun callback_fails(): bool acquires R
+    local l0: &mut R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    st_loc l0
+    copy_loc l0
+    pack_closure __lambda__1__callback_fails, 0
+    // @5
+    call callee::call_me<R>
+    copy_loc l0
+    mut_borrow_field R, count
+    st_loc l1
+    copy_loc l1
+    // @10
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    // @15
+    move_loc l0
+    borrow_field R, count
+    read_ref
+    ld_u64 2
+    eq
+    // @20
+    br_false l0
+    ld_false
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 2
+fun callback_ok(): bool acquires R
+    local l0: &mut R
+    local l1: &mut u64
+    ld_const<address> 66
+    mut_borrow_global R
+    st_loc l0
+    copy_loc l0
+    pack_closure do_something, 0
+    // @5
+    call callee::call_me<R>
+    copy_loc l0
+    mut_borrow_field R, count
+    st_loc l1
+    copy_loc l1
+    // @10
+    read_ref
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    // @15
+    move_loc l0
+    borrow_field R, count
+    read_ref
+    ld_u64 2
+    eq
+    // @20
+    br_false l0
+    ld_true
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 3
+fun do_something(l0: &mut R)
+    local l1: &mut u64
+    move_loc l0
+    mut_borrow_field R, count
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u64 1
+    add
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 4
+fun __lambda__1__callback_fails(l0: &mut R) acquires R
+    local l1: &mut u64
+    move_loc l0
+    pop
+    ld_const<address> 66
+    mut_borrow_global R
+    mut_borrow_field R, count
+    // @5
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 1
+    add
+    // @10
+    move_loc l1
+    write_ref
+    ret
+
+
+
+//# run 0x42::caller::init --signers 0x42
+
+//# run 0x42::caller::callback_ok
+
+//# run 0x42::caller::callback_fails --verbose

@@ -1,0 +1,29 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/bug_16667.move`
+
+//# publish
+// Bytecode version v8
+module 0xaa00::M0
+struct S1 has drop
+  dummy_field: bool
+
+
+
+//# publish
+// Bytecode version v8
+module 0xaa00::M1
+use 0xaa00::M0
+// Function definition at index 0
+#[persistent] entry public fun f1()
+    pack_closure __lambda__2__f1, 0
+    pack_closure __lambda__1__f1, 0
+    call_closure <|(|M0::S1| has drop)|>
+    ret
+
+// Function definition at index 1
+fun __lambda__1__f1(l0: |M0::S1| has drop)
+    ret
+
+// Function definition at index 2
+fun __lambda__2__f1(l0: M0::S1)
+    ret
+

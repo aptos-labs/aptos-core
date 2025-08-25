@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 3-83:  publish [// Bytecode version v8]
+task 1 lines 87-87:  run  0x42::simple_map::run

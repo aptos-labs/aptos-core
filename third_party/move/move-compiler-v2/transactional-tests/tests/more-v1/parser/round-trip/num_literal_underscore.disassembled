@@ -1,0 +1,109 @@
+//**** Cross-compiled for `masm` syntax from `tests/more-v1/parser/num_literal_underscore.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    ret
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    // @5
+    ld_u64 15
+    abort
+    ld_u64 150
+    abort
+    ld_u64 15
+    // @10
+    abort
+    ld_u64 1556
+    abort
+    ld_u64 1556
+    abort
+    // @15
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    // @20
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    // @25
+    ld_u64 150
+    abort
+    ld_u64 15
+    abort
+    ld_u64 1556
+    // @30
+    abort
+    ld_u64 1556
+    abort
+    ld_u64 15
+    abort
+    // @35
+    ld_u64 150
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    // @40
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    // @45
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    ld_u64 150
+    // @50
+    abort
+    ld_u64 15
+    abort
+    ld_u64 1556
+    abort
+    // @55
+    ld_u64 1556
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    // @60
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+    // @65
+    ld_u64 15
+    abort
+    ld_u64 150
+    abort
+    ld_u64 15
+    // @70
+    abort
+    ld_u64 1556
+    abort
+    ld_u64 1556
+    abort
+    // @75
+    ld_u64 15
+    abort
+    ld_u64 150
+    abort
+    ld_u64 15
+    // @80
+    abort
+    ld_u64 15
+    abort
+    ld_u64 15
+    abort
+

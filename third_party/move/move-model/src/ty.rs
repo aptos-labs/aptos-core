@@ -21,6 +21,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
     language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     u256::U256,
 };
@@ -29,9 +30,8 @@ use num_traits::identities::Zero;
 use std::{
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    fmt,
-    fmt::{Debug, Formatter},
-    iter,
+    fmt::{self, Debug, Formatter},
+    iter, str,
 };
 
 /// Represents a type.
@@ -3554,6 +3554,8 @@ pub struct TypeDisplayContext<'a> {
     pub use_module_qualification: bool,
     /// Whether to display module addresses in types, to accommodate special cases
     pub display_module_addr: bool,
+    /// Module aliases
+    pub aliases: BTreeMap<String, BTreeMap<AccountAddress, String>>,
     /// Var types that are recursive and should appear as `..` in display
     pub recursive_vars: Option<BTreeSet<u32>>,
 }
@@ -3569,6 +3571,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            aliases: BTreeMap::new(),
             display_module_addr: false,
             recursive_vars: None,
         }
@@ -3594,6 +3597,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            aliases: BTreeMap::new(),
             display_module_addr: false,
             recursive_vars: None,
         }
@@ -3617,6 +3621,14 @@ impl<'a> TypeDisplayContext<'a> {
             },
             ..self.clone()
         }
+    }
+
+    pub fn get_alias(&self, address: AccountAddress, module_name: String) -> Option<String> {
+        self.aliases
+            .get(&module_name) // If the module name exists
+            .and_then(|m| m.get(&address)) // If the address exists
+            .filter(|alias| **alias != module_name) // If an alias exists
+            .cloned()
     }
 }
 
@@ -3767,43 +3779,57 @@ impl TypeDisplay<'_> {
     #[allow(clippy::assigning_clones)]
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
-        let mut str = if let Some(builder_table) = self.context.builder_struct_table {
-            let qsym = builder_table.get(&(mid, sid)).expect("type known");
-            qsym.display(self.context.env).to_string()
-        } else {
-            let struct_env = env.get_module(mid).into_struct(sid);
-            let module_name = struct_env.module_env.get_name();
-            let module_str = if !self.context.display_module_addr
-                && (self.context.use_module_qualification
-                    || self.context.used_modules.contains(&mid)
-                    || Some(module_name) == self.context.module_name.as_ref())
-            {
-                module_name.display(env).to_string()
+        // get the module containing the struct and struct name
+        let (struct_module, struct_name) =
+            if let Some(builder_table) = self.context.builder_struct_table {
+                let qsym = builder_table.get(&(mid, sid)).expect("type known");
+                (
+                    qsym.module_name.clone(),
+                    qsym.symbol
+                        .display(self.context.env.symbol_pool())
+                        .to_string(),
+                )
             } else {
-                module_name.display_full(env).to_string()
+                let module_env = env.get_module(mid);
+                (
+                    module_env.get_name().clone(),
+                    module_env
+                        .into_struct(sid)
+                        .get_name()
+                        .display(env.symbol_pool())
+                        .to_string(),
+                )
             };
-            format!(
-                "{}::{}",
-                module_str,
-                struct_env.get_name().display(env.symbol_pool())
-            )
-        };
-        if !self.context.display_module_addr && !self.context.use_module_qualification {
-            if let Some(mname) = &self.context.module_name {
-                let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
-                if let Some(shortcut) = str.strip_prefix(&s) {
-                    if let Some(tparams) = &self.context.type_param_names {
-                        // Avoid name clash with type parameter
-                        if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
-                            str = shortcut.to_owned()
-                        }
-                    } else {
-                        str = shortcut.to_owned();
-                    }
-                }
+
+        let struct_module_addr = struct_module.addr().expect_numerical();
+        let struct_module_name = struct_module
+            .name()
+            .display(self.context.env.symbol_pool())
+            .to_string();
+        // If module alias exists, we should use the alias!
+        if let Some(module_alias) = self
+            .context
+            .get_alias(struct_module_addr, struct_module_name.clone())
+        {
+            format!("{}::{}", module_alias, struct_name)
+        } else {
+            let context_module = self.context.module_name.clone();
+            let mut str = String::new();
+            // if address is needed, let's display it!
+            if self.context.display_module_addr {
+                str.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
             }
+            // if module name is needed or the struct-containing module is not the current module, let's display the module name
+            if self.context.use_module_qualification
+                || (self.context.used_modules.contains(&mid)
+                    && context_module
+                        .map_or_else(|| true, |ctx_module| ctx_module != struct_module))
+            {
+                str.push_str(&format!("{}::", struct_module_name));
+            }
+            str.push_str(&struct_name);
+            str
         }
-        str
     }
 }
 

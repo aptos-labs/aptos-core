@@ -1,0 +1,58 @@
+//**** Cross-compiled for `masm` syntax from `tests/evaluation_order/short_circuiting.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::X
+// Function definition at index 0
+#[persistent] public fun error(): bool
+    ld_u64 42
+    abort
+
+
+
+//# run
+// Bytecode version v8
+script
+use 0x42::X
+// Function definition at index 0
+entry public fun main()
+l8: branch l0
+    call X::error
+    pop
+l7: branch l1
+    call X::error
+    // @5
+    pop
+l6: branch l2
+    call X::error
+    pop
+l5: branch l3
+    // @10
+    call X::error
+    pop
+l4: ret
+    ld_u64 0
+    abort
+    // @15
+    ld_u64 0
+    abort
+l3: branch l4
+l2: branch l5
+l1: branch l6
+    // @20
+l0: branch l7
+    call X::error
+    pop
+    branch l8
+    call X::error
+    // @25
+    pop
+    branch l8
+    call X::error
+    pop
+    branch l8
+    // @30
+    call X::error
+    pop
+    branch l8
+

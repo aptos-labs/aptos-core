@@ -1,0 +1,24 @@
+//**** Cross-compiled for `masm` syntax from `tests/control_flow/while_false.move`
+
+//# run
+// Bytecode version v8
+script
+// Function definition at index 0
+entry public fun main()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: branch l0
+    ld_u64 1
+    st_loc l0
+    // @5
+    branch l1
+l0: move_loc l0
+    ld_u64 0
+    eq
+    br_false l2
+    // @10
+    ret
+l2: ld_u64 42
+    abort
+

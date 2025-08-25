@@ -1,0 +1,44 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/flush_if_alive.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct Cap1 has copy + store
+  x: address
+
+struct Cap2 has copy + store
+  x: address
+
+struct Cap3 has copy + store
+  x: address
+
+struct Store has key
+  c: Cap3
+
+// Function definition at index 0
+fun init(l0: &signer): (Cap1, Cap3)
+    local l1: Cap3
+    local l2: Cap1
+    call stuff
+    st_loc l1
+    move_loc l0
+    copy_loc l1
+    pack Store
+    // @5
+    move_to Store
+    call destroy
+    move_loc l1
+    ret
+
+// Function definition at index 1
+fun destroy(l0: Cap2)
+    move_loc l0
+    unpack Cap2
+    pop
+    ret
+
+// Function definition at index 2
+fun stuff(): (Cap1, Cap2, Cap3)
+    ld_u64 0
+    abort
+

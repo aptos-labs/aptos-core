@@ -1,0 +1,70 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/calls_with_freeze.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct S has drop
+  x: u64
+
+// Function definition at index 0
+fun sum(l0: &S, l1: &S): u64
+    move_loc l0
+    borrow_field S, x
+    read_ref
+    move_loc l1
+    borrow_field S, x
+    // @5
+    read_ref
+    add
+    ret
+
+// Function definition at index 1
+fun test(): u64
+    ld_u64 2
+    pack S
+    call test_arg_freeze
+    ret
+
+// Function definition at index 2
+fun test_arg_freeze(l0: S): u64
+    local l1: &mut S
+    local l2: S
+    local l3: &mut S
+    local l4: u64
+    local l5: u64
+    local l6: u64
+    mut_borrow_loc l0
+    st_loc l1
+    ld_u64 4
+    pack S
+    st_loc l2
+    // @5
+    mut_borrow_loc l2
+    st_loc l3
+    copy_loc l1
+    freeze_ref
+    copy_loc l3
+    // @10
+    freeze_ref
+    call sum
+    copy_loc l1
+    freeze_ref
+    move_loc l1
+    // @15
+    freeze_ref
+    call sum
+    borrow_loc l0
+    move_loc l3
+    freeze_ref
+    // @20
+    call sum
+    st_loc l4
+    add
+    move_loc l4
+    add
+    // @25
+    ret
+
+
+
+//# run 0x42::m::test

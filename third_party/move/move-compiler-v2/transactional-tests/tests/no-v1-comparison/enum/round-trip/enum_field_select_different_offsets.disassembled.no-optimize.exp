@@ -1,0 +1,26 @@
+processed 7 tasks
+task 0 lines 3-177:  publish [// Bytecode version v8]
+task 1 lines 181-181:  run 0x42::m::test_get_x_v1
+return values: 43
+task 2 lines 183-183:  run 0x42::m::test_get_x_v2
+return values: 43
+task 3 lines 185-185:  run 0x42::m::test_get_x_v3
+return values: 43
+task 4 lines 187-187:  run 0x42::m::test_get_y_v1
+Error: Function execution failed with VMError: {
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x42::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 4)],
+}
+task 5 lines 189-189:  run 0x42::m::test_get_y_v2
+return values: true
+task 6 lines 191-191:  run 0x42::m::test_get_y_v3
+Error: Function execution failed with VMError: {
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x42::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 9)],
+}

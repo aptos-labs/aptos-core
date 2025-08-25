@@ -1,0 +1,26 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/bug_13488_missing_copy.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun test() {
+        let _t0 = 0;
+        let _t1 = &_t0;
+        let _t2 = 0;
+        let _t3 = &_t2;
+        let _t11 = 0 + 0;
+        if (!(*_t1 == 0)) abort 1;
+        if (!(*_t3 == 0)) abort 1;
+    }
+    fun test2() {
+        let _t0 = 2;
+        let _t1 = &_t0;
+        let _t2 = 2;
+        let _t3 = &_t2;
+        if (!(2 + 2 == 4)) abort 1;
+    }
+}
+
+
+//# run 0xc0ffee::m::test
+
+//# run 0xc0ffee::m::test2

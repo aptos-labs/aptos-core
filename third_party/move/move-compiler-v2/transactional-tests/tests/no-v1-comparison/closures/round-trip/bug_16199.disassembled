@@ -1,0 +1,52 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/bug_16199.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun test()
+    local l0: |u64||u64||u64|u64
+    pack_closure __lambda__3__test, 0
+    st_loc l0
+    ld_u64 3
+    ld_u64 2
+    ld_u64 1
+    // @5
+    move_loc l0
+    call_closure <|u64||u64||u64|u64>
+    call_closure <|u64||u64|u64>
+    call_closure <|u64|u64>
+    ld_u64 6
+    // @10
+    eq
+    br_false l0
+    ret
+l0: ld_u64 14566554180833181696
+    abort
+
+// Function definition at index 1
+fun __lambda__1__test(l0: u64, l1: u64, l2: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    move_loc l2
+    add
+    // @5
+    ret
+
+// Function definition at index 2
+fun __lambda__2__test(l0: u64, l1: u64): |u64|u64
+    move_loc l0
+    move_loc l1
+    pack_closure __lambda__1__test, 11
+    ret
+
+// Function definition at index 3
+fun __lambda__3__test(l0: u64): |u64||u64|u64
+    move_loc l0
+    pack_closure __lambda__2__test, 1
+    ret
+
+
+
+//# run 0xc0ffee::m::test

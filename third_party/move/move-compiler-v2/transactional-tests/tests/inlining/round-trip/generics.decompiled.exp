@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-20:  publish [module 0x42::Test {]
+task 1 lines 23-23:  run 0x42::Test::test
+return values: 6

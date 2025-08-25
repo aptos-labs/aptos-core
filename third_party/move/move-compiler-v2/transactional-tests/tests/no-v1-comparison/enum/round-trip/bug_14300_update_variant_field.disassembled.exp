@@ -1,0 +1,8 @@
+processed 4 tasks
+task 0 lines 3-118:  publish [// Bytecode version v8]
+task 1 lines 122-122:  run 0x815::m::update_common_field
+return values: 15
+task 2 lines 124-124:  run 0x815::m::update_non_common_field
+return values: 15
+task 3 lines 126-126:  run 0x815::m::update_common_field_different_offset
+return values: 15

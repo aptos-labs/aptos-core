@@ -1,0 +1,87 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/capturing.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::test
+struct S has copy + drop
+  f: u64
+
+// Function definition at index 0
+#[persistent] public fun one_captured(l0: u64): u64
+    local l1: |u64|u64
+    move_loc l0
+    pack_closure __lambda__1__one_captured, 1
+    st_loc l1
+    ld_u64 2
+    move_loc l1
+    // @5
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun struct_captured(l0: u64): u64
+    move_loc l0
+    pack S
+    call struct_captured_helper
+    ret
+
+// Function definition at index 2
+fun struct_captured_helper(l0: S): u64
+    local l1: |u64|u64
+    move_loc l0
+    pack_closure __lambda__1__struct_captured_helper, 1
+    st_loc l1
+    ld_u64 4
+    move_loc l1
+    // @5
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 3
+#[persistent] public fun two_captured(l0: u64, l1: u8): u64
+    local l2: |u64|u64
+    move_loc l0
+    move_loc l1
+    pack_closure __lambda__1__two_captured, 11
+    st_loc l2
+    ld_u64 3
+    // @5
+    move_loc l2
+    call_closure <|u64|u64>
+    ret
+
+// Function definition at index 4
+fun __lambda__1__one_captured(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 5
+fun __lambda__1__struct_captured_helper(l0: S, l1: u64): u64
+    borrow_loc l0
+    borrow_field S, f
+    read_ref
+    move_loc l1
+    add
+    // @5
+    ret
+
+// Function definition at index 6
+fun __lambda__1__two_captured(l0: u64, l1: u8, l2: u64): u64
+    move_loc l0
+    move_loc l1
+    cast_u64
+    add
+    move_loc l2
+    // @5
+    add
+    ret
+
+
+
+//# run 0x42::test::one_captured --args 3
+
+//# run 0x42::test::two_captured --args 3 2u8
+
+//# run 0x42::test::struct_captured --args 3

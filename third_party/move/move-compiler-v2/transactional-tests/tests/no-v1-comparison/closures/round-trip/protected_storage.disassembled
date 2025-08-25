@@ -1,0 +1,105 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/protected_storage.move`
+
+//# publish
+// Bytecode version v8
+module 0x66::protected
+use 0x1::signer
+struct Entry<T0> has key
+  _0: T0
+
+// Function definition at index 0
+#[persistent] public fun create<T0: store>(l0: &signer, l1: T0)
+    move_loc l0
+    move_loc l1
+    pack Entry<T0>
+    move_to Entry<T0>
+    ret
+
+// Function definition at index 1
+#[persistent] public fun modify<T0: store, T1>(l0: &signer, l1: |&mut T0|T1): T1 acquires Entry
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global Entry<T0>
+    mut_borrow_field Entry<T0>, _0
+    move_loc l1
+    // @5
+    call_closure <|&mut T0|T1>
+    ret
+
+// Function definition at index 2
+#[persistent] public fun read<T0: store, T1>(l0: &signer, l1: |&T0|T1): T1 acquires Entry
+    move_loc l0
+    call signer::address_of
+    borrow_global Entry<T0>
+    borrow_field Entry<T0>, _0
+    move_loc l1
+    // @5
+    call_closure <|&T0|T1>
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x66::app
+use 0x66::protected
+struct Data has store
+  _0: u64
+
+// Function definition at index 0
+fun increment(l0: &signer): u64
+    move_loc l0
+    pack_closure __lambda__1__increment, 0
+    call protected::modify<Data, u64>
+    ret
+
+// Function definition at index 1
+fun init_module(l0: &signer)
+    move_loc l0
+    ld_u64 0
+    pack Data
+    call protected::create<Data>
+    ret
+
+// Function definition at index 2
+fun view(l0: &signer): u64
+    move_loc l0
+    pack_closure __lambda__1__view, 0
+    call protected::read<Data, u64>
+    ret
+
+// Function definition at index 3
+fun __lambda__1__increment(l0: &mut Data): u64
+    local l1: &mut u64
+    copy_loc l0
+    borrow_field Data, _0
+    read_ref
+    move_loc l0
+    mut_borrow_field Data, _0
+    // @5
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 1
+    add
+    // @10
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 4
+fun __lambda__1__view(l0: &Data): u64
+    move_loc l0
+    borrow_field Data, _0
+    read_ref
+    ret
+
+
+
+//# run 0x66::app::init_module --signers 0x66
+
+//# run 0x66::app::increment --signers 0x66
+
+//# run 0x66::app::increment --signers 0x66
+
+//# run 0x66::app::view --signers 0x66

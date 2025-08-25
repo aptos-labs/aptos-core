@@ -7,20 +7,20 @@ fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &signer, $t1: S) {
      var $t2: &signer
      var $t3: u64
-     var $t4: &0xc0ffee::m::S
+     var $t4: &S
      var $t5: &u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::S
+     var $t7: &S
      var $t8: &u64
   0: $t2 := infer($t0)
   1: $t4 := borrow_local($t1)
-  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+  2: $t5 := borrow_field<S>.a($t4)
   3: $t3 := read_ref($t5)
   4: $t7 := borrow_local($t1)
-  5: $t8 := borrow_field<0xc0ffee::m::S>.b($t7)
+  5: $t8 := borrow_field<S>.b($t7)
   6: $t6 := read_ref($t8)
   7: m::foo($t2, $t3, $t6)
   8: return ()
@@ -43,13 +43,13 @@ fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &signer, $t1: S) {
      var $t2: &signer
      var $t3: u64
-     var $t4: &0xc0ffee::m::S
+     var $t4: &S
      var $t5: &u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::S
+     var $t7: &S
      var $t8: &u64
      # abort state: {returns,aborts}
      # live vars: $t0, $t1
@@ -79,7 +79,7 @@ public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
      # #root
      #   => #4 via [local `y`] at line 10
      #
-  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+  2: $t5 := borrow_field<S>.a($t4)
      # abort state: {returns,aborts}
      # live vars: $t1, $t2, $t5
      # refs: [$t2 => #2, $t5 => #5]
@@ -110,7 +110,7 @@ public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
      # #root
      #   => #7 via [local `y`] at line 10
      #
-  5: $t8 := borrow_field<0xc0ffee::m::S>.b($t7)
+  5: $t8 := borrow_field<S>.b($t7)
      # abort state: {returns,aborts}
      # live vars: $t2, $t3, $t8
      # refs: [$t2 => #2, $t8 => #8]
@@ -147,20 +147,20 @@ fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &signer, $t1: S) {
      var $t2: &signer
      var $t3: u64
-     var $t4: &0xc0ffee::m::S
+     var $t4: &S
      var $t5: &u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::S
+     var $t7: &S
      var $t8: &u64
   0: $t2 := infer($t0)
   1: $t4 := borrow_local($t1)
-  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+  2: $t5 := borrow_field<S>.a($t4)
   3: $t3 := read_ref($t5)
   4: $t7 := borrow_local($t1)
-  5: $t8 := borrow_field<0xc0ffee::m::S>.b($t7)
+  5: $t8 := borrow_field<S>.b($t7)
   6: $t6 := read_ref($t8)
   7: m::foo($t2, $t3, $t6)
   8: return ()
@@ -178,26 +178,26 @@ fun m::foo($t0: &signer, $t1: u64, $t2: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &signer, $t1: S) {
      var $t2: &signer [unused]
      var $t3: u64
-     var $t4: &0xc0ffee::m::S
+     var $t4: &S
      var $t5: &u64
      var $t6: u64
-     var $t7: &0xc0ffee::m::S [unused]
+     var $t7: &S [unused]
      var $t8: &u64 [unused]
      # live vars: $t0, $t1
   0: $t0 := move($t0)
      # live vars: $t0, $t1
   1: $t4 := borrow_local($t1)
      # live vars: $t0, $t1, $t4
-  2: $t5 := borrow_field<0xc0ffee::m::S>.a($t4)
+  2: $t5 := borrow_field<S>.a($t4)
      # live vars: $t0, $t1, $t5
   3: $t3 := read_ref($t5)
      # live vars: $t0, $t1, $t3
   4: $t4 := borrow_local($t1)
      # live vars: $t0, $t3, $t4
-  5: $t5 := borrow_field<0xc0ffee::m::S>.b($t4)
+  5: $t5 := borrow_field<S>.b($t4)
      # live vars: $t0, $t3, $t5
   6: $t6 := read_ref($t5)
      # live vars: $t0, $t3, $t6

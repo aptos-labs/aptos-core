@@ -1,0 +1,13 @@
+//**** Cross-compiled for `masm` syntax from `tests/optimization/cyclic_assignments.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun cyclic(l0: u64): u64
+    move_loc l0
+    ret
+
+
+
+//# run 0xc0ffee::m::cyclic --args 42

@@ -413,8 +413,22 @@ impl<'a> BinaryModuleLoader<'a> {
         let result_type = Type::tuple(handle_view.return_().0.iter().map(|s| self.ty(s)).collect());
 
         // Convert access specifiers from file format to AST format
-        // [Optional TODO] fetch `acquires` from the definition view, if available
-        let access_specifiers = self.access_specifiers(&handle_view, &module_id, &params);
+        let rw_specifiers = self.rw_specifiers(&handle_view, &params);
+        let acquire_specifiers = if let Some((_, def_view)) = def_view.clone() {
+            self.acquire_specifiers(&def_view)
+        } else {
+            None
+        };
+        // Combine read/write and acquire specifiers.
+        let access_specifiers = rw_specifiers
+            .clone()
+            .zip(acquire_specifiers.clone())
+            .map(|(mut rw, acquire)| {
+                rw.extend(acquire);
+                rw
+            })
+            .or(rw_specifiers)
+            .or(acquire_specifiers);
 
         let (visibility, is_native, kind) = if let Some((_, def_view)) = def_view {
             (
@@ -497,10 +511,9 @@ impl<'a> BinaryModuleLoader<'a> {
         }
     }
 
-    fn access_specifiers(
+    fn rw_specifiers(
         &self,
         handle_view: &FunctionHandleView<CompiledModule>,
-        module_id: &ModuleId,
         params: &[Parameter],
     ) -> Option<Vec<ASTAccessSpecifier>> {
         let ff_access_specifiers = handle_view.access_specifiers()?;
@@ -542,7 +555,7 @@ impl<'a> BinaryModuleLoader<'a> {
                     };
                     // The struct may not have been loaded. If so, we have to skip this.
                     if let Some(sid) = self.env.find_struct_by_tag(&stag) {
-                        ASTResourceSpecifier::Resource(module_id.qualified_inst(sid.id, vec![]))
+                        ASTResourceSpecifier::Resource(sid.module_id.qualified_inst(sid.id, vec![]))
                     } else {
                         continue;
                     }
@@ -573,7 +586,9 @@ impl<'a> BinaryModuleLoader<'a> {
                     };
                     // The struct may not have been loaded. If so, we have to skip this.
                     if let Some(sid) = self.env.find_struct_by_tag(&stag) {
-                        ASTResourceSpecifier::Resource(module_id.qualified_inst(sid.id, type_args))
+                        ASTResourceSpecifier::Resource(
+                            sid.module_id.qualified_inst(sid.id, type_args),
+                        )
                     } else {
                         continue;
                     }
@@ -597,7 +612,9 @@ impl<'a> BinaryModuleLoader<'a> {
                             .find_function_by_language_storage_id_name(&ff_mid, func_name);
                         if let Some(func) = func {
                             ASTAddressSpecifier::Call(
-                                module_id.qualified_inst(func.get_id(), func.get_parameter_types()),
+                                func.module_env
+                                    .get_id()
+                                    .qualified_inst(func.get_id(), func.get_parameter_types()),
                                 params[param_idx as usize].0,
                             )
                         } else {
@@ -617,6 +634,52 @@ impl<'a> BinaryModuleLoader<'a> {
                 loc,
             };
             access_specifiers.push(ast_access_specifier);
+        }
+        Some(access_specifiers)
+    }
+
+    fn acquire_specifiers(
+        &self,
+        def_view: &FunctionDefinitionView<CompiledModule>,
+    ) -> Option<Vec<ASTAccessSpecifier>> {
+        let mut access_specifiers = Vec::new();
+        let ff_module = def_view.module();
+        let ff_acquires = def_view.acquired_resources();
+        if ff_acquires.is_empty() {
+            return None;
+        }
+        for sdef_idx in def_view.acquired_resources() {
+            let spec_kind = ASTAccessSpecifierKind::LegacyAcquires;
+            let spec_negated = false;
+            let resource_spec = {
+                let struct_hidx = ff_module.struct_def_at(*sdef_idx).struct_handle;
+                let struct_handle = ff_module.struct_handle_at(struct_hidx);
+                let mhandle = ff_module.module_handle_at(struct_handle.module);
+                let ff_mid = ff_module.module_id_for_handle(mhandle);
+                let sname = ff_module.identifier_at(struct_handle.name);
+                let stag = language_storage::StructTag {
+                    address: ff_mid.address,
+                    module: ff_mid.name,
+                    name: Identifier::new_unchecked(sname.as_str()),
+                    type_args: vec![],
+                };
+                // The struct may not have been loaded. If so, we have to skip this.
+                if let Some(sid) = self.env.find_struct_by_tag(&stag) {
+                    ASTResourceSpecifier::Resource(sid.module_id.qualified_inst(sid.id, vec![]))
+                } else {
+                    continue;
+                }
+            };
+            let addr_spec = ASTAddressSpecifier::Any;
+            let loc = Loc::default();
+            let ast_acquire_specifier: ASTAccessSpecifier = ASTAccessSpecifier {
+                kind: spec_kind,
+                negated: spec_negated,
+                resource: (loc.clone(), resource_spec),
+                address: (loc.clone(), addr_spec),
+                loc,
+            };
+            access_specifiers.push(ast_acquire_specifier);
         }
         Some(access_specifiers)
     }

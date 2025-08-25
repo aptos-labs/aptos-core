@@ -1,0 +1,59 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/borrowed_from_one_path.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+struct R has key
+  data: vector<u64>
+
+// Function definition at index 0
+fun f(l0: u8, l1: &vector<u64>): u64 acquires R
+    local l2: &vector<u64>
+    move_loc l0
+    ld_u8 0
+    eq
+    br_false l0
+    move_loc l1
+    // @5
+    pop
+    ld_const<address> 1
+    borrow_global R
+    borrow_field R, data
+    st_loc l2
+    // @10
+l1: move_loc l2
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ret
+    // @15
+l0: move_loc l1
+    st_loc l2
+    branch l1
+
+// Function definition at index 1
+fun g(l0: u8, l1: &mut vector<u64>) acquires R
+    local l2: &mut vector<u64>
+    move_loc l0
+    ld_u8 0
+    eq
+    br_false l0
+    move_loc l1
+    // @5
+    pop
+    ld_const<address> 1
+    mut_borrow_global R
+    mut_borrow_field R, data
+    st_loc l2
+    // @10
+l1: ld_u64 1
+    move_loc l2
+    ld_u64 0
+    vec_mut_borrow <u64>
+    write_ref
+    // @15
+    ret
+l0: move_loc l1
+    st_loc l2
+    branch l1
+

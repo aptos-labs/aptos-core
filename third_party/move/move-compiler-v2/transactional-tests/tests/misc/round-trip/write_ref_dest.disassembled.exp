@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-39:  publish [// Bytecode version v8]
+task 1 lines 43-43:  run 0x42::m::test_call
+task 2 lines 45-45:  run 0x42::m::test_assign

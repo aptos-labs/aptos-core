@@ -1,0 +1,55 @@
+//**** Cross-compiled for `masm` syntax from `tests/inlining/function_name_shadowing.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::OtherModule
+// Function definition at index 0
+#[persistent] public fun g(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] public fun h(l0: u64, l1: u64): u64
+    ld_u64 2
+    move_loc l0
+    mul
+    move_loc l1
+    add
+    // @5
+    ret
+
+
+
+//# publish
+// Bytecode version v8
+module 0x42::Test
+use 0x42::OtherModule
+// Function definition at index 0
+#[persistent] public fun f(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    mul
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_shadowing(): u64
+    ld_u64 10
+    ld_u64 2
+    call f
+    ld_u64 10
+    ld_u64 2
+    // @5
+    call OtherModule::g
+    mul
+    ld_u64 10
+    ld_u64 2
+    call OtherModule::h
+    // @10
+    mul
+    ret
+
+
+
+//# run 0x42::Test::test_shadowing

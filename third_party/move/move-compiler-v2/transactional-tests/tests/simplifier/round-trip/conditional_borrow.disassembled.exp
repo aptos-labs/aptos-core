@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-251:  publish [// Bytecode version v8]
+task 1 lines 255-255:  run 0x8675::M::test
+return values: 11
+task 2 lines 257-257:  run 0x8675::M::testb
+return values: 11

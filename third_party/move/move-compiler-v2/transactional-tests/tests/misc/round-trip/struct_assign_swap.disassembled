@@ -1,0 +1,86 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/struct_assign_swap.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+struct S
+  f: u32
+  g: u32
+
+// Function definition at index 0
+fun swap1(l0: u32, l1: u32): (u32, u32)
+    move_loc l1
+    move_loc l0
+    pack S
+    unpack S
+    ret
+
+// Function definition at index 1
+fun swap2(): (u32, u32)
+    ld_u32 55
+    ld_u32 44
+    pack S
+    unpack S
+    pop
+    // @5
+    pop
+    ld_u32 55
+    ld_u32 44
+    ret
+
+// Function definition at index 2
+fun swap3(l0: u32, l1: u32): (u32, u32)
+    move_loc l0
+    move_loc l1
+    pack S
+    unpack S
+    st_loc l0
+    // @5
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    ret
+
+// Function definition at index 3
+fun swap4(l0: u32, l1: u32): (u32, u32)
+    move_loc l0
+    move_loc l1
+    pack S
+    unpack S
+    st_loc l0
+    // @5
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    ret
+
+// Function definition at index 4
+fun test1(): (u32, u32)
+    ld_u32 1
+    ld_u32 2
+    call swap1
+    ret
+
+// Function definition at index 5
+fun test3(): (u32, u32)
+    ld_u32 1
+    ld_u32 2
+    call swap3
+    ret
+
+// Function definition at index 6
+fun test4(): (u32, u32)
+    ld_u32 1
+    ld_u32 2
+    call swap4
+    ret
+
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::swap2
+
+//# run 0xc0ffee::m::test3
+
+//# run 0xc0ffee::m::test4

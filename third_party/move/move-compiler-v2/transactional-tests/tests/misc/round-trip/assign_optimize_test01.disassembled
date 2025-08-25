@@ -1,0 +1,68 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/assign_optimize_test01.move`
+
+//# publish
+// Bytecode version v8
+module 0xc0ffee::m
+// Function definition at index 0
+fun bar()
+    ret
+    ld_u64 1
+    abort
+
+// Function definition at index 1
+fun foo1(l0: u64, l1: u64, l2: bool): u64
+    move_loc l2
+    br_true l0
+    branch l1
+l0: move_loc l1
+    st_loc l0
+    // @5
+l1: copy_loc l0
+    ld_u64 2
+    mul
+    call bar
+    move_loc l0
+    // @10
+    ld_u64 3
+    mul
+    add
+    ret
+
+// Function definition at index 2
+fun foo2(l0: u64, l1: u64, l2: bool): u64
+    copy_loc l2
+    br_true l0
+    branch l1
+l0: move_loc l1
+    st_loc l0
+    // @5
+l1: copy_loc l0
+    ld_u64 2
+    mul
+    st_loc l1
+    move_loc l2
+    // @10
+    br_true l2
+    branch l3
+l2: call bar
+l3: call bar
+    move_loc l0
+    // @15
+    ld_u64 3
+    mul
+    st_loc l0
+    move_loc l1
+    move_loc l0
+    // @20
+    add
+    ret
+
+
+
+//# run 0xc0ffee::m::foo1 --args 10 20 true
+
+//# run 0xc0ffee::m::foo1 --args 10 20 false
+
+//# run 0xc0ffee::m::foo2 --args 10 20 true
+
+//# run 0xc0ffee::m::foo2 --args 10 20 false

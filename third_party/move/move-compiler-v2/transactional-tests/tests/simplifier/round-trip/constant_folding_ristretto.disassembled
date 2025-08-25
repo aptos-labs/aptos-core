@@ -1,0 +1,11 @@
+//**** Cross-compiled for `masm` syntax from `tests/simplifier/constant_folding_ristretto.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::Ristretto
+// Function definition at index 0
+#[persistent] public fun test()
+    ret
+    ld_u64 1
+    abort
+

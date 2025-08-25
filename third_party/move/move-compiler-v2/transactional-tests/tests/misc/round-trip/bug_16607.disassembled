@@ -1,0 +1,53 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/bug_16607.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::Module0
+enum Enum0 has copy + drop
+  E1
+    _0: bool
+
+struct S has copy + drop
+  x: Enum0
+
+// Function definition at index 0
+fun f(l0: S)
+    local l1: || has copy + drop
+    local l2: || has copy + drop
+    local l3: Enum0
+    local l4: &mut || has copy + drop
+    pack_closure __lambda__1__f, 0
+    st_loc l1
+    pack_closure __lambda__2__f, 0
+    st_loc l2
+    borrow_loc l0
+    // @5
+    borrow_field S, x
+    read_ref
+    st_loc l3
+    borrow_loc l3
+    test_variant Enum0, E1
+    // @10
+    br_false l0
+    move_loc l3
+    unpack_variant Enum0, E1
+    pop
+    mut_borrow_loc l1
+    // @15
+    st_loc l4
+    move_loc l2
+    move_loc l4
+    write_ref
+    ret
+    // @20
+l0: ld_u64 14566554180833181697
+    abort
+
+// Function definition at index 1
+fun __lambda__1__f()
+    ret
+
+// Function definition at index 2
+fun __lambda__2__f()
+    ret
+

@@ -1,10 +1,10 @@
 ============ bytecode before first stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut S, $t1: u64): u64 {
      var $t2: u64
      var $t3: &mut u64
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
   1: write_ref($t3, $t1)
   2: $t2 := infer($t1)
   3: return $t2
@@ -12,31 +12,31 @@ fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: 0xc0ffee::m::S) {
+fun m::destroy($t0: S) {
      var $t1: u64
-  0: $t1 := unpack 0xc0ffee::m::S($t0)
+  0: $t1 := unpack S($t0)
   1: return ()
 }
 
 
 [variant baseline]
-fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+fun m::foo($t0: &mut S, $t1: u64) {
      var $t2: &mut u64
-  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t2 := borrow_field<S>.x($t0)
   1: write_ref($t2, $t1)
   2: return ()
 }
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &mut S, $t1: S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
      var $t5: u64
-     var $t6: &mut 0xc0ffee::m::S
+     var $t6: &mut S
      var $t7: u64
-     var $t8: &mut 0xc0ffee::m::S
+     var $t8: &mut S
      var $t9: u64
      var $t10: u64
      var $t11: u64
@@ -68,7 +68,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut S, $t1: u64): u64 {
      var $t2: u64
      var $t3: &mut u64
      # abort state: {returns}
@@ -79,7 +79,7 @@ fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
      # #root
      #   <no edges>
      #
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
      # abort state: {returns}
      # live vars: $t1, $t3
      # refs: [$t3 => #3]
@@ -103,13 +103,13 @@ fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: 0xc0ffee::m::S) {
+fun m::destroy($t0: S) {
      var $t1: u64
      # abort state: {returns}
      # live vars: $t0
      # refs: []
      #
-  0: $t1 := unpack 0xc0ffee::m::S($t0)
+  0: $t1 := unpack S($t0)
      # abort state: {returns}
      # live vars:
      # refs: []
@@ -119,7 +119,7 @@ fun m::destroy($t0: 0xc0ffee::m::S) {
 
 
 [variant baseline]
-fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+fun m::foo($t0: &mut S, $t1: u64) {
      var $t2: &mut u64
      # abort state: {returns}
      # live vars: $t0, $t1
@@ -129,7 +129,7 @@ fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
      # #root
      #   <no edges>
      #
-  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t2 := borrow_field<S>.x($t0)
      # abort state: {returns}
      # live vars: $t1, $t2
      # refs: [$t2 => #2]
@@ -148,14 +148,14 @@ fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &mut S, $t1: S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
      var $t5: u64
-     var $t6: &mut 0xc0ffee::m::S
+     var $t6: &mut S
      var $t7: u64
-     var $t8: &mut 0xc0ffee::m::S
+     var $t8: &mut S
      var $t9: u64
      var $t10: u64
      var $t11: u64
@@ -363,10 +363,10 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
 ============ bytecode before second stackless bytecode pipeline ================
 
 [variant baseline]
-fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut S, $t1: u64): u64 {
      var $t2: u64
      var $t3: &mut u64
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
   1: write_ref($t3, $t1)
   2: $t2 := infer($t1)
   3: return $t2
@@ -374,31 +374,31 @@ fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: 0xc0ffee::m::S) {
+fun m::destroy($t0: S) {
      var $t1: u64
-  0: $t1 := unpack 0xc0ffee::m::S($t0)
+  0: $t1 := unpack S($t0)
   1: return ()
 }
 
 
 [variant baseline]
-fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+fun m::foo($t0: &mut S, $t1: u64) {
      var $t2: &mut u64
-  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t2 := borrow_field<S>.x($t0)
   1: write_ref($t2, $t1)
   2: return ()
 }
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &mut S, $t1: S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
      var $t5: u64
-     var $t6: &mut 0xc0ffee::m::S
+     var $t6: &mut S
      var $t7: u64
-     var $t8: &mut 0xc0ffee::m::S
+     var $t8: &mut S
      var $t9: u64
      var $t10: u64
      var $t11: u64
@@ -430,11 +430,11 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
+fun m::bar($t0: &mut S, $t1: u64): u64 {
      var $t2: u64 [unused]
      var $t3: &mut u64
      # live vars: $t0, $t1
-  0: $t3 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t3 := borrow_field<S>.x($t0)
      # live vars: $t1, $t3
   1: write_ref($t3, $t1)
      # live vars: $t1
@@ -443,20 +443,20 @@ fun m::bar($t0: &mut 0xc0ffee::m::S, $t1: u64): u64 {
 
 
 [variant baseline]
-fun m::destroy($t0: 0xc0ffee::m::S) {
+fun m::destroy($t0: S) {
      var $t1: u64
      # live vars: $t0
-  0: $t1 := unpack 0xc0ffee::m::S($t0)
+  0: $t1 := unpack S($t0)
      # live vars:
   1: return ()
 }
 
 
 [variant baseline]
-fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
+fun m::foo($t0: &mut S, $t1: u64) {
      var $t2: &mut u64
      # live vars: $t0, $t1
-  0: $t2 := borrow_field<0xc0ffee::m::S>.x($t0)
+  0: $t2 := borrow_field<S>.x($t0)
      # live vars: $t1, $t2
   1: write_ref($t2, $t1)
      # live vars:
@@ -465,14 +465,14 @@ fun m::foo($t0: &mut 0xc0ffee::m::S, $t1: u64) {
 
 
 [variant baseline]
-public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
+public fun m::test($t0: &mut S, $t1: S) {
      var $t2: u64
      var $t3: bool
      var $t4: u64
      var $t5: u64
-     var $t6: &mut 0xc0ffee::m::S
+     var $t6: &mut S
      var $t7: u64 [unused]
-     var $t8: &mut 0xc0ffee::m::S
+     var $t8: &mut S
      var $t9: u64 [unused]
      var $t10: u64 [unused]
      var $t11: u64 [unused]

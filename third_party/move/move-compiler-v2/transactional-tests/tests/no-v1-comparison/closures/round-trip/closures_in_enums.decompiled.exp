@@ -1,0 +1,44 @@
+processed 5 tasks
+task 0 lines 3-158:  publish [module 0xc0ffee::m {]
+Error: compilation errors:
+ error: unexpected token
+   ┌─ TEMPFILE:24:43
+   │
+24 │             let Function::NoParam{_0: _t8 : ||(u64) has copy + drop} = p0;
+   │                                  -        ^ Expected '}'
+   │                                  │         
+   │                                  To match this '{'
+
+
+task 1 lines 161-161:  run 0xc0ffee::m::test_1
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 163-163:  run 0xc0ffee::m::test_2
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 165-165:  run 0xc0ffee::m::test_3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 167-167:  run 0xc0ffee::m::test_4
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

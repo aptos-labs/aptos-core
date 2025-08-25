@@ -1,0 +1,5 @@
+processed 3 tasks
+task 0 lines 3-21:  publish [// Bytecode version v8]
+task 1 lines 25-51:  publish [// Bytecode version v8]
+task 2 lines 55-55:  run 0x42::Test::test_shadowing
+return values: 5280

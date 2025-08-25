@@ -1,0 +1,271 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/fv_enum.move`
+
+//# publish
+// Bytecode version v8
+module 0x66::fv_enum_basic
+use 0x1::signer
+enum Action has drop
+  Noop
+  Call
+    _0: |u64|u64 has drop
+
+enum FunVec<T0> has key
+  V1
+    v1: vector<|&mut T0|T0 has copy + store>
+  V2
+    v0: u64
+    v1: vector<|&mut T0|T0 has copy + store>
+
+enum Mapper<T0, T1> has key
+  Id
+    _0: |T0|T1 has copy + store
+  Twice
+    _0: Version<T0, T1>
+
+enum Version<T0, T1> has copy + store
+  V1
+    v1: |T0|T1 has copy + store
+
+// Function definition at index 0
+#[persistent] fun add_k_persistent(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] fun add_k_persistent_ref(l0: &mut u64, l1: u64): u64
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    read_ref
+    move_loc l1
+    add
+    // @10
+    ret
+
+// Function definition at index 2
+fun call_square(l0: u64)
+    local l1: Action
+    local l2: |u64|u64 has drop
+    local l3: u64
+    pack_closure square, 0
+    pack_variant Action, Call
+    st_loc l1
+    borrow_loc l1
+    test_variant Action, Call
+    // @5
+    br_false l0
+    move_loc l1
+    unpack_variant Action, Call
+    st_loc l2
+    move_loc l0
+    // @10
+    move_loc l2
+    call_closure <|u64|u64 has drop>
+    st_loc l3
+l2: move_loc l3
+    ld_u64 49
+    // @15
+    eq
+    br_false l1
+    ret
+l1: ld_u64 14566554180833181696
+    abort
+    // @20
+l0: ld_u64 0
+    st_loc l3
+    branch l2
+
+// Function definition at index 3
+fun square(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    mul
+    ret
+
+// Function definition at index 4
+fun test_enum_in_another_enum(l0: &signer) acquires Mapper
+    local l1: Version<u64, u64>
+    local l2: &Mapper<u64, u64>
+    local l3: &Version<u64, u64>
+    local l4: u64
+    local l5: &|u64|u64 has copy + store
+    ld_u64 3
+    pack_closure add_k_persistent, 10
+    pack_variant Version<u64, u64>, V1
+    st_loc l1
+    copy_loc l0
+    // @5
+    move_loc l1
+    pack_variant Mapper<u64, u64>, Twice
+    move_to Mapper<u64, u64>
+    move_loc l0
+    call signer::address_of
+    // @10
+    borrow_global Mapper<u64, u64>
+    st_loc l2
+    copy_loc l2
+    test_variant Mapper<u64, u64>, Twice
+    br_false l0
+    // @15
+    move_loc l2
+    borrow_variant_field Mapper<u64, u64>, Twice::_0
+    st_loc l3
+    ld_u64 10
+    copy_loc l3
+    // @20
+    borrow_variant_field Version<u64, u64>, V1::v1
+    read_ref
+    call_closure <|u64|u64 has copy + store>
+    move_loc l3
+    borrow_variant_field Version<u64, u64>, V1::v1
+    // @25
+    read_ref
+    call_closure <|u64|u64 has copy + store>
+    st_loc l4
+l3: move_loc l4
+    ld_u64 16
+    // @30
+    eq
+    br_false l1
+    ret
+l1: ld_u64 99
+    abort
+    // @35
+l0: copy_loc l2
+    test_variant Mapper<u64, u64>, Id
+    br_false l2
+    move_loc l2
+    borrow_variant_field Mapper<u64, u64>, Id::_0
+    // @40
+    st_loc l5
+    ld_u64 10
+    move_loc l5
+    read_ref
+    call_closure <|u64|u64 has copy + store>
+    // @45
+    st_loc l4
+    branch l3
+l2: move_loc l2
+    pop
+    ld_u64 14566554180833181697
+    // @50
+    abort
+
+// Function definition at index 5
+fun test_fun_vec(l0: &signer) acquires FunVec
+    local l1: |&mut u64|u64 has copy + drop + store
+    local l2: FunVec<u64>
+    local l3: FunVec<u64>
+    local l4: &FunVec<u64>
+    local l5: vector<|&mut u64|u64 has copy + store>
+    local l6: |&mut u64|u64 has copy + store
+    local l7: u64
+    local l8: u64
+    local l9: bool
+    ld_u64 3
+    pack_closure add_k_persistent_ref, 10
+    st_loc l1
+    copy_loc l1
+    move_loc l1
+    // @5
+    vec_pack <|&mut u64|u64 has copy + store>, 2
+    pack_variant FunVec<u64>, V1
+    st_loc l2
+    copy_loc l0
+    move_loc l2
+    // @10
+    move_to FunVec<u64>
+    copy_loc l0
+    call signer::address_of
+    move_from FunVec<u64>
+    st_loc l3
+    // @15
+    borrow_loc l3
+    st_loc l4
+    copy_loc l4
+    test_variant FunVec<u64>, V1
+    br_false l0
+    // @20
+    move_loc l4
+    pop
+    move_loc l3
+    unpack_variant FunVec<u64>, V1
+    st_loc l5
+    // @25
+    mut_borrow_loc l5
+    vec_pop_back <|&mut u64|u64 has copy + store>
+    st_loc l6
+    ld_u64 3
+    st_loc l7
+    // @30
+    mut_borrow_loc l7
+    copy_loc l6
+    call_closure <|&mut u64|u64 has copy + store>
+    st_loc l8
+    move_loc l7
+    // @35
+    ld_u64 4
+    eq
+    br_false l1
+    move_loc l8
+    ld_u64 7
+    // @40
+    eq
+    br_false l2
+    mut_borrow_loc l5
+    move_loc l6
+    vec_push_back <|&mut u64|u64 has copy + store>
+    // @45
+    ld_u64 10
+    move_loc l5
+    pack_variant FunVec<u64>, V2
+    st_loc l2
+    move_loc l0
+    // @50
+    move_loc l2
+    move_to FunVec<u64>
+l5: ret
+l2: move_loc l0
+    pop
+    // @55
+    ld_u64 1
+    abort
+l1: move_loc l0
+    pop
+    ld_u64 0
+    // @60
+    abort
+l0: move_loc l0
+    pop
+    move_loc l4
+    test_variant FunVec<u64>, V2
+    // @65
+    br_false l3
+    move_loc l3
+    unpack_variant FunVec<u64>, V2
+    vec_unpack <|&mut u64|u64 has copy + store>, 0
+    pop
+    // @70
+    ld_false
+    br_false l4
+    branch l5
+l4: ld_u64 2
+    abort
+    // @75
+l3: ld_u64 14566554180833181697
+    abort
+
+
+
+//# run 0x66::fv_enum_basic::call_square --args 7
+
+//# run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+
+//# run 0x66::fv_enum_basic::test_fun_vec --signers 0x66

@@ -1,0 +1,13 @@
+processed 7 tasks
+task 0 lines 3-55:  publish [// Bytecode version v8]
+task 1 lines 59-59:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 61-61:  run --verbose -- 0x42::test::ok1
+return values: true
+task 3 lines 63-63:  run --verbose -- 0x42::test::ok2
+return values: true
+task 4 lines 65-65:  run --verbose -- 0x42::test::fail1
+return values: true
+task 5 lines 67-67:  run --verbose -- 0x42::test::fail2
+return values: true
+task 6 lines 69-69:  run --verbose -- 0x42::test::ok3
+return values: true

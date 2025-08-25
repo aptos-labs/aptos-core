@@ -1,0 +1,11 @@
+processed 3 tasks
+task 0 lines 3-11:  run [script {]
+task 1 lines 14-22:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+}
+task 2 lines 25-33:  run [script {]

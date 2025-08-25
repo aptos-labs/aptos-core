@@ -1,0 +1,103 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/power_function.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::power_function
+// Function definition at index 0
+#[persistent] public fun pow(l0: u64, l1: u64): u64
+    local l2: u64
+    local l3: u64
+    copy_loc l1
+    ld_u64 0
+    eq
+    br_false l0
+    ld_u64 1
+    // @5
+    ret
+l0: copy_loc l0
+    st_loc l2
+    ld_u64 1
+    st_loc l3
+    // @10
+l2: copy_loc l3
+    copy_loc l1
+    lt
+    br_false l1
+    move_loc l2
+    // @15
+    copy_loc l0
+    mul
+    st_loc l2
+    move_loc l3
+    ld_u64 1
+    // @20
+    add
+    st_loc l3
+    branch l2
+l1: move_loc l2
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_pow()
+    ld_u64 2
+    ld_u64 0
+    call pow
+    ld_u64 1
+    eq
+    // @5
+    br_false l0
+    ld_u64 2
+    ld_u64 1
+    call pow
+    ld_u64 2
+    // @10
+    eq
+    br_false l1
+    ld_u64 2
+    ld_u64 2
+    call pow
+    // @15
+    ld_u64 4
+    eq
+    br_false l2
+    ld_u64 2
+    ld_u64 3
+    // @20
+    call pow
+    ld_u64 8
+    eq
+    br_false l3
+    ld_u64 3
+    // @25
+    ld_u64 3
+    call pow
+    ld_u64 27
+    eq
+    br_false l4
+    // @30
+    ld_u64 5
+    ld_u64 4
+    call pow
+    ld_u64 625
+    eq
+    // @35
+    br_false l5
+    ret
+l5: ld_u64 5
+    abort
+l4: ld_u64 4
+    // @40
+    abort
+l3: ld_u64 3
+    abort
+l2: ld_u64 2
+    abort
+    // @45
+l1: ld_u64 1
+    abort
+l0: ld_u64 0
+    abort
+
+
+
+//# run 0x42::power_function::test_pow

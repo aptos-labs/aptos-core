@@ -1,0 +1,24 @@
+//**** Cross-compiled for `masm` syntax from `tests/no-v1-comparison/closures/very_large_2.move`
+
+//# publish
+// Bytecode version v8
+module 0xcafe::Module0
+// Function definition at index 0
+#[persistent] public fun f1(l0: &|(|&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop)| has drop)
+    move_loc l0
+    pop
+    ret
+
+// Function definition at index 1
+#[persistent] public fun f2()
+    local l0: |(|&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop)| has drop
+    pack_closure __lambda__1__f2, 0
+    st_loc l0
+    borrow_loc l0
+    call f1
+    ret
+
+// Function definition at index 2
+fun __lambda__1__f2(l0: |&u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8, &u8| has drop)
+    ret
+

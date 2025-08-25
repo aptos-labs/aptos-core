@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/nested_loops.move`
+
+//# publish
+module 0x42::M {
+    public fun foobar(p0: bool) {
+        loop {
+            if (!p0) continue;
+            if (!p0) continue;
+            break
+        };
+    }
+}
+
+
+//# run
+script {
+    use 0x42::M;
+    fun main() {
+        M::foobar(true);
+    }
+}

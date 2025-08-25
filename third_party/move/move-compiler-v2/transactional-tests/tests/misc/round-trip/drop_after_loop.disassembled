@@ -1,0 +1,41 @@
+//**** Cross-compiled for `masm` syntax from `tests/misc/drop_after_loop.move`
+
+//# publish
+// Bytecode version v8
+module 0x42::m
+// Function definition at index 0
+fun drop_required()
+    local l0: u64
+    local l1: &mut u64
+    local l2: bool
+    ld_u64 1
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    ld_true
+    // @5
+    st_loc l2
+l1: move_loc l2
+    br_false l0
+    ld_u64 2
+    copy_loc l1
+    // @10
+    write_ref
+    ld_false
+    st_loc l2
+    branch l1
+l0: move_loc l1
+    // @15
+    pop
+    move_loc l0
+    ld_u64 2
+    eq
+    br_false l2
+    // @20
+    ret
+l2: ld_u64 0
+    abort
+
+
+
+//# run 0x42::m::drop_required
