@@ -13,8 +13,9 @@ runs:
   steps:
   - name: Check if Docker Files Changed
     id: changed
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
     run: |
-      BASE_REF=${{ inputs.base-ref }}
       # Validate BASE_REF
       if [ -z "$BASE_REF" ]; then
         echo "No base ref provided. Defaulting to 'movement'"

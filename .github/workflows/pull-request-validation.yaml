@@ -29,12 +29,12 @@ jobs:
         id: members_check
         uses: ./.github/actions/cargo-members-changed
         with:
-          base-ref: ${{ github.event.pull_request.base.ref }}
+          base-ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
       - name: Check if Docker Files Changed
         id: docker_check
         uses: ./.github/actions/docker-files-changed
         with:
-          base-ref: ${{ github.event.pull_request.base.ref }}
+          base-ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
 
   build-binaries:
