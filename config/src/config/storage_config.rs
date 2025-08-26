@@ -103,18 +103,9 @@ impl ShardedDbPathConfig {
     }
 }
 
-/// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
-/// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
-/// for detailed explanations.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct RocksdbConfig {
-    /// Maximum number of files open by RocksDB at one time
-    pub max_open_files: i32,
-    /// Maximum size of the RocksDB write ahead log (WAL)
-    pub max_total_wal_size: u64,
-    /// Maximum number of background threads for Rocks DB
-    pub max_background_jobs: i32,
+pub struct CFConfig {
     /// Block cache size for Rocks DB
     pub block_cache_size: u64,
     /// Block size for Rocks DB
@@ -123,8 +114,55 @@ pub struct RocksdbConfig {
     pub cache_index_and_filter_blocks: bool,
 }
 
+impl Default for CFConfig {
+    fn default() -> Self {
+        Self {
+            // Default block cache size is 8MB,
+            block_cache_size: 8 * (1u64 << 20),
+            // Default block cache size is 4KB,
+            block_size: 4 * (1u64 << 10),
+            // Whether cache index and filter blocks into block cache.
+            cache_index_and_filter_blocks: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CFConfigOverride {
+    pub block_cache_size: Option<u64>,
+    pub block_size: Option<u64>,
+    pub cache_index_and_filter_blocks: Option<bool>,
+}
+
+/// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
+/// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
+/// for detailed explanations.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RocksdbConfig {
+    /// Maximum number of files open by RocksDB at one time
+    pub max_open_files: i32,
+    /// Maximum size of the RocksDB write ahead log (WAL)
+    pub max_total_wal_size: u64,
+    /// Maximum number of background threads for Rocks DB
+    pub max_background_jobs: i32,
+
+    pub cf_defaults: ColumnFamilyConfig,
+
+    pub cf_overrides: HashMap<String, ColumnFamilyConfig>,
+
+    // Kept for backward compatibility.
+    pub block_cache_size: u64,
+    pub block_size: u64,
+    pub cache_index_and_filter_blocks: bool,
+}
+
 impl Default for RocksdbConfig {
     fn default() -> Self {
+        let state_kv_config = ColumnFamilyConfig {
+            block_cache_size: 1 << 30,
+        };
         Self {
             // Allow db to close old sst files, saving memory.
             max_open_files: 5000,
@@ -144,7 +182,7 @@ impl Default for RocksdbConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
     // TODO(grao): Add RocksdbConfig for individual ledger DBs when necessary.
