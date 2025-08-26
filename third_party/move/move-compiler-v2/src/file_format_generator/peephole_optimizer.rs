@@ -62,7 +62,7 @@ impl BasicBlockOptimizerPipeline {
                 // Number of basic blocks changed, re-run the basic-block
                 // optimization pipeline again on the new basic blocks.
                 cfg = optimized_cfg;
-                code_chunk = optimized_code_chunk.remap(code_chunk.original_offsets);
+                code_chunk = optimized_code_chunk;
             }
         }
     }
