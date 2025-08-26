@@ -329,7 +329,7 @@ async fn test_multi_agent_signed_transaction(
         factory
             .create_user_account(account.public_key())
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -418,7 +418,7 @@ async fn test_fee_payer_signed_transaction(
         factory
             .create_user_account(account.public_key())
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -488,7 +488,7 @@ async fn test_fee_payer_signed_transaction(
                 .max_gas_amount(200_000)
                 .gas_unit_price(1)
                 .expiration_timestamp_secs(context.get_expiration_time())
-                .upgrade_payload(
+                .upgrade_payload_with_rng(
                     &mut context.rng,
                     context.use_txn_payload_v2_format,
                     context.use_orderless_transactions,
@@ -586,7 +586,7 @@ async fn test_multi_ed25519_signed_transaction() {
         factory
             .create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key())
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -599,7 +599,7 @@ async fn test_multi_ed25519_signed_transaction() {
         .sender(auth_key.account_address())
         .sequence_number(0)
         .expiration_timestamp_secs(context.get_expiration_time())
-        .upgrade_payload(
+        .upgrade_payload_with_rng(
             &mut context.rng,
             context.use_txn_payload_v2_format,
             context.use_orderless_transactions,
@@ -1308,7 +1308,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode(
             .transaction_factory()
             .script(Script::new(invalid_bytecode, vec![], vec![]))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -1662,7 +1662,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
             .transaction_factory()
             .script(Script::new(script, vec![], vec![]))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -1705,7 +1705,7 @@ async fn test_submit_entry_function_api_validation(
                 args,
             ))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -1743,7 +1743,7 @@ async fn test_get_txn_execute_failed_by_invalid_entry_function(
                 args,
             ))
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -2327,7 +2327,7 @@ async fn test_simulation_failure_with_move_abort_error_rendering(
         .sender(account.address())
         .sequence_number(account.sequence_number())
         .expiration_timestamp_secs(context.get_expiration_time())
-        .upgrade_payload(
+        .upgrade_payload_with_rng(
             &mut context.rng,
             context.use_txn_payload_v2_format,
             context.use_orderless_transactions,
@@ -2384,7 +2384,7 @@ async fn test_simulation_failure_with_detail_error(
         .sender(account.address())
         .sequence_number(account.sequence_number())
         .expiration_timestamp_secs(context.get_expiration_time())
-        .upgrade_payload(
+        .upgrade_payload_with_rng(
             &mut context.rng,
             context.use_txn_payload_v2_format,
             context.use_orderless_transactions,
@@ -2431,7 +2431,7 @@ async fn test_runtime_error_message_in_interpreter(
             .transaction_factory()
             .payload(payload)
             .expiration_timestamp_secs(context.get_expiration_time())
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
