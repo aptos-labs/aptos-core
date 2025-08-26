@@ -114,3 +114,28 @@ jobs:
           name: ${{ matrix.binary.package }}-${{ github.sha }}
           path: ${{ env.TARGET_FOLDER }}/${{ matrix.binary.package }}
           retention-days: 7
+
+  build-docker:
+    needs: build-binaries
+    runs-on: k8s-movement-labs
+    name: "Build Docker Images"
+    steps:
+      - uses: actions/checkout@v4
+      # Additional steps to build and push Docker images
+      - name: Download aptos-node binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-node-${{ github.sha }}
+          path: ./downloaded-artifacts/aptos-node
+      - name: Download aptos-cli binary
+        uses: actions/download-artifact@v4
+        with:
+          name: aptos-${{ github.sha }}
+          path: ./downloaded-artifacts/aptos-cli
+      - name: Download l1-migration binary
+        uses: actions/download-artifact@v4
+        with:
+          name: l1-migration-${{ github.sha }}
+          path: ./downloaded-artifacts/l1-migration
+      - run: |
+          ls -al ./downloaded-artifacts/
