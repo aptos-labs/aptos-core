@@ -9,8 +9,17 @@ runs:
   - name: Get list of changed files
     id: changed
     run: |
-      git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-      git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD > changed_files.txt
+      # Get the base branch - fallback to 'main' if not in PR context
+      BASE_REF="${{ github.event.pull_request.base.ref }}"
+      if [ -z "$BASE_REF" ]; then
+        BASE_REF="${{ github.event.repository.default_branch }}"
+      fi
+      if [ -z "$BASE_REF" ]; then
+        BASE_REF="main"
+      fi
+
+      git fetch origin "$BASE_REF" --depth=1
+      git diff --name-only "origin/$BASE_REF"...HEAD > changed_files.txt
       grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt || true
     shell: bash
 
