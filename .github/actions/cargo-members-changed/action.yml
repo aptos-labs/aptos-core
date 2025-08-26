@@ -3,7 +3,8 @@ description: "Checks if the [workspace] members array in Cargo.toml has changed"
 inputs:
   base-ref:
     description: "Base branch ref"
-    required: true
+    required: false
+    default: "main"
   file:
     description: "Path to Cargo.toml"
     required: false
@@ -15,8 +16,17 @@ runs:
   using: "composite"
   steps:
   - run: |
-      git fetch origin ${{ inputs.base-ref }} --depth=1
-      git show origin/${{ inputs.base-ref }}:${{ inputs.file }} > base_Cargo.toml
+      # Get the base branch - fallback to 'movement' if not in PR context
+      BASE_REF="${{ github.event.pull_request.base.ref || github.event.repository.default_branch || 'movement' }}"
+
+      # Additional safety check in case the above still results in empty string
+      if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "" ]; then
+        BASE_REF="movement"
+      fi
+
+      echo "Using base ref: $BASE_REF"
+      git fetch origin "$BASE_REF" --depth=1
+      git show "origin/$BASE_REF":${{ inputs.file }} > base_Cargo.toml
       awk '/\[workspace\]/,/\[/' base_Cargo.toml | awk '/members = \[/,/\]/' > base_members.txt
       awk '/\[workspace\]/,/\[/' ${{ inputs.file }} | awk '/members = \[/,/\]/' > pr_members.txt
       if ! diff -u base_members.txt pr_members.txt; then
