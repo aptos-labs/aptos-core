@@ -8,6 +8,7 @@ inputs:
 outputs:
   changed:
     description: "true if Docker files changed, false otherwise"
+    value: ${{ steps.changed.outputs.changed }}
 runs:
   using: "composite"
   steps:
