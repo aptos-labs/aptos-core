@@ -33,6 +33,8 @@ jobs:
       - name: Check if Docker Files Changed
         id: docker_check
         uses: ./.github/actions/docker-files-changed
+        with:
+          base-ref: ${{ github.event.pull_request.base.ref }}
 
 
   build-binaries:

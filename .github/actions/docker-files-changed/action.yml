@@ -1,31 +1,25 @@
 name: "Check Docker Files Changed"
 description: "Checks if any Docker-related files have changed"
+inputs:
+  base-ref:
+    description: "Base branch ref"
+    required: false
+    default: "movement"
 outputs:
   changed:
     description: "true if Docker files changed, false otherwise"
 runs:
   using: "composite"
+  env:
+    BASE_REF: ${{ inputs.base-ref }}
   steps:
-  - name: Get list of changed files
+  - name: Check if Docker Files Changed
     id: changed
     run: |
-      # Get the base branch - fallback to 'movement' if not in PR context
-      BASE_REF="${{ github.event.pull_request.base.ref || github.event.repository.default_branch || 'movement' }}"
-
-      # Additional safety check in case the above still results in empty string
-      if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "" ]; then
-        BASE_REF="movement"
-      fi
-
       echo "Using base ref: $BASE_REF"
       git fetch origin "$BASE_REF" --depth=1
       git diff --name-only "origin/$BASE_REF"...HEAD > changed_files.txt
       grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt || true
-    shell: bash
-
-  - name: Set output if Docker files changed
-    id: set-output
-    run: |
       if grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt > /dev/null; then
         echo "changed=true" >> $GITHUB_OUTPUT
       else
