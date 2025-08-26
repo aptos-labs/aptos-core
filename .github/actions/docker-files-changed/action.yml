@@ -31,3 +31,4 @@ runs:
       else
         echo "changed=false" >> $GITHUB_OUTPUT
       fi
+    shell: bash
