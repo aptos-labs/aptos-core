@@ -1,0 +1,27 @@
+name: "Check Cargo Members Changed"
+description: "Checks if the [workspace] members array in Cargo.toml has changed"
+inputs:
+  base-ref:
+    description: "Base branch ref"
+    required: true
+  file:
+    description: "Path to Cargo.toml"
+    required: false
+    default: "Cargo.toml"
+outputs:
+  changed:
+    description: "true if members changed, false otherwise"
+runs:
+  using: "composite"
+  steps:
+  - run: |
+      git fetch origin ${{ inputs.base-ref }} --depth=1
+      git show origin/${{ inputs.base-ref }}:${{ inputs.file }} > base_Cargo.toml
+      awk '/\[workspace\]/,/\[/' base_Cargo.toml | awk '/members = \[/,/\]/' > base_members.txt
+      awk '/\[workspace\]/,/\[/' ${{ inputs.file }} | awk '/members = \[/,/\]/' > pr_members.txt
+      if ! diff -u base_members.txt pr_members.txt; then
+        echo "changed=true" >> $GITHUB_OUTPUT
+      else
+        echo "changed=false" >> $GITHUB_OUTPUT
+      fi
+    shell: bash
