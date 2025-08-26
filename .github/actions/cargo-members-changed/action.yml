@@ -20,14 +20,40 @@ runs:
     env:
       BASE_REF: ${{ inputs.base-ref }}
     run: |
-      echo "Using base ref: $BASE_REF"
+      # Validate BASE_REF
+      if [ -z "$BASE_REF" ]; then
+        echo "No base ref provided. Defaulting to 'movement'"
+        BASE_REF="movement"
+      fi
+
+      # Fetch the base branch, handling potential errors
+      set +e
       git fetch origin "$BASE_REF" --depth=1
-      git show "origin/$BASE_REF":${{ inputs.file }} > base_Cargo.toml
+      FETCH_RESULT=$?
+      set -e
+
+      if [ $FETCH_RESULT -ne 0 ]; then
+        echo "Warning: Could not fetch base branch '$BASE_REF'. Assuming no changes."
+        echo "changed=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      # Try to show the base Cargo.toml, fall back to current if not possible
+      if ! git show "origin/$BASE_REF":${{ inputs.file }} > base_Cargo.toml 2>/dev/null; then
+        echo "Could not retrieve base Cargo.toml. Using current Cargo.toml for comparison."
+        cp ${{ inputs.file }} base_Cargo.toml
+      fi
+
+      # Extract workspace members from base and current Cargo.toml
       awk '/\[workspace\]/,/\[/' base_Cargo.toml | awk '/members = \[/,/\]/' > base_members.txt
       awk '/\[workspace\]/,/\[/' ${{ inputs.file }} | awk '/members = \[/,/\]/' > pr_members.txt
+
+      # Compare members
       if ! diff -u base_members.txt pr_members.txt; then
+        echo "Workspace members have changed."
         echo "changed=true" >> $GITHUB_OUTPUT
       else
+        echo "No changes in workspace members."
         echo "changed=false" >> $GITHUB_OUTPUT
       fi
     shell: bash

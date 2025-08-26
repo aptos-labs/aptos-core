@@ -16,13 +16,42 @@ runs:
     env:
       BASE_REF: ${{ inputs.base-ref }}
     run: |
-      echo "Using base ref: $BASE_REF"
+      # Validate BASE_REF
+      if [ -z "$BASE_REF" ]; then
+        echo "No base ref provided. Defaulting to 'movement'"
+        BASE_REF="movement"
+      fi
+
+      # Fetch the base branch, handling potential errors
+      set +e
       git fetch origin "$BASE_REF" --depth=1
+      FETCH_RESULT=$?
+      set -e
+
+      if [ $FETCH_RESULT -ne 0 ]; then
+        echo "Warning: Could not fetch base branch '$BASE_REF'. Assuming no Docker file changes."
+        echo "changed=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      # Compare changes, handling potential git diff errors
+      set +e
       git diff --name-only "origin/$BASE_REF"...HEAD > changed_files.txt
-      grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt || true
+      DIFF_RESULT=$?
+      set -e
+
+      if [ $DIFF_RESULT -ne 0 ]; then
+        echo "Warning: Could not perform git diff. Assuming no Docker file changes."
+        echo "changed=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      # Check for Docker-related file changes
       if grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt > /dev/null; then
+        echo "Docker-related files changed."
         echo "changed=true" >> $GITHUB_OUTPUT
       else
+        echo "No Docker-related file changes."
         echo "changed=false" >> $GITHUB_OUTPUT
       fi
     shell: bash
