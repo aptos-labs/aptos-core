@@ -39,7 +39,7 @@ jobs:
 
   build-binaries:
     needs: build-checks
-    if: needs.build-checks.outputs.members_changed == 'true'
+    if: needs.build-checks.outputs.members_changed == 'true' || needs.build-checks.outputs.docker_changed == 'true'
     runs-on: k8s-movement-labs
     name: "Build Binaries with Nix"
     strategy:
