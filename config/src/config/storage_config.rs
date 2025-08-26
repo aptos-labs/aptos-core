@@ -123,6 +123,18 @@ pub struct RocksdbConfig {
     pub cache_index_and_filter_blocks: bool,
 }
 
+impl RocksdbConfig {
+    /// Default block cache size is 1GB,
+    const DEFAULT_BLOCK_CACHE_SIZE: u64 = 1 << 30;
+    /// Default block cache size is 4KB,
+    const DEFAULT_BLOCK_SIZE: u64 = 4 * (1 << 10);
+    /// Count index/filter blocks in block cache usage by default.
+    const DEFAULT_CACHE_INDEX_AND_FILTER_BLOCKS: bool = true;
+    /// Default block cache size for state kv db is 16GB, because the number of different keys
+    /// being read is usually large.
+    const DEFAULT_STATE_KV_BLOCK_CACHE_SIZE: u64 = 16 * (1 << 30);
+}
+
 impl Default for RocksdbConfig {
     fn default() -> Self {
         Self {
@@ -134,12 +146,9 @@ impl Default for RocksdbConfig {
             // This includes threads for flashing and compaction. Rocksdb will decide the # of
             // threads to use internally.
             max_background_jobs: 16,
-            // Default block cache size is 8MB,
-            block_cache_size: 8 * (1u64 << 20),
-            // Default block cache size is 4KB,
-            block_size: 4 * (1u64 << 10),
-            // Whether cache index and filter blocks into block cache.
-            cache_index_and_filter_blocks: false,
+            block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
+            block_size: Self::DEFAULT_BLOCK_SIZE,
+            cache_index_and_filter_blocks: Self::DEFAULT_CACHE_INDEX_AND_FILTER_BLOCKS,
         }
     }
 }
@@ -165,7 +174,10 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            state_kv_db_config: RocksdbConfig::default(),
+            state_kv_db_config: RocksdbConfig {
+                block_cache_size: RocksdbConfig::DEFAULT_STATE_KV_BLOCK_CACHE_SIZE,
+                ..Default::default()
+            },
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
@@ -662,8 +674,8 @@ impl ConfigSanitizer for StorageConfig {
 #[cfg(test)]
 mod test {
     use crate::config::{
-        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig, ShardPathConfig,
-        ShardedDbPathConfig, StorageConfig,
+        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PersistableConfig, PrunerConfig,
+        RocksdbConfig, ShardPathConfig, ShardedDbPathConfig, StorageConfig,
     };
     use aptos_types::chain_id::ChainId;
 
@@ -779,5 +791,60 @@ mod test {
 
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
         assert!(node_config.storage.assert_rlimit_nofile);
+    }
+
+    fn verify_parsing_block_cache_size(
+        yaml: &str,
+        expected_ledger_block_cache_size: u64,
+        expected_state_kv_block_cache_size: u64,
+    ) {
+        let node_config = NodeConfig::parse_serialized_config(&yaml).unwrap();
+        let config = &node_config.storage;
+        assert_eq!(
+            config.rocksdb_configs.ledger_db_config.block_cache_size,
+            expected_ledger_block_cache_size
+        );
+        assert_eq!(
+            config.rocksdb_configs.state_kv_db_config.block_cache_size,
+            expected_state_kv_block_cache_size,
+        );
+    }
+
+    #[test]
+    fn test_rocksdb_config_override() {
+        verify_parsing_block_cache_size(
+            r#"
+            storage:
+              rocksdb_configs:
+                ledger_db_config:
+                  block_cache_size: 123
+            "#,
+            123,
+            RocksdbConfig::DEFAULT_STATE_KV_BLOCK_CACHE_SIZE,
+        );
+
+        verify_parsing_block_cache_size(
+            r#"
+            storage:
+              rocksdb_configs:
+                state_kv_db_config:
+                  block_cache_size: 123
+            "#,
+            RocksdbConfig::DEFAULT_BLOCK_CACHE_SIZE,
+            123,
+        );
+
+        verify_parsing_block_cache_size(
+            r#"
+            storage:
+              rocksdb_configs:
+                ledger_db_config:
+                  block_cache_size: 123
+                state_kv_db_config:
+                  block_cache_size: 456
+            "#,
+            123,
+            456,
+        );
     }
 }
