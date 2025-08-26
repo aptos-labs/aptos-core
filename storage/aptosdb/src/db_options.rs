@@ -163,13 +163,16 @@ fn gen_cfds<F>(
 where
     F: Fn(ColumnFamilyName, &mut Options),
 {
-    let mut table_options = BlockBasedOptions::default();
-    table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
-    table_options.set_block_size(rocksdb_config.block_size as usize);
-    let cache = Cache::new_lru_cache(rocksdb_config.block_cache_size as usize);
-    table_options.set_block_cache(&cache);
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
+        let mut table_options = BlockBasedOptions::default();
+        table_options.set_cache_index_and_filter_blocks(
+            rocksdb_config.cache_index_and_filter_blocks(cf_name),
+        );
+        table_options.set_block_size(rocksdb_config.block_size(cf_name) as usize);
+        let cache = Cache::new_lru_cache(rocksdb_config.block_cache_size(cf_name) as usize);
+        table_options.set_block_cache(&cache);
+
         let mut cf_opts = Options::default();
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);

@@ -13,6 +13,7 @@ use anyhow::{bail, ensure, Result};
 use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use arr_macro::arr;
+use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::{
@@ -103,6 +104,14 @@ impl ShardedDbPathConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CFConfigOverride {
+    pub block_cache_size: Option<u64>,
+    pub block_size: Option<u64>,
+    pub cache_index_and_filter_blocks: Option<bool>,
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -115,12 +124,15 @@ pub struct RocksdbConfig {
     pub max_total_wal_size: u64,
     /// Maximum number of background threads for Rocks DB
     pub max_background_jobs: i32,
+
     /// Block cache size for Rocks DB
     pub block_cache_size: u64,
     /// Block size for Rocks DB
     pub block_size: u64,
     /// Whether cache index and filter blocks into block cache.
     pub cache_index_and_filter_blocks: bool,
+
+    pub cf_overrides: HashMap<String, CFConfigOverride>,
 }
 
 impl Default for RocksdbConfig {
@@ -130,17 +142,49 @@ impl Default for RocksdbConfig {
             max_open_files: 5000,
             // For now we set the max total WAL size to be 1G. This config can be useful when column
             // families are updated at non-uniform frequencies.
-            max_total_wal_size: 1u64 << 30,
+            max_total_wal_size: 1 << 30,
             // This includes threads for flashing and compaction. Rocksdb will decide the # of
             // threads to use internally.
             max_background_jobs: 16,
-            // Default block cache size is 8MB,
-            block_cache_size: 8 * (1u64 << 20),
+            // Default block cache size is 32MB. Should be enough for most of tables where no one
+            // reads a huge number of keys.
+            block_cache_size: 32 * (1 << 20),
             // Default block cache size is 4KB,
-            block_size: 4 * (1u64 << 10),
-            // Whether cache index and filter blocks into block cache.
-            cache_index_and_filter_blocks: false,
+            block_size: 4 * (1 << 10),
+            // Store index and filter blocks in the block cache. This means that less used ones can
+            // be evicted if we exceed max block cache size.
+            cache_index_and_filter_blocks: true,
+            cf_overrides: hashmap! {
+                "state_value_by_key_hash".to_string() => CFConfigOverride {
+                    // 1GB block cache per shard.
+                    block_cache_size: Some(1 << 30),
+                    ..Default::default()
+                }
+            },
         }
+    }
+}
+
+impl RocksdbConfig {
+    pub fn block_cache_size(&self, cf_name: &str) -> u64 {
+        self.cf_overrides
+            .get(cf_name)
+            .and_then(|cf_override| cf_override.block_cache_size)
+            .unwrap_or(self.block_cache_size)
+    }
+
+    pub fn block_size(&self, cf_name: &str) -> u64 {
+        self.cf_overrides
+            .get(cf_name)
+            .and_then(|cf_override| cf_override.block_size)
+            .unwrap_or(self.block_cache_size)
+    }
+
+    pub fn cache_index_and_filter_blocks(&self, cf_name: &str) -> bool {
+        self.cf_overrides
+            .get(cf_name)
+            .and_then(|cf_override| cf_override.cache_index_and_filter_blocks)
+            .unwrap_or(self.cache_index_and_filter_blocks)
     }
 }
 
