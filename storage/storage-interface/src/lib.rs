@@ -166,6 +166,11 @@ pub trait DbReader: Send + Sync {
             version: Version,
         ) -> Result<Option<TransactionAuxiliaryData>>;
 
+        fn get_persisted_auxiliary_info_by_version(
+            &self,
+            version: Version,
+        ) -> Result<PersistedAuxiliaryInfo>;
+
         /// See [AptosDB::get_persisted_auxiliary_info_iterator].
         ///
         /// [AptosDB::get_persisted_auxiliary_info_iterator]: ../aptosdb/struct.AptosDB.html#method.get_persisted_auxiliary_info_iterator
