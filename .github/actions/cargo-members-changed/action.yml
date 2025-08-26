@@ -14,11 +14,11 @@ outputs:
     description: "true if members changed, false otherwise"
 runs:
   using: "composite"
-  env:
-    BASE_REF: ${{ inputs.base-ref }}
   steps:
   - name: Check if Cargo Members Changed
     id: changed
+    env:
+      BASE_REF: ${{ inputs.base-ref }}
     run: |
       echo "Using base ref: $BASE_REF"
       git fetch origin "$BASE_REF" --depth=1
