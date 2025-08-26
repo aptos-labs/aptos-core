@@ -28,7 +28,7 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_schemadb::{batch::SchemaBatch, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
@@ -123,6 +123,11 @@ impl LedgerDb {
         readonly: bool,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
+        let block_cache = Cache::new_hyper_clock_cache(
+            rocksdb_configs.ledger_db_config.block_cache_size as usize,
+            0,
+        );
+
         let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref(), sharding);
         let ledger_metadata_db = Arc::new(Self::open_rocksdb(
             ledger_metadata_db_path.clone(),
@@ -132,6 +137,7 @@ impl LedgerDb {
                 LEDGER_DB_NAME
             },
             &rocksdb_configs.ledger_db_config,
+            &block_cache,
             readonly,
         )?);
 
@@ -181,6 +187,7 @@ impl LedgerDb {
                         ledger_db_folder.join(EVENT_DB_NAME),
                         EVENT_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -196,6 +203,7 @@ impl LedgerDb {
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
                         PERSISTED_AUXILIARY_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -207,6 +215,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
                         TRANSACTION_ACCUMULATOR_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -218,6 +227,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
                         TRANSACTION_AUXILIARY_DATA_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -229,6 +239,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_DB_NAME),
                         TRANSACTION_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -240,6 +251,7 @@ impl LedgerDb {
                         ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
                         TRANSACTION_INFO_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -251,6 +263,7 @@ impl LedgerDb {
                         ledger_db_folder.join(WRITE_SET_DB_NAME),
                         WRITE_SET_DB_NAME,
                         &rocksdb_configs.ledger_db_config,
+                        &block_cache,
                         readonly,
                     )
                     .unwrap(),
@@ -430,6 +443,7 @@ impl LedgerDb {
         path: PathBuf,
         name: &str,
         db_config: &RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         let db = if readonly {
@@ -437,14 +451,14 @@ impl LedgerDb {
                 &gen_rocksdb_options(db_config, true),
                 path.clone(),
                 name,
-                Self::gen_cfds_by_name(db_config, name),
+                Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(db_config, false),
                 path.clone(),
                 name,
-                Self::gen_cfds_by_name(db_config, name),
+                Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         };
 
@@ -468,17 +482,24 @@ impl LedgerDb {
         }
     }
 
-    fn gen_cfds_by_name(db_config: &RocksdbConfig, name: &str) -> Vec<ColumnFamilyDescriptor> {
+    fn gen_cfds_by_name(
+        db_config: &RocksdbConfig,
+        block_cache: &Cache,
+        name: &str,
+    ) -> Vec<ColumnFamilyDescriptor> {
+        let cache = Some(block_cache);
         match name {
-            LEDGER_DB_NAME => gen_ledger_cfds(db_config),
-            LEDGER_METADATA_DB_NAME => gen_ledger_metadata_cfds(db_config),
-            EVENT_DB_NAME => gen_event_cfds(db_config),
-            PERSISTED_AUXILIARY_INFO_DB_NAME => gen_persisted_auxiliary_info_cfds(db_config),
-            TRANSACTION_ACCUMULATOR_DB_NAME => gen_transaction_accumulator_cfds(db_config),
-            TRANSACTION_AUXILIARY_DATA_DB_NAME => gen_transaction_auxiliary_data_cfds(db_config),
-            TRANSACTION_DB_NAME => gen_transaction_cfds(db_config),
-            TRANSACTION_INFO_DB_NAME => gen_transaction_info_cfds(db_config),
-            WRITE_SET_DB_NAME => gen_write_set_cfds(db_config),
+            LEDGER_DB_NAME => gen_ledger_cfds(db_config, cache),
+            LEDGER_METADATA_DB_NAME => gen_ledger_metadata_cfds(db_config, cache),
+            EVENT_DB_NAME => gen_event_cfds(db_config, cache),
+            PERSISTED_AUXILIARY_INFO_DB_NAME => gen_persisted_auxiliary_info_cfds(db_config, cache),
+            TRANSACTION_ACCUMULATOR_DB_NAME => gen_transaction_accumulator_cfds(db_config, cache),
+            TRANSACTION_AUXILIARY_DATA_DB_NAME => {
+                gen_transaction_auxiliary_data_cfds(db_config, cache)
+            },
+            TRANSACTION_DB_NAME => gen_transaction_cfds(db_config, cache),
+            TRANSACTION_INFO_DB_NAME => gen_transaction_info_cfds(db_config, cache),
+            WRITE_SET_DB_NAME => gen_write_set_cfds(db_config, cache),
             _ => unreachable!(),
         }
     }
