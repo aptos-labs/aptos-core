@@ -47,7 +47,6 @@ impl BasicBlockOptimizerPipeline {
     /// returning new (possibly optimized) code.
     pub fn optimize(&self, code: &[Bytecode]) -> TransformedCodeChunk {
         let mut code_chunk = TransformedCodeChunk::make_from(code);
-        let original_offsets = code_chunk.original_offsets.clone();
         let mut cfg = VMControlFlowGraph::new(&code_chunk.code);
         loop {
             let optimized_blocks = self.get_optimized_blocks(&code_chunk, &cfg);
@@ -63,7 +62,7 @@ impl BasicBlockOptimizerPipeline {
                 // Number of basic blocks changed, re-run the basic-block
                 // optimization pipeline again on the new basic blocks.
                 cfg = optimized_cfg;
-                code_chunk = optimized_code_chunk.remap(original_offsets.clone());
+                code_chunk = optimized_code_chunk;
             }
         }
     }
