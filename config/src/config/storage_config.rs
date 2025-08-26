@@ -139,7 +139,7 @@ impl Default for RocksdbConfig {
             // Default block cache size is 4KB,
             block_size: 4 * (1u64 << 10),
             // Whether cache index and filter blocks into block cache.
-            cache_index_and_filter_blocks: false,
+            cache_index_and_filter_blocks: true,
         }
     }
 }
@@ -165,7 +165,10 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            state_kv_db_config: RocksdbConfig::default(),
+            state_kv_db_config: RocksdbConfig {
+                block_cache_size: 16 * (1 << 30),
+                ..Default::default()
+            },
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
