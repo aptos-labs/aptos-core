@@ -283,7 +283,7 @@ async fn entry_function_payload(context: &mut TestContext) -> Vec<serde_json::Va
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,
@@ -354,7 +354,7 @@ async fn script_payload(context: &mut TestContext) -> Vec<serde_json::Value> {
             .max_gas_amount(gen_u64(&mut value_gen))
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
-            .upgrade_payload(
+            .upgrade_payload_with_rng(
                 &mut context.rng,
                 context.use_txn_payload_v2_format,
                 context.use_orderless_transactions,

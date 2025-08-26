@@ -31,3 +31,7 @@ hyper = { workspace = true }
 sha256 = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemalloc-ctl = "0.5.4"
+jemalloc-sys = "0.5.4"
