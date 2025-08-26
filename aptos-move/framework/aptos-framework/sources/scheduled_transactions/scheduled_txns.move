@@ -134,7 +134,7 @@ module aptos_framework::scheduled_txns {
     /// as a key. That is we have "{time, gas_priority, txn_id} -> ScheduledTxn" instead of
     /// "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
     /// Note: ScheduledTxn is still variable size though due to its closure.
-    struct ScheduleMapKey has copy, drop, store {
+    public struct ScheduleMapKey has copy, drop, store {
         /// UTC timestamp ms
         time: u64,
         /// gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
@@ -204,7 +204,15 @@ module aptos_framework::scheduled_txns {
         sender_addr: address,
         scheduled_time_ms: u64,
         max_gas_amount: u64,
-        gas_unit_price: u64
+        gas_unit_price: u64,
+        pass_signer: bool
+    }
+
+    #[event]
+    struct TransactionCancelledEvent has drop, store {
+        scheduled_txn_time: u64,
+        scheduled_txn_hash: u256,
+        sender_addr: address,
     }
 
     #[event]
@@ -292,10 +300,9 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Continues shutdown process. Can only be called when module status is ShutdownInProgress.
-    public entry fun continue_shutdown(
-        framework: &signer, cancel_batch_size: u64
+    entry fun continue_shutdown(
+        cancel_batch_size: u64
     ) acquires ScheduleQueue, ToRemoveTbl, AuxiliaryData {
-        system_addresses::assert_aptos_framework(framework);
         process_shutdown_batch(cancel_batch_size);
     }
 
@@ -519,7 +526,8 @@ module aptos_framework::scheduled_txns {
                 sender_addr: txn.sender_addr,
                 scheduled_time_ms: txn.scheduled_time_ms,
                 max_gas_amount: txn.max_gas_amount,
-                gas_unit_price: txn.gas_unit_price
+                gas_unit_price: txn.gas_unit_price,
+                pass_signer: txn.pass_signer
             }
         );
 
@@ -554,11 +562,21 @@ module aptos_framework::scheduled_txns {
         let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
 
         // verify sender
+        let sender_addr = signer::address_of(sender);
         assert!(
-            signer::address_of(sender) == txn.sender_addr,
+            sender_addr == txn.sender_addr,
             error::permission_denied(EINVALID_SIGNER)
         );
-        cancel_internal(signer::address_of(sender), key, deposit_amt);
+        cancel_internal(sender_addr, key, deposit_amt);
+
+        // emit cancel event
+        event::emit(
+            TransactionCancelledEvent {
+                scheduled_txn_time: key.time,
+                scheduled_txn_hash: key.txn_id,
+                sender_addr
+            }
+        );
     }
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
@@ -776,19 +794,6 @@ module aptos_framework::scheduled_txns {
         true
     }
 
-    public(friend) fun emit_transaction_failed_event(
-        key: ScheduleMapKey, sender_addr: address
-    ) {
-        event::emit(
-            TransactionFailedEvent {
-                scheduled_txn_time: key.time,
-                scheduled_txn_hash: key.txn_id,
-                sender_addr,
-                cancelled_txn_code: CancelledTxnCode::Failed
-            }
-        );
-    }
-
     ////////////////////////// TESTS //////////////////////////
     #[test_only]
     public fun get_num_txns(): u64 acquires ScheduleQueue {
@@ -829,6 +834,11 @@ module aptos_framework::scheduled_txns {
     #[test_only]
     public fun shutdown_test(fx: &signer) acquires AuxiliaryData {
         start_shutdown(fx);
+    }
+
+    #[test_only]
+    public fun continue_shutdown_test(batch_size: u64) acquires AuxiliaryData, ScheduleQueue, ToRemoveTbl {
+        continue_shutdown(batch_size);
     }
 
     #[test_only]
@@ -1108,7 +1118,7 @@ module aptos_framework::scheduled_txns {
 
         // Verify that next call to shutdown complete without error
         while (txns_count_pre_batch > 0) {
-            continue_shutdown(fx, SHUTDOWN_CANCEL_BATCH_SIZE_DEFAULT);
+            continue_shutdown(SHUTDOWN_CANCEL_BATCH_SIZE_DEFAULT);
             let txns_count_post_batch = get_num_txns();
             assert!(
                 txns_count_pre_batch

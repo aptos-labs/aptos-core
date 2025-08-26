@@ -190,7 +190,7 @@ module aptos_framework::test_scheduled_txns {
         );
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
-        scheduled_txns::continue_shutdown(fx, 100);
+        scheduled_txns::continue_shutdown_test(100);
 
         // Check that deposit store has been emptied
         assert!(
