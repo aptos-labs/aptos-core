@@ -1,0 +1,24 @@
+name: "Check Docker Files Changed"
+description: "Checks if any Docker-related files have changed"
+outputs:
+  changed:
+    description: "true if Docker files changed, false otherwise"
+runs:
+  using: "composite"
+  steps:
+  - name: Get list of changed files
+    id: changed
+    run: |
+      git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
+      git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD > changed_files.txt
+      grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt || true
+    shell: bash
+
+  - name: Set output if Docker files changed
+    id: set-output
+    run: |
+      if grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt > /dev/null; then
+        echo "changed=true" >> $GITHUB_OUTPUT
+      else
+        echo "changed=false" >> $GITHUB_OUTPUT
+      fi
