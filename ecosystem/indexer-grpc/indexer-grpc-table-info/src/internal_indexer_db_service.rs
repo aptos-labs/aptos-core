@@ -68,11 +68,11 @@ impl InternalIndexerDBService {
             .get_dir_paths()
             .default_root_path()
             .join(INTERNAL_INDEXER_DB);
-        let rocksdb_config = node_config.storage.rocksdb_configs.index_db_config;
+        let rocksdb_config = &node_config.storage.rocksdb_configs.index_db_config;
         let db_path = db_path_buf.as_path();
 
         let arc_db = Arc::new(
-            open_internal_indexer_db(db_path, &rocksdb_config)
+            open_internal_indexer_db(db_path, rocksdb_config)
                 .expect("Failed to open internal indexer db"),
         );
         Some(InternalIndexerDB::new(

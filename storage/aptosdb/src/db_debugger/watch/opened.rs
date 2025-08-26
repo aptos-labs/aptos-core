@@ -28,7 +28,7 @@ impl Cmd {
             config.get_dir_paths(),
             false, /* readonly */
             config.storage_pruner_config,
-            config.rocksdb_configs,
+            &config.rocksdb_configs,
             config.enable_indexer,
             config.buffered_state_target_items,
             config.max_num_nodes_per_lru_cache_shard,

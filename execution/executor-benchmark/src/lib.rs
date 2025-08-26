@@ -67,7 +67,7 @@ pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
             config.storage.get_dir_paths(),
             false, /* readonly */
             config.storage.storage_pruner_config,
-            config.storage.rocksdb_configs,
+            &config.storage.rocksdb_configs,
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,

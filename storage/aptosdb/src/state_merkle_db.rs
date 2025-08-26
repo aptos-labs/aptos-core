@@ -70,14 +70,14 @@ pub struct StateMerkleDb {
 impl StateMerkleDb {
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         readonly: bool,
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
-        let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
+        let state_merkle_db_config = &rocksdb_configs.state_merkle_db_config;
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
@@ -90,7 +90,7 @@ impl StateMerkleDb {
             let db = Arc::new(Self::open_db(
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
-                &state_merkle_db_config,
+                state_merkle_db_config,
                 readonly,
             )?);
             return Ok(Self {
@@ -168,7 +168,7 @@ impl StateMerkleDb {
         // TODO(grao): Support path override here.
         let state_merkle_db = Self::new(
             &StorageDirPaths::from_path(db_root_path),
-            rocksdb_configs,
+            &rocksdb_configs,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
         )?;
@@ -552,7 +552,7 @@ impl StateMerkleDb {
 
     fn open(
         db_paths: &StorageDirPaths,
-        state_merkle_db_config: RocksdbConfig,
+        state_merkle_db_config: &RocksdbConfig,
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
@@ -565,7 +565,7 @@ impl StateMerkleDb {
         let state_merkle_metadata_db = Arc::new(Self::open_db(
             state_merkle_metadata_db_path.clone(),
             STATE_MERKLE_METADATA_DB_NAME,
-            &state_merkle_db_config,
+            state_merkle_db_config,
             readonly,
         )?);
 
@@ -579,7 +579,7 @@ impl StateMerkleDb {
             .map(|shard_id| {
                 let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
                 let db =
-                    Self::open_shard(shard_root_path, shard_id, &state_merkle_db_config, readonly)
+                    Self::open_shard(shard_root_path, shard_id, state_merkle_db_config, readonly)
                         .unwrap_or_else(|e| {
                             panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
                         });

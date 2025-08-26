@@ -172,7 +172,7 @@ impl GenesisInfo {
             StorageDirPaths::from_path(path),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            RocksdbConfigs::default(),
+            &RocksdbConfigs::default(),
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,

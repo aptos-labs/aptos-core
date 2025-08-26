@@ -119,7 +119,7 @@ pub struct LedgerDb {
 impl LedgerDb {
     pub(crate) fn new<P: AsRef<Path>>(
         db_root_path: P,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         readonly: bool,
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
@@ -297,7 +297,7 @@ impl LedgerDb {
             enable_storage_sharding: sharding,
             ..Default::default()
         };
-        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let ledger_db = Self::new(db_root_path, &rocksdb_configs, /*readonly=*/ false)?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
         info!(

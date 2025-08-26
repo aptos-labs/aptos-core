@@ -74,7 +74,7 @@ impl AptosDB {
         db_paths: &StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
@@ -130,7 +130,7 @@ impl AptosDB {
         if !readonly && enable_indexer {
             myself.open_indexer(
                 db_paths.default_root_path(),
-                rocksdb_configs.index_db_config,
+                &rocksdb_configs.index_db_config,
             )?;
         }
 
@@ -140,7 +140,7 @@ impl AptosDB {
     fn open_indexer(
         &mut self,
         db_root_path: impl AsRef<Path>,
-        rocksdb_config: RocksdbConfig,
+        rocksdb_config: &RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
         let ledger_next_version = self.get_synced_version()?.map_or(0, |v| v + 1);
@@ -191,7 +191,7 @@ impl AptosDB {
             StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs {
+            &RocksdbConfigs {
                 enable_storage_sharding: enable_sharding,
                 ..Default::default()
             },

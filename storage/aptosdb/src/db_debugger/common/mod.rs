@@ -28,7 +28,7 @@ impl DbDir {
     pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
         StateMerkleDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfigs {
+            &RocksdbConfigs {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
@@ -41,7 +41,7 @@ impl DbDir {
         let leger_db = self.open_ledger_db()?;
         StateKvDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfigs {
+            &RocksdbConfigs {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
@@ -53,7 +53,7 @@ impl DbDir {
     pub fn open_ledger_db(&self) -> Result<LedgerDb> {
         LedgerDb::new(
             self.db_dir.as_path(),
-            RocksdbConfigs {
+            &RocksdbConfigs {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },

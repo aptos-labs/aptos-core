@@ -165,7 +165,7 @@ pub fn new_test_context_inner(
             StorageDirPaths::from_path(&tmp_dir),
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs {
+            &RocksdbConfigs {
                 enable_storage_sharding: node_config
                     .storage
                     .rocksdb_configs

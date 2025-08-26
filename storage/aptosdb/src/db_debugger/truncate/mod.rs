@@ -70,7 +70,7 @@ impl Cmd {
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
-            rocksdb_config,
+            &rocksdb_config,
             /*readonly=*/ false,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
         )?;
@@ -244,7 +244,7 @@ mod test {
 
             let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 &StorageDirPaths::from_path(tmp_dir.path()),
-                RocksdbConfigs {
+                &RocksdbConfigs {
                     enable_storage_sharding: input.1,
                     ..Default::default()
                 },

@@ -71,9 +71,9 @@ pub fn bootstrap(
         .get_dir_paths()
         .default_root_path()
         .join(INDEX_ASYNC_V2_DB_NAME);
-    let rocksdb_config = node_config.storage.rocksdb_configs.index_db_config;
+    let rocksdb_config = &node_config.storage.rocksdb_configs.index_db_config;
     let db =
-        open_db(db_path, &rocksdb_config).expect("Failed to open up indexer async v2 db initially");
+        open_db(db_path, rocksdb_config).expect("Failed to open up indexer async v2 db initially");
 
     let indexer_async_v2 =
         Arc::new(IndexerAsyncV2::new(db).expect("Failed to initialize indexer async v2"));

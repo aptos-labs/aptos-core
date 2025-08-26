@@ -43,7 +43,7 @@ impl Cmd {
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
-            rocksdb_config,
+            &rocksdb_config,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
         )?;

@@ -58,7 +58,7 @@ pub struct Indexer {
 impl Indexer {
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
-        rocksdb_config: RocksdbConfig,
+        rocksdb_config: &RocksdbConfig,
     ) -> Result<Self> {
         let db_path = db_root_path.as_ref().join(INDEX_DB_NAME);
 
@@ -66,7 +66,7 @@ impl Indexer {
             db_path,
             "index_db",
             column_families(),
-            &gen_rocksdb_options(&rocksdb_config, false),
+            &gen_rocksdb_options(rocksdb_config, false),
         )?;
 
         let next_version = db
