@@ -35,7 +35,7 @@ impl AptosDB {
             StorageDirPaths::from_path(db_root_path),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            db_config,
+            &db_config,
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             max_node_cache,

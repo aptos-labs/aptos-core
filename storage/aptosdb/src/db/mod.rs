@@ -121,7 +121,7 @@ impl AptosDB {
         db_paths: StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
@@ -144,7 +144,7 @@ impl AptosDB {
         db_paths: StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
@@ -165,7 +165,7 @@ impl AptosDB {
 
     pub fn open_dbs(
         db_paths: &StorageDirPaths,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {

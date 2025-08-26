@@ -98,7 +98,7 @@ pub(crate) fn bootstrap_with_genesis(
             StorageDirPaths::from_path(db_dir),
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
-            rocksdb_configs,
+            &rocksdb_configs,
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,

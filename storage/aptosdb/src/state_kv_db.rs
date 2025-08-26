@@ -53,7 +53,7 @@ pub struct StateKvDb {
 impl StateKvDb {
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: &RocksdbConfigs,
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
@@ -68,12 +68,12 @@ impl StateKvDb {
             });
         }
 
-        Self::open_sharded(db_paths, rocksdb_configs.state_kv_db_config, readonly)
+        Self::open_sharded(db_paths, &rocksdb_configs.state_kv_db_config, readonly)
     }
 
     pub(crate) fn open_sharded(
         db_paths: &StorageDirPaths,
-        state_kv_db_config: RocksdbConfig,
+        state_kv_db_config: &RocksdbConfig,
         readonly: bool,
     ) -> Result<Self> {
         let state_kv_metadata_db_path =
@@ -82,7 +82,7 @@ impl StateKvDb {
         let state_kv_metadata_db = Arc::new(Self::open_db(
             state_kv_metadata_db_path.clone(),
             STATE_KV_METADATA_DB_NAME,
-            &state_kv_db_config,
+            state_kv_db_config,
             readonly,
             /* is_hot = */ false,
         )?);
@@ -99,7 +99,7 @@ impl StateKvDb {
                 let db = Self::open_shard(
                     shard_root_path,
                     shard_id,
-                    &state_kv_db_config,
+                    state_kv_db_config,
                     readonly,
                     /* is_hot = */ false,
                 )
@@ -123,7 +123,7 @@ impl StateKvDb {
                         let db = Self::open_shard(
                             shard_root_path,
                             shard_id,
-                            &state_kv_db_config,
+                            state_kv_db_config,
                             readonly,
                             /* is_hot = */ true,
                         )
@@ -216,7 +216,7 @@ impl StateKvDb {
         // TODO(grao): Support path override here.
         let state_kv_db = Self::open_sharded(
             &StorageDirPaths::from_path(db_root_path),
-            RocksdbConfig::default(),
+            &RocksdbConfig::default(),
             false,
         )?;
         let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
