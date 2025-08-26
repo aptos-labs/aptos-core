@@ -18,9 +18,22 @@ env:
   FEATURES: ""
 
 jobs:
-  build-binaries:
-    name: "Build ${{ matrix.binary.name }} with Nix"
+  check-members-changed:
     runs-on: k8s-movement-labs
+    outputs:
+      members_changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        uses: ./.github/actions/check-cargo-members-changed
+        with:
+          base-ref: ${{ github.event.pull_request.base.ref }}
+
+  build-binaries:
+    needs: check-members-changed
+    if: needs.check-members-changed.outputs.members_changed == 'true'
+    runs-on: k8s-movement-labs
+    name: "Build ${{ matrix.binary.name }} with Nix"
     strategy:
       matrix:
         binary:
