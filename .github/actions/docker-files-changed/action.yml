@@ -13,14 +13,15 @@ runs:
   steps:
   - name: Check if Docker Files Changed
     id: changed
-    env:
-      BASE_REF: ${{ inputs.base-ref }}
     run: |
+      BASE_REF=${{ inputs.base-ref }}
       # Validate BASE_REF
       if [ -z "$BASE_REF" ]; then
         echo "No base ref provided. Defaulting to 'movement'"
         BASE_REF="movement"
       fi
+
+      echo "Using base ref: $BASE_REF"
 
       # Fetch the base branch, handling potential errors
       set +e
@@ -34,17 +35,35 @@ runs:
         exit 0
       fi
 
-      # Compare changes, handling potential git diff errors
+      # Try different git diff approaches to handle various scenarios
       set +e
-      git diff --name-only "origin/$BASE_REF"...HEAD > changed_files.txt
-      DIFF_RESULT=$?
-      set -e
 
+      # First try: three-dot syntax (requires merge base)
+      git diff --name-only "origin/$BASE_REF"...HEAD > changed_files.txt 2>/dev/null
+      DIFF_RESULT=$?
+
+      # If that fails, try two-dot syntax
       if [ $DIFF_RESULT -ne 0 ]; then
-        echo "Warning: Could not perform git diff. Assuming no Docker file changes."
-        echo "changed=false" >> $GITHUB_OUTPUT
+        echo "Three-dot diff failed, trying two-dot syntax..."
+        git diff --name-only "origin/$BASE_REF"..HEAD > changed_files.txt 2>/dev/null
+        DIFF_RESULT=$?
+      fi
+
+      # If that also fails, compare against the base branch directly
+      if [ $DIFF_RESULT -ne 0 ]; then
+        echo "Two-dot diff failed, comparing against base branch directly..."
+        git diff --name-only "origin/$BASE_REF" HEAD > changed_files.txt 2>/dev/null
+        DIFF_RESULT=$?
+      fi
+
+      # If all diff approaches fail, assume changes exist
+      if [ $DIFF_RESULT -ne 0 ]; then
+        echo "Warning: Could not perform git diff. Assuming Docker file changes exist."
+        echo "changed=true" >> $GITHUB_OUTPUT
         exit 0
       fi
+
+      set -e
 
       # Check for Docker-related file changes
       if grep -E '(^|/)(Dockerfile|docker-compose\.ya?ml|docker/)' changed_files.txt > /dev/null; then

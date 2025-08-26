@@ -41,7 +41,7 @@ jobs:
     needs: build-checks
     if: needs.build-checks.outputs.members_changed == 'true'
     runs-on: k8s-movement-labs
-    name: "Build ${{ matrix.binary.name }} with Nix"
+    name: "Build Binaries with Nix"
     strategy:
       matrix:
         binary:

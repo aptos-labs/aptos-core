@@ -17,14 +17,15 @@ runs:
   steps:
   - name: Check if Cargo Members Changed
     id: changed
-    env:
-      BASE_REF: ${{ inputs.base-ref }}
     run: |
+      BASE_REF=${{ inputs.base-ref }}
       # Validate BASE_REF
       if [ -z "$BASE_REF" ]; then
         echo "No base ref provided. Defaulting to 'movement'"
         BASE_REF="movement"
       fi
+
+      echo "Using base ref: $BASE_REF"
 
       # Fetch the base branch, handling potential errors
       set +e
@@ -56,4 +57,7 @@ runs:
         echo "No changes in workspace members."
         echo "changed=false" >> $GITHUB_OUTPUT
       fi
+
+      # Clean up temporary files
+      rm -f base_Cargo.toml base_members.txt pr_members.txt
     shell: bash
