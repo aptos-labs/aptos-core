@@ -70,14 +70,12 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `slice`](#0x1_vector_slice)
 -  [Specification](#@Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
-    -  [Function `singleton`](#@Specification_1_singleton)
     -  [Function `reverse`](#@Specification_1_reverse)
     -  [Function `reverse_slice`](#@Specification_1_reverse_slice)
     -  [Function `append`](#@Specification_1_append)
     -  [Function `reverse_append`](#@Specification_1_reverse_append)
     -  [Function `trim`](#@Specification_1_trim)
     -  [Function `trim_reverse`](#@Specification_1_trim_reverse)
-    -  [Function `is_empty`](#@Specification_1_is_empty)
     -  [Function `contains`](#@Specification_1_contains)
     -  [Function `index_of`](#@Specification_1_index_of)
     -  [Function `insert`](#@Specification_1_insert)
@@ -410,7 +408,7 @@ Return an vector of size one containing element <code>e</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_singleton">singleton</a>&lt;Element&gt;(e: Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_singleton">singleton</a>&lt;Element&gt;(e: Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
     <b>let</b> v = <a href="vector.md#0x1_vector_empty">empty</a>();
     v.<a href="vector.md#0x1_vector_push_back">push_back</a>(e);
     v
@@ -633,7 +631,7 @@ Return <code><b>true</b></code> if the vector <code>self</code> has no elements 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_is_empty">is_empty</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_is_empty">is_empty</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
     self.<a href="vector.md#0x1_vector_length">length</a>() == 0
 }
 </code></pre>
@@ -1927,23 +1925,6 @@ Check if <code>self</code> contains <code>e</code>.
 
 
 
-<a id="@Specification_1_singleton"></a>
-
-### Function `singleton`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_singleton">singleton</a>&lt;Element&gt;(e: Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == vec(e);
-</code></pre>
-
-
-
 <a id="@Specification_1_reverse"></a>
 
 ### Function `reverse`
@@ -2030,22 +2011,6 @@ Check if <code>self</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_trim_reverse">trim_reverse</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, new_len: u64): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> intrinsic = <b>true</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_is_empty"></a>
-
-### Function `is_empty`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_is_empty">is_empty</a>&lt;Element&gt;(self: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool
 </code></pre>
 
 

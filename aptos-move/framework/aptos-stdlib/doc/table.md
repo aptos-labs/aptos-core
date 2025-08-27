@@ -203,10 +203,10 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_with_default">borrow_with_default</a>&lt;K: <b>copy</b> + drop, V&gt;(self: &<a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: &V): &V {
-    <b>if</b> (!self.<a href="table.md#0x1_table_contains">contains</a>(<b>copy</b> key)) {
+    <b>if</b> (!<a href="table.md#0x1_table_contains_box">contains_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key)) {
         default
     } <b>else</b> {
-        self.<a href="table.md#0x1_table_borrow">borrow</a>(<b>copy</b> key)
+        &<a href="table.md#0x1_table_borrow_box">borrow_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
     }
 }
 </code></pre>
@@ -259,10 +259,10 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_borrow_mut_with_default">borrow_mut_with_default</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, default: V): &<b>mut</b> V {
-    <b>if</b> (!self.<a href="table.md#0x1_table_contains">contains</a>(<b>copy</b> key)) {
-        self.<a href="table.md#0x1_table_add">add</a>(<b>copy</b> key, default)
+    <b>if</b> (!<a href="table.md#0x1_table_contains_box">contains_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key)) {
+        <a href="table.md#0x1_table_add_box">add_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key, <a href="table.md#0x1_table_Box">Box</a> { val: default })
     };
-    self.<a href="table.md#0x1_table_borrow_mut">borrow_mut</a>(key)
+    &<b>mut</b> <a href="table.md#0x1_table_borrow_box_mut">borrow_box_mut</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val
 }
 </code></pre>
 
@@ -288,11 +288,10 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="table.md#0x1_table_upsert">upsert</a>&lt;K: <b>copy</b> + drop, V: drop&gt;(self: &<b>mut</b> <a href="table.md#0x1_table_Table">Table</a>&lt;K, V&gt;, key: K, value: V) {
-    <b>if</b> (!self.<a href="table.md#0x1_table_contains">contains</a>(<b>copy</b> key)) {
-        self.<a href="table.md#0x1_table_add">add</a>(<b>copy</b> key, value)
+    <b>if</b> (!<a href="table.md#0x1_table_contains_box">contains_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key)) {
+        <a href="table.md#0x1_table_add_box">add_box</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key, <a href="table.md#0x1_table_Box">Box</a> { val: value })
     } <b>else</b> {
-        <b>let</b> ref = self.<a href="table.md#0x1_table_borrow_mut">borrow_mut</a>(key);
-        *ref = value;
+        <a href="table.md#0x1_table_borrow_box_mut">borrow_box_mut</a>&lt;K, V, <a href="table.md#0x1_table_Box">Box</a>&lt;V&gt;&gt;(self, key).val = value;
     };
 }
 </code></pre>
