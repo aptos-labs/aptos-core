@@ -61,7 +61,7 @@ module aptos_experimental::market {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
-    use aptos_experimental::bulk_order_book::new_bulk_order_request;
+    use aptos_experimental::bulk_order_book_types::new_bulk_order_request;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
         pre_cancel_order_for_tracker, is_pre_cancelled
