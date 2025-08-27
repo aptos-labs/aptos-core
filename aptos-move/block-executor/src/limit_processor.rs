@@ -8,7 +8,7 @@ use aptos_logger::{info, warn};
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
-    state_store::{state_slot::StateSlot, TStateView},
+    state_store::{state_slot::StateSlot, TStateView, NUM_STATE_SHARDS},
     transaction::{
         block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
         BlockExecutableTransaction as Transaction,
@@ -42,6 +42,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
         block_gas_limit_override: Option<u64>,
         init_size: usize,
     ) -> Self {
+        println!(
+            "BlockGasLimitProcessor::new. block_gas_limit_type: {:?}",
+            block_gas_limit_type
+        );
         let hot_state_op_accumulator = block_gas_limit_type
             .add_block_limit_outcome_onchain()
             .then(|| BlockHotStateOpAccumulator::new(base_view));
@@ -89,7 +93,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
             if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+                x.add_transaction(
+                    rw_summary.keys_written().cloned(),
+                    rw_summary.keys_read().cloned(),
+                );
             }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
@@ -292,18 +299,20 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_slots_to_make_hot();
-        TBlockEndInfoExt::new(inner, to_make_hot)
+        let (to_make_hot, to_evict) = self.get_promotions_and_evictions();
+        TBlockEndInfoExt::new(inner, to_make_hot, to_evict)
     }
 
-    fn get_slots_to_make_hot(&self) -> BTreeMap<T::Key, StateSlot> {
+    fn get_promotions_and_evictions(
+        &self,
+    ) -> (BTreeMap<T::Key, StateSlot>, BTreeMap<T::Key, StateSlot>) {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }
 
         self.hot_state_op_accumulator
             .as_ref()
-            .map(|x| x.get_slots_to_make_hot())
+            .map(|x| x.get_promotions_and_evictions())
             .unwrap_or_default()
     }
 }

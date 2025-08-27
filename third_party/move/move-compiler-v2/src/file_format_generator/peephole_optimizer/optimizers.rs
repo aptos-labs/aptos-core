@@ -7,6 +7,7 @@ use move_binary_format::file_format::{Bytecode, CodeOffset};
 
 /// A contiguous chunk of bytecode that may have been transformed from some
 /// other "original" contiguous chunk of bytecode.
+#[derive(PartialEq, Eq)]
 pub struct TransformedCodeChunk {
     /// The transformed bytecode.
     pub code: Vec<Bytecode>,

@@ -115,3 +115,58 @@ impl BasicBlockOptimizerPipeline {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_block_optimizer_pipeline() {
+        let pipeline = BasicBlockOptimizerPipeline::default();
+        use Bytecode::*;
+        // Below, we handcraft a scenario where multiple peephole optimizations can be applied,
+        // in multiple passes, including merging basic blocks multiple times.
+        // We test both the optimization as well as the offset transformation.
+        let code = vec![
+            CopyLoc(0),  // 0
+            CopyLoc(0),  // 1
+            Add,         // 2
+            StLoc(0),    // 3
+            CopyLoc(0),  // 4
+            StLoc(1),    // 5
+            MoveLoc(1),  // 6
+            StLoc(0),    // 7
+            LdTrue,      // 8
+            StLoc(2),    // 9
+            LdTrue,      // 10
+            StLoc(3),    // 11
+            MoveLoc(3),  // 12
+            BrFalse(22), // 13
+            MoveLoc(2),  // 14
+            BrFalse(22), // 15
+            CopyLoc(0),  // 16
+            CopyLoc(0),  // 17
+            Add,         // 18
+            StLoc(0),    // 19
+            CopyLoc(0),  // 20
+            Pop,         // 21
+            Ret,         // 22
+        ];
+        let optimized_code_chunk = pipeline.optimize(&code);
+        let expected_code_chunk = TransformedCodeChunk::new(
+            vec![
+                CopyLoc(0), // 0
+                CopyLoc(0), // 1
+                Add,        // 2
+                StLoc(0),   // 3
+                CopyLoc(0), // 16
+                CopyLoc(0), // 17
+                Add,        // 18
+                StLoc(0),   // 19
+                Ret,        // 22
+            ],
+            vec![0, 1, 2, 3, 16, 17, 18, 19, 22],
+        );
+        assert!(optimized_code_chunk == expected_code_chunk);
+    }
+}
