@@ -353,6 +353,11 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
         txn_idx: usize,
     ) -> &mut Self {
         for (k, v, has_delta) in writes {
+            if v.is_deletion() {
+                self.current_world.remove(k);
+                continue;
+            }
+
             // Here we don't know IDs but we know values, so use the GenericWrite to store the
             // expected value, and compare that against the actual read on delayed field that was
             // performed during committed execution.
@@ -390,14 +395,16 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
 
     /// Process a single delta and return the appropriate result.
     ///
-    /// Returns an optional resource delta, if None, the caller should
-    /// mark the transaction as failed.
+    /// Returns a Result containing an optional resource delta.
+    /// Err indicates a fatal transaction error (e.g. for AggregatorV1).
+    /// Ok(None) indicates a non-fatal failure (e.g. for DelayedFields).
+    /// Ok(Some(...)) indicates a successful delta application.
     fn process_delta(
         &mut self,
         key: &K,
         delta: &DeltaOp,
         delta_test_kind: DeltaTestKind,
-    ) -> Option<(K, u128, Option<u32>)> {
+    ) -> Result<Option<(K, u128, Option<u32>)>, ()> {
         let base_value = BaselineValue::Empty(delta_test_kind);
 
         // Delayed field last write version is used for delayed field testing only, making
@@ -438,16 +445,20 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
 
         match delta.apply_to(base) {
             Err(_) => {
-                // Transaction does not take effect and we record delta application failure.
-                None
+                // For delayed fields, failure is non-fatal. For AggregatorV1, it's fatal.
+                if delta_test_kind == DeltaTestKind::DelayedFields {
+                    Ok(None)
+                } else {
+                    Err(())
+                }
             },
             Ok(resolved_value) => {
                 // Transaction succeeded, return the resolved delta
-                Some((
+                Ok(Some((
                     key.clone(),
                     resolved_value,
                     delayed_field_last_write_version,
-                ))
+                )))
             },
         }
     }
@@ -466,13 +477,16 @@ impl<K: Clone + Debug + Eq + Hash> BaselineOutputBuilder<K> {
 
         for (k, delta, maybe_tag) in deltas {
             if let Some(tag) = maybe_tag {
-                assert_eq!(*tag, RESERVED_TAG);
-                // This is a group delta
+                // Group deltas for delayed fields are processed during result verification,
+                // not here in the baseline world simulation.
+                assert_eq!(delta_test_kind, DeltaTestKind::DelayedFields);
                 group_deltas.push((k.clone(), *delta));
             } else {
                 match self.process_delta(k, delta, delta_test_kind) {
-                    Some(rd) => resource_deltas.push(rd),
-                    None => {
+                    Ok(Some(rd)) => resource_deltas.push(rd),
+                    Ok(None) => (), // Non-fatal failure, continue.
+                    Err(_) => {
+                        // Fatal error, abort transaction.
                         self.with_transaction_failed();
                         return (false, Vec::new(), Vec::new());
                     },

@@ -46,6 +46,8 @@ pub(crate) const MAX_GAS_PER_TXN: u64 = 4;
 pub(crate) const RESERVED_TAG: u32 = 0;
 
 pub(crate) struct DeltaDataView<K> {
+    pub(crate) initial_values: HashMap<K, u128>,
+    pub(crate) default_base_value: u128,
     pub(crate) phantom: PhantomData<K>,
 }
 
@@ -56,10 +58,12 @@ where
     type Key = K;
 
     // Contains mock storage value with STORAGE_AGGREGATOR_VALUE.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateViewError> {
-        Ok(Some(StateValue::new_legacy(
-            serialize(&STORAGE_AGGREGATOR_VALUE).into(),
-        )))
+    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
+        let value = self
+            .initial_values
+            .get(key)
+            .unwrap_or(&self.default_base_value);
+        Ok(Some(StateValue::new_legacy(serialize(value).into())))
     }
 
     fn id(&self) -> StateViewId {
@@ -72,7 +76,7 @@ where
 }
 
 pub(crate) struct NonEmptyGroupDataView<K> {
-    pub(crate) group_keys: HashSet<K>,
+    pub(crate) group_keys_with_delta_tags: HashMap<K, Vec<u32>>,
     // When we are testing with delayed fields, currently deletion is not supported,
     // so we need to return for each key that can contain a delayed field. for groups,
     // the reserved tag is the only such key, and we simply return a value for all
@@ -80,16 +84,19 @@ pub(crate) struct NonEmptyGroupDataView<K> {
     pub(crate) delayed_field_testing: bool,
 }
 
-pub(crate) fn default_group_map() -> BTreeMap<u32, Bytes> {
-    let bytes: Bytes = bcs::to_bytes(&(
-        STORAGE_AGGREGATOR_VALUE,
-        // u32::MAX represents storage version.
-        u32::MAX,
-    ))
-    .unwrap()
-    .into();
-
-    BTreeMap::from([(RESERVED_TAG, bytes)])
+pub(crate) fn default_group_map(tags_with_deltas: &[DeltaHoldingTag]) -> BTreeMap<u32, Bytes> {
+    let mut map = BTreeMap::new();
+    for tag_config in tags_with_deltas {
+        let bytes: Bytes = bcs::to_bytes(&(
+            tag_config.base_value,
+            // u32::MAX represents storage version.
+            u32::MAX,
+        ))
+        .unwrap()
+        .into();
+        map.insert(tag_config.tag, bytes);
+    }
+    map
 }
 
 impl<K> TStateView for NonEmptyGroupDataView<K>
@@ -101,10 +108,10 @@ where
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
     fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
         Ok(self
-            .group_keys
-            .contains(key)
-            .then(|| {
-                let bytes = bcs::to_bytes(&default_group_map()).unwrap();
+            .group_keys_with_delta_tags
+            .get(key)
+            .map(|tags| {
+                let bytes = bcs::to_bytes(&default_group_map(tags)).unwrap();
                 StateValue::new_with_metadata(bytes.into(), raw_metadata(5))
             })
             .or_else(|| {
@@ -254,53 +261,137 @@ impl TransactionWrite for ValueType {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(crate) struct TransactionGenParams {
-    /// Each transaction's read-set consists of between 1 and read_size many reads.
-    read_size: usize,
-    /// Each mock execution will produce between 1 and output_size many writes and deltas.
-    output_size: usize,
-    /// The number of different incarnation behaviors that a mock execution of the transaction
-    /// may exhibit. For instance, incarnation_alternatives = 1 corresponds to a "static"
-    /// mock execution behavior regardless of the incarnation, while value > 1 may lead to "dynamic",
-    /// i.e. different behavior when executing different incarnations of the transaction.
-    incarnation_alternatives: usize,
-    // TODO(BlockSTMv2): add a parameter to control the range of possible values, which is
-    // necessary to better cover value validation in BlockSTMv2. Currently, certain bugs can
-    // only be discovered by fixed behavior (incarnation_alternatives = 1) tests, since they
-    // write the same value with a different version (incarnation number). This change should
-    // be coupled with the refactor of mock incarnation generation to make sure it does not
-    // interfere with other logic, such as allowing deletions or deltas (which currently are
-    // hackily determined by the bits of the value).
+///////////////////////////////////////////////////////////////////////////
+// Generation of transactions
+///////////////////////////////////////////////////////////////////////////
+
+/// The following structs are used to configure and generate transactions for proptests.
+/// The goal is to move away from imperative logic (e.g. using modulo operators on random
+/// values to determine operation types) to a more declarative, strategy-based approach.
+///
+/// 1. `TransactionGenParams`: Top-level parameters for a test run, including weights
+///    for different types of modifications.
+/// 2. `ModificationWeights`: A struct to hold the weights for writes, deletions, and deltas,
+///    allowing runtime configuration of the operation mix.
+/// 3. `Modification<V>`: An enum that semantically represents the intended operation. `proptest`
+///    will generate this directly based on the weights in `ModificationWeights`.
+/// 4. `TransactionGenData<V>`: A container for the raw data generated by `proptest`, which serves
+///    as input to the `MockTransactionBuilder`.
+/// 5. `MockTransactionBuilder`: A builder that uses a fluent API to configure and construct
+///    a `MockTransaction` from `TransactionGenData`, replacing the old `materialize_*` functions.
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ModificationWeights {
+    pub write: u32,
+    pub deletion: u32,
+    pub delta: u32,
 }
 
-#[derive(Arbitrary, Debug, Clone)]
-#[proptest(params = "TransactionGenParams")]
-pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
-    /// Generate keys for possible read-sets of the transaction based on the above parameters.
-    #[proptest(
-        strategy = "vec(vec(any::<Index>(), 1..=params.read_size), params.incarnation_alternatives)"
-    )]
+impl Default for ModificationWeights {
+    fn default() -> Self {
+        Self {
+            write: 8,
+            deletion: 1,
+            delta: 4,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TransactionGenParams {
+    /// Each transaction's read-set consists of between 1 and read_size many reads.
+    pub(crate) read_size: usize,
+    /// Each mock execution will produce between 1 and output_size many writes and deltas.
+    pub(crate) output_size: usize,
+    /// The number of different incarnation behaviors that a mock execution of the transaction
+    /// may exhibit.
+    pub(crate) incarnation_alternatives: usize,
+    /// Weights for generating different types of modifications.
+    pub(crate) modification_weights: ModificationWeights,
+}
+
+/// A semantic representation of a data modification, generated by `proptest` according
+/// to configured weights. This avoids interpreting raw random values with brittle logic.
+#[derive(Debug, Clone)]
+pub(crate) enum Modification<V> {
+    Write(Index, V),
+    Deletion(Index),
+    Delta(Index, DeltaOp),
+}
+
+/// A container for the raw data generated by `proptest`. This struct is the input
+/// to the `MockTransactionBuilder`.
+#[derive(Debug, Clone)]
+pub(crate) struct TransactionGenData<V> {
+    /// Generate keys for possible read-sets of the transaction.
     reads: Vec<Vec<Index>>,
-    /// Generate keys and values for possible write-sets based on above transaction gen parameters.
-    /// Based on how the test is configured, some of these "writes" will convert to deltas.
-    #[proptest(
-        strategy = "vec(vec((any::<Index>(), any::<V>()), 1..=params.output_size), \
-		    params.incarnation_alternatives)"
-    )]
-    modifications: Vec<Vec<(Index, V)>>,
+    /// Generate a semantic description of modifications for the transaction.
+    modifications: Vec<Vec<Modification<V>>>,
     /// Generate gas for different incarnations of the transactions.
-    #[proptest(strategy = "vec(any::<Index>(), params.incarnation_alternatives)")]
     gas: Vec<Index>,
     /// Generate seeds for group metadata.
-    #[proptest(strategy = "vec(vec(any::<Index>(), 3), params.incarnation_alternatives)")]
     metadata_seeds: Vec<Vec<Index>>,
     /// Generate indices to derive random behavior for querying resource group sizes.
-    /// For now hardcoding 3 resource groups.
-    #[proptest(
-        strategy = "vec((any::<Index>(), any::<Index>(), any::<Index>()), params.incarnation_alternatives)"
-    )]
-    group_size_indicators: Vec<(Index, Index, Index)>,
+    group_size_indicators: Vec<Vec<Index>>,
+}
+
+impl<V> Arbitrary for TransactionGenData<V>
+where
+    V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static,
+{
+    type Parameters = TransactionGenParams;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+        let weights = params.modification_weights;
+
+        // Use prop_oneof! to create a dynamic strategy based on runtime weights.
+        let modification_strategy = prop_oneof![
+            weights.write => (any::<Index>(), any::<V>()).prop_map(|(i, v)| Modification::Write(i, v)),
+            weights.deletion => any::<Index>().prop_map(Modification::Deletion),
+            weights.delta => (any::<Index>(), any::<u128>()).prop_map(|(i, v)| {
+                // This logic is preserved from the original implementation to maintain
+                // existing test characteristics, but is now contained in a more
+                // structured way.
+                let magnitude = v % 100;
+                let op = if v % 10 < 5 {
+                    delta_sub(magnitude, u128::MAX)
+                } else {
+                    delta_add(magnitude, u128::MAX)
+                };
+                Modification::Delta(i, op)
+            }),
+        ];
+
+        (
+            vec(
+                vec(any::<Index>(), 1..=params.read_size),
+                params.incarnation_alternatives,
+            ),
+            vec(
+                vec(modification_strategy, 1..=params.output_size),
+                params.incarnation_alternatives,
+            ),
+            vec(any::<Index>(), params.incarnation_alternatives),
+            vec(vec(any::<Index>(), 3), params.incarnation_alternatives),
+            // To maintain behavior but allow flexibility, we generate a vec of 3 indices.
+            // The consuming logic can handle a variable number of groups.
+            vec(
+                vec(any::<Index>(), 3),
+                params.incarnation_alternatives,
+            ),
+        )
+            .prop_map(
+                |(reads, modifications, gas, metadata_seeds, group_size_indicators)| Self {
+                    reads,
+                    modifications,
+                    gas,
+                    metadata_seeds,
+                    group_size_indicators,
+                },
+            )
+            .boxed()
+    }
 }
 
 /// Describes behavior of a particular incarnation of a mock transaction, as keys to be read,
@@ -501,261 +592,268 @@ impl<
     }
 }
 
-// TODO: try and test different strategies.
 impl TransactionGenParams {
     pub fn new_dynamic() -> Self {
-        TransactionGenParams {
+        Self {
             read_size: 10,
             output_size: 5,
             incarnation_alternatives: 5,
+            modification_weights: ModificationWeights::default(),
         }
     }
 
     // The read and write will be converted to a module read and write.
     pub fn new_dynamic_modules_only() -> Self {
-        TransactionGenParams {
+        Self {
             read_size: 1,
             output_size: 1,
             incarnation_alternatives: 5,
+            modification_weights: ModificationWeights {
+                write: 1,
+                deletion: 0,
+                delta: 0,
+            },
         }
     }
 
     // Last read and write will be converted to module reads and writes.
     pub fn new_dynamic_with_modules() -> Self {
-        TransactionGenParams {
+        Self {
             read_size: 3,
             output_size: 3,
             incarnation_alternatives: 5,
+            modification_weights: ModificationWeights {
+                write: 1,
+                deletion: 0,
+                delta: 0,
+            },
         }
+    }
+
+    pub fn with_modification_weights(mut self, weights: ModificationWeights) -> Self {
+        self.modification_weights = weights;
+        self
+    }
+
+    pub fn with_no_deletions(mut self) -> Self {
+        self.modification_weights.deletion = 0;
+        self
     }
 }
 
 impl Default for TransactionGenParams {
     fn default() -> Self {
-        TransactionGenParams {
+        Self {
             read_size: 10,
             output_size: 1,
             incarnation_alternatives: 1,
+            modification_weights: ModificationWeights::default(),
         }
     }
 }
 
-/// A simple enum to represent either a write or a delta operation result
-enum WriteDeltaVariant<W, D> {
-    Write(W),
-    Delta(D),
+#[derive(Clone)]
+pub(crate) struct DeltaHoldingTag {
+    pub tag: u32,
+    pub base_value: u128,
 }
 
-fn is_delta_on(index: usize, delta_threshold: Option<usize>) -> bool {
-    delta_threshold.is_some_and(|threshold| threshold <= index)
+#[derive(Clone)]
+pub(crate) struct PerGroupConfig<K> {
+    pub key: K,
+    pub query_percentage: Option<u8>,
+    pub tags_with_deltas: Vec<DeltaHoldingTag>,
 }
 
-impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
-    /// Determines whether to generate a delta operation or a write operation based on parameters
-    ///
-    /// # Arguments
-    /// * `is_delta_path` - attempt to generate a delta value first
-    /// * `value` - The value to process
-    /// * `delta_threshold` - All indices below this threshold will be writes (not deltas)
-    /// * `allow_deletes` - Whether deletion operations are allowed
-    ///
-    /// # Returns
-    /// Either a delta operation or a write operation with its is_aggregator_v1 flag
-    fn generate_write_or_delta<KeyType>(
-        is_delta_path: bool,
-        value: &V,
-        key: KeyType,
-        allow_deletes: bool,
-    ) -> WriteDeltaVariant<(KeyType, ValueType), (KeyType, DeltaOp)> {
-        // First check if this should be a delta
-        if is_delta_path {
-            let val_u128 = ValueType::from_value(value.clone(), true)
-                .as_u128()
-                .unwrap()
-                .unwrap();
+pub(crate) struct MockTransactionBuilder<'a, K, V> {
+    gen_data: TransactionGenData<V>,
+    universe: &'a [K],
 
-            // Not all values become deltas - some remain as normal writes
-            if val_u128 % 10 != 0 {
-                let delta = if val_u128 % 10 < 5 {
-                    delta_sub(val_u128 % 100, u128::MAX)
-                } else {
-                    delta_add(val_u128 % 100, u128::MAX)
-                };
-                return WriteDeltaVariant::Delta((key, delta));
-            }
+    // Configuration flags that determine how the final transaction is constructed.
+    materialize_as_modules: bool,
+    group_config: Option<Vec<PerGroupConfig<K>>>,
+    delta_test_kind: DeltaTestKind,
+}
+
+impl<'a, K, V> MockTransactionBuilder<'a, K, V>
+where
+    K: Clone + Hash + Debug + Eq + Ord,
+    V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send,
+{
+    pub fn new(gen_data: TransactionGenData<V>, universe: &'a [K]) -> Self {
+        Self {
+            gen_data,
+            universe,
+            materialize_as_modules: false,
+            group_config: None,
+            delta_test_kind: DeltaTestKind::None,
         }
-
-        // Otherwise create a normal write
-        let val_u128 = ValueType::from_value(value.clone(), true)
-            .as_u128()
-            .unwrap()
-            .unwrap();
-        let is_deletion = allow_deletes && val_u128 % 23 == 0;
-        let mut write_value = ValueType::from_value(value.clone(), !is_deletion);
-        write_value.metadata = raw_metadata((val_u128 >> 64) as u64);
-
-        WriteDeltaVariant::Write((key, write_value))
     }
 
-    fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
-        // TODO: disentangle writes and deltas.
-        universe: &[K],
-        gen: Vec<Vec<(Index, V)>>,
-        allow_deletes: bool,
-        delta_threshold: Option<usize>,
-    ) -> Vec<(
-        /* writes = */ Vec<(KeyType<K>, ValueType, bool)>,
-        /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
-    )> {
-        let mut ret = Vec::with_capacity(gen.len());
-        for write_gen in gen.into_iter() {
-            let mut keys_modified = BTreeSet::new();
-            let mut incarnation_writes = vec![];
-            let mut incarnation_deltas = vec![];
-            for (idx, value) in write_gen.into_iter() {
-                let i = idx.index(universe.len());
-                let key = universe[i].clone();
-                if !keys_modified.contains(&key) {
-                    keys_modified.insert(key.clone());
+    pub fn with_modules(mut self) -> Self {
+        self.materialize_as_modules = true;
+        self
+    }
 
-                    let is_delta_path = is_delta_on(i, delta_threshold);
-                    match Self::generate_write_or_delta(
-                        is_delta_path,
-                        &value,
-                        KeyType(key),
-                        allow_deletes,
-                    ) {
-                        WriteDeltaVariant::Write((key, value)) => {
-                            incarnation_writes.push((key, value, is_delta_path));
-                        },
-                        WriteDeltaVariant::Delta((key, delta)) => {
-                            incarnation_deltas.push((key, delta));
-                        },
+    pub fn with_groups(mut self, config: Vec<PerGroupConfig<K>>) -> Self {
+        self.group_config = Some(config);
+        self
+    }
+
+    pub fn with_deltas(mut self, kind: DeltaTestKind) -> Self {
+        self.delta_test_kind = kind;
+        self
+    }
+
+    pub fn build<E: Send + Sync + Debug + Clone + TransactionEvent>(
+        self,
+    ) -> MockTransaction<KeyType<K>, E> {
+        let mut behaviors = self.generate_base_behaviors();
+
+        if let Some(group_config) = self.group_config {
+            self.transform_for_groups(&mut behaviors, &group_config);
+        }
+
+        if self.materialize_as_modules {
+            self.transform_for_modules(&mut behaviors);
+        }
+
+        let mut txn = MockTransaction::from_behaviors(behaviors);
+        match self.delta_test_kind {
+            DeltaTestKind::DelayedFields => txn.with_delayed_fields_testing(),
+            DeltaTestKind::AggregatorV1 => txn.with_aggregator_v1_testing(),
+            DeltaTestKind::None => txn,
+        }
+    }
+
+    fn generate_base_behaviors<E: Send + Sync + Debug + Clone + TransactionEvent>(
+        &self,
+    ) -> Vec<MockIncarnation<KeyType<K>, E>> {
+        let is_delta_path = |key_idx: usize| {
+            matches!(
+                self.delta_test_kind,
+                DeltaTestKind::AggregatorV1 | DeltaTestKind::DelayedFields
+            ) && key_idx >= self.universe.len() / 2 // Simplified from delta_threshold
+        };
+
+        // 1. Generate reads
+        let reads: Vec<Vec<(KeyType<K>, bool)>> = self
+            .gen_data
+            .reads
+            .iter()
+            .map(|read_gen| {
+                read_gen
+                    .iter()
+                    .map(|idx| {
+                        let i = idx.index(self.universe.len());
+                        let key = self.universe[i].clone();
+                        (KeyType(key), is_delta_path(i))
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // 2. Generate modifications (writes, deletions, deltas)
+        let modifications: Vec<(Vec<(KeyType<K>, ValueType, bool)>, Vec<(KeyType<K>, DeltaOp)>)> =
+            self.gen_data
+                .modifications
+                .iter()
+                .map(|modification_gen| {
+                    let mut keys_modified = BTreeSet::new();
+                    let mut incarnation_writes = vec![];
+                    let mut incarnation_deltas = vec![];
+
+                    for modification in modification_gen {
+                        match modification {
+                            Modification::Write(idx, value) => {
+                                let i = idx.index(self.universe.len());
+                                let key = self.universe[i].clone();
+                                if keys_modified.insert(key.clone()) {
+                                    let val_u128 = ValueType::from_value(value.clone(), true)
+                                        .as_u128()
+                                        .unwrap()
+                                        .unwrap();
+                                    let mut write_value = ValueType::from_value(value.clone(), true);
+                                    write_value.metadata = raw_metadata((val_u128 >> 64) as u64);
+                                    incarnation_writes
+                                        .push((KeyType(key), write_value, is_delta_path(i)));
+                                }
+                            },
+                            Modification::Deletion(idx) => {
+                                let i = idx.index(self.universe.len());
+                                let key = self.universe[i].clone();
+                                if keys_modified.insert(key.clone()) {
+                                    let value = ValueType::new(None, StateValueMetadata::none(), WriteOpKind::Deletion);
+                                    incarnation_writes.push((KeyType(key), value, is_delta_path(i)));
+                                }
+                            },
+                            Modification::Delta(idx, op) => {
+                                let i = idx.index(self.universe.len());
+                                let key = self.universe[i].clone();
+                                if keys_modified.insert(key.clone()) {
+                                    // Deltas are only produced for paths that are configured for it.
+                                    if is_delta_path(i) {
+                                        incarnation_deltas.push((KeyType(key), *op));
+                                    }
+                                }
+                            },
+                        }
                     }
-                }
-            }
-            ret.push((incarnation_writes, incarnation_deltas));
-        }
-        ret
-    }
+                    (incarnation_writes, incarnation_deltas)
+                })
+                .collect();
 
-    fn reads_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
-        universe: &[K],
-        gen: Vec<Vec<Index>>,
-        delta_threshold: Option<usize>,
-    ) -> Vec<Vec<(KeyType<K>, bool)>> {
-        let mut ret = vec![];
-        for read_gen in gen.into_iter() {
-            let mut incarnation_reads: Vec<(KeyType<K>, bool)> = vec![];
-            for idx in read_gen.into_iter() {
-                let i = idx.index(universe.len());
-                let key = universe[i].clone();
-                incarnation_reads.push((KeyType(key), is_delta_on(i, delta_threshold)));
-            }
-            ret.push(incarnation_reads);
-        }
-        ret
-    }
-
-    fn gas_from_gen(gas_gen: Vec<Index>) -> Vec<u64> {
-        // TODO: generalize gas charging.
-        gas_gen
-            .into_iter()
+        // 3. Generate gas
+        let gas: Vec<u64> = self
+            .gen_data
+            .gas
+            .iter()
             .map(|idx| idx.index(MAX_GAS_PER_TXN as usize + 1) as u64)
-            .collect()
-    }
+            .collect();
 
-    fn group_size_indicator_from_gen(
-        group_size_query_gen: Vec<(Index, Index, Index)>,
-    ) -> Vec<(u8, u8, u8)> {
-        group_size_query_gen
+        // 4. Generate metadata seeds
+        let metadata_seeds: Vec<[u64; 3]> = self
+            .gen_data
+            .metadata_seeds
+            .iter()
+            .map(|vec| {
+                [
+                    vec[0].index(100000) as u64,
+                    vec[1].index(100000) as u64,
+                    vec[2].index(100000) as u64,
+                ]
+            })
+            .collect();
+
+        // 5. Combine into MockIncarnation behaviors
+        modifications
             .into_iter()
-            .map(|(idx1, idx2, idx3)| {
-                (
-                    idx1.index(100) as u8,
-                    idx2.index(100) as u8,
-                    idx3.index(100) as u8,
+            .zip(reads)
+            .zip(gas)
+            .zip(metadata_seeds)
+            .map(|((((writes, deltas), reads), gas), metadata_seeds)| {
+                MockIncarnation::new_with_metadata_seeds(
+                    reads,
+                    writes,
+                    deltas
+                        .into_iter()
+                        .map(|(k, delta)| (k, delta, None))
+                        .collect(),
+                    vec![], // events
+                    metadata_seeds,
+                    gas,
                 )
             })
             .collect()
     }
 
-    fn new_mock_write_txn<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        allow_deletes: bool,
-        delta_threshold: Option<usize>,
-    ) -> MockTransaction<KeyType<K>, E> {
-        let reads = Self::reads_from_gen(universe, self.reads, delta_threshold);
-        let gas = Self::gas_from_gen(self.gas);
+    fn transform_for_modules<E>(&self, behaviors: &mut [MockIncarnation<KeyType<K>, E>]) {
+        let universe_len = self.universe.len();
+        for behavior in behaviors.iter_mut() {
+            if behavior.resource_writes.is_empty() || behavior.resource_reads.is_empty() {
+                return;
+            }
 
-        let behaviors = Self::writes_and_deltas_from_gen(
-            universe,
-            self.modifications,
-            allow_deletes,
-            delta_threshold,
-        )
-        .into_iter()
-        .zip(reads)
-        .zip(gas)
-        .zip(
-            self.metadata_seeds
-                .into_iter()
-                .map(|vec| {
-                    [
-                        vec[0].index(100000) as u64,
-                        vec[1].index(100000) as u64,
-                        vec[2].index(100000) as u64,
-                    ]
-                })
-                .collect::<Vec<_>>(),
-        )
-        .map(|((((writes, deltas), reads), gas), metadata_seeds)| {
-            MockIncarnation::new_with_metadata_seeds(
-                reads,
-                writes,
-                // materialize_groups sets the Option<u32> to a tag as needed.
-                deltas
-                    .into_iter()
-                    .map(|(k, delta)| (k, delta, None))
-                    .collect(),
-                vec![], // events
-                metadata_seeds,
-                gas,
-            )
-        })
-        .collect();
-
-        MockTransaction::from_behaviors(behaviors)
-    }
-
-    pub(crate) fn materialize<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-    ) -> MockTransaction<KeyType<K>, E> {
-        self.new_mock_write_txn(universe, true, None)
-    }
-
-    pub(crate) fn materialize_modules<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-    ) -> MockTransaction<KeyType<K>, E> {
-        let universe_len = universe.len();
-
-        let mut behaviors = self
-            .new_mock_write_txn(universe, false, None)
-            .into_behaviors();
-
-        behaviors.iter_mut().for_each(|behavior| {
             // Handle writes
             let (key_to_convert, mut value, _) = behavior.resource_writes.pop().unwrap();
             let module_id = key_to_mock_module_id(&key_to_convert, universe_len);
@@ -772,174 +870,173 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             // Handle reads.
             let (key_to_convert, _) = behavior.resource_reads.pop().unwrap();
             behavior.module_reads = vec![key_to_mock_module_id(&key_to_convert, universe_len)];
-        });
-
-        MockTransaction::from_behaviors(behaviors)
+        }
     }
 
-    // Generates a mock txn without group reads/writes and converts it to have group
-    // operations. Last 3 keys of the universe are used as group keys.
-    pub(crate) fn materialize_groups<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        group_size_query_pcts: [Option<u8>; 3],
-        delta_threshold: Option<usize>,
-    ) -> MockTransaction<KeyType<K>, E> {
-        let universe_len = universe.len();
-        assert_ge!(universe_len, 3, "Universe must have size >= 3");
+    fn transform_for_groups<E>(
+        &self,
+        behaviors: &mut [MockIncarnation<KeyType<K>, E>],
+        group_config: &[PerGroupConfig<K>],
+    ) {
+        let num_groups = group_config.len();
+        if num_groups == 0 {
+            return;
+        }
 
-        let group_size_query_indicators =
-            Self::group_size_indicator_from_gen(self.group_size_indicators.clone());
-        let mut behaviors = self
-            .new_mock_write_txn(&universe[0..universe.len() - 3], false, delta_threshold)
-            .into_behaviors();
+        let group_keys: Vec<_> = group_config.iter().map(|c| &c.key).collect();
 
-        let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32, bool)> {
+        let group_size_query_indicators: Vec<Vec<u8>> = self
+            .gen_data
+            .group_size_indicators
+            .iter()
+            .map(|indices| {
+                indices
+                    .iter()
+                    .map(|idx| idx.index(100) as u8)
+                    .collect()
+            })
+            .collect();
+
+        let key_to_group = |key: &KeyType<K>| -> Option<(usize, u32)> {
             let mut hasher = DefaultHasher::new();
             key.hash(&mut hasher);
             let bytes = hasher.finish().to_be_bytes();
-            // Choose from a smaller universe so different ops have intersection on a key.
             let tag = (bytes[0] % 16) as u32;
 
-            let group_key_idx = bytes[1] % 4;
-
-            // 3/4 of the time key will map to group - rest are normal resource accesses.
-            (group_key_idx < 3).then_some((group_key_idx as usize, tag, group_key_idx > 0))
+            // Map to one of the configured group keys.
+            let group_idx = (bytes[1] as usize) % (num_groups + 1); // +1 to allow non-group ops
+            (group_idx < num_groups).then_some((group_idx, tag))
         };
 
         for (behavior_idx, behavior) in behaviors.iter_mut().enumerate() {
             let mut reads = vec![];
             let mut group_reads = vec![];
-            for (read_key, contains_delta) in behavior.resource_reads.clone() {
-                assert!(read_key != KeyType(universe[universe_len - 1].clone()));
-                assert!(read_key != KeyType(universe[universe_len - 2].clone()));
-                assert!(read_key != KeyType(universe[universe_len - 3].clone()));
-                match key_to_group(&read_key) {
-                    Some((idx, tag, has_delayed_field)) => {
-                        // Custom logic for has_delayed_fields for groups: shadowing
-                        // the flag of the original read.
-                        group_reads.push((
-                            KeyType(universe[universe_len - 1 - idx].clone()),
-                            tag,
-                            // Reserved tag is configured to have delayed fields.
-                            has_delayed_field && tag == RESERVED_TAG && delta_threshold.is_some(),
-                        ))
-                    },
-                    None => reads.push((read_key, contains_delta)),
+            for (read_key, _contains_delta) in behavior.resource_reads.clone() {
+                if let Some((idx, tag)) = key_to_group(&read_key) {
+                    let is_delayed_field_test =
+                        matches!(self.delta_test_kind, DeltaTestKind::DelayedFields);
+                    let is_delta_tag = group_config[idx]
+                        .tags_with_deltas
+                        .iter()
+                        .any(|t| t.tag == tag);
+                    group_reads.push((
+                        KeyType(group_keys[idx].clone()),
+                        tag,
+                        is_delta_tag && is_delayed_field_test,
+                    ))
+                } else {
+                    // contains_delta logic for non-group reads remains the same.
+                    let original_read = behavior
+                        .resource_reads
+                        .iter()
+                        .find(|(k, _)| k == &read_key)
+                        .unwrap();
+                    reads.push(original_read.clone());
                 }
             }
 
             let mut writes = vec![];
-            let mut group_writes = vec![];
-            let mut inner_ops = vec![HashMap::new(); 3];
-            for (write_key, value, has_delayed_field) in behavior.resource_writes.clone() {
-                match key_to_group(&write_key) {
-                    Some((key_idx, tag, has_delayed_field)) => {
-                        // Same shadowing of has_delayed_field variable and logic as above.
-                        if tag != RESERVED_TAG || !value.is_deletion() {
-                            inner_ops[key_idx]
-                                .insert(tag, (value, has_delayed_field && tag == RESERVED_TAG));
-                        }
-                    },
-                    None => {
-                        writes.push((write_key, value, has_delayed_field));
-                    },
+            let mut inner_ops: Vec<HashMap<u32, (ValueType, bool)>> =
+                vec![HashMap::new(); num_groups];
+            for (write_key, value, _has_delayed_field) in behavior.resource_writes.clone() {
+                if let Some((key_idx, tag)) = key_to_group(&write_key) {
+                    let is_delta_tag = group_config[key_idx]
+                        .tags_with_deltas
+                        .iter()
+                        .any(|t| t.tag == tag);
+                    if !value.is_deletion() || !is_delta_tag {
+                        inner_ops[key_idx].insert(tag, (value, is_delta_tag));
+                    }
+                } else {
+                    let original_write = behavior
+                        .resource_writes
+                        .iter()
+                        .find(|(k, _, _)| k == &write_key)
+                        .unwrap();
+                    writes.push(original_write.clone());
                 }
             }
+
+            let mut group_writes = vec![];
             for (idx, inner_ops) in inner_ops.into_iter().enumerate() {
                 if !inner_ops.is_empty() {
                     group_writes.push((
-                        KeyType(universe[universe_len - 1 - idx].clone()),
-                        raw_metadata(behavior.metadata_seeds[idx]),
+                        KeyType(group_keys[idx].clone()),
+                        raw_metadata(behavior.metadata_seeds[idx % 3]), // Preserved modulo logic
                         inner_ops,
                     ));
                 }
             }
 
-            // Group test does not handle deltas for aggregator v1(different view, no default
-            // storage value). However, it does handle deltas (added below) for delayed fields.
-            assert!(delta_threshold.is_some() || behavior.deltas.is_empty());
+            assert!(
+                !matches!(self.delta_test_kind, DeltaTestKind::AggregatorV1)
+                    || behavior.deltas.is_empty()
+            );
             behavior.resource_reads = reads;
             behavior.resource_writes = writes;
             behavior.group_reads = group_reads;
             behavior.group_writes = group_writes;
 
-            if delta_threshold.is_some() {
-                // TODO: We can have a threshold over which we create a delta for RESERVED_TAG,
-                // because currently only RESERVED_TAG in a group contains a delayed field.
-                let mut delta_for_keys = [false; 3];
+            if matches!(self.delta_test_kind, DeltaTestKind::DelayedFields) {
+                let mut delta_for_keys: HashMap<K, bool> = HashMap::new();
                 behavior.deltas = behavior
                     .deltas
                     .iter()
-                    .filter_map(|(key, delta, maybe_tag)| {
-                        if let Some((idx, _, has_delayed_field)) = key_to_group(key) {
-                            if has_delayed_field && !delta_for_keys[idx] {
-                                delta_for_keys[idx] = true;
-                                Some((
-                                    KeyType(universe[universe_len - 1 - idx].clone()),
-                                    *delta,
-                                    Some(RESERVED_TAG),
-                                ))
+                    .filter_map(|(key, delta, _maybe_tag)| {
+                        if let Some((idx, tag)) = key_to_group(key) {
+                            let group_key = group_keys[idx];
+                            if group_config[idx]
+                                .tags_with_deltas
+                                .iter()
+                                .any(|t| t.tag == tag)
+                                && !*delta_for_keys.entry(group_key.clone()).or_insert(false)
+                            {
+                                *delta_for_keys.get_mut(group_key).unwrap() = true;
+                                Some((KeyType(group_key.clone()), *delta, Some(tag)))
                             } else {
                                 None
                             }
                         } else {
-                            Some((key.clone(), *delta, *maybe_tag))
+                            let original_delta =
+                                behavior.deltas.iter().find(|(k, _, _)| k == key).unwrap();
+                            Some(original_delta.clone())
                         }
                     })
                     .collect();
             }
 
-            behavior.group_queries = group_size_query_pcts
+            behavior.group_queries = group_config
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, size_query_pct)| match size_query_pct {
-                    Some(size_query_pct) => {
-                        assert_le!(*size_query_pct, 100, "Must be percentage point (0..100]");
-                        let indicator = match idx {
-                            0 => group_size_query_indicators[behavior_idx].0,
-                            1 => group_size_query_indicators[behavior_idx].1,
-                            2 => group_size_query_indicators[behavior_idx].2,
-                            _ => unreachable!("Test uses 3 groups"),
-                        };
-                        (indicator < *size_query_pct).then(|| {
+                .filter_map(|(idx, config)| {
+                    if let Some(query_percentage) = config.query_percentage {
+                        assert_le!(query_percentage, 100, "Must be percentage point (0..100]");
+                        let indicators = &group_size_query_indicators[behavior_idx];
+                        // Use modulo on the number of available indicators.
+                        let indicator = indicators[idx % indicators.len()];
+                        (indicator < query_percentage).then(|| {
                             (
-                                KeyType(universe[universe_len - 1 - idx].clone()),
-                                // TODO: handle metadata queries more uniformly w. size.
-                                indicator % 2 == 0,
+                                KeyType(config.key.clone()),
+                                indicator % 2 == 0, // preserved logic for metadata vs size
                             )
                         })
-                    },
-                    None => None,
+                    } else {
+                        None
+                    }
                 })
                 .collect();
         }
-
-        // When delayed fields are not enabled, the flag is ignored, so we can always
-        // set with_delayed_fields here.
-        if delta_threshold.is_some() {
-            MockTransaction::from_behaviors(behaviors).with_delayed_fields_testing()
-        } else {
-            MockTransaction::from_behaviors(behaviors)
-        }
     }
+}
 
-    pub(crate) fn materialize_with_deltas<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        delta_threshold: usize,
-        allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, E> {
-        // Enable delta generation for this specific method
-        self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
-            .with_aggregator_v1_testing()
-    }
+/// A simple enum to represent either a write or a delta operation result
+enum WriteDeltaVariant<W, D> {
+    Write(W),
+    Delta(D),
+}
+
+fn is_delta_on(index: usize, delta_threshold: Option<usize>) -> bool {
+    delta_threshold.is_some_and(|threshold| threshold <= index)
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {

@@ -9,7 +9,10 @@ use crate::{
     combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockOutput, MockTask},
-        types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
+        types::{
+            KeyType, MockTransaction, MockTransactionBuilder, TransactionGenData,
+            TransactionGenParams,
+        },
     },
     executor::BlockExecutor,
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -101,7 +104,7 @@ where
             .current();
 
         let transaction_gens = vec(
-            any_with::<TransactionGen<V>>(transaction_params),
+            any_with::<TransactionGenData<V>>(transaction_params),
             num_transactions,
         )
         .new_tree(&mut runner)
@@ -110,7 +113,7 @@ where
 
         let transactions: Vec<_> = transaction_gens
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&key_universe))
+            .map(|txn_gen| MockTransactionBuilder::new(txn_gen, &key_universe).build())
             .collect();
         let txns_provider = DefaultTxnProvider::new_without_info(transactions.clone());
 

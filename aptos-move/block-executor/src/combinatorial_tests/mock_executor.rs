@@ -151,6 +151,7 @@ pub(crate) struct MockOutput<K, E> {
 /// A builder for incrementally constructing MockOutput instances for cleaner code.
 pub(crate) struct MockOutputBuilder<K, E> {
     pub(crate) output: MockOutput<K, E>,
+    pub(crate) new_delayed_field_id_counter: u32,
 }
 
 impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E> {
@@ -187,7 +188,10 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
             group_reads_needing_exchange: HashMap::new(),
         };
 
-        Self { output }
+        Self {
+            output,
+            new_delayed_field_id_counter: 0,
+        }
     }
 
     /// This method reads metadata for each module ID in the provided list
@@ -504,9 +508,21 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
                 continue;
             }
 
-            if *has_delta && delayed_fields_enabled && value_to_add.bytes().is_some() {
-                let prev_id = self.get_delayed_field_id_from_resource(view, k, None)?;
-                value_to_add.set_bytes(serialize_from_delayed_field_id(prev_id, txn_idx));
+            if *has_delta && delayed_fields_enabled && !value_to_add.is_deletion() {
+                let id_to_serialize =
+                    match self.get_delayed_field_id_from_resource(view, k, None)? {
+                        Some(prev_id) => prev_id,
+                        None => {
+                            // This is a resource creation, so generate a new ID.
+                            let new_id = DelayedFieldID::new_for_test(
+                                (txn_idx as u64) << 32 | self.new_delayed_field_id_counter as u64,
+                            );
+                            self.new_delayed_field_id_counter += 1;
+                            new_id
+                        },
+                    };
+
+                value_to_add.set_bytes(serialize_from_delayed_field_id(id_to_serialize, txn_idx));
                 value_to_add_layout = Some(Arc::new(MOCK_LAYOUT.clone()));
             }
 
@@ -532,7 +548,13 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
         match delta_test_kind {
             DeltaTestKind::DelayedFields => {
                 for (k, delta, maybe_tag) in deltas {
-                    let id = self.get_delayed_field_id_from_resource(view, k, *maybe_tag)?;
+                    let id = self
+                        .get_delayed_field_id_from_resource(view, k, *maybe_tag)?
+                        .ok_or_else(|| {
+                            ExecutionStatus::Success(MockOutput::with_error(
+                                "Attempting to apply a delta to a non-existent resource",
+                            ))
+                        })?;
 
                     // Currently, we test with base delta of 0 and a max value of u128::MAX.
                     let base_delta = &SignedU128::Positive(0);
@@ -575,8 +597,8 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         key: &K,
         maybe_tag: Option<u32>,
-    ) -> Result<DelayedFieldID, ExecutionStatus<MockOutput<K, E>, usize>> {
-        let bytes = match maybe_tag {
+    ) -> Result<Option<DelayedFieldID>, ExecutionStatus<MockOutput<K, E>, usize>> {
+        let maybe_bytes = match maybe_tag {
             None => try_with_status!(
                 view.get_resource_bytes(key, Some(&*MOCK_LAYOUT)),
                 "Failed to get resource bytes"
@@ -585,24 +607,29 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
                 view.get_resource_from_group(key, &tag, Some(&*MOCK_LAYOUT)),
                 "Failed to get resource bytes from group"
             ),
-        }
-        .expect("In current tests, delayed field is always initialized");
+        };
 
-        if maybe_tag.is_some() {
-            // TODO: test metadata.
-            self.output
-                .group_reads_needing_exchange
-                .insert(key.clone(), StateValueMetadata::none());
+        if let Some(bytes) = maybe_bytes {
+            if maybe_tag.is_some() {
+                // TODO: test metadata.
+                self.output
+                    .group_reads_needing_exchange
+                    .insert(key.clone(), StateValueMetadata::none());
+            } else {
+                self.output.reads_needing_exchange.insert(
+                    key.clone(),
+                    (StateValueMetadata::none(), Arc::new(MOCK_LAYOUT.clone())),
+                );
+            }
+
+            Ok(Some(
+                deserialize_to_delayed_field_id(&bytes)
+                    .expect("Must deserialize delayed field tuple")
+                    .0,
+            ))
         } else {
-            self.output.reads_needing_exchange.insert(
-                key.clone(),
-                (StateValueMetadata::none(), Arc::new(MOCK_LAYOUT.clone())),
-            );
+            Ok(None)
         }
-
-        Ok(deserialize_to_delayed_field_id(&bytes)
-            .expect("Must deserialize delayed field tuple")
-            .0)
     }
 
     /// Perform a delayed field read and update the output accordingly.

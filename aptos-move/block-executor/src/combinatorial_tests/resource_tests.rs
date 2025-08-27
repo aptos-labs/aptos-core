@@ -7,7 +7,10 @@ use crate::{
     combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
-        types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN},
+        types::{
+            KeyType, MockTransaction, MockTransactionBuilder, TransactionGenData,
+            TransactionGenParams, MAX_GAS_PER_TXN,
+        },
     },
     executor::BlockExecutor,
     task::ExecutorTask,
@@ -139,30 +142,27 @@ where
     }
 }
 
-pub(crate) fn generate_universe_and_transactions(
+pub(crate) fn generate_test_data(
     runner: &mut TestRunner,
     universe_size: usize,
     transaction_count: usize,
-    is_dynamic: bool,
-) -> (Vec<[u8; 32]>, Vec<TransactionGen<[u8; 32]>>) {
+    params: TransactionGenParams,
+) -> (
+    Vec<[u8; 32]>,
+    Vec<TransactionGenData<[u8; 32]>>,
+) {
     let universe = vec(any::<[u8; 32]>(), universe_size)
         .new_tree(runner)
         .expect("creating universe should succeed")
         .current();
 
-    let transaction_strategy = if is_dynamic {
-        vec(
-            any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-            transaction_count,
-        )
-    } else {
-        vec(any::<TransactionGen<[u8; 32]>>(), transaction_count)
-    };
-
-    let transaction_gen = transaction_strategy
-        .new_tree(runner)
-        .expect("creating transactions should succeed")
-        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGenData<[u8; 32]>>(params),
+        transaction_count,
+    )
+    .new_tree(runner)
+    .expect("creating transactions should succeed")
+    .current();
 
     (universe, transaction_gen)
 }
@@ -185,12 +185,13 @@ pub(crate) fn run_transactions_resources(
     // Run the test cases directly
     for idx_generation in 0..num_random_generations {
         // Generate universe and transactions
-        let (universe, transaction_gen) = generate_universe_and_transactions(
-            &mut runner,
-            universe_size,
-            transaction_count,
-            is_dynamic,
-        );
+        let params = if is_dynamic {
+            TransactionGenParams::new_dynamic()
+        } else {
+            TransactionGenParams::default()
+        };
+        let (universe, transaction_gen) =
+            generate_test_data(&mut runner, universe_size, transaction_count, params);
 
         // Generate abort and skip_rest transaction indices
         let abort_strategy = vec(any::<Index>(), abort_count);
@@ -209,7 +210,7 @@ pub(crate) fn run_transactions_resources(
         // Create transactions
         let mut transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>> = transaction_gen
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&universe))
+            .map(|txn_gen| MockTransactionBuilder::new(txn_gen, &universe).build())
             .collect();
 
         // Apply modifications to transactions

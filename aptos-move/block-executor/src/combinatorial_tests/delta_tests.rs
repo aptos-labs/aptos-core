@@ -7,10 +7,13 @@ use crate::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
         resource_tests::{
-            create_executor_thread_pool, execute_block_parallel,
-            generate_universe_and_transactions, get_gas_limit_variants,
+            create_executor_thread_pool, execute_block_parallel, generate_test_data,
+            get_gas_limit_variants,
         },
-        types::{DeltaDataView, KeyType, MockTransaction},
+        types::{
+            DeltaDataView, DeltaTestKind, KeyType, MockTransaction, MockTransactionBuilder,
+            ModificationWeights, TransactionGenData, TransactionGenParams, STORAGE_AGGREGATOR_VALUE,
+        },
     },
     task::ExecutorTask,
     txn_provider::default::DefaultTxnProvider,
@@ -18,6 +21,7 @@ use crate::{
 use proptest::test_runner::TestRunner;
 use std::marker::PhantomData;
 use test_case::test_matrix;
+use std::collections::HashMap;
 
 fn run_transactions_deltas(
     universe_size: usize,
@@ -31,26 +35,29 @@ fn run_transactions_deltas(
 
     // The delta threshold controls how many keys / paths are guaranteed r/w resources even
     // in the presence of deltas.
-    let delta_threshold = std::cmp::min(15, universe_size / 2);
+    let _delta_threshold = std::cmp::min(15, universe_size / 2);
 
     for _ in 0..num_random_generations {
         let mut local_runner = TestRunner::default();
 
-        let (universe, transaction_gen) = generate_universe_and_transactions(
-            &mut local_runner,
-            universe_size,
-            transaction_count,
-            true,
-        );
+        let params = TransactionGenParams::new_dynamic().with_no_deletions();
+        let (universe, transaction_gen) =
+            generate_test_data(&mut local_runner, universe_size, transaction_count, params);
 
         // Do not allow deletions as resolver can't apply delta to a deleted aggregator.
         let transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>> = transaction_gen
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, delta_threshold, false))
+            .map(|txn_gen| {
+                MockTransactionBuilder::new(txn_gen, &universe)
+                    .with_deltas(DeltaTestKind::AggregatorV1)
+                    .build()
+            })
             .collect();
         let txn_provider = DefaultTxnProvider::new_without_info(transactions);
 
         let data_view = DeltaDataView::<KeyType<[u8; 32]>> {
+            initial_values: HashMap::new(),
+            default_base_value: STORAGE_AGGREGATOR_VALUE,
             phantom: PhantomData,
         };
 

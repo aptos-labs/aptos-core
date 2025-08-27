@@ -10,7 +10,8 @@ use crate::{
             create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
         },
         types::{
-            key_to_mock_module_id, KeyType, MockTransaction, TransactionGen, TransactionGenParams,
+            key_to_mock_module_id, KeyType, MockTransaction, MockTransactionBuilder,
+            TransactionGenData, TransactionGenParams,
         },
     },
     task::ExecutorTask,
@@ -87,16 +88,16 @@ fn execute_module_tests(
             .into_iter()
             .enumerate()
             .map(|(i, txn_gen)| {
+                let mut builder = MockTransactionBuilder::new(txn_gen, &universe);
                 if i % 5 == 0
                     || !matches!(
                         modules_test_type,
                         ModuleTestType::MixedTransactionsMixedAccesses
                     )
                 {
-                    txn_gen.materialize_modules(&universe)
-                } else {
-                    txn_gen.materialize(&universe)
+                    builder = builder.with_modules();
                 }
+                builder.build()
             })
             .collect();
 
