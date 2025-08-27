@@ -206,7 +206,7 @@ module aptos_experimental::order_book {
 
     // ============================= APIs relevant to bulk order only ====================================
     public fun place_bulk_order<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_req: aptos_experimental::bulk_order_book::BulkOrderRequest
+        self: &mut OrderBook<M>, order_req: aptos_experimental::bulk_order_book_types::BulkOrderRequest
     ) : OrderIdType {
         self.bulk_order_book.place_bulk_order(
             &mut self.price_time_idx,

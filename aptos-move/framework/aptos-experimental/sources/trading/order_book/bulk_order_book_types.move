@@ -54,6 +54,32 @@ module aptos_experimental::bulk_order_book_types {
     const EUNEXPECTED_MATCH_PRICE: u64 = 1;
     const EUNEXPECTED_MATCH_SIZE: u64 = 2;
     const E_REINSERT_ORDER_MISMATCH: u64 = 3;
+    const EINVLID_MM_ORDER_REQUEST: u64 = 4;
+    const EPRICE_CROSSING: u64 = 5;
+
+    /// Request structure for placing a new bulk order with multiple price levels.
+    ///
+    /// # Fields:
+    /// - `account`: The account placing the order
+    /// - `bid_prices`: Vector of bid prices in descending order (best price first)
+    /// - `bid_sizes`: Vector of bid sizes corresponding to each price level
+    /// - `ask_prices`: Vector of ask prices in ascending order (best price first)
+    /// - `ask_sizes`: Vector of ask sizes corresponding to each price level
+    ///
+    /// # Validation:
+    /// - Bid prices must be in descending order
+    /// - Ask prices must be in ascending order
+    /// - All sizes must be greater than 0
+    /// - Price and size vectors must have matching lengths
+    enum BulkOrderRequest has copy, drop {
+        V1 {
+            account: address,
+            bid_prices: vector<u64>, // prices for each levels of the order
+            bid_sizes: vector<u64>, // sizes for each levels of the order
+            ask_prices: vector<u64>, // prices for each levels of the order
+            ask_sizes: vector<u64>, // sizes for each levels of the order
+        }
+    }
 
     /// Represents a multi-level order with both bid and ask sides.
     ///
@@ -103,13 +129,24 @@ module aptos_experimental::bulk_order_book_types {
     /// A new `BulkOrder` instance with calculated original and remaining sizes.
     public(friend) fun new_bulk_order(
         order_id: OrderIdType,
-        account: address,
         unique_priority_idx: UniqueIdxType,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>
+        order_req: BulkOrderRequest, best_bid_price: Option<u64>, best_ask_price: Option<u64>,
     ): BulkOrder {
+        let BulkOrderRequest::V1 { account, bid_prices, bid_sizes, ask_prices, ask_sizes } = order_req;
+        let bid_price_crossing_idx = discard_price_crossing_levels(&bid_prices, best_ask_price, true);
+        let ask_price_crossing_idx = discard_price_crossing_levels(&ask_prices, best_bid_price, false);
+        let (post_only_bid_prices, post_only_bid_sizes) = if (bid_price_crossing_idx > 0) {
+            (bid_prices.slice(bid_price_crossing_idx, bid_prices.length()),
+            bid_sizes.slice(bid_price_crossing_idx, bid_sizes.length()))
+        } else {
+            (bid_prices, bid_sizes)
+        };
+        let (post_only_ask_prices, post_only_ask_sizes) = if (ask_price_crossing_idx > 0) {
+            (ask_prices.slice(ask_price_crossing_idx, ask_prices.length()),
+            ask_sizes.slice(ask_price_crossing_idx, ask_sizes.length()))
+        } else {
+            (ask_prices, ask_sizes)
+        };
         // Original bid and ask sizes are the sum of the sizes at each price level
         let orig_bid_size = bid_sizes.fold(0, |acc, size| acc + size);
         let orig_ask_size = ask_sizes.fold(0, |acc, size| acc + size);
@@ -121,12 +158,164 @@ module aptos_experimental::bulk_order_book_types {
             orig_ask_size,
             total_remaining_bid_size: orig_bid_size, // Initially, the remaining size is the original size
             total_remaining_ask_size: orig_ask_size, // Initially, the remaining size is the original size
+            bid_prices: post_only_bid_prices,
+            bid_sizes: post_only_bid_sizes,
+            ask_prices: post_only_ask_prices,
+            ask_sizes: post_only_ask_sizes
+        }
+    }
+
+    /// Creates a new bulk order request with the specified price levels and sizes.
+    ///
+    /// # Arguments:
+    /// - `account`: The account placing the order
+    /// - `bid_prices`: Vector of bid prices in descending order
+    /// - `bid_sizes`: Vector of bid sizes corresponding to each price level
+    /// - `ask_prices`: Vector of ask prices in ascending order
+    /// - `ask_sizes`: Vector of ask sizes corresponding to each price level
+    /// - `metadata`: Additional metadata for the order
+    ///
+    /// # Returns:
+    /// A `BulkOrderRequest` instance.
+    ///
+    /// # Aborts:
+    /// - If bid_prices and bid_sizes have different lengths
+    /// - If ask_prices and ask_sizes have different lengths
+    public fun new_bulk_order_request(
+        account: address,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>
+    ): BulkOrderRequest {
+        assert!(bid_prices.length() == bid_sizes.length(), EINVLID_MM_ORDER_REQUEST);
+        assert!(ask_prices.length() == ask_sizes.length(), EINVLID_MM_ORDER_REQUEST);
+        let req = BulkOrderRequest::V1 {
+            account,
             bid_prices,
             bid_sizes,
             ask_prices,
             ask_sizes
-        }
+        };
+        validate_bulk_order_request(&req);
+        req
     }
+
+    public fun get_account_from_order_request(
+        order_req: &BulkOrderRequest
+    ): address {
+        let BulkOrderRequest::V1 { account, .. } = order_req;
+        *account
+    }
+
+    /// Validates that all sizes in the vector are greater than 0.
+    ///
+    /// # Arguments:
+    /// - `sizes`: Vector of sizes to validate
+    ///
+    /// # Aborts:
+    /// - If the vector is empty
+    /// - If any size is 0
+    fun validate_not_zero_sizes(
+        sizes: &vector<u64>
+    ) {
+        let i = 0;
+        while (i < sizes.length()) {
+            assert!(sizes[i] > 0, EINVLID_MM_ORDER_REQUEST);
+            i += 1;
+        };
+    }
+
+    /// Validates that prices are in the correct order (descending for bids, ascending for asks).
+    ///
+    /// # Arguments:
+    /// - `prices`: Vector of prices to validate
+    /// - `is_descending`: True if prices should be in descending order, false for ascending
+    ///
+    /// # Aborts:
+    /// - If prices are not in the correct order
+    fun validate_price_ordering(
+        prices: &vector<u64>,
+        is_descending: bool
+    ) {
+        let i = 0;
+        if (prices.length() == 0) {
+            return ; // No prices to validate
+        };
+        while (i < prices.length() - 1) {
+            if (is_descending) {
+                assert!(prices[i] > prices[i + 1], EINVLID_MM_ORDER_REQUEST);
+            } else {
+                assert!(prices[i] < prices[i + 1], EINVLID_MM_ORDER_REQUEST);
+            };
+            i += 1;
+        };
+    }
+
+    /// Validates that bid and ask prices don't cross.
+    ///
+    /// This ensures that the highest bid price is lower than the lowest ask price,
+    /// preventing self-matching within a single order.
+    ///
+    /// # Arguments:
+    /// - `bid_prices`: Vector of bid prices (should be in descending order)
+    /// - `ask_prices`: Vector of ask prices (should be in ascending order)
+    ///
+    /// # Aborts:
+    /// - If the highest bid price is greater than or equal to the lowest ask price
+    fun validate_no_price_crossing(
+        bid_prices: &vector<u64>,
+        ask_prices: &vector<u64>
+    ) {
+        if (bid_prices.length() > 0 && ask_prices.length() > 0) {
+            let highest_bid = bid_prices[0]; // First element is highest (descending order)
+            let lowest_ask = ask_prices[0];  // First element is lowest (ascending order)
+            assert!(highest_bid < lowest_ask, EPRICE_CROSSING);
+        };
+    }
+
+    /// Validates a bulk order request for correctness.
+    ///
+    /// # Arguments:
+    /// - `order_req`: The bulk order request to validate
+    ///
+    /// # Aborts:
+    /// - If any validation fails (price ordering, sizes, vector lengths, price crossing)
+    fun validate_bulk_order_request(
+        order_req: &BulkOrderRequest,
+    ) {
+        // Ensure bid prices are in descending order and ask prices are in ascending order
+        assert!(order_req.bid_sizes.length() > 0 || order_req.ask_sizes.length() > 0, EINVLID_MM_ORDER_REQUEST);
+        validate_not_zero_sizes(&order_req.bid_sizes);
+        validate_not_zero_sizes(&order_req.ask_sizes);
+        assert!(order_req.bid_prices.length() == order_req.bid_sizes.length(), EINVLID_MM_ORDER_REQUEST);
+        assert!(order_req.ask_prices.length() == order_req.ask_sizes.length(), EINVLID_MM_ORDER_REQUEST);
+        validate_price_ordering(&order_req.bid_prices, true);  // descending
+        validate_price_ordering(&order_req.ask_prices, false); // ascending
+        validate_no_price_crossing(&order_req.bid_prices, &order_req.ask_prices);
+    }
+
+    fun discard_price_crossing_levels(
+        prices: &vector<u64>,
+        best_price: Option<u64>,
+        is_bid: bool,
+    ): u64 {
+        // Discard bid levels that are >= best ask price
+        let i = 0;
+        if (best_price != option::none()) {
+            let best_price = best_price.destroy_some();
+            while (i < prices.length()) {
+                if (is_bid && prices[i] < best_price) {
+                    break; // All remaining levels are removed
+                } else if (!is_bid && prices[i] > best_price) {
+                    break; // All remaining levels are removed
+                };
+                i += 1;
+            };
+        };
+        i // Return the index of the first non-crossing level
+    }
+
 
     /// Creates a new single bulk order match result.
     ///
@@ -249,6 +438,28 @@ module aptos_experimental::bulk_order_book_types {
             option::none() // No active price level
         } else {
             option::some(prices[0]) // Return the first price level
+        }
+    }
+
+    public(friend) fun get_all_prices(
+        self: &BulkOrder,
+        is_bid: bool,
+    ): vector<u64> {
+        if (is_bid) {
+            self.bid_prices
+        } else {
+            self.ask_prices
+        }
+    }
+
+    public(friend) fun get_all_sizes(
+        self: &BulkOrder,
+        is_bid: bool,
+    ): vector<u64> {
+        if (is_bid) {
+            self.bid_sizes
+        } else {
+            self.ask_sizes
         }
     }
 
