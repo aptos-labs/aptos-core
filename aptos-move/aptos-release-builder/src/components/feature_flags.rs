@@ -149,6 +149,7 @@ pub enum FeatureFlag {
     EnableLazyLoading,
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
+    AptosVmV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -395,6 +396,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
             },
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::AptosVmV2 => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
         }
     }
 }
@@ -568,6 +570,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CalculateTransactionFeeForDistribution
             },
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
+            AptosFeatureFlag::APTOS_VM_V2 => FeatureFlag::AptosVmV2,
         }
     }
 }

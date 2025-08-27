@@ -477,7 +477,7 @@ fn validate_and_construct(
         expected_type,
     )?;
     let mut args = vec![];
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
+    let ty_builder = loader.runtime_environment().vm_config().ty_builder.clone();
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder

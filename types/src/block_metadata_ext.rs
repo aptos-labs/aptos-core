@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_metadata::BlockMetadata, randomness::Randomness};
+use crate::{
+    block_metadata::BlockMetadata, move_utils::as_move_value::AsMoveValue, randomness::Randomness,
+};
 use aptos_crypto::HashValue;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
 
 /// The extended block metadata.
@@ -109,6 +111,36 @@ impl BlockMetadataExt {
         match self {
             BlockMetadataExt::V0(_) => "block_metadata_ext_transaction__v0",
             BlockMetadataExt::V1(_) => "block_metadata_ext_transaction__v1",
+        }
+    }
+
+    pub fn get_prologue_move_args(self) -> Vec<MoveValue> {
+        match self {
+            BlockMetadataExt::V0(block_metadata) => block_metadata.get_prologue_move_args(),
+            BlockMetadataExt::V1(block_metadata) => {
+                vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(
+                        AccountAddress::from_bytes(block_metadata.id.to_vec()).unwrap(),
+                    ),
+                    MoveValue::U64(block_metadata.epoch),
+                    MoveValue::U64(block_metadata.round),
+                    MoveValue::Address(block_metadata.proposer),
+                    block_metadata
+                        .failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    block_metadata.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(block_metadata.timestamp_usecs),
+                    block_metadata
+                        .randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                ]
+            },
         }
     }
 }
