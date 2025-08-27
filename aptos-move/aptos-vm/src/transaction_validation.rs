@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
-use move_binary_format::errors::VMResult;
+use move_binary_format::errors::{VMResult, PartialVMError, Location};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -37,6 +37,7 @@ use move_vm_runtime::{
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use aptos_logger::warn;
+
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -104,7 +105,33 @@ impl TransactionValidation {
                 ))
     }
 
+    /// Safely check if the transaction validation module is available
+    /// This handles cases where the node might still be syncing
+    pub fn is_module_available(
+        &self,
+        module_storage: &impl ModuleStorage,
+    ) -> bool {
+        module_storage
+            .unmetered_check_module_exists(&self.module_addr, &self.module_name)
+            .unwrap_or(false)
+    }
 
+    /// Check if we should defer execution due to potential sync issues
+    pub fn should_defer_execution(
+        &self,
+        module_storage: &impl ModuleStorage,
+        log_context: &AdapterLogSchema,
+    ) -> bool {
+        if !self.is_module_available(module_storage) {
+            warn!(
+                *log_context,
+                "Transaction validation module not available, node may still be syncing: {:?}",
+                self.module_id()
+            );
+            return true;
+        }
+        false
+    }
 }
 
 pub(crate) fn run_script_prologue(
@@ -117,7 +144,15 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
-
+    // Check if the transaction validation module is available
+    // If not, it might indicate the node is still syncing
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(module_storage, log_context) {
+        // Return a more specific error that indicates sync state rather than function resolution
+        return Err(VMStatus::error(
+            StatusCode::STORAGE_ERROR,
+            Some("Transaction validation module not available - node may be syncing".to_string()),
+        ));
+    }
 
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
@@ -446,7 +481,13 @@ pub(crate) fn run_multisig_prologue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
-
+    // Check if the transaction validation module is available
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(module_storage, log_context) {
+        return Err(VMStatus::error(
+            StatusCode::STORAGE_ERROR,
+            Some("Transaction validation module not available - node may be syncing".to_string()),
+        ));
+    }
 
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
@@ -501,7 +542,15 @@ fn run_epilogue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
-
+    // Check if the transaction validation module is available
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(
+        module_storage,
+        &AdapterLogSchema::new(aptos_types::state_store::StateViewId::Miscellaneous, 0)
+    ) {
+        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
+            .with_message("Transaction validation module not available - node may be syncing".to_string())
+            .finish(Location::Undefined));
+    }
 
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
