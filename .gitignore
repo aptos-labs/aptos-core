@@ -147,3 +147,6 @@ genesis_antithesis_*/
 
 # Ignore generated credentials from google-github-actions/auth
 gha-creds-*.json
+
+# Ignore cache for move-package-resolver tests
+third_party/move/tools/move-package-resolver/cache
