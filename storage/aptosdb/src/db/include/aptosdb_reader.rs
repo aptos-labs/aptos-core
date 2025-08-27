@@ -6,6 +6,7 @@ use aptos_storage_interface::state_store::{
 };
 use aptos_types::{
     block_info::BlockHeight,
+    state_store::state_slot::StateSlot,
     transaction::{
         IndexedTransactionSummary, TransactionListWithAuxiliaryInfos, TransactionListWithProofV2,
         TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,

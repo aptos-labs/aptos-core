@@ -23,6 +23,9 @@ pub struct PerVersionStateUpdateRefs<'kv> {
     pub num_versions: usize,
     /// Converting to Vec to Box<[]> to release over-allocated memory during construction
     /// TODO(HotState): let WriteOp always carry StateSlot, so we can use &'kv StateSlot here
+    /// TODO(wqfish): check if this is deterministic, i.e. if the order within one
+    /// version/transaction is deterministic.
+    /// Note(wqfish): this is the flattened write sets.
     pub shards: [Box<[(&'kv StateKey, StateUpdateRef<'kv>)]>; NUM_STATE_SHARDS],
 }
 
