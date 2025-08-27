@@ -747,7 +747,6 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
- "scopeguard",
  "test-case",
 ]
 

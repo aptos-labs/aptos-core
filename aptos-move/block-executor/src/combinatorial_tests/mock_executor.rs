@@ -25,7 +25,6 @@ use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -760,20 +759,14 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        StateValueMetadata,
-        Arc<MoveTypeLayout>,
-    )> {
+    ) -> Vec<(K, StateValueMetadata, Arc<MoveTypeLayout>)> {
         self.reads_needing_exchange
             .iter()
             .map(|(key, (metadata, layout))| (key.clone(), metadata.clone(), layout.clone()))
             .collect()
     }
 
-    fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)> {
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(K, StateValueMetadata)> {
         self.group_reads_needing_exchange
             .iter()
             .map(|(key, metadata)| (key.clone(), metadata.clone()))
@@ -796,14 +789,18 @@ where
             .collect()
     }
 
-    fn for_each_resource_group_key_and_tags<F>(&self, mut callback: F) -> Result<(), PanicError>
-    where
-        F: FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
-    {
+    fn for_each_resource_group_key_and_tags(
+        &self,
+        callback: &mut dyn FnMut(&K, HashSet<&u32>) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
         for (key, _, _, ops) in self.group_writes.iter() {
             callback(key, ops.iter().map(|(tag, _)| tag).collect())?;
         }
         Ok(())
+    }
+
+    fn is_committed(&self) -> Result<bool, PanicError> {
+        Ok(!self.skipped)
     }
 
     fn skip_output() -> Self {
@@ -814,27 +811,17 @@ where
         Self::with_discard_code(discard_code)
     }
 
-    fn output_approx_size(&self) -> u64 {
+    fn output_approx_size(&self) -> Result<u64, PanicError> {
         // TODO add block output limit testing
-        0
+        Ok(0)
     }
 
-    fn get_write_summary(
-        &self,
-    ) -> HashSet<
-        crate::types::InputOutputKey<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-        >,
-    > {
+    fn get_write_summary(&self) -> HashSet<crate::types::InputOutputKey<K, u32>> {
         _ = self.called_write_summary.set(());
         HashSet::new()
     }
 
-    fn legacy_sequential_materialize_agg_v1(
-        &self,
-        _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
-    ) {
+    fn legacy_sequential_materialize_agg_v1(&self, _view: &impl TAggregatorV1View<Identifier = K>) {
         // TODO[agg_v2](tests): implement this method and compare
         // against sequential execution results v. aggregator v1.
     }
@@ -847,12 +834,9 @@ where
 
     fn incorporate_materialized_txn_output(
         &self,
-        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        patched_resource_write_set: Vec<(
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Value,
-        )>,
-        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
+        aggregator_v1_writes: Vec<(K, WriteOp)>,
+        patched_resource_write_set: Vec<(K, ValueType)>,
+        _patched_events: Vec<E>,
     ) -> Result<(), PanicError> {
         assert_ok!(self
             .patched_resource_write_set
@@ -866,30 +850,34 @@ where
         // No compatibility issues here since the move-vm doesn't use the dynamic flag.
     }
 
-    fn fee_statement(&self) -> FeeStatement {
+    fn fee_statement_before_commit(&self) -> Result<FeeStatement, PanicError> {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted
         // towards the block limit. We split the total into two pieces for these arguments.
         // TODO: add variety to generating fee statement based on total gas.
-        FeeStatement::new(
+        Ok(FeeStatement::new(
             self.total_gas,
             self.total_gas / 2,
             (self.total_gas + 1) / 2,
             0,
             0,
-        )
+        ))
     }
 
-    fn is_retry(&self) -> bool {
-        self.skipped
+    fn fee_statement_after_commit(&self) -> Result<FeeStatement, PanicError> {
+        self.fee_statement_before_commit()
     }
 
-    fn has_new_epoch_event(&self) -> bool {
-        false
+    fn has_new_epoch_event_before_commit(&self) -> Result<bool, PanicError> {
+        Ok(false)
     }
 
-    fn is_success(&self) -> bool {
-        !self.skipped
+    fn has_new_epoch_event_after_commit(&self) -> Result<bool, PanicError> {
+        Ok(false)
+    }
+
+    fn is_kept_success_after_commit(&self) -> Result<bool, PanicError> {
+        Ok(!self.skipped)
     }
 }
 
