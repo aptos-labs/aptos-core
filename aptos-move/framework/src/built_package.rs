@@ -97,6 +97,8 @@ pub struct BuildOptions {
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
     #[clap(long)]
+    pub skip_download_git_tree: bool,
+    #[clap(long)]
     pub bytecode_version: Option<u32>,
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
@@ -130,6 +132,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            skip_download_git_tree: false,
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
@@ -209,6 +212,7 @@ pub fn build_model(
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
+        skip_download_git_tree: true,
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
@@ -259,6 +263,7 @@ impl BuiltPackage {
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            skip_download_git_tree: options.skip_download_git_tree,
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,

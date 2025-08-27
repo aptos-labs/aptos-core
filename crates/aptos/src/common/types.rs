@@ -1220,6 +1220,14 @@ pub struct MovePackageOptions {
     #[clap(long)]
     pub(crate) skip_fetch_latest_git_deps: bool,
 
+    /// Skip downloading git tree for dependencies
+    ///
+    /// For large dependencies, downloading the entire git tree can be slow.
+    /// This option will skip downloading the git tree and will cause the build to be
+    /// much faster.  Useful if using `aptos-core` as a dependency.
+    #[clap(long)]
+    pub(crate) skip_download_git_tree: bool,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -1297,6 +1305,7 @@ impl MovePackageOptions {
             language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
             skip_checks_on_test_code: false,
+            skip_download_git_tree: false,
             optimize: None,
             fail_on_warning: false,
             experiments: vec![],

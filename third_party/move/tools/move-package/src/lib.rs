@@ -91,6 +91,10 @@ pub struct BuildConfig {
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
 
+    /// Skip downloading git tree for git dependencies
+    #[clap(long = "skip-download-git-tree", global = false)]
+    pub skip_download_git_tree: bool,
+
     #[clap(flatten)]
     pub compiler_config: CompilerConfig,
 }

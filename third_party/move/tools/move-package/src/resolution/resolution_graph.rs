@@ -410,6 +410,7 @@ impl ResolvingGraph {
             dep_name_in_pkg,
             &dep,
             self.build_options.skip_fetch_latest_git_deps,
+            self.build_options.skip_download_git_tree,
             writer,
         )?;
         let (dep_package, dep_package_dir) =
@@ -558,6 +559,7 @@ impl ResolvingGraph {
                 *dep_name,
                 dep,
                 build_options.skip_fetch_latest_git_deps,
+                build_options.skip_download_git_tree,
                 writer,
             )?;
 
@@ -574,6 +576,7 @@ impl ResolvingGraph {
         dep_name: PackageName,
         dep: &Dependency,
         skip_fetch_latest_git_deps: bool,
+        skip_download_git_tree: bool,
         writer: &mut W,
     ) -> Result<()> {
         if let Some(git_info) = &dep.git_info {
@@ -593,13 +596,17 @@ impl ResolvingGraph {
                 // Confirm git is available.
                 confirm_git_available()?;
 
+                let mut args = vec!["clone", git_url, git_path];
+                if !skip_download_git_tree {
+                    args.push("--depth=1");
+                    args.push("--filter=tree:0");
+                    args.push("--single-branch");
+                }
+
                 // If the cached folder does not exist, download and clone accordingly
-                Command::new("git")
-                    .args(["clone", git_url, git_path])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
-                    })?;
+                Command::new("git").args(args).output().map_err(|_| {
+                    anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
+                })?;
                 Command::new("git")
                     .args(["-C", git_path, "checkout", git_rev])
                     .output()
