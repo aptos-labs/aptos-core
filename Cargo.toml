@@ -888,7 +888,9 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
-debug = true
+debug = "line-tables-only"
+debug-assertions = true
+opt-level = "z"
 overflow-checks = true
 
 # The performance build is not currently recommended

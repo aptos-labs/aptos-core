@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_metrics_core::IntCounterHelper;
 use aptos_types::{
-    state_store::{state_slot::StateSlot, TStateView},
+    state_store::{
+        hot_state::HOT_STATE_MAX_ITEMS_PER_SHARD, state_slot::StateSlot, TStateView,
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use std::{
@@ -73,22 +76,64 @@ where
         self.reads.extend(reads);
     }
 
-    pub fn get_slots_to_make_hot(&self) -> BTreeMap<Key, StateSlot> {
+    pub fn get_promotions_and_evictions(
+        &self,
+    ) -> (BTreeMap<Key, StateSlot>, BTreeMap<Key, StateSlot>) {
         let read_only: BTreeSet<_> = self.reads.difference(&self.writes).collect();
         let to_make_hot: BTreeMap<_, _> = read_only
-            .into_iter()
-            .filter_map(|key| self.maybe_make_hot(key).map(|slot| (key.clone(), slot)))
+            .iter()
+            .filter_map(|key| self.maybe_make_hot(*key).map(|slot| ((*key).clone(), slot)))
             .take(self.max_promotions_per_block)
             .collect();
         COUNTER.inc_with_by(&["total_make_hot"], to_make_hot.len() as u64);
-        to_make_hot
+
+        let mut to_evict = BTreeMap::new();
+        let mut num_hot_items = self.base_view.num_hot_items();
+        for key in self.writes.iter().chain(read_only.iter().map(|k| *k)) {
+            if self.base_view.contains_hot_state_value(key) {
+                continue;
+            }
+            let shard_id = self.base_view.get_shard_id(key);
+            num_hot_items[shard_id] += 1;
+        }
+
+        for shard_id in 0..NUM_STATE_SHARDS {
+            // The previous key considered for eviction. Starts with `None`, which means we try to
+            // evict the oldest key first.
+            let mut prev = None;
+            info!(
+                "shard {} size before eviction: {}",
+                shard_id, num_hot_items[shard_id]
+            );
+            while num_hot_items[shard_id] > HOT_STATE_MAX_ITEMS_PER_SHARD {
+                unreachable!("no evictions for now");
+                while let Some(k) = self
+                    .base_view
+                    .get_next_old_key(shard_id, prev.as_ref())
+                    .unwrap()
+                {
+                    prev = Some(k.clone());
+                    if !self.writes.contains(&k) && !read_only.contains(&k) {
+                        let slot = self
+                            .base_view
+                            .get_state_slot(&k)
+                            .expect("base_view.get_slot() should not fail for keys to evict");
+                        to_evict.insert(k, slot);
+                        num_hot_items[shard_id] -= 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        (to_make_hot, to_evict)
     }
 
     fn maybe_make_hot(&self, key: &Key) -> Option<StateSlot> {
         let slot = self
             .base_view
             .get_state_slot(key)
-            .expect("base_view.get_slot() failed.");
+            .expect("base_view.get_slot() should not fail for keys to make hot");
 
         match &slot {
             StateSlot::ColdVacant => {
