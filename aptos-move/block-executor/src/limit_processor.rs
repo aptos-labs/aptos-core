@@ -89,7 +89,10 @@ impl<'s, T: Transaction, S: TStateView<Key = T::Key>> BlockGasLimitProcessor<'s,
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
             if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+                x.add_transaction(
+                    rw_summary.keys_written().cloned(),
+                    rw_summary.keys_read().cloned(),
+                );
             }
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
