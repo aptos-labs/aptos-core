@@ -8,10 +8,6 @@ on:
       - 'testsuite/fuzzer/data/**'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write # Required for GCP Workload Identity federation
-
 jobs:
   update-fuzzer-data:
     runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
