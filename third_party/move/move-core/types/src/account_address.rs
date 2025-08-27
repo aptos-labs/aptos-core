@@ -271,7 +271,7 @@ impl fmt::Display for AccountAddress {
 
 impl fmt::Debug for AccountAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:x}", self)
+        write!(f, "{}", self.short_str_lossless())
     }
 }
 

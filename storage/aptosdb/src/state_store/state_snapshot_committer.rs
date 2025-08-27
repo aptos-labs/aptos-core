@@ -14,7 +14,7 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
@@ -118,6 +118,12 @@ impl StateSnapshotCommitter {
                                             shard_id as u8,
                                         );
                                     // TODO(aldenhu): iterator of refs
+                                    info!(
+                                        "shard_id: {}, min_version: {}, updates: {:?}",
+                                        shard_id,
+                                        min_version,
+                                        updates.iter().collect_vec()
+                                    );
                                     let updates = {
                                         let _timer =
                                             OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
@@ -129,6 +135,11 @@ impl StateSnapshotCommitter {
                                             })
                                             .collect_vec()
                                     };
+
+                                    info!(
+                                        "shard_id: {}, filtered updates: {:?}",
+                                        shard_id, updates
+                                    );
 
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
                                         shard_id,
