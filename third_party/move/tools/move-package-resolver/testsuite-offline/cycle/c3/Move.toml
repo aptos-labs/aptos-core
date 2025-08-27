@@ -1,0 +1,6 @@
+[package]
+name = "C3"
+version = "0.1.2"
+
+[dependencies]
+C4 = { local = "../c4" }
