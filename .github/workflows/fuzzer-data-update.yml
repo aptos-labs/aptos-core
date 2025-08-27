@@ -16,8 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run dev_setup.sh
-        run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
