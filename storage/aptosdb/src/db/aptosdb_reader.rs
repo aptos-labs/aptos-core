@@ -1,16 +1,54 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_storage_interface::state_store::{
-    state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+use crate::{
+    common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
+    db::{
+        aptosdb_internal::{error_if_too_many_requested, gauged_api, get_first_seq_num_and_limit},
+        AptosDB,
+    },
+    pruner::PrunerManager,
+    schema::block_info::BlockInfoSchema,
+};
+use aptos_crypto::HashValue;
+use aptos_storage_interface::{
+    db_ensure as ensure, db_other_bail as bail,
+    state_store::{
+        state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+    },
+    AptosDbError, BlockHeight, DbReader, LedgerSummary, Order, Result, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
-    block_info::BlockHeight,
-    transaction::{
-        IndexedTransactionSummary, TransactionListWithAuxiliaryInfos, TransactionListWithProofV2,
-        TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+    account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
+    contract_event::{ContractEvent, EventWithVersion},
+    epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
+    event::EventKey,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::{
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
+        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
+        TransactionInfoListWithProof,
     },
+    state_proof::StateProof,
+    state_store::{
+        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
+    },
+    transaction::{
+        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithAuxiliaryInfos,
+        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
+        TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
+    },
+    write_set::WriteSet,
 };
+use itertools::Itertools;
+use std::{iter::Iterator, sync::Arc};
 
 impl DbReader for AptosDB {
     fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
@@ -886,7 +924,7 @@ impl AptosDB {
         )
     }
 
-    fn get_epoch_ending_ledger_infos_impl(
+    pub(super) fn get_epoch_ending_ledger_infos_impl(
         &self,
         start_epoch: u64,
         end_epoch: u64,
@@ -938,7 +976,7 @@ impl AptosDB {
 
     /// Returns the transaction with proof for a given version, or error if the transaction is not
     /// found.
-    fn get_transaction_with_proof(
+    pub(super) fn get_transaction_with_proof(
         &self,
         version: Version,
         ledger_version: Version,
@@ -973,7 +1011,7 @@ impl AptosDB {
     }
 
     /// TODO(bowu): Deprecate after internal index migration
-    fn get_events_by_event_key(
+    pub(super) fn get_events_by_event_key(
         &self,
         event_key: &EventKey,
         start_seq_num: u64,

@@ -3,7 +3,8 @@
 
 use crate::{
     db::{
-        get_first_seq_num_and_limit, test_helper,
+        aptosdb_internal::get_first_seq_num_and_limit,
+        test_helper,
         test_helper::{arb_blocks_to_commit, put_transaction_auxiliary_data},
         AptosDB,
     },
