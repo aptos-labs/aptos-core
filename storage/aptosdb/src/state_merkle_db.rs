@@ -25,7 +25,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
     batch::{IntoRawBatch, RawBatch, SchemaBatch, WriteBatch},
-    DB,
+    Cache, DB,
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
@@ -78,12 +78,18 @@ impl StateMerkleDb {
     ) -> Result<Self> {
         let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
+
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
             version_caches.insert(Some(i), VersionedNodeCache::new());
         }
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
+        let block_cache = Cache::new_hyper_clock_cache(
+            state_merkle_db_config.block_cache_size as usize,
+            /* estimated_entry_charge = */ 0,
+        );
+
         if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
@@ -91,6 +97,7 @@ impl StateMerkleDb {
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
                 &state_merkle_db_config,
+                &block_cache,
                 readonly,
             )?);
             return Ok(Self {
@@ -105,6 +112,7 @@ impl StateMerkleDb {
         Self::open(
             db_paths,
             state_merkle_db_config,
+            &block_cache,
             readonly,
             version_caches,
             lru_cache,
@@ -553,6 +561,7 @@ impl StateMerkleDb {
     fn open(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
         version_caches: HashMap<Option<usize>, VersionedNodeCache>,
         lru_cache: Option<LruNodeCache>,
@@ -566,6 +575,7 @@ impl StateMerkleDb {
             state_merkle_metadata_db_path.clone(),
             STATE_MERKLE_METADATA_DB_NAME,
             &state_merkle_db_config,
+            block_cache,
             readonly,
         )?);
 
@@ -578,11 +588,16 @@ impl StateMerkleDb {
             .into_par_iter()
             .map(|shard_id| {
                 let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
-                let db =
-                    Self::open_shard(shard_root_path, shard_id, &state_merkle_db_config, readonly)
-                        .unwrap_or_else(|e| {
-                            panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
-                        });
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id,
+                    &state_merkle_db_config,
+                    block_cache,
+                    readonly,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
                 Arc::new(db)
             })
             .collect::<Vec<_>>()
@@ -615,6 +630,7 @@ impl StateMerkleDb {
         db_root_path: P,
         shard_id: usize,
         state_merkle_db_config: &RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         let db_name = format!("state_merkle_db_shard_{}", shard_id);
@@ -622,6 +638,7 @@ impl StateMerkleDb {
             Self::db_shard_path(db_root_path, shard_id),
             &db_name,
             state_merkle_db_config,
+            block_cache,
             readonly,
         )
     }
@@ -630,6 +647,7 @@ impl StateMerkleDb {
         path: PathBuf,
         name: &str,
         state_merkle_db_config: &RocksdbConfig,
+        block_cache: &Cache,
         readonly: bool,
     ) -> Result<DB> {
         Ok(if readonly {
@@ -637,14 +655,14 @@ impl StateMerkleDb {
                 &gen_rocksdb_options(state_merkle_db_config, true),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config),
+                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(state_merkle_db_config, false),
                 path,
                 name,
-                gen_state_merkle_cfds(state_merkle_db_config),
+                gen_state_merkle_cfds(state_merkle_db_config, Some(block_cache)),
             )?
         })
     }
