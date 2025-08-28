@@ -1,5 +1,5 @@
 [package]
-name = "BCSStream"
+name = "bcs_stream"
 version = "0.0.0"
 
 [addresses]

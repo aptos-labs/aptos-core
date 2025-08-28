@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    module_traversal::TraversalContext, storage::loader::traits::StructDefinitionLoader,
-    RuntimeEnvironment, WithRuntimeEnvironment,
+    config::VMConfig, module_traversal::TraversalContext,
+    storage::loader::traits::StructDefinitionLoader, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use claims::assert_none;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -76,6 +76,13 @@ pub(crate) struct MockStructDefinitionLoader {
 }
 
 impl MockStructDefinitionLoader {
+    pub(crate) fn new_with_config(config: VMConfig) -> Self {
+        Self {
+            runtime_environment: RuntimeEnvironment::new_with_config(vec![], config),
+            struct_definitions: RefCell::new(HashMap::new()),
+        }
+    }
+
     /// Returns an index for a struct name. The struct name is added to the environment.
     pub(crate) fn get_struct_identifier(&self, struct_name: &str) -> StructNameIndex {
         let struct_identifier = StructIdentifier {
@@ -157,6 +164,10 @@ impl WithRuntimeEnvironment for MockStructDefinitionLoader {
 }
 
 impl StructDefinitionLoader for MockStructDefinitionLoader {
+    fn is_lazy_loading_enabled(&self) -> bool {
+        self.runtime_environment().vm_config().enable_lazy_loading
+    }
+
     fn load_struct_definition(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,

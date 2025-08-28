@@ -1,6 +1,7 @@
 processed 8 tasks
-
-task 2 'run'. lines 59-71:
+task 0 lines 1-46:  publish [module 0x2.A {]
+task 1 lines 48-57:  run --signers 0x1  [import 0x2.A;]
+task 2 lines 59-71:  run --signers 0x1  [import 0x2.A;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -8,8 +9,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 7)],
 }
-
-task 3 'run'. lines 73-86:
+task 3 lines 73-86:  run --signers 0x1  [import 0x2.A;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -17,8 +17,9 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 10)],
 }
-
-task 6 'run'. lines 116-127:
+task 4 lines 88-100:  run --signers 0x1  [import 0x2.A;]
+task 5 lines 102-114:  run --signers 0x1  [import 0x2.A;]
+task 6 lines 116-127:  run --signers 0x1  [import 0x2.A;]
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -26,3 +27,4 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 8)],
 }
+task 7 lines 129-140:  run --signers 0x1  [import 0x2.A;]

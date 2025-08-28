@@ -1,0 +1,39 @@
+processed 1 task
+task 0 lines 1-26:  publish --print-bytecode [module 0x66::test]
+Error: error: number 512 out of range (max 255)
+  ┌─ test:4:5
+  │
+4 │     ld_u8 512
+  │     ^^^^^^^^^
+
+error: expected number argument
+  ┌─ test:7:5
+  │
+7 │     ld_u16 ident
+  │     ^^^^^^^^^^^^
+
+error: number 65536 out of range (max 65535)
+   ┌─ test:10:5
+   │
+10 │     ld_const<u16> 65536
+   │     ^^^^^^^^^^^^^^^^^^^
+
+error: number 512 out of range (max 255)
+   ┌─ test:13:5
+   │
+13 │     ld_const<u8> 512
+   │     ^^^^^^^^^^^^^^^^
+
+error: number 256 out of range (max 255)
+   ┌─ test:16:5
+   │
+16 │     ld_const<vector<u8>> [256, 0]
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected vector value
+   ┌─ test:19:5
+   │
+19 │     ld_const<vector<u8>> 256
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+

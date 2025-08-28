@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        hot_state::{LRUEntry, THotStateSlot},
+        state_key::StateKey,
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use derivative::Derivative;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 use StateSlot::*;
 
 /// Represents the content of a state slot, or the lack there of, along with information indicating
@@ -15,11 +20,12 @@ use StateSlot::*;
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
     ColdOccupied {
         value_version: Version,
@@ -29,6 +35,7 @@ pub enum StateSlot {
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
+        lru_info: LRUEntry<StateKey>,
     },
 }
 
@@ -36,7 +43,9 @@ impl StateSlot {
     fn maybe_update_cold_state(&self, min_version: Version) -> Option<Option<&StateValue>> {
         match self {
             ColdVacant => Some(None),
-            HotVacant { hot_since_version } => {
+            HotVacant {
+                hot_since_version, ..
+            } => {
                 if *hot_since_version >= min_version {
                     // TODO(HotState): revisit after the hot state is exclusive with the cold state
                     // Can't tell if there was a deletion to the cold state here, not much harm to
@@ -55,7 +64,7 @@ impl StateSlot {
             | HotOccupied {
                 value_version,
                 value,
-                hot_since_version: _,
+                ..
             } => {
                 if *value_version >= min_version {
                     // an update happened at or after min_version, need to update
@@ -108,6 +117,10 @@ impl StateSlot {
         }
     }
 
+    pub fn is_hot(&self) -> bool {
+        !self.is_cold()
+    }
+
     pub fn is_cold(&self) -> bool {
         match self {
             ColdVacant | ColdOccupied { .. } => true,
@@ -145,6 +158,18 @@ impl StateSlot {
         self.hot_since_version_opt().expect("expecting hot")
     }
 
+    pub fn refresh(&mut self, version: Version) {
+        match self {
+            HotOccupied {
+                hot_since_version, ..
+            }
+            | HotVacant {
+                hot_since_version, ..
+            } => *hot_since_version = version,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
     pub fn expect_value_version(&self) -> Version {
         match self {
             ColdVacant | HotVacant { .. } => unreachable!("expecting occupied"),
@@ -152,5 +177,112 @@ impl StateSlot {
                 *value_version
             },
         }
+    }
+
+    pub fn to_hot(self, hot_since_version: Version) -> Self {
+        match self {
+            ColdOccupied {
+                value_version,
+                value,
+            } => HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+            ColdVacant => HotVacant {
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            },
+            _ => panic!("Should not be called on hot slots."),
+        }
+    }
+
+    pub fn to_cold(self) -> Self {
+        match self {
+            HotOccupied {
+                value_version,
+                value,
+                ..
+            } => ColdOccupied {
+                value_version,
+                value,
+            },
+            HotVacant { .. } => ColdVacant,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+}
+
+impl THotStateSlot for StateSlot {
+    type Key = StateKey;
+
+    fn prev(&self) -> Option<&Self::Key> {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev.as_ref(),
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn next(&self) -> Option<&Self::Key> {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next.as_ref(),
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn set_prev(&mut self, prev: Option<Self::Key>) {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.prev = prev,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+
+    fn set_next(&mut self, next: Option<Self::Key>) {
+        match self {
+            HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next = next,
+            _ => panic!("Should not be called on cold slots."),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for StateSlot {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        let hot_vacant = any::<Version>().prop_map(|hot_since_version| HotVacant {
+            hot_since_version,
+            lru_info: LRUEntry::uninitialized(),
+        });
+        let cold_occupied =
+            (any::<Version>(), any::<StateValue>()).prop_map(|(value_version, value)| {
+                ColdOccupied {
+                    value_version,
+                    value,
+                }
+            });
+        let hot_occupied = (any::<Version>(), any::<StateValue>())
+            .prop_flat_map(|(value_version, value)| {
+                (
+                    Just(value_version),
+                    (value_version..Version::MAX),
+                    Just(value),
+                )
+            })
+            .prop_map(|(value_version, hot_since_version, value)| HotOccupied {
+                value_version,
+                value,
+                hot_since_version,
+                lru_info: LRUEntry::uninitialized(),
+            });
+        prop_oneof![
+            1 => Just(ColdVacant),
+            1 => hot_vacant,
+            2 => cold_occupied,
+            2 => hot_occupied,
+        ]
+        .boxed()
     }
 }

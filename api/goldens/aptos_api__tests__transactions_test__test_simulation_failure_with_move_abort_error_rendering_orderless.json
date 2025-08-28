@@ -1,0 +1,63 @@
+[
+  {
+    "version": "3",
+    "hash": "",
+    "state_change_hash": "",
+    "event_root_hash": "",
+    "state_checkpoint_hash": null,
+    "gas_used": "9",
+    "success": false,
+    "vm_status": "Move abort in 0x1::fungible_asset: EINSUFFICIENT_BALANCE(0x10004): Insufficient balance to withdraw or transfer.",
+    "accumulator_root_hash": "",
+    "changes": [
+      {
+        "state_key_hash": "",
+        "handle": "0xdc3189011da6e60643ef48030b4f8fc315beddc236c6c523db96778af7b47056",
+        "key": "0x75bc000000000000",
+        "value": "0x00000100013c0000000000000034bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afafe2a8cb18c3b7335f01010000000000000000000000000000000000000a0000000000000001000000000000000000000000010000000000000001000000000000000155005300000001000134bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afafe2a8cb18c3b7335f013c000000000000000000000000000000000000000000000000000a0000000000000001000000000000000000000000010000000000000001000000000000000166005500",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
+      }
+    ],
+    "sender": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+    "sequence_number": "18446744073709551615",
+    "max_gas_amount": "100000000",
+    "gas_unit_price": "0",
+    "expiration_timestamp_secs": "60",
+    "payload": {
+      "function": "0x1::aptos_account::transfer",
+      "type_arguments": [],
+      "arguments": [
+        "0x1",
+        "999999999999999999"
+      ],
+      "type": "entry_function_payload"
+    },
+    "signature": {
+      "public_key": "0xd5a781494d2bf1a174ddffde1e02cb8881cff6dab70e61cbdef393deac0ce639",
+      "signature": "0x164f0a1bc359da6e509275fa368df787bea736807b1638e7c7d5714d012348ccf5dc83883a6f79082420b2819b3e41ceb1a4c31ef0e04ce022afea5e646fb107",
+      "type": "ed25519_signature"
+    },
+    "replay_protection_nonce": "6860028705977903330",
+    "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::transaction_fee::FeeStatement",
+        "data": {
+          "execution_gas_units": "4",
+          "io_gas_units": "5",
+          "storage_fee_octas": "0",
+          "storage_fee_refund_octas": "0",
+          "total_charge_gas_units": "9"
+        }
+      }
+    ],
+    "timestamp": "500000"
+  }
+]

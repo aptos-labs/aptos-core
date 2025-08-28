@@ -29,13 +29,11 @@ use aptos_schemadb::{
 };
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{
-    db_ensure as ensure, state_store::NUM_STATE_SHARDS, AptosDbError, Result,
-};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use arr_macro::arr;
@@ -523,11 +521,13 @@ impl StateMerkleDb {
         self.lru_cache.as_ref()
     }
 
-    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
-        self.state_merkle_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateMerklePrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+    pub(crate) fn write_pruner_progress(
+        &self,
+        progress_key: &DbMetadataKey,
+        version: Version,
+    ) -> Result<()> {
+        self.state_merkle_metadata_db
+            .put::<DbMetadataSchema>(progress_key, &DbMetadataValue::Version(version))
     }
 
     pub(crate) fn num_shards(&self) -> usize {

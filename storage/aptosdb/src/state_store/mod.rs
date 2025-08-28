@@ -58,7 +58,6 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
-        NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -72,6 +71,7 @@ use aptos_types::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
+        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -996,7 +996,6 @@ impl StateStore {
             version,
             start_idx,
         )?
-        .map(|it| it)
         .map(move |res| match res {
             Ok((_hashed_key, (key, version))) => {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
@@ -1016,8 +1015,7 @@ impl StateStore {
             version,
             first_index,
         )?
-        .take(chunk_size)
-        .map(|it| it);
+        .take(chunk_size);
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| {

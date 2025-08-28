@@ -806,6 +806,16 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>, r
             <b>if</b> (ord.is_eq()) {
                 // we skip the entries one, and below put in the result one from other.
                 overwritten.push_back(self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
+
+                <b>if</b> (cur_i == 0) {
+                    // make other_entries empty, and rest in entries.
+                    // TODO cannot <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a> until it is <b>public</b>/released
+                    // <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> self.entries, &<b>mut</b> other_entries);
+                    self.entries.<a href="ordered_map.md#0x1_ordered_map_append">append</a>(other_entries);
+                    <b>break</b>;
+                } <b>else</b> {
+                    cur_i -= 1;
+                };
             };
 
             reverse_result.push_back(other_entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
@@ -1651,7 +1661,7 @@ using lambdas to destroy the individual keys and values.
 Apply the function to each key-value pair in the map, consuming it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each">for_each</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(K, V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each">for_each</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |K, V|)
 </code></pre>
 
 
@@ -1683,7 +1693,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref">for_each_ref</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1735,7 +1745,7 @@ to O(n).
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &V)|)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_ref_friend">for_each_ref_friend</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &V|)
 </code></pre>
 
 
@@ -1767,7 +1777,7 @@ Current implementation is O(n * log(n)). After function values will be optimized
 to O(n).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|)
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_for_each_mut">for_each_mut</a>&lt;K: <b>copy</b>, drop, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, f: |&K, &<b>mut</b> V|)
 </code></pre>
 
 

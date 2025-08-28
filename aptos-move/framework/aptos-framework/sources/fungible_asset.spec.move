@@ -135,6 +135,25 @@ spec aptos_framework::fungible_asset {
     ///
     spec module {
         // TODO: verification disabled until this module is specified.
-        pragma verify=false;
+        pragma verify = false;
+    }
+
+    spec unchecked_withdraw {
+        modifies global<FungibleStore>(store_addr);
+        modifies global<ConcurrentFungibleBalance>(store_addr);
+    }
+
+    spec deposit {
+        modifies global<FungibleStore>(object::object_address(store));
+        modifies global<ConcurrentFungibleBalance>(object::object_address(store));
+    }
+
+    spec unchecked_deposit {
+        modifies global<FungibleStore>(store_addr);
+        modifies global<ConcurrentFungibleBalance>(store_addr);
+    }
+
+    spec withdraw_permission_check {
+        modifies global<permissioned_signer::PermissionStorage>(permissioned_signer::spec_permission_address(owner));
     }
 }

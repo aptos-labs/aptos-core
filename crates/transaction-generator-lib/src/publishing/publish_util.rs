@@ -25,11 +25,10 @@ use aptos_sdk::{
 };
 use move_binary_format::{
     access::ModuleAccess,
-    deserializer::DeserializerConfig,
     file_format::{CompiledScript, FunctionHandleIndex, IdentifierIndex, SignatureToken},
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT, VERSION_MAX},
     CompiledModule,
 };
+use move_core_types::language_storage::pseudo_script_module_id;
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -128,13 +127,9 @@ pub enum Package {
 
 impl Package {
     pub fn by_name(pre_built: &'static dyn PreBuiltPackages, name: &str) -> Self {
-        let (modules, metadata) = Self::load_package(
-            pre_built.package_metadata(name),
-            pre_built.package_modules(name),
-        );
-        let script = pre_built
-            .package_script(name)
-            .map(|code| CompiledScript::deserialize(code).expect("Script must deserialize"));
+        let modules = pre_built.package_modules(name);
+        let metadata = pre_built.package_metadata(name);
+        let script = pre_built.package_script(name);
         Self::Simple {
             modules,
             metadata,
@@ -150,13 +145,13 @@ impl Package {
                 let mut script = script_opt
                     .clone()
                     .expect("Script not defined for wanted package");
-                assert_ne!(publisher, AccountAddress::MAX_ADDRESS);
+                assert_ne!(publisher, *pseudo_script_module_id().address());
 
-                // Make sure dependencies link to published modules. Compiler V2 adds 0xf..ff so we need to
+                // Make sure dependencies link to published modules. Compiler V2 adds `pseudo_script_module_id()` so we need to
                 // skip it.
                 assert_eq!(script.address_identifiers.len(), 2);
                 for address in &mut script.address_identifiers {
-                    if address != &AccountAddress::MAX_ADDRESS {
+                    if address != pseudo_script_module_id().address() {
                         *address = publisher;
                     }
                 }
@@ -166,36 +161,6 @@ impl Package {
                 TransactionPayload::Script(Script::new(code, vec![], vec![]))
             },
         }
-    }
-
-    fn load_package(
-        package_bytes: &[u8],
-        modules_bytes: &[Vec<u8>],
-    ) -> (Vec<(String, CompiledModule, u32)>, PackageMetadata) {
-        let metadata = bcs::from_bytes::<PackageMetadata>(package_bytes)
-            .expect("PackageMetadata for GenericModule must deserialize");
-        let mut modules = Vec::new();
-
-        let default_config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
-
-        for module_content in modules_bytes {
-            let (module, binary_format_version) = if let Ok(module) =
-                CompiledModule::deserialize_with_config(module_content, &default_config)
-            {
-                (module, VERSION_DEFAULT)
-            } else {
-                let module = CompiledModule::deserialize(module_content)
-                    .expect("Simple.move must deserialize");
-                (module, VERSION_MAX)
-            };
-
-            modules.push((
-                module.self_id().name().to_string(),
-                module,
-                binary_format_version,
-            ));
-        }
-        (modules, metadata)
     }
 
     // Given an "original" package, updates all modules with the given publisher.

@@ -9,7 +9,7 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
-use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
@@ -47,6 +47,7 @@ macro_rules! forward_on_success_or_skip_rest {
             })
     }};
 }
+
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
@@ -58,8 +59,6 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,
-    resource_group_keys_and_tags:
-        Vec<CachePadded<ExplicitSyncWrapper<Vec<(T::Key, HashSet<T::Tag>)>>>>,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
@@ -76,9 +75,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             arced_resource_writes: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
-            resource_group_keys_and_tags: (0..num_txns)
-                .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
-                .collect(),
         }
     }
 
@@ -88,10 +84,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         input: TxnInput<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
-        group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)>,
     ) {
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
-        *self.resource_group_keys_and_tags[txn_idx as usize].acquire() = group_keys_and_tags;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
     }
@@ -229,25 +223,35 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize].load_full()
     }
 
-    // BlockSTMv1 method, avoids cloning the tags by calling mark_estimate on reference.
-    pub(crate) fn mark_estimate_group_keys_and_tags(
+    /// Returns an error if callback returns an error.
+    pub(crate) fn for_each_resource_group_key_and_tags<F>(
         &self,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         txn_idx: TxnIndex,
-    ) {
-        for (key, tags) in self.resource_group_keys_and_tags[txn_idx as usize]
-            .acquire()
-            .dereference()
-            .iter()
-        {
-            versioned_cache
-                .group_data()
-                .mark_estimate(key, txn_idx, tags);
+        callback: F,
+    ) -> Result<(), PanicError>
+    where
+        F: FnMut(&T::Key, HashSet<&T::Tag>) -> Result<(), PanicError>,
+    {
+        if let Some(txn_output) = self.outputs[txn_idx as usize].load().as_ref() {
+            match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    t.for_each_resource_group_key_and_tags(callback)?;
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
+                    // No resource group keys for failed transactions
+                },
+            }
         }
+        Ok(())
     }
 
-    pub(crate) fn modified_group_keys(&self, txn_idx: TxnIndex) -> Vec<(T::Key, HashSet<T::Tag>)> {
-        std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
+    pub(crate) fn modified_group_key_and_tags_cloned(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Vec<(T::Key, HashSet<T::Tag>)> {
+        forward_on_success_or_skip_rest!(self, txn_idx, resource_group_tags)
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from
@@ -258,18 +262,51 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
-            .load_full()
+            .load()
+            .as_ref()
             .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
                         .map(|(k, _, _)| (k, false))
                         .chain(t.aggregator_v1_write_set().into_keys().map(|k| (k, true)))
-                        .chain(
-                            t.aggregator_v1_delta_set()
-                                .into_iter()
-                                .map(|(k, _)| (k, true)),
-                        ),
+                        .chain(t.aggregator_v1_delta_set().into_keys().map(|k| (k, true))),
+                ),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_resource_keys_no_aggregator_v1(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.resource_write_set().into_iter().map(|(k, _, _)| k))
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
+    pub(crate) fn modified_aggregator_v1_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
+                    t.aggregator_v1_write_set()
+                        .into_keys()
+                        .chain(t.aggregator_v1_delta_set().into_keys()),
                 ),
                 ExecutionStatus::Abort(_)
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
@@ -326,11 +363,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         forward_on_success_or_skip_rest!(self, txn_idx, group_reads_needing_delayed_field_exchange)
     }
 
-    pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
-        forward_on_success_or_skip_rest!(self, txn_idx, aggregator_v1_delta_set)
-            .into_iter()
-            .map(|(k, _)| k)
-            .collect()
+    pub(crate) fn aggregator_v1_delta_keys(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<impl Iterator<Item = T::Key>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.aggregator_v1_delta_set().into_keys())
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
     }
 
     pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {

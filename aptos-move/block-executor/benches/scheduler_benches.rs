@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Run this bencher via `cargo bench --features fuzzing`.
-use aptos_block_executor::proptest_types::bencher::Bencher;
+use aptos_block_executor::combinatorial_tests::bencher::Bencher;
 use criterion::{criterion_group, criterion_main, Criterion};
 use proptest::prelude::*;
 

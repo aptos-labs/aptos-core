@@ -1,0 +1,13 @@
+processed 3 tasks
+task 0 lines 1-35:  publish [module 0x66::helpers]
+task 1 lines 38-48:  run --verbose [script]
+task 2 lines 51-59:  run --verbose [script]
+Error: Script execution failed with VMError: {
+    message: Type |u64|u32 does not have expected ability drop,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

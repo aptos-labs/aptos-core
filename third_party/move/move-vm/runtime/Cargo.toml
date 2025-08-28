@@ -14,6 +14,7 @@ edition = "2021"
 ambassador = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
+cfg-if = { workspace = true }
 claims = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
@@ -40,6 +41,7 @@ move-vm-test-utils ={ workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 smallbitvec = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = []
@@ -49,6 +51,8 @@ failpoints = ["fail/failpoints"]
 debugging = []
 testing = []
 stacktrace = []
+# Enable this features for tests that check bytecode verification.
+disable_verifier_cache = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

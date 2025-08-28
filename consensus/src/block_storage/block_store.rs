@@ -22,6 +22,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_bitvec::BitVec;
+use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::Round,
@@ -593,6 +594,15 @@ impl BlockStore {
         Ok(())
     }
 
+    pub fn check_denied_inline_transactions(
+        &self,
+        block: &Block,
+        block_txn_filter_config: &BlockTransactionFilterConfig,
+    ) -> anyhow::Result<()> {
+        self.payload_manager
+            .check_denied_inline_transactions(block, block_txn_filter_config)
+    }
+
     pub fn check_payload(&self, proposal: &Block) -> Result<(), BitVec> {
         self.payload_manager.check_payload_availability(proposal)
     }
@@ -761,7 +771,7 @@ impl BlockReader for BlockStore {
             match cur_block {
                 Some(block) => {
                     if let Some(execution_time_and_size) = block.get_execution_summary() {
-                        info!(
+                        debug!(
                             "Found execution time for {}, {:?}",
                             block.id(),
                             execution_time_and_size

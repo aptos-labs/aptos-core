@@ -8,7 +8,10 @@ use crate::types::{
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_infallible::Mutex;
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{
+    error::{code_invariant_error, PanicError},
+    write_set::TransactionWrite,
+};
 use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -258,6 +261,10 @@ impl<V: TransactionWrite + PartialEq> VersionedValue<V> {
         let mut accumulator: Option<Result<DeltaOp, ()>> = None;
         while let Some((idx, entry)) = iter.next_back() {
             if entry.is_estimate() {
+                debug_assert!(
+                    maybe_reader_incarnation.is_none(),
+                    "Entry must not be marked as estimate for BlockSTMv2"
+                );
                 // Found a dependency.
                 return Err(Dependency(
                     idx.idx().expect("May not depend on storage version"),
@@ -465,48 +472,57 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         &self,
         key: &Q,
         txn_idx: TxnIndex,
-    ) -> BTreeSet<(TxnIndex, Incarnation)>
+    ) -> Result<BTreeSet<(TxnIndex, Incarnation)>, PanicError>
     where
-        Q: Equivalent<K> + Hash,
+        Q: Equivalent<K> + Hash + Debug,
     {
-        let mut v = self.values.get_mut(key).expect("Path must exist");
+        let mut v = self.values.get_mut(key).ok_or_else(|| {
+            code_invariant_error(format!("Path must exist for remove_v2: {:?}", key))
+        })?;
 
         // Get the entry to be removed
         let removed_entry = v
             .versioned_map
             .remove(&ShiftedTxnIndex::new(txn_idx))
-            .expect("Entry for key / idx must exist to be deleted");
+            .ok_or_else(|| {
+                code_invariant_error(format!(
+                    "Entry for key / idx must exist to be deleted: {:?}, {}",
+                    key, txn_idx
+                ))
+            })?;
 
-        if let EntryCell::ResourceWrite {
-            incarnation: _,
-            value_with_layout,
-            dependencies,
-        } = &removed_entry.value
-        {
-            match value_with_layout {
-                ValueWithLayout::RawFromStorage(_) => {
-                    unreachable!(
-                        "Removed value written by txn {txn_idx} may not be RawFromStorage"
-                    );
-                },
-                ValueWithLayout::Exchanged(data, layout) => {
-                    let removed_deps = std::mem::take(&mut *dependencies.lock());
-                    v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
-                        txn_idx,
-                        removed_deps,
-                        data,
-                        layout,
-                    )
-                },
-            }
-        } else {
-            BTreeSet::new()
-        }
+        Ok(
+            if let EntryCell::ResourceWrite {
+                incarnation: _,
+                value_with_layout,
+                dependencies,
+            } = &removed_entry.value
+            {
+                match value_with_layout {
+                    ValueWithLayout::RawFromStorage(_) => {
+                        unreachable!(
+                            "Removed value written by txn {txn_idx} may not be RawFromStorage"
+                        );
+                    },
+                    ValueWithLayout::Exchanged(data, layout) => {
+                        let removed_deps = std::mem::take(&mut *dependencies.lock());
+                        v.handle_removed_dependencies::<ONLY_COMPARE_METADATA>(
+                            txn_idx,
+                            removed_deps,
+                            data,
+                            layout,
+                        )
+                    },
+                }
+            } else {
+                BTreeSet::new()
+            },
+        )
     }
 
-    // This method can also be used from BlockSTMv2 flow, e.g. during post-commit
-    // final validation for safety, as it avoids making any dependency records.
-    pub fn fetch_data<Q>(
+    // Fetches data but does not record a read dependency. This is used for BlockSTMv1
+    // or for BlockSTMv2 post-commit final (for safety) validation.
+    pub fn fetch_data_no_record<Q>(
         &self,
         key: &Q,
         txn_idx: TxnIndex,
@@ -520,10 +536,11 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
+    // Fetches data and records a read dependency. This is used for BlockSTMv2 reads.
     // TODO(BlockSTMv2): Have a dispatch or dedicated interfaces for reading data,
     // metadata, size, and exists predicate. Return the appropriately cast value, record
     // the kind of each read dependency, then validate accordingly on write / removal.
-    pub fn fetch_data_v2<Q>(
+    pub fn fetch_data_and_record_dependency<Q>(
         &self,
         key: &Q,
         txn_idx: TxnIndex,
@@ -631,8 +648,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         assert!(prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
-                value_with_layout: _,
-                dependencies: _,
+                ..
             } = entry.value
             {
                 prev_incarnation < incarnation
@@ -722,9 +738,8 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         // Changes versioned metadata that was stored.
         prev_entry.map_or(true, |entry| -> bool {
             if let EntryCell::ResourceWrite {
-                incarnation: _,
                 value_with_layout: existing_value_with_layout,
-                dependencies: _,
+                ..
             } = &entry.value
             {
                 arc_data.as_state_value_metadata()
@@ -786,11 +801,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             .expect("Entry must exist for the given txn_idx")
             .value
         {
-            EntryCell::ResourceWrite {
-                incarnation: _,
-                value_with_layout: _,
-                dependencies,
-            } => dependencies.lock().clone(),
+            EntryCell::ResourceWrite { dependencies, .. } => dependencies.lock().clone(),
             _ => unreachable!("Dependencies can only be recorded for resource writes"),
         }
     }
@@ -807,7 +818,7 @@ mod tests {
         write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
-    use claims::assert_ok_eq;
+    use claims::{assert_err, assert_ok_eq};
     use fail::FailScenario;
     use test_case::test_case;
 
@@ -857,12 +868,7 @@ mod tests {
     fn get_deps_from_entry(
         entry: &Entry<EntryCell<TestValueWithMetadata>>,
     ) -> BTreeSet<(TxnIndex, Incarnation)> {
-        if let EntryCell::ResourceWrite {
-            incarnation: _,
-            value_with_layout: _,
-            dependencies,
-        } = &entry.value
-        {
+        if let EntryCell::ResourceWrite { dependencies, .. } = &entry.value {
             dependencies.lock().clone()
         } else {
             unreachable!()
@@ -1005,12 +1011,12 @@ mod tests {
                 // Test all combinations of value/metadata/layout comparison parameters
                 for same_value in [true, false] {
                     for same_metadata in [true, false] {
-                        for same_layout in [true, false] {
+                        for no_layouts in [true, false] {
                             let mut v = VersionedValue::<TestValueWithMetadata>::default();
 
                             // Setup: Create a write with value 10, metadata 100 and one dependency
                             let deps = BTreeSet::from([(1, 0)]);
-                            let layout = if same_layout { None } else { Some(Arc::new(MoveTypeLayout::Bool)) };
+                            let layout = if no_layouts { None } else { Some(Arc::new(MoveTypeLayout::Bool)) };
                             v.versioned_map.insert(
                                 ShiftedTxnIndex::new(0),
                                 CachePadded::new(new_write_entry(0, ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), layout), deps)),
@@ -1026,7 +1032,7 @@ mod tests {
                             let expected_validation = if $only_compare_metadata {
                                 same_metadata
                             } else {
-                                same_value && same_metadata && same_layout
+                                same_value && same_metadata && no_layouts
                             };
 
                             // Test split_off_affected_read_dependencies
@@ -1040,14 +1046,14 @@ mod tests {
                             assert_eq!(
                                 validation_passed,
                                 expected_validation,
-                                "Validation failed for same_value={}, same_metadata={}, only_compare_metadata={}, same_layout={}",
-                                same_value, same_metadata, $only_compare_metadata, same_layout
+                                "Validation failed for same_value={}, same_metadata={}, only_compare_metadata={}, no_layouts={}",
+                                same_value, same_metadata, $only_compare_metadata, no_layouts
                             );
                             assert_eq!(
                                 deps,
                                 BTreeSet::from([(1, 0)]),
-                                "Dependencies don't match for same_value={}, same_metadata={}, only_compare_metadata={}, same_layout={}",
-                                same_value, same_metadata, $only_compare_metadata, same_layout
+                                "Dependencies don't match for same_value={}, same_metadata={}, only_compare_metadata={}, no_layouts={}",
+                                same_value, same_metadata, $only_compare_metadata, no_layouts
                             );
 
                             // Test handle_removed_dependencies
@@ -1076,6 +1082,67 @@ mod tests {
         // Test both cases
         test_metadata_layout_case!(true);
         test_metadata_layout_case!(false);
+    }
+
+    #[test]
+    fn test_same_layout_validation_fails() {
+        let mut v = VersionedValue::<TestValueWithMetadata>::default();
+
+        // Setup: Create a write with value 10, metadata 100 and layout Some(Bool)
+        let deps = BTreeSet::from([(1, 0)]);
+        let layout = Some(Arc::new(MoveTypeLayout::Bool));
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(0),
+            CachePadded::new(new_write_entry(
+                0,
+                ValueWithLayout::Exchanged(
+                    Arc::new(TestValueWithMetadata::new(10, 100)),
+                    layout.clone(),
+                ),
+                deps,
+            )),
+        );
+
+        // Create test value with same value, metadata, and layout
+        let test_value = TestValueWithMetadata::new(10, 100);
+
+        // Test split_off_affected_read_dependencies with ONLY_COMPARE_METADATA = false
+        let (deps, validation_passed) = v.split_off_affected_read_dependencies::<false>(
+            0,
+            &Arc::new(test_value.clone()),
+            &layout,
+        );
+
+        // Validation should fail because both layouts are Some, even though they're identical
+        assert!(
+            !validation_passed,
+            "Validation should fail when both layouts are Some, even if identical"
+        );
+        assert_eq!(
+            deps,
+            BTreeSet::from([(1, 0)]),
+            "Dependencies should be returned"
+        );
+
+        // Test handle_removed_dependencies
+        let remaining_deps = v.handle_removed_dependencies::<false>(
+            1,
+            BTreeSet::from([(2, 0)]),
+            &Arc::new(test_value),
+            &layout,
+        );
+
+        assert_eq!(
+            remaining_deps,
+            BTreeSet::from([(2, 0)]),
+            "Dependencies should be returned when validation fails"
+        );
+        // Verify that dependencies are empty in 0-th entry (invalidated)
+        assert_eq!(
+            get_deps_from_entry(v.versioned_map.get(&ShiftedTxnIndex::new(0)).unwrap()).len(),
+            0,
+            "Dependencies should be cleared when validation fails"
+        );
     }
 
     #[test]
@@ -1268,7 +1335,7 @@ mod tests {
         scenario.teardown();
 
         assert_ok_eq!(
-            versioned_data.fetch_data_v2(&(), 5, 1),
+            versioned_data.fetch_data_and_record_dependency(&(), 5, 1),
             MVDataOutput::Versioned(
                 Err(StorageVersion),
                 ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
@@ -1318,14 +1385,20 @@ mod tests {
         );
 
         assert_ok_eq!(
-            versioned_data.fetch_data_v2(&(), 2, 0),
+            versioned_data.fetch_data_and_record_dependency(&(), 2, 0),
             MVDataOutput::Versioned(
                 Ok((1, 1)),
                 ValueWithLayout::Exchanged(Arc::new(TestValueWithMetadata::new(10, 100)), None),
             ),
         );
-        assert_eq!(versioned_data.remove_v2::<_, false>(&(), 3).len(), 0);
-        assert_eq!(versioned_data.remove_v2::<_, true>(&(), 1).len(), 0);
+        assert_eq!(
+            versioned_data.remove_v2::<_, false>(&(), 3).unwrap().len(),
+            0
+        );
+        assert_eq!(
+            versioned_data.remove_v2::<_, true>(&(), 1).unwrap().len(),
+            0
+        );
         check_versioned_data_deps(
             &versioned_data,
             ShiftedTxnIndex::zero_idx(),
@@ -1334,8 +1407,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Entry for key / idx must exist to be deleted")]
-    fn test_remove_v2_panic_no_entry() {
+    fn test_remove_v2_err_no_entry() {
         let versioned_data = VersionedData::<(), TestValueWithMetadata>::empty();
 
         // Add an entry at index 0
@@ -1348,6 +1420,7 @@ mod tests {
         );
 
         // Try to remove a non-existent entry at index 1
-        versioned_data.remove_v2::<_, false>(&(), 1);
+        assert_err!(versioned_data.remove_v2::<_, false>(&(), 1));
+        assert_err!(versioned_data.remove_v2::<_, true>(&(), 1));
     }
 }

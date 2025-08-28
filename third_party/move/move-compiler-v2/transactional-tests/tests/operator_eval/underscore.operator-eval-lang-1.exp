@@ -1,6 +1,5 @@
 processed 13 tasks
-
-task 0 'publish'. lines 1-77:
+task 0 lines 1-77:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: undeclared `_`
    ┌─ TEMPFILE:32:9
@@ -39,8 +38,7 @@ error: cannot pass `integer` to a function which expects argument of type `|u64|
    │                     ^
 
 
-
-task 1 'run'. lines 79-79:
+task 1 lines 79-79:  run 0xc0ffee::m::test --args 4
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -48,8 +46,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 81-81:
+task 2 lines 81-81:  run 0xc0ffee::m::test3 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -57,8 +54,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 3 'run'. lines 83-83:
+task 3 lines 83-83:  run 0xc0ffee::m::test4 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -66,8 +62,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 4 'run'. lines 85-85:
+task 4 lines 85-85:  run 0xc0ffee::m::test5 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -75,8 +70,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 5 'run'. lines 87-87:
+task 5 lines 87-87:  run 0xc0ffee::m::test6 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -84,8 +78,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 6 'run'. lines 89-89:
+task 6 lines 89-89:  run 0xc0ffee::m::test7 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -93,8 +86,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 7 'run'. lines 91-91:
+task 7 lines 91-91:  run 0xc0ffee::m::test8 --args 5
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -102,8 +94,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 8 'run'. lines 93-93:
+task 8 lines 93-93:  run 0xc0ffee::m::test9
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -111,8 +102,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 9 'run'. lines 95-95:
+task 9 lines 95-95:  run 0xc0ffee::m::test10a
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -120,8 +110,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 10 'run'. lines 97-97:
+task 10 lines 97-97:  run 0xc0ffee::m::test10b
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -129,8 +118,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 11 'run'. lines 99-99:
+task 11 lines 99-99:  run 0xc0ffee::m::test10c
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -138,8 +126,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 12 'run'. lines 101-101:
+task 12 lines 101-101:  run 0xc0ffee::m::test11
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

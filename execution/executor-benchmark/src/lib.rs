@@ -660,7 +660,7 @@ mod tests {
         state_store::state_key::inner::StateKeyInner,
         transaction::{
             signature_verified_transaction::into_signature_verified_block, Transaction,
-            TransactionPayload,
+            TransactionOutput, TransactionPayload,
         },
     };
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
@@ -806,7 +806,7 @@ mod tests {
         let other_txn_output = &other_to_commit.transaction_outputs[0];
         let other_cp_txn_output = &other_to_commit.transaction_outputs[1];
 
-        assert_eq!(vm_cp_txn_output, other_cp_txn_output);
+        assert_equal_transaction_outputs(vm_cp_txn_output, other_cp_txn_output);
 
         let vm_event_types = vm_txn_output
             .events()
@@ -879,6 +879,16 @@ mod tests {
         if values_match {
             assert_eq!(vm_txn_output, other_txn_output);
         }
+    }
+
+    // TODO(HotState): hotness computation not implemented in all VMs, so their hotness part of the
+    // write set might be different.
+    fn assert_equal_transaction_outputs(output1: &TransactionOutput, output2: &TransactionOutput) {
+        assert_eq!(output1.write_set().as_v0(), output2.write_set().as_v0());
+        assert_eq!(output1.events(), output2.events());
+        assert_eq!(output1.gas_used(), output2.gas_used());
+        assert_eq!(output1.status(), output2.status());
+        assert_eq!(output1.auxiliary_data(), output2.auxiliary_data());
     }
 
     fn test_generic_benchmark<E>(
@@ -968,6 +978,18 @@ mod tests {
         NativeConfig::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVMBlockExecutor>(
             Some(TransactionTypeArg::ModifyGlobalMilestoneAggV2),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_benchmark_orderless_transaction() {
+        AptosVM::set_num_shards_once(4);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        NativeConfig::set_concurrency_level_once(4);
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::NoOpOrderless),
             true,
         );
     }

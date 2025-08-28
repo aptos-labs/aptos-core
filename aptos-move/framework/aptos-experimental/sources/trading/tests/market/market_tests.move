@@ -4,6 +4,8 @@ module aptos_experimental::market_tests {
     use std::option::Option;
     use std::signer;
     use std::vector;
+    use aptos_framework::timestamp;
+    use aptos_experimental::event_utils::latest_emitted_events;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
@@ -19,13 +21,13 @@ module aptos_experimental::market_tests {
         verify_fills
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{
-        good_till_cancelled,
-        post_only,
-        immediate_or_cancel
-    };
-    use aptos_experimental::market::{new_market, new_market_config};
+    use aptos_experimental::market_types::{order_status_open};
+    use aptos_experimental::market::{new_market, new_market_config, OrderEvent};
     use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
+
+    const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
+    const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;
 
     #[test(
         admin = @0x1, market_signer = @0x123, maker = @0x456, taker = @0x789
@@ -40,7 +42,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
@@ -58,7 +60,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -70,7 +73,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -84,7 +87,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
         assert!(get_position_size(maker_addr) == 1000000);
@@ -96,7 +99,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -110,7 +113,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -135,7 +138,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
@@ -153,7 +156,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -161,7 +165,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 2000000,
                 false,
                 good_till_cancelled(),
@@ -175,7 +179,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(2),
                 &test_market_callbacks()
             );
         assert!(get_position_size(maker_addr) == 1000000);
@@ -198,7 +202,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
@@ -217,7 +221,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -233,7 +238,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -265,7 +271,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -284,7 +290,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -300,7 +307,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 true,
                 true,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -328,7 +336,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -346,16 +354,17 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
         // Taker order will be immediately match in the same transaction
         let limit_price =
             if (is_market_order) {
-                option::none() // Market order has no price
+                1 // Market order has no price, use max to ensure it matches
             } else {
-                option::some(1000) // Limit price for limit order
+                1000
             };
         let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
@@ -375,7 +384,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -432,7 +441,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -450,16 +459,17 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
         // Taker order is IOC, which will partially match and remaining will be cancelled
         let limit_price =
             if (is_market_order) {
-                option::none() // Market order has no price
+                1 // Market order has no price, use minimum to ensure it matches
             } else {
-                option::some(1000) // Limit price for limit order
+                1000
             };
         let (taker_order_id, _) =
             place_taker_order_and_verify_fill(
@@ -479,7 +489,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 true,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -542,7 +552,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -560,7 +570,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -582,7 +593,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false, // Despite it being a "taker", this order will not cross
                 true,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -618,32 +630,57 @@ module aptos_experimental::market_tests {
     }
 
     #[test(admin = @0x1, market_signer = @0x123, taker = @0x789)]
-    public fun test_market_order_no_match(
+    public fun test_market_order_empty_order_book(
         admin: &signer, market_signer: &signer, taker: &signer
     ) {
         // Setup accounts
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
+        market.place_market_order(
+            taker,
+            1000000,
+            false, // is_buy
+            new_test_order_metadata(1),
+                option::none(), // client_order_id
+            1000,
+            true,
+                &test_market_callbacks(),
+        );
 
-        let _taker_order_id =
-            place_order_and_verify(
-                &mut market,
-                taker,
-                option::none(),
-                1000000, // 1 BTC
-                false, // is_buy
-                immediate_or_cancel(), // order_type
-                &mut event_store,
-                false, // Despite it being a "taker", this order will not cross
-                true,
-                new_test_order_metadata(),
-                &test_market_callbacks()
-            );
+        let events = latest_emitted_events<OrderEvent>(&mut event_store, option::some(1));
+        let order_place_event = events[0];
+        let order_id = order_place_event.get_order_id_from_event();
+        order_place_event.verify_order_event(
+            order_id,
+            option::none(), // client_order_id
+            market.get_market(),
+            signer::address_of(taker),
+            1000000,
+            1000000,
+            1000000,
+            1, // price
+            false,
+            false, // Even if it's a market order, it won't cross.
+            order_status_open()
+        );
+        verify_cancel_event(
+            &mut market,
+            taker,
+            false, // Not a maker order
+            order_id,
+            option::none(), // client_order_id
+            1, // price
+            1000000, // original size
+            0, // filled size
+            1000000, // remaining size
+            false, // Order is cancelled
+            &mut event_store
+        );
         market.destroy_market()
     }
 
@@ -660,7 +697,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -679,7 +716,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -688,7 +726,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000, // 1 BTC
                 false, // is_bid
                 good_till_cancelled(),
@@ -702,7 +740,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -736,7 +774,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -762,7 +800,8 @@ module aptos_experimental::market_tests {
                     &mut event_store,
                     false,
                     false,
-                    new_test_order_metadata(),
+                    new_test_order_metadata(1),
+                    option::none(),
                     &test_market_callbacks()
                 );
             maker_order_ids.push_back(maker_order_id);
@@ -781,7 +820,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(990),
+                990,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -795,7 +834,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
         assert!(get_position_size(maker_addr) == total_fill_size);
@@ -823,7 +862,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker_addr = signer::address_of(maker);
@@ -841,7 +880,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -853,7 +893,7 @@ module aptos_experimental::market_tests {
             place_taker_order_and_verify_fill(
                 &mut market,
                 taker,
-                option::some(1000),
+                1000,
                 1000000,
                 false,
                 good_till_cancelled(),
@@ -867,7 +907,7 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 true,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks_with_taker_cancelled()
             );
         // Make sure the taker was cancelled
@@ -893,7 +933,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
@@ -910,7 +950,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -925,7 +966,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -944,7 +986,7 @@ module aptos_experimental::market_tests {
                 good_till_cancelled(),
                 &mut event_store,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -954,7 +996,7 @@ module aptos_experimental::market_tests {
             false,
             maker1_order_id,
             option::none(),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,
@@ -967,7 +1009,7 @@ module aptos_experimental::market_tests {
             maker1,
             taker_order_id,
             option::none(),
-            option::some(1000),
+            1000,
             1000000,
             false,
             vector[1000000],
@@ -987,19 +1029,21 @@ module aptos_experimental::market_tests {
     }
 
     #[test(
-        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
+       aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_self_matching_allowed(
+        aptos_framework: &signer,
         admin: &signer,
         market_signer: &signer,
         maker1: &signer,
         maker2: &signer
     ) {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
         // Setup accounts
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(true, true)
+            new_market_config(true, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
@@ -1015,7 +1059,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -1030,7 +1075,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -1049,7 +1095,7 @@ module aptos_experimental::market_tests {
                 good_till_cancelled(),
                 &mut event_store,
                 option::none(),
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
                 &test_market_callbacks()
             );
 
@@ -1058,7 +1104,7 @@ module aptos_experimental::market_tests {
             maker1,
             taker_order_id,
             option::some(1),
-            option::some(1001),
+            1001,
             1000000,
             false,
             vector[1000000],
@@ -1087,7 +1133,7 @@ module aptos_experimental::market_tests {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(false, true)
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
         );
         clearinghouse_test::initialize(admin);
         let maker1_addr = signer::address_of(maker1);
@@ -1104,7 +1150,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -1119,7 +1166,8 @@ module aptos_experimental::market_tests {
                 &mut event_store,
                 false,
                 false,
-                new_test_order_metadata(),
+                new_test_order_metadata(1),
+                option::none(),
                 &test_market_callbacks()
             );
 
@@ -1137,7 +1185,7 @@ module aptos_experimental::market_tests {
             good_till_cancelled(),
             &mut event_store,
             option::none(),
-            new_test_order_metadata(),
+            new_test_order_metadata(1),
             &test_market_callbacks()
         );
 
@@ -1147,7 +1195,7 @@ module aptos_experimental::market_tests {
             false,
             maker1_order_id,
             option::none(),
-            option::some(1001),
+            1001,
             2000000,
             0,
             2000000,
@@ -1159,4 +1207,114 @@ module aptos_experimental::market_tests {
         assert!(get_position_size(maker2_addr) == 0);
         market.destroy_market()
     }
+
+    #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
+    public fun test_duplicate_client_order_id_not_allowed(
+        aptos_framework: &signer,
+        admin: &signer,
+        market_signer: &signer,
+        maker1: &signer
+    ) {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        // Setup accounts
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
+        );
+        clearinghouse_test::initialize(admin);
+        let event_store = event_utils::new_event_store();
+        let _ =
+            place_order_and_verify(
+                &mut market,
+                maker1,
+                option::some(1001),
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(1),
+                option::some(111),
+                &test_market_callbacks()
+            );
+
+        let _ =
+            place_order_and_verify(
+                &mut market,
+                maker1,
+                option::some(1000),
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                true, // This should fail due to duplicate client order ID
+                new_test_order_metadata(1),
+                option::some(111), // Duplicate client order ID
+                &test_market_callbacks()
+            );
+        market.destroy_market()
+    }
+
+
+    #[test(aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456)]
+    public fun test_metadata_update(
+        aptos_framework: &signer,
+        admin: &signer,
+        market_signer: &signer,
+        maker1: &signer
+    ) {
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        // Setup accounts
+        let market = new_market(
+            admin,
+            market_signer,
+            new_market_config(false, true, PRE_CANCEL_WINDOW_MICROS)
+        );
+        clearinghouse_test::initialize(admin);
+        let event_store = event_utils::new_event_store();
+        let order_id =
+            place_order_and_verify(
+                &mut market,
+                maker1,
+                option::some(1001),
+                2000000,
+                true,
+                good_till_cancelled(),
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(1),
+                option::some(111),
+                &test_market_callbacks()
+            );
+
+        let metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), 111);
+        assert!(metadata.destroy_some() == new_test_order_metadata(1));
+
+        // Test getting the metadata by order ID
+        let metadata_by_order_id = market.get_order_metadata(order_id);
+        assert!(metadata_by_order_id.destroy_some() == new_test_order_metadata(1));
+
+        // Update metadata
+        market.set_order_metadata_by_client_id(
+            signer::address_of(maker1),
+            111,
+            new_test_order_metadata(2)
+        );
+
+        // Verify updated metadata
+        let updated_metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), 111);
+        assert!(updated_metadata.destroy_some() == new_test_order_metadata(2));
+
+        // Update metadata by order ID
+        market.set_order_metadata(order_id, new_test_order_metadata(3));
+        let updated_metadata_by_order_id = market.get_order_metadata(order_id);
+        assert!(updated_metadata_by_order_id.destroy_some() == new_test_order_metadata(3));
+        market.destroy_market()
+    }
+
+
 }

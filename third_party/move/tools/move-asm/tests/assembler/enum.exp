@@ -1,0 +1,39 @@
+processed 1 task
+task 0 lines 1-30:  publish --print-bytecode [module 0x66::test]
+
+== BEGIN Bytecode ==
+// Bytecode version v7
+module 0x66::test
+enum E has drop
+  V1
+    _1: u64
+    _2: u8
+  V2
+    _1: u64
+    _2: u32
+
+// Function definition at index 0
+fun pack_and_select(): u64
+    ld_u64 1
+    ld_u8 2
+    pack_variant E, V1
+    call select
+    ret
+
+// Function definition at index 1
+fun select(l0: E): u64
+    borrow_loc l0
+    borrow_variant_field E, V1::_1, V2::_1
+    read_ref
+    ret
+
+// Function definition at index 2
+fun pack_and_unpack(): (u64, u32)
+    ld_u64 1
+    ld_u8 2
+    pack_variant E, V1
+    unpack_variant E, V2
+    ret
+
+
+== END Bytecode ==

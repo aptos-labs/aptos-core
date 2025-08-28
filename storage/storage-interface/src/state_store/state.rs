@@ -11,7 +11,6 @@ use crate::{
             hot_state_view::HotStateView,
         },
         versioned_state_value::StateUpdateRef,
-        NUM_STATE_SHARDS,
     },
     DbReader,
 };
@@ -21,7 +20,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        StateViewId,
+        StateViewId, NUM_STATE_SHARDS,
     },
     transaction::Version,
 };
@@ -30,6 +29,23 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
+
+#[derive(Clone, Debug)]
+pub struct HotStateMetadata {
+    latest: Option<StateKey>,
+    oldest: Option<StateKey>,
+    num_items: usize,
+}
+
+impl HotStateMetadata {
+    fn new() -> Self {
+        Self {
+            latest: None,
+            oldest: None,
+            num_items: 0,
+        }
+    }
+}
 
 /// Represents the blockchain state at a given version.
 /// n.b. the state can be either persisted or speculative.
@@ -42,6 +58,7 @@ pub struct State {
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
     shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -50,11 +67,13 @@ impl State {
     pub fn new_with_updates(
         version: Option<Version>,
         shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards,
+            hot_state_metadata,
             usage,
         }
     }
@@ -63,6 +82,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
+            arr![HotStateMetadata::new(); 16],
             usage,
         )
     }
@@ -102,6 +122,18 @@ impl State {
 
     pub fn is_descendant_of(&self, rhs: &State) -> bool {
         self.shards[0].is_descendant_of(&rhs.shards[0])
+    }
+
+    pub(crate) fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].latest.clone()
+    }
+
+    pub(crate) fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
+        self.hot_state_metadata[shard_id].oldest.clone()
+    }
+
+    pub(crate) fn num_hot_items(&self, shard_id: usize) -> usize {
+        self.hot_state_metadata[shard_id].num_items
     }
 
     pub fn update(
@@ -150,7 +182,9 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        // TODO(HotState): compute new hot state metadata.
+        let hot_state_metadata = arr![HotStateMetadata::new(); 16];
+        State::new_with_updates(updates.last_version(), shards, hot_state_metadata, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {

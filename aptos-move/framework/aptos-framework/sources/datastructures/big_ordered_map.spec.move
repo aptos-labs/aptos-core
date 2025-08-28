@@ -245,5 +245,11 @@ spec aptos_std::big_ordered_map {
         pragma verify = false;
     }
 
+    spec compute_length {
+        pragma verify = false;
+        pragma opaque;
+        ensures [abstract] result == spec_len(self);
+    }
+
 
 }

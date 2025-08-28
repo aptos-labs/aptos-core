@@ -58,7 +58,7 @@ jobs:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
 

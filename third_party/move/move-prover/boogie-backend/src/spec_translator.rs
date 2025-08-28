@@ -576,6 +576,13 @@ impl SpecTranslator<'_> {
                 ..self.clone()
             };
 
+            let skip_immutable_reference = |ty: &Type| {
+                if !ty.is_mutable_reference() {
+                    ty.skip_reference().clone()
+                } else {
+                    ty.clone()
+                }
+            };
             // Pairs of context parameter names and boogie types
             let param_decls = info
                 .free_vars
@@ -583,14 +590,15 @@ impl SpecTranslator<'_> {
                 .map(|(s, ty)| {
                     (
                         s.display(env.symbol_pool()).to_string(),
-                        boogie_type(env, ty.skip_reference()),
+                        boogie_type(env, &skip_immutable_reference(ty)),
                     )
                 })
-                .chain(
-                    info.used_temps
-                        .iter()
-                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty.skip_reference()))),
-                )
+                .chain(info.used_temps.iter().map(|(t, ty)| {
+                    (
+                        format!("$t{}", t),
+                        boogie_type(env, &skip_immutable_reference(ty)),
+                    )
+                }))
                 .chain(info.used_memory.iter().map(|(m, l)| {
                     let struct_env = &env.get_struct(m.to_qualified_id());
                     (
@@ -607,6 +615,11 @@ impl SpecTranslator<'_> {
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
                 let suffix = boogie_type_suffix(env, ty.skip_reference());
+                let n = if ty.is_mutable_reference() {
+                    format!("$Dereference({})", n)
+                } else {
+                    n.to_owned()
+                };
                 emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);
@@ -982,7 +995,7 @@ impl SpecTranslator<'_> {
                 self.translate_select_variant(node_id, *module_id, *struct_id, field_ids, args);
             },
             Operation::TestVariants(module_id, struct_id, variants) => {
-                self.translate_test_variants(node_id, *module_id, *struct_id, variants, args);
+                self.translate_test_variants(*module_id, *struct_id, variants, args);
             },
             Operation::UpdateField(module_id, struct_id, field_id) => {
                 self.translate_update_field(node_id, *module_id, *struct_id, *field_id, args)
@@ -1397,6 +1410,7 @@ impl SpecTranslator<'_> {
         }
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let inst = &self.inst_slice(inst);
         let l = self.fresh_var_name("l");
         emit!(self.writer, "(var {} := ", l);
         self.translate_exp(&args[0]);
@@ -1435,7 +1449,6 @@ impl SpecTranslator<'_> {
 
     fn translate_test_variants(
         &self,
-        node_id: NodeId,
         module_id: ModuleId,
         struct_id: StructId,
         variants: &[Symbol],
@@ -1443,9 +1456,8 @@ impl SpecTranslator<'_> {
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
         let struct_type = &self.get_node_type(args[0].node_id());
-        let (_, _, _) = struct_type.skip_reference().require_struct();
-        let inst = self.env.get_node_instantiation(node_id);
-        let inst = &self.inst_slice(&inst);
+        let (_, _, inst) = struct_type.skip_reference().require_struct();
+        let inst = &self.inst_slice(inst);
         let test_var_result = self.fresh_var_name("test_variant_var");
         emit!(self.writer, "(var {} := ", test_var_result);
         self.translate_exp(&args[0]);

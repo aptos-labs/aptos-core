@@ -59,7 +59,8 @@ use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
-    BatchTransactionFilterConfig, ConsensusConfig, DagConsensusConfig, NodeConfig,
+    BatchTransactionFilterConfig, BlockTransactionFilterConfig, ConsensusConfig,
+    DagConsensusConfig, NodeConfig,
 };
 use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
@@ -176,6 +177,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     key_storage: PersistentSafetyStorage,
 
+    consensus_txn_filter_config: BlockTransactionFilterConfig,
     quorum_store_txn_filter_config: BatchTransactionFilterConfig,
 }
 
@@ -204,6 +206,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         let key_storage = safety_rules_manager::storage(sr_config);
+        let consensus_txn_filter_config = node_config.transaction_filters.consensus_filter.clone();
         let quorum_store_txn_filter_config =
             node_config.transaction_filters.quorum_store_filter.clone();
 
@@ -249,6 +252,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             consensus_publisher,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
             key_storage,
+            consensus_txn_filter_config,
             quorum_store_txn_filter_config,
         }
     }
@@ -569,7 +573,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
@@ -681,7 +685,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -936,13 +940,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
@@ -966,6 +970,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage.clone(),
             onchain_consensus_config,
             buffered_proposal_tx,
+            self.consensus_txn_filter_config.clone(),
             self.config.clone(),
             onchain_randomness_config,
             onchain_jwk_consensus_config,
@@ -1261,7 +1266,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
             QueueStyle::KLAST,
-            10,
+            self.config.internal_per_key_channel_size,
             None,
         );
 

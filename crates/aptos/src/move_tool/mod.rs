@@ -51,7 +51,9 @@ use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
-    transaction::{Transaction, TransactionArgument, TransactionPayload, TransactionStatus},
+    transaction::{
+        ReplayProtector, Transaction, TransactionArgument, TransactionPayload, TransactionStatus,
+    },
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use async_trait::async_trait;
@@ -65,6 +67,7 @@ use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
+use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -76,7 +79,6 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 use url::Url;
-
 pub mod aptos_debug_natives;
 mod bytecode;
 pub mod coverage;
@@ -594,7 +596,6 @@ impl CliCommand<&'static str> for TestPackage {
             config.clone(),
             UnitTestingConfig {
                 filter: self.filter.clone(),
-                report_stacktrace_on_abort: true,
                 report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 named_address_values: self
@@ -2175,7 +2176,8 @@ impl CliCommand<TransactionSummary> for Simulate {
         if self.local {
             self.txn_options.simulate_locally(payload).await
         } else {
-            self.txn_options.simulate_remotely(payload).await
+            let mut rng = rand::rngs::StdRng::from_entropy();
+            self.txn_options.simulate_remotely(&mut rng, payload).await
         }
     }
 }
@@ -2397,7 +2399,11 @@ impl CliCommand<TransactionSummary> for Replay {
             gas_unit_price: Some(txn.gas_unit_price()),
             pending: None,
             sender: Some(txn.sender()),
-            sequence_number: Some(txn.sequence_number()),
+            sequence_number: match txn.replay_protector() {
+                ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+                _ => None,
+            },
+            replay_protector: Some(txn.replay_protector()),
             success,
             timestamp_us: None,
             version: Some(self.txn_id),

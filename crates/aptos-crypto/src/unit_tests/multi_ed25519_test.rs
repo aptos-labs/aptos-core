@@ -472,7 +472,7 @@ fn test_multi_ed25519_signature_verification() {
 fn test_invalid_multi_ed25519_signature_bitmap() {
     let priv_keys_3 = generate_keys(3);
 
-    let multi_private_key_2of3 = MultiEd25519PrivateKey::new(priv_keys_3, 2).unwrap();
+    let multi_private_key_2of3 = MultiEd25519PrivateKey::new(priv_keys_3.clone(), 2).unwrap();
     let multi_public_key_2of3 = MultiEd25519PublicKey::from(&multi_private_key_2of3);
 
     let multi_signature_2of3 = multi_private_key_2of3.sign(message()).unwrap();
@@ -502,6 +502,50 @@ fn test_invalid_multi_ed25519_signature_bitmap() {
     assert!(multi_signature_1of3
         .verify(message(), &multi_public_key_2of3)
         .is_err());
+
+    let multi_signature_3of3_invalid_bitmap = MultiEd25519Signature::new_with_signatures_and_bitmap(
+        priv_keys_3
+            .iter()
+            .map(|x| x.sign(message()).unwrap())
+            .collect(),
+        [0b1100_0000, 0u8, 0u8, 0u8],
+    );
+
+    // Bitmap is invalid
+    assert_eq!(
+        multi_signature_3of3_invalid_bitmap
+            .verify(message(), &multi_public_key_2of3)
+            .unwrap_err()
+            .to_string(),
+        "BitVecError(\"Bitmap ones and signatures count are not equal\")".to_string()
+    );
+
+    let multi_signature_3of3 = MultiEd25519Signature::new_with_signatures_and_bitmap(
+        priv_keys_3
+            .iter()
+            .map(|x| x.sign(message()).unwrap())
+            .collect(),
+        [0b1110_0000, 0u8, 0u8, 0u8],
+    );
+    let multi_public_key_2of3_2only = MultiEd25519PublicKey::new(
+        multi_public_key_2of3
+            .public_keys()
+            .iter()
+            .take(2)
+            .cloned()
+            .collect(),
+        2,
+    )
+    .unwrap();
+
+    // Bitmap is valid but fewer public keys provided
+    assert_eq!(
+        multi_signature_3of3
+            .verify(message(), &multi_public_key_2of3_2only)
+            .unwrap_err()
+            .to_string(),
+        "BitVecError(\"Signature index is out of range\")".to_string()
+    );
 }
 
 /// Used for generating test cases for the MultiEd25519 Move module.

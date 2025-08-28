@@ -58,22 +58,32 @@ module aptos_experimental::market {
     use std::signer;
     use std::string::String;
     use std::vector;
+    use aptos_std::table;
+    use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_order_request};
+    use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
+        pre_cancel_order_for_tracker, is_pre_cancelled
+    };
+    use aptos_experimental::price_time_index::PriceTimeIndex;
     use aptos_experimental::order_book_types::{
         new_order_id_type,
         new_ascending_id_generator,
         AscendingIdGenerator,
-        TriggerCondition,
-        Order,
         OrderIdType
     };
+    use aptos_experimental::single_order_types::{
+        Order
+    };
+    use aptos_experimental::order_book_types::TriggerCondition;
+    use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
     use aptos_experimental::market_types::{
         Self,
-        TimeInForce,
         OrderStatus,
         MarketClearinghouseCallbacks
     };
+    #[test_only]
+    use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
@@ -87,6 +97,9 @@ module aptos_experimental::market {
     const EINVALID_LIQUIDATION: u64 = 11;
     const ENOT_ORDER_CREATOR: u64 = 12;
 
+    const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
+    const U64_MAX: u64 = 0xffffffffffffffff;
+
     enum Market<M: store + copy + drop> has store {
         V1 {
             /// Address of the parent object that created this market
@@ -98,7 +111,11 @@ module aptos_experimental::market {
             // Incremental fill id for matched orders
             next_fill_id: u64,
             config: MarketConfig,
-            order_book: OrderBook<M>
+            order_book: OrderBook<M>,
+            /// Pre cancellation tracker for the market, it is wrapped inside a table
+            /// as otherwise any insertion/deletion from the tracker would cause conflict
+            /// with the order book.
+            pre_cancellation_tracker: Table<u8, PreCancellationTracker>,
         }
     }
 
@@ -107,7 +124,9 @@ module aptos_experimental::market {
             /// Weather to allow self matching orders
             allow_self_trade: bool,
             /// Whether to allow sending all events for the markett
-            allow_events_emission: bool
+            allow_events_emission: bool,
+            /// Pre cancellation window in microseconds
+            pre_cancellation_window_secs: u64
         }
     }
 
@@ -129,12 +148,15 @@ module aptos_experimental::market {
         /// FILLED - size_delta will be amount of size filled
         /// REJECTED - size_delta will always be 0
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         /// Whether the order crosses the orderbook.
         is_taker: bool,
         status: OrderStatus,
-        details: std::string::String
+        details: std::string::String,
+        metadata_bytes: vector<u8>,
+        time_in_force: TimeInForce,
+        trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
     }
 
     enum OrderCancellationReason has drop, copy {
@@ -143,26 +165,34 @@ module aptos_experimental::market {
         PositionUpdateViolation,
         ReduceOnlyViolation,
         ClearinghouseSettleViolation,
-        MaxFillLimitViolation
+        MaxFillLimitViolation,
+        DuplicateClientOrderIdViolation,
+        OrderPreCancelled,
     }
 
     struct OrderMatchResult has drop {
         order_id: OrderIdType,
         remaining_size: u64,
         cancel_reason: Option<OrderCancellationReason>,
-        fill_sizes: vector<u64>
+        fill_sizes: vector<u64>,
+        match_count: u32, // includes fills and cancels
     }
 
     public fun destroy_order_match_result(
         self: OrderMatchResult
-    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<u64>) {
-        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes } =
+    ): (OrderIdType, u64, Option<OrderCancellationReason>, vector<u64>, u32) {
+        let OrderMatchResult { order_id, remaining_size, cancel_reason, fill_sizes, match_count } =
             self;
-        (order_id, remaining_size, cancel_reason, fill_sizes)
+        (order_id, remaining_size, cancel_reason, fill_sizes, match_count)
     }
 
     public fun number_of_fills(self: &OrderMatchResult): u64 {
         self.fill_sizes.length()
+    }
+
+    /// Includes fills and cancels
+    public fun number_of_matches(self: &OrderMatchResult): u32 {
+        self.match_count
     }
 
     public fun total_fill_size(self: &OrderMatchResult): u64 {
@@ -192,11 +222,12 @@ module aptos_experimental::market {
     }
 
     public fun new_market_config(
-        allow_self_matching: bool, allow_events_emission: bool
+        allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
     ): MarketConfig {
         MarketConfig::V1 {
             allow_self_trade: allow_self_matching,
-            allow_events_emission: allow_events_emission
+            allow_events_emission,
+            pre_cancellation_window_secs,
         }
     }
 
@@ -205,13 +236,20 @@ module aptos_experimental::market {
     ): Market<M> {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
+        let pre_cancellation_window = config.pre_cancellation_window_secs;
+        let pre_cancellation_tracker = table::new();
+        pre_cancellation_tracker.add(
+            PRE_CANCELLATION_TRACKER_KEY,
+            new_pre_cancellation_tracker(pre_cancellation_window)
+        );
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
             order_id_generator: new_ascending_id_generator(),
             next_fill_id: 0,
             config,
-            order_book: new_order_book()
+            order_book: new_order_book(),
+            pre_cancellation_tracker,
         }
     }
 
@@ -239,7 +277,7 @@ module aptos_experimental::market {
 
     public fun is_taker_order<M: store + copy + drop>(
         self: &Market<M>,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>
     ): bool {
@@ -264,10 +302,10 @@ module aptos_experimental::market {
     /// - client_order_id: The client order id for the order. This is an optional field that can be specified by the client
     ///   is solely used for their own tracking of the order. client order id doesn't have semantic meaning and
     ///   is not be inspected by the orderbook internally.
-    /// - max_fill_limit: The maximum fill limit for the order. This is the maximum number of fills to trigger for this order.
+    /// - max_match_limit: The maximum match limit for the order. This is the maximum number of matches (fills or cancels) to trigger for this order.
     /// This knob is present to configure maximum amount of gas any order placement transaction might consume and avoid
     /// hitting the maximum has limit of the blockchain.
-    /// - emit_cancel_on_fill_limit: bool,: Whether to emit an order cancellation event when the fill limit is reached.
+    /// - cancel_on_match_limit: bool: Whether to cancel the given order when the match limit is reached.
     /// This is used ful as the caller might not want to cancel the order when the limit is reached and can continue
     /// that order in a separate transaction.
     /// - callbacks: The callbacks for the market clearinghouse. This is a struct that implements the MarketClearinghouseCallbacks
@@ -283,13 +321,13 @@ module aptos_experimental::market {
         trigger_condition: Option<TriggerCondition>,
         metadata: M,
         client_order_id: Option<u64>,
-        max_fill_limit: u64,
-        emit_cancel_on_fill_limit: bool,
+        max_match_limit: u32,
+        cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         self.place_order_with_order_id(
             signer::address_of(user),
-            option::some(limit_price),
+            limit_price,
             orig_size,
             orig_size,
             is_bid,
@@ -298,8 +336,8 @@ module aptos_experimental::market {
             metadata,
             option::none(), // order_id
             client_order_id,
-            max_fill_limit,
-            emit_cancel_on_fill_limit,
+            max_match_limit,
+            cancel_on_match_limit,
             true,
             callbacks
         )
@@ -313,23 +351,23 @@ module aptos_experimental::market {
         is_bid: bool,
         metadata: M,
         client_order_id: Option<u64>,
-        max_fill_limit: u64,
-        emit_cancel_on_fill_limit: bool,
+        max_match_limit: u32,
+        cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         self.place_order_with_order_id(
             signer::address_of(user),
-            option::none(),
+            if (is_bid) { U64_MAX } else { 1 },
             orig_size,
             orig_size,
             is_bid,
-            market_types::immediate_or_cancel(), // market orders are always IOC
+            immediate_or_cancel(), // market orders are always IOC
             option::none(), // trigger_condition
             metadata,
             option::none(), // order_id
             client_order_id,
-            max_fill_limit,
-            emit_cancel_on_fill_limit,
+            max_match_limit,
+            cancel_on_match_limit,
             true,
             callbacks
         )
@@ -345,7 +383,7 @@ module aptos_experimental::market {
         next_fill_id
     }
 
-    fun emit_event_for_order<M: store + copy + drop>(
+    public fun emit_event_for_order<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
@@ -353,14 +391,19 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         is_taker: bool,
         status: OrderStatus,
-        details: &String
+        details: &String,
+        metadata: M,
+        trigger_condition: Option<TriggerCondition>,
+        time_in_force: TimeInForce,
+        callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
+            let metadata_bytes = callbacks.get_order_metadata_bytes(metadata);
             event::emit(
                 OrderEvent {
                     parent: self.parent,
@@ -372,10 +415,13 @@ module aptos_experimental::market {
                     remaining_size,
                     size_delta,
                     price,
-                    is_bid: is_bid,
+                    is_bid,
                     is_taker,
                     status,
-                    details: *details
+                    details: *details,
+                    metadata_bytes,
+                    time_in_force,
+                    trigger_condition
                 }
             );
         };
@@ -384,10 +430,11 @@ module aptos_experimental::market {
     fun place_maker_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         orig_size: u64,
         remaining_size: u64,
         fill_sizes: vector<u64>,
+        match_count: u32,
         is_bid: bool,
         time_in_force: TimeInForce,
         trigger_condition: Option<TriggerCondition>,
@@ -398,8 +445,7 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         // Validate that the order is valid from position management perspective
-        if (time_in_force == market_types::immediate_or_cancel()
-            || limit_price.is_none()) {
+        if (time_in_force == immediate_or_cancel()) {
             return self.cancel_order_internal(
                 user_addr,
                 limit_price,
@@ -408,10 +454,13 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 fill_sizes,
+                match_count,
                 is_bid,
                 false, // is_taker
                 OrderCancellationReason::IOCViolation,
                 std::string::utf8(b"IOC Violation"),
+                metadata,
+                time_in_force,
                 callbacks
             );
         };
@@ -423,12 +472,16 @@ module aptos_experimental::market {
                 user_addr,
                 orig_size,
                 remaining_size,
-                orig_size,
+                remaining_size,
                 limit_price,
                 is_bid,
                 false,
                 market_types::order_status_open(),
-                &std::string::utf8(b"")
+                &std::string::utf8(b""),
+                metadata,
+                trigger_condition,
+                time_in_force,
+                callbacks
             );
         };
 
@@ -436,7 +489,7 @@ module aptos_experimental::market {
             user_addr,
             order_id,
             is_bid,
-            limit_price.destroy_some(),
+            limit_price,
             remaining_size,
             metadata
         );
@@ -445,11 +498,12 @@ module aptos_experimental::market {
                 user_addr,
                 order_id,
                 client_order_id,
-                limit_price.destroy_some(),
+                limit_price,
                 orig_size,
                 remaining_size,
                 is_bid,
                 trigger_condition,
+                time_in_force,
                 metadata
             )
         );
@@ -457,7 +511,8 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
     }
 
@@ -469,6 +524,8 @@ module aptos_experimental::market {
         order_id: OrderIdType,
         maker_cancellation_reason: String,
         unsettled_size: u64,
+        metadata: M,
+        time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let maker_cancel_size = unsettled_size + maker_order.get_remaining_size();
@@ -479,11 +536,15 @@ module aptos_experimental::market {
             maker_order.get_orig_size(),
             0,
             maker_cancel_size,
-            option::some(maker_order.get_price()),
+            maker_order.get_price(),
             maker_order.is_bid(),
             false,
             market_types::order_status_cancelled(),
-            &maker_cancellation_reason
+            &maker_cancellation_reason,
+            metadata,
+            option::none(), // trigger_condition
+            time_in_force,
+            callbacks
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size() != 0) {
@@ -497,16 +558,19 @@ module aptos_experimental::market {
     fun cancel_order_internal<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
         orig_size: u64,
         size_delta: u64,
         fill_sizes: vector<u64>,
+        match_count: u32,
         is_bid: bool,
         is_taker: bool,
         cancel_reason: OrderCancellationReason,
         cancel_details: String,
+        metadata: M,
+        time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
         self.emit_event_for_order(
@@ -520,7 +584,11 @@ module aptos_experimental::market {
             is_bid,
             is_taker,
             market_types::order_status_cancelled(),
-            &cancel_details
+            &cancel_details,
+            metadata,
+            option::none(), // trigger_condition
+            time_in_force,
+            callbacks
         );
         callbacks.cleanup_order(
             user_addr, order_id, is_bid, size_delta
@@ -529,14 +597,15 @@ module aptos_experimental::market {
             order_id,
             remaining_size: 0,
             cancel_reason: option::some(cancel_reason),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
     }
 
     fun settle_single_trade<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        price: Option<u64>,
+        price: u64,
         orig_size: u64,
         remaining_size: &mut u64,
         is_bid: bool,
@@ -544,13 +613,15 @@ module aptos_experimental::market {
         order_id: OrderIdType,
         client_order_id: Option<u64>,
         callbacks: &MarketClearinghouseCallbacks<M>,
-        fill_sizes: &mut vector<u64>
+        time_in_force: TimeInForce,
+        fill_sizes: &mut vector<u64>,
     ): Option<OrderCancellationReason> {
-        let result = self.order_book
-            .get_single_match_for_taker(price, *remaining_size, is_bid);
-        let (
-            maker_order, maker_matched_size
-        ) = result.destroy_single_order_match();
+        let result =
+            self.order_book
+                .get_single_match_for_taker(price, *remaining_size, is_bid);let (
+                maker_order, maker_matched_size
+            ) = result
+            .destroy_single_order_match();
         if (!self.config.allow_self_trade && maker_order.get_account() == user_addr) {
             self.cancel_maker_order_internal(
                 &maker_order,
@@ -559,6 +630,8 @@ module aptos_experimental::market {
                 maker_order.get_order_id(),
                 std::string::utf8(b"Disallowed self trading"),
                 maker_matched_size,
+                maker_order.get_metadata_from_order(),
+                maker_order.get_time_in_force(),
                 callbacks
             );
             return option::none();
@@ -583,7 +656,7 @@ module aptos_experimental::market {
             *remaining_size -= settled_size;
             unsettled_maker_size -= settled_size;
             fill_sizes.push_back(settled_size);
-                // Event for taker fill
+            // Event for taker fill
             self.emit_event_for_order(
                 order_id,
                 client_order_id,
@@ -591,11 +664,15 @@ module aptos_experimental::market {
                 orig_size,
                 *remaining_size,
                 settled_size,
-                option::some(maker_order.get_price()),
+                maker_order.get_price(),
                 is_bid,
                 true,
                 market_types::order_status_filled(),
-                &std::string::utf8(b"")
+                &std::string::utf8(b""),
+                metadata,
+                option::none(), // trigger_condition
+                time_in_force,
+                callbacks
             );
             // Event for maker fill
             self.emit_event_for_order(
@@ -605,11 +682,15 @@ module aptos_experimental::market {
                 maker_order.get_orig_size(),
                 maker_order.get_remaining_size() + unsettled_maker_size,
                 settled_size,
-                option::some(maker_order.get_price()),
+                maker_order.get_price(),
                 !is_bid,
                 false,
                 market_types::order_status_filled(),
-                &std::string::utf8(b"")
+                &std::string::utf8(b""),
+                maker_order.get_metadata_from_order(),
+                option::none(),
+                maker_order.get_time_in_force(),
+                callbacks
             );
         };
 
@@ -625,10 +706,13 @@ module aptos_experimental::market {
                 orig_size,
                 *remaining_size,
                 *fill_sizes,
+                0, // match_count - doesn't matter as we don't use the result.
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::ClearinghouseSettleViolation,
                 taker_cancellation_reason.destroy_some(),
+                metadata,
+                time_in_force,
                 callbacks
             );
             if (maker_cancellation_reason.is_none() && unsettled_maker_size > 0) {
@@ -644,6 +728,7 @@ module aptos_experimental::market {
                         unsettled_maker_size,
                         !is_bid,
                         option::none(),
+                        maker_order.get_time_in_force(),
                         maker_order.get_metadata_from_order()
                     ),
                     maker_order
@@ -659,6 +744,8 @@ module aptos_experimental::market {
                 maker_order.get_order_id(),
                 maker_cancellation_reason.destroy_some(),
                 unsettled_maker_size,
+                maker_order.get_metadata_from_order(),
+                maker_order.get_time_in_force(),
                 callbacks
             );
         } else if (maker_order.get_remaining_size() == 0) {
@@ -681,7 +768,7 @@ module aptos_experimental::market {
     public fun place_order_with_order_id<M: store + copy + drop>(
         self: &mut Market<M>,
         user_addr: address,
-        limit_price: Option<u64>,
+        limit_price: u64,
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
@@ -690,8 +777,8 @@ module aptos_experimental::market {
         metadata: M,
         order_id: Option<OrderIdType>,
         client_order_id: Option<u64>,
-        max_fill_limit: u64,
-        cancel_on_fill_limit: bool,
+        max_match_limit: u32,
+        cancel_on_match_limit: bool,
         emit_taker_order_open: bool,
         callbacks: &MarketClearinghouseCallbacks<M>
     ): OrderMatchResult {
@@ -709,31 +796,6 @@ module aptos_experimental::market {
         // TODO(skedia) reconsile the semantics around global order id vs account local id.
         let is_taker_order =
             self.order_book.is_taker_order(limit_price, is_bid, trigger_condition);
-        if (
-            !callbacks.validate_order_placement(
-                user_addr,
-                order_id,
-                is_taker_order, // is_taker
-                is_bid,
-                limit_price,
-                remaining_size,
-                metadata
-            )) {
-            return self.cancel_order_internal(
-                user_addr,
-                limit_price,
-                order_id,
-                client_order_id,
-                orig_size,
-                0, // 0 because order was never placed
-                vector[],
-                is_bid,
-                true, // is_taker
-                OrderCancellationReason::PositionUpdateViolation,
-                std::string::utf8(b"Position Update violation"),
-                callbacks
-            );
-        };
 
         if (emit_taker_order_open) {
             self.emit_event_for_order(
@@ -747,9 +809,91 @@ module aptos_experimental::market {
                 is_bid,
                 is_taker_order,
                 market_types::order_status_open(),
-                &std::string::utf8(b"")
+                &std::string::utf8(b""),
+                metadata,
+                trigger_condition,
+                time_in_force,
+                callbacks
             );
         };
+
+        if (
+            !callbacks.validate_order_placement(
+                user_addr,
+                order_id,
+                is_taker_order, // is_taker
+                is_bid,
+                limit_price,
+                time_in_force,
+                remaining_size,
+                metadata
+            )) {
+            return self.cancel_order_internal(
+                user_addr,
+                limit_price,
+                order_id,
+                client_order_id,
+                orig_size,
+                remaining_size,
+                vector[],
+                0, // match_count
+                is_bid,
+                is_taker_order, // is_taker
+                OrderCancellationReason::PositionUpdateViolation,
+                std::string::utf8(b"Position Update violation"),
+                metadata,
+                time_in_force,
+                callbacks
+            );
+        };
+
+        if (client_order_id.is_some()) {
+            if (self.order_book.client_order_id_exists(user_addr, client_order_id.destroy_some())) {
+                // Client provided a client order id that already exists in the order book
+                return self.cancel_order_internal(
+                    user_addr,
+                    limit_price,
+                    order_id,
+                    client_order_id,
+                    orig_size,
+                    remaining_size,
+                    vector[],
+                    0, // match_count
+                    is_bid,
+                    is_taker_order, // is_taker
+                    OrderCancellationReason::DuplicateClientOrderIdViolation,
+                    std::string::utf8(b"Duplicate client order id"),
+                    metadata,
+                    time_in_force,
+                    callbacks
+                );
+            };
+
+            if (is_pre_cancelled(
+                self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY),
+                user_addr,
+                client_order_id.destroy_some()
+            )) {
+                return self.cancel_order_internal(
+                    user_addr,
+                    limit_price,
+                    order_id,
+                    client_order_id,
+                    orig_size,
+                    remaining_size,
+                    vector[],
+                    0, // match_count
+                    is_bid,
+                    is_taker_order, // is_taker
+                    OrderCancellationReason::OrderPreCancelled,
+                    std::string::utf8(b"Order pre cancelled"),
+                    metadata,
+                    time_in_force,
+                    callbacks
+                );
+            };
+        };
+
         if (!is_taker_order) {
             return self.place_maker_order_internal(
                 user_addr,
@@ -757,6 +901,7 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 vector[],
+                0, // match_count
                 is_bid,
                 time_in_force,
                 trigger_condition,
@@ -770,7 +915,7 @@ module aptos_experimental::market {
 
         // NOTE: We should always use is_taker: true for this order past this
         // point so that indexer can consistently track the order's status
-        if (time_in_force == market_types::post_only()) {
+        if (time_in_force == post_only()) {
             return self.cancel_order_internal(
                 user_addr,
                 limit_price,
@@ -779,15 +924,20 @@ module aptos_experimental::market {
                 orig_size,
                 remaining_size,
                 vector[],
+                0, // match_count
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::PostOnlyViolation,
                 std::string::utf8(b"Post Only violation"),
+                metadata,
+                time_in_force,
                 callbacks
             );
         };
         let fill_sizes = vector::empty();
+        let match_count = 0;
         loop {
+            match_count += 1;
             let taker_cancellation_reason =
                 self.settle_single_trade(
                     user_addr,
@@ -799,6 +949,7 @@ module aptos_experimental::market {
                     order_id,
                     client_order_id,
                     callbacks,
+                    time_in_force,
                     &mut fill_sizes
                 );
             if (taker_cancellation_reason.is_some()) {
@@ -806,7 +957,8 @@ module aptos_experimental::market {
                     order_id,
                     remaining_size: 0, // 0 because the order is cancelled
                     cancel_reason: taker_cancellation_reason,
-                    fill_sizes
+                    fill_sizes,
+                    match_count
                 }
             };
             if (remaining_size == 0) {
@@ -820,7 +972,7 @@ module aptos_experimental::market {
             let is_taker_order =
                 self.order_book.is_taker_order(limit_price, is_bid, option::none());
             if (!is_taker_order) {
-                if (time_in_force == market_types::immediate_or_cancel()) {
+                if (time_in_force == immediate_or_cancel()) {
                     return self.cancel_order_internal(
                         user_addr,
                         limit_price,
@@ -829,10 +981,13 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::IOCViolation,
                         std::string::utf8(b"IOC_VIOLATION"),
+                        metadata,
+                        time_in_force,
                         callbacks
                     );
                 } else {
@@ -843,6 +998,7 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         time_in_force,
                         trigger_condition,
@@ -855,8 +1011,8 @@ module aptos_experimental::market {
                 };
             };
 
-            if (fill_sizes.length() >= max_fill_limit) {
-                if (cancel_on_fill_limit) {
+            if (match_count >= max_match_limit) {
+                if (cancel_on_match_limit) {
                     return self.cancel_order_internal(
                         user_addr,
                         limit_price,
@@ -865,10 +1021,13 @@ module aptos_experimental::market {
                         orig_size,
                         remaining_size,
                         fill_sizes,
+                        match_count,
                         is_bid,
                         true, // is_taker
                         OrderCancellationReason::MaxFillLimitViolation,
                         std::string::utf8(b"Max fill limit reached"),
+                        metadata,
+                        time_in_force,
                         callbacks
                     );
                 } else {
@@ -878,7 +1037,8 @@ module aptos_experimental::market {
                         cancel_reason: option::some(
                             OrderCancellationReason::MaxFillLimitViolation
                         ),
-                        fill_sizes
+                        fill_sizes,
+                        match_count
                     }
                 };
             };
@@ -887,8 +1047,30 @@ module aptos_experimental::market {
             order_id,
             remaining_size,
             cancel_reason: option::none(),
-            fill_sizes
+            fill_sizes,
+            match_count
         }
+    }
+
+    public fun cancel_order_with_client_id<M: store + copy + drop>(
+        self: &mut Market<M>,
+        user: &signer,
+        client_order_id: u64,
+        callbacks: &MarketClearinghouseCallbacks<M>
+    ) {
+        let order =
+            self.order_book.try_cancel_order_with_client_order_id(
+                signer::address_of(user), client_order_id
+            );
+        if (order.is_some()) {
+            // Order is already placed in the order book, so we can cancel it
+            return self.cancel_order_helper(order.destroy_some(), callbacks);
+        };
+        pre_cancel_order_for_tracker(
+            self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY),
+            user,
+            client_order_id,
+        );
     }
 
     /// Cancels an order - this will cancel the order and emit an event for the order cancellation.
@@ -899,8 +1081,14 @@ module aptos_experimental::market {
         callbacks: &MarketClearinghouseCallbacks<M>
     ) {
         let account = signer::address_of(user);
-        let order = self.order_book.cancel_order(account, order_id);
+        let order = self.order_book.cancel_order( account, order_id);
         assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
+        self.cancel_order_helper(order, callbacks);
+    }
+
+    fun cancel_order_helper<M: store + copy + drop>(
+        self: &mut Market<M>, order: Order<M>, callbacks: &MarketClearinghouseCallbacks<M>
+    ) {
         let (
             account,
             order_id,
@@ -910,7 +1098,8 @@ module aptos_experimental::market {
             remaining_size,
             is_bid,
             _trigger_condition,
-            _metadata
+            time_in_force,
+            metadata
         ) = order.destroy_order();
         callbacks.cleanup_order(
             account, order_id, is_bid, remaining_size
@@ -920,13 +1109,17 @@ module aptos_experimental::market {
             client_order_id,
             account,
             orig_size,
+            0,
             remaining_size,
-            remaining_size,
-            option::some(price),
+            price,
             is_bid,
             false,
             market_types::order_status_cancelled(),
-            &std::string::utf8(b"Order cancelled")
+            &std::string::utf8(b"Order cancelled"),
+            metadata,
+            option::none(), // trigger_condition
+            time_in_force,
+            callbacks
         );
     }
 
@@ -953,7 +1146,8 @@ module aptos_experimental::market {
             remaining_size,
             is_bid,
             _trigger_condition,
-            _metadata
+            time_in_force,
+            metadata
         ) = order.destroy_order();
         callbacks.decrease_order_size(
             user, order_id, is_bid, price, remaining_size
@@ -966,11 +1160,15 @@ module aptos_experimental::market {
             orig_size,
             remaining_size,
             size_delta,
-            option::some(price),
+            price,
             is_bid,
             false,
             market_types::order_status_size_reduced(),
-            &std::string::utf8(b"Order size reduced")
+            &std::string::utf8(b"Order size reduced"),
+            metadata,
+            option::none(), // trigger_condition
+            time_in_force,
+            callbacks
         );
     }
 
@@ -981,20 +1179,54 @@ module aptos_experimental::market {
         self.order_book.get_remaining_size(order_id)
     }
 
+    public fun get_order_metadata<M: store + copy + drop>(
+        self: &Market<M>, order_id: OrderIdType
+    ): Option<M> {
+        self.order_book.get_order_metadata(order_id)
+    }
+
+    /// Returns the order metadata for an order by order id.
+    /// It is up to the caller to perform necessary permissions checks
+    public fun set_order_metadata<M: store + copy + drop>(
+        self: &mut Market<M>, order_id: OrderIdType, metadata: M
+    ) {
+        self.order_book.set_order_metadata(order_id, metadata);
+    }
+
+    public fun get_order_metadata_by_client_id<M: store + copy + drop>(
+        self: &Market<M>, user: address, client_order_id: u64
+    ): Option<M> {
+        let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
+        if (order_id.is_none()) {
+            return option::none();
+        };
+        return self.get_order_metadata(order_id.destroy_some())
+    }
+
+    /// Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
+    /// around ownership of the order.
+    public fun set_order_metadata_by_client_id<M: store + copy + drop>(
+        self: &mut Market<M>, user: address, client_order_id: u64, metadata: M
+    ) {
+        let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
+        assert!(order_id.is_some(), EORDER_DOES_NOT_EXIST);
+        self.set_order_metadata(order_id.destroy_some(), metadata);
+    }
+
     /// Returns all the pending order ready to be executed based on the oracle price. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>, oracle_price: u64
+        self: &mut Market<M>, oracle_price: u64, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_price_based_orders(oracle_price)
+        self.order_book.take_ready_price_based_orders(oracle_price, order_limit)
     }
 
     /// Returns all the pending order that are ready to be executed based on current time stamp. The caller is responsible to
     /// call the `place_order_with_order_id` API to place the order with the order id returned from this API.
     public fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut Market<M>
+        self: &mut Market<M>, order_limit: u64
     ): vector<Order<M>> {
-        self.order_book.take_ready_time_based_orders()
+        self.order_book.take_ready_time_based_orders(order_limit)
     }
 
     // ============================= test_only APIs ====================================
@@ -1006,9 +1238,12 @@ module aptos_experimental::market {
             order_id_generator: _order_id_generator,
             next_fill_id: _next_fill_id,
             config,
-            order_book
+            order_book,
+            pre_cancellation_tracker,
         } = self;
-        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _ } = config;
+        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _ } = config;
+        destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
+        pre_cancellation_tracker.drop_unchecked();
         order_book.destroy_order_book()
     }
 
@@ -1043,7 +1278,7 @@ module aptos_experimental::market {
         orig_size: u64,
         remaining_size: u64,
         size_delta: u64,
-        price: Option<u64>,
+        price: u64,
         is_bid: bool,
         is_taker: bool,
         status: OrderStatus

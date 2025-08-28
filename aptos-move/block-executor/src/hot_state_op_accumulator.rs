@@ -25,7 +25,7 @@ pub struct BlockHotStateOpAccumulator<'base_view, Key, BaseView> {
     max_promotions_per_block: usize,
     /// Every now and then refresh `hot_since_version` for hot items to prevent them from being
     /// evicted.
-    refresh_interval_versions: usize,
+    _refresh_interval_versions: usize,
 }
 
 impl<'base_view, Key, BaseView> BlockHotStateOpAccumulator<'base_view, Key, BaseView>
@@ -57,14 +57,14 @@ where
             to_make_hot: BTreeMap::new(),
             writes: hashbrown::HashSet::new(),
             max_promotions_per_block,
-            refresh_interval_versions,
+            _refresh_interval_versions: refresh_interval_versions,
         }
     }
 
     pub fn add_transaction<'a>(
         &mut self,
         writes: impl Iterator<Item = &'a Key>,
-        read_only: impl Iterator<Item = &'a Key>,
+        reads: impl Iterator<Item = &'a Key>,
     ) where
         Key: 'a,
     {
@@ -75,7 +75,7 @@ where
             self.writes.get_or_insert_owned(key);
         }
 
-        for key in read_only {
+        for key in reads {
             if self.to_make_hot.len() >= self.max_promotions_per_block {
                 COUNTER.inc_with(&["max_promotions_per_block_hit"]);
                 continue;
@@ -95,7 +95,9 @@ where
                     COUNTER.inc_with(&["vacant_new"]);
                     true
                 },
-                StateSlot::HotVacant { hot_since_version } => {
+                StateSlot::HotVacant {
+                    hot_since_version, ..
+                } => {
                     if self.should_refresh(hot_since_version) {
                         COUNTER.inc_with(&["vacant_refresh"]);
                         true
@@ -132,8 +134,13 @@ where
 
     pub fn should_refresh(&self, hot_since_version: Version) -> bool {
         if hot_since_version >= self.first_version {
-            error!("Unexpected: hot_since_version > block first version");
+            error!(
+                "Unexpected: hot_since_version {} >= block first version {}",
+                hot_since_version, self.first_version
+            );
         }
-        hot_since_version + self.refresh_interval_versions as Version >= self.first_version
+        // TODO(HotState): understand perf impact. For now, we always refresh.
+        // hot_since_version + self.refresh_interval_versions as Version <= self.first_version
+        true
     }
 }

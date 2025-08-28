@@ -8,7 +8,7 @@ use crate::loaded_data::struct_name_indexing::StructNameIndex;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult},
     file_format::{
         SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
@@ -243,7 +243,7 @@ impl StructType {
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex::new(0),
@@ -431,6 +431,14 @@ impl Type {
             | MutableReference(_)
             | TyParam(_) => false,
         }
+    }
+
+    pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
+        if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
+            let msg = format!("{} `{}` cannot be a reference", msg, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
     }
 
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
@@ -1033,9 +1041,9 @@ impl TypeBuilder {
     }
 
     /// Creates a fully-instantiated type from its storage representation.
-    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         let mut count = 0;
         self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
@@ -1266,15 +1274,14 @@ impl TypeBuilder {
         resolver: &mut F,
         count: &mut u64,
         depth: u64,
-    ) -> VMResult<Type>
+    ) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         use Type::*;
         use TypeTag as T;
 
-        self.check(count, depth)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        self.check(count, depth)?;
         *count += 1;
         Ok(match ty_tag {
             T::Bool => Bool,
@@ -1304,8 +1311,7 @@ impl TypeBuilder {
                         let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);
                     }
-                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)?;
                     StructInstantiation {
                         idx: struct_ty.idx,
                         ty_args: triomphe::Arc::new(ty_args),
@@ -1339,7 +1345,7 @@ impl TypeBuilder {
                                 },
                             })
                         })
-                        .collect::<VMResult<Vec<_>>>()
+                        .collect::<PartialVMResult<Vec<_>>>()
                 };
                 Function {
                     args: to_list(args)?,

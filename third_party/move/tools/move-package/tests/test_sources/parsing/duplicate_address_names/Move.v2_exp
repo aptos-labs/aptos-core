@@ -1,6 +1,0 @@
-Unable to parse Move package manifest: TOML parse error at line 7, column 1
-  |
-7 | a = "0x2"
-  | ^
-duplicate key `a` in table `addresses`
-

@@ -1,8 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// Cfg due to delayed_field_mock_serialization use and to avoid warning.
 #[cfg(test)]
-use crate::types::InputOutputKey;
+use crate::types::{
+    delayed_field_mock_serialization::{
+        deserialize_to_delayed_field_id, deserialize_to_delayed_field_u128, mock_layout,
+        serialize_from_delayed_field_id, serialize_from_delayed_field_u128,
+    },
+    InputOutputKey,
+};
 use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
@@ -51,6 +58,9 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
+// Cfg due to delayed_field_mock_serialization use and to avoid warning.
+#[cfg(test)]
+use fail::fail_point;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     CompiledModule,
@@ -552,11 +562,17 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
         }
 
         loop {
-            match self
-                .versioned_map
-                .group_data()
-                .get_group_size(group_key, txn_idx)
-            {
+            let group_size = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .get_group_size_and_record_dependency(group_key, txn_idx, self.incarnation)
+            } else {
+                self.versioned_map
+                    .group_data()
+                    .get_group_size_no_record(group_key, txn_idx)
+            };
+
+            match group_size {
                 Ok(group_size) => {
                     assert_ok!(
                         self.captured_reads
@@ -614,11 +630,13 @@ impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
 
         loop {
             let data = if self.scheduler.is_v2() {
-                self.versioned_map
-                    .data()
-                    .fetch_data_v2(key, txn_idx, self.incarnation)
+                self.versioned_map.data().fetch_data_and_record_dependency(
+                    key,
+                    txn_idx,
+                    self.incarnation,
+                )
             } else {
-                self.versioned_map.data().fetch_data(key, txn_idx)
+                self.versioned_map.data().fetch_data_no_record(key, txn_idx)
             };
 
             match data {
@@ -739,11 +757,24 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
         }
 
         loop {
-            match self.versioned_map.group_data().fetch_tagged_data(
-                group_key,
-                resource_tag,
-                txn_idx,
-            ) {
+            let data = if self.scheduler.is_v2() {
+                self.versioned_map
+                    .group_data()
+                    .fetch_tagged_data_and_record_dependency(
+                        group_key,
+                        resource_tag,
+                        txn_idx,
+                        self.incarnation,
+                    )
+            } else {
+                self.versioned_map.group_data().fetch_tagged_data_no_record(
+                    group_key,
+                    resource_tag,
+                    txn_idx,
+                )
+            };
+
+            match data {
                 Ok((version, value_with_layout)) => {
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     if let UnknownOrLayout::Known(layout) = layout {
@@ -784,23 +815,18 @@ impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
                     return Ok(GroupReadResult::Uninitialized);
                 },
                 Err(TagNotFound) => {
-                    let empty_data_read = DataRead::Versioned(
-                        Err(StorageVersion),
-                        Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
-                        None,
-                    );
-                    // Capture empty / deletion as a read.
-                    self.captured_reads.borrow_mut().capture_group_read(
-                        group_key.clone(),
-                        resource_tag.clone(),
-                        empty_data_read.clone(),
-                        &target_kind,
-                    )?;
-                    return Ok(GroupReadResult::from_data_read(
-                        empty_data_read
-                            .convert_to(&target_kind)
-                            .expect("Converting from value must succeed"),
-                    ));
+                    // TagNotFound means group was initialized (o.w. Uninitialized branch
+                    // would be visited), but the tag didn't exist. So record an empty resource
+                    // as a base value, and do continue to retry the read.
+                    self.versioned_map
+                        .group_data()
+                        .update_tagged_base_value_with_layout(
+                            group_key.clone(),
+                            resource_tag.clone(),
+                            TransactionWrite::from_state_value(None),
+                            None,
+                        );
+                    continue;
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(&self.scheduler, txn_idx, dep_idx)? {
@@ -1143,6 +1169,37 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         value: &T::Value,
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<T::Value> {
+        // Cfg due to deserialize_to_delayed_field_u128 use.
+        #[cfg(test)]
+        fail_point!("delayed_field_test", |_| {
+            let mut ret_state_value = value.as_state_value().clone();
+            if let Some(layout) = layout {
+                assert_eq!(
+                    layout,
+                    &mock_layout(),
+                    "Layout does not match expected mock layout"
+                );
+                if let Some(state_value) = value.as_state_value() {
+                    let (value, txn_idx) = deserialize_to_delayed_field_u128(state_value.bytes())
+                        .expect("Mock deserialization failed in delayed field test.");
+                    let base_value = DelayedFieldValue::Aggregator(value);
+                    // Replicate the logic of value_to_identifier, we use width 8 in the tests.
+                    // The real width is irrelevant as test manages all serialization / deserialization.
+                    let id = self.generate_delayed_field_id(8);
+                    match &self.latest_view {
+                        ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
+                        ViewState::Unsync(state) => state.set_delayed_field_value(id, base_value),
+                    };
+
+                    ret_state_value
+                        .as_mut()
+                        .expect("Cloned value checked, must be Some")
+                        .set_bytes(serialize_from_delayed_field_id(id, txn_idx));
+                }
+            }
+            Ok(TransactionWrite::from_state_value(ret_state_value))
+        });
+
         let maybe_patched = match (value.as_state_value(), layout) {
             (Some(state_value), Some(layout)) => {
                 let res = self.replace_values_with_identifiers(state_value, layout);
@@ -1216,6 +1273,45 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<(Bytes, HashSet<DelayedFieldID>)> {
+        // Cfg due to deserialize_to_delayed_field_id use.
+        #[cfg(test)]
+        fail_point!("delayed_field_test", |_| {
+            assert_eq!(
+                layout,
+                &mock_layout(),
+                "Layout does not match expected mock layout"
+            );
+
+            // Replicate the logic of identifier_to_value.
+            let (delayed_field_id, txn_idx) = deserialize_to_delayed_field_id(bytes)
+                .expect("Mock deserialization failed in delayed field test.");
+            let delayed_field = match &self.latest_view {
+                ViewState::Sync(state) => state
+                    .versioned_map
+                    .delayed_fields()
+                    .read_latest_predicted_value(
+                        &delayed_field_id,
+                        self.txn_idx,
+                        ReadPosition::AfterCurrentTxn,
+                    )
+                    .expect("Committed value for ID must always exist"),
+                ViewState::Unsync(state) => state
+                    .read_delayed_field(delayed_field_id)
+                    .expect("Delayed field value for ID must always exist in sequential execution"),
+            };
+
+            // Note: Test correctness relies on the fact that current proptests use the
+            // same layout for all values ever stored at any key, given that some value
+            // at the key contains a delayed field.
+            Ok((
+                serialize_from_delayed_field_u128(
+                    delayed_field.into_aggregator_value().unwrap(),
+                    txn_idx,
+                ),
+                HashSet::from([delayed_field_id]),
+            ))
+        });
+
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
         let function_value_extension = self.as_function_value_extension();
@@ -1718,6 +1814,13 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestVi
         &self,
         state_key: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
+        if let ViewState::Sync(parallel_state) = &self.latest_view {
+            parallel_state
+                .captured_reads
+                .borrow_mut()
+                .capture_aggregator_v1_read(state_key.clone());
+        }
+
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1882,7 +1985,7 @@ mod test {
     use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
-        proptest_types::{
+        combinatorial_tests::{
             mock_executor::MockEvent,
             types::{KeyType, ValueType},
         },
@@ -3185,7 +3288,7 @@ mod test {
             holder
                 .versioned_map
                 .data()
-                .fetch_data(&KeyType::<u32>(3), 1)
+                .fetch_data_no_record(&KeyType::<u32>(3), 1)
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));

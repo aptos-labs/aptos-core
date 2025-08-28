@@ -190,12 +190,12 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
+    "testsuite/benchmark-workloads/package-generator",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
-    "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
@@ -240,6 +240,7 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/transactional-test-runner",
+    "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-cli",
@@ -248,7 +249,9 @@ members = [
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
+    "third_party/move/tools/move-package-cache",
     "third_party/move/tools/move-package-manifest",
+    "third_party/move/tools/move-package-resolver",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
     "tools/calc-dep-sizes",
@@ -286,7 +289,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.80.1"
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -498,7 +501,7 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.1", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
     "postgres_partial",
 ] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
@@ -609,6 +612,7 @@ futures-channel = "0.3.29"
 futures-core = "0.3.29"
 futures-util = "0.3.29"
 fxhash = "0.2.1"
+fs2 = "0.4.3"
 getrandom = "0.2.2"
 gcp-bigquery-client = "0.16.8"
 get_if_addrs = "0.5.3"
@@ -698,7 +702,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.4", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.5", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -834,6 +838,7 @@ z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
+move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
 move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
 move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
@@ -858,6 +863,7 @@ move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-byt
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
+move-package-cache = { path = "third_party/move/tools/move-package-cache" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
