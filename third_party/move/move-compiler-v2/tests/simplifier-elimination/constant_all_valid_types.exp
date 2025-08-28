@@ -50,7 +50,7 @@ module 0x42::M {
         false
     }
     fun t5(): address {
-        0x0
+        @0x0
     }
     fun t6(): vector<u8> {
         vector[1u8, 35u8]
@@ -65,7 +65,7 @@ script {
         0;
         0u128;
         false;
-        0x0;
+        @0x0;
         vector[1u8, 35u8];
         vector[97u8, 98u8, 99u8, 100u8];
     }

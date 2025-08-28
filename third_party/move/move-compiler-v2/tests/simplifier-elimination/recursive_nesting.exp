@@ -66,14 +66,14 @@ module 0x42::test {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::mathtest {
     public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
-        (a as u128) * (b as u128) / (c as u128) as u64
+        ((a as u128) * (b as u128) / (c as u128)) as u64
     }
 }
 module 0x42::mathtest2 {
     use 0x42::mathtest;
     public inline fun mul_div2(a: u64, b: u64, c: u64): u64 {
         let (a,b,c) = (b, a, c);
-        (a as u128) * (b as u128) / (c as u128) as u64
+        ((a as u128) * (b as u128) / (c as u128)) as u64
     }
 }
 module 0x42::mathtest3 {
@@ -81,7 +81,7 @@ module 0x42::mathtest3 {
     public inline fun mul_div3(a: u64, b: u64, c: u64): u64 {
         let (a,b,c) = (b, a, c);
         let (a,b,c) = (b, a, c);
-        (a as u128) * (b as u128) / (c as u128) as u64
+        ((a as u128) * (b as u128) / (c as u128)) as u64
     }
 }
 module 0x42::test {
@@ -94,16 +94,16 @@ module 0x42::test {
                 let (a,b,c) = (1, 1, 1);
                 let (a,b,c) = (b, a, c);
                 let (a,b,c) = (b, a, c);
-                (a as u128) * (b as u128) / (c as u128) as u64
+                ((a as u128) * (b as u128) / (c as u128)) as u64
             }, {
                 let (a,b,c) = (1, 1, 1);
-                (a as u128) * (b as u128) / (c as u128) as u64
+                ((a as u128) * (b as u128) / (c as u128)) as u64
             }, {
                 let (a,b,c) = (1, 1, 1);
                 let (a,b,c) = (b, a, c);
-                (a as u128) * (b as u128) / (c as u128) as u64
+                ((a as u128) * (b as u128) / (c as u128)) as u64
             });
-            (a as u128) * (b as u128) / (c as u128) as u64
+            ((a as u128) * (b as u128) / (c as u128)) as u64
         };
         if (a == 1) () else abort 0;
     }

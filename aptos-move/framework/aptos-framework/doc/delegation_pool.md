@@ -3935,9 +3935,7 @@ Update DelegatedVotes of a voter to up-to-date then return the total voting powe
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(
-    pool_address: <b>address</b>
-): &<b>mut</b> SmartTable&lt;<b>address</b>, bool&gt; <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address: <b>address</b>): &<b>mut</b> SmartTable&lt;<b>address</b>, bool&gt; {
     &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a>&gt;(pool_address).allowlist
 }
 </code></pre>

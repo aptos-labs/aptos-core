@@ -545,6 +545,11 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
+            if (chain_id.is_testnet() || chain_id.is_mainnet())
+                && config_yaml["rocksdb_configs"]["enable_storage_sharding"].as_bool() != Some(true)
+            {
+                panic!("Storage sharding (AIP-97) is not enabled in node config. Please follow the guide to migration your node, and set storage.rocksdb_configs.enable_storage_sharding to true explicitly in your node config. https://aptoslabs.notion.site/DB-Sharding-Migration-Public-Full-Nodes-1978b846eb7280b29f17ceee7d480730");
+            }
         }
 
         Ok(modified_config)
@@ -743,9 +748,17 @@ mod test {
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 0);
         assert!(!node_config.storage.assert_rlimit_nofile);
 
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              rocksdb_configs:
+                enable_storage_sharding: true
+            "#,
+        )
+        .unwrap();
         let modified_config = StorageConfig::optimize(
             &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            &yaml,
             NodeType::Validator,
             Some(ChainId::mainnet()),
         )
@@ -757,7 +770,7 @@ mod test {
 
         let modified_config = StorageConfig::optimize(
             &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            &yaml,
             NodeType::Validator,
             Some(ChainId::testnet()),
         )
