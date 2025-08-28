@@ -30,11 +30,11 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec OptionalAggregator {
-        invariant option::is_some(aggregator) <==> option::is_none(integer);
-        invariant option::is_some(integer) <==> option::is_none(aggregator);
-        invariant option::is_some(integer) ==> option::borrow(integer).value <= option::borrow(integer).limit;
-        invariant option::is_some(aggregator) ==> aggregator::spec_aggregator_get_val(option::borrow(aggregator)) <=
-            aggregator::spec_get_limit(option::borrow(aggregator));
+        invariant option::spec_is_some(aggregator) <==> option::spec_is_none(integer);
+        invariant option::spec_is_some(integer) <==> option::spec_is_none(aggregator);
+        invariant option::spec_is_some(integer) ==> option::spec_borrow(integer).value <= option::spec_borrow(integer).limit;
+        invariant option::spec_is_some(aggregator) ==> aggregator::spec_aggregator_get_val(option::spec_borrow(aggregator)) <=
+            aggregator::spec_get_limit(option::spec_borrow(aggregator));
     }
 
     spec new_integer(limit: u128): Integer {
@@ -75,16 +75,16 @@ spec aptos_framework::optional_aggregator {
     spec schema SubAbortsIf {
         optional_aggregator: OptionalAggregator;
         value: u128;
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::spec_borrow(optional_aggregator.aggregator))
             < value);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value < value);
+            (option::spec_borrow(optional_aggregator.integer).value < value);
     }
 
     spec read(optional_aggregator: &OptionalAggregator): u128 {
-        ensures !is_parallelizable(optional_aggregator) ==> result == option::borrow(optional_aggregator.integer).value;
+        ensures !is_parallelizable(optional_aggregator) ==> result == option::spec_borrow(optional_aggregator.integer).value;
         ensures is_parallelizable(optional_aggregator) ==>
-            result == aggregator::spec_read(option::borrow(optional_aggregator.aggregator));
+            result == aggregator::spec_read(option::spec_borrow(optional_aggregator.aggregator));
     }
 
     spec add(optional_aggregator: &mut OptionalAggregator, value: u128) {
@@ -95,14 +95,14 @@ spec aptos_framework::optional_aggregator {
     spec schema AddAbortsIf {
         optional_aggregator: OptionalAggregator;
         value: u128;
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
-            + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::spec_borrow(optional_aggregator.aggregator))
+            + value > aggregator::spec_get_limit(option::spec_borrow(optional_aggregator.aggregator)));
+        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::spec_borrow(optional_aggregator.aggregator))
             + value > MAX_U128);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value + value > MAX_U128);
+            (option::spec_borrow(optional_aggregator.integer).value + value > MAX_U128);
         aborts_if !is_parallelizable(optional_aggregator) &&
-            (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value));
+            (value > (option::spec_borrow(optional_aggregator.integer).limit - option::spec_borrow(optional_aggregator.integer).value));
     }
 
     spec switch(_optional_aggregator: &mut OptionalAggregator) {
@@ -123,37 +123,37 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec destroy(optional_aggregator: OptionalAggregator) {
-        // aborts_if is_parallelizable(optional_aggregator) && len(optional_aggregator.integer.vec) != 0;
-        // aborts_if !is_parallelizable(optional_aggregator) && len(optional_aggregator.integer.vec) == 0;
+        aborts_if is_parallelizable(optional_aggregator) && option::spec_is_some(optional_aggregator.integer);
+        aborts_if !is_parallelizable(optional_aggregator) && option::spec_is_none(optional_aggregator.integer);
     }
 
     /// The aggregator exists and the integer does not exist when destroy the aggregator.
     spec destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
-        // aborts_if len(optional_aggregator.aggregator.vec) == 0;
-        // aborts_if len(optional_aggregator.integer.vec) != 0;
-        ensures result == aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));
+        aborts_if option::spec_is_none(optional_aggregator.aggregator);
+        aborts_if option::spec_is_some(optional_aggregator.integer);
+        ensures result == aggregator::spec_get_limit(option::spec_borrow(optional_aggregator.aggregator));
     }
 
     /// The integer exists and the aggregator does not exist when destroy the integer.
     spec destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
-        // aborts_if len(optional_aggregator.integer.vec) == 0;
-        // aborts_if len(optional_aggregator.aggregator.vec) != 0;
-        ensures result == option::borrow(optional_aggregator.integer).limit;
+        aborts_if option::spec_is_none(optional_aggregator.integer);
+        aborts_if option::spec_is_some(optional_aggregator.aggregator);
+        ensures result == option::spec_borrow(optional_aggregator.integer).limit;
     }
 
     spec fun optional_aggregator_value(optional_aggregator: OptionalAggregator): u128 {
         if (is_parallelizable(optional_aggregator)) {
-            aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+            aggregator::spec_aggregator_get_val(option::spec_borrow(optional_aggregator.aggregator))
         } else {
-            option::borrow(optional_aggregator.integer).value
+            option::spec_borrow(optional_aggregator.integer).value
         }
     }
 
     spec fun optional_aggregator_limit(optional_aggregator: OptionalAggregator): u128 {
         if (is_parallelizable(optional_aggregator)) {
-            aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator))
+            aggregator::spec_get_limit(option::spec_borrow(optional_aggregator.aggregator))
         } else {
-            option::borrow(optional_aggregator.integer).limit
+            option::spec_borrow(optional_aggregator.integer).limit
         }
     }
 

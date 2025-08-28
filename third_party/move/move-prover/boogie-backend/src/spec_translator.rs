@@ -1410,7 +1410,6 @@ impl SpecTranslator<'_> {
         }
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, inst) = struct_type.skip_reference().require_struct();
-        let inst = &self.inst_slice(inst);
         let l = self.fresh_var_name("l");
         emit!(self.writer, "(var {} := ", l);
         self.translate_exp(&args[0]);
@@ -1457,7 +1456,6 @@ impl SpecTranslator<'_> {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
         let struct_type = &self.get_node_type(args[0].node_id());
         let (_, _, inst) = struct_type.skip_reference().require_struct();
-        let inst = &self.inst_slice(inst);
         let test_var_result = self.fresh_var_name("test_variant_var");
         emit!(self.writer, "(var {} := ", test_var_result);
         self.translate_exp(&args[0]);

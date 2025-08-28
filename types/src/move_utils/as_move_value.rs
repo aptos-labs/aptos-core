@@ -9,11 +9,13 @@ pub trait AsMoveValue {
 
 impl<T: AsMoveValue> AsMoveValue for Option<T> {
     fn as_move_value(&self) -> MoveValue {
-        if let Some(obj) = self.as_ref() {
-            MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![obj.as_move_value()]))
+        let items = if let Some(obj) = self.as_ref() {
+            vec![obj.as_move_value()]
         } else {
-            MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![]))
-        }
+            vec![]
+        };
+
+        MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::Vector(items)]))
     }
 }
 
