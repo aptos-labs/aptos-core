@@ -269,6 +269,9 @@ pub enum EntryPoints {
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
     },
+
+    /// Reads nested enum.
+    ReadEnumVariants,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -300,7 +303,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
             | EntryPoints::MakeOrChangeTableRandom { .. }
-            | EntryPoints::SimpleScript => "simple",
+            | EntryPoints::SimpleScript
+            | EntryPoints::ReadEnumVariants => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
@@ -367,6 +371,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::MakeOrChangeTable { .. }
             | EntryPoints::MakeOrChangeTableRandom { .. }
             | EntryPoints::SimpleScript => "simple",
+            EntryPoints::ReadEnumVariants => "enum",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
@@ -877,6 +882,9 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::ReadEnumVariants => {
+                get_payload_void(module_id, ident_str!("read_enum_variants").to_owned())
+            },
         }
     }
 
@@ -955,6 +963,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::MakeOrChangeTable { .. }
             | EntryPoints::MakeOrChangeTableRandom { .. }
             | EntryPoints::SimpleScript => AutomaticArgs::Signer,
+            EntryPoints::ReadEnumVariants => AutomaticArgs::None,
             EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
