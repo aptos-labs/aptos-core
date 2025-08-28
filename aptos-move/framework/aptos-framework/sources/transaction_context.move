@@ -31,6 +31,19 @@ module aptos_framework::transaction_context {
         entry_function_payload: Option<EntryFunctionPayload>,
     }
 
+    struct ScheduledTxnConfig has copy, drop, store {
+        allow_rescheduling: bool,
+        expiration_time: u64,
+        authorization_seqno: u64,
+    }
+
+    /// Represents the payload configuration for transactions.
+    struct TransactionPayloadConfig has copy, drop {
+        multisig_address: Option<address>,
+        replay_protection_nonce: Option<u64>,
+        scheduled_txn_auth_token: Option<ScheduledTxnConfig>,
+    }
+
     /// Returns the transaction hash of the current transaction.
     native fun get_txn_hash(): vector<u8>;
 
@@ -182,6 +195,35 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
+    /// Returns the transaction payload config if the current transaction has such a config. Otherwise, return `None`.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    public fun payload_config(): Option<TransactionPayloadConfig> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload_config_internal()
+    }
+    native fun payload_config_internal(): Option<TransactionPayloadConfig>;
+
+    public fun payload_scheduled_txn_config_allow_resched(payload_config: &ScheduledTxnConfig): bool {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload_config.allow_rescheduling
+    }
+
+    public fun payload_scheduled_txn_config_auth_seqno(payload_config: &ScheduledTxnConfig): u64 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload_config.authorization_seqno
+    }
+
+    public fun payload_scheduled_txn_config_auth_expiration(payload_config: &ScheduledTxnConfig): u64 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload_config.expiration_time
+    }
+
+    /// Returns the scheduled transaction auth token from the payload config.
+    public fun payload_config_scheduled_txn_auth_token(config: &TransactionPayloadConfig): Option<ScheduledTxnConfig> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        config.scheduled_txn_auth_token
+    }
+
     #[test_only]
     public fun new_entry_function_payload(
         account_address: address,
@@ -196,6 +238,32 @@ module aptos_framework::transaction_context {
             function_name,
             ty_args_names,
             args,
+        }
+    }
+
+    #[test_only]
+    public fun new_scheduled_txn_config(
+        allow_rescheduling: bool,
+        expiration_time: u64,
+        authorization_seqno: u64,
+    ): ScheduledTxnConfig {
+        ScheduledTxnConfig {
+            allow_rescheduling,
+            expiration_time,
+            authorization_seqno,
+        }
+    }
+
+    #[test_only]
+    public fun new_transaction_payload_config(
+        multisig_address: Option<address>,
+        replay_protection_nonce: Option<u64>,
+        scheduled_txn_auth_token: Option<ScheduledTxnConfig>,
+    ): TransactionPayloadConfig {
+        TransactionPayloadConfig {
+            multisig_address,
+            replay_protection_nonce,
+            scheduled_txn_auth_token,
         }
     }
 

@@ -2,7 +2,7 @@ module aptos_framework::scheduled_txns {
     use std::bcs;
     use std::error;
     use std::hash::sha3_256;
-    use std::option::{Option, some};
+    use std::option::{Option, some, none};
     use std::signer;
     use std::vector;
     use aptos_std::from_bcs;
@@ -18,9 +18,13 @@ module aptos_framework::scheduled_txns {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::transaction_context::{payload_config, payload_scheduled_txn_config_auth_expiration,
+        payload_scheduled_txn_config_auth_seqno, payload_scheduled_txn_config_allow_resched
+    };
 
     #[test_only]
     use aptos_framework::transaction_fee;
+
 
     friend aptos_framework::block;
     friend aptos_framework::transaction_validation;
@@ -66,6 +70,21 @@ module aptos_framework::scheduled_txns {
     /// Cannot cancel a transaction that is about to be run or has already been run
     const ECANCEL_TOO_LATE: u64 = 13;
 
+    /// Authorization token not found in payload config
+    const EAUTH_TOKEN_NOT_FOUND: u64 = 14;
+
+    /// Current time is after expiration time
+    const EAUTH_TOKEN_EXPIRED: u64 = 15;
+
+    /// Schedule time is after expiration time
+    const EAUTH_TOKEN_INSUFFICIENT_DURATION: u64 = 15;
+
+    /// Authorization sequence number mismatch
+    const EAUTH_SEQNO_MISMATCH: u64 = 16;
+
+    /// Sender sequence number not found - must be initialized first via get_sender_seqno
+    const ESENDER_SEQNO_NOT_FOUND: u64 = 17;
+
     const U64_MAX: u64 = 18446744073709551615;
 
     /// Can't cancel a transaction that is going to be run in next 10 seconds
@@ -102,7 +121,14 @@ module aptos_framework::scheduled_txns {
     const MIN_GAS_AMOUNT: u64 = 100;
 
     enum ScheduledFunction has copy, store, drop {
-        V1(|Option<signer>| has copy + store + drop),
+        V1(|| has copy + store + drop),
+        V1WithAuthToken(|&signer, ScheduledTxnAuthToken| has copy + store + drop),
+    }
+
+    struct ScheduledTxnAuthToken has copy, drop, store {
+        allow_rescheduling: bool,
+        expiration_time: u64,
+        authorization_seqno: u64,
     }
 
     /// ScheduledTransaction with scheduled_time, gas params, and function
@@ -115,8 +141,9 @@ module aptos_framework::scheduled_txns {
         max_gas_amount: u64,
         /// Gas unit price that the user is willing to pay for this txn when it is scheduled
         gas_unit_price: u64,
-        /// Option to pass a signer to the function
-        pass_signer: bool,
+        /// If some, a signer for the scheduling account is passed to the function and we also check the capability at
+        /// the time of execution; if none, no signer is passed
+        auth_token: Option<ScheduledTxnAuthToken>,
         /// Variables are captured in the closure; optionally a signer is passed; no return
         f: ScheduledFunction
     }
@@ -134,7 +161,7 @@ module aptos_framework::scheduled_txns {
     /// as a key. That is we have "{time, gas_priority, txn_id} -> ScheduledTxn" instead of
     /// "{time, gas_priority} --> List<(txn_id, ScheduledTxn)>".
     /// Note: ScheduledTxn is still variable size though due to its closure.
-    public struct ScheduleMapKey has copy, drop, store {
+    struct ScheduleMapKey has copy, drop, store {
         /// UTC timestamp ms
         time: u64,
         /// gas_priority = U64_MAX - gas_unit_price; we want higher gas_unit_price to come before lower gas_unit_price
@@ -176,7 +203,9 @@ module aptos_framework::scheduled_txns {
         // Current status of the scheduled transactions module
         module_status: ScheduledTxnsModuleStatus,
         /// Expiry delta used to determine when scheduled transactions become invalid (and subsequently aborted)
-        expiry_delta: u64
+        expiry_delta: u64,
+        /// BigOrderedMap to track sender address -> current sequence number for authorization
+        sender_seqno_map: BigOrderedMap<address, u64>
     }
 
     const TO_REMOVE_PARALLELISM: u64 = GET_READY_TRANSACTIONS_LIMIT;
@@ -193,8 +222,8 @@ module aptos_framework::scheduled_txns {
         Shutdown,
         /// Transaction was expired
         Expired,
-        /// Transcation failed to execute
-        Failed
+        /// Auth token expired
+        AuthExpired,
     }
 
     #[event]
@@ -205,7 +234,7 @@ module aptos_framework::scheduled_txns {
         scheduled_time_ms: u64,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        pass_signer: bool
+        auth_required: bool
     }
 
     #[event]
@@ -258,7 +287,8 @@ module aptos_framework::scheduled_txns {
             AuxiliaryData {
                 gas_fee_deposit_store_signer_cap: owner_cap,
                 module_status: ScheduledTxnsModuleStatus::Active,
-                expiry_delta: EXPIRY_DELTA_DEFAULT
+                expiry_delta: EXPIRY_DELTA_DEFAULT,
+                sender_seqno_map: big_ordered_map::new_with_reusable()
             }
         );
 
@@ -432,22 +462,159 @@ module aptos_framework::scheduled_txns {
         aux_data.expiry_delta = new_expiry_delta;
     }
 
+    /// Returns the current authorization sequence number for a sender address
+    /// Lazy initialization: starts from 1 and stores in map upon first use
+    public fun get_sender_seqno(sender_addr: address): u64 acquires AuxiliaryData {
+        let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
+        if (aux_data.sender_seqno_map.contains(&sender_addr)) {
+            *aux_data.sender_seqno_map.borrow(&sender_addr)
+        } else {
+            // Lazy initialization: start from 1
+            let initial_seqno = 1;
+            aux_data.sender_seqno_map.add(sender_addr, initial_seqno);
+            initial_seqno
+        }
+    }
+
+    fun get_sender_seqno_readonly(sender_addr: address): u64 acquires AuxiliaryData {
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        assert!(
+            aux_data.sender_seqno_map.contains(&sender_addr),
+            error::invalid_state(ESENDER_SEQNO_NOT_FOUND)
+        );
+        *aux_data.sender_seqno_map.borrow(&sender_addr)
+    }
+
+    /// Increments and returns the new sequence number for a sender address
+    /// Requires that the sender already exists in sender_seqno_map (initialized via get_sender_seqno)
+    fun increment_sender_seqno(sender_addr: address) acquires AuxiliaryData {
+        let aux_data = borrow_global_mut<AuxiliaryData>(@aptos_framework);
+
+        // Assert that sender exists in map - must be initialized first via get_sender_seqno
+        assert!(
+            aux_data.sender_seqno_map.contains(&sender_addr),
+            error::invalid_state(ESENDER_SEQNO_NOT_FOUND)
+        );
+
+        let current_seqno = *aux_data.sender_seqno_map.borrow(&sender_addr);
+        let new_seqno = current_seqno + 1;
+        *aux_data.sender_seqno_map.borrow_mut(&sender_addr) = new_seqno;
+    }
+
+    /// Read functions for ScheduleMapKey individual parameters
+    public fun schedule_map_key_time(key: &ScheduleMapKey): u64 {
+        key.time
+    }
+
+    public fun schedule_map_key_gas_priority(key: &ScheduleMapKey): u64 {
+        key.gas_priority
+    }
+
+    public fun schedule_map_key_txn_id(key: &ScheduleMapKey): u256 {
+        key.txn_id
+    }
+
+    /// Create ScheduleMapKey from individual parameters
+    fun create_schedule_map_key(time: u64, gas_priority: u64, txn_id: u256): ScheduleMapKey {
+        ScheduleMapKey {
+            time,
+            gas_priority,
+            txn_id
+        }
+    }
+
+    /// Common validation helper for auth token based scheduled transactions
+    fun validate_auth_token(
+        sender_addr: address,
+        scheduled_time_ms: u64,
+        auth_token: &ScheduledTxnAuthToken
+    ) acquires AuxiliaryData {
+        // Get current time and validate expiration
+        let current_time_ms = timestamp::now_microseconds() / 1000;
+        assert!(current_time_ms <= auth_token.expiration_time, error::invalid_argument(EAUTH_TOKEN_EXPIRED));
+        assert!(scheduled_time_ms <= auth_token.expiration_time, error::invalid_argument(EAUTH_TOKEN_INSUFFICIENT_DURATION));
+
+        // Validate authorization sequence number
+        let sender_seqno = get_sender_seqno_readonly(sender_addr);
+        assert!(auth_token.authorization_seqno == sender_seqno, error::invalid_argument(EAUTH_SEQNO_MISMATCH));
+    }
+
     /// Constructor
-    public fun new_scheduled_transaction(
+    public fun new_scheduled_transaction_no_signer(
         sender_addr: address,
         scheduled_time_ms: u64,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        pass_signer: bool,
-        f: |Option<signer>| has copy + store + drop
+        f: || has copy + store + drop
     ): ScheduledTransaction {
         ScheduledTransaction {
             sender_addr,
             scheduled_time_ms,
             max_gas_amount,
             gas_unit_price,
-            pass_signer,
+            auth_token: none(),
             f: ScheduledFunction::V1(f)
+        }
+    }
+
+    public fun new_scheduled_transaction_gen_auth_token(
+        sender: &signer,
+        scheduled_time_ms: u64,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        f: |&signer, ScheduledTxnAuthToken| has copy + store + drop
+    ): ScheduledTransaction acquires AuxiliaryData {
+        let sender_addr = signer::address_of(sender);
+        // Extract the payload config from the current transaction context
+        let payload_config_opt = payload_config();
+        assert!(payload_config_opt.is_some(), error::invalid_argument(EAUTH_TOKEN_NOT_FOUND));
+
+        let payload_config = payload_config_opt.extract();
+        let scheduled_config_opt = aptos_framework::transaction_context::payload_config_scheduled_txn_auth_token(&payload_config);
+        assert!(scheduled_config_opt.is_some(), error::invalid_argument(EAUTH_TOKEN_NOT_FOUND));
+
+        let scheduled_config = scheduled_config_opt.extract();
+
+        // Create the required auth token
+        let auth_token = ScheduledTxnAuthToken {
+            allow_rescheduling: payload_scheduled_txn_config_allow_resched(&scheduled_config),
+            expiration_time: payload_scheduled_txn_config_auth_expiration(&scheduled_config),
+            authorization_seqno: payload_scheduled_txn_config_auth_seqno(&scheduled_config)
+        };
+
+        // Validate the auth token
+        validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
+
+        ScheduledTransaction {
+            sender_addr,
+            scheduled_time_ms,
+            max_gas_amount,
+            gas_unit_price,
+            auth_token: some(auth_token),
+            f: ScheduledFunction::V1WithAuthToken(f)
+        }
+    }
+
+    public fun new_scheduled_transaction_reuse_auth_token(
+        sender: &signer,
+        auth_token: ScheduledTxnAuthToken,
+        scheduled_time_ms: u64,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        f: |&signer, ScheduledTxnAuthToken| has copy + store + drop,
+    ): ScheduledTransaction acquires AuxiliaryData {
+        let sender_addr = signer::address_of(sender);
+
+        // Validate the auth token (same checks as new_auth_token)
+       validate_auth_token(sender_addr, scheduled_time_ms, &auth_token);
+
+        ScheduledTransaction {
+            sender_addr,
+            scheduled_time_ms,
+            max_gas_amount,
+            gas_unit_price,
+            auth_token: some(auth_token),
+            f: ScheduledFunction::V1WithAuthToken(f)
         }
     }
 
@@ -481,6 +648,10 @@ module aptos_framework::scheduled_txns {
             txn.max_gas_amount >= MIN_GAS_AMOUNT,
             error::invalid_argument(ETOO_LOW_GAS_AMOUNT)
         );
+
+        if (txn.auth_token.is_some()) {
+            validate_auth_token(txn.sender_addr, txn_time, txn.auth_token.borrow());
+        };
 
         let txn_bytes = bcs::to_bytes(&txn);
         assert!(
@@ -527,7 +698,7 @@ module aptos_framework::scheduled_txns {
                 scheduled_time_ms: txn.scheduled_time_ms,
                 max_gas_amount: txn.max_gas_amount,
                 gas_unit_price: txn.gas_unit_price,
-                pass_signer: txn.pass_signer
+                auth_required: txn.auth_token.is_some()
             }
         );
 
@@ -535,7 +706,7 @@ module aptos_framework::scheduled_txns {
     }
 
     /// Cancel a scheduled transaction, must be called by the signer who originally scheduled the transaction.
-    public fun cancel(sender: &signer, key: ScheduleMapKey) acquires ScheduleQueue, AuxiliaryData {
+    public fun cancel_with_key(sender: &signer, key: ScheduleMapKey) acquires ScheduleQueue, AuxiliaryData {
         // If scheduling is shutdown, we cannot schedule any more transactions
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         assert!(
@@ -577,6 +748,35 @@ module aptos_framework::scheduled_txns {
                 sender_addr
             }
         );
+    }
+
+    /// Entry function for cancel that takes individual ScheduleMapKey parameters
+    public entry fun cancel(
+        sender: &signer,
+        time: u64,
+        gas_priority: u64,
+        txn_id: u256
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let key = create_schedule_map_key(time, gas_priority, txn_id);
+        cancel_with_key(sender, key);
+    }
+
+    /// Cancel all scheduled transactions for a sender using lazy cancel approach.
+    /// This increments the sender's authorization sequence number, which will cause
+    /// all existing scheduled transactions with auth tokens to fail validation when executed.
+    public entry fun cancel_all(sender: &signer) acquires AuxiliaryData {
+        // Check module is active
+        let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
+        assert!(
+            (aux_data.module_status == ScheduledTxnsModuleStatus::Active),
+            error::unavailable(EUNAVAILABLE)
+        );
+
+        let sender_addr = signer::address_of(sender);
+
+        // Increment the sender's sequence number to invalidate all existing auth tokens
+        // This will fail if sender is not initialized (which is the desired behavior)
+        increment_sender_seqno(sender_addr);
     }
 
     const MASK_64: u256 = 0xffffffffffffffff; // 2^64 - 1
@@ -764,25 +964,55 @@ module aptos_framework::scheduled_txns {
 
     /// Called by the executor when the scheduled transaction is run
     fun execute_user_function_wrapper(
-        signer: signer, txn_key: ScheduleMapKey
-    ): bool acquires ScheduleQueue {
-        let queue = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+        signer: signer, txn_key: ScheduleMapKey, block_timestamp_ms: u64
+    ): bool acquires AuxiliaryData, ScheduleQueue {
+        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
 
         if (!queue.schedule_map.contains(&txn_key)) {
             // It is possible that the scheduled transaction was cancelled before in the same block
             return false;
         };
         let txn = queue.txn_table.borrow(txn_key.txn_id);
-        let pass_signer = txn.pass_signer;
 
-        match(txn.f) {
+        match (txn.f) {
             ScheduledFunction::V1(f) => {
-                if (pass_signer) {
-                    f(some(signer));
-                } else {
-                    f(std::option::none());
+                f();
+            },
+            ScheduledFunction::V1WithAuthToken(f) => {
+                let sender_addr = txn.sender_addr;
+                assert!(txn.auth_token.is_some(), error::internal(EAUTH_TOKEN_NOT_FOUND));
+                let auth_token = txn.auth_token.borrow();
+
+                // Check if token is expired or sequence number mismatched
+                if (auth_token.expiration_time <= block_timestamp_ms ||
+                    auth_token.authorization_seqno != get_sender_seqno_readonly(sender_addr)) {
+                    // Cancel the transaction due to invalid auth token
+                    let deposit_amt = txn.max_gas_amount * txn.gas_unit_price;
+                    cancel_internal(sender_addr, txn_key, deposit_amt);
+                    event::emit(
+                        TransactionFailedEvent {
+                            scheduled_txn_time: txn_key.time,
+                            scheduled_txn_hash: txn_key.txn_id,
+                            sender_addr,
+                            cancelled_txn_code: CancelledTxnCode::AuthExpired
+                        }
+                    );
+                    return true
                 };
-            }
+
+                let updated_auth_token = if (!auth_token.allow_rescheduling) {
+                    // Set authorization_seqno = 0 to invalidate the token for any use in the user function
+                    ScheduledTxnAuthToken {
+                        allow_rescheduling: auth_token.allow_rescheduling,
+                        expiration_time: auth_token.expiration_time,
+                        authorization_seqno: 0
+                    }
+                } else {
+                    *auth_token
+                };
+
+                f(&signer, updated_auth_token);
+            },
         };
 
         // The scheduled transaction is removed from two data structures at different times:
@@ -790,7 +1020,8 @@ module aptos_framework::scheduled_txns {
         //    of all scheduled transactions in the current block
         // 2. From txn_table: Removed immediately after transaction execution in this function to enable
         //    proper refunding of storage gas fees to the user
-        queue.txn_table.remove(txn_key.txn_id);
+        let queue_mut = borrow_global_mut<ScheduleQueue>(@aptos_framework);
+        queue_mut.txn_table.remove(txn_key.txn_id);
         true
     }
 
@@ -820,15 +1051,10 @@ module aptos_framework::scheduled_txns {
     }
 
     #[test_only]
-    public fun get_func_from_txn_key(
-        key: ScheduleMapKey
-    ): |Option<signer>| has copy acquires ScheduleQueue {
-        let queue = borrow_global<ScheduleQueue>(@aptos_framework);
-        assert!(queue.schedule_map.contains(&key), 0);
-        let txn = queue.txn_table.borrow(key.txn_id);
-        match(txn.f) {
-            ScheduledFunction::V1(f) => { f }
-        }
+    public fun execute_user_function_wrapper_test(
+        signer: signer, txn_key: ScheduleMapKey, block_timestamp_ms: u64
+    ): bool acquires AuxiliaryData, ScheduleQueue {
+        execute_user_function_wrapper(signer, txn_key, block_timestamp_ms)
     }
 
     #[test_only]
@@ -868,9 +1094,37 @@ module aptos_framework::scheduled_txns {
     }
 
     #[test_only]
+    public fun cancel_test(
+        sender: &signer,
+        time: u64,
+        gas_priority: u64,
+        txn_id: u256
+    ) acquires ScheduleQueue, AuxiliaryData {
+        cancel(sender, time, gas_priority, txn_id);
+    }
+
+    #[test_only]
+    public fun cancel_all_test(sender: &signer) acquires AuxiliaryData {
+        cancel_all(sender);
+    }
+
+    #[test_only]
     fun get_module_status(): ScheduledTxnsModuleStatus acquires AuxiliaryData {
         let aux_data = borrow_global<AuxiliaryData>(@aptos_framework);
         aux_data.module_status
+    }
+
+    #[test_only]
+    public fun create_mock_auth_token(
+        allow_rescheduling: bool,
+        expiration_time: u64,
+        authorization_seqno: u64
+    ): ScheduledTxnAuthToken {
+        ScheduledTxnAuthToken {
+            allow_rescheduling,
+            expiration_time,
+            authorization_seqno,
+        }
     }
 
     struct State has copy, drop, store {
@@ -878,10 +1132,39 @@ module aptos_framework::scheduled_txns {
     }
 
     #[persistent]
-    fun step(state: State, _s: Option<signer>) {
+    fun step(state: State) {
         if (state.count < 10) {
             state.count = state.count + 1;
         }
+    }
+
+    #[persistent]
+    fun step_with_auth_token(state: State, _signer: &signer, _auth_token: ScheduledTxnAuthToken) {
+        if (state.count < 10) {
+            state.count = state.count + 1;
+        }
+    }
+
+    #[persistent]
+    fun rescheduling_test_func(
+        sender: &signer,
+        auth_token: ScheduledTxnAuthToken
+    ) {
+        let current_time = timestamp::now_microseconds() / 1000;
+        let next_schedule_time = current_time + 1000; // Would schedule 1 second later
+
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| rescheduling_test_func(signer, auth_token);
+
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            sender,
+            auth_token,
+            next_schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        insert(sender, txn);
     }
 
     #[test(fx = @0x1, user = @0x1234)]
@@ -893,36 +1176,36 @@ module aptos_framework::scheduled_txns {
 
         // Create transactions with same scheduled_time but different gas prices
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
+        let foo = || step(state);
         let schedule_time1 = curr_mock_time_micro_s / 1000 + 1000;
         let schedule_time2 = schedule_time1 * 2;
         let schedule_time3 = schedule_time1 * 4;
-        let txn1 = new_scheduled_transaction(
-            user_addr, schedule_time1, 100, 200, false, foo
+        let txn1 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time1, 100, 200, foo
         ); // time: 1s, gas: 20
-        let txn2 = new_scheduled_transaction(
-            user_addr, schedule_time1, 100, 300, false, foo
+        let txn2 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time1, 100, 300, foo
         ); // time: 1s, gas: 30
-        let txn3 = new_scheduled_transaction(
-            user_addr, schedule_time1, 100, 100, false, foo
+        let txn3 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time1, 100, 100, foo
         ); // time: 1s, gas: 10
 
         // Create transactions with same scheduled_time and gas price
-        let txn4 = new_scheduled_transaction(
-            user_addr, schedule_time2, 1000, 200, false, foo
+        let txn4 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time2, 1000, 200, foo
         ); // time: 2s, gas: 20
-        let txn5 = new_scheduled_transaction(
-            user_addr, schedule_time2, 100, 200, false, foo
+        let txn5 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time2, 100, 200, foo
         );
-        let txn6 = new_scheduled_transaction(
-            user_addr, schedule_time2, 200, 200, false, foo
+        let txn6 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time2, 200, 200, foo
         ); // time: 2s, gas: 20
 
-        let txn7 = new_scheduled_transaction(
-            user_addr, schedule_time3, 100, 200, false, foo
+        let txn7 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time3, 100, 200, foo
         ); // time: 2s, gas: 20
-        let txn8 = new_scheduled_transaction(
-            user_addr, schedule_time3, 200, 200, false, foo
+        let txn8 = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time3, 200, 200, foo
         ); // time: 2s, gas: 20
 
         // Insert all transactions
@@ -998,8 +1281,8 @@ module aptos_framework::scheduled_txns {
         // Try to schedule transaction in the past
         let past_time = curr_mock_time_micro_s / 1000 - 100;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, past_time, 100, 200, false, foo);
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(user_addr, past_time, 100, 200, foo);
 
         // Create a signer from the handle to use for insert
         insert(&user, txn); // Should fail with EINVALID_TIME since time is in the past
@@ -1018,8 +1301,8 @@ module aptos_framework::scheduled_txns {
         // Try to schedule transaction with wrong user
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, future_time, 100, 200, false, foo);
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
         insert(&other_user, txn); // Should fail with EINVALID_SIGNER
     }
 
@@ -1036,12 +1319,12 @@ module aptos_framework::scheduled_txns {
         // Schedule a valid transaction
         let future_time = curr_mock_time + 1000;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, future_time, 100, 200, false, foo);
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
         let txn_id = insert(&user, txn);
 
         // Try to cancel the transaction with wrong user
-        cancel(&other_user, txn_id); // Should fail with EINVALID_SIGNER
+        cancel_with_key(&other_user, txn_id); // Should fail with EINVALID_SIGNER
     }
 
     #[test(fx = @0x1, user = @0x1234)]
@@ -1060,8 +1343,8 @@ module aptos_framework::scheduled_txns {
         // Try to insert a transaction after shutdown
         let future_time = curr_mock_time_micro_s / 1000 + 1000;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(user_addr, future_time, 100, 200, false, foo);
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(user_addr, future_time, 100, 200, foo);
 
         // This should fail with EUNAVAILABLE
         insert(&user, txn);
@@ -1081,14 +1364,13 @@ module aptos_framework::scheduled_txns {
         let i = 0;
         while (i < total_txns) {
             let state = State { count: 8 };
-            let foo = |s: Option<signer>| step(state, s);
+            let foo = || step(state);
             let txn =
-                new_scheduled_transaction(
+                new_scheduled_transaction_no_signer(
                     user_addr,
                     curr_mock_time_micro_s / 1000 + 1000 + i, // Different times to ensure unique ordering
                     100,
                     200,
-                    false,
                     foo
                 );
             insert(&user, txn);
@@ -1132,14 +1414,13 @@ module aptos_framework::scheduled_txns {
         re_initialize(fx);
 
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
+        let foo = || step(state);
         let txn1 =
-            new_scheduled_transaction(
+            new_scheduled_transaction_no_signer(
                 user_addr,
                 curr_mock_time_micro_s / 1000 + 1000,
                 100,
                 200,
-                false,
                 foo
             );
         insert(&user, txn1);
@@ -1157,9 +1438,9 @@ module aptos_framework::scheduled_txns {
         let user_addr = signer::address_of(&user);
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(
-            user_addr, schedule_time, 100, 200, false, foo
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time, 100, 200, foo
         );
         let _txn_key = insert(&user, txn);
         assert!(get_num_txns() == 1, 1);
@@ -1219,10 +1500,276 @@ module aptos_framework::scheduled_txns {
         let user_addr = signer::address_of(&user);
         let schedule_time = curr_mock_time_micro_s / 1000 + 1000;
         let state = State { count: 8 };
-        let foo = |s: Option<signer>| step(state, s);
-        let txn = new_scheduled_transaction(
-            user_addr, schedule_time, 100, 200, false, foo
+        let foo = || step(state);
+        let txn = new_scheduled_transaction_no_signer(
+            user_addr, schedule_time, 100, 200, foo
         );
         insert(&user, txn); // Should fail with EUNAVAILABLE
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    fun test_insert_with_reused_auth_token(
+        fx: &signer, user: signer
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        // Initialize sender seqno to 1
+        let sender_seqno = get_sender_seqno(user_addr);
+        assert!(sender_seqno == 1, sender_seqno);
+
+        // Create transaction with auth token using test helper
+        let schedule_time = curr_mock_time_micro_s / 1000 + 1000;
+        let expiration_time = schedule_time + 10000; // 10 seconds after scheduled time
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        // Insert transaction
+        let txn_key = insert(&user, txn);
+        assert!(get_num_txns() == 1, get_num_txns());
+
+        // Verify the transaction was scheduled correctly
+        assert!(txn_key.time == schedule_time, 0);
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    fun test_cancel_with_reused_auth_token(
+        fx: &signer, user: signer
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 20000; // 20 seconds in future (more than CANCEL_DELTA_DEFAULT)
+        let expiration_time = schedule_time + 10000;
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        let txn_key = insert(&user, txn);
+        assert!(get_num_txns() == 1, get_num_txns());
+
+        // Cancel the transaction
+        cancel_with_key(&user, txn_key);
+        assert!(get_num_txns() == 0, get_num_txns());
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    fun test_cancel_all_with_auth_tokens(
+        fx: &signer, user: signer
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 2000;
+        let expiration_time = schedule_time + 10000;
+
+        // Create multiple transactions with auth tokens
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        // Create 3 transactions with the same auth seqno
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn1 = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+        let txn2 = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time + 1000,
+            1000,
+            200,
+            foo
+        );
+        let txn3 = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time + 2000,
+            1000,
+            200,
+            foo
+        );
+
+        // Store transaction keys for later testing
+        let txn1_key = insert(&user, txn1);
+        let _txn2_key = insert(&user, txn2);
+        let _txn3_key = insert(&user, txn3);
+        assert!(get_num_txns() == 3, get_num_txns());
+
+        // Cancel all - this increments the sender's seqno
+        cancel_all(&user);
+
+        // Verify the sender seqno was incremented
+        let new_seqno = get_sender_seqno(user_addr);
+        assert!(new_seqno == sender_seqno + 1, new_seqno);
+
+        // The transactions are still in the queue because cancellation is lazy
+        assert!(get_num_txns() == 3, get_num_txns());
+
+        // Test lazy delete: try to execute one of the transactions
+        // It should be cancelled and removed due to auth token sequence number mismatch
+        let current_time = schedule_time;
+        execute_user_function_wrapper_test(user, txn1_key, current_time);
+        assert!(get_num_txns() == 2, get_num_txns());
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    fun test_cancel_entry_function(
+        fx: &signer, user: signer
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 20000; // 20 seconds in future (more than CANCEL_DELTA_DEFAULT)
+        let expiration_time = schedule_time + 10000;
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        // Create and insert a transaction with auth token
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        let txn_key = insert(&user, txn);
+        assert!(get_num_txns() == 1, get_num_txns());
+
+        // Test the cancel entry function using individual parameters
+        cancel_test(&user, txn_key.time, txn_key.gas_priority, txn_key.txn_id);
+        assert!(get_num_txns() == 0, get_num_txns());
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    #[expected_failure(abort_code = 65551)] // EAUTH_TOKEN_EXPIRED
+    fun test_auth_token_expired_validation(
+        fx: &signer, user: signer
+    ) acquires AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 2000;
+        let expiration_time = curr_mock_time_micro_s / 1000 - 1000; // Already expired!
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    #[expected_failure(abort_code = 65551)] // EAUTH_TOKEN_INSUFFICIENT_DURATION
+    fun test_auth_token_insufficient_duration(
+        fx: &signer, user: signer
+    ) acquires AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 10000; // 10 seconds in future
+        let expiration_time = curr_mock_time_micro_s / 1000 + 5000; // Expires before schedule time
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno);
+        new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    #[expected_failure(abort_code = 65552)] // EAUTH_SEQNO_MISMATCH
+    fun test_auth_seqno_mismatch_validation(
+        fx: &signer, user: signer
+    ) acquires ScheduleQueue, AuxiliaryData {
+        let user_addr = signer::address_of(&user);
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        let sender_seqno = get_sender_seqno(user_addr);
+        let schedule_time = curr_mock_time_micro_s / 1000 + 2000;
+        let expiration_time = schedule_time + 10000;
+
+        let state = State { count: 8 };
+        let foo = |signer: &signer, auth_token: ScheduledTxnAuthToken| step_with_auth_token(state, signer, auth_token);
+
+        // This should fail due to seqno mismatch
+        let auth_token = create_mock_auth_token(true, expiration_time, sender_seqno + 5);
+        let txn = new_scheduled_transaction_reuse_auth_token(
+            &user,
+            auth_token,
+            schedule_time,
+            1000,
+            200,
+            foo
+        );
+
+        insert(&user, txn); // Should fail
+    }
+
+    #[test(fx = @0x1, user = @0x1234)]
+    #[expected_failure(abort_code = 196625)] // ESENDER_SEQNO_NOT_FOUND
+    fun test_cancel_all_uninitialized_sender(
+        fx: &signer, user: signer
+    ) acquires AuxiliaryData {
+        let curr_mock_time_micro_s = 1000000;
+        setup_test_env(fx, &user, curr_mock_time_micro_s);
+
+        // This should fail because increment_sender_seqno requires sender to exist
+        cancel_all(&user);
     }
 }

@@ -1,6 +1,6 @@
 #[test_only]
 module aptos_framework::test_scheduled_txns {
-    use std::option::{Option, some};
+
     use std::signer;
     use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
@@ -9,7 +9,7 @@ module aptos_framework::test_scheduled_txns {
     use aptos_framework::transaction_validation;
 
     #[persistent]
-    fun simpleFunc(_state: u64, _s: Option<signer>) {
+    fun simpleFunc(_state: u64) {
         if (_state < 10) {
             _state = _state + 1;
         }
@@ -17,47 +17,21 @@ module aptos_framework::test_scheduled_txns {
 
     #[test_only]
     public fun mock_execute(key: ScheduleMapKey, signer: signer) {
-        let f = scheduled_txns::get_func_from_txn_key(key);
-        f(some<signer>(signer));
+        let block_timestamp_ms = timestamp::now_microseconds() / 1000;
+        scheduled_txns::execute_user_function_wrapper_test(signer, key, block_timestamp_ms);
+        //f(some<signer>(signer));
         // Finish execution
         mark_txn_to_remove_test(key);
     }
 
     #[persistent]
-    fun self_rescheduling_func(
-        scheduling_acc_signer: Option<signer>,
+    fun simple_work_func(
         max_gas_amount: u64,
         max_gas_unit_price: u64,
         delta_time: u64
     ) {
-        // do work
-
-        // reschedule
-        // Get current time in microseconds
-        let current_time = timestamp::now_microseconds() / 1000;
-
-        let next_txn = {
-            let foo =
-                |signer: Option<signer>| self_rescheduling_func(
-                    signer,
-                    max_gas_amount,
-                    max_gas_unit_price,
-                    delta_time
-                );
-            let signer = scheduling_acc_signer.borrow();
-            let scheduling_acc_addr = signer::address_of(signer);
-            scheduled_txns::new_scheduled_transaction(
-                scheduling_acc_addr,
-                current_time + delta_time,
-                max_gas_amount,
-                max_gas_unit_price,
-                true,
-                foo
-            )
-        };
-        // Schedule next execution
-        let signer = scheduling_acc_signer.extract();
-        scheduled_txns::insert(&signer, next_txn);
+        // do work without rescheduling (unsigned version can't reschedule)
+        let _ = max_gas_amount + max_gas_unit_price + delta_time; // consume parameters
     }
 
     // Purpose of this test is to test 'scheduled_txn_epilogue'
@@ -83,33 +57,29 @@ module aptos_framework::test_scheduled_txns {
         let gas_units_remaining = 50;
 
         // Create test transactions
-        let foo = |signer: Option<signer>| simpleFunc(5, signer);
+        let foo = || simpleFunc(5);
         let gas_price_txn1 = 200;
         let txn1 =
-            scheduled_txns::new_scheduled_transaction(
+            scheduled_txns::new_scheduled_transaction_no_signer(
                 user_addr,
                 schedule_time,
                 txn_max_gas_units,
                 gas_price_txn1,
-                false,
                 foo
             );
         let gas_price_txn2 = 300;
-        let rescheduling_foo =
-            |signer: Option<signer>| self_rescheduling_func(
-                signer,
-                gas_price_txn2,
-                txn_max_gas_units,
-                3000
-            );
+        let work_foo = || simple_work_func(
+            gas_price_txn2,
+            txn_max_gas_units,
+            3000
+        );
         let txn2 =
-            scheduled_txns::new_scheduled_transaction(
+            scheduled_txns::new_scheduled_transaction_no_signer(
                 user_addr,
                 schedule_time,
                 txn_max_gas_units,
                 gas_price_txn2,
-                true,
-                rescheduling_foo
+                work_foo
             );
 
         // Insert transactions
@@ -179,15 +149,10 @@ module aptos_framework::test_scheduled_txns {
             post_txn2_balance
         );
 
-        // check reschedule
+        // check execution without rescheduling
         mock_execute(txn2_key, user);
         scheduled_txns::remove_txns(timestamp::now_microseconds() / 1000);
-        assert!(scheduled_txns::get_num_txns() == 1, scheduled_txns::get_num_txns());
-        assert!(
-            scheduled_txns::get_ready_transactions_test(schedule_time + 2000).length()
-                == 1,
-            scheduled_txns::get_num_txns()
-        );
+        assert!(scheduled_txns::get_num_txns() == 0, scheduled_txns::get_num_txns());
         // Shutdown should cancel all transactions and refund all deposits
         scheduled_txns::shutdown_test(fx);
         scheduled_txns::continue_shutdown_test(100);
