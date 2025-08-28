@@ -761,9 +761,16 @@ impl TransactionPayload {
     }
 
     pub fn into_entry_function(self) -> EntryFunction {
-        match self {
-            Self::EntryFunction(f) => f,
-            payload => panic!("Expected EntryFunction(_) payload, found: {:#?}", payload),
+        if !self.is_multisig() {
+            match self.executable_ref() {
+                Ok(TransactionExecutableRef::EntryFunction(f)) => f.clone(),
+                _ => panic!(
+                    "Expected EntryFunction(_) executable, found: {:#?}",
+                    self.executable_ref()
+                ),
+            }
+        } else {
+            panic!("Expected EntryFunction(_) payload, found: {:#?}", self);
         }
     }
 
