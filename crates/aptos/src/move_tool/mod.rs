@@ -2325,7 +2325,7 @@ impl CliCommand<TransactionSummary> for Replay {
         let debugger = AptosDebugger::rest_client(client)?;
 
         // Fetch the transaction to replay.
-        let (txn, txn_info) = debugger
+        let (txn, txn_info, aux_info) = debugger
             .get_committed_transaction_at_version(self.txn_id)
             .await?;
 
@@ -2349,6 +2349,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         } else if self.benchmark {
             println!("Benchmarking transaction...");
@@ -2357,6 +2358,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         } else {
             println!("Replaying transaction...");
@@ -2365,6 +2367,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         };
 
