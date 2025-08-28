@@ -54,7 +54,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 
 
 - <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a></code>: Main order book container
-- <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a></code>: Request structure for placing new orders
+- <code>BulkOrderRequest</code>: Request structure for placing new orders
 - <code>BulkOrder</code>: Internal representation of a multi-level order
 - <code>BulkOrderResult</code>: Result of order matching operations
 - <code>SingleBulkOrderMatch</code>: Single match result between orders
@@ -121,52 +121,35 @@ order_book.cancel_order(@trader);
     -  [Data Structures:](#@Data_Structures:_5)
     -  [Error Codes:](#@Error_Codes:_6)
     -  [Usage Example:](#@Usage_Example:_7)
--  [Enum `BulkOrderRequest`](#0x7_bulk_order_book_BulkOrderRequest)
-    -  [Fields:](#@Fields:_8)
-    -  [Validation:](#@Validation:_9)
 -  [Enum `BulkOrderBook`](#0x7_bulk_order_book_BulkOrderBook)
-    -  [Fields:](#@Fields:_10)
--  [Constants](#@Constants_11)
+    -  [Fields:](#@Fields:_8)
+-  [Constants](#@Constants_9)
 -  [Function `new_bulk_order_book`](#0x7_bulk_order_book_new_bulk_order_book)
-    -  [Returns:](#@Returns:_12)
--  [Function `new_bulk_order_request`](#0x7_bulk_order_book_new_bulk_order_request)
-    -  [Arguments:](#@Arguments:_13)
-    -  [Returns:](#@Returns:_14)
-    -  [Aborts:](#@Aborts:_15)
+    -  [Returns:](#@Returns:_10)
 -  [Function `get_single_match_for_taker`](#0x7_bulk_order_book_get_single_match_for_taker)
-    -  [Arguments:](#@Arguments:_16)
-    -  [Returns:](#@Returns:_17)
-    -  [Side Effects:](#@Side_Effects:_18)
--  [Function `validate_price_ordering`](#0x7_bulk_order_book_validate_price_ordering)
-    -  [Arguments:](#@Arguments:_19)
-    -  [Aborts:](#@Aborts:_20)
--  [Function `validate_not_zero_sizes`](#0x7_bulk_order_book_validate_not_zero_sizes)
-    -  [Arguments:](#@Arguments:_21)
-    -  [Aborts:](#@Aborts:_22)
--  [Function `validate_no_price_crossing`](#0x7_bulk_order_book_validate_no_price_crossing)
-    -  [Arguments:](#@Arguments:_23)
-    -  [Aborts:](#@Aborts:_24)
--  [Function `validate_mm_order_request`](#0x7_bulk_order_book_validate_mm_order_request)
-    -  [Arguments:](#@Arguments:_25)
-    -  [Aborts:](#@Aborts:_26)
+    -  [Arguments:](#@Arguments:_11)
+    -  [Returns:](#@Returns:_12)
+    -  [Side Effects:](#@Side_Effects:_13)
 -  [Function `cancel_active_order_for_side`](#0x7_bulk_order_book_cancel_active_order_for_side)
-    -  [Arguments:](#@Arguments:_27)
+    -  [Arguments:](#@Arguments:_14)
 -  [Function `cancel_active_orders`](#0x7_bulk_order_book_cancel_active_orders)
-    -  [Arguments:](#@Arguments:_28)
+    -  [Arguments:](#@Arguments:_15)
 -  [Function `activate_first_price_level_for_side`](#0x7_bulk_order_book_activate_first_price_level_for_side)
-    -  [Arguments:](#@Arguments:_29)
+    -  [Arguments:](#@Arguments:_16)
 -  [Function `activate_first_price_levels`](#0x7_bulk_order_book_activate_first_price_levels)
-    -  [Arguments:](#@Arguments:_30)
+    -  [Arguments:](#@Arguments:_17)
 -  [Function `reinsert_order`](#0x7_bulk_order_book_reinsert_order)
-    -  [Arguments:](#@Arguments:_31)
-    -  [Aborts:](#@Aborts:_32)
+    -  [Arguments:](#@Arguments:_18)
+    -  [Aborts:](#@Aborts:_19)
 -  [Function `cancel_bulk_order`](#0x7_bulk_order_book_cancel_bulk_order)
-    -  [Arguments:](#@Arguments:_33)
-    -  [Aborts:](#@Aborts:_34)
+    -  [Arguments:](#@Arguments:_20)
+    -  [Aborts:](#@Aborts:_21)
 -  [Function `get_remaining_size`](#0x7_bulk_order_book_get_remaining_size)
+-  [Function `get_prices`](#0x7_bulk_order_book_get_prices)
+-  [Function `get_sizes`](#0x7_bulk_order_book_get_sizes)
 -  [Function `place_bulk_order`](#0x7_bulk_order_book_place_bulk_order)
-    -  [Arguments:](#@Arguments:_35)
-    -  [Aborts:](#@Aborts:_36)
+    -  [Arguments:](#@Arguments:_22)
+    -  [Aborts:](#@Aborts:_23)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -178,91 +161,6 @@ order_book.cancel_order(@trader);
 
 
 
-<a id="0x7_bulk_order_book_BulkOrderRequest"></a>
-
-## Enum `BulkOrderRequest`
-
-Request structure for placing a new bulk order with multiple price levels.
-
-
-<a id="@Fields:_8"></a>
-
-### Fields:
-
-- <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a></code>: The account placing the order
-- <code>bid_prices</code>: Vector of bid prices in descending order (best price first)
-- <code>bid_sizes</code>: Vector of bid sizes corresponding to each price level
-- <code>ask_prices</code>: Vector of ask prices in ascending order (best price first)
-- <code>ask_sizes</code>: Vector of ask sizes corresponding to each price level
-
-
-<a id="@Validation:_9"></a>
-
-### Validation:
-
-- Bid prices must be in descending order
-- Ask prices must be in ascending order
-- All sizes must be greater than 0
-- Price and size vectors must have matching lengths
-
-
-<pre><code>enum <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a> <b>has</b> <b>copy</b>, drop
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>V1</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
 <a id="0x7_bulk_order_book_BulkOrderBook"></a>
 
 ## Enum `BulkOrderBook`
@@ -270,7 +168,7 @@ Request structure for placing a new bulk order with multiple price levels.
 Main bulk order book container that manages all orders and their matching.
 
 
-<a id="@Fields:_10"></a>
+<a id="@Fields:_8"></a>
 
 ### Fields:
 
@@ -317,7 +215,7 @@ Main bulk order book container that manages all orders and their matching.
 
 </details>
 
-<a id="@Constants_11"></a>
+<a id="@Constants_9"></a>
 
 ## Constants
 
@@ -327,6 +225,24 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x7_bulk_order_book_EPRICE_CROSSING"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 11;
 </code></pre>
 
 
@@ -354,15 +270,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>: u64 = 5;
-</code></pre>
-
-
-
-<a id="0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>: u64 = 10;
 </code></pre>
 
 
@@ -403,15 +310,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 
-<a id="0x7_bulk_order_book_EPRICE_CROSSING"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 11;
-</code></pre>
-
-
-
 <a id="0x7_bulk_order_book_E_NOT_ACTIVE_ORDER"></a>
 
 
@@ -428,7 +326,7 @@ Main bulk order book container that manages all orders and their matching.
 Creates a new empty bulk order book.
 
 
-<a id="@Returns:_12"></a>
+<a id="@Returns:_10"></a>
 
 ### Returns:
 
@@ -456,72 +354,6 @@ A new <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkO
 
 </details>
 
-<a id="0x7_bulk_order_book_new_bulk_order_request"></a>
-
-## Function `new_bulk_order_request`
-
-Creates a new bulk order request with the specified price levels and sizes.
-
-
-<a id="@Arguments:_13"></a>
-
-### Arguments:
-
-- <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a></code>: The account placing the order
-- <code>bid_prices</code>: Vector of bid prices in descending order
-- <code>bid_sizes</code>: Vector of bid sizes corresponding to each price level
-- <code>ask_prices</code>: Vector of ask prices in ascending order
-- <code>ask_sizes</code>: Vector of ask sizes corresponding to each price level
-- <code>metadata</code>: Additional metadata for the order
-
-
-<a id="@Returns:_14"></a>
-
-### Returns:
-
-A <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a></code> instance.
-
-
-<a id="@Aborts:_15"></a>
-
-### Aborts:
-
-- If bid_prices and bid_sizes have different lengths
-- If ask_prices and ask_sizes have different lengths
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_request">new_bulk_order_request</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">bulk_order_book::BulkOrderRequest</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_request">new_bulk_order_request</a>(
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
-    bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
-): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a> {
-    <b>assert</b>!(bid_prices.length() == bid_sizes.length(), <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-    <b>assert</b>!(ask_prices.length() == ask_sizes.length(), <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-    <b>return</b> BulkOrderRequest::V1 {
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        bid_prices,
-        bid_sizes,
-        ask_prices,
-        ask_sizes
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x7_bulk_order_book_get_single_match_for_taker"></a>
 
 ## Function `get_single_match_for_taker`
@@ -532,7 +364,7 @@ This function should only be called after verifying that the order is a taker or
 using <code>is_taker_order()</code>. If called on a non-taker order, it will abort.
 
 
-<a id="@Arguments:_16"></a>
+<a id="@Arguments:_11"></a>
 
 ### Arguments:
 
@@ -543,14 +375,14 @@ using <code>is_taker_order()</code>. If called on a non-taker order, it will abo
 - <code>is_bid</code>: True if the taker order is a bid, false if ask
 
 
-<a id="@Returns:_17"></a>
+<a id="@Returns:_12"></a>
 
 ### Returns:
 
 A <code>SingleBulkOrderMatch</code> containing the match details.
 
 
-<a id="@Side_Effects:_18"></a>
+<a id="@Side_Effects:_13"></a>
 
 ### Side Effects:
 
@@ -606,205 +438,6 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 
 </details>
 
-<a id="0x7_bulk_order_book_validate_price_ordering"></a>
-
-## Function `validate_price_ordering`
-
-Validates that prices are in the correct order (descending for bids, ascending for asks).
-
-
-<a id="@Arguments:_19"></a>
-
-### Arguments:
-
-- <code>prices</code>: Vector of prices to validate
-- <code>is_descending</code>: True if prices should be in descending order, false for ascending
-
-
-<a id="@Aborts:_20"></a>
-
-### Aborts:
-
-- If prices are not in the correct order
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_price_ordering">validate_price_ordering</a>(prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, is_descending: bool)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_price_ordering">validate_price_ordering</a>(
-    prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    is_descending: bool
-) {
-    <b>let</b> i = 0;
-    <b>if</b> (prices.length() == 0) {
-        <b>return</b> ; // No prices <b>to</b> validate
-    };
-    <b>while</b> (i &lt; prices.length() - 1) {
-        <b>if</b> (is_descending) {
-            <b>assert</b>!(prices[i] &gt; prices[i + 1], <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-        } <b>else</b> {
-            <b>assert</b>!(prices[i] &lt; prices[i + 1], <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-        };
-        i += 1;
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_validate_not_zero_sizes"></a>
-
-## Function `validate_not_zero_sizes`
-
-Validates that all sizes in the vector are greater than 0.
-
-
-<a id="@Arguments:_21"></a>
-
-### Arguments:
-
-- <code>sizes</code>: Vector of sizes to validate
-
-
-<a id="@Aborts:_22"></a>
-
-### Aborts:
-
-- If the vector is empty
-- If any size is 0
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_not_zero_sizes">validate_not_zero_sizes</a>(sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_not_zero_sizes">validate_not_zero_sizes</a>(
-    sizes: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) {
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; sizes.length()) {
-        <b>assert</b>!(sizes[i] &gt; 0, <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-        i += 1;
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_validate_no_price_crossing"></a>
-
-## Function `validate_no_price_crossing`
-
-Validates that bid and ask prices don't cross.
-
-This ensures that the highest bid price is lower than the lowest ask price,
-preventing self-matching within a single order.
-
-
-<a id="@Arguments:_23"></a>
-
-### Arguments:
-
-- <code>bid_prices</code>: Vector of bid prices (should be in descending order)
-- <code>ask_prices</code>: Vector of ask prices (should be in ascending order)
-
-
-<a id="@Aborts:_24"></a>
-
-### Aborts:
-
-- If the highest bid price is greater than or equal to the lowest ask price
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_no_price_crossing">validate_no_price_crossing</a>(bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_no_price_crossing">validate_no_price_crossing</a>(
-    bid_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    ask_prices: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) {
-    <b>if</b> (bid_prices.length() &gt; 0 && ask_prices.length() &gt; 0) {
-        <b>let</b> highest_bid = bid_prices[0]; // First element is highest (descending order)
-        <b>let</b> lowest_ask = ask_prices[0];  // First element is lowest (ascending order)
-        <b>assert</b>!(highest_bid &lt; lowest_ask, <a href="bulk_order_book.md#0x7_bulk_order_book_EPRICE_CROSSING">EPRICE_CROSSING</a>);
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_validate_mm_order_request"></a>
-
-## Function `validate_mm_order_request`
-
-Validates a bulk order request for correctness.
-
-
-<a id="@Arguments:_25"></a>
-
-### Arguments:
-
-- <code>order_req</code>: The bulk order request to validate
-
-
-<a id="@Aborts:_26"></a>
-
-### Aborts:
-
-- If any validation fails (price ordering, sizes, vector lengths, price crossing)
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_mm_order_request">validate_mm_order_request</a>(order_req: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">bulk_order_book::BulkOrderRequest</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_validate_mm_order_request">validate_mm_order_request</a>(
-    order_req: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a>,
-) {
-    // Ensure bid prices are in descending order and ask prices are in ascending order
-    <b>assert</b>!(order_req.bid_sizes.length() &gt; 0 || order_req.ask_sizes.length() &gt; 0, <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_not_zero_sizes">validate_not_zero_sizes</a>(&order_req.bid_sizes);
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_not_zero_sizes">validate_not_zero_sizes</a>(&order_req.ask_sizes);
-    <b>assert</b>!(order_req.bid_prices.length() == order_req.bid_sizes.length(), <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-    <b>assert</b>!(order_req.ask_prices.length() == order_req.ask_sizes.length(), <a href="bulk_order_book.md#0x7_bulk_order_book_EINVLID_MM_ORDER_REQUEST">EINVLID_MM_ORDER_REQUEST</a>);
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_price_ordering">validate_price_ordering</a>(&order_req.bid_prices, <b>true</b>);  // descending
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_price_ordering">validate_price_ordering</a>(&order_req.ask_prices, <b>false</b>); // ascending
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_no_price_crossing">validate_no_price_crossing</a>(&order_req.bid_prices, &order_req.ask_prices);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x7_bulk_order_book_cancel_active_order_for_side"></a>
 
 ## Function `cancel_active_order_for_side`
@@ -812,7 +445,7 @@ Validates a bulk order request for correctness.
 Cancels active orders for a specific side (bid or ask) of a bulk order.
 
 
-<a id="@Arguments:_27"></a>
+<a id="@Arguments:_14"></a>
 
 ### Arguments:
 
@@ -857,7 +490,7 @@ Cancels active orders for a specific side (bid or ask) of a bulk order.
 Cancels all active orders (both bid and ask) for a bulk order.
 
 
-<a id="@Arguments:_28"></a>
+<a id="@Arguments:_15"></a>
 
 ### Arguments:
 
@@ -893,7 +526,7 @@ Cancels all active orders (both bid and ask) for a bulk order.
 Activates the first price level for a specific side of a bulk order.
 
 
-<a id="@Arguments:_29"></a>
+<a id="@Arguments:_16"></a>
 
 ### Arguments:
 
@@ -944,7 +577,7 @@ Activates the first price level for a specific side of a bulk order.
 Activates the first price levels for both bid and ask sides of a bulk order.
 
 
-<a id="@Arguments:_30"></a>
+<a id="@Arguments:_17"></a>
 
 ### Arguments:
 
@@ -984,7 +617,7 @@ This function allows traders to reinsert portions of their orders that were matc
 effectively allowing them to "reuse" matched liquidity.
 
 
-<a id="@Arguments:_31"></a>
+<a id="@Arguments:_18"></a>
 
 ### Arguments:
 
@@ -994,7 +627,7 @@ effectively allowing them to "reuse" matched liquidity.
 - <code>original_order</code>: The original order result for validation
 
 
-<a id="@Aborts:_32"></a>
+<a id="@Aborts:_19"></a>
 
 ### Aborts:
 
@@ -1043,7 +676,7 @@ and sets the order to empty state, allowing the same account to place new orders
 with the same order ID in the future.
 
 
-<a id="@Arguments:_33"></a>
+<a id="@Arguments:_20"></a>
 
 ### Arguments:
 
@@ -1052,7 +685,7 @@ with the same order ID in the future.
 - <code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a></code>: The account whose order should be cancelled
 
 
-<a id="@Aborts:_34"></a>
+<a id="@Aborts:_21"></a>
 
 ### Aborts:
 
@@ -1125,6 +758,70 @@ with the same order ID in the future.
 
 </details>
 
+<a id="0x7_bulk_order_book_get_prices"></a>
+
+## Function `get_prices`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>(
+    self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    is_bid: bool
+): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
+        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
+    };
+
+    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_prices(is_bid)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_book_get_sizes"></a>
+
+## Function `get_sizes`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>(
+    self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    is_bid: bool
+): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
+    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
+        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
+    };
+
+    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_sizes(is_bid)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_bulk_order_book_place_bulk_order"></a>
 
 ## Function `place_bulk_order`
@@ -1135,7 +832,7 @@ If an order already exists for the account, it will be replaced with the new ord
 The first price levels of both bid and ask sides will be activated in the active order book.
 
 
-<a id="@Arguments:_35"></a>
+<a id="@Arguments:_22"></a>
 
 ### Arguments:
 
@@ -1145,14 +842,14 @@ The first price levels of both bid and ask sides will be activated in the active
 - <code>order_req</code>: The bulk order request to place
 
 
-<a id="@Aborts:_36"></a>
+<a id="@Aborts:_23"></a>
 
 ### Aborts:
 
 - If the order request validation fails
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">bulk_order_book::BulkOrderRequest</a>): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
 </code></pre>
 
 
@@ -1165,30 +862,27 @@ The first price levels of both bid and ask sides will be activated in the active
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     ascending_id_generator: &<b>mut</b> AscendingIdGenerator,
-    order_req: <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderRequest">BulkOrderRequest</a>
+    order_req: BulkOrderRequest
 ) : OrderIdType {
-    <a href="bulk_order_book.md#0x7_bulk_order_book_validate_mm_order_request">validate_mm_order_request</a>(&order_req);
-    <b>let</b> existing_order = self.orders.contains(&order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
+    <b>let</b> existing_order = self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
     <b>let</b> order_id = <b>if</b> (existing_order) {
-        <b>let</b> old_order = self.orders.remove(&order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+        <b>let</b> old_order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         old_order.get_order_id()
     } <b>else</b> {
         <b>let</b> order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
-        self.order_id_to_address.add(order_id, order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+        self.order_id_to_address.add(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         order_id
     };
-    <b>let</b> BulkOrderRequest::V1 { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bid_prices, bid_sizes, ask_prices, ask_sizes } = order_req;
     <b>let</b> new_order = new_bulk_order(
         order_id,
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         new_unique_idx_type(ascending_id_generator.next_ascending_id()),
-        bid_prices,
-        bid_sizes,
-        ask_prices,
-        ask_sizes
+        order_req,
+        price_time_idx.best_bid_price(),
+        price_time_idx.best_ask_price(),
     );
-    self.orders.add(order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, new_order);
+    self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, new_order);
     // Activate the first price levels in the active order book
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &new_order, order_id);
     order_id
