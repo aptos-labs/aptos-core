@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     config::VMConfig,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::{DataCacheGasMeterWrapper, TransactionDataCache, TypeWithRuntimeEnvironment},
     frame::Frame,
     frame_type_cache::{
         AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
@@ -36,7 +36,6 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::TypeTag,
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
@@ -51,7 +50,6 @@ use move_vm_types::{
         self, AbstractFunction, Closure, GlobalValue, IntegerValue, Locals, Reference, SignerRef,
         Struct, StructRef, VMValueCast, Value, Vector, VectorRef,
     },
-    views::TypeView,
 };
 use std::{
     cell::RefCell,
@@ -105,17 +103,6 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
     layout_converter: &'ctx LayoutConverter<'ctx, LoaderImpl>,
-}
-
-struct TypeWithRuntimeEnvironment<'a, 'b> {
-    ty: &'a Type,
-    runtime_environment: &'b RuntimeEnvironment,
-}
-
-impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
-    fn to_type_tag(&self) -> TypeTag {
-        self.runtime_environment.ty_to_ty_tag(self.ty).unwrap()
-    }
 }
 
 impl Interpreter {
@@ -1096,38 +1083,6 @@ where
         self.binop(|lhs, rhs| Ok(Value::bool(f(lhs, rhs)?)))
     }
 
-    /// Creates a data cache entry for the specified address-type pair. Charges gas for the number
-    /// of bytes loaded.
-    fn create_and_charge_data_cache_entry(
-        &self,
-        resource_resolver: &impl ResourceResolver,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        addr: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<DataCacheEntry> {
-        let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
-            self.loader,
-            self.layout_converter,
-            gas_meter,
-            traversal_context,
-            self.loader.unmetered_module_storage(),
-            resource_resolver,
-            &addr,
-            ty,
-        )?;
-        gas_meter.charge_load_resource(
-            addr,
-            TypeWithRuntimeEnvironment {
-                ty,
-                runtime_environment: self.loader.runtime_environment(),
-            },
-            entry.value().view(),
-            bytes_loaded,
-        )?;
-        Ok(entry)
-    }
-
     /// Loads a resource from the data store and return the number of bytes read from the storage.
     fn load_resource<'c>(
         &self,
@@ -1138,17 +1093,46 @@ where
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        if !data_cache.contains_resource(&addr, ty) {
-            let entry = self.create_and_charge_data_cache_entry(
-                resource_resolver,
-                gas_meter,
+        if !data_cache.contains_resource_value(&addr, ty) {
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
+                self.loader,
+                self.layout_converter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
                 traversal_context,
-                addr,
+                self.loader.unmetered_module_storage(),
+                resource_resolver,
+                &addr,
                 ty,
+                true,
             )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
         }
         data_cache.get_resource_mut(&addr, ty)
+    }
+
+    fn load_resource_existence<'c>(
+        &self,
+        data_cache: &'c mut TransactionDataCache,
+        resource_resolver: &impl ResourceResolver,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<bool> {
+        if !data_cache.contains_resource_existence(&addr, ty) {
+            data_cache.create_and_insert_or_upgrade_and_charge_data_cache_entry(
+                self.loader,
+                self.layout_converter,
+                DataCacheGasMeterWrapper::Full(gas_meter),
+                traversal_context,
+                self.loader.unmetered_module_storage(),
+                resource_resolver,
+                &addr,
+                ty,
+                // This value will be overridden if lightweight resource existence feature is disabled
+                false,
+            )?;
+        }
+        data_cache.get_resource_existence(&addr, ty)
     }
 
     /// BorrowGlobal (mutable and not) opcode.
@@ -1243,7 +1227,7 @@ where
         ty: &Type,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
-        let gv = self.load_resource(
+        let exists = self.load_resource_existence(
             data_cache,
             resource_resolver,
             gas_meter,
@@ -1251,7 +1235,6 @@ where
             addr,
             ty,
         )?;
-        let exists = gv.exists()?;
         gas_meter.charge_exists(
             is_generic,
             TypeWithRuntimeEnvironment {

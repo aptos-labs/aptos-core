@@ -13,6 +13,22 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
     resource.as_ref().map(|bytes| bytes.len()).unwrap_or(0)
 }
 
+pub struct ResourceSizeInfo {
+    // Size of the resource or resource group member. None if it does not exist
+    pub size: Option<u64>,
+    // Number of bytes loaded when accessing this resource, used for gas charging only
+    pub bytes_loaded_for_gas_charge: u64,
+}
+
+impl ResourceSizeInfo {
+    pub fn new(size: Option<u64>, bytes_loaded: u64) -> Self {
+        Self {
+            size,
+            bytes_loaded_for_gas_charge: bytes_loaded,
+        }
+    }
+}
+
 /// A persistent storage backend that can resolve resources by address + type
 /// Storage backends should return
 ///   - Ok(Some(..)) if the data exists
@@ -30,4 +46,19 @@ pub trait ResourceResolver {
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)>;
+
+    fn get_resource_size_with_metadata_and_layout(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+        layout: Option<&MoveTypeLayout>,
+    ) -> PartialVMResult<ResourceSizeInfo> {
+        let (bytes, bytes_loaded) = self
+            .get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, layout)?;
+        Ok(ResourceSizeInfo::new(
+            bytes.map(|bytes| bytes.len() as u64),
+            bytes_loaded as u64,
+        ))
+    }
 }
