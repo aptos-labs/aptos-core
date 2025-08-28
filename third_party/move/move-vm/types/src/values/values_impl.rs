@@ -4232,7 +4232,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
                     value::MOVE_ENUM_NAME,
                     variant_names,
                     StructVariantVisitor(self.ctx, variants),
-                ).map_err(|e| D::Error::custom(format!("Enum deserialize failed: {:?}", e)))?;
+                )?;
                 Ok(Struct::pack(fields))
             },
             MoveStructLayout::WithFields(_)

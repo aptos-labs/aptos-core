@@ -654,10 +654,10 @@ spec aptos_framework::stake {
     spec find_validator {
         pragma opaque;
         aborts_if false;
-        ensures option::is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
-        ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
+        ensures option::spec_is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
+        ensures option::spec_is_some(result) ==> v[option::spec_borrow(result)].addr == addr;
         // Additional postcondition to help the quantifier instantiation.
-        ensures option::is_some(result) ==> spec_contains(v, addr);
+        ensures option::spec_is_some(result) ==> spec_contains(v, addr);
         ensures [abstract] result == spec_find_validator(v,addr);
     }
 

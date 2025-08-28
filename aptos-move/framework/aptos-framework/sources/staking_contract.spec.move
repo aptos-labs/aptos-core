@@ -606,9 +606,7 @@ spec aptos_framework::staking_contract {
 
         // postconditions account::create_resource_account()
         let acc = global<account::Account>(resource_addr);
-        // aborts_if exists<account::Account>(resource_addr) && (len(
-        //     acc.signer_capability_offer.for.vec
-        // ) != 0 || acc.sequence_number != 0);
+        aborts_if exists<account::Account>(resource_addr) && (std::option::spec_is_some(acc.signer_capability_offer.for) || acc.sequence_number != 0);
         aborts_if !exists<account::Account>(resource_addr) && len(bcs::to_bytes(resource_addr)) != 32;
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
 

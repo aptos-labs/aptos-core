@@ -27,10 +27,7 @@ impl OnChainConfig for RequiredGasDeposit {
 
 impl AsMoveValue for RequiredGasDeposit {
     fn as_move_value(&self) -> MoveValue {
-        match self.gas_amount {
-            Some(gas_amount) => MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![MoveValue::U64(gas_amount)])),
-            None => MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![])),
-        }
+        MoveValue::Struct(MoveStruct::Runtime(vec![self.gas_amount.as_move_value()]))
     }
 }
 

@@ -889,12 +889,12 @@ Remove a key/value pair from the map. The key must exist.
 <pre><code><b>pragma</b> intrinsic;
 <b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result_1);
-<b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result_2);
+<b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result_1);
+<b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result_2);
 <b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(self, key);
 <b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_get">spec_get</a>(self, key) == value;
-<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result_1)) && (<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result_1) == key));
-<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result_2)) && (<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result_2) == <a href="simple_map.md#0x1_simple_map_spec_get">spec_get</a>(<b>old</b>(
+<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(result_1)) && (<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result_1) == key));
+<b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(result_2)) && (<a href="../../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result_2) == <a href="simple_map.md#0x1_simple_map_spec_get">spec_get</a>(<b>old</b>(
     self
 ), key)));
 </code></pre>

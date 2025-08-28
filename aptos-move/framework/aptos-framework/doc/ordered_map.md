@@ -2099,10 +2099,10 @@ to O(n).
 
 <pre><code><b>pragma</b> opaque;
 <b>pragma</b> verify = <b>false</b>;
-<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result);
+<b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(result);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, key) == value;
-<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(
     self), key)));
 <b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) + 1 == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);

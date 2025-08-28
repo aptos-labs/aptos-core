@@ -11,6 +11,7 @@ use dashmap::{DashMap, Entry};
 use lazy_static::lazy_static;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::Identifier,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
@@ -23,7 +24,7 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::{ops::Deref, sync::Arc};
+use std::{str::FromStr, ops::Deref, sync::Arc};
 
 lazy_static! {
     pub static ref LAYOUT_CACHE: DashMap<StructNameIndex, LayoutWithDelayedFields> = DashMap::new();
@@ -333,6 +334,37 @@ where
             // delayed fields is needed because enums cannot be delayed fields!
             StructLayout::Variants(variants) => {
                 let mut variant_contains_delayed_fields = false;
+                if ANNOTATED {
+                    let ty_tag_converter =
+                        TypeTagConverter::new(self.struct_definition_loader.runtime_environment());
+                    let struct_tag =
+                        ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)?;
+                    if struct_tag.name.as_str() == "Option"
+                        && struct_tag.module.as_str() == "option"
+                        && struct_tag.address == AccountAddress::ONE
+                    {
+                        let field_name = Identifier::from_str("vec").unwrap();
+                        let field_type = variants[1].1[0].1.clone();
+                        let vec_ty = Type::Vector(triomphe::Arc::new(field_type.clone()));
+                        let sub_ty = &self
+                            .apply_subst_for_field_tys(&[(field_name.clone(), vec_ty)], ty_args)?;
+                        let (field_layout, _) = self.types_to_type_layouts::<ANNOTATED>(
+                            gas_meter,
+                            traversal_context,
+                            sub_ty,
+                            count,
+                            depth + 1,
+                        )?;
+                        let field_layout =
+                            MoveFieldLayout::new(field_name, field_layout[0].clone());
+                        let struct_layout =
+                            MoveStructLayout::with_types(struct_tag, vec![field_layout]);
+                        return Ok((
+                            MoveTypeLayout::Struct(struct_layout),
+                            variant_contains_delayed_fields,
+                        ));
+                    }
+                }
                 let variant_layouts = variants
                     .iter()
                     .map(|variant| {

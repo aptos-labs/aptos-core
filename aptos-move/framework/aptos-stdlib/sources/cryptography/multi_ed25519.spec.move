@@ -107,15 +107,15 @@ spec aptos_std::multi_ed25519 {
     spec fun spec_check_and_get_threshold(bytes: vector<u8>): Option<u8> {
         let len = len(bytes);
         if (len == 0) {
-            option::none<u8>()
+            option::spec_none<u8>()
         } else {
             let threshold_num_of_bytes = len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
             let num_of_keys = len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
             let threshold_byte = bytes[len - 1];
             if (num_of_keys == 0 || num_of_keys > MAX_NUMBER_OF_PUBLIC_KEYS || len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES != 1) {
-                option::none<u8>()
+                option::spec_none<u8>()
             } else if (threshold_byte == 0 || threshold_byte > (num_of_keys as u8)) {
-                option::none<u8>()
+                option::spec_none<u8>()
             } else {
                 option::spec_some(threshold_byte)
             }

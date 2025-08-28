@@ -1252,15 +1252,15 @@ Returns <code><b>false</b></code> if either:
 <pre><code><b>fun</b> <a href="multi_ed25519.md#0x1_multi_ed25519_spec_check_and_get_threshold">spec_check_and_get_threshold</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;u8&gt; {
    <b>let</b> len = len(bytes);
    <b>if</b> (len == 0) {
-       <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+       <a href="../../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;u8&gt;()
    } <b>else</b> {
        <b>let</b> threshold_num_of_bytes = len % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
        <b>let</b> num_of_keys = len / <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a>;
        <b>let</b> threshold_byte = bytes[len - 1];
        <b>if</b> (num_of_keys == 0 || num_of_keys &gt; <a href="multi_ed25519.md#0x1_multi_ed25519_MAX_NUMBER_OF_PUBLIC_KEYS">MAX_NUMBER_OF_PUBLIC_KEYS</a> || len % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> != 1) {
-           <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+           <a href="../../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;u8&gt;()
        } <b>else</b> <b>if</b> (threshold_byte == 0 || threshold_byte &gt; (num_of_keys <b>as</b> u8)) {
-           <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
+           <a href="../../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;u8&gt;()
        } <b>else</b> {
            <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(threshold_byte)
        }

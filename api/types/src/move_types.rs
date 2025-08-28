@@ -226,6 +226,29 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
+        if s.ty_tag.name.as_str() == "Option"
+            && s.ty_tag.module.as_str() == "option"
+            && s.ty_tag.address == AccountAddress::ONE
+        {
+            if let Some((_, name)) = &s.variant_info {
+                if name.to_string() == "None" {
+                    assert!(s.value.is_empty());
+                    map.insert(
+                        IdentifierWrapper::from_str("vec")?,
+                        MoveValue::Vector(vec![]).json()?,
+                    );
+                } else {
+                    assert!(name.to_string() == "Some");
+                    assert!(s.value.len() == 1);
+                    let v = s.value.into_iter().next().unwrap().1;
+                    map.insert(
+                        IdentifierWrapper::from_str("vec")?,
+                        MoveValue::Vector(vec![MoveValue::try_from(v)?]).json()?,
+                    );
+                }
+                return Ok(Self(map));
+            }
+        }
         if let Some((_, name)) = s.variant_info {
             map.insert(
                 IdentifierWrapper::from_str("__variant__")?,

@@ -1206,11 +1206,11 @@ module aptos_framework::coin {
                 use aptos_framework::optional_aggregator;
                 use aptos_framework::aggregator;
                 assume optional_aggregator::is_parallelizable(supply) ==> (aggregator::spec_aggregator_get_val(
-                    option::borrow(supply.aggregator)
+                    option::spec_borrow(supply.aggregator)
                 )
-                    + amount <= aggregator::spec_get_limit(option::borrow(supply.aggregator)));
+                    + amount <= aggregator::spec_get_limit(option::spec_borrow(supply.aggregator)));
                 assume !optional_aggregator::is_parallelizable(supply) ==>
-                    (option::borrow(supply.integer).value + amount <= option::borrow(supply.integer).limit);
+                    (option::spec_borrow(supply.integer).value + amount <= option::spec_borrow(supply.integer).limit);
             };
             optional_aggregator::add(supply, (amount as u128));
         };

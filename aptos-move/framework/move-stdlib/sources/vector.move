@@ -86,10 +86,14 @@ module std::vector {
     );
 
     /// Return an vector of size one containing element `e`.
-    public inline fun singleton<Element>(e: Element): vector<Element> {
+    public fun singleton<Element>(e: Element): vector<Element> {
         let v = empty();
         v.push_back(e);
         v
+    }
+    spec singleton {
+        aborts_if false;
+        ensures result == vec(e);
     }
 
     /// Reverses the order of the elements in the vector `self` in place.
@@ -130,6 +134,9 @@ module std::vector {
         }
     }
     spec append {
+        pragma intrinsic = true;
+    }
+    spec is_empty {
         pragma intrinsic = true;
     }
 
@@ -189,7 +196,7 @@ module std::vector {
 
 
     /// Return `true` if the vector `self` has no elements and `false` otherwise.
-    public inline fun is_empty<Element>(self: &vector<Element>): bool {
+    public fun is_empty<Element>(self: &vector<Element>): bool {
         self.length() == 0
     }
 

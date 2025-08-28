@@ -293,11 +293,11 @@ fn native_chain_id_internal(
 }
 
 fn create_option_some_value(value: Value) -> Value {
-    Value::struct_(Struct::pack(vec![create_singleton_vector(value)]))
+    Value::struct_(Struct::pack_variant(1, vec![value]))
 }
 
 fn create_option_none() -> Value {
-    Value::struct_(Struct::pack(vec![create_empty_vector()]))
+    Value::struct_(Struct::pack_variant(0, vec![]))
 }
 
 fn create_string_value(s: String) -> Value {
@@ -307,14 +307,6 @@ fn create_string_value(s: String) -> Value {
 fn create_vector_value(vv: Vec<Value>) -> Value {
     // This is safe because this function is only used to create vectors of homogenous values.
     Value::vector_for_testing_only(vv)
-}
-
-fn create_singleton_vector(v: Value) -> Value {
-    create_vector_value(vec![v])
-}
-
-fn create_empty_vector() -> Value {
-    create_vector_value(vec![])
 }
 
 fn num_bytes_from_entry_function_payload(entry_function_payload: &EntryFunctionPayload) -> usize {
