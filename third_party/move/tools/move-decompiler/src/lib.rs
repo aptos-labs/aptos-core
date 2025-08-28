@@ -2,10 +2,13 @@
 // Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use clap::Parser;
 use codespan::Span;
-use codespan_reporting::{diagnostic::Severity, term::termcolor::WriteColor};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{Buffer, WriteColor},
+};
 use move_binary_format::{file_format::CompiledScript, module_script_conversion, CompiledModule};
 use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::files::FileHash;
@@ -113,12 +116,12 @@ impl Decompiler {
                 let script = CompiledScript::deserialize(&bytes)
                     .with_context(|| format!("deserializing script `{}`", input_path))?;
                 let source_map = self.get_source_map(&input_path, &input_file, &bytes);
-                self.decompile_script(script, source_map)
+                self.decompile_script(script, source_map)?
             } else {
                 let module = CompiledModule::deserialize(&bytes)
                     .with_context(|| format!("deserializing module `{}`", input_path))?;
                 let source_map = self.get_source_map(&input_path, &input_file, &bytes);
-                self.decompile_module(module, source_map)
+                self.decompile_module(module, source_map)?
             };
             self.env.check_diag(
                 error_writer,
@@ -151,27 +154,27 @@ impl Decompiler {
         &mut self,
         modules: Vec<CompiledModule>,
         source_maps: Vec<SourceMap>,
-    ) -> String {
+    ) -> Result<String> {
         let mut result = String::new();
         let mut module_ids = vec![];
         for (module, source_map) in modules.iter().zip(source_maps.iter()) {
-            if let Some(module_id) = self.load_module(module.clone(), source_map.clone()) {
-                module_ids.push(module_id);
-            }
+            let module_id = self.load_module(module.clone(), source_map.clone())?;
+            module_ids.push(module_id);
         }
-        module_ids.iter().for_each(|&module_id| {
-            result.push_str(&self.decompile_loaded_module(module_id));
-        });
-        result
+        for &module_id in module_ids.iter() {
+            result.push_str(&self.decompile_loaded_module(module_id)?);
+        }
+        Ok(result)
     }
 
     /// Decompiles the given binary module. A source map must be provided for error
     /// reporting; use `self.empty_source_map` to create one if none is available.
-    pub fn decompile_module(&mut self, module: CompiledModule, source_map: SourceMap) -> String {
-        let module_id = match self.load_module(module, source_map) {
-            Some(id) => id,
-            None => return String::default(),
-        };
+    pub fn decompile_module(
+        &mut self,
+        module: CompiledModule,
+        source_map: SourceMap,
+    ) -> Result<String> {
+        let module_id = self.load_module(module, source_map)?;
         self.decompile_loaded_module(module_id)
     }
 
@@ -179,39 +182,44 @@ impl Decompiler {
         &mut self,
         module: CompiledModule,
         source_map: SourceMap,
-    ) -> Option<ModuleId> {
-        if !self.validate_module(&module, &source_map) {
-            return None;
-        }
+    ) -> Result<ModuleId> {
+        self.validate_module(&module)?;
         let module_id = self
             .env
             .load_compiled_module(/*with_dep_closure*/ true, module, source_map);
-        if self.env.has_errors() {
-            return None;
-        }
-        Some(module_id)
+        let mut error_writer = Buffer::no_color();
+        self.env
+            .check_diag(&mut error_writer, Severity::Warning, "load compiled module")?;
+        Ok(module_id)
     }
 
-    pub fn decompile_loaded_module(&mut self, module_id: ModuleId) -> String {
+    pub fn decompile_loaded_module(&mut self, module_id: ModuleId) -> Result<String> {
         // Lift file format bytecode to stackless bytecode.
         let mut targets = FunctionTargetsHolder::default();
         self.lift_to_stackless_bytecode(module_id, &mut targets);
         // Lift stackless bytecode to AST.
         self.lift_to_ast(&targets);
         // Sourcify the ast.
-        self.sourcify_ast(module_id)
+        let output = self.sourcify_ast(module_id);
+        // Check for decompilation errors
+        let mut error_writer = Buffer::no_color();
+        if self
+            .env()
+            .check_diag(&mut error_writer, Severity::Warning, "decompilation")
+            .is_err()
+        {
+            return Err(anyhow::Error::msg(format!(
+                "decompilation errors:\n{}",
+                String::from_utf8_lossy(&error_writer.into_inner())
+            )));
+        }
+        Ok(output)
     }
 
-    pub fn validate_module(&self, module: &CompiledModule, source_map: &SourceMap) -> bool {
+    pub fn validate_module(&self, module: &CompiledModule) -> Result<()> {
         // Run bytecode verification on the module.
-        if let Err(e) = move_bytecode_verifier::verify_module(module) {
-            self.env.error(
-                &self.env.to_loc(&source_map.definition_location),
-                &format!("bytecode verification failed: {:#?}", e),
-            );
-            return false;
-        }
-        true
+        move_bytecode_verifier::verify_module(module)
+            .map_err(|e| anyhow::Error::msg(format!("Bytecode verification failed: {:#?}", e)))
     }
 
     pub fn lift_to_stackless_bytecode(
@@ -269,7 +277,11 @@ impl Decompiler {
     }
 
     /// Decompiles the give binary script. Same as `decompile_module` but for scripts.
-    pub fn decompile_script(&mut self, script: CompiledScript, source_map: SourceMap) -> String {
+    pub fn decompile_script(
+        &mut self,
+        script: CompiledScript,
+        source_map: SourceMap,
+    ) -> Result<String> {
         let module = module_script_conversion::script_into_module(script, "main");
         self.decompile_module(module, source_map)
     }

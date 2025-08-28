@@ -1,0 +1,7 @@
+[package]
+name = "Pack"
+version = "0.1.2"
+
+[dependencies]
+MoveStdlib = { aptos = "https://fullnode.mainnet.aptoslabs.com", address = "0x1" }
+AptosStdlib = { aptos = "https://fullnode.mainnet.aptoslabs.com", address = "0x1" }

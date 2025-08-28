@@ -3,13 +3,15 @@
 
 use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
+    code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     errors::ParallelBlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
+    scheduler_wrapper::SchedulerWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
-use aptos_mvhashmap::types::TxnIndex;
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
 use aptos_types::{
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
@@ -18,15 +20,14 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
     write_set::WriteOp,
 };
-use aptos_vm_types::module_write_set::ModuleWrite;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
-use move_vm_runtime::Module;
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::HashSet,
+    collections::{BTreeSet, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
@@ -251,7 +252,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Vec<(T::Key, HashSet<T::Tag>)> {
-        forward_on_success_or_skip_rest!(self, txn_idx, resource_group_tags)
+        forward_on_success_or_skip_rest!(self, txn_idx, legacy_v1_resource_group_tags)
     }
 
     // Extracts a set of resource paths (keys) written or updated during execution from
@@ -314,7 +315,19 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn module_write_set(&self, txn_idx: TxnIndex) -> Vec<ModuleWrite<T::Value>> {
+    pub(crate) fn publish_module_write_set(
+        &self,
+        txn_idx: TxnIndex,
+        global_module_cache: &GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        runtime_environment: &RuntimeEnvironment,
+        scheduler: &SchedulerWrapper<'_>,
+    ) -> Result<bool, PanicError> {
         use ExecutionStatus as E;
 
         match self.outputs[txn_idx as usize]
@@ -322,13 +335,34 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .as_ref()
             .map(|status| status.as_ref())
         {
-            Some(E::Success(t) | E::SkipRest(t)) => t.module_write_set(),
+            Some(E::Success(t) | E::SkipRest(t)) => {
+                let mut published = false;
+                let mut module_ids_for_v2 = BTreeSet::new();
+                for write in t.module_write_set().as_ref().values() {
+                    published = true;
+                    if scheduler.is_v2() {
+                        module_ids_for_v2.insert(write.module_id().clone());
+                    }
+                    add_module_write_to_module_cache::<T>(
+                        write,
+                        txn_idx,
+                        runtime_environment,
+                        global_module_cache,
+                        versioned_cache.module_cache(),
+                    )?;
+                }
+                if published {
+                    // Record validation requirements after the modules are published.
+                    scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
+                }
+                Ok(published)
+            },
             Some(
                 E::Abort(_)
                 | E::DelayedFieldsCodeInvariantError(_)
                 | E::SpeculativeExecutionAbortError(_),
             )
-            | None => Vec::new(),
+            | None => Ok(false),
         }
     }
 

@@ -3,8 +3,11 @@
 
 use crate::{
     db::{
-        get_first_seq_num_and_limit, test_helper,
-        test_helper::{arb_blocks_to_commit, put_transaction_auxiliary_data},
+        aptosdb_internal::get_first_seq_num_and_limit,
+        test_helper::{
+            arb_blocks_to_commit, put_transaction_auxiliary_data, test_save_blocks_impl,
+            test_sync_transactions_impl,
+        },
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -31,7 +34,6 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
-use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
