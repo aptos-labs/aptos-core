@@ -25,7 +25,7 @@ use aptos_vm_types::{
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt::Debug,
     sync::Arc,
 };
@@ -236,4 +236,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn get_write_summary(
         &self,
     ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
+
+    fn get_storage_keys_written(&self) -> BTreeSet<<Self::Txn as Transaction>::Key>;
 }

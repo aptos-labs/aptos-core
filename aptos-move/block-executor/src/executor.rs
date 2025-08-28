@@ -14,6 +14,7 @@ use crate::{
     errors::*,
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
+    hot_state_op_accumulator::BlockHotStateOpAccumulator,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
@@ -73,7 +74,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -848,6 +849,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        hot_op_accumulator: &ExplicitSyncWrapper<BlockHotStateOpAccumulator<T::Key, S>>,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -862,7 +864,6 @@ where
         block: &TP,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
-        let block_limit_processor = &mut block_limit_processor.acquire();
         let mut side_effect_at_commit = false;
 
         if !Self::validate_and_commit_delayed_fields(
@@ -974,6 +975,8 @@ where
         // Handle a potential vm error, then check invariants on the recorded outputs.
         last_input_output.check_execution_status_during_commit(txn_idx)?;
 
+        let block_limit_processor = &mut block_limit_processor.acquire();
+        let hot_op_accumulator = &mut hot_op_accumulator.acquire();
         if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
             let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
                 last_input_output
@@ -1002,6 +1005,8 @@ where
                 // Set the execution output status to be SkipRest, to skip the rest of the txns.
                 last_input_output.update_to_skip_rest(txn_idx)?;
             }
+
+            hot_op_accumulator.add_transaction(/* writes */, /* reads */);
         }
 
         let skips = last_input_output.block_skips_rest_at_idx(txn_idx);
@@ -1279,11 +1284,12 @@ where
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T, S>>,
+        hot_op_accumulator: &ExplicitSyncWrapper<BlockHotStateOpAccumulator<T::Key, S>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         block_epilogue_txn: &ExplicitSyncWrapper<Option<T>>,
         num_txns_materialized: &AtomicU32,
         total_txns_to_materialize: &AtomicU32,
-        num_running_workers: &AtomicU32,
+        num_running_workers: &AtomicUsize,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         defer!( num_running_workers.fetch_sub(1, Ordering::SeqCst); );
@@ -1444,6 +1450,7 @@ where
                         versioned_cache,
                         last_input_output,
                         block_limit_processor,
+                        hot_op_accumulator,
                         base_view,
                         global_module_cache,
                         runtime_environment,
@@ -1664,6 +1671,7 @@ where
     /// Handles commit task validation, error checking, state updates, and cleanup.
     fn finalize_parallel_execution(
         &self,
+        base_view: &S,
         shared_maybe_error: &AtomicBool,
         has_remaining_commit_tasks: bool,
         final_results: ExplicitSyncWrapper<Vec<E::Output>>,
@@ -1794,6 +1802,7 @@ where
         drop(timer);
 
         self.finalize_parallel_execution(
+            base_view,
             &shared_maybe_error,
             !scheduler.post_commit_processing_queue_is_empty(),
             final_results,
@@ -1838,6 +1847,8 @@ where
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         ));
+        let hot_op_accumulator =
+            ExplicitSyncWrapper::new(BlockHotStateOpAccumulator::new(base_view));
         let shared_maybe_error = AtomicBool::new(false);
 
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns + 1));
@@ -1858,7 +1869,7 @@ where
         let scheduler = Scheduler::new(num_txns);
         let num_txns_materialized = AtomicU32::new(0);
         let total_txns_to_materialize = AtomicU32::new(num_txns);
-        let num_running_workers = AtomicU32::new(num_workers as u32);
+        let num_running_workers = AtomicUsize::new(num_workers);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -1877,6 +1888,7 @@ where
                         start_shared_counter,
                         &shared_counter,
                         &block_limit_processor,
+                        &hot_op_accumulator,
                         &final_results,
                         &block_epilogue_txn,
                         &num_txns_materialized,
@@ -1901,6 +1913,7 @@ where
         drop(timer);
 
         self.finalize_parallel_execution(
+            base_view,
             &shared_maybe_error,
             scheduler.pop_from_commit_queue().is_ok(),
             final_results,
@@ -2157,6 +2170,7 @@ where
             self.config.onchain.block_gas_limit_override(),
             num_txns,
         );
+        let mut hot_op_accumulator = BlockHotStateOpAccumulator::new(base_view);
 
         let mut block_epilogue_txn = None;
         let mut idx = 0;
@@ -2418,6 +2432,13 @@ where
                         );
                     }
 
+                    // NOTE: this probably includes the epilogue transaction. Still, it breaks out
+                    // of the loop soon, so the info from epilogue is not used.
+                    hot_op_accumulator.add_transaction(
+                        output.get_storage_keys_written(),
+                        sequential_reads.get_storage_key_read(),
+                    );
+
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_transaction_committed(idx as TxnIndex, &output);
                     }
@@ -2443,6 +2464,10 @@ where
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
                     if !has_reconfig {
+                        // TODO: pass hot_op_accumulator here. Also this means that the keys read
+                        // by the block epilogue is not considered.
+                        // This is a problem, because block epilogue at least introduces additional
+                        // writes, so evictions cannot be computed accurately.
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             signature_verified_block,

@@ -45,7 +45,7 @@ use move_core_types::{
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
 };
@@ -488,6 +488,25 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         }
 
         writes
+    }
+
+    fn get_storage_keys_written(&self) -> BTreeSet<StateKey> {
+        if let Some(output) = self.committed_output.get() {
+            return output
+                .write_set()
+                .write_op_iter()
+                .map(|(key, _op)| key.clone())
+                .collect();
+        }
+
+        let locked = self.vm_output.lock();
+        let vm_output = locked.as_ref().expect("Output needs to be set");
+
+        let mut keys = BTreeSet::new();
+        keys.extend(vm_output.resource_write_set().keys().cloned());
+        keys.extend(vm_output.aggregator_v1_write_set().keys().cloned());
+        keys.extend(vm_output.module_write_set().keys().cloned());
+        keys
     }
 }
 
