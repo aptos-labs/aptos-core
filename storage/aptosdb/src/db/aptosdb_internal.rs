@@ -1,9 +1,41 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::CONCURRENCY_GAUGE;
+use crate::{
+    db::AptosDB,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    metrics::{API_LATENCY_SECONDS, CONCURRENCY_GAUGE},
+    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+};
+use aptos_config::config::{
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
+};
+use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
+use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGaugeHelper;
-use aptos_storage_interface::block_info::BlockInfo;
+use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_storage_interface::{
+    block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
+    Order, Result,
+};
+use aptos_types::{
+    account_config::{new_block_event_key, NewBlockEvent},
+    transaction::Version,
+};
+use std::{
+    cell::Cell,
+    fmt::{Debug, Formatter},
+    iter::Iterator,
+    path::Path,
+    sync::Arc,
+    time::Instant,
+};
 
 impl AptosDB {
     fn new_with_dbs(
@@ -70,7 +102,7 @@ impl AptosDB {
         }
     }
 
-    fn open_internal(
+    pub(super) fn open_internal(
         db_paths: &StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
@@ -179,7 +211,7 @@ impl AptosDB {
     }
 
     #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
-    fn new_without_pruner<P: AsRef<Path> + Clone>(
+    pub(super) fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
         buffered_state_target_items: usize,
@@ -203,7 +235,7 @@ impl AptosDB {
         .expect("Unable to open AptosDB")
     }
 
-    fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
+    pub(super) fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self.ledger_pruner.get_min_readable_version();
         ensure!(
             version >= min_readable_version,
@@ -215,7 +247,11 @@ impl AptosDB {
         Ok(())
     }
 
-    fn error_if_state_merkle_pruned(&self, data_type: &str, version: Version) -> Result<()> {
+    pub(super) fn error_if_state_merkle_pruned(
+        &self,
+        data_type: &str,
+        version: Version,
+    ) -> Result<()> {
         let min_readable_version = self
             .state_store
             .state_db
@@ -243,7 +279,7 @@ impl AptosDB {
         }
     }
 
-    fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
+    pub(super) fn error_if_state_kv_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self.state_store.state_kv_pruner.get_min_readable_version();
         ensure!(
             version >= min_readable_version,
@@ -255,7 +291,7 @@ impl AptosDB {
         Ok(())
     }
 
-    fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
+    pub(super) fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
         if !self.skip_index_and_usage {
             let (first_version, new_block_event) = self.event_store.get_event_by_key(
                 &new_block_event_key(),
@@ -278,7 +314,7 @@ impl AptosDB {
         }
     }
 
-    fn get_raw_block_info_by_version(
+    pub(super) fn get_raw_block_info_by_version(
         &self,
         version: Version,
     ) -> Result<(u64 /* block_height */, BlockInfo)> {
@@ -312,7 +348,7 @@ impl AptosDB {
         }
     }
 
-    fn to_api_block_info(
+    pub(super) fn to_api_block_info(
         &self,
         block_height: u64,
         block_info: BlockInfo,
@@ -352,7 +388,7 @@ impl Debug for AptosDB {
     }
 }
 
-fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
+pub(super) fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
         Err(AptosDbError::TooManyRequested(num_requested, max_allowed))
     } else {
@@ -364,7 +400,7 @@ thread_local! {
     static ENTERED_GAUGED_API: Cell<bool> = const { Cell::new(false) };
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub(super) fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
@@ -407,7 +443,11 @@ where
 }
 
 // Convert requested range and order to a range in ascending order.
-fn get_first_seq_num_and_limit(order: Order, cursor: u64, limit: u64) -> Result<(u64, u64)> {
+pub(super) fn get_first_seq_num_and_limit(
+    order: Order,
+    cursor: u64,
+    limit: u64,
+) -> Result<(u64, u64)> {
     ensure!(limit > 0, "limit should > 0, got {}", limit);
 
     Ok(if order == Order::Ascending {

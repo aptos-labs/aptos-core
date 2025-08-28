@@ -1,8 +1,44 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
+use crate::{
+    backup::restore_utils,
+    db::{aptosdb_internal::gauged_api, AptosDB},
+    ledger_db::{
+        ledger_metadata_db::LedgerMetadataDb,
+        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
+        transaction_info_db::TransactionInfoDb, LedgerDbSchemaBatches,
+    },
+    metrics::{
+        COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
+    },
+    pruner::PrunerManager,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
+    },
+};
+use aptos_crypto::HashValue;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_metrics_core::TimerHelper;
+use aptos_schemadb::batch::SchemaBatch;
+use aptos_storage_interface::{
+    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
+    StateSnapshotReceiver,
+};
+use aptos_types::{
+    account_config::new_block_event_key,
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::{
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionOutput,
+        TransactionOutputListWithProofV2, Version,
+    },
+    write_set::WriteSet,
+};
 use itertools::Itertools;
+use rayon::prelude::*;
+use std::{iter::Iterator, time::Instant};
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
@@ -385,7 +421,7 @@ impl AptosDB {
         }
     }
 
-    fn commit_transaction_accumulator(
+    pub(super) fn commit_transaction_accumulator(
         &self,
         first_version: Version,
         transaction_infos: &[TransactionInfo],
@@ -435,7 +471,7 @@ impl AptosDB {
     }
 
     #[allow(dead_code)]
-    fn commit_transaction_auxiliary_data<'a>(
+    pub(super) fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,
         auxiliary_data: impl IntoIterator<Item = &'a TransactionAuxiliaryData>,
@@ -463,7 +499,7 @@ impl AptosDB {
             .write_schemas(batch)
     }
 
-    fn commit_transaction_infos(
+    pub(super) fn commit_transaction_infos(
         &self,
         first_version: Version,
         txn_infos: &[TransactionInfo],
