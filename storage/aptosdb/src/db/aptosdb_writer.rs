@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
+use crate::{db::{AptosDB, aptosdb_internal::gauged_api}};
+use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbWriter};
 use itertools::Itertools;
 
 impl DbWriter for AptosDB {

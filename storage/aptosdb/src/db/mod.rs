@@ -104,11 +104,11 @@ pub struct AptosDB {
 }
 
 // DbReader implementations and private functions used by them.
-include!("include/aptosdb_reader.rs");
+mod aptosdb_reader;
 // DbWriter implementations and private functions used by them.
-include!("include/aptosdb_writer.rs");
+mod aptosdb_writer;
 // Other private methods.
-include!("include/aptosdb_internal.rs");
+mod aptosdb_internal;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 include!("include/aptosdb_testonly.rs");
