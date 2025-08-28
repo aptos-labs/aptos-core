@@ -1,13 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::db::AptosDB;
+#[cfg(test)]
+use crate::state_merkle_db::StateMerkleDb;
 use aptos_config::config::{
-    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
-use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
-use std::default::Default;
+use aptos_storage_interface::{
+    chunk_to_commit::ChunkToCommit, state_store::state_summary::ProvableStateSummary, DbReader,
+    DbWriter, Result,
+};
+use aptos_types::{
+    contract_event::ContractEvent,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
+        TransactionToCommit, Version,
+    },
+};
+use itertools::Itertools;
+use std::path::Path;
+#[cfg(test)]
+use std::sync::Arc;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.

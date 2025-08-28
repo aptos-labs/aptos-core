@@ -4770,7 +4770,6 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
- "aptos-infallible",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -4804,6 +4803,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros",
+ "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -12413,6 +12413,26 @@ dependencies = [
  "move-model",
  "move-prover-test-utils",
  "serde",
+ "toml 0.7.8",
+ "url",
+]
+
+[[package]]
+name = "move-package-resolver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-rest-client",
+ "datatest-stable",
+ "either",
+ "git2 0.16.1",
+ "move-core-types",
+ "move-package-cache",
+ "move-package-manifest",
+ "move-prover-test-utils",
+ "petgraph 0.6.5",
+ "serde",
+ "tokio",
  "toml 0.7.8",
  "url",
 ]
