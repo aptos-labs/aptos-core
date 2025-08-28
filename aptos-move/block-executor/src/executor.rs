@@ -4,7 +4,7 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    code_cache_global::GlobalModuleCache,
+    code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
         self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
@@ -53,10 +53,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
-use aptos_vm_types::{
-    change_set::randomly_check_layout_matches, module_write_set::ModuleWrite,
-    resolver::ResourceGroupSize,
-};
+use aptos_vm_types::{change_set::randomly_check_layout_matches, resolver::ResourceGroupSize};
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -64,7 +61,7 @@ use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
-use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use rayon::ThreadPool;
 use scopeguard::defer;
@@ -938,30 +935,16 @@ where
             }
         }
 
-        let module_write_set = last_input_output.module_write_set(txn_idx);
-        let mut module_ids_for_v2 = BTreeSet::new();
         // Publish modules before we decrease validation index (in V1) so that validations observe
         // the new module writes as well.
-        if !module_write_set.is_empty() {
+        if last_input_output.publish_module_write_set(
+            txn_idx,
+            global_module_cache,
+            versioned_cache,
+            runtime_environment,
+            &scheduler,
+        )? {
             side_effect_at_commit = true;
-
-            if scheduler.is_v2() {
-                module_ids_for_v2 = module_write_set
-                    .iter()
-                    .map(|write| write.module_id().clone())
-                    .collect();
-            }
-
-            Self::publish_module_writes(
-                txn_idx,
-                module_write_set,
-                global_module_cache,
-                versioned_cache,
-                runtime_environment,
-            )?;
-
-            // Record validation requirements after the modules are published.
-            scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
 
         if side_effect_at_commit {
@@ -1030,30 +1013,6 @@ where
             .into()));
         }
 
-        Ok(())
-    }
-
-    fn publish_module_writes(
-        txn_idx: TxnIndex,
-        module_write_set: Vec<ModuleWrite<T::Value>>,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        runtime_environment: &RuntimeEnvironment,
-    ) -> Result<(), PanicError> {
-        for write in module_write_set {
-            Self::add_module_write_to_module_cache(
-                write,
-                txn_idx,
-                runtime_environment,
-                global_module_cache,
-                versioned_cache.module_cache(),
-            )?;
-        }
         Ok(())
     }
 
@@ -1988,57 +1947,6 @@ where
         T::block_epilogue_v1(block_id, block_end_info, FeeDistribution::new(amount))
     }
 
-    /// Converts module write into cached module representation, and adds it to the module cache.
-    fn add_module_write_to_module_cache(
-        write: ModuleWrite<T::Value>,
-        txn_idx: TxnIndex,
-        runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
-        per_block_module_cache: &impl ModuleCache<
-            Key = ModuleId,
-            Deserialized = CompiledModule,
-            Verified = Module,
-            Extension = AptosModuleExtension,
-            Version = Option<TxnIndex>,
-        >,
-    ) -> Result<(), PanicError> {
-        let (id, write_op) = write.unpack();
-
-        let state_value = write_op.as_state_value().ok_or_else(|| {
-            PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
-        })?;
-
-        // Since we have successfully serialized the module when converting into this transaction
-        // write, the deserialization should never fail.
-        let compiled_module = runtime_environment
-            .deserialize_into_compiled_module(state_value.bytes())
-            .map_err(|err| {
-                let msg = format!("Failed to construct the module from state value: {:?}", err);
-                PanicError::CodeInvariantError(msg)
-            })?;
-        let extension = Arc::new(AptosModuleExtension::new(state_value));
-
-        per_block_module_cache
-            .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
-            .map_err(|err| {
-                let msg = format!(
-                    "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
-                    id.address(),
-                    id.name(),
-                    txn_idx,
-                    err
-                );
-                PanicError::CodeInvariantError(msg)
-            })?;
-        global_module_cache.mark_overridden(&id);
-        Ok(())
-    }
-
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
@@ -2067,8 +1975,8 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
-        for write in output.module_write_set().into_iter() {
-            Self::add_module_write_to_module_cache(
+        for write in output.module_write_set().as_ref().values() {
+            add_module_write_to_module_cache::<T>(
                 write,
                 txn_idx,
                 runtime_environment,

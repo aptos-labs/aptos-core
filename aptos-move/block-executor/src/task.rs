@@ -108,7 +108,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
         Option<Arc<MoveTypeLayout>>,
     )>;
 
-    fn module_write_set(&self) -> Vec<ModuleWrite<<Self::Txn as Transaction>::Value>>;
+    fn module_write_set(
+        &self,
+    ) -> impl AsRef<
+        BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>,
+    > + '_;
 
     fn aggregator_v1_write_set(
         &self,
@@ -174,7 +178,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
             .collect()
     }
 
-    fn resource_group_tags(
+    fn legacy_v1_resource_group_tags(
         &self,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
