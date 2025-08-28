@@ -4227,11 +4227,13 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
                 }
                 let variant_names = value::variant_name_placeholder(variants.len())
                     .map_err(|e| D::Error::custom(format!("{}", e)))?;
-                let fields = deserializer.deserialize_enum(
-                    value::MOVE_ENUM_NAME,
-                    variant_names,
-                    StructVariantVisitor(self.ctx, variants),
-                ).map_err(|e| D::Error::custom(format!("Enum deserialize failed: {:?}", e)))?;
+                let fields = deserializer
+                    .deserialize_enum(
+                        value::MOVE_ENUM_NAME,
+                        variant_names,
+                        StructVariantVisitor(self.ctx, variants),
+                    )
+                    .map_err(|e| D::Error::custom(format!("Enum deserialize failed: {:?}", e)))?;
                 Ok(Struct::pack(fields))
             },
             MoveStructLayout::WithFields(_)

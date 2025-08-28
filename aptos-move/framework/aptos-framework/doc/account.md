@@ -3751,8 +3751,6 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-<b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-<b>aborts_if</b> len(account_resource.rotation_capability_offer.for.vec) == 0;
 </code></pre>
 
 
@@ -3888,8 +3886,6 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-<b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
-<b>aborts_if</b> len(account_resource.signer_capability_offer.for.vec) == 0;
 </code></pre>
 
 

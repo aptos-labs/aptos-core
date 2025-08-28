@@ -26,7 +26,7 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
-use std::{borrow::Borrow, fmt::format};
+use std::borrow::Borrow;
 
 /// Return values from function execution in [MoveVm].
 #[derive(Debug)]

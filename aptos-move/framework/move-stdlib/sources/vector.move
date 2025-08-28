@@ -86,7 +86,7 @@ module std::vector {
     );
 
     /// Return an vector of size one containing element `e`.
-    public inline fun singleton<Element>(e: Element): vector<Element> {
+    public fun singleton<Element>(e: Element): vector<Element> {
         let v = empty();
         v.push_back(e);
         v
@@ -189,7 +189,7 @@ module std::vector {
 
 
     /// Return `true` if the vector `self` has no elements and `false` otherwise.
-    public inline fun is_empty<Element>(self: &vector<Element>): bool {
+    public fun is_empty<Element>(self: &vector<Element>): bool {
         self.length() == 0
     }
 
