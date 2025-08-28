@@ -3067,14 +3067,24 @@ dependencies = [
 name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-gas-algebra",
+ "aptos-gas-profiling",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-sdk",
  "aptos-transaction-generator-lib",
  "aptos-transaction-workloads-lib",
  "aptos-types",
+ "aptos-vm-environment",
+ "async-trait",
  "clap 4.5.21",
+ "e2e-move-tests",
  "rand 0.7.3",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -8131,9 +8141,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-package-builder",
  "aptos-rest-client",
- "aptos-transaction-generator-lib",
  "aptos-transaction-simulation",
- "aptos-transaction-workloads-lib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -8149,7 +8157,6 @@ dependencies = [
  "once_cell",
  "project-root",
  "proptest",
- "rand 0.7.3",
  "rstest",
  "serde",
  "sha3 0.9.1",

@@ -23,9 +23,7 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
-aptos-transaction-generator-lib = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
-aptos-transaction-workloads-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-environment = { workspace = true }
@@ -40,7 +38,6 @@ move-symbol-pool = { workspace = true }
 once_cell = { workspace = true }
 project-root = { workspace = true }
 proptest = { workspace = true }
-rand = { workspace = true }
 rstest = { workspace = true }
 serde = { workspace = true }
 sha3 = { workspace = true }
