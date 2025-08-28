@@ -233,7 +233,6 @@ module aptos_experimental::price_time_index {
     ): bool {
         if (is_bid) {
             let best_ask_price = self.best_ask_price();
-            // print(&best_ask_price);
             best_ask_price.is_some() && price >= best_ask_price.destroy_some()
         } else {
             let best_bid_price = self.best_bid_price();

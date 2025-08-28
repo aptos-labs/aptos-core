@@ -70,7 +70,9 @@ module aptos_experimental::bulk_order_book_types {
     /// - Bid prices must be in descending order
     /// - Ask prices must be in ascending order
     /// - All sizes must be greater than 0
-    /// - Price and size vectors must have matching lengths
+    /// - Price and size vectors must have matching lengths.
+    /// All bulk orders by default are post-only and will not cross the spread -
+    /// GTC and non-reduce-only orders
     enum BulkOrderRequest has copy, drop {
         V1 {
             account: address,
@@ -353,22 +355,6 @@ module aptos_experimental::bulk_order_book_types {
             ),
             matched_size
         )
-    }
-
-    /// Checks if a bulk order has remaining orders on the specified side.
-    ///
-    /// # Arguments:
-    /// - `self`: Reference to the bulk order
-    /// - `is_bid`: True to check bid side, false for ask side
-    ///
-    /// # Returns:
-    /// True if there are remaining orders on the specified side, false otherwise.
-    public(friend) fun is_remaining_order(
-        self: &BulkOrder,
-        is_bid: bool,
-    ): bool {
-        let sizes = if (is_bid) { self.bid_sizes } else { self.ask_sizes };
-        return sizes.length() > 0 && sizes[0] > 0 // Check if the first price level has a non-zero size
     }
 
     public(friend)  fun get_total_remaining_size(

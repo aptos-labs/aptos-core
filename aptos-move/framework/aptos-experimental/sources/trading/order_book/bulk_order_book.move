@@ -42,38 +42,6 @@
 /// - `EINVLID_MM_ORDER_REQUEST`: Invalid bulk order request (price ordering, sizes, etc.)
 /// - `EPRICE_CROSSING`: Price crossing is not allowed in bulk orders
 ///
-/// ## Usage Example:
-/// ```move
-/// // Create a new bulk order book
-/// let order_book = bulk_order_book::new_bulk_order_book();
-///
-/// // Create a bulk order request with multiple price levels
-/// let bid_prices = vector[100, 99, 98];
-/// let bid_sizes = vector[10, 20, 30];
-/// let ask_prices = vector[101, 102, 103];
-/// let ask_sizes = vector[15, 25, 35];
-///
-/// let order_request = bulk_order_book::new_bulk_order_request(
-///     @trader,
-///     bid_prices,
-///     bid_sizes,
-///     ask_prices,
-///     ask_sizes
-/// );
-///
-/// // Place the maker order
-/// order_book.place_maker_order(order_request);
-///
-/// // Check if a taker order would match
-/// if (order_book.is_taker_order(101, true)) {
-///     // Get the match
-///     let match_result = order_book.get_single_match_for_taker(101, 10, true);
-///     // Process the match...
-/// }
-///
-/// // Cancel the order
-/// order_book.cancel_order(@trader);
-/// ```
 module aptos_experimental::bulk_order_book {
     use aptos_framework::big_ordered_map::BigOrderedMap;
     use aptos_experimental::order_book_types::ActiveMatchedOrder;
@@ -107,6 +75,7 @@ module aptos_experimental::bulk_order_book {
     /// - `order_id_to_address`: Map of order IDs to account addresses for lookup
     enum BulkOrderBook has store {
         V1 {
+            // TODO(skedia): Consider using a Table instead of BigOrderedMap so that each order has its own storage slot.
             orders: BigOrderedMap<address, BulkOrder>,
             order_id_to_address: BigOrderedMap<OrderIdType, address>
         }
