@@ -151,6 +151,8 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
+    /// Whether to enable size and time-aware chunking
+    pub enable_size_and_time_aware_chunking: bool,
     /// Whether transaction data v2 is enabled
     pub enable_transaction_data_v2: bool,
     /// Maximum number of epoch ending ledger infos per chunk
@@ -171,6 +173,8 @@ pub struct StorageServiceConfig {
     pub max_optimistic_fetch_period_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum time (ms) to wait for storage before truncating a response
+    pub max_storage_read_wait_time_ms: u64,
     /// Maximum period (ms) of pending subscription requests
     pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
@@ -188,6 +192,7 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
+            enable_size_and_time_aware_chunking: true,
             enable_transaction_data_v2: true,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
@@ -198,7 +203,8 @@ impl Default for StorageServiceConfig {
             max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 30_000, // 30 seconds
+            max_storage_read_wait_time_ms: 10_000, // 10 seconds
+            max_subscription_period_ms: 30_000,    // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
