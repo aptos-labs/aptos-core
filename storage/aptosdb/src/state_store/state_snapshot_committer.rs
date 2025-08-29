@@ -13,12 +13,14 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
+use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
 };
+use aptos_types::state_store::state_key::StateKey;
 use itertools::Itertools;
 use rayon::prelude::*;
 use static_assertions::const_assert;
@@ -103,11 +105,13 @@ impl StateSnapshotCommitter {
 
                         let min_version = self.last_snapshot.next_version();
 
-                        THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                        let total_updates = std::sync::Mutex::new(Vec::new());
+
+                        let ret = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                             snapshot
                                 .make_delta(&self.last_snapshot)
                                 .shards
-                                .par_iter()
+                                .iter()
                                 .enumerate()
                                 .map(|(shard_id, updates)| {
                                     let node_hashes = snapshot
@@ -117,7 +121,14 @@ impl StateSnapshotCommitter {
                                             &self.last_snapshot.summary().global_state_summary,
                                             shard_id as u8,
                                         );
-                                    // TODO(aldenhu): iterator of refs
+                                     // TODO(aldenhu): iterator of refs
+                                     info!(
+                                         "shard_id: {}, min_version: {}, num_updates: {}, updates before filtering: {:?}",
+                                         shard_id,
+                                         min_version,
+                                         updates.iter().collect_vec().len(),
+                                         updates.iter().collect_vec()
+                                     );
                                     let updates = {
                                         let _timer =
                                             OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
@@ -129,10 +140,27 @@ impl StateSnapshotCommitter {
                                             })
                                             .collect_vec()
                                     };
+                                    let mut locked = total_updates.lock().unwrap();
+                                    locked.extend(updates.iter().map(
+                                        |ks_opt: &(
+                                            HashValue,
+                                            StateKey,
+                                            Option<(HashValue, StateKey)>,
+                                        )| {
+                                            (ks_opt.1.clone(), ks_opt.2.as_ref().map(|x| x.0))
+                                        },
+                                    ));
+
+                                    // info!(
+                                    //     "shard_id: {}, filtered updates len: {}",
+                                    //     shard_id, updates.len()
+                                    // );
 
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
                                         shard_id,
-                                        jmt_update_refs(&updates),
+                                        jmt_update_refs(
+                                            &updates.into_iter().map(|x| (x.0, x.2)).collect_vec(),
+                                        ),
                                         Some(&node_hashes),
                                         version,
                                         base_version,
@@ -144,7 +172,28 @@ impl StateSnapshotCommitter {
                                 .expect("Error calculating StateMerkleBatch for shards.")
                                 .into_iter()
                                 .unzip()
-                        })
+                        });
+                        {
+                            let print_updates =
+                                |tu: &Vec<(StateKey, Option<HashValue>)>| -> String {
+                                    let mut out = "\n".to_string();
+                                    for u in tu {
+                                        out += &format!(
+                                            "\t{:<125} => {:?}\n",
+                                            format!("{:?}", u.0),
+                                            u.1
+                                        );
+                                    }
+                                    out
+                                };
+                            info!(
+                                "total JMT updates (next version {}): min_version: {}. {}",
+                                base_version.map_or(0, |v| v + 1),
+                                min_version,
+                                print_updates(&*total_updates.lock().unwrap())
+                            );
+                        }
+                        ret
                     };
 
                     let (root_hash, leaf_count, top_levels_batch) = {
