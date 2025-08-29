@@ -1545,6 +1545,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         maker_order.get_book_type_from_match_details(),
         maker_order.is_bid_from_match_details(),
         maker_cancel_size,
+        metadata,
         callbacks
     );
 }
@@ -1605,7 +1606,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         callbacks
     );
     callbacks.cleanup_order(
-        user_addr, order_id, is_bid, size_delta, metadata
+        user_addr, order_id, is_bid, size_delta, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata)
     );
     <b>return</b> <a href="market.md#0x7_market_OrderMatchResult">OrderMatchResult</a> {
         order_id,
@@ -1627,7 +1628,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>fun</b> <a href="market.md#0x7_market_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>, is_bid: bool, remaining_size: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="market.md#0x7_market_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>, is_bid: bool, remaining_size: u64, metadata: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;M&gt;, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -1642,11 +1643,12 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     book_type: OrderBookType,
     is_bid: bool,
     remaining_size: u64,
+    metadata: Option&lt;M&gt;,
     callbacks: &MarketClearinghouseCallbacks&lt;M&gt;
 ) {
     <b>if</b> (book_type == single_order_book_type()) {
         callbacks.cleanup_order(
-            user_addr, order_id, is_bid, remaining_size
+            user_addr, order_id, is_bid, remaining_size, metadata
         );
     } <b>else</b> {
         callbacks.cleanup_bulk_orders(
@@ -1817,6 +1819,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_book_type_from_match_details(),
             !is_bid, // is_bid is inverted for maker orders
             0, // 0 because the order is fully filled
+            maker_order.get_metadata_from_match_details(),
             callbacks
         );
     };
@@ -2047,7 +2050,7 @@ of fill limit violation  in the previous transaction and the order is just a con
         };
         <b>if</b> (remaining_size == 0) {
             <a href="market.md#0x7_market_cleanup_order_internal">cleanup_order_internal</a>(
-                user_addr, order_id, single_order_book_type(), is_bid, 0, callbacks
+                user_addr, order_id, single_order_book_type(), is_bid, 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata), callbacks
             );
             <b>break</b>;
         };
@@ -2247,7 +2250,7 @@ Cancels an order - this will cancel the order and emit an event for the order ca
         metadata
     ) = order.destroy_single_order();
     <a href="market.md#0x7_market_cleanup_order_internal">cleanup_order_internal</a>(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, callbacks
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(metadata), callbacks
     );
     self.<a href="market.md#0x7_market_emit_event_for_order">emit_event_for_order</a>(
         order_id,
