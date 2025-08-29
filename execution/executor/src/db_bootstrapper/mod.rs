@@ -27,7 +27,7 @@ use aptos_types::{
     on_chain_config::ConfigurationResource,
     state_store::{state_key::StateKey, StateViewId, TStateView},
     timestamp::TimestampResource,
-    transaction::{AuxiliaryInfo, Transaction},
+    transaction::{AuxiliaryInfo, AuxiliaryInfoTrait, Transaction},
     waypoint::Waypoint,
 };
 use aptos_vm::VMBlockExecutor;

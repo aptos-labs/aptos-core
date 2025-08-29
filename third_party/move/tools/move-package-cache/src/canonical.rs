@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use std::ops::Deref;
+use std::{
+    fmt::{self, Display},
+    ops::Deref,
+};
 use url::Url;
 
 /// Canonicalized identity of a git repository, derived from a [`Url`].
@@ -40,6 +43,12 @@ impl Deref for CanonicalGitIdentity {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Display for CanonicalGitIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -105,6 +114,12 @@ impl Deref for CanonicalNodeIdentity {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Display for CanonicalNodeIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
