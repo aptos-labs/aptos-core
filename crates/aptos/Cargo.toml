@@ -69,6 +69,7 @@ indoc = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 maplit = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-cli = { workspace = true }
@@ -76,6 +77,7 @@ move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-coverage = { workspace = true }
+move-decompiler = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-linter = { workspace = true }

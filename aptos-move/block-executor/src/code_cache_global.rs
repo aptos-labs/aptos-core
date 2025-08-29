@@ -1,9 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::error::PanicError;
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::{
+    error::PanicError, transaction::BlockExecutableTransaction, vm::modules::AptosModuleExtension,
+    write_set::TransactionWrite,
+};
+use aptos_vm_types::module_write_set::ModuleWrite;
 use hashbrown::HashMap;
-use move_vm_types::code::{ModuleCode, WithSize};
+use move_binary_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
+use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_types::code::{ModuleCache, ModuleCode, WithSize};
 use std::{
     hash::Hash,
     ops::Deref,
@@ -180,6 +188,56 @@ where
             false
         }
     }
+}
+
+/// Converts module write into cached module representation, and adds it to the module cache.
+pub(crate) fn add_module_write_to_module_cache<T: BlockExecutableTransaction>(
+    write: &ModuleWrite<T::Value>,
+    txn_idx: TxnIndex,
+    runtime_environment: &RuntimeEnvironment,
+    global_module_cache: &GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    per_block_module_cache: &impl ModuleCache<
+        Key = ModuleId,
+        Deserialized = CompiledModule,
+        Verified = Module,
+        Extension = AptosModuleExtension,
+        Version = Option<TxnIndex>,
+    >,
+) -> Result<(), PanicError> {
+    let state_value = write
+        .write_op()
+        .as_state_value()
+        .ok_or_else(|| PanicError::CodeInvariantError("Modules cannot be deleted".to_string()))?;
+
+    // Since we have successfully serialized the module when converting into this transaction
+    // write, the deserialization should never fail.
+    let compiled_module = runtime_environment
+        .deserialize_into_compiled_module(state_value.bytes())
+        .map_err(|err| {
+            let msg = format!("Failed to construct the module from state value: {:?}", err);
+            PanicError::CodeInvariantError(msg)
+        })?;
+    let extension = Arc::new(AptosModuleExtension::new(state_value));
+
+    per_block_module_cache
+        .insert_deserialized_module(
+            write.module_id().clone(),
+            compiled_module,
+            extension,
+            Some(txn_idx),
+        )
+        .map_err(|err| {
+            let msg = format!(
+                "Failed to insert code for module {}::{} at version {} to module cache: {:?}",
+                write.module_address(),
+                write.module_name(),
+                txn_idx,
+                err
+            );
+            PanicError::CodeInvariantError(msg)
+        })?;
+    global_module_cache.mark_overridden(write.module_id());
+    Ok(())
 }
 
 #[cfg(test)]

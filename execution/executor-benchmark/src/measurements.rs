@@ -236,6 +236,58 @@ pub struct OverallMeasurement {
 }
 
 impl OverallMeasurement {
+    pub fn get_tps(&self) -> f64 {
+        self.num_txns as f64 / self.elapsed
+    }
+
+    pub fn get_gps(&self) -> f64 {
+        self.delta_gas.gas / self.elapsed
+    }
+
+    pub fn get_effective_gps(&self) -> f64 {
+        self.delta_gas.effective_block_gas / self.elapsed
+    }
+
+    pub fn get_effective_conflict_multiplier(&self) -> f64 {
+        self.delta_gas.effective_block_gas / self.delta_gas.gas
+    }
+
+    pub fn get_speculative_abort_rate(&self) -> f64 {
+        self.delta_gas.speculative_abort_count as f64 / self.num_txns as f64
+    }
+
+    pub fn get_io_gps(&self) -> f64 {
+        self.delta_gas.io_gas / self.elapsed
+    }
+
+    pub fn get_execution_gps(&self) -> f64 {
+        self.delta_gas.execution_gas / self.elapsed
+    }
+
+    pub fn get_gpt(&self) -> f64 {
+        self.delta_gas.gas / (self.delta_gas.gas_count as f64).max(1.0)
+    }
+
+    pub fn get_io_gpt(&self) -> f64 {
+        self.delta_gas.io_gas / (self.delta_gas.gas_count as f64).max(1.0)
+    }
+
+    pub fn get_execution_gpt(&self) -> f64 {
+        self.delta_gas.execution_gas / (self.delta_gas.gas_count as f64).max(1.0)
+    }
+
+    pub fn get_storage_fee_per_txn(&self) -> f64 {
+        self.delta_gas.storage_fee / (self.delta_gas.gas_count as f64).max(1.0)
+    }
+
+    pub fn get_approx_output_per_s(&self) -> f64 {
+        self.delta_gas.approx_block_output / self.elapsed
+    }
+
+    pub fn get_output_per_s(&self) -> f64 {
+        self.delta_execution.output_size / self.elapsed
+    }
+
     pub fn print_end(&self) {
         let num_txns = self.num_txns as f64;
 
@@ -244,63 +296,51 @@ impl OverallMeasurement {
         info!(
             "{} TPS: {} txn/s (over {} txns, in {} s)",
             self.prefix,
-            num_txns / self.elapsed,
+            self.get_tps(),
             num_txns,
             self.elapsed
         );
-        info!(
-            "{} GPS: {} gas/s",
-            self.prefix,
-            self.delta_gas.gas / self.elapsed
-        );
+        info!("{} GPS: {} gas/s", self.prefix, self.get_gps());
         info!(
             "{} effectiveGPS: {} gas/s ({} effective block gas, in {} s)",
             self.prefix,
-            self.delta_gas.effective_block_gas / self.elapsed,
+            self.get_effective_gps(),
             self.delta_gas.effective_block_gas,
             self.elapsed
         );
         info!(
             "{} effective conflict multiplier: {}",
             self.prefix,
-            self.delta_gas.effective_block_gas / self.delta_gas.gas
+            self.get_effective_conflict_multiplier()
         );
         info!(
             "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
             self.prefix,
-            self.delta_gas.speculative_abort_count as f64 / num_txns,
+            self.get_speculative_abort_rate(),
             self.delta_gas.speculative_abort_count,
             self.num_txns
         );
-        info!(
-            "{} ioGPS: {} gas/s",
-            self.prefix,
-            self.delta_gas.io_gas / self.elapsed
-        );
+        info!("{} ioGPS: {} gas/s", self.prefix, self.get_io_gps());
         info!(
             "{} executionGPS: {} gas/s",
             self.prefix,
-            self.delta_gas.execution_gas / self.elapsed
+            self.get_execution_gps()
         );
-        info!(
-            "{} GPT: {} gas/txn",
-            self.prefix,
-            self.delta_gas.gas / (self.delta_gas.gas_count as f64).max(1.0)
-        );
+        info!("{} GPT: {} gas/txn", self.prefix, self.get_gpt());
         info!(
             "{} Storage fee: {} octas/txn",
             self.prefix,
-            self.delta_gas.storage_fee / (self.delta_gas.gas_count as f64).max(1.0)
+            self.get_storage_fee_per_txn()
         );
         info!(
             "{} approx_output: {} bytes/s",
             self.prefix,
-            self.delta_gas.approx_block_output / self.elapsed
+            self.get_approx_output_per_s()
         );
         info!(
             "{} output: {} bytes/s",
             self.prefix,
-            self.delta_execution.output_size / self.elapsed
+            self.get_output_per_s()
         );
 
         info!(
@@ -388,31 +428,22 @@ impl OverallMeasurement {
             format!("{: >12}", v.prefix.replace("Staged execution: ", ""))
         });
         print_one(stages, overall, "TPS", |v| {
-            format!("{: >12.2}", v.num_txns as f64 / v.elapsed)
+            format!("{: >12.2}", v.get_tps())
         });
         print_one(stages, overall, "GPS", |v| {
-            format!("{: >12.2}", v.delta_gas.gas / v.elapsed)
+            format!("{: >12.2}", v.get_gps())
         });
         print_one(stages, overall, "effGPS", |v| {
-            format!("{: >12.2}", v.delta_gas.effective_block_gas / v.elapsed)
+            format!("{: >12.2}", v.get_effective_gps())
         });
         print_one(stages, overall, "GPT", |v| {
-            format!(
-                "{: >12.2}",
-                v.delta_gas.gas / (v.delta_gas.gas_count as f64).max(1.0)
-            )
+            format!("{: >12.2}", v.get_gpt())
         });
         print_one(stages, overall, "ioGPT", |v| {
-            format!(
-                "{: >12.2}",
-                v.delta_gas.io_gas / (v.delta_gas.gas_count as f64).max(1.0)
-            )
+            format!("{: >12.2}", v.get_io_gpt())
         });
         print_one(stages, overall, "exeGPT", |v| {
-            format!(
-                "{: >12.2}",
-                v.delta_gas.execution_gas / (v.delta_gas.gas_count as f64).max(1.0)
-            )
+            format!("{: >12.2}", v.get_execution_gpt())
         });
     }
 }

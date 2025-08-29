@@ -23,10 +23,10 @@ module 0x42::mod1 {
         x: u64,
     }
     public fun triple(x: u64): u64 {
-        let _f = |arg0| __lambda__1__triple(arg0);
+        let _f : |u64|u64 has drop = |arg0| lambda__1__triple(arg0);
         x * 3
     }
-    fun __lambda__1__triple(x: u64): u64 {
+    fun lambda__1__triple(x: u64): u64 {
         let _t = S{x: 3};
         x
     }

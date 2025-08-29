@@ -25,7 +25,7 @@ use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::BlockExecutableTransaction as Transaction,
+    transaction::{AuxiliaryInfo, BlockExecutableTransaction as Transaction},
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -131,7 +131,7 @@ pub(crate) struct MockOutput<K, E> {
         ResourceGroupSize,
         BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
     )>,
-    pub(crate) module_writes: Vec<ModuleWrite<ValueType>>,
+    pub(crate) module_writes: BTreeMap<K, ModuleWrite<ValueType>>,
     pub(crate) deltas: Vec<(K, DeltaOp, Option<(DelayedFieldID, bool)>)>,
     pub(crate) events: Vec<E>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
@@ -153,7 +153,7 @@ pub(crate) struct MockOutputBuilder<K, E> {
     pub(crate) output: MockOutput<K, E>,
 }
 
-impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E> {
+impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E> {
     /// Create a new builder from mock incarnation.
     pub(crate) fn from_mock_incarnation(
         mock_incarnation: &MockIncarnation<K, E>,
@@ -170,7 +170,7 @@ impl<K: Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder<K, E>
                 })
                 .collect(),
             group_writes: Vec::with_capacity(mock_incarnation.group_writes.len()),
-            module_writes: mock_incarnation.module_writes.clone(),
+            module_writes: mock_incarnation.module_writes.clone().into_iter().collect(),
             deltas: Vec::with_capacity(mock_incarnation.deltas.len()),
             events: mock_incarnation.events.to_vec(),
             read_results: Vec::with_capacity(mock_incarnation.resource_reads.len()),
@@ -641,7 +641,7 @@ impl<K, E> MockOutput<K, E> {
             writes: vec![],
             aggregator_v1_writes: vec![],
             group_writes: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas: vec![],
             events: vec![],
             read_results: vec![],
@@ -665,7 +665,7 @@ impl<K, E> MockOutput<K, E> {
             writes: vec![],
             aggregator_v1_writes: vec![],
             group_writes: vec![],
-            module_writes: vec![],
+            module_writes: BTreeMap::new(),
             deltas: vec![],
             events: vec![],
             read_results: vec![],
@@ -694,6 +694,17 @@ impl<K, E> MockOutput<K, E> {
     }
 }
 
+/// Wrapper that provides AsRef access to module write set without cloning.
+struct ModuleWriteSetRefWrapper<'a, K, V> {
+    writes: &'a BTreeMap<K, ModuleWrite<V>>,
+}
+
+impl<'a, K, V> AsRef<BTreeMap<K, ModuleWrite<V>>> for ModuleWriteSetRefWrapper<'a, K, V> {
+    fn as_ref(&self) -> &BTreeMap<K, ModuleWrite<V>> {
+        self.writes
+    }
+}
+
 impl<K, E> TransactionOutput for MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
@@ -713,8 +724,10 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> Vec<ModuleWrite<ValueType>> {
-        self.module_writes.clone()
+    fn module_write_set(&self) -> impl AsRef<BTreeMap<K, ModuleWrite<ValueType>>> + '_ {
+        ModuleWriteSetRefWrapper {
+            writes: &self.module_writes,
+        }
     }
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
@@ -925,6 +938,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
+    type AuxiliaryInfo = AuxiliaryInfo;
     type Error = usize;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
@@ -940,6 +954,7 @@ where
               + AptosCodeStorage
               + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
+        _auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {

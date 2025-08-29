@@ -16,7 +16,7 @@ use aptos_types::transaction::{
 pub struct ChunkToCommit<'a> {
     pub first_version: Version,
     pub transactions: &'a [Transaction],
-    pub persisted_info: &'a [PersistedAuxiliaryInfo],
+    pub persisted_auxiliary_infos: &'a [PersistedAuxiliaryInfo],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
     pub state: &'a LedgerState,
