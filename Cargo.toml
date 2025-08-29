@@ -642,6 +642,8 @@ inferno = "0.11.14"
 internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
 itertools = "0.13"
+jemalloc-ctl = "0.5.4"
+jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -889,7 +891,9 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
-debug = true
+debug = "line-tables-only"
+debug-assertions = true
+opt-level = 1
 overflow-checks = true
 
 # The performance build is not currently recommended
