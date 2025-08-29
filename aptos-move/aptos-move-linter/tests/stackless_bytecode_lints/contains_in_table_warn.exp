@@ -1,0 +1,127 @@
+
+Diagnostics:
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:132:9
+    │
+132 │         table::borrow(&table.table, 1); // UNSAFE: no contains check
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::add called without ensuring key doesn't exist. This may fail if key already exists. Consider using table::upsert or check with table::contains first.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:143:9
+    │
+143 │         table::add(&mut table.table, 1, 100); // UNSAFE: no contains check
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:155:13
+    │
+155 │             table::borrow(&table.table, 2); // UNSAFE: checked key 1, borrowing key 2
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::add called without ensuring key doesn't exist. This may fail if key already exists. Consider using table::upsert or check with table::contains first.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:168:13
+    │
+168 │             table::add(&mut table.table, 2, 200); // UNSAFE: checked key 1, adding key 2
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:181:13
+    │
+181 │             table::borrow(&table.table, 1); // UNSAFE: key doesn't exist
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:195:13
+    │
+195 │             table::borrow(&table.table, 2); // UNSAFE - checked key 1, borrowing key 2
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:239:13
+    │
+239 │             table::borrow(&table.table, 1); // Should be SAFE - linter does not handle this correctly!
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:254:13
+    │
+254 │             table::borrow(&table.table, 1); // Should be SAFE - linter does not handle this correctly!
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:271:13
+    │
+271 │             table::borrow(&table.table, 1); // Should be SAFE - linter does not handle this correctly!
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:300:13
+    │
+300 │             table::borrow(&table.table, 1); // Should be SAFE - linter does not handle this correctly!
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:329:13
+    │
+329 │             table::borrow(&table.table, 1); // CORRECTLY FLAGGED - unsafe when other_condition=true, linter ignores this!
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:350:13
+    │
+350 │             table::borrow(&table2.table, 1); // UNSAFE: different table
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::borrow called without checking if key exists. Consider using table::contains first to avoid runtime errors.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:417:17
+    │
+417 │                 table::borrow(&table.table, (i as u64)); // Should be SAFE - linter does not handle this correctly!
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
+
+warning: [lint] table::add called without ensuring key doesn't exist. This may fail if key already exists. Consider using table::upsert or check with table::contains first.
+    ┌─ tests/stackless_bytecode_lints/contains_in_table_warn.move:432:13
+    │
+432 │             table::add(&mut table.table, 2, 200); // Modifying table (but different key) -> This add is not safe
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(contains_in_table)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#contains_in_table.
