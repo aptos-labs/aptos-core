@@ -10,6 +10,7 @@ use move_model::ast::{ExpData, Operation};
 /// `Deref` calls can occur anywhere without affecting the result.
 /// Patterns that use global storage or non-builtin function (including vector operations)
 /// are not considered simple access patterns for the purpose of this function and return `false`.
+#[allow(dead_code)]
 pub(crate) fn is_simple_access_equal(expr1: &ExpData, expr2: &ExpData) -> bool {
     match (expr1, expr2) {
         (ExpData::Call(_, Operation::Deref, args), expr)
