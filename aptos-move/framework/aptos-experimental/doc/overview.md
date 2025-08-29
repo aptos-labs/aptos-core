@@ -13,6 +13,8 @@ This is the reference documentation of the Aptos experimental framework.
 
 
 -  [`0x7::benchmark_utils`](benchmark_utils.md#0x7_benchmark_utils)
+-  [`0x7::bulk_order_book`](bulk_order_book.md#0x7_bulk_order_book)
+-  [`0x7::bulk_order_book_types`](bulk_order_book_types.md#0x7_bulk_order_book_types)
 -  [`0x7::confidential_asset`](confidential_asset.md#0x7_confidential_asset)
 -  [`0x7::confidential_balance`](confidential_balance.md#0x7_confidential_balance)
 -  [`0x7::confidential_proof`](confidential_proof.md#0x7_confidential_proof)
