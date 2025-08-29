@@ -21,19 +21,18 @@ module aptos_experimental::single_order_book {
         OrderIdType,
         AscendingIdGenerator,
         AccountClientOrderId,
-        new_ascending_id_generator,
         new_unique_idx_type,
         new_account_client_order_id,
-        new_default_big_ordered_map
+        new_default_big_ordered_map, OrderMatch, new_order_match, new_order_match_details, OrderMatchDetails,
+        UniqueIdxType, single_order_book_type
     };
     use aptos_experimental::single_order_types::{
         OrderWithState,
-        new_order,
+        new_single_order,
         new_order_with_state,
-        new_single_order_match,
-        SingleOrderMatch,
-        Order
+        SingleOrder
     };
+    use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types::{TimeInForce, TriggerCondition};
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
     use aptos_experimental::pending_order_book_index::{
@@ -43,7 +42,7 @@ module aptos_experimental::single_order_book {
     #[test_only]
     use aptos_experimental::order_book_types::{
         new_order_id_type,
-        UniqueIdxType
+        new_ascending_id_generator
     };
     #[test_only]
     use aptos_experimental::order_book_types::{good_till_cancelled, price_move_up_condition, price_move_down_condition};
@@ -56,8 +55,9 @@ module aptos_experimental::single_order_book {
     const E_NOT_ACTIVE_ORDER: u64 = 7;
     const E_REINSERT_ORDER_MISMATCH: u64 = 8;
     const EORDER_CREATOR_MISMATCH: u64 = 9;
+    const ENOT_SINGLE_ORDER_BOOK: u64 = 10;
 
-    enum OrderRequest<M: store + copy + drop> has copy, drop {
+    enum SingleOrderRequest<M: store + copy + drop> has copy, drop {
         V1 {
             account: address,
             order_id: OrderIdType,
@@ -72,7 +72,7 @@ module aptos_experimental::single_order_book {
         }
     }
 
-    enum RetailOrderBook<M: store + copy + drop> has store {
+    enum SingleOrderBook<M: store + copy + drop> has store {
         V1 {
             orders: BigOrderedMap<OrderIdType, OrderWithState<M>>,
             client_order_ids: BigOrderedMap<AccountClientOrderId, OrderIdType>,
@@ -86,7 +86,7 @@ module aptos_experimental::single_order_book {
         FillOrKill
     }
 
-    public(friend) fun new_order_request<M: store + copy + drop>(
+    public(friend) fun new_single_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
         client_order_id: Option<u64>,
@@ -97,8 +97,8 @@ module aptos_experimental::single_order_book {
         trigger_condition: Option<TriggerCondition>,
         time_in_force: TimeInForce,
         metadata: M
-    ): OrderRequest<M> {
-        OrderRequest::V1 {
+    ): SingleOrderRequest<M> {
+        SingleOrderRequest::V1 {
             account,
             order_id,
             client_order_id,
@@ -112,8 +112,38 @@ module aptos_experimental::single_order_book {
         }
     }
 
-    public(friend) fun new_single_order_book<M: store + copy + drop>(): RetailOrderBook<M> {
-        RetailOrderBook::V1 {
+    fun new_order_request_from_match_details<M: store + copy + drop>(
+        order_match_details: OrderMatchDetails<M>
+    ): SingleOrderRequest<M> {
+        let (
+            order_id,
+            account,
+            client_order_id,
+            _unique_priority_idx,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            time_in_force,
+            metadata,
+            _single_order_book_type
+        ) = order_match_details.destroy_order_match_details();
+        SingleOrderRequest::V1 {
+            account,
+            order_id,
+            client_order_id,
+            price,
+            orig_size,
+            remaining_size,
+            is_bid,
+            trigger_condition: option::none(),
+            time_in_force,
+            metadata: metadata.destroy_some(),
+        }
+    }
+
+    public(friend) fun new_single_order_book<M: store + copy + drop>(): SingleOrderBook<M> {
+        SingleOrderBook::V1 {
             orders: new_default_big_ordered_map(),
             client_order_ids: new_default_big_ordered_map(),
             pending_orders: new_pending_order_book_index()
@@ -130,18 +160,18 @@ module aptos_experimental::single_order_book {
     ///
     /// `order_creator` is passed to only verify order cancellation is authorized correctly
     public(friend) fun cancel_order<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
-    ): Order<M> {
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
+    ): SingleOrder<M> {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
         let order_with_state = self.orders.remove(&order_id);
         let (order, is_active) = order_with_state.destroy_order_from_state();
         assert!(order_creator == order.get_account(), EORDER_CREATOR_MISMATCH);
         if (is_active) {
-            let unique_priority_idx = order.get_unique_priority_idx();
             let (
                 account,
                 _order_id,
                 client_order_id,
+                unique_priority_idx,
                 bid_price,
                 _orig_size,
                 _size,
@@ -149,7 +179,7 @@ module aptos_experimental::single_order_book {
                 _,
                 _,
                 _
-            ) = order.destroy_order();
+            ) = order.destroy_single_order();
             price_time_idx.cancel_active_order(bid_price, unique_priority_idx, is_bid);
             if (client_order_id.is_some()) {
                 self.client_order_ids.remove(
@@ -157,11 +187,11 @@ module aptos_experimental::single_order_book {
                 );
             };
         } else {
-            let unique_priority_idx = order.get_unique_priority_idx();
             let (
                 _account,
                 _order_id,
                 client_order_id,
+                unique_priority_idx,
                 _bid_price,
                 _orig_size,
                 _size,
@@ -169,7 +199,7 @@ module aptos_experimental::single_order_book {
                 trigger_condition,
                 _,
                 _
-            ) = order.destroy_order();
+            ) = order.destroy_single_order();
             self.pending_orders.cancel_pending_order(
                 trigger_condition.destroy_some(), unique_priority_idx
             );
@@ -185,8 +215,8 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, client_order_id: u64
-    ): Option<Order<M>> {
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, client_order_id: u64
+    ): Option<SingleOrder<M>> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
         if (!self.client_order_ids.contains(&account_client_order_id)) {
@@ -197,7 +227,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun client_order_id_exists<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_creator: address, client_order_id: u64
+        self: &SingleOrderBook<M>, order_creator: address, client_order_id: u64
     ): bool {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
@@ -207,22 +237,30 @@ module aptos_experimental::single_order_book {
     /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
     /// else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
     public(friend) fun place_maker_order<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: OrderRequest<M>
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
     ) {
+        let ascending_idx =
+            new_unique_idx_type(ascending_id_generator.next_ascending_id());
         if (order_req.trigger_condition.is_some()) {
             return self.place_pending_maker_order(ascending_id_generator, order_req);
         };
+        self.place_ready_maker_order_with_unique_idx(price_time_idx, order_req, ascending_idx);
 
-        let ascending_idx =
-            new_unique_idx_type(ascending_id_generator.next_ascending_id());
+    }
 
+    fun place_ready_maker_order_with_unique_idx<M: store + copy + drop>(
+        self: &mut SingleOrderBook<M>,
+        price_time_idx: &mut PriceTimeIndex,
+        order_req: SingleOrderRequest<M>,
+        ascending_idx: UniqueIdxType
+    ) {
         assert!(
             !self.orders.contains(&order_req.order_id),
             error::invalid_argument(EORDER_ALREADY_EXISTS)
         );
 
         let order =
-            new_order(
+            new_single_order(
                 order_req.order_id,
                 order_req.account,
                 ascending_idx,
@@ -246,6 +284,7 @@ module aptos_experimental::single_order_book {
         };
         price_time_idx.place_maker_order(
             order_req.order_id,
+            single_order_book_type(),
             order_req.price,
             ascending_idx,
             order_req.remaining_size,
@@ -253,47 +292,31 @@ module aptos_experimental::single_order_book {
         );
     }
 
+
     /// Reinserts a maker order to the order book. This is used when the order is removed from the order book
     /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
     /// it is added to the order book, if it exists, it's size is updated.
-    public(friend) fun reinsert_maker_order<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: OrderRequest<M>, original_order: Order<M>
+    public(friend) fun reinsert_order<M: store + copy + drop>(
+        self: &mut SingleOrderBook<M>,
+        price_time_idx: &mut PriceTimeIndex,
+        reinsert_order: OrderMatchDetails<M>,
+        original_order: &OrderMatchDetails<M>,
     ) {
-        assert!(
-            &original_order.get_order_id() == &order_req.order_id,
-            E_REINSERT_ORDER_MISMATCH
-        );
-        assert!(
-            &original_order.get_account() == &order_req.account,
-            E_REINSERT_ORDER_MISMATCH
-        );
-        assert!(
-            original_order.get_orig_size() == order_req.orig_size,
-            E_REINSERT_ORDER_MISMATCH
-        );
-        assert!(original_order.get_client_order_id() == order_req.client_order_id,
-            E_REINSERT_ORDER_MISMATCH);
-        // TODO check what should the rule be for remaining_size. check test_maker_order_reinsert_not_exists unit test.
-        // assert!(
-        //     original_order.get_remaining_size() >= order_req.remaining_size,
-        //     E_REINSERT_ORDER_MISMATCH
-        // );
-        assert!(original_order.get_price() == order_req.price, E_REINSERT_ORDER_MISMATCH);
-        assert!(original_order.is_bid() == order_req.is_bid, E_REINSERT_ORDER_MISMATCH);
-
-        assert!(order_req.trigger_condition.is_none(), E_NOT_ACTIVE_ORDER);
-        if (!self.orders.contains(&order_req.order_id)) {
-            return self.place_maker_order(price_time_idx, ascending_id_generator, order_req);
+        assert!(reinsert_order.validate_reinsertion_request(original_order), E_REINSERT_ORDER_MISMATCH);
+        let order_id = reinsert_order.get_order_id_from_match_details();
+        let unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
+        if (!self.orders.contains(&order_id)) {
+            return self.place_ready_maker_order_with_unique_idx(price_time_idx, new_order_request_from_match_details(reinsert_order), unique_idx);
         };
 
-        modify_order(&mut self.orders, &order_req.order_id, |order_with_state| {
-            order_with_state.increase_remaining_size(order_req.remaining_size);
+        modify_order(&mut self.orders, &order_id, |order_with_state| {
+            order_with_state.increase_remaining_size(reinsert_order.get_remaining_size_from_match_details());
         });
         price_time_idx.increase_order_size(
-            order_req.price,
-            original_order.get_unique_priority_idx(),
-            order_req.remaining_size,
-            order_req.is_bid
+            reinsert_order.get_price_from_match_details(),
+            unique_idx,
+            reinsert_order.get_remaining_size_from_match_details(),
+            reinsert_order.is_bid_from_match_details(),
         );
     }
 
@@ -328,13 +351,13 @@ module aptos_experimental::single_order_book {
 
 
     fun place_pending_maker_order<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, ascending_id_generator: &mut AscendingIdGenerator, order_req: OrderRequest<M>
+        self: &mut SingleOrderBook<M>, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
     ) {
         let order_id = order_req.order_id;
         let ascending_idx =
             new_unique_idx_type(ascending_id_generator.next_ascending_id());
         let order =
-            new_order(
+            new_single_order(
                 order_id,
                 order_req.account,
                 ascending_idx,
@@ -360,15 +383,12 @@ module aptos_experimental::single_order_book {
     /// Returns a single match for a taker order. It is responsibility of the caller to first call the `is_taker_order`
     /// API to ensure that the order is a taker order before calling this API, otherwise it will abort.
     public(friend) fun get_single_match_for_taker<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>,
-        price_time_idx: &mut PriceTimeIndex,
-        price: u64,
-        size: u64,
-        is_bid: bool
-    ): SingleOrderMatch<M> {
-        let result = price_time_idx.get_single_match_result(price, size, is_bid);
-        let (order_id, matched_size, remaining_size) =
-            result.destroy_active_matched_order();
+        self: &mut SingleOrderBook<M>,
+        active_matched_order: ActiveMatchedOrder,
+    ): OrderMatch<M> {
+        let (order_id, matched_size, remaining_size, order_book_type) =
+            active_matched_order.destroy_active_matched_order();
+        assert!(order_book_type == single_order_book_type(), ENOT_SINGLE_ORDER_BOOK);
 
         let order_with_state = modify_or_remove_order(&mut self.orders, &order_id, |order_with_state| {
             order_with_state.set_remaining_size(remaining_size);
@@ -383,8 +403,21 @@ module aptos_experimental::single_order_book {
                 )
             );
         };
+        let (
+            account,
+            order_id,
+            client_order_id,
+            unique_priority_idx,
+            price,
+            orig_size,
+            size,
+            is_bid,
+            _trigger_condition,
+            time_in_force,
+            metadata
+        ) = order.destroy_single_order();
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
-        new_single_order_match(order, matched_size)
+        new_order_match(new_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, option::some(metadata), single_order_book_type()), matched_size)
     }
 
     /// Decrease the size of the order by the given size delta. The API aborts if the order is not found in the order book or
@@ -394,7 +427,7 @@ module aptos_experimental::single_order_book {
     ///
     /// `order_creator` is passed to only verify order cancellation is authorized correctly
     public(friend) fun decrease_order_size<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>,
+        self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,
         order_creator: address,
         order_id: OrderIdType,
@@ -425,7 +458,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun get_order_id_by_client_id<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_creator: address, client_order_id: u64
+        self: &SingleOrderBook<M>, order_creator: address, client_order_id: u64
     ): Option<OrderIdType> {
         let account_client_order_id =
             new_account_client_order_id(order_creator, client_order_id);
@@ -436,7 +469,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun get_order_metadata<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_id: OrderIdType
+        self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<M> {
         if (!self.orders.contains(&order_id)) {
             return option::none();
@@ -445,7 +478,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun set_order_metadata<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, order_id: OrderIdType, metadata: M
+        self: &mut SingleOrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
         assert!(self.orders.contains(&order_id), EORDER_NOT_FOUND);
 
@@ -455,7 +488,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun is_active_order<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_id: OrderIdType
+        self: &SingleOrderBook<M>, order_id: OrderIdType
     ): bool {
         if (!self.orders.contains(&order_id)) {
             return false;
@@ -464,7 +497,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun get_order<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_id: OrderIdType
+        self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<OrderWithState<M>> {
         if (!self.orders.contains(&order_id)) {
             return option::none();
@@ -473,7 +506,7 @@ module aptos_experimental::single_order_book {
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_id: OrderIdType
+        self: &SingleOrderBook<M>, order_id: OrderIdType
     ): u64 {
         if (!self.orders.contains(&order_id)) {
             return 0;
@@ -483,8 +516,8 @@ module aptos_experimental::single_order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
     public(friend) fun take_ready_price_based_orders<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, current_price: u64, order_limit: u64
-    ): vector<Order<M>> {
+        self: &mut SingleOrderBook<M>, current_price: u64, order_limit: u64
+    ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
         let order_ids = self.pending_orders.take_ready_price_based_orders(current_price, order_limit);
         let orders = vector::empty();
@@ -499,8 +532,8 @@ module aptos_experimental::single_order_book {
 
     /// Removes and returns the orders that are ready to be executed based on the time condition.
     public(friend) fun take_ready_time_based_orders<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>,  order_limit: u64
-    ): vector<Order<M>> {
+        self: &mut SingleOrderBook<M>, order_limit: u64
+    ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
         let order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
         let orders = vector::empty();
@@ -516,8 +549,8 @@ module aptos_experimental::single_order_book {
     // ============================= test_only APIs ====================================
 
     #[test_only]
-    public(friend) fun destroy_single_order_book<M: store + copy + drop>(self: RetailOrderBook<M>) {
-        let RetailOrderBook::V1 {
+    public(friend) fun destroy_single_order_book<M: store + copy + drop>(self: SingleOrderBook<M>) {
+        let SingleOrderBook::V1 {
             orders,
             client_order_ids,
             pending_orders
@@ -529,7 +562,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
-        self: &RetailOrderBook<M>, order_id: OrderIdType
+        self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<UniqueIdxType> {
         if (!self.orders.contains(&order_id)) {
             return option::none();
@@ -552,8 +585,8 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun place_order_and_get_matches<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: OrderRequest<M>
-    ): vector<SingleOrderMatch<M>> {
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+    ): vector<OrderMatch<M>> {
         let match_results = vector::empty();
         let remaining_size = order_req.remaining_size;
         while (remaining_size > 0) {
@@ -563,7 +596,7 @@ module aptos_experimental::single_order_book {
                 self.place_maker_order(
                     price_time_idx,
                     ascending_id_generator,
-                    OrderRequest::V1 {
+                    SingleOrderRequest::V1 {
                         account: order_req.account,
                         order_id: order_req.order_id,
                         client_order_id: order_req.client_order_id,
@@ -578,10 +611,9 @@ module aptos_experimental::single_order_book {
                 );
                 return match_results;
             };
+            let result = price_time_idx.get_single_match_result( order_req.price, remaining_size, order_req.is_bid);
             let match_result =
-                self.get_single_match_for_taker(
-                    price_time_idx, order_req.price, remaining_size, order_req.is_bid
-                );
+                self.get_single_match_for_taker(result);
             let matched_size = match_result.get_matched_size();
             match_results.push_back(match_result);
             remaining_size -= matched_size;
@@ -591,12 +623,12 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun update_order_and_get_matches<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: OrderRequest<M>
-    ): vector<SingleOrderMatch<M>> {
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
+    ): vector<OrderMatch<M>> {
         let unique_priority_idx = self.get_unique_priority_idx(order_req.order_id);
         assert!(unique_priority_idx.is_some(), EORDER_NOT_FOUND);
         self.cancel_order(price_time_idx, order_req.account, order_req.order_id);
-        let order_req = OrderRequest::V1 {
+        let order_req = SingleOrderRequest::V1 {
             account: order_req.account,
             order_id: order_req.order_id,
             client_order_id: order_req.client_order_id,
@@ -613,8 +645,8 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun trigger_pending_orders<M: store + copy + drop>(
-        self: &mut RetailOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, oracle_price: u64
-    ): vector<SingleOrderMatch<M>> {
+        self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, oracle_price: u64
+    ): vector<OrderMatch<M>> {
         let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
         let all_matches = vector::empty();
         let i = 0;
@@ -624,6 +656,7 @@ module aptos_experimental::single_order_book {
                 account,
                 order_id,
                 client_order_id,
+                _unique_priority_idx,
                 price,
                 orig_size,
                 remaining_size,
@@ -631,8 +664,8 @@ module aptos_experimental::single_order_book {
                 _,
                 time_in_force,
                 metadata
-            ) = order.destroy_order();
-            let order_req = OrderRequest::V1 {
+            ) = order.destroy_single_order();
+            let order_req = SingleOrderRequest::V1 {
                 account,
                 order_id,
                 client_order_id,
@@ -653,7 +686,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public(friend) fun total_matched_size<M: store + copy + drop>(
-        match_results: &vector<SingleOrderMatch<M>>
+        match_results: &vector<OrderMatch<M>>
     ): u64 {
         let total_matched_size = 0;
         let i = 0;
@@ -672,7 +705,7 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public fun set_up_test(): (RetailOrderBook<TestMetadata>, PriceTimeIndex, AscendingIdGenerator) {
+    public fun set_up_test(): (SingleOrderBook<TestMetadata>, PriceTimeIndex, AscendingIdGenerator) {
         let order_book = new_single_order_book<TestMetadata>();
         let price_time_idx = new_price_time_idx();
         let ascending_id_generator = new_ascending_id_generator();
@@ -680,7 +713,7 @@ module aptos_experimental::single_order_book {
     }
 
     #[test_only]
-    public fun set_up_test_with_id(): (RetailOrderBook<u64>, PriceTimeIndex, AscendingIdGenerator) {
+    public fun set_up_test_with_id(): (SingleOrderBook<u64>, PriceTimeIndex, AscendingIdGenerator) {
         let order_book = new_single_order_book<u64>();
         let price_time_idx = new_price_time_idx();
         let ascending_id_generator = new_ascending_id_generator();
@@ -700,8 +733,8 @@ module aptos_experimental::single_order_book {
         is_bid: bool,
         trigger_condition: Option<TriggerCondition>,
         metadata: M
-    ): OrderRequest<M> {
-        OrderRequest::V1 {
+    ): SingleOrderRequest<M> {
+        SingleOrderRequest::V1 {
             account,
             order_id,
             client_order_id,
@@ -723,7 +756,7 @@ module aptos_experimental::single_order_book {
         size: u64,
         is_bid: bool,
         metadata: M
-    ): OrderRequest<M> {
+    ): SingleOrderRequest<M> {
         create_test_order_request(
             account,
             order_id,
@@ -746,7 +779,7 @@ module aptos_experimental::single_order_book {
         size: u64,
         is_bid: bool,
         metadata: M
-    ): OrderRequest<M> {
+    ): SingleOrderRequest<M> {
         create_test_order_request(
             account,
             order_id,
@@ -762,7 +795,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public fun verify_order_state<M: store + copy + drop>(
-        order_book: &RetailOrderBook<M>,
+        order_book: &SingleOrderBook<M>,
         order_id: OrderIdType,
         expected_account: address,
         expected_price: u64,
@@ -773,8 +806,8 @@ module aptos_experimental::single_order_book {
     ) {
         let order_state = *order_book.orders.borrow(&order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
-        let (account, _order_id, client_order_id, price, orig_size, size, is_bid,_, _, _) =
-            order.destroy_order();
+        let (account, _order_id, client_order_id, _, price, orig_size, size, is_bid,_, _, _) =
+            order.destroy_single_order();
         assert!(is_active == true);
         assert!(account == expected_account);
         assert!(price == expected_price);
@@ -786,7 +819,7 @@ module aptos_experimental::single_order_book {
 
     #[test_only]
     public fun verify_match_result<M: store + copy + drop>(
-        match_results: &vector<SingleOrderMatch<M>>,
+        match_results: &vector<OrderMatch<M>>,
         expected_matched_size: u64,
         expected_maker_account: address,
         expected_maker_order_id: OrderIdType,
@@ -797,17 +830,17 @@ module aptos_experimental::single_order_book {
         assert!(total_matched_size(match_results) == expected_matched_size);
         assert!(match_results.length() == 1);
         let maker_match = match_results[0];
-        let (order, matched_size) = maker_match.destroy_single_order_match();
-        assert!(order.get_account() == expected_maker_account);
-        assert!(order.get_order_id() == expected_maker_order_id);
+        let (match_details, matched_size) = maker_match.destroy_order_match();
+        assert!(match_details.get_account_from_match_details() == expected_maker_account);
+        assert!(match_details.get_order_id_from_match_details() == expected_maker_order_id);
         assert!(matched_size == expected_maker_matched_size);
-        assert!(order.get_orig_size() == expected_maker_orig_size);
-        assert!(order.get_remaining_size() == expected_maker_remaining_size);
+        assert!(match_details.get_orig_size_from_match_details() == expected_maker_orig_size);
+        assert!(match_details.get_remaining_size_from_match_details() == expected_maker_remaining_size);
     }
 
     #[test_only]
     public fun cleanup_test<M: store + copy + drop>(
-        order_book: RetailOrderBook<M>,
+        order_book: SingleOrderBook<M>,
         price_time_idx: PriceTimeIndex
     ) {
         order_book.destroy_single_order_book();
@@ -1450,32 +1483,10 @@ module aptos_experimental::single_order_book {
 
         assert!(order_book.client_order_id_exists(@0xAA, 1));
 
-        let (matched_order, _) = match_results[0].destroy_single_order_match();
-        let (
-            _account,
-            _order_id,
-            _client_order_id,
-            price,
-            orig_size,
-            _remaining_size,
-            is_bid,
-            _trigger_condition,
-            _time_in_force,
-            metadata
-        ) = matched_order.destroy_order();
+        let (matched_order, _) = match_results[0].destroy_order_match();
+        let reinsert_request = matched_order.new_order_match_details_with_modified_size(50);
         // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
-        let order_req = create_test_order_request(
-            @0xAA,
-            new_order_id_type(1),
-            option::some(1),
-            price,
-            orig_size,
-            50,
-            is_bid,
-            option::none(),
-            metadata
-        );
-        order_book.reinsert_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req, matched_order);
+        order_book.reinsert_order(&mut price_time_idx, reinsert_request,  &matched_order);
         assert!(order_book.client_order_id_exists(@0xAA, 1));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 950);
@@ -1517,32 +1528,10 @@ module aptos_experimental::single_order_book {
 
         assert!(!order_book.client_order_id_exists(@0xAA, 1));
 
-        let (matched_order, _) = match_results[0].destroy_single_order_match();
-        let (
-            _account,
-            _order_id,
-            _client_order_id,
-            price,
-            orig_size,
-            _remaining_size,
-            is_bid,
-            _trigger_condition,
-            _time_in_force,
-            metadata
-        ) = matched_order.destroy_order();
-        // Assume half of the order was matched and remaining 50 size is reinserted back to the order book
-        let order_req = create_test_order_request(
-            @0xAA,
-            new_order_id_type(1),
-            option::some(1),
-            price,
-            orig_size,
-            500,
-            is_bid,
-            option::none(),
-            metadata
-        );
-        order_book.reinsert_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req, matched_order);
+        let (matched_order, _) = match_results[0].destroy_order_match();
+        let reinsert_request = matched_order.new_order_match_details_with_modified_size(500);
+
+        order_book.reinsert_order(&mut price_time_idx,  reinsert_request, &matched_order);
         assert!(order_book.client_order_id_exists(@0xAA, 1));
         // Verify order was reinserted with updated size
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 500);
