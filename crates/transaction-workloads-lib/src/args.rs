@@ -326,7 +326,6 @@ impl TransactionTypeArg {
                     creation_balance: 200000,
                 }),
                 num_modules: 1,
-                use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
             },
             TransactionTypeArg::LiquidityPoolSwap => {

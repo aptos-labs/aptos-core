@@ -516,7 +516,14 @@ pub enum SingleRunMode {
         /// If your workflow has an end (generats no transactions after some point),
         /// you can set a large number, and test will stop by itself.
         run_for_blocks: Option<usize>,
+        additional_configs: Option<SingleRunAdditionalConfigs>,
     },
+}
+
+// Optional more detailed configuration.
+pub struct SingleRunAdditionalConfigs {
+    pub num_generator_workers: usize,
+    pub split_stages: bool,
 }
 
 pub fn run_single_with_default_params(
@@ -567,6 +574,32 @@ pub fn run_single_with_default_params(
             (approx_tps / 4).clamp(10, 10000)
         },
     };
+    let num_generator_workers = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            additional_configs: None,
+            ..
+        } => 4,
+        SingleRunMode::BENCHMARK {
+            additional_configs:
+                Some(SingleRunAdditionalConfigs {
+                    num_generator_workers,
+                    ..
+                }),
+            ..
+        } => num_generator_workers,
+    };
+    let split_stages = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            additional_configs: None,
+            ..
+        } => false,
+        SingleRunMode::BENCHMARK {
+            additional_configs: Some(SingleRunAdditionalConfigs { split_stages, .. }),
+            ..
+        } => split_stages,
+    };
 
     let num_main_signer_accounts = num_accounts / 5;
     let num_dst_pool_accounts = num_accounts / 2;
@@ -605,6 +638,8 @@ pub fn run_single_with_default_params(
         generate_then_execute: true,
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
         print_transactions,
+        num_generator_workers,
+        split_stages,
         ..Default::default()
     };
 
