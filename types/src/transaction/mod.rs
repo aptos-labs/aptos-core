@@ -46,6 +46,8 @@ pub mod authenticator;
 pub mod block_epilogue;
 mod block_output;
 mod change_set;
+pub mod diff;
+pub mod diff_filter;
 mod module;
 mod multisig;
 mod script;

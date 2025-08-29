@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::replay_verify_comparison::ReplayVerifyComparisonConfig;
 use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -18,7 +19,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
+        BlockExecutableTransaction, PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
     },
     write_set::WriteSet,
 };
@@ -72,6 +73,12 @@ pub struct Opt {
         help = "The maximum time in seconds to wait for each transaction replay"
     )]
     pub timeout_secs: Option<u64>,
+
+    #[clap(
+        long,
+        help = "Path to JSON configuration file for replay verification comparison. If not provided, uses exact comparison."
+    )]
+    pub config_file: Option<PathBuf>,
 }
 
 impl Opt {
@@ -131,6 +138,7 @@ struct Verifier {
     concurrent_replay: usize,
     replay_stat: ReplayTps,
     timeout_secs: Option<u64>,
+    comparison_config: ReplayVerifyComparisonConfig,
 }
 
 impl Verifier {
@@ -185,6 +193,10 @@ impl Verifier {
             concurrent_replay: config.concurrent_replay,
             replay_stat: ReplayTps::new(),
             timeout_secs: config.timeout_secs,
+            comparison_config: match &config.config_file {
+                Some(config_path) => ReplayVerifyComparisonConfig::from_file(config_path)?,
+                None => ReplayVerifyComparisonConfig::Exact,
+            },
         })
     }
 
@@ -341,6 +353,17 @@ impl Verifier {
             .iter()
             .map(|txn| SignatureVerifiedTransaction::from(txn.clone()))
             .collect::<Vec<_>>();
+        let fee_payers = txns
+            .iter()
+            .map(|txn| {
+                txn.try_as_signed_user_txn().map(|txn| {
+                    txn.authenticator_ref()
+                        .fee_payer_address()
+                        .unwrap_or_else(|| txn.sender())
+                })
+            })
+            .collect::<Vec<_>>();
+
         let txns_provider = DefaultTxnProvider::new(
             txns,
             cur_persisted_aux_info
@@ -360,11 +383,13 @@ impl Verifier {
             let version = *current_version;
             *current_version += 1;
 
-            if let Err(err) = executed_outputs[idx].ensure_match_transaction_info(
+            if let Err(err) = self.comparison_config.ensure_match_transaction_info(
                 version,
+                &executed_outputs[idx],
                 &expected_txn_infos[idx],
-                Some(&expected_writesets[idx]),
-                Some(&expected_events[idx]),
+                &expected_writesets[idx],
+                &expected_events[idx],
+                fee_payers[idx],
             ) {
                 cur_txns.drain(0..idx + 1);
                 cur_persisted_aux_info.drain(0..idx + 1);

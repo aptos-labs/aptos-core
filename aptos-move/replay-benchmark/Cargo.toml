@@ -25,7 +25,6 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
-claims = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 move-core-types = { workspace = true }

@@ -302,10 +302,10 @@ where
             self.total_dependency_size += size;
 
             if self.num_dependencies > self.vm_gas_params.txn.max_num_dependencies {
-                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+                return Err(PartialVMError::new(StatusCode::ZERO_VARIANTS_ERROR));
             }
             if self.total_dependency_size > self.vm_gas_params.txn.max_total_dependency_size {
-                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+                return Err(PartialVMError::new(StatusCode::ZERO_VARIANTS_ERROR));
             }
         }
         Ok(())

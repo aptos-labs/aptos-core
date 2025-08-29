@@ -38,6 +38,7 @@
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
 !testsuite/forge/src/backend/k8s/
+!testsuite/replay-verify/replay_verification_config.json
 !third_party/move/move-prover/boogie-backend/**/*.bpl
 !testsuite/testcases/src/data/
 !types/src/jwks/rsa/insecure_test_jwk.json

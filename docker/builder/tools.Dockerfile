@@ -34,6 +34,9 @@ COPY --link --from=tools-builder /aptos/dist/aptos-fn-check-client /usr/local/bi
 COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 COPY --link --from=tools-builder /aptos/dist/aptos-api-tester /usr/local/bin/aptos-api-tester
 
+# Copy replay verification config file
+COPY --link --from=tools-builder /aptos/testsuite/replay-verify/replay_verification_config.json /usr/local/share/replay_verification_config.json
+
 # Copy the example module to publish for api-tester
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-framework /aptos-move/framework/aptos-framework
 COPY --link --from=tools-builder /aptos/aptos-move/framework/aptos-stdlib /aptos-move/framework/aptos-stdlib
