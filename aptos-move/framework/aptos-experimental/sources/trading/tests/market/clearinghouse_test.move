@@ -3,7 +3,6 @@ module aptos_experimental::clearinghouse_test {
     use std::error;
     use std::option;
     use std::signer;
-    use std::string;
     use std::vector;
     use aptos_std::table;
     use aptos_std::table::Table;
