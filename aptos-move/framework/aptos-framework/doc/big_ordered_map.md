@@ -905,11 +905,19 @@ Returns true iff the BigOrderedMap is empty.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
-    <b>if</b> (self.root.is_leaf) {
+    <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(self.min_leaf_index);
+    <b>let</b> check = node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>();
+
+
+    <b>let</b> result = <b>if</b> (self.root.is_leaf) {
         self.root.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
     } <b>else</b> {
         <b>false</b>
-    }
+    };
+
+    <b>assert</b>!(check == result);
+
+    result
 }
 </code></pre>
 

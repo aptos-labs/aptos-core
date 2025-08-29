@@ -297,11 +297,19 @@ module aptos_std::big_ordered_map {
 
     /// Returns true iff the BigOrderedMap is empty.
     public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
-        if (self.root.is_leaf) {
+        let node = self.borrow_node(self.min_leaf_index);
+        let check = node.children.is_empty();
+
+
+        let result = if (self.root.is_leaf) {
             self.root.children.is_empty()
         } else {
             false
-        }
+        };
+
+        assert!(check == result);
+
+        result
     }
 
     /// Returns the number of elements in the BigOrderedMap.
