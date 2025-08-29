@@ -33,5 +33,5 @@ tokio = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemalloc-ctl = "0.5.4"
-jemalloc-sys = "0.5.4"
+jemalloc-ctl = { workspace = true }
+jemalloc-sys = { workspace = true }
