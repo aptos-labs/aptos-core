@@ -5,7 +5,7 @@ use crate::common::types::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::FrameName;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction};
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -29,8 +29,13 @@ pub fn run_transaction_using_debugger(
     let resolver = state_view.as_move_resolver();
     let code_storage = state_view.as_aptos_code_storage(&env);
 
-    let (vm_status, vm_output) =
-        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
+    let (vm_status, vm_output) = vm.execute_user_transaction(
+        &resolver,
+        &code_storage,
+        &transaction,
+        &log_context,
+        &AuxiliaryInfo::default(),
+    );
 
     Ok((vm_status, vm_output))
 }
@@ -48,8 +53,13 @@ pub fn benchmark_transaction_using_debugger(
 
     let resolver = state_view.as_move_resolver();
     let code_storage = state_view.as_aptos_code_storage(&env);
-    let (vm_status, vm_output) =
-        vm.execute_user_transaction(&resolver, &code_storage, &transaction, &log_context);
+    let (vm_status, vm_output) = vm.execute_user_transaction(
+        &resolver,
+        &code_storage,
+        &transaction,
+        &log_context,
+        &AuxiliaryInfo::default(),
+    );
 
     let time_cold = {
         let n = 15;
@@ -68,6 +78,7 @@ pub fn benchmark_transaction_using_debugger(
                 &code_storage,
                 &transaction,
                 &log_context,
+                &AuxiliaryInfo::default(),
             ));
             let t2 = Instant::now();
 
@@ -82,7 +93,7 @@ pub fn benchmark_transaction_using_debugger(
         let mut times = vec![];
         let n = 15;
 
-        for _i in 0..n {
+        for i in 0..n {
             // Reuse the existing VM with warm code cache so to measure only the
             // execution time.
             let t1 = Instant::now();
@@ -91,6 +102,12 @@ pub fn benchmark_transaction_using_debugger(
                 &code_storage,
                 &transaction,
                 &log_context,
+                &AuxiliaryInfo::new(
+                    PersistedAuxiliaryInfo::V1 {
+                        transaction_index: i,
+                    },
+                    None,
+                ),
             ));
             let t2 = Instant::now();
 
@@ -98,7 +115,7 @@ pub fn benchmark_transaction_using_debugger(
         }
         times.sort();
 
-        times[n / 2]
+        times[(n / 2) as usize]
     };
 
     println!("Running time (cold code cache): {:?}", time_cold);
@@ -114,7 +131,16 @@ pub fn profile_transaction_using_debugger(
     hash: HashValue,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, gas_log) = debugger
-        .execute_transaction_at_version_with_gas_profiler(version, transaction)
+        .execute_transaction_at_version_with_gas_profiler(
+            version,
+            transaction,
+            AuxiliaryInfo::new(
+                PersistedAuxiliaryInfo::V1 {
+                    transaction_index: 2,
+                },
+                None,
+            ),
+        )
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;

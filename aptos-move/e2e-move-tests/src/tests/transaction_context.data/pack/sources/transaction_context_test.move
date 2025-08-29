@@ -24,6 +24,10 @@ module admin::transaction_context_test {
         type_arg_names: vector<String>,
         args: vector<vector<u8>>,
         multisig_address: address,
+        // Fields for monotonically increasing counter tests
+        counter_values: vector<u128>,
+        counter_timestamps: vector<u64>,
+        counter_call_count: u64,
     }
 
     /// Called when the module is first deployed at address `signer`, which is supposed to be @admin (= 0x1).
@@ -44,6 +48,9 @@ module admin::transaction_context_test {
                 args: vector[],
                 type_arg_names: vector[],
                 multisig_address: @0x0,
+                counter_values: vector[],
+                counter_timestamps: vector[],
+                counter_call_count: 0,
             }
         );
     }
@@ -147,5 +154,79 @@ module admin::transaction_context_test {
         multisig_account::create_transaction(s, multisig_account, payload);
 
         store.multisig_address = multisig_account;
+    }
+
+    // ===== Monotonically Increasing Counter Tests =====
+
+    /// Test that stores a single counter value and verifies it's non-zero
+    public entry fun store_monotonically_increasing_counter_single(_s: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+        let counter = transaction_context::monotonically_increasing_counter();
+
+        // Store the counter value
+        vector::push_back(&mut store.counter_values, counter);
+        store.counter_call_count = store.counter_call_count + 1;
+
+        // Verify counter is non-zero
+        assert!(counter > 0, 100);
+    }
+
+    /// Test that stores multiple counter values in a single transaction and verifies they increase
+    public entry fun store_monotonically_increasing_counter_multiple(_s: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+
+        // Get multiple counter values in the same transaction
+        let counter1 = transaction_context::monotonically_increasing_counter();
+        let counter2 = transaction_context::monotonically_increasing_counter();
+        let counter3 = transaction_context::monotonically_increasing_counter();
+
+        // Store all values
+        vector::push_back(&mut store.counter_values, counter1);
+        vector::push_back(&mut store.counter_values, counter2);
+        vector::push_back(&mut store.counter_values, counter3);
+        store.counter_call_count = store.counter_call_count + 3;
+
+        // Verify they increase monotonically
+        assert!(counter2 > counter1, 101);
+        assert!(counter3 > counter2, 102);
+        assert!(counter3 > counter1, 103);
+    }
+
+    /// Test that extracts the components of the counter to verify format
+    public entry fun test_monotonically_increasing_counter_format(_s: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+
+        let counter_1 = transaction_context::monotonically_increasing_counter();
+
+        // Extract components according to format:
+        // `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session_counter (8 bits) || local_counter (16 bits)`
+        let local_counter_1 = (counter_1 & 0xFFFF) as u16;
+        let session_counter_1 = ((counter_1 >> 16) & 0xFF) as u8;
+        let transaction_index_1 = ((counter_1 >> 24) & 0xFFFFFFFF) as u32;
+        let timestamp_us_1 = ((counter_1 >> 56) & 0xFFFFFFFFFFFFFFFF) as u64;
+        let reserved_byte_1 = (counter_1 >> 120) as u8;
+
+        vector::push_back(&mut store.counter_values, counter_1);
+        vector::push_back(&mut store.counter_timestamps, timestamp_us_1);
+        store.counter_call_count = store.counter_call_count + 1;
+
+        let counter_2 = transaction_context::monotonically_increasing_counter();
+        let local_counter_2 = (counter_2 & 0xFFFF) as u16;
+        let session_counter_2 = ((counter_2 >> 16) & 0xFF) as u8;
+        let transaction_index_2 = ((counter_2 >> 24) & 0xFFFFFFFF) as u32;
+        let timestamp_us_2 = ((counter_2 >> 56) & 0xFFFFFFFFFFFFFFFF) as u64;
+        let reserved_byte_2 = (counter_2 >> 120) as u8;
+
+        vector::push_back(&mut store.counter_values, counter_2);
+        vector::push_back(&mut store.counter_timestamps, timestamp_us_2);
+        store.counter_call_count = store.counter_call_count + 1;
+
+        // Verify format constraints
+        assert!(reserved_byte_1 == reserved_byte_2, 110); // Reserved byte should be the same
+        assert!(local_counter_2 > 0, 111); // Local counter should be > 0 after first call
+        assert!(session_counter_1 == session_counter_2, 112); // Session counter should be the same
+        assert!(transaction_index_1 == transaction_index_2, 113); // Transaction index should be the same after two calls
+        assert!(timestamp_us_1 == timestamp_us_2, 114); // Timestamp should be the same within transaction
+        assert!(local_counter_1 < local_counter_2, 115); // Local counter should increase monotonically
     }
 }

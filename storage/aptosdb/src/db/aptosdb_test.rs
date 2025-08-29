@@ -26,8 +26,8 @@ use aptos_types::{
     proof::SparseMerkleLeafNode,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
-        TransactionToCommit, VMErrorDetail, Version,
+        ExecutionStatus, PersistedAuxiliaryInfo, TransactionAuxiliaryData,
+        TransactionAuxiliaryDataV1, TransactionInfo, TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
     write_set::WriteSet,
@@ -194,6 +194,9 @@ fn test_get_latest_ledger_summary() {
     let key = StateKey::raw(b"test_key");
     let value = StateValue::from(b"test_val".to_vec());
     let state_hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
+    let auxiliary_info = PersistedAuxiliaryInfo::V1 {
+        transaction_index: 0,
+    };
     let txn_info = TransactionInfo::new(
         HashValue::random(),
         HashValue::random(),
@@ -201,7 +204,7 @@ fn test_get_latest_ledger_summary() {
         Some(state_hash),
         0,
         ExecutionStatus::MiscellaneousError(None),
-        Some(HashValue::random()),
+        Some(auxiliary_info.hash()),
     );
     let root_hash = txn_info.hash();
     let mut txn_to_commit = TransactionToCommit::dummy();

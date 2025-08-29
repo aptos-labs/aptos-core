@@ -56,7 +56,9 @@ fn pfn_const_tps(
             7,
             add_cpu_chaos,
             add_network_emulation,
-            None,
+            Some(Arc::new(|config: &mut NodeConfig, _| {
+                config.indexer_db_config.enable_event = true;
+            })),
         ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();

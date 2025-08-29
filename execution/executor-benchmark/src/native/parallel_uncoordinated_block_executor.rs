@@ -29,8 +29,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionOutput,
-        TransactionStatus,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, Transaction, TransactionAuxiliaryData,
+        TransactionOutput, TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -80,7 +80,7 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
