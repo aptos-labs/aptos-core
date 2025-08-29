@@ -88,6 +88,7 @@ where
         resolver: &'r R,
     ) -> Self {
         let mut extensions = NativeContextExtensions::default();
+        let session_counter = session_id.session_counter();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
             .to_vec()
@@ -109,6 +110,7 @@ where
             session_id.into_script_hash(),
             chain_id.id(),
             maybe_user_transaction_context,
+            session_counter,
         ));
         extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));

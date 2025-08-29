@@ -1312,7 +1312,6 @@ impl IndexedTransactionSummary {
         }
     }
 }
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
@@ -1900,7 +1899,7 @@ impl TransactionInfo {
             state_checkpoint_hash,
             gas_used,
             status,
-            None,
+            Some(HashValue::default()),
         )
     }
 
@@ -1913,7 +1912,7 @@ impl TransactionInfo {
             None,
             0,
             ExecutionStatus::Success,
-            None,
+            Some(HashValue::default()),
         )
     }
 }
@@ -2133,11 +2132,11 @@ impl TransactionToCommit {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.transaction_info.gas_used
+        self.transaction_info.gas_used()
     }
 
     pub fn status(&self) -> &ExecutionStatus {
-        &self.transaction_info.status
+        self.transaction_info.status()
     }
 
     pub fn is_reconfig(&self) -> bool {
@@ -2486,11 +2485,11 @@ impl TransactionOutputListWithProof {
             // Verify the write set matches for both the transaction info and output
             let write_set_hash = CryptoHash::hash(&txn_output.write_set);
             ensure!(
-                txn_info.state_change_hash == write_set_hash,
+                txn_info.state_change_hash() == write_set_hash,
                 "The write set in transaction output does not match the transaction info \
                      in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
                 write_set_hash,
-                txn_info.state_change_hash,
+                txn_info.state_change_hash(),
             );
 
             // Verify the gas matches for both the transaction info and output
@@ -3120,13 +3119,6 @@ impl AuxiliaryInfo {
         }
     }
 
-    pub fn new_empty() -> Self {
-        Self {
-            persisted_info: PersistedAuxiliaryInfo::None,
-            ephemeral_info: None,
-        }
-    }
-
     pub fn into_persisted_info(self) -> PersistedAuxiliaryInfo {
         self.persisted_info
     }
@@ -3138,18 +3130,72 @@ impl AuxiliaryInfo {
     pub fn ephemeral_info(&self) -> &Option<EphemeralAuxiliaryInfo> {
         &self.ephemeral_info
     }
+
+    pub fn persisted_info_hash(&self) -> Option<HashValue> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { .. } => Some(self.persisted_info.hash()),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
+}
+
+impl Default for AuxiliaryInfo {
+    fn default() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None, // Use None by default for compatibility
+            ephemeral_info: None,
+        }
+    }
+}
+
+impl AuxiliaryInfoTrait for AuxiliaryInfo {
+    fn new_empty() -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::None,
+            ephemeral_info: None,
+        }
+    }
+
+    fn transaction_index(&self) -> Option<u32> {
+        match self.persisted_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => Some(transaction_index),
+            PersistedAuxiliaryInfo::None => None,
+        }
+    }
+
+    fn proposer_index(&self) -> Option<u64> {
+        self.ephemeral_info
+            .map(|EphemeralAuxiliaryInfo { proposer_index }| proposer_index)
+    }
+
+    fn auxiliary_info_at_txn_index(txn_index: u32) -> Self {
+        Self {
+            persisted_info: PersistedAuxiliaryInfo::V1 {
+                transaction_index: txn_index,
+            },
+            ephemeral_info: None,
+        }
+    }
 }
 
 #[derive(
-    BCSCryptoHash, Clone, Copy, CryptoHasher, Debug, Eq, Serialize, Deserialize, PartialEq,
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+
 pub enum PersistedAuxiliaryInfo {
     None,
     // The index of the transaction in a block (after shuffler, before execution).
     // Note that this would be slightly different from the index of transactions that get committed
     // onchain, as this considers transactions that may get discarded.
     V1 { transaction_index: u32 },
+}
+
+pub trait AuxiliaryInfoTrait: Clone {
+    fn transaction_index(&self) -> Option<u32>;
+    fn proposer_index(&self) -> Option<u64>;
+    fn new_empty() -> Self;
+    fn auxiliary_info_at_txn_index(txn_index: u32) -> Self;
 }
 
 #[derive(Debug, Clone, Copy)]
