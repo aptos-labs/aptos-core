@@ -23,6 +23,13 @@ pub enum ValidatorInfoIdlError {
     HexError(String),
 }
 
+/// Error types for JWK IDL operations
+#[derive(Debug, Error)]
+pub enum JwkIdlError {
+    #[error("JSON deserialization error: {0}")]
+    JsonDeserializationError(String),
+}
+
 /// Error types for general IDL operations
 #[derive(Debug, Error)]
 pub enum IdlError {

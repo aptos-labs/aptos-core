@@ -5,6 +5,7 @@ pub mod compute_res;
 pub mod events;
 pub mod on_chain_config;
 pub mod config_storage;
+pub mod relayer;
 use crate::account::{ExternalAccountAddress, ExternalChainId};
 use crate::u256_define::HashValue;
 use compute_res::ComputeRes;
@@ -49,12 +50,14 @@ pub struct ExternalBlockMeta {
 pub struct ExternalBlock {
     pub block_meta: ExternalBlockMeta,
     pub txns: Vec<VerifiedTxn>,
+    pub jwks_extra_data: Vec<Vec<u8>>,
 }
 
 #[derive(Debug)]
 pub enum ExecError {
     InternalError,
     DuplicateExecError,
+    Other(String),
 }
 
 pub enum ExecTxn {

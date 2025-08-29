@@ -68,6 +68,7 @@ aptos-network = { workspace = true }
 aptos-memsocket = { workspace = true }
 aptos-safety-rules = { workspace = true }
 aptos-mempool = { workspace = true }
+aptos-jwk-consensus = { workspace = true }
 
 [features]
 default = [

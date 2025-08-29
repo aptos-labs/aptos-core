@@ -6,8 +6,8 @@ use self::{
     rsa::{INSECURE_TEST_RSA_JWK, RSA_JWK, SECURE_TEST_RSA_JWK},
 };
 use crate::{
-    aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
+    aggregate_signature::AggregateSignature, idl::jwk_converter::construct_observed_jwks,
+    move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig,
 };
 use anyhow::{bail, Context};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -227,6 +227,10 @@ impl ObservedJWKs {
 impl OnChainConfig for ObservedJWKs {
     const MODULE_IDENTIFIER: &'static str = "jwks";
     const TYPE_IDENTIFIER: &'static str = "ObservedJWKs";
+
+    fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
+        Ok(construct_observed_jwks(bytes)?)
+    }
 }
 
 /// Reflection of Move type `0x1::jwks::PatchedJWKs`.

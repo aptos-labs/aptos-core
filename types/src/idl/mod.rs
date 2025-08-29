@@ -23,6 +23,7 @@
 pub mod validator_info;
 pub mod error;
 pub mod api_types_converter;
+pub mod jwk_converter;
 
 pub use validator_info::*;
 pub use error::*;

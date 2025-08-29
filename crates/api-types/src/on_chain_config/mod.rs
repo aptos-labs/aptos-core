@@ -8,3 +8,4 @@ pub mod validator_set;
 pub mod validator_info;
 pub mod validator_config;
 pub mod consensus_config;
+pub mod jwks;

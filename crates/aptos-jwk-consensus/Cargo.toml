@@ -43,6 +43,7 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
+api-types = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

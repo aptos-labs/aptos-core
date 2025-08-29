@@ -9,7 +9,8 @@ use crate::{
     },
     dkg::DKGStartEvent,
     event::EventKey,
-    jwks::ObservedJWKsUpdated,
+    jwks::{jwk::JWKMoveStruct, AllProvidersJWKs, ObservedJWKsUpdated, ProviderJWKs},
+    move_any::Any,
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
@@ -440,7 +441,34 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                     serde_json::to_vec(&data).unwrap(),
                 )))
             },
-            GravityEvent::JWK => todo!(),
+            GravityEvent::ObservedJWKsUpdated(epoch, jwks) => {
+                let data = ObservedJWKsUpdated {
+                    epoch: *epoch,
+                    jwks: AllProvidersJWKs {
+                        entries: jwks
+                            .iter()
+                            .map(|jwk| ProviderJWKs {
+                                issuer: jwk.issuer.clone(),
+                                version: jwk.version,
+                                jwks: jwk
+                                    .jwks
+                                    .iter()
+                                    .map(|jwk| JWKMoveStruct {
+                                        variant: Any {
+                                            type_name: "0x1::jwks::JWK".to_string(),
+                                            data: jwk.data.clone(),
+                                        },
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
+                    },
+                };
+                Ok(ContractEvent::V2(ContractEventV2::new(
+                    TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag())),
+                    bcs::to_bytes(&data).unwrap(),
+                )))
+            },
             GravityEvent::DKG => todo!(),
         }
     }

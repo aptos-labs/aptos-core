@@ -57,3 +57,4 @@ pub use aptos_netcore;
 pub use aptos_memsocket;
 pub use aptos_safety_rules;
 pub use aptos_mempool;
+pub use aptos_jwk_consensus;

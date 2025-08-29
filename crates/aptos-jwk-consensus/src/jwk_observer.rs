@@ -3,10 +3,11 @@
 
 use crate::counters::OBSERVATION_SECONDS;
 use anyhow::{anyhow, Result};
+use api_types::relayer::GLOBAL_RELAYER;
 use aptos_channels::aptos_channel;
 use aptos_jwk_utils::{fetch_jwks_from_jwks_uri, fetch_jwks_uri_from_openid_config};
-use aptos_logger::{debug, info};
-use aptos_types::jwks::{jwk::JWK, Issuer};
+use aptos_logger::{debug, error, info};
+use aptos_types::jwks::{jwk::JWK, unsupported::UnsupportedJWK, Issuer};
 use futures::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use std::time::{Duration, Instant};
@@ -67,11 +68,25 @@ impl JWKObserver {
             None
         };
 
+        if issuer.starts_with("gravity://") {
+            let relayer = GLOBAL_RELAYER.get().unwrap();
+            let r = relayer
+                .add_uri(issuer.as_str(), open_id_config_url.as_str())
+                .await;
+            if r.is_err() {
+                error!(
+                    "Failed to add issuer to relayer with uri={:?}, error={:?}",
+                    open_id_config_url, r.unwrap_err(),
+                );
+                return;
+            }
+        }
+
         loop {
             tokio::select! {
                 _ = interval.tick().fuse() => {
                     let timer = Instant::now();
-                    let result = fetch_jwks(open_id_config_url.as_str(), my_addr).await;
+                    let result = fetch_jwks(open_id_config_url.as_str(), my_addr, issuer.as_str()).await;
                     debug!(issuer = issuer, "observe_result={:?}", result);
                     let secs = timer.elapsed().as_secs_f64();
                     if let Ok(mut jwks) = result {
@@ -99,7 +114,20 @@ impl JWKObserver {
     }
 }
 
-async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>) -> Result<Vec<JWK>> {
+async fn fetch_jwks_with_relayer(issuer: &str) -> Result<Vec<JWK>> {
+    let relayer = GLOBAL_RELAYER.get().unwrap();
+    let last_state = relayer.get_last_state(issuer).await.unwrap();
+    let jwks = JWK::Unsupported(UnsupportedJWK {
+        id: issuer.as_bytes().to_vec(),
+        payload: last_state,
+    });
+    Ok(vec![jwks])
+}
+
+async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>, issuer: &str) -> Result<Vec<JWK>> {
+    if issuer.starts_with("gravity://") {
+        return fetch_jwks_with_relayer(issuer).await;
+    }
     let jwks_uri = fetch_jwks_uri_from_openid_config(open_id_config_url)
         .await
         .map_err(|e| anyhow!("fetch_jwks failed with open-id config request: {e}"))?;
