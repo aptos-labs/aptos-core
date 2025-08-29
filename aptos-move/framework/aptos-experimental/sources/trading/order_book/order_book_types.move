@@ -32,7 +32,7 @@ module aptos_experimental::order_book_types {
         client_order_id: u64
     }
 
-    // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
+    // Internal type representing order in which trades are placed.
     struct UniqueIdxType has store, copy, drop {
         idx: u128
     }
@@ -40,15 +40,6 @@ module aptos_experimental::order_book_types {
     enum OrderBookType has store, drop, copy {
         SingleOrderBook,
         BulkOrderBook
-    }
-
-    // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
-    // Returned ids are ascending and unique within a single instance of AscendingIdGenerator.
-    enum AscendingIdGenerator has store, drop {
-        FromCounter {
-            value: u64
-        }
-        // TODO: add stateless (and with that fully parallel) support for id creation via native function
     }
 
     public fun single_order_book_type(): OrderBookType {
@@ -75,15 +66,6 @@ module aptos_experimental::order_book_types {
         account: address, client_order_id: u64
     ): AccountClientOrderId {
         AccountClientOrderId { account, client_order_id }
-    }
-
-    public(friend) fun new_ascending_id_generator(): AscendingIdGenerator {
-        AscendingIdGenerator::FromCounter { value: 0 }
-    }
-
-    public(friend) fun next_ascending_id(self: &mut AscendingIdGenerator): u128 {
-        self.value += 1;
-        self.value as u128
     }
 
     public(friend) fun new_unique_idx_type(idx: u128): UniqueIdxType {

@@ -44,6 +44,7 @@
 ///
 module aptos_experimental::bulk_order_book {
     use aptos_framework::big_ordered_map::BigOrderedMap;
+    use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{BulkOrder, new_bulk_order,
@@ -52,7 +53,7 @@ module aptos_experimental::bulk_order_book {
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_book_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        AscendingIdGenerator, new_order_id_type, new_unique_idx_type
+        new_order_id_type, new_unique_idx_type
     };
     // Error codes for various failure scenarios
     const EORDER_ALREADY_EXISTS: u64 = 1;
@@ -325,7 +326,6 @@ module aptos_experimental::bulk_order_book {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order book
     /// - `price_time_idx`: Mutable reference to the price time index
-    /// - `ascending_id_generator`: Mutable reference to the ascending id generator
     /// - `order_req`: The bulk order request to place
     ///
     /// # Aborts:
@@ -333,7 +333,6 @@ module aptos_experimental::bulk_order_book {
     public fun place_bulk_order(
         self: &mut BulkOrderBook,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
-        ascending_id_generator: &mut AscendingIdGenerator,
         order_req: BulkOrderRequest
     ) : OrderIdType {
         let account = get_account_from_order_request(&order_req);
@@ -343,13 +342,13 @@ module aptos_experimental::bulk_order_book {
             cancel_active_orders(price_time_idx, &old_order);
             old_order.get_order_id()
         } else {
-            let order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
+            let order_id = new_order_id_type(transaction_context::monotonically_increasing_counter());
             self.order_id_to_address.add(order_id, account);
             order_id
         };
         let new_order = new_bulk_order(
             order_id,
-            new_unique_idx_type(ascending_id_generator.next_ascending_id()),
+            new_unique_idx_type(transaction_context::monotonically_increasing_counter()),
             order_req,
             price_time_idx.best_bid_price(),
             price_time_idx.best_ask_price(),

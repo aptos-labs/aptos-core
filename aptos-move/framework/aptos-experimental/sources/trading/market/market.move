@@ -61,6 +61,7 @@ module aptos_experimental::market {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_framework::transaction_context;
     use aptos_experimental::bulk_order_book_types::new_bulk_order_request;
     use aptos_experimental::order_book::{OrderBook, new_order_book, new_single_order_request};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker,
@@ -68,8 +69,6 @@ module aptos_experimental::market {
     };
     use aptos_experimental::order_book_types::{
         new_order_id_type,
-        new_ascending_id_generator,
-        AscendingIdGenerator,
         OrderIdType, OrderMatchDetails, single_order_book_type, OrderBookType
     };
     use aptos_experimental::single_order_types::{
@@ -107,7 +106,6 @@ module aptos_experimental::market {
             parent: address,
             /// Address of the market object of this market.
             market: address,
-            order_id_generator: AscendingIdGenerator,
             // Incremental fill id for matched orders
             next_fill_id: u64,
             config: MarketConfig,
@@ -245,7 +243,6 @@ module aptos_experimental::market {
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
-            order_id_generator: new_ascending_id_generator(),
             next_fill_id: 0,
             config,
             order_book: new_order_book(),
@@ -374,7 +371,7 @@ module aptos_experimental::market {
     }
 
     public fun next_order_id<M: store + copy + drop>(self: &mut Market<M>): OrderIdType {
-        new_order_id_type(self.order_id_generator.next_ascending_id())
+        new_order_id_type(transaction_context::monotonically_increasing_counter())
     }
 
     fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
@@ -1311,7 +1308,6 @@ module aptos_experimental::market {
         let Market::V1 {
             parent: _parent,
             market: _market,
-            order_id_generator: _order_id_generator,
             next_fill_id: _next_fill_id,
             config,
             order_book,
