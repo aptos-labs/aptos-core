@@ -226,6 +226,8 @@ impl CompiledScriptBuilder {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I64 => I64,
+            I128 => I128,
             Bool => Bool,
             Address => Address,
             Signer => Signer,

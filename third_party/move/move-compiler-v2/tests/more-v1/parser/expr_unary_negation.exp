@@ -1,10 +1,13 @@
 
 Diagnostics:
-error: unexpected token
-  ┌─ tests/more-v1/parser/expr_unary_negation.move:5:19
+error: constraint `u8|u16|u32|u64|u128|u256` incompatible with `i64|i128`
+  ┌─ tests/more-v1/parser/expr_unary_negation.move:5:20
   │
 5 │     assert!(((1 - -2) == 3) && (-(1 - 2) == 1), 100);
-  │                   ^
-  │                   │
-  │                   Unexpected '-'
-  │                   Expected an expression term
+  │                    ^
+
+error: the function takes 2 arguments but 1 were provided
+  ┌─ tests/more-v1/parser/expr_unary_negation.move:5:33
+  │
+5 │     assert!(((1 - -2) == 3) && (-(1 - 2) == 1), 100);
+  │                                 ^^^^^^^^

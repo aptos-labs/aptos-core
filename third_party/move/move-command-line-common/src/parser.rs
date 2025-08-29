@@ -345,10 +345,14 @@ pub enum NumberFormat {
 }
 
 // Determines the base of the number literal, depending on the prefix
-pub(crate) fn determine_num_text_and_base(s: &str) -> (&str, NumberFormat) {
-    match s.strip_prefix("0x") {
-        Some(s_hex) => (s_hex, NumberFormat::Hex),
-        None => (s, NumberFormat::Decimal),
+pub(crate) fn determine_num_text_and_base(s: &str) -> (String, NumberFormat) {
+    if let Some(s_hex) = s.strip_prefix("0x") {
+        (s_hex.to_string(), NumberFormat::Hex)
+    } else if let Some(s_hex) = s.strip_prefix("-0x") {
+        // if negative hex, need to add the '-' back
+        (format!("-{}", s_hex), NumberFormat::Hex)
+    } else {
+        (s.to_string(), NumberFormat::Decimal)
     }
 }
 
@@ -402,6 +406,24 @@ pub fn parse_u256(s: &str) -> Result<(U256, NumberFormat), U256FromStrError> {
     let (txt, base) = determine_num_text_and_base(s);
     Ok((
         U256::from_str_radix(&txt.replace('_', ""), base as u32)?,
+        base,
+    ))
+}
+
+/// Parse an i64 from a decimal or hex encoding and return its value in i64
+pub fn parse_i64(s: &str) -> Result<(i64, NumberFormat), ParseIntError> {
+    let (txt, base) = determine_num_text_and_base(s);
+    Ok((
+        i64::from_str_radix(&txt.replace('_', ""), base as u32)?,
+        base,
+    ))
+}
+
+/// Parse an i128 from a decimal or hex encoding and return its value in i128
+pub fn parse_i128(s: &str) -> Result<(i128, NumberFormat), ParseIntError> {
+    let (txt, base) = determine_num_text_and_base(s);
+    Ok((
+        i128::from_str_radix(&txt.replace('_', ""), base as u32)?,
         base,
     ))
 }

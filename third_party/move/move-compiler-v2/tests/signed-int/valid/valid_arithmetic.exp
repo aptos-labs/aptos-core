@@ -1,0 +1,4591 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_arithmetic {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_add1(x: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::add(x, x)
+    }
+    private fun test_add2(x: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::add(x, x)
+    }
+    private fun test_add3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::add(i64::add(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_add4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::add(i128::add(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_div1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::div(x, y)
+    }
+    private fun test_div2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::div(x, y)
+    }
+    private fun test_div3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::div(i64::div(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_div4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::div(i128::div(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mix1(x: 0x1::i64::I64,y: 0x1::i64::I64,z: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mod(i64::div(i64::mul(i64::sub(i64::add(x, y), z), x), y), z)
+    }
+    private fun test_mix2(x: 0x1::i128::I128,y: 0x1::i128::I128,z: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mod(i128::div(i128::mul(i128::sub(i128::add(x, y), z), x), y), z)
+    }
+    private fun test_mix3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mod(i64::div(i64::mul(i64::sub(i64::add(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3)), select valid_arithmetic::S1.y<S1>(s1)), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mix4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mod(i128::div(i128::mul(i128::sub(i128::add(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3)), select valid_arithmetic::S1.z<S1>(s1)), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mod1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mod(x, y)
+    }
+    private fun test_mod2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mod(x, y)
+    }
+    private fun test_mod3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mod(i64::mod(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mod4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mod(i128::mod(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mul1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mul(x, y)
+    }
+    private fun test_mul2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mul(x, y)
+    }
+    private fun test_mul3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mul(i64::mul(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mul4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mul(i128::mul(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_neg1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::sub(i64::add(i64::neg(x), y), i64::mod(i64::div(i64::mul(i64::neg(x), i64::neg(y)), i64::neg(x)), i64::neg(y)))
+    }
+    private fun test_neg2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::sub(i128::add(i128::neg(x), y), i128::mod(i128::div(i128::mul(i128::neg(x), i128::neg(y)), i128::neg(x)), i128::neg(y)))
+    }
+    private fun test_sub1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::sub(x, y)
+    }
+    private fun test_sub2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::sub(x, y)
+    }
+    private fun test_sub3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::sub(i64::sub(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_sub4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::sub(i128::sub(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+} // end 0x42::valid_arithmetic
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_arithmetic {
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test_add1(x: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::add(x, x)
+    }
+    fun test_add2(x: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::add(x, x)
+    }
+    fun test_add3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::add(0x1::i64::add(s1.y, s2.y), s3.x)
+    }
+    fun test_add4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::add(0x1::i128::add(s1.z, s2.z), s3.x)
+    }
+    fun test_div1(x: 0x1::i64::I64, y: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::div(x, y)
+    }
+    fun test_div2(x: 0x1::i128::I128, y: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::div(x, y)
+    }
+    fun test_div3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::div(0x1::i64::div(s1.y, s2.y), s3.x)
+    }
+    fun test_div4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::div(0x1::i128::div(s1.z, s2.z), s3.x)
+    }
+    fun test_mix1(x: 0x1::i64::I64, y: 0x1::i64::I64, z: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::mod(0x1::i64::div(0x1::i64::mul(0x1::i64::sub(0x1::i64::add(x, y), z), x), y), z)
+    }
+    fun test_mix2(x: 0x1::i128::I128, y: 0x1::i128::I128, z: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::mod(0x1::i128::div(0x1::i128::mul(0x1::i128::sub(0x1::i128::add(x, y), z), x), y), z)
+    }
+    fun test_mix3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::mod(0x1::i64::div(0x1::i64::mul(0x1::i64::sub(0x1::i64::add(s1.y, s2.y), s3.x), s1.y), s2.y), s3.x)
+    }
+    fun test_mix4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::mod(0x1::i128::div(0x1::i128::mul(0x1::i128::sub(0x1::i128::add(s1.z, s2.z), s3.x), s1.z), s2.z), s3.x)
+    }
+    fun test_mod1(x: 0x1::i64::I64, y: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::mod(x, y)
+    }
+    fun test_mod2(x: 0x1::i128::I128, y: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::mod(x, y)
+    }
+    fun test_mod3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::mod(0x1::i64::mod(s1.y, s2.y), s3.x)
+    }
+    fun test_mod4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::mod(0x1::i128::mod(s1.z, s2.z), s3.x)
+    }
+    fun test_mul1(x: 0x1::i64::I64, y: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::mul(x, y)
+    }
+    fun test_mul2(x: 0x1::i128::I128, y: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::mul(x, y)
+    }
+    fun test_mul3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::mul(0x1::i64::mul(s1.y, s2.y), s3.x)
+    }
+    fun test_mul4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::mul(0x1::i128::mul(s1.z, s2.z), s3.x)
+    }
+    fun test_neg1(x: 0x1::i64::I64, y: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::sub(0x1::i64::add(0x1::i64::neg(x), y), 0x1::i64::mod(0x1::i64::div(0x1::i64::mul(0x1::i64::neg(x), 0x1::i64::neg(y)), 0x1::i64::neg(x)), 0x1::i64::neg(y)))
+    }
+    fun test_neg2(x: 0x1::i128::I128, y: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::sub(0x1::i128::add(0x1::i128::neg(x), y), 0x1::i128::mod(0x1::i128::div(0x1::i128::mul(0x1::i128::neg(x), 0x1::i128::neg(y)), 0x1::i128::neg(x)), 0x1::i128::neg(y)))
+    }
+    fun test_sub1(x: 0x1::i64::I64, y: 0x1::i64::I64): 0x1::i64::I64 {
+        0x1::i64::sub(x, y)
+    }
+    fun test_sub2(x: 0x1::i128::I128, y: 0x1::i128::I128): 0x1::i128::I128 {
+        0x1::i128::sub(x, y)
+    }
+    fun test_sub3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        0x1::i64::sub(0x1::i64::sub(s1.y, s2.y), s3.x)
+    }
+    fun test_sub4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        0x1::i128::sub(0x1::i128::sub(s1.z, s2.z), s3.x)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_arithmetic::test_add1($t0: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+     var $t2: 0x1::i64::I64
+  0: $t2 := infer($t0)
+  1: $t1 := i64::add($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add2($t0: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+     var $t2: 0x1::i128::I128
+  0: $t2 := infer($t0)
+  1: $t1 := i128::add($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::add($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::add($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::add($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::add($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::div($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::div($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::div($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::div($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::div($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::div($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64, $t2: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+  0: $t8 := infer($t0)
+  1: $t7 := i64::add($t8, $t1)
+  2: $t6 := i64::sub($t7, $t2)
+  3: $t5 := i64::mul($t6, $t0)
+  4: $t4 := i64::div($t5, $t1)
+  5: $t3 := i64::mod($t4, $t2)
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128, $t2: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+  0: $t8 := infer($t0)
+  1: $t7 := i128::add($t8, $t1)
+  2: $t6 := i128::sub($t7, $t2)
+  3: $t5 := i128::mul($t6, $t0)
+  4: $t4 := i128::div($t5, $t1)
+  5: $t3 := i128::mod($t4, $t2)
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i64::I64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t16: &0x1::i64::I64
+     var $t17: 0x1::i64::I64
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i64::I64
+     var $t20: 0x1::i64::I64
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t25: &0x1::i64::I64
+  0: $t9 := borrow_local($t0)
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
+  2: $t8 := read_ref($t10)
+  3: $t12 := borrow_local($t1)
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
+  5: $t11 := read_ref($t13)
+  6: $t7 := i64::add($t8, $t11)
+  7: $t15 := borrow_local($t2)
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t15)
+  9: $t14 := read_ref($t16)
+ 10: $t6 := i64::sub($t7, $t14)
+ 11: $t18 := borrow_local($t0)
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.y($t18)
+ 13: $t17 := read_ref($t19)
+ 14: $t5 := i64::mul($t6, $t17)
+ 15: $t21 := borrow_local($t1)
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.y($t21)
+ 17: $t20 := read_ref($t22)
+ 18: $t4 := i64::div($t5, $t20)
+ 19: $t24 := borrow_local($t2)
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t24)
+ 21: $t23 := read_ref($t25)
+ 22: $t3 := i64::mod($t4, $t23)
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i128::I128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t16: &0x1::i128::I128
+     var $t17: 0x1::i128::I128
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i128::I128
+     var $t20: 0x1::i128::I128
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t25: &0x1::i128::I128
+  0: $t9 := borrow_local($t0)
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
+  2: $t8 := read_ref($t10)
+  3: $t12 := borrow_local($t1)
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
+  5: $t11 := read_ref($t13)
+  6: $t7 := i128::add($t8, $t11)
+  7: $t15 := borrow_local($t2)
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t15)
+  9: $t14 := read_ref($t16)
+ 10: $t6 := i128::sub($t7, $t14)
+ 11: $t18 := borrow_local($t0)
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.z($t18)
+ 13: $t17 := read_ref($t19)
+ 14: $t5 := i128::mul($t6, $t17)
+ 15: $t21 := borrow_local($t1)
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.z($t21)
+ 17: $t20 := read_ref($t22)
+ 18: $t4 := i128::div($t5, $t20)
+ 19: $t24 := borrow_local($t2)
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t24)
+ 21: $t23 := read_ref($t25)
+ 22: $t3 := i128::mod($t4, $t23)
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::mod($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::mod($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::mod($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::mod($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::mod($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::mod($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::mul($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::mul($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::mul($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::mul($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::mul($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::mul($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+  0: $t4 := i64::neg($t0)
+  1: $t3 := i64::add($t4, $t1)
+  2: $t8 := i64::neg($t0)
+  3: $t9 := i64::neg($t1)
+  4: $t7 := i64::mul($t8, $t9)
+  5: $t10 := i64::neg($t0)
+  6: $t6 := i64::div($t7, $t10)
+  7: $t11 := i64::neg($t1)
+  8: $t5 := i64::mod($t6, $t11)
+  9: $t2 := i64::sub($t3, $t5)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+  0: $t4 := i128::neg($t0)
+  1: $t3 := i128::add($t4, $t1)
+  2: $t8 := i128::neg($t0)
+  3: $t9 := i128::neg($t1)
+  4: $t7 := i128::mul($t8, $t9)
+  5: $t10 := i128::neg($t0)
+  6: $t6 := i128::div($t7, $t10)
+  7: $t11 := i128::neg($t1)
+  8: $t5 := i128::mod($t6, $t11)
+  9: $t2 := i128::sub($t3, $t5)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::sub($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::sub($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::sub($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::sub($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::sub($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::sub($t4, $t11)
+ 11: return $t3
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_arithmetic::test_add1($t0: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+     var $t2: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t1 := i64::add($t2, $t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add2($t0: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+     var $t2: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t1 := i128::add($t2, $t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 35
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `y`] at line 35
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 35
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `y`] at line 35
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i64::add($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 35
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 35
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i64::add($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 39
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `z`] at line 39
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 39
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `z`] at line 39
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i128::add($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 39
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 39
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i128::add($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i64::div($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i128::div($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 83
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `y`] at line 83
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 83
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `y`] at line 83
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i64::div($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 83
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 83
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i64::div($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 87
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `z`] at line 87
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 87
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `z`] at line 87
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i128::div($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 87
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 87
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i128::div($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64, $t2: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+  1: $t7 := i64::add($t8, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+  2: $t6 := i64::sub($t7, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+  3: $t5 := i64::mul($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  4: $t4 := i64::div($t5, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  5: $t3 := i64::mod($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128, $t2: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+  1: $t7 := i128::add($t8, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+  2: $t6 := i128::sub($t7, $t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+  3: $t5 := i128::mul($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  4: $t4 := i128::div($t5, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  5: $t3 := i128::mod($t4, $t2)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i64::I64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t16: &0x1::i64::I64
+     var $t17: 0x1::i64::I64
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i64::I64
+     var $t20: 0x1::i64::I64
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t25: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t9 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s1`] at line 115
+     #
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s1`, field `y`] at line 115
+     #
+  2: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+  3: $t12 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s2`] at line 115
+     #
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s2`, field `y`] at line 115
+     #
+  5: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t11
+     # refs: []
+     #
+  6: $t7 := i64::add($t8, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+  7: $t15 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s3`] at line 115
+     #
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `s3`, field `x`] at line 115
+     #
+  9: $t14 := read_ref($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t14
+     # refs: []
+     #
+ 10: $t6 := i64::sub($t7, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 11: $t18 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => #18 via [local `s1`] at line 115
+     #
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.y($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => #19 via [local `s1`, field `y`] at line 115
+     #
+ 13: $t17 := read_ref($t19)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t17
+     # refs: []
+     #
+ 14: $t5 := i64::mul($t6, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+ 15: $t21 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `s2`] at line 115
+     #
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.y($t21)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t22
+     # refs: [$t22 => #22]
+     # #22
+     #   <no edges>
+     # #root
+     #   => #22 via [local `s2`, field `y`] at line 115
+     #
+ 17: $t20 := read_ref($t22)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t20
+     # refs: []
+     #
+ 18: $t4 := i64::div($t5, $t20)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+ 19: $t24 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s3`] at line 115
+     #
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t25
+     # refs: [$t25 => #25]
+     # #25
+     #   <no edges>
+     # #root
+     #   => #25 via [local `s3`, field `x`] at line 115
+     #
+ 21: $t23 := read_ref($t25)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t23
+     # refs: []
+     #
+ 22: $t3 := i64::mod($t4, $t23)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i128::I128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t16: &0x1::i128::I128
+     var $t17: 0x1::i128::I128
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i128::I128
+     var $t20: 0x1::i128::I128
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t25: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t9 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s1`] at line 119
+     #
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s1`, field `z`] at line 119
+     #
+  2: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+  3: $t12 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s2`] at line 119
+     #
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s2`, field `z`] at line 119
+     #
+  5: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8, $t11
+     # refs: []
+     #
+  6: $t7 := i128::add($t8, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+  7: $t15 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s3`] at line 119
+     #
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t16
+     # refs: [$t16 => #16]
+     # #16
+     #   <no edges>
+     # #root
+     #   => #16 via [local `s3`, field `x`] at line 119
+     #
+  9: $t14 := read_ref($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7, $t14
+     # refs: []
+     #
+ 10: $t6 := i128::sub($t7, $t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 11: $t18 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => #18 via [local `s1`] at line 119
+     #
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.z($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t19
+     # refs: [$t19 => #19]
+     # #19
+     #   <no edges>
+     # #root
+     #   => #19 via [local `s1`, field `z`] at line 119
+     #
+ 13: $t17 := read_ref($t19)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6, $t17
+     # refs: []
+     #
+ 14: $t5 := i128::mul($t6, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+ 15: $t21 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `s2`] at line 119
+     #
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.z($t21)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t22
+     # refs: [$t22 => #22]
+     # #22
+     #   <no edges>
+     # #root
+     #   => #22 via [local `s2`, field `z`] at line 119
+     #
+ 17: $t20 := read_ref($t22)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t20
+     # refs: []
+     #
+ 18: $t4 := i128::div($t5, $t20)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+ 19: $t24 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s3`] at line 119
+     #
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t25
+     # refs: [$t25 => #25]
+     # #25
+     #   <no edges>
+     # #root
+     #   => #25 via [local `s3`, field `x`] at line 119
+     #
+ 21: $t23 := read_ref($t25)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t23
+     # refs: []
+     #
+ 22: $t3 := i128::mod($t4, $t23)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i64::mod($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i128::mod($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 99
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `y`] at line 99
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 99
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `y`] at line 99
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i64::mod($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 99
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 99
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i64::mod($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 103
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `z`] at line 103
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 103
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `z`] at line 103
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i128::mod($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 103
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 103
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i128::mod($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i64::mul($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i128::mul($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 67
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `y`] at line 67
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 67
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `y`] at line 67
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i64::mul($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 67
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 67
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i64::mul($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 71
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `z`] at line 71
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 71
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `z`] at line 71
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i128::mul($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 71
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 71
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i128::mul($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := i64::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::add($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t8 := i64::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  3: $t9 := i64::neg($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  4: $t7 := i64::mul($t8, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  5: $t10 := i64::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t7, $t10
+     # refs: []
+     #
+  6: $t6 := i64::div($t7, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  7: $t11 := i64::neg($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t11
+     # refs: []
+     #
+  8: $t5 := i64::mod($t6, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  9: $t2 := i64::sub($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := i128::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i128::add($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t8 := i128::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8
+     # refs: []
+     #
+  3: $t9 := i128::neg($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t8, $t9
+     # refs: []
+     #
+  4: $t7 := i128::mul($t8, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3, $t7
+     # refs: []
+     #
+  5: $t10 := i128::neg($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t7, $t10
+     # refs: []
+     #
+  6: $t6 := i128::div($t7, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  7: $t11 := i128::neg($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t6, $t11
+     # refs: []
+     #
+  8: $t5 := i128::mod($t6, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  9: $t2 := i128::sub($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i64::sub($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  1: $t2 := i128::sub($t3, $t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 51
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `y`] at line 51
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 51
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `y`] at line 51
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i64::sub($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 51
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 51
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i64::sub($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t6 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t6
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `s1`] at line 55
+     #
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t7
+     # refs: [$t7 => #7]
+     # #7
+     #   <no edges>
+     # #root
+     #   => #7 via [local `s1`, field `z`] at line 55
+     #
+  2: $t5 := read_ref($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2, $t5
+     # refs: []
+     #
+  3: $t9 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t9
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `s2`] at line 55
+     #
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t10
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `s2`, field `z`] at line 55
+     #
+  5: $t8 := read_ref($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t5, $t8
+     # refs: []
+     #
+  6: $t4 := i128::sub($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  7: $t12 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s3`] at line 55
+     #
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t13
+     # refs: [$t13 => #13]
+     # #13
+     #   <no edges>
+     # #root
+     #   => #13 via [local `s3`, field `x`] at line 55
+     #
+  9: $t11 := read_ref($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t11
+     # refs: []
+     #
+ 10: $t3 := i128::sub($t4, $t11)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 11: return $t3
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_arithmetic {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_add1(x: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::add(x, x)
+    }
+    private fun test_add2(x: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::add(x, x)
+    }
+    private fun test_add3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::add(i64::add(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_add4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::add(i128::add(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_div1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::div(x, y)
+    }
+    private fun test_div2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::div(x, y)
+    }
+    private fun test_div3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::div(i64::div(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_div4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::div(i128::div(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mix1(x: 0x1::i64::I64,y: 0x1::i64::I64,z: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mod(i64::div(i64::mul(i64::sub(i64::add(x, y), z), x), y), z)
+    }
+    private fun test_mix2(x: 0x1::i128::I128,y: 0x1::i128::I128,z: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mod(i128::div(i128::mul(i128::sub(i128::add(x, y), z), x), y), z)
+    }
+    private fun test_mix3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mod(i64::div(i64::mul(i64::sub(i64::add(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3)), select valid_arithmetic::S1.y<S1>(s1)), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mix4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mod(i128::div(i128::mul(i128::sub(i128::add(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3)), select valid_arithmetic::S1.z<S1>(s1)), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mod1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mod(x, y)
+    }
+    private fun test_mod2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mod(x, y)
+    }
+    private fun test_mod3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mod(i64::mod(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mod4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mod(i128::mod(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_mul1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::mul(x, y)
+    }
+    private fun test_mul2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::mul(x, y)
+    }
+    private fun test_mul3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::mul(i64::mul(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_mul4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::mul(i128::mul(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+    private fun test_neg1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::sub(i64::add(i64::neg(x), y), i64::mod(i64::div(i64::mul(i64::neg(x), i64::neg(y)), i64::neg(x)), i64::neg(y)))
+    }
+    private fun test_neg2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::sub(i128::add(i128::neg(x), y), i128::mod(i128::div(i128::mul(i128::neg(x), i128::neg(y)), i128::neg(x)), i128::neg(y)))
+    }
+    private fun test_sub1(x: 0x1::i64::I64,y: 0x1::i64::I64): 0x1::i64::I64 {
+        i64::sub(x, y)
+    }
+    private fun test_sub2(x: 0x1::i128::I128,y: 0x1::i128::I128): 0x1::i128::I128 {
+        i128::sub(x, y)
+    }
+    private fun test_sub3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): 0x1::i64::I64 {
+        i64::sub(i64::sub(select valid_arithmetic::S1.y<S1>(s1), select valid_arithmetic::S2.y<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i64::I64>>(s3))
+    }
+    private fun test_sub4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): 0x1::i128::I128 {
+        i128::sub(i128::sub(select valid_arithmetic::S1.z<S1>(s1), select valid_arithmetic::S2.z<S2>(s2)), select valid_arithmetic::S3.x<S3<0x1::i128::I128>>(s3))
+    }
+} // end 0x42::valid_arithmetic
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_arithmetic::test_add1($t0: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64
+     var $t2: 0x1::i64::I64
+  0: $t2 := infer($t0)
+  1: $t1 := i64::add($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add2($t0: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128
+     var $t2: 0x1::i128::I128
+  0: $t2 := infer($t0)
+  1: $t1 := i128::add($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::add($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::add($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::add($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::add($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::div($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::div($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::div($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::div($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::div($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::div($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64, $t2: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+  0: $t8 := infer($t0)
+  1: $t7 := i64::add($t8, $t1)
+  2: $t6 := i64::sub($t7, $t2)
+  3: $t5 := i64::mul($t6, $t0)
+  4: $t4 := i64::div($t5, $t1)
+  5: $t3 := i64::mod($t4, $t2)
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128, $t2: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+  0: $t8 := infer($t0)
+  1: $t7 := i128::add($t8, $t1)
+  2: $t6 := i128::sub($t7, $t2)
+  3: $t5 := i128::mul($t6, $t0)
+  4: $t4 := i128::div($t5, $t1)
+  5: $t3 := i128::mod($t4, $t2)
+  6: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i64::I64
+     var $t14: 0x1::i64::I64
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t16: &0x1::i64::I64
+     var $t17: 0x1::i64::I64
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i64::I64
+     var $t20: 0x1::i64::I64
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t25: &0x1::i64::I64
+  0: $t9 := borrow_local($t0)
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
+  2: $t8 := read_ref($t10)
+  3: $t12 := borrow_local($t1)
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
+  5: $t11 := read_ref($t13)
+  6: $t7 := i64::add($t8, $t11)
+  7: $t15 := borrow_local($t2)
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t15)
+  9: $t14 := read_ref($t16)
+ 10: $t6 := i64::sub($t7, $t14)
+ 11: $t18 := borrow_local($t0)
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.y($t18)
+ 13: $t17 := read_ref($t19)
+ 14: $t5 := i64::mul($t6, $t17)
+ 15: $t21 := borrow_local($t1)
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.y($t21)
+ 17: $t20 := read_ref($t22)
+ 18: $t4 := i64::div($t5, $t20)
+ 19: $t24 := borrow_local($t2)
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t24)
+ 21: $t23 := read_ref($t25)
+ 22: $t3 := i64::mod($t4, $t23)
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i128::I128
+     var $t14: 0x1::i128::I128
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t16: &0x1::i128::I128
+     var $t17: 0x1::i128::I128
+     var $t18: &0x42::valid_arithmetic::S1
+     var $t19: &0x1::i128::I128
+     var $t20: 0x1::i128::I128
+     var $t21: &0x42::valid_arithmetic::S2
+     var $t22: &0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t25: &0x1::i128::I128
+  0: $t9 := borrow_local($t0)
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
+  2: $t8 := read_ref($t10)
+  3: $t12 := borrow_local($t1)
+  4: $t13 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
+  5: $t11 := read_ref($t13)
+  6: $t7 := i128::add($t8, $t11)
+  7: $t15 := borrow_local($t2)
+  8: $t16 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t15)
+  9: $t14 := read_ref($t16)
+ 10: $t6 := i128::sub($t7, $t14)
+ 11: $t18 := borrow_local($t0)
+ 12: $t19 := borrow_field<0x42::valid_arithmetic::S1>.z($t18)
+ 13: $t17 := read_ref($t19)
+ 14: $t5 := i128::mul($t6, $t17)
+ 15: $t21 := borrow_local($t1)
+ 16: $t22 := borrow_field<0x42::valid_arithmetic::S2>.z($t21)
+ 17: $t20 := read_ref($t22)
+ 18: $t4 := i128::div($t5, $t20)
+ 19: $t24 := borrow_local($t2)
+ 20: $t25 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t24)
+ 21: $t23 := read_ref($t25)
+ 22: $t3 := i128::mod($t4, $t23)
+ 23: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::mod($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::mod($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::mod($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::mod($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::mod($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::mod($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::mul($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::mul($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::mul($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::mul($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::mul($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::mul($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     var $t7: 0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+  0: $t4 := i64::neg($t0)
+  1: $t3 := i64::add($t4, $t1)
+  2: $t8 := i64::neg($t0)
+  3: $t9 := i64::neg($t1)
+  4: $t7 := i64::mul($t8, $t9)
+  5: $t10 := i64::neg($t0)
+  6: $t6 := i64::div($t7, $t10)
+  7: $t11 := i64::neg($t1)
+  8: $t5 := i64::mod($t6, $t11)
+  9: $t2 := i64::sub($t3, $t5)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: 0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+  0: $t4 := i128::neg($t0)
+  1: $t3 := i128::add($t4, $t1)
+  2: $t8 := i128::neg($t0)
+  3: $t9 := i128::neg($t1)
+  4: $t7 := i128::mul($t8, $t9)
+  5: $t10 := i128::neg($t0)
+  6: $t6 := i128::div($t7, $t10)
+  7: $t11 := i128::neg($t1)
+  8: $t5 := i128::mod($t6, $t11)
+  9: $t2 := i128::sub($t3, $t5)
+ 10: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64
+     var $t3: 0x1::i64::I64
+  0: $t3 := infer($t0)
+  1: $t2 := i64::sub($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128
+     var $t3: 0x1::i128::I128
+  0: $t3 := infer($t0)
+  1: $t2 := i128::sub($t3, $t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i64::sub($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i64::sub($t4, $t11)
+ 11: return $t3
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128
+  0: $t6 := borrow_local($t0)
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+  2: $t5 := read_ref($t7)
+  3: $t9 := borrow_local($t1)
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+  5: $t8 := read_ref($t10)
+  6: $t4 := i128::sub($t5, $t8)
+  7: $t12 := borrow_local($t2)
+  8: $t13 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+  9: $t11 := read_ref($t13)
+ 10: $t3 := i128::sub($t4, $t11)
+ 11: return $t3
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_arithmetic::test_add1($t0: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t1: 0x1::i64::I64 [unused]
+     var $t2: 0x1::i64::I64
+     # live vars: $t0
+  0: $t2 := copy($t0)
+     # live vars: $t0, $t2
+  1: $t0 := i64::add($t2, $t0)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add2($t0: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t1: 0x1::i128::I128 [unused]
+     var $t2: 0x1::i128::I128
+     # live vars: $t0
+  0: $t2 := copy($t0)
+     # live vars: $t0, $t2
+  1: $t0 := i128::add($t2, $t0)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i64::add($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i64::add($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_add4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i128::add($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i128::add($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64 [unused]
+     var $t3: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i64::div($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128 [unused]
+     var $t3: 0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i128::div($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i64::div($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i64::div($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_div4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i128::div($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i128::div($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64, $t2: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     var $t7: 0x1::i64::I64 [unused]
+     var $t8: 0x1::i64::I64
+     # live vars: $t0, $t1, $t2
+  0: $t8 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t8
+  1: $t8 := i64::add($t8, $t1)
+     # live vars: $t0, $t1, $t2, $t8
+  2: $t8 := i64::sub($t8, $t2)
+     # live vars: $t0, $t1, $t2, $t8
+  3: $t0 := i64::mul($t8, $t0)
+     # live vars: $t0, $t1, $t2
+  4: $t0 := i64::div($t0, $t1)
+     # live vars: $t0, $t2
+  5: $t0 := i64::mod($t0, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128, $t2: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128 [unused]
+     var $t6: 0x1::i128::I128 [unused]
+     var $t7: 0x1::i128::I128 [unused]
+     var $t8: 0x1::i128::I128
+     # live vars: $t0, $t1, $t2
+  0: $t8 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t8
+  1: $t8 := i128::add($t8, $t1)
+     # live vars: $t0, $t1, $t2, $t8
+  2: $t8 := i128::sub($t8, $t2)
+     # live vars: $t0, $t1, $t2, $t8
+  3: $t0 := i128::mul($t8, $t0)
+     # live vars: $t0, $t1, $t2
+  4: $t0 := i128::div($t0, $t1)
+     # live vars: $t0, $t2
+  5: $t0 := i128::mod($t0, $t2)
+     # live vars: $t0
+  6: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     var $t7: 0x1::i64::I64 [unused]
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i64::I64 [unused]
+     var $t14: 0x1::i64::I64 [unused]
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t16: &0x1::i64::I64 [unused]
+     var $t17: 0x1::i64::I64 [unused]
+     var $t18: &0x42::valid_arithmetic::S1 [unused]
+     var $t19: &0x1::i64::I64 [unused]
+     var $t20: 0x1::i64::I64 [unused]
+     var $t21: &0x42::valid_arithmetic::S2 [unused]
+     var $t22: &0x1::i64::I64 [unused]
+     var $t23: 0x1::i64::I64 [unused]
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i64::I64> [unused]
+     var $t25: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t9 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t9
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
+     # live vars: $t0, $t1, $t2, $t10
+  2: $t8 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8
+  3: $t12 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t8, $t12
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
+     # live vars: $t0, $t1, $t2, $t8, $t10
+  5: $t11 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8, $t11
+  6: $t8 := i64::add($t8, $t11)
+     # live vars: $t0, $t1, $t2, $t8
+  7: $t15 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t8, $t15
+  8: $t10 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t15)
+     # live vars: $t0, $t1, $t2, $t8, $t10
+  9: $t11 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8, $t11
+ 10: $t8 := i64::sub($t8, $t11)
+     # live vars: $t0, $t1, $t2, $t8
+ 11: $t9 := borrow_local($t0)
+     # live vars: $t1, $t2, $t8, $t9
+ 12: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
+     # live vars: $t1, $t2, $t8, $t10
+ 13: $t11 := read_ref($t10)
+     # live vars: $t1, $t2, $t8, $t11
+ 14: $t8 := i64::mul($t8, $t11)
+     # live vars: $t1, $t2, $t8
+ 15: $t12 := borrow_local($t1)
+     # live vars: $t2, $t8, $t12
+ 16: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
+     # live vars: $t2, $t8, $t10
+ 17: $t11 := read_ref($t10)
+     # live vars: $t2, $t8, $t11
+ 18: $t8 := i64::div($t8, $t11)
+     # live vars: $t2, $t8
+ 19: $t15 := borrow_local($t2)
+     # live vars: $t8, $t15
+ 20: $t10 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t15)
+     # live vars: $t8, $t10
+ 21: $t11 := read_ref($t10)
+     # live vars: $t8, $t11
+ 22: $t8 := i64::mod($t8, $t11)
+     # live vars: $t8
+ 23: return $t8
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128 [unused]
+     var $t6: 0x1::i128::I128 [unused]
+     var $t7: 0x1::i128::I128 [unused]
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S1
+     var $t10: &0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: &0x42::valid_arithmetic::S2
+     var $t13: &0x1::i128::I128 [unused]
+     var $t14: 0x1::i128::I128 [unused]
+     var $t15: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t16: &0x1::i128::I128 [unused]
+     var $t17: 0x1::i128::I128 [unused]
+     var $t18: &0x42::valid_arithmetic::S1 [unused]
+     var $t19: &0x1::i128::I128 [unused]
+     var $t20: 0x1::i128::I128 [unused]
+     var $t21: &0x42::valid_arithmetic::S2 [unused]
+     var $t22: &0x1::i128::I128 [unused]
+     var $t23: 0x1::i128::I128 [unused]
+     var $t24: &0x42::valid_arithmetic::S3<0x1::i128::I128> [unused]
+     var $t25: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t9 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t9
+  1: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
+     # live vars: $t0, $t1, $t2, $t10
+  2: $t8 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8
+  3: $t12 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t8, $t12
+  4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
+     # live vars: $t0, $t1, $t2, $t8, $t10
+  5: $t11 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8, $t11
+  6: $t8 := i128::add($t8, $t11)
+     # live vars: $t0, $t1, $t2, $t8
+  7: $t15 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t8, $t15
+  8: $t10 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t15)
+     # live vars: $t0, $t1, $t2, $t8, $t10
+  9: $t11 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t8, $t11
+ 10: $t8 := i128::sub($t8, $t11)
+     # live vars: $t0, $t1, $t2, $t8
+ 11: $t9 := borrow_local($t0)
+     # live vars: $t1, $t2, $t8, $t9
+ 12: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
+     # live vars: $t1, $t2, $t8, $t10
+ 13: $t11 := read_ref($t10)
+     # live vars: $t1, $t2, $t8, $t11
+ 14: $t8 := i128::mul($t8, $t11)
+     # live vars: $t1, $t2, $t8
+ 15: $t12 := borrow_local($t1)
+     # live vars: $t2, $t8, $t12
+ 16: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
+     # live vars: $t2, $t8, $t10
+ 17: $t11 := read_ref($t10)
+     # live vars: $t2, $t8, $t11
+ 18: $t8 := i128::div($t8, $t11)
+     # live vars: $t2, $t8
+ 19: $t15 := borrow_local($t2)
+     # live vars: $t8, $t15
+ 20: $t10 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t15)
+     # live vars: $t8, $t10
+ 21: $t11 := read_ref($t10)
+     # live vars: $t8, $t11
+ 22: $t8 := i128::mod($t8, $t11)
+     # live vars: $t8
+ 23: return $t8
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64 [unused]
+     var $t3: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i64::mod($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128 [unused]
+     var $t3: 0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i128::mod($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i64::mod($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i64::mod($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mod4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i128::mod($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i128::mod($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64 [unused]
+     var $t3: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i64::mul($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128 [unused]
+     var $t3: 0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i128::mul($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i64::mul($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i64::mul($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_mul4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i128::mul($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i128::mul($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64 [unused]
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     var $t7: 0x1::i64::I64 [unused]
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := i64::neg($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::add($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t8 := i64::neg($t0)
+     # live vars: $t0, $t1, $t4, $t8
+  3: $t9 := i64::neg($t1)
+     # live vars: $t0, $t1, $t4, $t8, $t9
+  4: $t8 := i64::mul($t8, $t9)
+     # live vars: $t0, $t1, $t4, $t8
+  5: $t0 := i64::neg($t0)
+     # live vars: $t0, $t1, $t4, $t8
+  6: $t0 := i64::div($t8, $t0)
+     # live vars: $t0, $t1, $t4
+  7: $t1 := i64::neg($t1)
+     # live vars: $t0, $t1, $t4
+  8: $t0 := i64::mod($t0, $t1)
+     # live vars: $t0, $t4
+  9: $t0 := i64::sub($t4, $t0)
+     # live vars: $t0
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_neg2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128 [unused]
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128 [unused]
+     var $t6: 0x1::i128::I128 [unused]
+     var $t7: 0x1::i128::I128 [unused]
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := i128::neg($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i128::add($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t8 := i128::neg($t0)
+     # live vars: $t0, $t1, $t4, $t8
+  3: $t9 := i128::neg($t1)
+     # live vars: $t0, $t1, $t4, $t8, $t9
+  4: $t8 := i128::mul($t8, $t9)
+     # live vars: $t0, $t1, $t4, $t8
+  5: $t0 := i128::neg($t0)
+     # live vars: $t0, $t1, $t4, $t8
+  6: $t0 := i128::div($t8, $t0)
+     # live vars: $t0, $t1, $t4
+  7: $t1 := i128::neg($t1)
+     # live vars: $t0, $t1, $t4
+  8: $t0 := i128::mod($t0, $t1)
+     # live vars: $t0, $t4
+  9: $t0 := i128::sub($t4, $t0)
+     # live vars: $t0
+ 10: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): 0x1::i64::I64 {
+     var $t2: 0x1::i64::I64 [unused]
+     var $t3: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i64::sub($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): 0x1::i128::I128 {
+     var $t2: 0x1::i128::I128 [unused]
+     var $t3: 0x1::i128::I128 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t0 := i128::sub($t0, $t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i64::I64>): 0x1::i64::I64 {
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i64::I64
+     var $t8: 0x1::i64::I64
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i64::I64>
+     var $t13: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.y($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.y($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i64::sub($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i64::I64>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i64::sub($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+[variant baseline]
+fun valid_arithmetic::test_sub4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::valid_arithmetic::S2, $t2: 0x42::valid_arithmetic::S3<0x1::i128::I128>): 0x1::i128::I128 {
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: &0x42::valid_arithmetic::S1
+     var $t7: &0x1::i128::I128
+     var $t8: 0x1::i128::I128
+     var $t9: &0x42::valid_arithmetic::S2
+     var $t10: &0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: &0x42::valid_arithmetic::S3<0x1::i128::I128>
+     var $t13: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t6 := borrow_local($t0)
+     # live vars: $t1, $t2, $t6
+  1: $t7 := borrow_field<0x42::valid_arithmetic::S1>.z($t6)
+     # live vars: $t1, $t2, $t7
+  2: $t5 := read_ref($t7)
+     # live vars: $t1, $t2, $t5
+  3: $t9 := borrow_local($t1)
+     # live vars: $t2, $t5, $t9
+  4: $t7 := borrow_field<0x42::valid_arithmetic::S2>.z($t9)
+     # live vars: $t2, $t5, $t7
+  5: $t8 := read_ref($t7)
+     # live vars: $t2, $t5, $t8
+  6: $t5 := i128::sub($t5, $t8)
+     # live vars: $t2, $t5
+  7: $t12 := borrow_local($t2)
+     # live vars: $t5, $t12
+  8: $t7 := borrow_field<0x42::valid_arithmetic::S3<0x1::i128::I128>>.x($t12)
+     # live vars: $t5, $t7
+  9: $t8 := read_ref($t7)
+     # live vars: $t5, $t8
+ 10: $t5 := i128::sub($t5, $t8)
+     # live vars: $t5
+ 11: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.valid_arithmetic {
+use 0000000000000000000000000000000000000000000000000000000000000001::i64;
+use 0000000000000000000000000000000000000000000000000000000000000001::i128;
+
+
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: I64,
+	z: I128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: I64,
+	z: I128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test_add1(x: I64): I64 /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: MoveLoc[0](x: I64)
+	2: Call i64::add(I64, I64): I64
+	3: Ret
+}
+test_add2(x: I128): I128 /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: MoveLoc[0](x: I128)
+	2: Call i128::add(I128, I128): I128
+	3: Ret
+}
+test_add3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::add(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::add(I64, I64): I64
+	11: Ret
+}
+test_add4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 3 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::add(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::add(I128, I128): I128
+	11: Ret
+}
+test_div1(x: I64, y: I64): I64 /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0](x: I64)
+	1: MoveLoc[1](y: I64)
+	2: Call i64::div(I64, I64): I64
+	3: Ret
+}
+test_div2(x: I128, y: I128): I128 /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[0](x: I128)
+	1: MoveLoc[1](y: I128)
+	2: Call i128::div(I128, I128): I128
+	3: Ret
+}
+test_div3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 6 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::div(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::div(I64, I64): I64
+	11: Ret
+}
+test_div4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 7 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::div(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::div(I128, I128): I128
+	11: Ret
+}
+test_mix1(x: I64, y: I64, z: I64): I64 /* def_idx: 8 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::add(I64, I64): I64
+	3: CopyLoc[2](z: I64)
+	4: Call i64::sub(I64, I64): I64
+	5: MoveLoc[0](x: I64)
+	6: Call i64::mul(I64, I64): I64
+	7: MoveLoc[1](y: I64)
+	8: Call i64::div(I64, I64): I64
+	9: MoveLoc[2](z: I64)
+	10: Call i64::mod(I64, I64): I64
+	11: Ret
+}
+test_mix2(x: I128, y: I128, z: I128): I128 /* def_idx: 9 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: CopyLoc[1](y: I128)
+	2: Call i128::add(I128, I128): I128
+	3: CopyLoc[2](z: I128)
+	4: Call i128::sub(I128, I128): I128
+	5: MoveLoc[0](x: I128)
+	6: Call i128::mul(I128, I128): I128
+	7: MoveLoc[1](y: I128)
+	8: Call i128::div(I128, I128): I128
+	9: MoveLoc[2](z: I128)
+	10: Call i128::mod(I128, I128): I128
+	11: Ret
+}
+test_mix3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 10 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::add(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::sub(I64, I64): I64
+	11: ImmBorrowLoc[0](s1: S1)
+	12: ImmBorrowField[0](S1.y: I64)
+	13: ReadRef
+	14: Call i64::mul(I64, I64): I64
+	15: ImmBorrowLoc[1](s2: S2)
+	16: ImmBorrowField[1](S2.y: I64)
+	17: ReadRef
+	18: Call i64::div(I64, I64): I64
+	19: ImmBorrowLoc[2](s3: S3<I64>)
+	20: ImmBorrowFieldGeneric[0](S3.x: T)
+	21: ReadRef
+	22: Call i64::mod(I64, I64): I64
+	23: Ret
+}
+test_mix4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 11 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::add(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::sub(I128, I128): I128
+	11: ImmBorrowLoc[0](s1: S1)
+	12: ImmBorrowField[3](S1.z: I128)
+	13: ReadRef
+	14: Call i128::mul(I128, I128): I128
+	15: ImmBorrowLoc[1](s2: S2)
+	16: ImmBorrowField[4](S2.z: I128)
+	17: ReadRef
+	18: Call i128::div(I128, I128): I128
+	19: ImmBorrowLoc[2](s3: S3<I128>)
+	20: ImmBorrowFieldGeneric[1](S3.x: T)
+	21: ReadRef
+	22: Call i128::mod(I128, I128): I128
+	23: Ret
+}
+test_mod1(x: I64, y: I64): I64 /* def_idx: 12 */ {
+B0:
+	0: MoveLoc[0](x: I64)
+	1: MoveLoc[1](y: I64)
+	2: Call i64::mod(I64, I64): I64
+	3: Ret
+}
+test_mod2(x: I128, y: I128): I128 /* def_idx: 13 */ {
+B0:
+	0: MoveLoc[0](x: I128)
+	1: MoveLoc[1](y: I128)
+	2: Call i128::mod(I128, I128): I128
+	3: Ret
+}
+test_mod3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 14 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::mod(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::mod(I64, I64): I64
+	11: Ret
+}
+test_mod4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 15 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::mod(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::mod(I128, I128): I128
+	11: Ret
+}
+test_mul1(x: I64, y: I64): I64 /* def_idx: 16 */ {
+B0:
+	0: MoveLoc[0](x: I64)
+	1: MoveLoc[1](y: I64)
+	2: Call i64::mul(I64, I64): I64
+	3: Ret
+}
+test_mul2(x: I128, y: I128): I128 /* def_idx: 17 */ {
+B0:
+	0: MoveLoc[0](x: I128)
+	1: MoveLoc[1](y: I128)
+	2: Call i128::mul(I128, I128): I128
+	3: Ret
+}
+test_mul3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 18 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::mul(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::mul(I64, I64): I64
+	11: Ret
+}
+test_mul4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 19 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::mul(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::mul(I128, I128): I128
+	11: Ret
+}
+test_neg1(x: I64, y: I64): I64 /* def_idx: 20 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: Call i64::neg(I64): I64
+	2: CopyLoc[1](y: I64)
+	3: Call i64::add(I64, I64): I64
+	4: CopyLoc[0](x: I64)
+	5: Call i64::neg(I64): I64
+	6: CopyLoc[1](y: I64)
+	7: Call i64::neg(I64): I64
+	8: Call i64::mul(I64, I64): I64
+	9: MoveLoc[0](x: I64)
+	10: Call i64::neg(I64): I64
+	11: Call i64::div(I64, I64): I64
+	12: MoveLoc[1](y: I64)
+	13: Call i64::neg(I64): I64
+	14: Call i64::mod(I64, I64): I64
+	15: Call i64::sub(I64, I64): I64
+	16: Ret
+}
+test_neg2(x: I128, y: I128): I128 /* def_idx: 21 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: Call i128::neg(I128): I128
+	2: CopyLoc[1](y: I128)
+	3: Call i128::add(I128, I128): I128
+	4: CopyLoc[0](x: I128)
+	5: Call i128::neg(I128): I128
+	6: CopyLoc[1](y: I128)
+	7: Call i128::neg(I128): I128
+	8: Call i128::mul(I128, I128): I128
+	9: MoveLoc[0](x: I128)
+	10: Call i128::neg(I128): I128
+	11: Call i128::div(I128, I128): I128
+	12: MoveLoc[1](y: I128)
+	13: Call i128::neg(I128): I128
+	14: Call i128::mod(I128, I128): I128
+	15: Call i128::sub(I128, I128): I128
+	16: Ret
+}
+test_sub1(x: I64, y: I64): I64 /* def_idx: 22 */ {
+B0:
+	0: MoveLoc[0](x: I64)
+	1: MoveLoc[1](y: I64)
+	2: Call i64::sub(I64, I64): I64
+	3: Ret
+}
+test_sub2(x: I128, y: I128): I128 /* def_idx: 23 */ {
+B0:
+	0: MoveLoc[0](x: I128)
+	1: MoveLoc[1](y: I128)
+	2: Call i128::sub(I128, I128): I128
+	3: Ret
+}
+test_sub3(s1: S1, s2: S2, s3: S3<I64>): I64 /* def_idx: 24 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::sub(I64, I64): I64
+	7: ImmBorrowLoc[2](s3: S3<I64>)
+	8: ImmBorrowFieldGeneric[0](S3.x: T)
+	9: ReadRef
+	10: Call i64::sub(I64, I64): I64
+	11: Ret
+}
+test_sub4(s1: S1, s2: S2, s3: S3<I128>): I128 /* def_idx: 25 */ {
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::sub(I128, I128): I128
+	7: ImmBorrowLoc[2](s3: S3<I128>)
+	8: ImmBorrowFieldGeneric[1](S3.x: T)
+	9: ReadRef
+	10: Call i128::sub(I128, I128): I128
+	11: Ret
+}
+}
+============ bytecode verification succeeded ========

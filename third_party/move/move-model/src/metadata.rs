@@ -304,6 +304,10 @@ impl LanguageVersion {
             LanguageVersion::V2_3 => "2.3",
         }
     }
+
+    pub const fn signed_int_ver() -> Self {
+        LanguageVersion::V2_3
+    }
 }
 
 impl Display for LanguageVersion {

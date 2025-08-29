@@ -2219,6 +2219,36 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             let e = parse_unary_exp(context)?;
             Exp_::UnaryExp(op, Box::new(e))
         },
+        // Parse `Minus` as the `negation` unary operator
+        Tok::Minus => {
+            context.tokens.advance()?;
+            let op_end_loc = context.tokens.previous_end_loc();
+            let e = parse_unary_exp(context)?;
+            // if the operand is a numeric literal, we fold the negation into the literal
+            if let Exp_::Value(Spanned {
+                loc,
+                value: Value_::Num(s),
+            }) = e.value
+            {
+                let neg_num = format!("-{}", s.as_str());
+                // the new literal now spans from the `-` to the end of the original literal
+                let op_end_loc = loc.end();
+                Exp_::Value(spanned(
+                    context.tokens.file_hash(),
+                    start_loc,
+                    op_end_loc as usize,
+                    Value_::Num(Symbol::from(neg_num)),
+                ))
+            } else { // otherwise, we create a new unary negation operator
+                let op = spanned(
+                    context.tokens.file_hash(),
+                    start_loc,
+                    op_end_loc,
+                    UnaryOp_::Neg,
+                );
+                Exp_::UnaryExp(op, Box::new(e))
+            }
+        },
         Tok::AmpMut => {
             context.tokens.advance()?;
             let e = parse_unary_exp(context)?;

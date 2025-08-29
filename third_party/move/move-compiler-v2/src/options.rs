@@ -252,6 +252,17 @@ impl Options {
             ..self
         }
     }
+
+    pub fn add_dependency(self, values: Vec<String>) -> Self {
+        Self {
+            dependencies: {
+                let mut v = self.dependencies.clone();
+                v.extend(values);
+                v
+            },
+            ..self
+        }
+    }
 }
 
 /// Finds the experiment in the list of definitions. A definition

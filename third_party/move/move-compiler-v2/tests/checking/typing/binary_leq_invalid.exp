@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
   ┌─ tests/checking/typing/binary_leq_invalid.move:8:9
   │
 8 │         false <= true;
   │         ^^^^^
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
   ┌─ tests/checking/typing/binary_leq_invalid.move:9:14
   │
 9 │         1 <= false;
   │              ^^^^^
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:10:9
    │
 10 │         false <= 1;
    │         ^^^^^
 
-error: cannot use `address` with an operator which expects a value of type `integer`
+error: cannot use `address` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:11:9
    │
 11 │         @0x0 <= @0x1;
@@ -30,55 +30,55 @@ error: cannot use `u128` with an operator which expects a value of type `u8`
 12 │         (0: u8) <= (1: u128);
    │                     ^
 
-error: cannot use `R` with an operator which expects a value of type `integer`
+error: cannot use `R` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:13:9
    │
 13 │         r <= r;
    │         ^
 
-error: cannot use `S` with an operator which expects a value of type `integer`
+error: cannot use `S` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:14:9
    │
 14 │         s <= s;
    │         ^
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:15:9
    │
 15 │         0 <= 1 <= 2;
    │         ^^^^^^
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:16:15
    │
 16 │         (1 <= false) && (@0x0 <= 0);
    │               ^^^^^
 
-error: cannot use `address` with an operator which expects a value of type `integer`
+error: cannot use `address` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:16:26
    │
 16 │         (1 <= false) && (@0x0 <= 0);
    │                          ^^^^
 
-error: cannot use `()` with an operator which expects a value of type `integer`
+error: cannot use `()` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:17:9
    │
 17 │         () <= ();
    │         ^^
 
-error: cannot use `()` with an operator which expects a value of type `integer`
+error: cannot use `()` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:18:14
    │
 18 │         1 <= ();
    │              ^^
 
-error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
+error: cannot use `(integer, integer)` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:19:9
    │
 19 │         (0, 1) <= (0, 1, 2);
    │         ^^^^^^
 
-error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
+error: cannot use `(integer, integer)` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/binary_leq_invalid.move:20:9
    │
 20 │         (1, 2) <= (0, 1);

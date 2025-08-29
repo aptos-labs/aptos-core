@@ -2051,6 +2051,43 @@ impl GlobalEnv {
             .map(|module| module.into_function(fun.id))
     }
 
+    pub fn set_struct_def(
+        &mut self,
+        struct_id: QualifiedId<StructId>,
+        fields: BTreeMap<FieldId, Type>,
+    ) {
+        let data = self
+            .module_data
+            .get_mut(struct_id.module_id.to_usize())
+            .unwrap()
+            .struct_data
+            .get_mut(&struct_id.id)
+            .unwrap();
+        fields.iter().for_each(|(id, ty)| {
+            if let Some(field) = data.field_data.get_mut(id) {
+                field.ty = ty.clone();
+            }
+        });
+    }
+
+    /// Sets the AST based declaration of the function.
+    pub fn set_function_decl(
+        &mut self,
+        fun: QualifiedId<FunId>,
+        params: Vec<Parameter>,
+        ret_type: Type,
+    ) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.params = params;
+        data.result_type = ret_type;
+    }
+
     /// Sets the AST based definition of the function.
     pub fn set_function_def(&mut self, fun: QualifiedId<FunId>, def: Exp) {
         let data = self

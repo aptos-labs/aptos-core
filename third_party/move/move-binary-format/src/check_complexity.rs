@@ -67,7 +67,7 @@ impl BinaryComplexityMeter<'_> {
                     cost = cost.saturating_add(struct_name.len() as u64 * COST_PER_IDENT_BYTE);
                     cost = cost.saturating_add(moduel_name.len() as u64 * COST_PER_IDENT_BYTE);
                 },
-                U8 | U16 | U32 | U64 | U128 | U256 | Signer | Address | Bool | Vector(_)
+                U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Signer | Address | Bool | Vector(_)
                 | Function(..) | TypeParameter(_) | Reference(_) | MutableReference(_) => (),
             }
         }

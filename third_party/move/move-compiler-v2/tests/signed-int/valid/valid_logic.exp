@@ -1,0 +1,5485 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_logic {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_cmp1(x: 0x1::i64::I64): bool {
+        And(And(And(And(And(And(i64::eq(x, x), i64::gte(x, x)), i64::lte(x, x)), i64::gt(x, x)), i64::lt(x, x)), i64::eq(x, x)), i64::gte(x, x))
+    }
+    private fun test_cmp2(x: 0x1::i128::I128): bool {
+        And(And(And(And(And(And(i128::eq(x, x), i128::gte(x, x)), i128::lte(x, x)), i128::gt(x, x)), i128::lt(x, x)), i128::eq(x, x)), i128::gte(x, x))
+    }
+    private fun test_cmp3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): bool {
+        And(And(And(And(And(And(i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2)), i64::lte(select valid_logic::S1.y<S1>(s1), select valid_logic::S3.x<S3<0x1::i64::I64>>(s3))), i64::gte(select valid_logic::S2.y<S2>(s2), select valid_logic::S3.x<S3<0x1::i64::I64>>(s3))), i64::gt(select valid_logic::S3.x<S3<0x1::i64::I64>>(s3), select valid_logic::S1.y<S1>(s1))), i64::lt(select valid_logic::S3.x<S3<0x1::i64::I64>>(s3), select valid_logic::S2.y<S2>(s2))), i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2))), i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2)))
+    }
+    private fun test_cmp4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): bool {
+        And(And(And(And(And(And(i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2)), i128::lte(select valid_logic::S1.z<S1>(s1), select valid_logic::S3.x<S3<0x1::i128::I128>>(s3))), i128::gte(select valid_logic::S2.z<S2>(s2), select valid_logic::S3.x<S3<0x1::i128::I128>>(s3))), i128::gt(select valid_logic::S3.x<S3<0x1::i128::I128>>(s3), select valid_logic::S1.z<S1>(s1))), i128::lt(select valid_logic::S3.x<S3<0x1::i128::I128>>(s3), select valid_logic::S2.z<S2>(s2))), i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2))), i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2)))
+    }
+    private fun test_mix1(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::add(x, y), i64::add(y, x))
+    }
+    private fun test_mix10(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::mod(x, i128::pack(2)), y), i128::mul(i128::mod(x, i128::pack(3)), y))
+    }
+    private fun test_mix2(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::lte(i128::add(x, i128::mul(i128::pack(2), y)), i128::add(x, i128::mul(i128::pack(3), y)))
+    }
+    private fun test_mix3(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::sub(x, y), i64::sub(y, x))
+    }
+    private fun test_mix4(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::sub(x, i128::mul(i128::pack(2), y)), i128::sub(x, i128::mul(i128::pack(3), y)))
+    }
+    private fun test_mix5(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::mul(x, y), i64::mul(y, x))
+    }
+    private fun test_mix6(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::mul(x, i128::pack(2)), y), i128::mul(i128::mul(x, i128::pack(3)), y))
+    }
+    private fun test_mix7(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::div(x, y), i64::div(y, x))
+    }
+    private fun test_mix8(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::div(x, i128::pack(2)), y), i128::mul(i128::div(x, i128::pack(3)), y))
+    }
+    private fun test_mix9(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::mod(x, y), i64::mod(y, x))
+    }
+} // end 0x42::valid_logic
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_logic {
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test_cmp1(x: 0x1::i64::I64): bool {
+        0x1::i64::eq(x, x) && 0x1::i64::gte(x, x) && 0x1::i64::lte(x, x) && 0x1::i64::gt(x, x) && 0x1::i64::lt(x, x) && 0x1::i64::eq(x, x) && 0x1::i64::gte(x, x)
+    }
+    fun test_cmp2(x: 0x1::i128::I128): bool {
+        0x1::i128::eq(x, x) && 0x1::i128::gte(x, x) && 0x1::i128::lte(x, x) && 0x1::i128::gt(x, x) && 0x1::i128::lt(x, x) && 0x1::i128::eq(x, x) && 0x1::i128::gte(x, x)
+    }
+    fun test_cmp3(s1: S1, s2: S2, s3: S3<0x1::i64::I64>): bool {
+        0x1::i64::eq(s1.y, s2.y) && 0x1::i64::lte(s1.y, s3.x) && 0x1::i64::gte(s2.y, s3.x) && 0x1::i64::gt(s3.x, s1.y) && 0x1::i64::lt(s3.x, s2.y) && 0x1::i64::eq(s1.y, s2.y) && 0x1::i64::eq(s1.y, s2.y)
+    }
+    fun test_cmp4(s1: S1, s2: S2, s3: S3<0x1::i128::I128>): bool {
+        0x1::i128::eq(s1.z, s2.z) && 0x1::i128::lte(s1.z, s3.x) && 0x1::i128::gte(s2.z, s3.x) && 0x1::i128::gt(s3.x, s1.z) && 0x1::i128::lt(s3.x, s2.z) && 0x1::i128::eq(s1.z, s2.z) && 0x1::i128::eq(s1.z, s2.z)
+    }
+    fun test_mix1(x: 0x1::i64::I64, y: 0x1::i64::I64): bool {
+        0x1::i64::eq(0x1::i64::add(x, y), 0x1::i64::add(y, x))
+    }
+    fun test_mix10(x: 0x1::i128::I128, y: 0x1::i128::I128): bool {
+        0x1::i128::gt(0x1::i128::mul(0x1::i128::mod(x, 0x1::i128::pack(2u128)), y), 0x1::i128::mul(0x1::i128::mod(x, 0x1::i128::pack(3u128)), y))
+    }
+    fun test_mix2(x: 0x1::i128::I128, y: 0x1::i128::I128): bool {
+        0x1::i128::lte(0x1::i128::add(x, 0x1::i128::mul(0x1::i128::pack(2u128), y)), 0x1::i128::add(x, 0x1::i128::mul(0x1::i128::pack(3u128), y)))
+    }
+    fun test_mix3(x: 0x1::i64::I64, y: 0x1::i64::I64): bool {
+        0x1::i64::eq(0x1::i64::sub(x, y), 0x1::i64::sub(y, x))
+    }
+    fun test_mix4(x: 0x1::i128::I128, y: 0x1::i128::I128): bool {
+        0x1::i128::gt(0x1::i128::sub(x, 0x1::i128::mul(0x1::i128::pack(2u128), y)), 0x1::i128::sub(x, 0x1::i128::mul(0x1::i128::pack(3u128), y)))
+    }
+    fun test_mix5(x: 0x1::i64::I64, y: 0x1::i64::I64): bool {
+        0x1::i64::eq(0x1::i64::mul(x, y), 0x1::i64::mul(y, x))
+    }
+    fun test_mix6(x: 0x1::i128::I128, y: 0x1::i128::I128): bool {
+        0x1::i128::gt(0x1::i128::mul(0x1::i128::mul(x, 0x1::i128::pack(2u128)), y), 0x1::i128::mul(0x1::i128::mul(x, 0x1::i128::pack(3u128)), y))
+    }
+    fun test_mix7(x: 0x1::i64::I64, y: 0x1::i64::I64): bool {
+        0x1::i64::eq(0x1::i64::div(x, y), 0x1::i64::div(y, x))
+    }
+    fun test_mix8(x: 0x1::i128::I128, y: 0x1::i128::I128): bool {
+        0x1::i128::gt(0x1::i128::mul(0x1::i128::div(x, 0x1::i128::pack(2u128)), y), 0x1::i128::mul(0x1::i128::div(x, 0x1::i128::pack(3u128)), y))
+    }
+    fun test_mix9(x: 0x1::i64::I64, y: 0x1::i64::I64): bool {
+        0x1::i64::eq(0x1::i64::mod(x, y), 0x1::i64::mod(y, x))
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_logic::test_cmp1($t0: 0x1::i64::I64): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: 0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: 0x1::i64::I64
+  0: $t8 := infer($t0)
+  1: $t7 := i64::eq($t8, $t0)
+  2: if ($t7) goto 3 else goto 7
+  3: label L0
+  4: $t9 := infer($t0)
+  5: $t6 := i64::gte($t9, $t0)
+  6: goto 9
+  7: label L1
+  8: $t6 := false
+  9: label L2
+ 10: if ($t6) goto 11 else goto 15
+ 11: label L3
+ 12: $t10 := infer($t0)
+ 13: $t5 := i64::lte($t10, $t0)
+ 14: goto 17
+ 15: label L4
+ 16: $t5 := false
+ 17: label L5
+ 18: if ($t5) goto 19 else goto 23
+ 19: label L6
+ 20: $t11 := infer($t0)
+ 21: $t4 := i64::gt($t11, $t0)
+ 22: goto 25
+ 23: label L7
+ 24: $t4 := false
+ 25: label L8
+ 26: if ($t4) goto 27 else goto 31
+ 27: label L9
+ 28: $t12 := infer($t0)
+ 29: $t3 := i64::lt($t12, $t0)
+ 30: goto 33
+ 31: label L10
+ 32: $t3 := false
+ 33: label L11
+ 34: if ($t3) goto 35 else goto 39
+ 35: label L12
+ 36: $t13 := infer($t0)
+ 37: $t2 := i64::eq($t13, $t0)
+ 38: goto 41
+ 39: label L13
+ 40: $t2 := false
+ 41: label L14
+ 42: if ($t2) goto 43 else goto 47
+ 43: label L15
+ 44: $t14 := infer($t0)
+ 45: $t1 := i64::gte($t14, $t0)
+ 46: goto 49
+ 47: label L16
+ 48: $t1 := false
+ 49: label L17
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp2($t0: 0x1::i128::I128): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: 0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: 0x1::i128::I128
+  0: $t8 := infer($t0)
+  1: $t7 := i128::eq($t8, $t0)
+  2: if ($t7) goto 3 else goto 7
+  3: label L0
+  4: $t9 := infer($t0)
+  5: $t6 := i128::gte($t9, $t0)
+  6: goto 9
+  7: label L1
+  8: $t6 := false
+  9: label L2
+ 10: if ($t6) goto 11 else goto 15
+ 11: label L3
+ 12: $t10 := infer($t0)
+ 13: $t5 := i128::lte($t10, $t0)
+ 14: goto 17
+ 15: label L4
+ 16: $t5 := false
+ 17: label L5
+ 18: if ($t5) goto 19 else goto 23
+ 19: label L6
+ 20: $t11 := infer($t0)
+ 21: $t4 := i128::gt($t11, $t0)
+ 22: goto 25
+ 23: label L7
+ 24: $t4 := false
+ 25: label L8
+ 26: if ($t4) goto 27 else goto 31
+ 27: label L9
+ 28: $t12 := infer($t0)
+ 29: $t3 := i128::lt($t12, $t0)
+ 30: goto 33
+ 31: label L10
+ 32: $t3 := false
+ 33: label L11
+ 34: if ($t3) goto 35 else goto 39
+ 35: label L12
+ 36: $t13 := infer($t0)
+ 37: $t2 := i128::eq($t13, $t0)
+ 38: goto 41
+ 39: label L13
+ 40: $t2 := false
+ 41: label L14
+ 42: if ($t2) goto 43 else goto 47
+ 43: label L15
+ 44: $t14 := infer($t0)
+ 45: $t1 := i128::gte($t14, $t0)
+ 46: goto 49
+ 47: label L16
+ 48: $t1 := false
+ 49: label L17
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i64::I64>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i64::I64
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i64::I64
+     var $t16: 0x1::i64::I64
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i64::I64
+     var $t19: 0x1::i64::I64
+     var $t20: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t21: &0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t27: &0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t30: &0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t36: &0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i64::I64
+     var $t40: 0x1::i64::I64
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i64::I64
+     var $t43: 0x1::i64::I64
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i64::I64
+     var $t46: 0x1::i64::I64
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i64::I64
+     var $t49: 0x1::i64::I64
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i64::I64
+  0: $t11 := borrow_local($t0)
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+  2: $t10 := read_ref($t12)
+  3: $t14 := borrow_local($t1)
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.y($t14)
+  5: $t13 := read_ref($t15)
+  6: $t9 := i64::eq($t10, $t13)
+  7: if ($t9) goto 8 else goto 17
+  8: label L0
+  9: $t17 := borrow_local($t0)
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.y($t17)
+ 11: $t16 := read_ref($t18)
+ 12: $t20 := borrow_local($t2)
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+ 14: $t19 := read_ref($t21)
+ 15: $t8 := i64::lte($t16, $t19)
+ 16: goto 19
+ 17: label L1
+ 18: $t8 := false
+ 19: label L2
+ 20: if ($t8) goto 21 else goto 30
+ 21: label L3
+ 22: $t23 := borrow_local($t1)
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.y($t23)
+ 24: $t22 := read_ref($t24)
+ 25: $t26 := borrow_local($t2)
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t26)
+ 27: $t25 := read_ref($t27)
+ 28: $t7 := i64::gte($t22, $t25)
+ 29: goto 32
+ 30: label L4
+ 31: $t7 := false
+ 32: label L5
+ 33: if ($t7) goto 34 else goto 43
+ 34: label L6
+ 35: $t29 := borrow_local($t2)
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t29)
+ 37: $t28 := read_ref($t30)
+ 38: $t32 := borrow_local($t0)
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.y($t32)
+ 40: $t31 := read_ref($t33)
+ 41: $t6 := i64::gt($t28, $t31)
+ 42: goto 45
+ 43: label L7
+ 44: $t6 := false
+ 45: label L8
+ 46: if ($t6) goto 47 else goto 56
+ 47: label L9
+ 48: $t35 := borrow_local($t2)
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t35)
+ 50: $t34 := read_ref($t36)
+ 51: $t38 := borrow_local($t1)
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.y($t38)
+ 53: $t37 := read_ref($t39)
+ 54: $t5 := i64::lt($t34, $t37)
+ 55: goto 58
+ 56: label L10
+ 57: $t5 := false
+ 58: label L11
+ 59: if ($t5) goto 60 else goto 69
+ 60: label L12
+ 61: $t41 := borrow_local($t0)
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.y($t41)
+ 63: $t40 := read_ref($t42)
+ 64: $t44 := borrow_local($t1)
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.y($t44)
+ 66: $t43 := read_ref($t45)
+ 67: $t4 := i64::eq($t40, $t43)
+ 68: goto 71
+ 69: label L13
+ 70: $t4 := false
+ 71: label L14
+ 72: if ($t4) goto 73 else goto 82
+ 73: label L15
+ 74: $t47 := borrow_local($t0)
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.y($t47)
+ 76: $t46 := read_ref($t48)
+ 77: $t50 := borrow_local($t1)
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.y($t50)
+ 79: $t49 := read_ref($t51)
+ 80: $t3 := i64::eq($t46, $t49)
+ 81: goto 84
+ 82: label L16
+ 83: $t3 := false
+ 84: label L17
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i128::I128>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i128::I128
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i128::I128
+     var $t16: 0x1::i128::I128
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i128::I128
+     var $t19: 0x1::i128::I128
+     var $t20: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t21: &0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t27: &0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t30: &0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t36: &0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i128::I128
+     var $t40: 0x1::i128::I128
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i128::I128
+     var $t43: 0x1::i128::I128
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i128::I128
+     var $t46: 0x1::i128::I128
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i128::I128
+     var $t49: 0x1::i128::I128
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i128::I128
+  0: $t11 := borrow_local($t0)
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+  2: $t10 := read_ref($t12)
+  3: $t14 := borrow_local($t1)
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.z($t14)
+  5: $t13 := read_ref($t15)
+  6: $t9 := i128::eq($t10, $t13)
+  7: if ($t9) goto 8 else goto 17
+  8: label L0
+  9: $t17 := borrow_local($t0)
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.z($t17)
+ 11: $t16 := read_ref($t18)
+ 12: $t20 := borrow_local($t2)
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+ 14: $t19 := read_ref($t21)
+ 15: $t8 := i128::lte($t16, $t19)
+ 16: goto 19
+ 17: label L1
+ 18: $t8 := false
+ 19: label L2
+ 20: if ($t8) goto 21 else goto 30
+ 21: label L3
+ 22: $t23 := borrow_local($t1)
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.z($t23)
+ 24: $t22 := read_ref($t24)
+ 25: $t26 := borrow_local($t2)
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t26)
+ 27: $t25 := read_ref($t27)
+ 28: $t7 := i128::gte($t22, $t25)
+ 29: goto 32
+ 30: label L4
+ 31: $t7 := false
+ 32: label L5
+ 33: if ($t7) goto 34 else goto 43
+ 34: label L6
+ 35: $t29 := borrow_local($t2)
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t29)
+ 37: $t28 := read_ref($t30)
+ 38: $t32 := borrow_local($t0)
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.z($t32)
+ 40: $t31 := read_ref($t33)
+ 41: $t6 := i128::gt($t28, $t31)
+ 42: goto 45
+ 43: label L7
+ 44: $t6 := false
+ 45: label L8
+ 46: if ($t6) goto 47 else goto 56
+ 47: label L9
+ 48: $t35 := borrow_local($t2)
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t35)
+ 50: $t34 := read_ref($t36)
+ 51: $t38 := borrow_local($t1)
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.z($t38)
+ 53: $t37 := read_ref($t39)
+ 54: $t5 := i128::lt($t34, $t37)
+ 55: goto 58
+ 56: label L10
+ 57: $t5 := false
+ 58: label L11
+ 59: if ($t5) goto 60 else goto 69
+ 60: label L12
+ 61: $t41 := borrow_local($t0)
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.z($t41)
+ 63: $t40 := read_ref($t42)
+ 64: $t44 := borrow_local($t1)
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.z($t44)
+ 66: $t43 := read_ref($t45)
+ 67: $t4 := i128::eq($t40, $t43)
+ 68: goto 71
+ 69: label L13
+ 70: $t4 := false
+ 71: label L14
+ 72: if ($t4) goto 73 else goto 82
+ 73: label L15
+ 74: $t47 := borrow_local($t0)
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.z($t47)
+ 76: $t46 := read_ref($t48)
+ 77: $t50 := borrow_local($t1)
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.z($t50)
+ 79: $t49 := read_ref($t51)
+ 80: $t3 := i128::eq($t46, $t49)
+ 81: goto 84
+ 82: label L16
+ 83: $t3 := false
+ 84: label L17
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::add($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::add($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix10($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::mod($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::mod($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t4 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t5 := i128::mul($t6, $t1)
+  4: $t3 := i128::add($t4, $t5)
+  5: $t9 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t10 := i128::mul($t11, $t1)
+  9: $t8 := i128::add($t9, $t10)
+ 10: $t2 := i128::lte($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix3($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::sub($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::sub($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix4($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t4 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t5 := i128::mul($t6, $t1)
+  4: $t3 := i128::sub($t4, $t5)
+  5: $t9 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t10 := i128::mul($t11, $t1)
+  9: $t8 := i128::sub($t9, $t10)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix5($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::mul($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::mul($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix6($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::mul($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::mul($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix7($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::div($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::div($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix8($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::div($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::div($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix9($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::mod($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::mod($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_logic::test_cmp1($t0: 0x1::i64::I64): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: 0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8
+     # refs: []
+     #
+  1: $t7 := i64::eq($t8, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+  2: if ($t7) goto 3 else goto 7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t9
+     # refs: []
+     #
+  5: $t6 := i64::gte($t9, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  8: $t6 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+ 10: if ($t6) goto 11 else goto 15
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 11: label L3
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 13: $t5 := i64::lte($t10, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 14: goto 17
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 15: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 16: $t5 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 17: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 18: if ($t5) goto 19 else goto 23
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 19: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 20: $t11 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t11
+     # refs: []
+     #
+ 21: $t4 := i64::gt($t11, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 23: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 24: $t4 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 25: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 26: if ($t4) goto 27 else goto 31
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 27: label L9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 28: $t12 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t12
+     # refs: []
+     #
+ 29: $t3 := i64::lt($t12, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 30: goto 33
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 31: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 32: $t3 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 33: label L11
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 34: if ($t3) goto 35 else goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 35: label L12
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 36: $t13 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t13
+     # refs: []
+     #
+ 37: $t2 := i64::eq($t13, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 38: goto 41
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 39: label L13
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 40: $t2 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 41: label L14
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 42: if ($t2) goto 43 else goto 47
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 43: label L15
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 44: $t14 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t14
+     # refs: []
+     #
+ 45: $t1 := i64::gte($t14, $t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 46: goto 49
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 47: label L16
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 48: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 49: label L17
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp2($t0: 0x1::i128::I128): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: 0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: 0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8
+     # refs: []
+     #
+  1: $t7 := i128::eq($t8, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+  2: if ($t7) goto 3 else goto 7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  4: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t9
+     # refs: []
+     #
+  5: $t6 := i128::gte($t9, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+  6: goto 9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: label L1
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  8: $t6 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t6
+     # refs: []
+     #
+ 10: if ($t6) goto 11 else goto 15
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 11: label L3
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 13: $t5 := i128::lte($t10, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 14: goto 17
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 15: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 16: $t5 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 17: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+ 18: if ($t5) goto 19 else goto 23
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 19: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 20: $t11 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t11
+     # refs: []
+     #
+ 21: $t4 := i128::gt($t11, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 22: goto 25
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 23: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 24: $t4 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 25: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+ 26: if ($t4) goto 27 else goto 31
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 27: label L9
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 28: $t12 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t12
+     # refs: []
+     #
+ 29: $t3 := i128::lt($t12, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 30: goto 33
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 31: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 32: $t3 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 33: label L11
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+ 34: if ($t3) goto 35 else goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 35: label L12
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 36: $t13 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t13
+     # refs: []
+     #
+ 37: $t2 := i128::eq($t13, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 38: goto 41
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 39: label L13
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 40: $t2 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 41: label L14
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+ 42: if ($t2) goto 43 else goto 47
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 43: label L15
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 44: $t14 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t14
+     # refs: []
+     #
+ 45: $t1 := i128::gte($t14, $t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 46: goto 49
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 47: label L16
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 48: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 49: label L17
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i64::I64>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i64::I64
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i64::I64
+     var $t16: 0x1::i64::I64
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i64::I64
+     var $t19: 0x1::i64::I64
+     var $t20: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t21: &0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t27: &0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t30: &0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t36: &0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i64::I64
+     var $t40: 0x1::i64::I64
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i64::I64
+     var $t43: 0x1::i64::I64
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i64::I64
+     var $t46: 0x1::i64::I64
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i64::I64
+     var $t49: 0x1::i64::I64
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t11 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t11
+     # refs: [$t11 => #11]
+     # #11
+     #   <no edges>
+     # #root
+     #   => #11 via [local `s1`] at line 35
+     #
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s1`, field `y`] at line 35
+     #
+  2: $t10 := read_ref($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10
+     # refs: []
+     #
+  3: $t14 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t14
+     # refs: [$t14 => #14]
+     # #14
+     #   <no edges>
+     # #root
+     #   => #14 via [local `s2`] at line 35
+     #
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s2`, field `y`] at line 35
+     #
+  5: $t13 := read_ref($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t13
+     # refs: []
+     #
+  6: $t9 := i64::eq($t10, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t9
+     # refs: []
+     #
+  7: if ($t9) goto 8 else goto 17
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  8: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  9: $t17 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => #17 via [local `s1`] at line 35
+     #
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.y($t17)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => #18 via [local `s1`, field `y`] at line 35
+     #
+ 11: $t16 := read_ref($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16
+     # refs: []
+     #
+ 12: $t20 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   => #20 via [local `s3`] at line 35
+     #
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `s3`, field `x`] at line 35
+     #
+ 14: $t19 := read_ref($t21)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t19
+     # refs: []
+     #
+ 15: $t8 := i64::lte($t16, $t19)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 16: goto 19
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 17: label L1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 18: $t8 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 19: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 20: if ($t8) goto 21 else goto 30
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 21: label L3
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 22: $t23 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t23
+     # refs: [$t23 => #23]
+     # #23
+     #   <no edges>
+     # #root
+     #   => #23 via [local `s2`] at line 35
+     #
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.y($t23)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s2`, field `y`] at line 35
+     #
+ 24: $t22 := read_ref($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22
+     # refs: []
+     #
+ 25: $t26 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t26
+     # refs: [$t26 => #26]
+     # #26
+     #   <no edges>
+     # #root
+     #   => #26 via [local `s3`] at line 35
+     #
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t26)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t27
+     # refs: [$t27 => #27]
+     # #27
+     #   <no edges>
+     # #root
+     #   => #27 via [local `s3`, field `x`] at line 35
+     #
+ 27: $t25 := read_ref($t27)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t25
+     # refs: []
+     #
+ 28: $t7 := i64::gte($t22, $t25)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 29: goto 32
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 30: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 31: $t7 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 32: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 33: if ($t7) goto 34 else goto 43
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 34: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 35: $t29 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t29
+     # refs: [$t29 => #29]
+     # #29
+     #   <no edges>
+     # #root
+     #   => #29 via [local `s3`] at line 35
+     #
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t29)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t30
+     # refs: [$t30 => #30]
+     # #30
+     #   <no edges>
+     # #root
+     #   => #30 via [local `s3`, field `x`] at line 35
+     #
+ 37: $t28 := read_ref($t30)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28
+     # refs: []
+     #
+ 38: $t32 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t32
+     # refs: [$t32 => #32]
+     # #32
+     #   <no edges>
+     # #root
+     #   => #32 via [local `s1`] at line 35
+     #
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.y($t32)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t33
+     # refs: [$t33 => #33]
+     # #33
+     #   <no edges>
+     # #root
+     #   => #33 via [local `s1`, field `y`] at line 35
+     #
+ 40: $t31 := read_ref($t33)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t31
+     # refs: []
+     #
+ 41: $t6 := i64::gt($t28, $t31)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 42: goto 45
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 43: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 44: $t6 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 45: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 46: if ($t6) goto 47 else goto 56
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 47: label L9
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 48: $t35 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t35
+     # refs: [$t35 => #35]
+     # #35
+     #   <no edges>
+     # #root
+     #   => #35 via [local `s3`] at line 35
+     #
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t35)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t36
+     # refs: [$t36 => #36]
+     # #36
+     #   <no edges>
+     # #root
+     #   => #36 via [local `s3`, field `x`] at line 35
+     #
+ 50: $t34 := read_ref($t36)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34
+     # refs: []
+     #
+ 51: $t38 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t38
+     # refs: [$t38 => #38]
+     # #38
+     #   <no edges>
+     # #root
+     #   => #38 via [local `s2`] at line 35
+     #
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.y($t38)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t39
+     # refs: [$t39 => #39]
+     # #39
+     #   <no edges>
+     # #root
+     #   => #39 via [local `s2`, field `y`] at line 35
+     #
+ 53: $t37 := read_ref($t39)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t37
+     # refs: []
+     #
+ 54: $t5 := i64::lt($t34, $t37)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 55: goto 58
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 56: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 57: $t5 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 58: label L11
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 59: if ($t5) goto 60 else goto 69
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 60: label L12
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 61: $t41 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t41
+     # refs: [$t41 => #41]
+     # #41
+     #   <no edges>
+     # #root
+     #   => #41 via [local `s1`] at line 35
+     #
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.y($t41)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t42
+     # refs: [$t42 => #42]
+     # #42
+     #   <no edges>
+     # #root
+     #   => #42 via [local `s1`, field `y`] at line 35
+     #
+ 63: $t40 := read_ref($t42)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40
+     # refs: []
+     #
+ 64: $t44 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t44
+     # refs: [$t44 => #44]
+     # #44
+     #   <no edges>
+     # #root
+     #   => #44 via [local `s2`] at line 35
+     #
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.y($t44)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t45
+     # refs: [$t45 => #45]
+     # #45
+     #   <no edges>
+     # #root
+     #   => #45 via [local `s2`, field `y`] at line 35
+     #
+ 66: $t43 := read_ref($t45)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t43
+     # refs: []
+     #
+ 67: $t4 := i64::eq($t40, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 68: goto 71
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 69: label L13
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 70: $t4 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 71: label L14
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 72: if ($t4) goto 73 else goto 82
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 73: label L15
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 74: $t47 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t47
+     # refs: [$t47 => #47]
+     # #47
+     #   <no edges>
+     # #root
+     #   => #47 via [local `s1`] at line 35
+     #
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.y($t47)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t48
+     # refs: [$t48 => #48]
+     # #48
+     #   <no edges>
+     # #root
+     #   => #48 via [local `s1`, field `y`] at line 35
+     #
+ 76: $t46 := read_ref($t48)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t46
+     # refs: []
+     #
+ 77: $t50 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t50
+     # refs: [$t50 => #50]
+     # #50
+     #   <no edges>
+     # #root
+     #   => #50 via [local `s2`] at line 35
+     #
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.y($t50)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t51
+     # refs: [$t51 => #51]
+     # #51
+     #   <no edges>
+     # #root
+     #   => #51 via [local `s2`, field `y`] at line 35
+     #
+ 79: $t49 := read_ref($t51)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t49
+     # refs: []
+     #
+ 80: $t3 := i64::eq($t46, $t49)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 81: goto 84
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 82: label L16
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 83: $t3 := false
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 84: label L17
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i128::I128>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i128::I128
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i128::I128
+     var $t16: 0x1::i128::I128
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i128::I128
+     var $t19: 0x1::i128::I128
+     var $t20: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t21: &0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t27: &0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t30: &0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t36: &0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i128::I128
+     var $t40: 0x1::i128::I128
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i128::I128
+     var $t43: 0x1::i128::I128
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i128::I128
+     var $t46: 0x1::i128::I128
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i128::I128
+     var $t49: 0x1::i128::I128
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i128::I128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  0: $t11 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t11
+     # refs: [$t11 => #11]
+     # #11
+     #   <no edges>
+     # #root
+     #   => #11 via [local `s1`] at line 39
+     #
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t12
+     # refs: [$t12 => #12]
+     # #12
+     #   <no edges>
+     # #root
+     #   => #12 via [local `s1`, field `z`] at line 39
+     #
+  2: $t10 := read_ref($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10
+     # refs: []
+     #
+  3: $t14 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t14
+     # refs: [$t14 => #14]
+     # #14
+     #   <no edges>
+     # #root
+     #   => #14 via [local `s2`] at line 39
+     #
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t15
+     # refs: [$t15 => #15]
+     # #15
+     #   <no edges>
+     # #root
+     #   => #15 via [local `s2`, field `z`] at line 39
+     #
+  5: $t13 := read_ref($t15)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t10, $t13
+     # refs: []
+     #
+  6: $t9 := i128::eq($t10, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t9
+     # refs: []
+     #
+  7: if ($t9) goto 8 else goto 17
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  8: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+  9: $t17 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t17
+     # refs: [$t17 => #17]
+     # #17
+     #   <no edges>
+     # #root
+     #   => #17 via [local `s1`] at line 39
+     #
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.z($t17)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t18
+     # refs: [$t18 => #18]
+     # #18
+     #   <no edges>
+     # #root
+     #   => #18 via [local `s1`, field `z`] at line 39
+     #
+ 11: $t16 := read_ref($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16
+     # refs: []
+     #
+ 12: $t20 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t20
+     # refs: [$t20 => #20]
+     # #20
+     #   <no edges>
+     # #root
+     #   => #20 via [local `s3`] at line 39
+     #
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t21
+     # refs: [$t21 => #21]
+     # #21
+     #   <no edges>
+     # #root
+     #   => #21 via [local `s3`, field `x`] at line 39
+     #
+ 14: $t19 := read_ref($t21)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t16, $t19
+     # refs: []
+     #
+ 15: $t8 := i128::lte($t16, $t19)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 16: goto 19
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 17: label L1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 18: $t8 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 19: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t8
+     # refs: []
+     #
+ 20: if ($t8) goto 21 else goto 30
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 21: label L3
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 22: $t23 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t23
+     # refs: [$t23 => #23]
+     # #23
+     #   <no edges>
+     # #root
+     #   => #23 via [local `s2`] at line 39
+     #
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.z($t23)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t24
+     # refs: [$t24 => #24]
+     # #24
+     #   <no edges>
+     # #root
+     #   => #24 via [local `s2`, field `z`] at line 39
+     #
+ 24: $t22 := read_ref($t24)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22
+     # refs: []
+     #
+ 25: $t26 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t26
+     # refs: [$t26 => #26]
+     # #26
+     #   <no edges>
+     # #root
+     #   => #26 via [local `s3`] at line 39
+     #
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t26)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t27
+     # refs: [$t27 => #27]
+     # #27
+     #   <no edges>
+     # #root
+     #   => #27 via [local `s3`, field `x`] at line 39
+     #
+ 27: $t25 := read_ref($t27)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t22, $t25
+     # refs: []
+     #
+ 28: $t7 := i128::gte($t22, $t25)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 29: goto 32
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 30: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 31: $t7 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 32: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t7
+     # refs: []
+     #
+ 33: if ($t7) goto 34 else goto 43
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 34: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 35: $t29 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t29
+     # refs: [$t29 => #29]
+     # #29
+     #   <no edges>
+     # #root
+     #   => #29 via [local `s3`] at line 39
+     #
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t29)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t30
+     # refs: [$t30 => #30]
+     # #30
+     #   <no edges>
+     # #root
+     #   => #30 via [local `s3`, field `x`] at line 39
+     #
+ 37: $t28 := read_ref($t30)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28
+     # refs: []
+     #
+ 38: $t32 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t32
+     # refs: [$t32 => #32]
+     # #32
+     #   <no edges>
+     # #root
+     #   => #32 via [local `s1`] at line 39
+     #
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.z($t32)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t33
+     # refs: [$t33 => #33]
+     # #33
+     #   <no edges>
+     # #root
+     #   => #33 via [local `s1`, field `z`] at line 39
+     #
+ 40: $t31 := read_ref($t33)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t28, $t31
+     # refs: []
+     #
+ 41: $t6 := i128::gt($t28, $t31)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 42: goto 45
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 43: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 44: $t6 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 45: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2, $t6
+     # refs: []
+     #
+ 46: if ($t6) goto 47 else goto 56
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 47: label L9
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 48: $t35 := borrow_local($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t35
+     # refs: [$t35 => #35]
+     # #35
+     #   <no edges>
+     # #root
+     #   => #35 via [local `s3`] at line 39
+     #
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t35)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t36
+     # refs: [$t36 => #36]
+     # #36
+     #   <no edges>
+     # #root
+     #   => #36 via [local `s3`, field `x`] at line 39
+     #
+ 50: $t34 := read_ref($t36)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34
+     # refs: []
+     #
+ 51: $t38 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t38
+     # refs: [$t38 => #38]
+     # #38
+     #   <no edges>
+     # #root
+     #   => #38 via [local `s2`] at line 39
+     #
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.z($t38)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t39
+     # refs: [$t39 => #39]
+     # #39
+     #   <no edges>
+     # #root
+     #   => #39 via [local `s2`, field `z`] at line 39
+     #
+ 53: $t37 := read_ref($t39)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t34, $t37
+     # refs: []
+     #
+ 54: $t5 := i128::lt($t34, $t37)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 55: goto 58
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t2
+     # refs: []
+     #
+ 56: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 57: $t5 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 58: label L11
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+ 59: if ($t5) goto 60 else goto 69
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 60: label L12
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 61: $t41 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t41
+     # refs: [$t41 => #41]
+     # #41
+     #   <no edges>
+     # #root
+     #   => #41 via [local `s1`] at line 39
+     #
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.z($t41)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t42
+     # refs: [$t42 => #42]
+     # #42
+     #   <no edges>
+     # #root
+     #   => #42 via [local `s1`, field `z`] at line 39
+     #
+ 63: $t40 := read_ref($t42)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40
+     # refs: []
+     #
+ 64: $t44 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t44
+     # refs: [$t44 => #44]
+     # #44
+     #   <no edges>
+     # #root
+     #   => #44 via [local `s2`] at line 39
+     #
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.z($t44)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t45
+     # refs: [$t45 => #45]
+     # #45
+     #   <no edges>
+     # #root
+     #   => #45 via [local `s2`, field `z`] at line 39
+     #
+ 66: $t43 := read_ref($t45)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t40, $t43
+     # refs: []
+     #
+ 67: $t4 := i128::eq($t40, $t43)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 68: goto 71
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 69: label L13
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 70: $t4 := false
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 71: label L14
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+ 72: if ($t4) goto 73 else goto 82
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 73: label L15
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 74: $t47 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t47
+     # refs: [$t47 => #47]
+     # #47
+     #   <no edges>
+     # #root
+     #   => #47 via [local `s1`] at line 39
+     #
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.z($t47)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t48
+     # refs: [$t48 => #48]
+     # #48
+     #   <no edges>
+     # #root
+     #   => #48 via [local `s1`, field `z`] at line 39
+     #
+ 76: $t46 := read_ref($t48)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t46
+     # refs: []
+     #
+ 77: $t50 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t50
+     # refs: [$t50 => #50]
+     # #50
+     #   <no edges>
+     # #root
+     #   => #50 via [local `s2`] at line 39
+     #
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.z($t50)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t51
+     # refs: [$t51 => #51]
+     # #51
+     #   <no edges>
+     # #root
+     #   => #51 via [local `s2`, field `z`] at line 39
+     #
+ 79: $t49 := read_ref($t51)
+     # abort state: {returns,aborts}
+     # live vars: $t46, $t49
+     # refs: []
+     #
+ 80: $t3 := i128::eq($t46, $t49)
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 81: goto 84
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 82: label L16
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+ 83: $t3 := false
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 84: label L17
+     # abort state: {returns}
+     # live vars: $t3
+     # refs: []
+     #
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::add($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := i64::add($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := i64::eq($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix10($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+  1: $t7 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t7
+     # refs: []
+     #
+  2: $t6 := i128::pack($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: []
+     #
+  3: $t4 := i128::mod($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  4: $t3 := i128::mul($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10
+     # refs: []
+     #
+  6: $t12 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t12
+     # refs: []
+     #
+  7: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := i128::mod($t10, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9
+     # refs: []
+     #
+  9: $t8 := i128::mul($t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t8
+     # refs: []
+     #
+ 10: $t2 := i128::gt($t3, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t7 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t7
+     # refs: []
+     #
+  2: $t6 := i128::pack($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t6
+     # refs: []
+     #
+  3: $t5 := i128::mul($t6, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  4: $t3 := i128::add($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9
+     # refs: []
+     #
+  6: $t12 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9, $t12
+     # refs: []
+     #
+  7: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9, $t11
+     # refs: []
+     #
+  8: $t10 := i128::mul($t11, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t9, $t10
+     # refs: []
+     #
+  9: $t8 := i128::add($t9, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t8
+     # refs: []
+     #
+ 10: $t2 := i128::lte($t3, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix3($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::sub($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := i64::sub($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := i64::eq($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix4($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t7 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t7
+     # refs: []
+     #
+  2: $t6 := i128::pack($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t6
+     # refs: []
+     #
+  3: $t5 := i128::mul($t6, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4, $t5
+     # refs: []
+     #
+  4: $t3 := i128::sub($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: $t9 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9
+     # refs: []
+     #
+  6: $t12 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9, $t12
+     # refs: []
+     #
+  7: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9, $t11
+     # refs: []
+     #
+  8: $t10 := i128::mul($t11, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t9, $t10
+     # refs: []
+     #
+  9: $t8 := i128::sub($t9, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t8
+     # refs: []
+     #
+ 10: $t2 := i128::gt($t3, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix5($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::mul($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := i64::mul($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := i64::eq($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix6($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+  1: $t7 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t7
+     # refs: []
+     #
+  2: $t6 := i128::pack($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: []
+     #
+  3: $t4 := i128::mul($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  4: $t3 := i128::mul($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10
+     # refs: []
+     #
+  6: $t12 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t12
+     # refs: []
+     #
+  7: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := i128::mul($t10, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9
+     # refs: []
+     #
+  9: $t8 := i128::mul($t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t8
+     # refs: []
+     #
+ 10: $t2 := i128::gt($t3, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix7($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::div($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := i64::div($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := i64::eq($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix8($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+  1: $t7 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t7
+     # refs: []
+     #
+  2: $t6 := i128::pack($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t5, $t6
+     # refs: []
+     #
+  3: $t4 := i128::div($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  4: $t3 := i128::mul($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: $t10 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10
+     # refs: []
+     #
+  6: $t12 := 3
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t12
+     # refs: []
+     #
+  7: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t10, $t11
+     # refs: []
+     #
+  8: $t9 := i128::div($t10, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t9
+     # refs: []
+     #
+  9: $t8 := i128::mul($t9, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t8
+     # refs: []
+     #
+ 10: $t2 := i128::gt($t3, $t8)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix9($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t4 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  1: $t3 := i64::mod($t4, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  2: $t6 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t6
+     # refs: []
+     #
+  3: $t5 := i64::mod($t6, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5
+     # refs: []
+     #
+  4: $t2 := i64::eq($t3, $t5)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  5: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_logic {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i64::I64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<0x1::i128::I128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S2 {
+        x: S1,
+        y: 0x1::i64::I64,
+        z: 0x1::i128::I128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test_cmp1(x: 0x1::i64::I64): bool {
+        And(And(And(And(And(And(i64::eq(x, x), i64::gte(x, x)), i64::lte(x, x)), i64::gt(x, x)), i64::lt(x, x)), i64::eq(x, x)), i64::gte(x, x))
+    }
+    private fun test_cmp2(x: 0x1::i128::I128): bool {
+        And(And(And(And(And(And(i128::eq(x, x), i128::gte(x, x)), i128::lte(x, x)), i128::gt(x, x)), i128::lt(x, x)), i128::eq(x, x)), i128::gte(x, x))
+    }
+    private fun test_cmp3(s1: S1,s2: S2,s3: S3<0x1::i64::I64>): bool {
+        And(And(And(And(And(And(i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2)), i64::lte(select valid_logic::S1.y<S1>(s1), select valid_logic::S3.x<S3<0x1::i64::I64>>(s3))), i64::gte(select valid_logic::S2.y<S2>(s2), select valid_logic::S3.x<S3<0x1::i64::I64>>(s3))), i64::gt(select valid_logic::S3.x<S3<0x1::i64::I64>>(s3), select valid_logic::S1.y<S1>(s1))), i64::lt(select valid_logic::S3.x<S3<0x1::i64::I64>>(s3), select valid_logic::S2.y<S2>(s2))), i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2))), i64::eq(select valid_logic::S1.y<S1>(s1), select valid_logic::S2.y<S2>(s2)))
+    }
+    private fun test_cmp4(s1: S1,s2: S2,s3: S3<0x1::i128::I128>): bool {
+        And(And(And(And(And(And(i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2)), i128::lte(select valid_logic::S1.z<S1>(s1), select valid_logic::S3.x<S3<0x1::i128::I128>>(s3))), i128::gte(select valid_logic::S2.z<S2>(s2), select valid_logic::S3.x<S3<0x1::i128::I128>>(s3))), i128::gt(select valid_logic::S3.x<S3<0x1::i128::I128>>(s3), select valid_logic::S1.z<S1>(s1))), i128::lt(select valid_logic::S3.x<S3<0x1::i128::I128>>(s3), select valid_logic::S2.z<S2>(s2))), i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2))), i128::eq(select valid_logic::S1.z<S1>(s1), select valid_logic::S2.z<S2>(s2)))
+    }
+    private fun test_mix1(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::add(x, y), i64::add(y, x))
+    }
+    private fun test_mix10(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::mod(x, i128::pack(2)), y), i128::mul(i128::mod(x, i128::pack(3)), y))
+    }
+    private fun test_mix2(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::lte(i128::add(x, i128::mul(i128::pack(2), y)), i128::add(x, i128::mul(i128::pack(3), y)))
+    }
+    private fun test_mix3(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::sub(x, y), i64::sub(y, x))
+    }
+    private fun test_mix4(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::sub(x, i128::mul(i128::pack(2), y)), i128::sub(x, i128::mul(i128::pack(3), y)))
+    }
+    private fun test_mix5(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::mul(x, y), i64::mul(y, x))
+    }
+    private fun test_mix6(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::mul(x, i128::pack(2)), y), i128::mul(i128::mul(x, i128::pack(3)), y))
+    }
+    private fun test_mix7(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::div(x, y), i64::div(y, x))
+    }
+    private fun test_mix8(x: 0x1::i128::I128,y: 0x1::i128::I128): bool {
+        i128::gt(i128::mul(i128::div(x, i128::pack(2)), y), i128::mul(i128::div(x, i128::pack(3)), y))
+    }
+    private fun test_mix9(x: 0x1::i64::I64,y: 0x1::i64::I64): bool {
+        i64::eq(i64::mod(x, y), i64::mod(y, x))
+    }
+} // end 0x42::valid_logic
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_logic::test_cmp1($t0: 0x1::i64::I64): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64
+     var $t10: 0x1::i64::I64
+     var $t11: 0x1::i64::I64
+     var $t12: 0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: 0x1::i64::I64
+  0: $t8 := infer($t0)
+  1: $t7 := i64::eq($t8, $t0)
+  2: if ($t7) goto 3 else goto 7
+  3: label L0
+  4: $t9 := infer($t0)
+  5: $t6 := i64::gte($t9, $t0)
+  6: goto 9
+  7: label L1
+  8: $t6 := false
+  9: label L2
+ 10: if ($t6) goto 11 else goto 15
+ 11: label L3
+ 12: $t10 := infer($t0)
+ 13: $t5 := i64::lte($t10, $t0)
+ 14: goto 17
+ 15: label L4
+ 16: $t5 := false
+ 17: label L5
+ 18: if ($t5) goto 19 else goto 23
+ 19: label L6
+ 20: $t11 := infer($t0)
+ 21: $t4 := i64::gt($t11, $t0)
+ 22: goto 25
+ 23: label L7
+ 24: $t4 := false
+ 25: label L8
+ 26: if ($t4) goto 27 else goto 31
+ 27: label L9
+ 28: $t12 := infer($t0)
+ 29: $t3 := i64::lt($t12, $t0)
+ 30: goto 33
+ 31: label L10
+ 32: $t3 := false
+ 33: label L11
+ 34: if ($t3) goto 35 else goto 39
+ 35: label L12
+ 36: $t13 := infer($t0)
+ 37: $t2 := i64::eq($t13, $t0)
+ 38: goto 41
+ 39: label L13
+ 40: $t2 := false
+ 41: label L14
+ 42: if ($t2) goto 43 else goto 47
+ 43: label L15
+ 44: $t14 := infer($t0)
+ 45: $t1 := i64::gte($t14, $t0)
+ 46: goto 49
+ 47: label L16
+ 48: $t1 := false
+ 49: label L17
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp2($t0: 0x1::i128::I128): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: 0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: 0x1::i128::I128
+  0: $t8 := infer($t0)
+  1: $t7 := i128::eq($t8, $t0)
+  2: if ($t7) goto 3 else goto 7
+  3: label L0
+  4: $t9 := infer($t0)
+  5: $t6 := i128::gte($t9, $t0)
+  6: goto 9
+  7: label L1
+  8: $t6 := false
+  9: label L2
+ 10: if ($t6) goto 11 else goto 15
+ 11: label L3
+ 12: $t10 := infer($t0)
+ 13: $t5 := i128::lte($t10, $t0)
+ 14: goto 17
+ 15: label L4
+ 16: $t5 := false
+ 17: label L5
+ 18: if ($t5) goto 19 else goto 23
+ 19: label L6
+ 20: $t11 := infer($t0)
+ 21: $t4 := i128::gt($t11, $t0)
+ 22: goto 25
+ 23: label L7
+ 24: $t4 := false
+ 25: label L8
+ 26: if ($t4) goto 27 else goto 31
+ 27: label L9
+ 28: $t12 := infer($t0)
+ 29: $t3 := i128::lt($t12, $t0)
+ 30: goto 33
+ 31: label L10
+ 32: $t3 := false
+ 33: label L11
+ 34: if ($t3) goto 35 else goto 39
+ 35: label L12
+ 36: $t13 := infer($t0)
+ 37: $t2 := i128::eq($t13, $t0)
+ 38: goto 41
+ 39: label L13
+ 40: $t2 := false
+ 41: label L14
+ 42: if ($t2) goto 43 else goto 47
+ 43: label L15
+ 44: $t14 := infer($t0)
+ 45: $t1 := i128::gte($t14, $t0)
+ 46: goto 49
+ 47: label L16
+ 48: $t1 := false
+ 49: label L17
+ 50: return $t1
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i64::I64>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i64::I64
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i64::I64
+     var $t16: 0x1::i64::I64
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i64::I64
+     var $t19: 0x1::i64::I64
+     var $t20: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t21: &0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t27: &0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t30: &0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t36: &0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i64::I64
+     var $t40: 0x1::i64::I64
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i64::I64
+     var $t43: 0x1::i64::I64
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i64::I64
+     var $t46: 0x1::i64::I64
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i64::I64
+     var $t49: 0x1::i64::I64
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i64::I64
+  0: $t11 := borrow_local($t0)
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+  2: $t10 := read_ref($t12)
+  3: $t14 := borrow_local($t1)
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.y($t14)
+  5: $t13 := read_ref($t15)
+  6: $t9 := i64::eq($t10, $t13)
+  7: if ($t9) goto 8 else goto 17
+  8: label L0
+  9: $t17 := borrow_local($t0)
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.y($t17)
+ 11: $t16 := read_ref($t18)
+ 12: $t20 := borrow_local($t2)
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+ 14: $t19 := read_ref($t21)
+ 15: $t8 := i64::lte($t16, $t19)
+ 16: goto 19
+ 17: label L1
+ 18: $t8 := false
+ 19: label L2
+ 20: if ($t8) goto 21 else goto 30
+ 21: label L3
+ 22: $t23 := borrow_local($t1)
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.y($t23)
+ 24: $t22 := read_ref($t24)
+ 25: $t26 := borrow_local($t2)
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t26)
+ 27: $t25 := read_ref($t27)
+ 28: $t7 := i64::gte($t22, $t25)
+ 29: goto 32
+ 30: label L4
+ 31: $t7 := false
+ 32: label L5
+ 33: if ($t7) goto 34 else goto 43
+ 34: label L6
+ 35: $t29 := borrow_local($t2)
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t29)
+ 37: $t28 := read_ref($t30)
+ 38: $t32 := borrow_local($t0)
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.y($t32)
+ 40: $t31 := read_ref($t33)
+ 41: $t6 := i64::gt($t28, $t31)
+ 42: goto 45
+ 43: label L7
+ 44: $t6 := false
+ 45: label L8
+ 46: if ($t6) goto 47 else goto 56
+ 47: label L9
+ 48: $t35 := borrow_local($t2)
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t35)
+ 50: $t34 := read_ref($t36)
+ 51: $t38 := borrow_local($t1)
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.y($t38)
+ 53: $t37 := read_ref($t39)
+ 54: $t5 := i64::lt($t34, $t37)
+ 55: goto 58
+ 56: label L10
+ 57: $t5 := false
+ 58: label L11
+ 59: if ($t5) goto 60 else goto 69
+ 60: label L12
+ 61: $t41 := borrow_local($t0)
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.y($t41)
+ 63: $t40 := read_ref($t42)
+ 64: $t44 := borrow_local($t1)
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.y($t44)
+ 66: $t43 := read_ref($t45)
+ 67: $t4 := i64::eq($t40, $t43)
+ 68: goto 71
+ 69: label L13
+ 70: $t4 := false
+ 71: label L14
+ 72: if ($t4) goto 73 else goto 82
+ 73: label L15
+ 74: $t47 := borrow_local($t0)
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.y($t47)
+ 76: $t46 := read_ref($t48)
+ 77: $t50 := borrow_local($t1)
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.y($t50)
+ 79: $t49 := read_ref($t51)
+ 80: $t3 := i64::eq($t46, $t49)
+ 81: goto 84
+ 82: label L16
+ 83: $t3 := false
+ 84: label L17
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i128::I128>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: 0x1::i128::I128
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i128::I128
+     var $t16: 0x1::i128::I128
+     var $t17: &0x42::valid_logic::S1
+     var $t18: &0x1::i128::I128
+     var $t19: 0x1::i128::I128
+     var $t20: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t21: &0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: &0x42::valid_logic::S2
+     var $t24: &0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t27: &0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t30: &0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: &0x42::valid_logic::S1
+     var $t33: &0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t36: &0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: &0x42::valid_logic::S2
+     var $t39: &0x1::i128::I128
+     var $t40: 0x1::i128::I128
+     var $t41: &0x42::valid_logic::S1
+     var $t42: &0x1::i128::I128
+     var $t43: 0x1::i128::I128
+     var $t44: &0x42::valid_logic::S2
+     var $t45: &0x1::i128::I128
+     var $t46: 0x1::i128::I128
+     var $t47: &0x42::valid_logic::S1
+     var $t48: &0x1::i128::I128
+     var $t49: 0x1::i128::I128
+     var $t50: &0x42::valid_logic::S2
+     var $t51: &0x1::i128::I128
+  0: $t11 := borrow_local($t0)
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+  2: $t10 := read_ref($t12)
+  3: $t14 := borrow_local($t1)
+  4: $t15 := borrow_field<0x42::valid_logic::S2>.z($t14)
+  5: $t13 := read_ref($t15)
+  6: $t9 := i128::eq($t10, $t13)
+  7: if ($t9) goto 8 else goto 17
+  8: label L0
+  9: $t17 := borrow_local($t0)
+ 10: $t18 := borrow_field<0x42::valid_logic::S1>.z($t17)
+ 11: $t16 := read_ref($t18)
+ 12: $t20 := borrow_local($t2)
+ 13: $t21 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+ 14: $t19 := read_ref($t21)
+ 15: $t8 := i128::lte($t16, $t19)
+ 16: goto 19
+ 17: label L1
+ 18: $t8 := false
+ 19: label L2
+ 20: if ($t8) goto 21 else goto 30
+ 21: label L3
+ 22: $t23 := borrow_local($t1)
+ 23: $t24 := borrow_field<0x42::valid_logic::S2>.z($t23)
+ 24: $t22 := read_ref($t24)
+ 25: $t26 := borrow_local($t2)
+ 26: $t27 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t26)
+ 27: $t25 := read_ref($t27)
+ 28: $t7 := i128::gte($t22, $t25)
+ 29: goto 32
+ 30: label L4
+ 31: $t7 := false
+ 32: label L5
+ 33: if ($t7) goto 34 else goto 43
+ 34: label L6
+ 35: $t29 := borrow_local($t2)
+ 36: $t30 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t29)
+ 37: $t28 := read_ref($t30)
+ 38: $t32 := borrow_local($t0)
+ 39: $t33 := borrow_field<0x42::valid_logic::S1>.z($t32)
+ 40: $t31 := read_ref($t33)
+ 41: $t6 := i128::gt($t28, $t31)
+ 42: goto 45
+ 43: label L7
+ 44: $t6 := false
+ 45: label L8
+ 46: if ($t6) goto 47 else goto 56
+ 47: label L9
+ 48: $t35 := borrow_local($t2)
+ 49: $t36 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t35)
+ 50: $t34 := read_ref($t36)
+ 51: $t38 := borrow_local($t1)
+ 52: $t39 := borrow_field<0x42::valid_logic::S2>.z($t38)
+ 53: $t37 := read_ref($t39)
+ 54: $t5 := i128::lt($t34, $t37)
+ 55: goto 58
+ 56: label L10
+ 57: $t5 := false
+ 58: label L11
+ 59: if ($t5) goto 60 else goto 69
+ 60: label L12
+ 61: $t41 := borrow_local($t0)
+ 62: $t42 := borrow_field<0x42::valid_logic::S1>.z($t41)
+ 63: $t40 := read_ref($t42)
+ 64: $t44 := borrow_local($t1)
+ 65: $t45 := borrow_field<0x42::valid_logic::S2>.z($t44)
+ 66: $t43 := read_ref($t45)
+ 67: $t4 := i128::eq($t40, $t43)
+ 68: goto 71
+ 69: label L13
+ 70: $t4 := false
+ 71: label L14
+ 72: if ($t4) goto 73 else goto 82
+ 73: label L15
+ 74: $t47 := borrow_local($t0)
+ 75: $t48 := borrow_field<0x42::valid_logic::S1>.z($t47)
+ 76: $t46 := read_ref($t48)
+ 77: $t50 := borrow_local($t1)
+ 78: $t51 := borrow_field<0x42::valid_logic::S2>.z($t50)
+ 79: $t49 := read_ref($t51)
+ 80: $t3 := i128::eq($t46, $t49)
+ 81: goto 84
+ 82: label L16
+ 83: $t3 := false
+ 84: label L17
+ 85: return $t3
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::add($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::add($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix10($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::mod($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::mod($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t4 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t5 := i128::mul($t6, $t1)
+  4: $t3 := i128::add($t4, $t5)
+  5: $t9 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t10 := i128::mul($t11, $t1)
+  9: $t8 := i128::add($t9, $t10)
+ 10: $t2 := i128::lte($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix3($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::sub($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::sub($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix4($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t4 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t5 := i128::mul($t6, $t1)
+  4: $t3 := i128::sub($t4, $t5)
+  5: $t9 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t10 := i128::mul($t11, $t1)
+  9: $t8 := i128::sub($t9, $t10)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix5($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::mul($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::mul($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix6($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::mul($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::mul($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix7($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::div($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::div($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix8($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128
+     var $t10: 0x1::i128::I128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+  0: $t5 := infer($t0)
+  1: $t7 := 2
+  2: $t6 := i128::pack($t7)
+  3: $t4 := i128::div($t5, $t6)
+  4: $t3 := i128::mul($t4, $t1)
+  5: $t10 := infer($t0)
+  6: $t12 := 3
+  7: $t11 := i128::pack($t12)
+  8: $t9 := i128::div($t10, $t11)
+  9: $t8 := i128::mul($t9, $t1)
+ 10: $t2 := i128::gt($t3, $t8)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix9($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64
+     var $t6: 0x1::i64::I64
+  0: $t4 := infer($t0)
+  1: $t3 := i64::mod($t4, $t1)
+  2: $t6 := infer($t1)
+  3: $t5 := i64::mod($t6, $t0)
+  4: $t2 := i64::eq($t3, $t5)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_logic::test_cmp1($t0: 0x1::i64::I64): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool [unused]
+     var $t7: bool
+     var $t8: 0x1::i64::I64
+     var $t9: 0x1::i64::I64 [unused]
+     var $t10: 0x1::i64::I64 [unused]
+     var $t11: 0x1::i64::I64 [unused]
+     var $t12: 0x1::i64::I64 [unused]
+     var $t13: 0x1::i64::I64 [unused]
+     var $t14: 0x1::i64::I64 [unused]
+     # live vars: $t0
+  0: $t8 := copy($t0)
+     # live vars: $t0, $t8
+  1: $t7 := i64::eq($t8, $t0)
+     # live vars: $t0, $t7
+  2: if ($t7) goto 3 else goto 48
+     # live vars: $t0
+  3: label L0
+     # live vars: $t0
+  4: $t8 := copy($t0)
+     # live vars: $t0, $t8
+  5: $t7 := i64::gte($t8, $t0)
+     # live vars: $t0, $t7
+  6: label L2
+     # live vars: $t0, $t7
+  7: if ($t7) goto 8 else goto 45
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 10: $t5 := i64::lte($t8, $t0)
+     # live vars: $t0, $t5
+ 11: label L5
+     # live vars: $t0, $t5
+ 12: if ($t5) goto 13 else goto 42
+     # live vars: $t0
+ 13: label L6
+     # live vars: $t0
+ 14: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 15: $t4 := i64::gt($t8, $t0)
+     # live vars: $t0, $t4
+ 16: label L8
+     # live vars: $t0, $t4
+ 17: if ($t4) goto 18 else goto 39
+     # live vars: $t0
+ 18: label L9
+     # live vars: $t0
+ 19: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 20: $t3 := i64::lt($t8, $t0)
+     # live vars: $t0, $t3
+ 21: label L11
+     # live vars: $t0, $t3
+ 22: if ($t3) goto 23 else goto 36
+     # live vars: $t0
+ 23: label L12
+     # live vars: $t0
+ 24: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 25: $t2 := i64::eq($t8, $t0)
+     # live vars: $t0, $t2
+ 26: label L14
+     # live vars: $t0, $t2
+ 27: if ($t2) goto 28 else goto 33
+     # live vars: $t0
+ 28: label L15
+     # live vars: $t0
+ 29: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 30: $t1 := i64::gte($t8, $t0)
+     # live vars: $t1
+ 31: label L17
+     # live vars: $t1
+ 32: return $t1
+     # live vars: $t0
+ 33: label L16
+     # live vars:
+ 34: $t1 := false
+     # live vars: $t1
+ 35: goto 31
+     # live vars: $t0
+ 36: label L13
+     # live vars: $t0
+ 37: $t2 := false
+     # live vars: $t0, $t2
+ 38: goto 26
+     # live vars: $t0
+ 39: label L10
+     # live vars: $t0
+ 40: $t3 := false
+     # live vars: $t0, $t3
+ 41: goto 21
+     # live vars: $t0
+ 42: label L7
+     # live vars: $t0
+ 43: $t4 := false
+     # live vars: $t0, $t4
+ 44: goto 16
+     # live vars: $t0
+ 45: label L4
+     # live vars: $t0
+ 46: $t5 := false
+     # live vars: $t0, $t5
+ 47: goto 11
+     # live vars: $t0
+ 48: label L1
+     # live vars: $t0
+ 49: $t7 := false
+     # live vars: $t0, $t7
+ 50: goto 6
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp2($t0: 0x1::i128::I128): bool {
+     var $t1: bool
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool [unused]
+     var $t7: bool
+     var $t8: 0x1::i128::I128
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: 0x1::i128::I128 [unused]
+     var $t13: 0x1::i128::I128 [unused]
+     var $t14: 0x1::i128::I128 [unused]
+     # live vars: $t0
+  0: $t8 := copy($t0)
+     # live vars: $t0, $t8
+  1: $t7 := i128::eq($t8, $t0)
+     # live vars: $t0, $t7
+  2: if ($t7) goto 3 else goto 48
+     # live vars: $t0
+  3: label L0
+     # live vars: $t0
+  4: $t8 := copy($t0)
+     # live vars: $t0, $t8
+  5: $t7 := i128::gte($t8, $t0)
+     # live vars: $t0, $t7
+  6: label L2
+     # live vars: $t0, $t7
+  7: if ($t7) goto 8 else goto 45
+     # live vars: $t0
+  8: label L3
+     # live vars: $t0
+  9: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 10: $t5 := i128::lte($t8, $t0)
+     # live vars: $t0, $t5
+ 11: label L5
+     # live vars: $t0, $t5
+ 12: if ($t5) goto 13 else goto 42
+     # live vars: $t0
+ 13: label L6
+     # live vars: $t0
+ 14: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 15: $t4 := i128::gt($t8, $t0)
+     # live vars: $t0, $t4
+ 16: label L8
+     # live vars: $t0, $t4
+ 17: if ($t4) goto 18 else goto 39
+     # live vars: $t0
+ 18: label L9
+     # live vars: $t0
+ 19: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 20: $t3 := i128::lt($t8, $t0)
+     # live vars: $t0, $t3
+ 21: label L11
+     # live vars: $t0, $t3
+ 22: if ($t3) goto 23 else goto 36
+     # live vars: $t0
+ 23: label L12
+     # live vars: $t0
+ 24: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 25: $t2 := i128::eq($t8, $t0)
+     # live vars: $t0, $t2
+ 26: label L14
+     # live vars: $t0, $t2
+ 27: if ($t2) goto 28 else goto 33
+     # live vars: $t0
+ 28: label L15
+     # live vars: $t0
+ 29: $t8 := copy($t0)
+     # live vars: $t0, $t8
+ 30: $t1 := i128::gte($t8, $t0)
+     # live vars: $t1
+ 31: label L17
+     # live vars: $t1
+ 32: return $t1
+     # live vars: $t0
+ 33: label L16
+     # live vars:
+ 34: $t1 := false
+     # live vars: $t1
+ 35: goto 31
+     # live vars: $t0
+ 36: label L13
+     # live vars: $t0
+ 37: $t2 := false
+     # live vars: $t0, $t2
+ 38: goto 26
+     # live vars: $t0
+ 39: label L10
+     # live vars: $t0
+ 40: $t3 := false
+     # live vars: $t0, $t3
+ 41: goto 21
+     # live vars: $t0
+ 42: label L7
+     # live vars: $t0
+ 43: $t4 := false
+     # live vars: $t0, $t4
+ 44: goto 16
+     # live vars: $t0
+ 45: label L4
+     # live vars: $t0
+ 46: $t5 := false
+     # live vars: $t0, $t5
+ 47: goto 11
+     # live vars: $t0
+ 48: label L1
+     # live vars: $t0
+ 49: $t7 := false
+     # live vars: $t0, $t7
+ 50: goto 6
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i64::I64>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool [unused]
+     var $t9: bool
+     var $t10: 0x1::i64::I64
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i64::I64
+     var $t13: 0x1::i64::I64
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i64::I64 [unused]
+     var $t16: 0x1::i64::I64 [unused]
+     var $t17: &0x42::valid_logic::S1 [unused]
+     var $t18: &0x1::i64::I64 [unused]
+     var $t19: 0x1::i64::I64 [unused]
+     var $t20: &0x42::valid_logic::S3<0x1::i64::I64>
+     var $t21: &0x1::i64::I64 [unused]
+     var $t22: 0x1::i64::I64 [unused]
+     var $t23: &0x42::valid_logic::S2 [unused]
+     var $t24: &0x1::i64::I64 [unused]
+     var $t25: 0x1::i64::I64 [unused]
+     var $t26: &0x42::valid_logic::S3<0x1::i64::I64> [unused]
+     var $t27: &0x1::i64::I64 [unused]
+     var $t28: 0x1::i64::I64 [unused]
+     var $t29: &0x42::valid_logic::S3<0x1::i64::I64> [unused]
+     var $t30: &0x1::i64::I64 [unused]
+     var $t31: 0x1::i64::I64 [unused]
+     var $t32: &0x42::valid_logic::S1 [unused]
+     var $t33: &0x1::i64::I64 [unused]
+     var $t34: 0x1::i64::I64 [unused]
+     var $t35: &0x42::valid_logic::S3<0x1::i64::I64> [unused]
+     var $t36: &0x1::i64::I64 [unused]
+     var $t37: 0x1::i64::I64 [unused]
+     var $t38: &0x42::valid_logic::S2 [unused]
+     var $t39: &0x1::i64::I64 [unused]
+     var $t40: 0x1::i64::I64 [unused]
+     var $t41: &0x42::valid_logic::S1 [unused]
+     var $t42: &0x1::i64::I64 [unused]
+     var $t43: 0x1::i64::I64 [unused]
+     var $t44: &0x42::valid_logic::S2 [unused]
+     var $t45: &0x1::i64::I64 [unused]
+     var $t46: 0x1::i64::I64 [unused]
+     var $t47: &0x42::valid_logic::S1 [unused]
+     var $t48: &0x1::i64::I64 [unused]
+     var $t49: 0x1::i64::I64 [unused]
+     var $t50: &0x42::valid_logic::S2 [unused]
+     var $t51: &0x1::i64::I64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t11
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # live vars: $t0, $t1, $t2, $t12
+  2: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+  3: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t10, $t14
+  4: $t12 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+  5: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+  6: $t9 := i64::eq($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t9
+  7: if ($t9) goto 8 else goto 83
+     # live vars: $t0, $t1, $t2
+  8: label L0
+     # live vars: $t0, $t1, $t2
+  9: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t11
+ 10: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # live vars: $t0, $t1, $t2, $t12
+ 11: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 12: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t10, $t20
+ 13: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 14: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 15: $t9 := i64::lte($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t9
+ 16: label L2
+     # live vars: $t0, $t1, $t2, $t9
+ 17: if ($t9) goto 18 else goto 80
+     # live vars: $t0, $t1, $t2
+ 18: label L3
+     # live vars: $t0, $t1, $t2
+ 19: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t14
+ 20: $t12 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # live vars: $t0, $t1, $t2, $t12
+ 21: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 22: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t10, $t20
+ 23: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 24: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 25: $t7 := i64::gte($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t7
+ 26: label L5
+     # live vars: $t0, $t1, $t2, $t7
+ 27: if ($t7) goto 28 else goto 77
+     # live vars: $t0, $t1, $t2
+ 28: label L6
+     # live vars: $t0, $t1, $t2
+ 29: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t20
+ 30: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t12
+ 31: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 32: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t10, $t11
+ 33: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 34: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 35: $t6 := i64::gt($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t6
+ 36: label L8
+     # live vars: $t0, $t1, $t2, $t6
+ 37: if ($t6) goto 38 else goto 74
+     # live vars: $t0, $t1, $t2
+ 38: label L9
+     # live vars: $t0, $t1, $t2
+ 39: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t20
+ 40: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i64::I64>>.x($t20)
+     # live vars: $t0, $t1, $t12
+ 41: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t10
+ 42: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t10, $t14
+ 43: $t12 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # live vars: $t0, $t1, $t10, $t12
+ 44: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t10, $t13
+ 45: $t5 := i64::lt($t10, $t13)
+     # live vars: $t0, $t1, $t5
+ 46: label L11
+     # live vars: $t0, $t1, $t5
+ 47: if ($t5) goto 48 else goto 71
+     # live vars: $t0, $t1
+ 48: label L12
+     # live vars: $t0, $t1
+ 49: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t11
+ 50: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # live vars: $t0, $t1, $t12
+ 51: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t10
+ 52: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t10, $t14
+ 53: $t12 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # live vars: $t0, $t1, $t10, $t12
+ 54: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t10, $t13
+ 55: $t4 := i64::eq($t10, $t13)
+     # live vars: $t0, $t1, $t4
+ 56: label L14
+     # live vars: $t0, $t1, $t4
+ 57: if ($t4) goto 58 else goto 68
+     # live vars: $t0, $t1
+ 58: label L15
+     # live vars: $t0, $t1
+ 59: $t11 := borrow_local($t0)
+     # live vars: $t1, $t11
+ 60: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+     # live vars: $t1, $t12
+ 61: $t10 := read_ref($t12)
+     # live vars: $t1, $t10
+ 62: $t14 := borrow_local($t1)
+     # live vars: $t10, $t14
+ 63: $t12 := borrow_field<0x42::valid_logic::S2>.y($t14)
+     # live vars: $t10, $t12
+ 64: $t13 := read_ref($t12)
+     # live vars: $t10, $t13
+ 65: $t3 := i64::eq($t10, $t13)
+     # live vars: $t3
+ 66: label L17
+     # live vars: $t3
+ 67: return $t3
+     # live vars: $t0, $t1
+ 68: label L16
+     # live vars:
+ 69: $t3 := false
+     # live vars: $t3
+ 70: goto 66
+     # live vars: $t0, $t1
+ 71: label L13
+     # live vars: $t0, $t1
+ 72: $t4 := false
+     # live vars: $t0, $t1, $t4
+ 73: goto 56
+     # live vars: $t0, $t1, $t2
+ 74: label L10
+     # live vars: $t0, $t1
+ 75: $t5 := false
+     # live vars: $t0, $t1, $t5
+ 76: goto 46
+     # live vars: $t0, $t1, $t2
+ 77: label L7
+     # live vars: $t0, $t1, $t2
+ 78: $t6 := false
+     # live vars: $t0, $t1, $t2, $t6
+ 79: goto 36
+     # live vars: $t0, $t1, $t2
+ 80: label L4
+     # live vars: $t0, $t1, $t2
+ 81: $t7 := false
+     # live vars: $t0, $t1, $t2, $t7
+ 82: goto 26
+     # live vars: $t0, $t1, $t2
+ 83: label L1
+     # live vars: $t0, $t1, $t2
+ 84: $t9 := false
+     # live vars: $t0, $t1, $t2, $t9
+ 85: goto 16
+}
+
+
+[variant baseline]
+fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S2, $t2: 0x42::valid_logic::S3<0x1::i128::I128>): bool {
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool [unused]
+     var $t9: bool
+     var $t10: 0x1::i128::I128
+     var $t11: &0x42::valid_logic::S1
+     var $t12: &0x1::i128::I128
+     var $t13: 0x1::i128::I128
+     var $t14: &0x42::valid_logic::S2
+     var $t15: &0x1::i128::I128 [unused]
+     var $t16: 0x1::i128::I128 [unused]
+     var $t17: &0x42::valid_logic::S1 [unused]
+     var $t18: &0x1::i128::I128 [unused]
+     var $t19: 0x1::i128::I128 [unused]
+     var $t20: &0x42::valid_logic::S3<0x1::i128::I128>
+     var $t21: &0x1::i128::I128 [unused]
+     var $t22: 0x1::i128::I128 [unused]
+     var $t23: &0x42::valid_logic::S2 [unused]
+     var $t24: &0x1::i128::I128 [unused]
+     var $t25: 0x1::i128::I128 [unused]
+     var $t26: &0x42::valid_logic::S3<0x1::i128::I128> [unused]
+     var $t27: &0x1::i128::I128 [unused]
+     var $t28: 0x1::i128::I128 [unused]
+     var $t29: &0x42::valid_logic::S3<0x1::i128::I128> [unused]
+     var $t30: &0x1::i128::I128 [unused]
+     var $t31: 0x1::i128::I128 [unused]
+     var $t32: &0x42::valid_logic::S1 [unused]
+     var $t33: &0x1::i128::I128 [unused]
+     var $t34: 0x1::i128::I128 [unused]
+     var $t35: &0x42::valid_logic::S3<0x1::i128::I128> [unused]
+     var $t36: &0x1::i128::I128 [unused]
+     var $t37: 0x1::i128::I128 [unused]
+     var $t38: &0x42::valid_logic::S2 [unused]
+     var $t39: &0x1::i128::I128 [unused]
+     var $t40: 0x1::i128::I128 [unused]
+     var $t41: &0x42::valid_logic::S1 [unused]
+     var $t42: &0x1::i128::I128 [unused]
+     var $t43: 0x1::i128::I128 [unused]
+     var $t44: &0x42::valid_logic::S2 [unused]
+     var $t45: &0x1::i128::I128 [unused]
+     var $t46: 0x1::i128::I128 [unused]
+     var $t47: &0x42::valid_logic::S1 [unused]
+     var $t48: &0x1::i128::I128 [unused]
+     var $t49: 0x1::i128::I128 [unused]
+     var $t50: &0x42::valid_logic::S2 [unused]
+     var $t51: &0x1::i128::I128 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t11
+  1: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # live vars: $t0, $t1, $t2, $t12
+  2: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+  3: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t10, $t14
+  4: $t12 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+  5: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+  6: $t9 := i128::eq($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t9
+  7: if ($t9) goto 8 else goto 83
+     # live vars: $t0, $t1, $t2
+  8: label L0
+     # live vars: $t0, $t1, $t2
+  9: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t11
+ 10: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # live vars: $t0, $t1, $t2, $t12
+ 11: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 12: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t10, $t20
+ 13: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 14: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 15: $t9 := i128::lte($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t9
+ 16: label L2
+     # live vars: $t0, $t1, $t2, $t9
+ 17: if ($t9) goto 18 else goto 80
+     # live vars: $t0, $t1, $t2
+ 18: label L3
+     # live vars: $t0, $t1, $t2
+ 19: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t14
+ 20: $t12 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # live vars: $t0, $t1, $t2, $t12
+ 21: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 22: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t10, $t20
+ 23: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 24: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 25: $t7 := i128::gte($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t7
+ 26: label L5
+     # live vars: $t0, $t1, $t2, $t7
+ 27: if ($t7) goto 28 else goto 77
+     # live vars: $t0, $t1, $t2
+ 28: label L6
+     # live vars: $t0, $t1, $t2
+ 29: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t20
+ 30: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+     # live vars: $t0, $t1, $t2, $t12
+ 31: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10
+ 32: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t2, $t10, $t11
+ 33: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # live vars: $t0, $t1, $t2, $t10, $t12
+ 34: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t2, $t10, $t13
+ 35: $t6 := i128::gt($t10, $t13)
+     # live vars: $t0, $t1, $t2, $t6
+ 36: label L8
+     # live vars: $t0, $t1, $t2, $t6
+ 37: if ($t6) goto 38 else goto 74
+     # live vars: $t0, $t1, $t2
+ 38: label L9
+     # live vars: $t0, $t1, $t2
+ 39: $t20 := borrow_local($t2)
+     # live vars: $t0, $t1, $t20
+ 40: $t12 := borrow_field<0x42::valid_logic::S3<0x1::i128::I128>>.x($t20)
+     # live vars: $t0, $t1, $t12
+ 41: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t10
+ 42: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t10, $t14
+ 43: $t12 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # live vars: $t0, $t1, $t10, $t12
+ 44: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t10, $t13
+ 45: $t5 := i128::lt($t10, $t13)
+     # live vars: $t0, $t1, $t5
+ 46: label L11
+     # live vars: $t0, $t1, $t5
+ 47: if ($t5) goto 48 else goto 71
+     # live vars: $t0, $t1
+ 48: label L12
+     # live vars: $t0, $t1
+ 49: $t11 := borrow_local($t0)
+     # live vars: $t0, $t1, $t11
+ 50: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # live vars: $t0, $t1, $t12
+ 51: $t10 := read_ref($t12)
+     # live vars: $t0, $t1, $t10
+ 52: $t14 := borrow_local($t1)
+     # live vars: $t0, $t1, $t10, $t14
+ 53: $t12 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # live vars: $t0, $t1, $t10, $t12
+ 54: $t13 := read_ref($t12)
+     # live vars: $t0, $t1, $t10, $t13
+ 55: $t4 := i128::eq($t10, $t13)
+     # live vars: $t0, $t1, $t4
+ 56: label L14
+     # live vars: $t0, $t1, $t4
+ 57: if ($t4) goto 58 else goto 68
+     # live vars: $t0, $t1
+ 58: label L15
+     # live vars: $t0, $t1
+ 59: $t11 := borrow_local($t0)
+     # live vars: $t1, $t11
+ 60: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+     # live vars: $t1, $t12
+ 61: $t10 := read_ref($t12)
+     # live vars: $t1, $t10
+ 62: $t14 := borrow_local($t1)
+     # live vars: $t10, $t14
+ 63: $t12 := borrow_field<0x42::valid_logic::S2>.z($t14)
+     # live vars: $t10, $t12
+ 64: $t13 := read_ref($t12)
+     # live vars: $t10, $t13
+ 65: $t3 := i128::eq($t10, $t13)
+     # live vars: $t3
+ 66: label L17
+     # live vars: $t3
+ 67: return $t3
+     # live vars: $t0, $t1
+ 68: label L16
+     # live vars:
+ 69: $t3 := false
+     # live vars: $t3
+ 70: goto 66
+     # live vars: $t0, $t1
+ 71: label L13
+     # live vars: $t0, $t1
+ 72: $t4 := false
+     # live vars: $t0, $t1, $t4
+ 73: goto 56
+     # live vars: $t0, $t1, $t2
+ 74: label L10
+     # live vars: $t0, $t1
+ 75: $t5 := false
+     # live vars: $t0, $t1, $t5
+ 76: goto 46
+     # live vars: $t0, $t1, $t2
+ 77: label L7
+     # live vars: $t0, $t1, $t2
+ 78: $t6 := false
+     # live vars: $t0, $t1, $t2, $t6
+ 79: goto 36
+     # live vars: $t0, $t1, $t2
+ 80: label L4
+     # live vars: $t0, $t1, $t2
+ 81: $t7 := false
+     # live vars: $t0, $t1, $t2, $t7
+ 82: goto 26
+     # live vars: $t0, $t1, $t2
+ 83: label L1
+     # live vars: $t0, $t1, $t2
+ 84: $t9 := false
+     # live vars: $t0, $t1, $t2, $t9
+ 85: goto 16
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix1($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::add($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := i64::add($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := i64::eq($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix10($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128 [unused]
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: u128 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t7 := 2
+     # live vars: $t0, $t1, $t5, $t7
+  2: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  3: $t5 := i128::mod($t5, $t6)
+     # live vars: $t0, $t1, $t5
+  4: $t5 := i128::mul($t5, $t1)
+     # live vars: $t0, $t1, $t5
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t5
+  6: $t7 := 3
+     # live vars: $t0, $t1, $t5, $t7
+  7: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  8: $t0 := i128::mod($t0, $t6)
+     # live vars: $t0, $t1, $t5
+  9: $t0 := i128::mul($t0, $t1)
+     # live vars: $t0, $t5
+ 10: $t2 := i128::gt($t5, $t0)
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix2($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128 [unused]
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128 [unused]
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: u128 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t7 := 2
+     # live vars: $t0, $t1, $t4, $t7
+  2: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t4, $t6
+  3: $t6 := i128::mul($t6, $t1)
+     # live vars: $t0, $t1, $t4, $t6
+  4: $t4 := i128::add($t4, $t6)
+     # live vars: $t0, $t1, $t4
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t4
+  6: $t7 := 3
+     # live vars: $t0, $t1, $t4, $t7
+  7: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t4, $t6
+  8: $t1 := i128::mul($t6, $t1)
+     # live vars: $t0, $t1, $t4
+  9: $t0 := i128::add($t0, $t1)
+     # live vars: $t0, $t4
+ 10: $t2 := i128::lte($t4, $t0)
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix3($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::sub($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := i64::sub($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := i64::eq($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix4($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128
+     var $t5: 0x1::i128::I128 [unused]
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128 [unused]
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: u128 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t7 := 2
+     # live vars: $t0, $t1, $t4, $t7
+  2: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t4, $t6
+  3: $t6 := i128::mul($t6, $t1)
+     # live vars: $t0, $t1, $t4, $t6
+  4: $t4 := i128::sub($t4, $t6)
+     # live vars: $t0, $t1, $t4
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t4
+  6: $t7 := 3
+     # live vars: $t0, $t1, $t4, $t7
+  7: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t4, $t6
+  8: $t1 := i128::mul($t6, $t1)
+     # live vars: $t0, $t1, $t4
+  9: $t0 := i128::sub($t0, $t1)
+     # live vars: $t0, $t4
+ 10: $t2 := i128::gt($t4, $t0)
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix5($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::mul($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := i64::mul($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := i64::eq($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix6($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128 [unused]
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: u128 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t7 := 2
+     # live vars: $t0, $t1, $t5, $t7
+  2: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  3: $t5 := i128::mul($t5, $t6)
+     # live vars: $t0, $t1, $t5
+  4: $t5 := i128::mul($t5, $t1)
+     # live vars: $t0, $t1, $t5
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t5
+  6: $t7 := 3
+     # live vars: $t0, $t1, $t5, $t7
+  7: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  8: $t0 := i128::mul($t0, $t6)
+     # live vars: $t0, $t1, $t5
+  9: $t0 := i128::mul($t0, $t1)
+     # live vars: $t0, $t5
+ 10: $t2 := i128::gt($t5, $t0)
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix7($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::div($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := i64::div($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := i64::eq($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix8($t0: 0x1::i128::I128, $t1: 0x1::i128::I128): bool {
+     var $t2: bool
+     var $t3: 0x1::i128::I128 [unused]
+     var $t4: 0x1::i128::I128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: 0x1::i128::I128
+     var $t7: u128
+     var $t8: 0x1::i128::I128 [unused]
+     var $t9: 0x1::i128::I128 [unused]
+     var $t10: 0x1::i128::I128 [unused]
+     var $t11: 0x1::i128::I128 [unused]
+     var $t12: u128 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t7 := 2
+     # live vars: $t0, $t1, $t5, $t7
+  2: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  3: $t5 := i128::div($t5, $t6)
+     # live vars: $t0, $t1, $t5
+  4: $t5 := i128::mul($t5, $t1)
+     # live vars: $t0, $t1, $t5
+  5: $t0 := move($t0)
+     # live vars: $t0, $t1, $t5
+  6: $t7 := 3
+     # live vars: $t0, $t1, $t5, $t7
+  7: $t6 := i128::pack($t7)
+     # live vars: $t0, $t1, $t5, $t6
+  8: $t0 := i128::div($t0, $t6)
+     # live vars: $t0, $t1, $t5
+  9: $t0 := i128::mul($t0, $t1)
+     # live vars: $t0, $t5
+ 10: $t2 := i128::gt($t5, $t0)
+     # live vars: $t2
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun valid_logic::test_mix9($t0: 0x1::i64::I64, $t1: 0x1::i64::I64): bool {
+     var $t2: bool
+     var $t3: 0x1::i64::I64 [unused]
+     var $t4: 0x1::i64::I64
+     var $t5: 0x1::i64::I64 [unused]
+     var $t6: 0x1::i64::I64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := copy($t0)
+     # live vars: $t0, $t1, $t4
+  1: $t4 := i64::mod($t4, $t1)
+     # live vars: $t0, $t1, $t4
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t4
+  3: $t0 := i64::mod($t1, $t0)
+     # live vars: $t0, $t4
+  4: $t2 := i64::eq($t4, $t0)
+     # live vars: $t2
+  5: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.valid_logic {
+use 0000000000000000000000000000000000000000000000000000000000000001::i64;
+use 0000000000000000000000000000000000000000000000000000000000000001::i128;
+
+
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<I128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: I64,
+	z: I128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: I64,
+	z: I128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test_cmp1(x: I64): bool /* def_idx: 0 */ {
+L1:	$t7: bool
+L2:	$t5: bool
+L3:	$t4: bool
+L4:	$t3: bool
+L5:	$t2: bool
+L6:	return: bool
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[0](x: I64)
+	2: Call i64::eq(I64, I64): bool
+	3: BrFalse(55)
+B1:
+	4: CopyLoc[0](x: I64)
+	5: CopyLoc[0](x: I64)
+	6: Call i64::gte(I64, I64): bool
+	7: StLoc[1]($t7: bool)
+B2:
+	8: MoveLoc[1]($t7: bool)
+	9: BrFalse(52)
+B3:
+	10: CopyLoc[0](x: I64)
+	11: CopyLoc[0](x: I64)
+	12: Call i64::lte(I64, I64): bool
+	13: StLoc[2]($t5: bool)
+B4:
+	14: MoveLoc[2]($t5: bool)
+	15: BrFalse(49)
+B5:
+	16: CopyLoc[0](x: I64)
+	17: CopyLoc[0](x: I64)
+	18: Call i64::gt(I64, I64): bool
+	19: StLoc[3]($t4: bool)
+B6:
+	20: MoveLoc[3]($t4: bool)
+	21: BrFalse(46)
+B7:
+	22: CopyLoc[0](x: I64)
+	23: CopyLoc[0](x: I64)
+	24: Call i64::lt(I64, I64): bool
+	25: StLoc[4]($t3: bool)
+B8:
+	26: MoveLoc[4]($t3: bool)
+	27: BrFalse(43)
+B9:
+	28: CopyLoc[0](x: I64)
+	29: CopyLoc[0](x: I64)
+	30: Call i64::eq(I64, I64): bool
+	31: StLoc[5]($t2: bool)
+B10:
+	32: MoveLoc[5]($t2: bool)
+	33: BrFalse(40)
+B11:
+	34: CopyLoc[0](x: I64)
+	35: MoveLoc[0](x: I64)
+	36: Call i64::gte(I64, I64): bool
+	37: StLoc[6](return: bool)
+B12:
+	38: MoveLoc[6](return: bool)
+	39: Ret
+B13:
+	40: LdFalse
+	41: StLoc[6](return: bool)
+	42: Branch(38)
+B14:
+	43: LdFalse
+	44: StLoc[5]($t2: bool)
+	45: Branch(32)
+B15:
+	46: LdFalse
+	47: StLoc[4]($t3: bool)
+	48: Branch(26)
+B16:
+	49: LdFalse
+	50: StLoc[3]($t4: bool)
+	51: Branch(20)
+B17:
+	52: LdFalse
+	53: StLoc[2]($t5: bool)
+	54: Branch(14)
+B18:
+	55: LdFalse
+	56: StLoc[1]($t7: bool)
+	57: Branch(8)
+}
+test_cmp2(x: I128): bool /* def_idx: 1 */ {
+L1:	$t7: bool
+L2:	$t5: bool
+L3:	$t4: bool
+L4:	$t3: bool
+L5:	$t2: bool
+L6:	return: bool
+B0:
+	0: CopyLoc[0](x: I128)
+	1: CopyLoc[0](x: I128)
+	2: Call i128::eq(I128, I128): bool
+	3: BrFalse(55)
+B1:
+	4: CopyLoc[0](x: I128)
+	5: CopyLoc[0](x: I128)
+	6: Call i128::gte(I128, I128): bool
+	7: StLoc[1]($t7: bool)
+B2:
+	8: MoveLoc[1]($t7: bool)
+	9: BrFalse(52)
+B3:
+	10: CopyLoc[0](x: I128)
+	11: CopyLoc[0](x: I128)
+	12: Call i128::lte(I128, I128): bool
+	13: StLoc[2]($t5: bool)
+B4:
+	14: MoveLoc[2]($t5: bool)
+	15: BrFalse(49)
+B5:
+	16: CopyLoc[0](x: I128)
+	17: CopyLoc[0](x: I128)
+	18: Call i128::gt(I128, I128): bool
+	19: StLoc[3]($t4: bool)
+B6:
+	20: MoveLoc[3]($t4: bool)
+	21: BrFalse(46)
+B7:
+	22: CopyLoc[0](x: I128)
+	23: CopyLoc[0](x: I128)
+	24: Call i128::lt(I128, I128): bool
+	25: StLoc[4]($t3: bool)
+B8:
+	26: MoveLoc[4]($t3: bool)
+	27: BrFalse(43)
+B9:
+	28: CopyLoc[0](x: I128)
+	29: CopyLoc[0](x: I128)
+	30: Call i128::eq(I128, I128): bool
+	31: StLoc[5]($t2: bool)
+B10:
+	32: MoveLoc[5]($t2: bool)
+	33: BrFalse(40)
+B11:
+	34: CopyLoc[0](x: I128)
+	35: MoveLoc[0](x: I128)
+	36: Call i128::gte(I128, I128): bool
+	37: StLoc[6](return: bool)
+B12:
+	38: MoveLoc[6](return: bool)
+	39: Ret
+B13:
+	40: LdFalse
+	41: StLoc[6](return: bool)
+	42: Branch(38)
+B14:
+	43: LdFalse
+	44: StLoc[5]($t2: bool)
+	45: Branch(32)
+B15:
+	46: LdFalse
+	47: StLoc[4]($t3: bool)
+	48: Branch(26)
+B16:
+	49: LdFalse
+	50: StLoc[3]($t4: bool)
+	51: Branch(20)
+B17:
+	52: LdFalse
+	53: StLoc[2]($t5: bool)
+	54: Branch(14)
+B18:
+	55: LdFalse
+	56: StLoc[1]($t7: bool)
+	57: Branch(8)
+}
+test_cmp3(s1: S1, s2: S2, s3: S3<I64>): bool /* def_idx: 2 */ {
+L3:	$t9: bool
+L4:	$t7: bool
+L5:	$t6: bool
+L6:	$t5: bool
+L7:	$t4: bool
+L8:	return: bool
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[0](S1.y: I64)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[1](S2.y: I64)
+	5: ReadRef
+	6: Call i64::eq(I64, I64): bool
+	7: BrFalse(83)
+B1:
+	8: ImmBorrowLoc[0](s1: S1)
+	9: ImmBorrowField[0](S1.y: I64)
+	10: ReadRef
+	11: ImmBorrowLoc[2](s3: S3<I64>)
+	12: ImmBorrowFieldGeneric[0](S3.x: T)
+	13: ReadRef
+	14: Call i64::lte(I64, I64): bool
+	15: StLoc[3]($t9: bool)
+B2:
+	16: MoveLoc[3]($t9: bool)
+	17: BrFalse(80)
+B3:
+	18: ImmBorrowLoc[1](s2: S2)
+	19: ImmBorrowField[1](S2.y: I64)
+	20: ReadRef
+	21: ImmBorrowLoc[2](s3: S3<I64>)
+	22: ImmBorrowFieldGeneric[0](S3.x: T)
+	23: ReadRef
+	24: Call i64::gte(I64, I64): bool
+	25: StLoc[4]($t7: bool)
+B4:
+	26: MoveLoc[4]($t7: bool)
+	27: BrFalse(77)
+B5:
+	28: ImmBorrowLoc[2](s3: S3<I64>)
+	29: ImmBorrowFieldGeneric[0](S3.x: T)
+	30: ReadRef
+	31: ImmBorrowLoc[0](s1: S1)
+	32: ImmBorrowField[0](S1.y: I64)
+	33: ReadRef
+	34: Call i64::gt(I64, I64): bool
+	35: StLoc[5]($t6: bool)
+B6:
+	36: MoveLoc[5]($t6: bool)
+	37: BrFalse(74)
+B7:
+	38: ImmBorrowLoc[2](s3: S3<I64>)
+	39: ImmBorrowFieldGeneric[0](S3.x: T)
+	40: ReadRef
+	41: ImmBorrowLoc[1](s2: S2)
+	42: ImmBorrowField[1](S2.y: I64)
+	43: ReadRef
+	44: Call i64::lt(I64, I64): bool
+	45: StLoc[6]($t5: bool)
+B8:
+	46: MoveLoc[6]($t5: bool)
+	47: BrFalse(71)
+B9:
+	48: ImmBorrowLoc[0](s1: S1)
+	49: ImmBorrowField[0](S1.y: I64)
+	50: ReadRef
+	51: ImmBorrowLoc[1](s2: S2)
+	52: ImmBorrowField[1](S2.y: I64)
+	53: ReadRef
+	54: Call i64::eq(I64, I64): bool
+	55: StLoc[7]($t4: bool)
+B10:
+	56: MoveLoc[7]($t4: bool)
+	57: BrFalse(68)
+B11:
+	58: ImmBorrowLoc[0](s1: S1)
+	59: ImmBorrowField[0](S1.y: I64)
+	60: ReadRef
+	61: ImmBorrowLoc[1](s2: S2)
+	62: ImmBorrowField[1](S2.y: I64)
+	63: ReadRef
+	64: Call i64::eq(I64, I64): bool
+	65: StLoc[8](return: bool)
+B12:
+	66: MoveLoc[8](return: bool)
+	67: Ret
+B13:
+	68: LdFalse
+	69: StLoc[8](return: bool)
+	70: Branch(66)
+B14:
+	71: LdFalse
+	72: StLoc[7]($t4: bool)
+	73: Branch(56)
+B15:
+	74: LdFalse
+	75: StLoc[6]($t5: bool)
+	76: Branch(46)
+B16:
+	77: LdFalse
+	78: StLoc[5]($t6: bool)
+	79: Branch(36)
+B17:
+	80: LdFalse
+	81: StLoc[4]($t7: bool)
+	82: Branch(26)
+B18:
+	83: LdFalse
+	84: StLoc[3]($t9: bool)
+	85: Branch(16)
+}
+test_cmp4(s1: S1, s2: S2, s3: S3<I128>): bool /* def_idx: 3 */ {
+L3:	$t9: bool
+L4:	$t7: bool
+L5:	$t6: bool
+L6:	$t5: bool
+L7:	$t4: bool
+L8:	return: bool
+B0:
+	0: ImmBorrowLoc[0](s1: S1)
+	1: ImmBorrowField[3](S1.z: I128)
+	2: ReadRef
+	3: ImmBorrowLoc[1](s2: S2)
+	4: ImmBorrowField[4](S2.z: I128)
+	5: ReadRef
+	6: Call i128::eq(I128, I128): bool
+	7: BrFalse(83)
+B1:
+	8: ImmBorrowLoc[0](s1: S1)
+	9: ImmBorrowField[3](S1.z: I128)
+	10: ReadRef
+	11: ImmBorrowLoc[2](s3: S3<I128>)
+	12: ImmBorrowFieldGeneric[1](S3.x: T)
+	13: ReadRef
+	14: Call i128::lte(I128, I128): bool
+	15: StLoc[3]($t9: bool)
+B2:
+	16: MoveLoc[3]($t9: bool)
+	17: BrFalse(80)
+B3:
+	18: ImmBorrowLoc[1](s2: S2)
+	19: ImmBorrowField[4](S2.z: I128)
+	20: ReadRef
+	21: ImmBorrowLoc[2](s3: S3<I128>)
+	22: ImmBorrowFieldGeneric[1](S3.x: T)
+	23: ReadRef
+	24: Call i128::gte(I128, I128): bool
+	25: StLoc[4]($t7: bool)
+B4:
+	26: MoveLoc[4]($t7: bool)
+	27: BrFalse(77)
+B5:
+	28: ImmBorrowLoc[2](s3: S3<I128>)
+	29: ImmBorrowFieldGeneric[1](S3.x: T)
+	30: ReadRef
+	31: ImmBorrowLoc[0](s1: S1)
+	32: ImmBorrowField[3](S1.z: I128)
+	33: ReadRef
+	34: Call i128::gt(I128, I128): bool
+	35: StLoc[5]($t6: bool)
+B6:
+	36: MoveLoc[5]($t6: bool)
+	37: BrFalse(74)
+B7:
+	38: ImmBorrowLoc[2](s3: S3<I128>)
+	39: ImmBorrowFieldGeneric[1](S3.x: T)
+	40: ReadRef
+	41: ImmBorrowLoc[1](s2: S2)
+	42: ImmBorrowField[4](S2.z: I128)
+	43: ReadRef
+	44: Call i128::lt(I128, I128): bool
+	45: StLoc[6]($t5: bool)
+B8:
+	46: MoveLoc[6]($t5: bool)
+	47: BrFalse(71)
+B9:
+	48: ImmBorrowLoc[0](s1: S1)
+	49: ImmBorrowField[3](S1.z: I128)
+	50: ReadRef
+	51: ImmBorrowLoc[1](s2: S2)
+	52: ImmBorrowField[4](S2.z: I128)
+	53: ReadRef
+	54: Call i128::eq(I128, I128): bool
+	55: StLoc[7]($t4: bool)
+B10:
+	56: MoveLoc[7]($t4: bool)
+	57: BrFalse(68)
+B11:
+	58: ImmBorrowLoc[0](s1: S1)
+	59: ImmBorrowField[3](S1.z: I128)
+	60: ReadRef
+	61: ImmBorrowLoc[1](s2: S2)
+	62: ImmBorrowField[4](S2.z: I128)
+	63: ReadRef
+	64: Call i128::eq(I128, I128): bool
+	65: StLoc[8](return: bool)
+B12:
+	66: MoveLoc[8](return: bool)
+	67: Ret
+B13:
+	68: LdFalse
+	69: StLoc[8](return: bool)
+	70: Branch(66)
+B14:
+	71: LdFalse
+	72: StLoc[7]($t4: bool)
+	73: Branch(56)
+B15:
+	74: LdFalse
+	75: StLoc[6]($t5: bool)
+	76: Branch(46)
+B16:
+	77: LdFalse
+	78: StLoc[5]($t6: bool)
+	79: Branch(36)
+B17:
+	80: LdFalse
+	81: StLoc[4]($t7: bool)
+	82: Branch(26)
+B18:
+	83: LdFalse
+	84: StLoc[3]($t9: bool)
+	85: Branch(16)
+}
+test_mix1(x: I64, y: I64): bool /* def_idx: 4 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::add(I64, I64): I64
+	3: MoveLoc[1](y: I64)
+	4: MoveLoc[0](x: I64)
+	5: Call i64::add(I64, I64): I64
+	6: Call i64::eq(I64, I64): bool
+	7: Ret
+}
+test_mix10(x: I128, y: I128): bool /* def_idx: 5 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: LdU128(2)
+	2: Call i128::pack(u128): I128
+	3: Call i128::mod(I128, I128): I128
+	4: CopyLoc[1](y: I128)
+	5: Call i128::mul(I128, I128): I128
+	6: MoveLoc[0](x: I128)
+	7: LdU128(3)
+	8: Call i128::pack(u128): I128
+	9: Call i128::mod(I128, I128): I128
+	10: MoveLoc[1](y: I128)
+	11: Call i128::mul(I128, I128): I128
+	12: Call i128::gt(I128, I128): bool
+	13: Ret
+}
+test_mix2(x: I128, y: I128): bool /* def_idx: 6 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: LdU128(2)
+	2: Call i128::pack(u128): I128
+	3: CopyLoc[1](y: I128)
+	4: Call i128::mul(I128, I128): I128
+	5: Call i128::add(I128, I128): I128
+	6: MoveLoc[0](x: I128)
+	7: LdU128(3)
+	8: Call i128::pack(u128): I128
+	9: MoveLoc[1](y: I128)
+	10: Call i128::mul(I128, I128): I128
+	11: Call i128::add(I128, I128): I128
+	12: Call i128::lte(I128, I128): bool
+	13: Ret
+}
+test_mix3(x: I64, y: I64): bool /* def_idx: 7 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::sub(I64, I64): I64
+	3: MoveLoc[1](y: I64)
+	4: MoveLoc[0](x: I64)
+	5: Call i64::sub(I64, I64): I64
+	6: Call i64::eq(I64, I64): bool
+	7: Ret
+}
+test_mix4(x: I128, y: I128): bool /* def_idx: 8 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: LdU128(2)
+	2: Call i128::pack(u128): I128
+	3: CopyLoc[1](y: I128)
+	4: Call i128::mul(I128, I128): I128
+	5: Call i128::sub(I128, I128): I128
+	6: MoveLoc[0](x: I128)
+	7: LdU128(3)
+	8: Call i128::pack(u128): I128
+	9: MoveLoc[1](y: I128)
+	10: Call i128::mul(I128, I128): I128
+	11: Call i128::sub(I128, I128): I128
+	12: Call i128::gt(I128, I128): bool
+	13: Ret
+}
+test_mix5(x: I64, y: I64): bool /* def_idx: 9 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::mul(I64, I64): I64
+	3: MoveLoc[1](y: I64)
+	4: MoveLoc[0](x: I64)
+	5: Call i64::mul(I64, I64): I64
+	6: Call i64::eq(I64, I64): bool
+	7: Ret
+}
+test_mix6(x: I128, y: I128): bool /* def_idx: 10 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: LdU128(2)
+	2: Call i128::pack(u128): I128
+	3: Call i128::mul(I128, I128): I128
+	4: CopyLoc[1](y: I128)
+	5: Call i128::mul(I128, I128): I128
+	6: MoveLoc[0](x: I128)
+	7: LdU128(3)
+	8: Call i128::pack(u128): I128
+	9: Call i128::mul(I128, I128): I128
+	10: MoveLoc[1](y: I128)
+	11: Call i128::mul(I128, I128): I128
+	12: Call i128::gt(I128, I128): bool
+	13: Ret
+}
+test_mix7(x: I64, y: I64): bool /* def_idx: 11 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::div(I64, I64): I64
+	3: MoveLoc[1](y: I64)
+	4: MoveLoc[0](x: I64)
+	5: Call i64::div(I64, I64): I64
+	6: Call i64::eq(I64, I64): bool
+	7: Ret
+}
+test_mix8(x: I128, y: I128): bool /* def_idx: 12 */ {
+B0:
+	0: CopyLoc[0](x: I128)
+	1: LdU128(2)
+	2: Call i128::pack(u128): I128
+	3: Call i128::div(I128, I128): I128
+	4: CopyLoc[1](y: I128)
+	5: Call i128::mul(I128, I128): I128
+	6: MoveLoc[0](x: I128)
+	7: LdU128(3)
+	8: Call i128::pack(u128): I128
+	9: Call i128::div(I128, I128): I128
+	10: MoveLoc[1](y: I128)
+	11: Call i128::mul(I128, I128): I128
+	12: Call i128::gt(I128, I128): bool
+	13: Ret
+}
+test_mix9(x: I64, y: I64): bool /* def_idx: 13 */ {
+B0:
+	0: CopyLoc[0](x: I64)
+	1: CopyLoc[1](y: I64)
+	2: Call i64::mod(I64, I64): I64
+	3: MoveLoc[1](y: I64)
+	4: MoveLoc[0](x: I64)
+	5: Call i64::mod(I64, I64): I64
+	6: Call i64::eq(I64, I64): bool
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

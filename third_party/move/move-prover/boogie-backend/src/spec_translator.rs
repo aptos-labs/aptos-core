@@ -27,6 +27,7 @@ use move_model::{
     },
     code_writer::CodeWriter,
     emit, emitln,
+    metadata::LanguageVersion,
     model::{
         FieldId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
         SpecFunId, SpecVarId, StructId,
@@ -1036,6 +1037,7 @@ impl SpecTranslator<'_> {
             // Unary operators
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
+            Operation::Neg => unimplemented!("negation not supported"),
             Operation::Int2Bv => {
                 let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
                 if exp_arith_flag {

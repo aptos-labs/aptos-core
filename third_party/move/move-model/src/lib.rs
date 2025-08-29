@@ -258,34 +258,18 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Extract the module/script dependency closure
     let mut visited_modules = BTreeSet::new();
-    // Extract the module dependency closure for the vector module
-    let mut vector_and_its_dependencies = BTreeSet::new();
-    // Extract the module dependency closure for the std::cmp module
-    let mut cmp_and_its_dependencies = BTreeSet::new();
-    let mut seen_vector = false;
-    let mut seen_cmp = false;
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
             collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
         }
-        if !seen_vector && is_vector(*mident) {
-            seen_vector = true;
-            // Collect the vector module and its dependencies.
-            collect_related_modules_recursive(
-                mident,
-                &expansion_ast.modules,
-                &mut vector_and_its_dependencies,
-            );
-        }
-        if !seen_cmp && is_cmp(*mident) {
-            seen_cmp = true;
-            // Collect the cmp module and its dependencies.
-            collect_related_modules_recursive(
-                mident,
-                &expansion_ast.modules,
-                &mut cmp_and_its_dependencies,
-            );
+        // We need to collect the module dependency closure for several special modules:
+        // - `std::vector`
+        // - `std::cmp`
+        // - `std::i64`
+        // - `std::i128`
+        if is_vector(*mident) || is_cmp(*mident) || is_signed_int(*mident) {
+            collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -305,16 +289,11 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // For compiler v2, we need to always include the `vector` module and any of its dependencies,
-            // to handle cases of implicit usage.
+            // For compiler v2, `visited_modules` always includes the aforementioned special modules (`std::vector`, `std::cmp`, `std::i64`, `std::i128`)
+            // to accommodate implicit usage.
             // E.g., index operation on a vector results in a call to `vector::borrow`.
             // TODO(#15483): consider refactoring code to avoid this special case.
-            (vector_and_its_dependencies.contains(&mident.value)
-                // We also need to always include the `cmp` module and its dependencies,
-                // so that we can use interfaces offered by `cmp` to support comparison, Lt/Le/Gt/Ge, over non-integer types.
-                || cmp_and_its_dependencies.contains(&mident.value)
-                || visited_modules.contains(&mident.value))
-            .then(|| {
+            visited_modules.contains(&mident.value).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -330,13 +309,20 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 /// Is `module_ident` the `vector` module?
 fn is_vector(module_ident: ModuleIdent_) -> bool {
     module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
-        && module_ident.module.0.value.as_str() == "vector"
+        && module_ident.module.0.value.as_str() == well_known::VECTOR_MODULE
 }
 
 /// Is `module_ident` the `0x1::cmp` module?
 fn is_cmp(module_ident: ModuleIdent_) -> bool {
     module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
         && module_ident.module.0.value.as_str() == well_known::CMP_MODULE
+}
+
+/// Does `module_ident` belong to signed integer modules (`i64`, `i128`)?
+fn is_signed_int(module_ident: ModuleIdent_) -> bool {
+    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+        && (module_ident.module.0.value.as_str() == well_known::I64_MODULE
+            || module_ident.module.0.value.as_str() == well_known::I128_MODULE)
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {

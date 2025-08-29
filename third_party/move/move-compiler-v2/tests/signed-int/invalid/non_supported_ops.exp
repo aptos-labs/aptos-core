@@ -1,0 +1,145 @@
+
+Diagnostics:
+error: operation not supported for signed integers
+  ┌─ tests/signed-int/invalid/non_supported_ops.move:3:9
+  │
+3 │         x | y
+  │         ^^^^^
+
+error: operation not supported for signed integers
+  ┌─ tests/signed-int/invalid/non_supported_ops.move:7:9
+  │
+7 │         x | y
+  │         ^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:11:9
+   │
+11 │         x & y
+   │         ^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:15:9
+   │
+15 │         x & y
+   │         ^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:19:9
+   │
+19 │         x ^ y
+   │         ^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:23:9
+   │
+23 │         x ^ y
+   │         ^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:27:9
+   │
+27 │         x << y
+   │         ^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:31:9
+   │
+31 │         x >> y
+   │         ^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:35:9
+   │
+35 │         x << y
+   │         ^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:39:9
+   │
+39 │         x >> y
+   │         ^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:51:9
+   │
+51 │         x as i128
+   │         ^^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:55:9
+   │
+55 │         x as u8
+   │         ^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:59:9
+   │
+59 │         x as u16
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:63:9
+   │
+63 │         x as u32
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:71:9
+   │
+71 │         x as u128
+   │         ^^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:75:9
+   │
+75 │         x as u256
+   │         ^^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:79:9
+   │
+79 │         x as i64
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:83:9
+   │
+83 │         x as u8
+   │         ^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:87:9
+   │
+87 │         x as u16
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:91:9
+   │
+91 │         x as u32
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+   ┌─ tests/signed-int/invalid/non_supported_ops.move:95:9
+   │
+95 │         x as u64
+   │         ^^^^^^^^
+
+error: operation not supported for signed integers
+    ┌─ tests/signed-int/invalid/non_supported_ops.move:103:9
+    │
+103 │         x as u256
+    │         ^^^^^^^^^
+
+error: operation not supported for signed integers
+    ┌─ tests/signed-int/invalid/non_supported_ops.move:107:9
+    │
+107 │         x as i128
+    │         ^^^^^^^^^
+
+error: operation not supported for signed integers
+    ┌─ tests/signed-int/invalid/non_supported_ops.move:111:9
+    │
+111 │         x as i64
+    │         ^^^^^^^^

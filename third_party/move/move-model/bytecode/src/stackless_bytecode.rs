@@ -232,6 +232,7 @@ pub enum Operation {
     CastU64,
     CastU128,
     Not,
+    Neg,
 
     // Binary
     Add,
@@ -340,6 +341,7 @@ impl Operation {
             Operation::CastU128 => true,
             Operation::CastU256 => true,
             Operation::Not => false,
+            Operation::Neg => true,
             Operation::Add => true,
             Operation::Sub => true,
             Operation::Mul => true,
@@ -1378,6 +1380,7 @@ impl fmt::Display for OperationDisplay<'_> {
             CastU64 => write!(f, "(u64)")?,
             CastU128 => write!(f, "(u128)")?,
             CastU256 => write!(f, "(u256)")?,
+            Neg => write!(f, "-")?,
             Not => write!(f, "!")?,
 
             // Binary

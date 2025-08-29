@@ -736,9 +736,13 @@ fn get_number_maybe_with_suffix(text: &str, num_text_len: usize) -> (Tok, usize)
     let rest = &text[num_text_len..];
     if rest.starts_with("u8") {
         (Tok::NumTypedValue, num_text_len + 2)
-    } else if rest.starts_with("u64") || rest.starts_with("u16") || rest.starts_with("u32") {
+    } else if rest.starts_with("u64")
+        || rest.starts_with("u16")
+        || rest.starts_with("u32")
+        || rest.starts_with("i64")
+    {
         (Tok::NumTypedValue, num_text_len + 3)
-    } else if rest.starts_with("u128") || rest.starts_with("u256") {
+    } else if rest.starts_with("u128") || rest.starts_with("u256") || rest.starts_with("i128") {
         (Tok::NumTypedValue, num_text_len + 4)
     } else {
         // No typed suffix

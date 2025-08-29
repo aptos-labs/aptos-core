@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: invalid number literal
+  ┌─ tests/signed-int/valid/valid_mixed_type.move:9:26
+  │
+9 │         let d = i64::abs(-100);
+  │                          ^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_mixed_type.move:13:23
+   │
+13 │         let y : i64 = -10;
+   │                       ^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_mixed_type.move:21:27
+   │
+21 │         let d = i128::abs(-100);
+   │                           ^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_mixed_type.move:25:24
+   │
+25 │         let y : i128 = -10;
+   │                        ^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'

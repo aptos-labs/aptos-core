@@ -14,7 +14,7 @@ error: Invalid type for constant
 6 │     const C1: signer = abort 0;
   │     -------------------^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_invalid_base_type.move:7:19
@@ -30,7 +30,7 @@ error: Invalid type for constant
 7 │     const C2: S = S{};
   │     --------------^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_invalid_base_type.move:8:19
@@ -46,7 +46,7 @@ error: Invalid type for constant
 8 │     const C3: R = R{};
   │     --------------^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_invalid_base_type.move:9:27
@@ -62,7 +62,7 @@ error: Invalid type for constant
 9 │     const C4: vector<S> = abort 0;
   │     ----------------------^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
    ┌─ tests/checking/typing/constant_invalid_base_type.move:10:27
@@ -78,7 +78,7 @@ error: Invalid type for constant
 10 │     const C5: vector<R> = abort 0;
    │     ----------------------^^^^^^^-
    │     │
-   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
    ┌─ tests/checking/typing/constant_invalid_base_type.move:11:35
@@ -94,7 +94,7 @@ error: Invalid type for constant
 11 │     const C6: vector<vector<S>> = abort 0;
    │     ------------------------------^^^^^^^-
    │     │
-   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
    ┌─ tests/checking/typing/constant_invalid_base_type.move:12:35
@@ -110,4 +110,4 @@ error: Invalid type for constant
 12 │     const C7: vector<vector<R>> = abort 0;
    │     ------------------------------^^^^^^^-
    │     │
-   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.

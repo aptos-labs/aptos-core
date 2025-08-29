@@ -63,6 +63,7 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
             !fun.is_native
         },
         RewriteTarget::SpecBlock(_) => true,
+        RewriteTarget::MoveStruct(_) => false,
     });
 
     // Identify the Move functions transitively called by those targets. They need to be
@@ -85,6 +86,7 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
             RewriteTarget::SpecFun(_) | RewriteTarget::SpecBlock(_) => {
                 target.used_funs_with_uses(env).into_keys().collect()
             },
+            RewriteTarget::MoveStruct(_) => BTreeSet::new(),
         };
         for callee in callees {
             called_funs.insert(callee);

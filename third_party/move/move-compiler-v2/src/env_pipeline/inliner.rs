@@ -467,6 +467,9 @@ impl<'env> Inliner<'env> {
                     *self.inline_targets.state_mut(&target) = Spec(new_spec)
                 }
             },
+            MoveStruct(_) => {
+                // Nothing to do for struct decls.
+            },
         }
     }
 

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: cannot use `bool` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
   ┌─ tests/checking/control_flow/for_type_mismatch.move:5:9
   │
 5 │ ╭         for (i in true..false) {

@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: cannot use `&i64` with an operator which expects a value of type `integer`
+  ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:6:9
+  │
+6 │         &x + &x
+  │         ^^
+
+error: cannot use `&i128` with an operator which expects a value of type `integer`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:10:9
+   │
+10 │         &x + &x
+   │         ^^
+
+error: cannot use `i128` with an operator which expects a value of type `i64`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:14:13
+   │
+14 │         x + y
+   │             ^
+
+error: cannot use `i128` with an operator which expects a value of type `i64`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:18:13
+   │
+18 │         x + y
+   │             ^
+
+error: cannot pass `i128` to a function which expects argument of type `0x1::i64::I64`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:22:21
+   │
+22 │         i64::add(x, y)
+   │                     ^
+
+error: cannot pass `i64` to a function which expects argument of type `0x1::i128::I128`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:26:19
+   │
+26 │         i128::add(x, y)
+   │                   ^
+
+error: cannot use `i64` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:30:9
+   │
+30 │         x && y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:34:9
+   │
+34 │         x && y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:38:9
+   │
+38 │         x || y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:42:9
+   │
+42 │         x || y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:46:10
+   │
+46 │         !x
+   │          ^
+
+error: cannot use `i128` with an operator which expects a value of type `bool`
+   ┌─ tests/signed-int/invalid/invalid_arithmetic_logic.move:50:10
+   │
+50 │         !x
+   │          ^

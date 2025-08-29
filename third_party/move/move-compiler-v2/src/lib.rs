@@ -21,7 +21,8 @@ use crate::{
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
         recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
-        spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
+        signed_int_rewriter, spec_checker, spec_rewriter, unused_params_checker,
+        EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -379,6 +380,20 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);
+    }
+
+    // The signed int rewriter is a new features in Aptos Move 2.2 and onwards
+    let signed_int_rewrite = options
+        .language_version
+        .unwrap_or_default()
+        .is_at_least(LanguageVersion::signed_int_ver())
+        && options.experiment_on(Experiment::SIGNED_INT_REWRITE);
+
+    // This rewrite needs to run before `rewrite_cmp` as comparison over signed int needs special handling!!!
+    if signed_int_rewrite {
+        env_pipeline.add("rewrite signed integer operations", |env| {
+            signed_int_rewriter::rewrite(env);
+        });
     }
 
     // The comparison rewriter is a new features in Aptos Move 2.2 and onwards

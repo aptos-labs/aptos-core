@@ -1,0 +1,97 @@
+
+Diagnostics:
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:78:31
+   │
+78 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:78:38
+   │
+78 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:84:31
+   │
+84 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:84:38
+   │
+84 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:85:32
+   │
+85 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:85:39
+   │
+85 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:91:31
+   │
+91 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:91:38
+   │
+91 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:92:32
+   │
+92 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:92:39
+   │
+92 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:93:30
+   │
+93 │         let s3 = S3<i64> {x: -1, y: s1, z: s2};
+   │                              ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:99:31
+   │
+99 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_fun_val.move:99:38
+   │
+99 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+    ┌─ tests/signed-int/valid/valid_fun_val.move:100:32
+    │
+100 │         let s2 = S2 {x: s1, y: -1, z: -2};
+    │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+    ┌─ tests/signed-int/valid/valid_fun_val.move:100:39
+    │
+100 │         let s2 = S2 {x: s1, y: -1, z: -2};
+    │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+    ┌─ tests/signed-int/valid/valid_fun_val.move:101:31
+    │
+101 │         let s3 = S3<i128> {x: -1, y: s1, z: s2};
+    │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
