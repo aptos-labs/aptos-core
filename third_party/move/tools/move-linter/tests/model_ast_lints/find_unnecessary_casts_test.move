@@ -49,6 +49,11 @@ module 0xc0ffee::unnecessary_casts_test {
         let sum = (a as u64) + (b as u64);
     }
 
+    public fun test_cast_nested_warn() {
+        let x: u64 = 1;
+        let y = ((x as u64) as u64);
+    }
+
     // ========== NEGATIVE TESTS (should not warn) ==========
 
     public fun test_necessary_cast_no_warn() {

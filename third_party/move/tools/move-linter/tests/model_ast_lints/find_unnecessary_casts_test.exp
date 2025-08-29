@@ -81,6 +81,24 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
 
+warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:18
+   │
+54 │         let y = ((x as u64) as u64);
+   │                  ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+
+warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:17
+   │
+54 │         let y = ((x as u64) as u64);
+   │                 ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(find_unnecessary_casts)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#find_unnecessary_casts.
+
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:13:17
    │
@@ -112,61 +130,67 @@ warning: This assignment/binding to the left-hand-side variable `sum` is unused.
    │                   ^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:56:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:17
    │
-56 │         let y = (x as u64);
+54 │         let y = ((x as u64) as u64);
+   │                 ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:61:17
+   │
+61 │         let y = (x as u64);
    │                 ^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `big` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_big`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:61:19
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:66:19
    │
-61 │         let big = (small as u256);
+66 │         let big = (small as u256);
    │                   ^^^^^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:65:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:70:17
    │
-65 │         let x = (U8_VALUE as u256);
+70 │         let x = (U8_VALUE as u256);
    │                 ^^^^^^^^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:70:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:75:17
    │
-70 │         let y = x;
+75 │         let y = x;
    │                 ^
 
 warning: This assignment/binding to the left-hand-side variable `small` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_small`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:75:21
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:80:21
    │
-75 │         let small = (big as u8);
+80 │         let small = (big as u8);
    │                     ^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `bigger` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_bigger`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:80:22
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:85:22
    │
-80 │         let bigger = (int_val as u128);
+85 │         let bigger = (int_val as u128);
    │                      ^^^^^^^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:88:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:93:17
    │
-88 │         let y = (x as u64);
+93 │         let y = (x as u64);
    │                 ^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `sum` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_sum`), or renaming to `_`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:95:19
-   │
-95 │         let sum = (a as u32) + (b as u32);
-   │                   ^^^^^^^^^^^^^^^^^^^^^^^
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:100:19
+    │
+100 │         let sum = (a as u32) + (b as u32);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:105:17
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:110:17
     │
-105 │         let y = (x as u64);
+110 │         let y = (x as u64);
     │                 ^^^^^^^^^^
 
 warning: This assignment/binding to the left-hand-side variable `result` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_result`), or renaming to `_`
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:111:22
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:116:22
     │
-111 │         let result = (a as u8) + (b as u8);
+116 │         let result = (a as u8) + (b as u8);
     │                      ^^^^^^^^^^^^^^^^^^^^^
