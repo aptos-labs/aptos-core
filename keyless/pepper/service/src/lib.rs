@@ -46,15 +46,20 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-pub mod about;
 pub mod account_db;
 pub mod account_managers;
 pub mod groth16_vk;
 pub mod jwk;
 pub mod keyless_config;
 pub mod metrics;
+pub mod request_handler;
 pub mod vuf_keys;
 pub mod watcher;
+
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod unit_tests;
 
 pub type Issuer = String;
 pub type KeyID = String;
@@ -69,6 +74,11 @@ pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
 
 #[async_trait]
 pub trait HandlerTrait<REQ, RES>: Send + Sync {
+    /// Returns the name of the handler (e.g., the type name). This is useful for logging.
+    fn get_handler_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     async fn handle(&self, request: REQ) -> Result<RES, ProcessingFailure>;
 }
 
@@ -563,6 +573,3 @@ async fn update_account_recovery_db(input: &PepperInput) -> Result<(), Processin
         },
     }
 }
-
-#[cfg(test)]
-mod tests;

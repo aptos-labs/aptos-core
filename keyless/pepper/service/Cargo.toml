@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
+aptos-build-info = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-inspection-service = { workspace = true }
