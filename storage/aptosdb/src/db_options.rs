@@ -186,6 +186,39 @@ where
     cfds
 }
 
+fn gen_cfds_new<F>(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+    cfs: Vec<ColumnFamilyName>,
+    cf_opts_post_processor: F,
+) -> Vec<ColumnFamilyDescriptor>
+where
+    F: Fn(ColumnFamilyName, &mut Options),
+{
+    let mut table_options = BlockBasedOptions::default();
+    table_options.set_bloom_filter(10.0, false);
+    table_options.set_whole_key_filtering(false);
+    table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
+    table_options.set_pin_l0_filter_and_index_blocks_in_cache(
+        rocksdb_config.pin_l0_filter_and_index_blocks_in_cache,
+    );
+    table_options.set_block_size(rocksdb_config.block_size as usize);
+    if let Some(cache) = block_cache {
+        table_options.set_block_cache(cache);
+    }
+
+    let mut cfds = Vec::with_capacity(cfs.len());
+    for cf_name in cfs {
+        let mut cf_opts = Options::default();
+        cf_opts.set_compression_type(DBCompressionType::Lz4);
+        cf_opts.set_block_based_table_factory(&table_options);
+        cf_opts.add_compact_on_deletion_collector_factory(0, 0, 0.4);
+        cf_opts_post_processor(cf_name, &mut cf_opts);
+        cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
+    }
+    cfds
+}
+
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
     if cf_name == STATE_VALUE_CF_NAME
         || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
@@ -290,7 +323,7 @@ pub(super) fn gen_state_kv_shard_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_kv_db_new_key_column_families();
-    gen_cfds(
+    gen_cfds_new(
         rocksdb_config,
         block_cache,
         cfs,
