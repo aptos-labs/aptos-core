@@ -1036,6 +1036,7 @@ impl SpecTranslator<'_> {
             // Unary operators
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
+            Operation::Neg => unimplemented!("i64/i128 not supported before language version 2.3"),
             Operation::Int2Bv => {
                 let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
                 if exp_arith_flag {

@@ -20,7 +20,7 @@ error: Invalid type for constant
 6 │     const S1: S = S { f: 0 };
   │     --------------^^^^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: expected 1 type argument but 0 were provided
   ┌─ tests/folding/bad_type_argument_arity_const.move:7:15
@@ -42,7 +42,7 @@ error: Invalid type for constant
 7 │     const S2: S<> = S { f: 0 };
   │     ----------------^^^^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: expected 1 type argument but 2 were provided
   ┌─ tests/folding/bad_type_argument_arity_const.move:8:15
@@ -64,7 +64,7 @@ error: Invalid type for constant
 8 │     const S3: S<u64, bool> = S { f: 0 };
   │     -------------------------^^^^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: expected 1 type argument but 2 were provided
   ┌─ tests/folding/bad_type_argument_arity_const.move:9:17
@@ -87,4 +87,4 @@ error: Invalid type for constant
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
   │     ----------------------------^^^^^^^^^^^^^^^^^^^-
   │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.

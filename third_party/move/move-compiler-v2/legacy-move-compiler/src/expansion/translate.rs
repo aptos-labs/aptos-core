@@ -29,7 +29,7 @@ use crate::{
     },
     FullyCompiledProgram,
 };
-use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
+use move_command_line_common::parser::{parse_i128_abs, parse_i64_abs, parse_u16, parse_u256, parse_u32};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
@@ -2868,7 +2868,25 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
                 return None;
             },
         },
-
+        // Store the absolute value of an `i64` literal inside `I64`
+        // How negative `i64` literals are handled: they are parsed as `Neg(Num(i64))` by the parser.
+        // A problem of doing the above: the value range of an `i64/i128` cannot be checked correctly since they are regarded as `u64` by `parse_i64_abs`.
+        //   - How this is addressed: the accurate value range will be checked by `translated_number` in a later phase.
+        PV::Num(s) if s.ends_with("i64") => match parse_i64_abs(&s[..s.len() - 3]) {
+            Ok((u, _format)) => EV::I64(u),
+            Err(_) => {
+                context.env.add_diag(num_too_big_error(loc, "'i64'"));
+                return None;
+            },
+        },
+        // Handled in the same way as i64
+        PV::Num(s) if s.ends_with("i128") => match parse_i128_abs(&s[..s.len() - 4]) {
+            Ok((u, _format)) => EV::I128(u),
+            Err(_) => {
+                context.env.add_diag(num_too_big_error(loc, "'i128'"));
+                return None;
+            },
+        },
         PV::Num(s) => match parse_u256(&s) {
             Ok((u, _format)) => EV::InferredNum(u),
             Err(_) => {

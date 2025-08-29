@@ -98,6 +98,8 @@ pub enum PrimitiveType {
     U64,
     U128,
     U256,
+    I64,
+    I128,
     Address,
     Signer,
     // Types only appearing in specifications
@@ -822,9 +824,14 @@ impl PrimitiveType {
     pub fn is_spec(&self) -> bool {
         use PrimitiveType::*;
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => false,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Address | Signer => false,
             Num | Range | EventStore => true,
         }
+    }
+
+    /// Return true if this is a signed integer type
+    pub fn is_signed_int(&self) -> bool {
+        matches!(self, PrimitiveType::I64 | PrimitiveType::I128)
     }
 
     /// Attempt to convert this type into a normalized::Type
@@ -841,20 +848,37 @@ impl PrimitiveType {
             U256 => MType::U256,
             Address => MType::Address,
             Signer => MType::Signer,
+            I64 | I128 => unimplemented!("i64/i128 not supported before language version 2.3"),
             Num | Range | EventStore => return None,
         })
     }
 
-    /// Infer a type from a value. Returns the set of int types which can fit the
-    /// value.
-    pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
+    /// Infer a type from a value. Returns the set of int types which can fit the value.
+    /// `neg` indicates if the value will be negated
+    pub fn possible_int_types(value: BigInt, neg: bool) -> Vec<PrimitiveType> {
         Self::all_int_types()
             .into_iter()
-            .filter(|t| value <= Self::get_max_value(t).expect("type has max"))
+            .filter(|t| {
+                (!neg && value <= Self::get_max_value(t).expect("type has max")) ||
+                (neg && t.is_signed_int() && -value.clone() >= Self::get_min_value(t).expect("type has min"))
+            })
             .collect()
     }
 
     pub fn all_int_types() -> Vec<PrimitiveType> {
+        let mut types = Self::all_signed_int_types();
+        types.extend(Self::all_unsigned_int_types());
+        types
+    }
+
+    pub fn all_signed_int_types() -> Vec<PrimitiveType> {
+        vec![
+            PrimitiveType::I64,
+            PrimitiveType::I128
+        ]
+    }
+
+    pub fn all_unsigned_int_types() -> Vec<PrimitiveType> {
         vec![
             PrimitiveType::U8,
             PrimitiveType::U16,
@@ -874,6 +898,8 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
             PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MAX)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MAX)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -888,6 +914,8 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::zero()),
             PrimitiveType::U128 => Some(BigInt::zero()),
             PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MIN)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MIN)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -1045,14 +1073,17 @@ impl Type {
         use PrimitiveType::*;
         use Type::*;
         match self {
-            Primitive(p) => matches!(p, U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address),
+            Primitive(p) => matches!(
+                p,
+                U8 | U16 | U32 | U64 | U128 | U256 | I64 | I128 | Bool | Address
+            ),
             Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
     }
 
     pub fn describe_valid_for_constant() -> &'static str {
-        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, \
          or `vector<_>` with valid element type."
     }
 
@@ -1177,6 +1208,8 @@ impl Type {
             | PrimitiveType::U64
             | PrimitiveType::U128
             | PrimitiveType::U256
+            | PrimitiveType::I64
+            | PrimitiveType::I128
             | PrimitiveType::Num = p
             {
                 return true;
@@ -3903,6 +3936,8 @@ impl fmt::Display for PrimitiveType {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Range => f.write_str("range"),
@@ -3926,6 +3961,8 @@ pub trait AbilityInference: AbilityContext {
                 | PrimitiveType::U64
                 | PrimitiveType::U128
                 | PrimitiveType::U256
+                | PrimitiveType::I64
+                | PrimitiveType::I128
                 | PrimitiveType::Num
                 | PrimitiveType::Range
                 | PrimitiveType::EventStore

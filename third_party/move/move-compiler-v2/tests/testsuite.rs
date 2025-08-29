@@ -18,7 +18,7 @@ use once_cell::unsync::Lazy;
 use std::{
     cell::{RefCell, RefMut},
     collections::BTreeMap,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, vec,
 };
 use walkdir::WalkDir;
 
@@ -111,6 +111,14 @@ impl TestConfig {
             ..self
         }
     }
+
+    fn add_dependency(self, values: Vec<String>) -> Self {
+        Self {
+            options: self.options.clone().add_dependency(values),
+            ..self
+        }
+    }
+
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Default)]
@@ -567,6 +575,16 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ..config()
         },
         TestConfig {
+            name: "signed-int",
+            runner: |p| run_test(p, get_config_by_name("signed-int")),
+            include: vec!["/signed-int/"],
+            exclude: vec!["/signed_int_dep/"],
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            ..config()
+            .add_dependency(vec![path_from_crate_root("./tests/signed-int/signed_int_dep")])
+        },
+        TestConfig {
             name: "eager-pushes",
             runner: |p| run_test(p, get_config_by_name("eager-pushes")),
             include: vec!["/eager-pushes/"],
@@ -604,7 +622,9 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
-        vec![path_from_crate_root("../move-stdlib/sources")]
+        let mut v1 = options.dependencies.clone();
+        v1.extend(vec![path_from_crate_root("../move-stdlib/sources")]);
+        v1
     } else {
         vec![]
     };
@@ -918,11 +938,14 @@ fn collect_tests(root: &str) -> Vec<Trial> {
             continue;
         }
         let mut found_one = false;
+        let mut excluded = false;
         for config in TEST_CONFIGS.values() {
-            if !config.include.iter().any(|s| entry_str.contains(s))
-                || config.exclude.iter().any(|s| entry_str.contains(s))
-            {
+            if !config.include.iter().any(|s| entry_str.contains(s)) {
+                continue;
+            }
+            if config.exclude.iter().any(|s| entry_str.contains(s)) {
                 // no match
+                excluded = true;
                 continue;
             }
             test_groups
@@ -932,7 +955,7 @@ fn collect_tests(root: &str) -> Vec<Trial> {
             found_one = true
         }
         assert!(
-            found_one,
+            found_one || excluded,
             "cannot find test configuration for `{}`",
             entry_str
         )

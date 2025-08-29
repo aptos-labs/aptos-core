@@ -43,6 +43,11 @@ pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
 ];
 
 pub const CMP_MODULE: &str = "cmp";
+pub const I64_MODULE: &str = "i64";
+pub const I128_MODULE: &str = "i128";
+pub const I64_STRUCT: &str = "I64";
+pub const I128_STRUCT: &str = "I128";
+pub const SIGNED_INT_FUNCTIONS: [&str; 13] = ["add", "sub", "mul", "div", "mod", "eq", "gt", "lt", "gte", "lte", "from", "neg", "pack"];
 
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";

@@ -932,6 +932,7 @@ impl Generator<'_> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
+            Operation::Neg => unimplemented!("negation not supported before language version 2.3"),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))

@@ -60,7 +60,7 @@ error: Invalid type for constant
 14 │ │ │         x + y;
 15 │ │ │     };
    │ ╰─│─────^
-   │   ╰──────' Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+   │   ╰──────' Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i64`, `i128`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
    ┌─ tests/more-v1/parser/constants_blocks.move:16:25

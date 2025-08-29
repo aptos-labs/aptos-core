@@ -1949,6 +1949,7 @@ pub enum Operation {
     // Unary operators
     Not,
     Cast,
+    Neg,
 
     // Builtin functions (impl and spec)
     Exists(Option<MemoryLabel>),
@@ -2691,7 +2692,7 @@ impl Operation {
         use Operation::*;
         matches!(
             self,
-            Tuple | Index | Slice | Range | Implies | Iff | Identical | Not | Cast | Len | Vector
+            Tuple | Index | Slice | Range | Implies | Iff | Identical | Not | Cast | Neg | Len | Vector
         ) || self.is_binop()
     }
 
@@ -2770,6 +2771,7 @@ impl Operation {
             // Unary operators
             Not => true,
             Cast => false, // can overflow
+            Neg => false, // can overflow
 
             // Builtin functions (impl and spec)
             Exists(..) => false, // Spec

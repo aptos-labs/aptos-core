@@ -406,6 +406,24 @@ pub fn parse_u256(s: &str) -> Result<(U256, NumberFormat), U256FromStrError> {
     ))
 }
 
+/// Parse an i64 from a decimal or hex encoding and return its value in u64 (signedness not visible here and handled separately)
+pub fn parse_i64_abs(s: &str) -> Result<(u64, NumberFormat), ParseIntError> {
+    let (txt, base) = determine_num_text_and_base(s);
+    Ok((
+        u64::from_str_radix(&txt.replace('_', ""), base as u32)?,
+        base,
+    ))
+}
+
+/// Parse an i128 from a decimal or hex encoding and return its value in u128 (signedness not visible here and handled separately)
+pub fn parse_i128_abs(s: &str) -> Result<(u128, NumberFormat), ParseIntError> {
+    let (txt, base) = determine_num_text_and_base(s);
+    Ok((
+        u128::from_str_radix(&txt.replace('_', ""), base as u32)?,
+        base,
+    ))
+}
+
 // Parse an address from a decimal or hex encoding
 pub fn parse_address_number(s: &str) -> Option<([u8; AccountAddress::LENGTH], NumberFormat)> {
     let (txt, base) = determine_num_text_and_base(s);

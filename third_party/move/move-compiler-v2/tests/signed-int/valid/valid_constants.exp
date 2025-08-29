@@ -1,0 +1,1880 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): 0x1::i128::I128 {
+        {
+          let a_ann: 0x1::i128::I128 = i128::pack(0);
+          {
+            let b_ann: 0x1::i128::I128 = i128::pack(1);
+            {
+              let c_ann: 0x1::i128::I128 = i128::pack(-1);
+              {
+                let d_ann: 0x1::i128::I128 = i128::pack(170141183460469231731687303715884105727);
+                {
+                  let e_ann: 0x1::i128::I128 = i128::pack(-170141183460469231731687303715884105728);
+                  {
+                    let a: 0x1::i128::I128 = i128::pack(0);
+                    {
+                      let b: 0x1::i128::I128 = i128::pack(1);
+                      {
+                        let c: 0x1::i128::I128 = i128::pack(-1);
+                        {
+                          let d: 0x1::i128::I128 = i128::pack(170141183460469231731687303715884105727);
+                          {
+                            let e: 0x1::i128::I128 = i128::pack(-170141183460469231731687303715884105728);
+                            i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::pack(0), i128::pack(1)), i128::pack(1)), i128::pack(-1)), i128::pack(-1)), i128::pack(170141183460469231731687303715884105727)), i128::pack(170141183460469231731687303715884105727)), i128::pack(-170141183460469231731687303715884105728)), i128::pack(-170141183460469231731687303715884105728)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i64(): 0x1::i64::I64 {
+        {
+          let a_ann: 0x1::i64::I64 = i64::pack(0);
+          {
+            let b_ann: 0x1::i64::I64 = i64::pack(1);
+            {
+              let c_ann: 0x1::i64::I64 = i64::pack(-1);
+              {
+                let d_ann: 0x1::i64::I64 = i64::pack(9223372036854775807);
+                {
+                  let e_ann: 0x1::i64::I64 = i64::pack(-9223372036854775808);
+                  {
+                    let a: 0x1::i64::I64 = i64::pack(0);
+                    {
+                      let b: 0x1::i64::I64 = i64::pack(1);
+                      {
+                        let c: 0x1::i64::I64 = i64::pack(-1);
+                        {
+                          let d: 0x1::i64::I64 = i64::pack(9223372036854775807);
+                          {
+                            let e: 0x1::i64::I64 = i64::pack(-9223372036854775808);
+                            i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::pack(0), i64::pack(1)), i64::pack(1)), i64::pack(-1)), i64::pack(-1)), i64::pack(9223372036854775807)), i64::pack(9223372036854775807)), i64::pack(-9223372036854775808)), i64::pack(-9223372036854775808)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::constants
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): 0x1::i128::I128 {
+        let a_ann = 0x1::i128::pack(0u128);
+        let b_ann = 0x1::i128::pack(1u128);
+        let c_ann = 0x1::i128::pack(-1u128);
+        let d_ann = 0x1::i128::pack(170141183460469231731687303715884105727u128);
+        let e_ann = 0x1::i128::pack(-170141183460469231731687303715884105728u128);
+        let a = 0x1::i128::pack(0u128);
+        let b = 0x1::i128::pack(1u128);
+        let c = 0x1::i128::pack(-1u128);
+        let d = 0x1::i128::pack(170141183460469231731687303715884105727u128);
+        let e = 0x1::i128::pack(-170141183460469231731687303715884105728u128);
+        0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::add(0x1::i128::pack(0u128), 0x1::i128::pack(1u128)), 0x1::i128::pack(1u128)), 0x1::i128::pack(-1u128)), 0x1::i128::pack(-1u128)), 0x1::i128::pack(170141183460469231731687303715884105727u128)), 0x1::i128::pack(170141183460469231731687303715884105727u128)), 0x1::i128::pack(-170141183460469231731687303715884105728u128)), 0x1::i128::pack(-170141183460469231731687303715884105728u128)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+    }
+    public fun test_i64(): 0x1::i64::I64 {
+        let a_ann = 0x1::i64::pack(0);
+        let b_ann = 0x1::i64::pack(1);
+        let c_ann = 0x1::i64::pack(-1);
+        let d_ann = 0x1::i64::pack(9223372036854775807);
+        let e_ann = 0x1::i64::pack(-9223372036854775808);
+        let a = 0x1::i64::pack(0);
+        let b = 0x1::i64::pack(1);
+        let c = 0x1::i64::pack(-1);
+        let d = 0x1::i64::pack(9223372036854775807);
+        let e = 0x1::i64::pack(-9223372036854775808);
+        0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::add(0x1::i64::pack(0), 0x1::i64::pack(1)), 0x1::i64::pack(1)), 0x1::i64::pack(-1)), 0x1::i64::pack(-1)), 0x1::i64::pack(9223372036854775807)), 0x1::i64::pack(9223372036854775807)), 0x1::i64::pack(-9223372036854775808)), 0x1::i64::pack(-9223372036854775808)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun constants::test_i128(): 0x1::i128::I128 {
+     var $t0: 0x1::i128::I128
+     var $t1: 0x1::i128::I128
+     var $t2: u128
+     var $t3: 0x1::i128::I128
+     var $t4: u128
+     var $t5: 0x1::i128::I128
+     var $t6: u128
+     var $t7: 0x1::i128::I128
+     var $t8: u128
+     var $t9: 0x1::i128::I128
+     var $t10: u128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     var $t13: 0x1::i128::I128
+     var $t14: u128
+     var $t15: 0x1::i128::I128
+     var $t16: u128
+     var $t17: 0x1::i128::I128
+     var $t18: u128
+     var $t19: 0x1::i128::I128
+     var $t20: u128
+     var $t21: 0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: 0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: 0x1::i128::I128
+     var $t27: 0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: 0x1::i128::I128
+     var $t30: 0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: 0x1::i128::I128
+     var $t33: 0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: 0x1::i128::I128
+     var $t36: 0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: 0x1::i128::I128
+     var $t39: u128
+     var $t40: 0x1::i128::I128
+     var $t41: u128
+     var $t42: 0x1::i128::I128
+     var $t43: u128
+     var $t44: 0x1::i128::I128
+     var $t45: u128
+     var $t46: 0x1::i128::I128
+     var $t47: u128
+     var $t48: 0x1::i128::I128
+     var $t49: u128
+     var $t50: 0x1::i128::I128
+     var $t51: u128
+     var $t52: 0x1::i128::I128
+     var $t53: u128
+     var $t54: 0x1::i128::I128
+     var $t55: u128
+  0: $t2 := 0
+  1: $t1 := i128::pack($t2)
+  2: $t4 := 1
+  3: $t3 := i128::pack($t4)
+  4: $t6 := 0
+  5: $t5 := i128::pack($t6)
+  6: $t8 := 170141183460469231731687303715884105727
+  7: $t7 := i128::pack($t8)
+  8: $t10 := 0
+  9: $t9 := i128::pack($t10)
+ 10: $t12 := 0
+ 11: $t11 := i128::pack($t12)
+ 12: $t14 := 1
+ 13: $t13 := i128::pack($t14)
+ 14: $t16 := 0
+ 15: $t15 := i128::pack($t16)
+ 16: $t18 := 170141183460469231731687303715884105727
+ 17: $t17 := i128::pack($t18)
+ 18: $t20 := 0
+ 19: $t19 := i128::pack($t20)
+ 20: $t39 := 0
+ 21: $t38 := i128::pack($t39)
+ 22: $t41 := 1
+ 23: $t40 := i128::pack($t41)
+ 24: $t37 := i128::add($t38, $t40)
+ 25: $t43 := 1
+ 26: $t42 := i128::pack($t43)
+ 27: $t36 := i128::add($t37, $t42)
+ 28: $t45 := 0
+ 29: $t44 := i128::pack($t45)
+ 30: $t35 := i128::add($t36, $t44)
+ 31: $t47 := 0
+ 32: $t46 := i128::pack($t47)
+ 33: $t34 := i128::add($t35, $t46)
+ 34: $t49 := 170141183460469231731687303715884105727
+ 35: $t48 := i128::pack($t49)
+ 36: $t33 := i128::add($t34, $t48)
+ 37: $t51 := 170141183460469231731687303715884105727
+ 38: $t50 := i128::pack($t51)
+ 39: $t32 := i128::add($t33, $t50)
+ 40: $t53 := 0
+ 41: $t52 := i128::pack($t53)
+ 42: $t31 := i128::add($t32, $t52)
+ 43: $t55 := 0
+ 44: $t54 := i128::pack($t55)
+ 45: $t30 := i128::add($t31, $t54)
+ 46: $t29 := i128::add($t30, $t1)
+ 47: $t28 := i128::add($t29, $t3)
+ 48: $t27 := i128::add($t28, $t5)
+ 49: $t26 := i128::add($t27, $t7)
+ 50: $t25 := i128::add($t26, $t9)
+ 51: $t24 := i128::add($t25, $t11)
+ 52: $t23 := i128::add($t24, $t13)
+ 53: $t22 := i128::add($t23, $t15)
+ 54: $t21 := i128::add($t22, $t17)
+ 55: $t0 := i128::add($t21, $t19)
+ 56: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): 0x1::i64::I64 {
+     var $t0: 0x1::i64::I64
+     var $t1: 0x1::i64::I64
+     var $t2: u64
+     var $t3: 0x1::i64::I64
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: u64
+     var $t7: 0x1::i64::I64
+     var $t8: u64
+     var $t9: 0x1::i64::I64
+     var $t10: u64
+     var $t11: 0x1::i64::I64
+     var $t12: u64
+     var $t13: 0x1::i64::I64
+     var $t14: u64
+     var $t15: 0x1::i64::I64
+     var $t16: u64
+     var $t17: 0x1::i64::I64
+     var $t18: u64
+     var $t19: 0x1::i64::I64
+     var $t20: u64
+     var $t21: 0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: 0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: 0x1::i64::I64
+     var $t27: 0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: 0x1::i64::I64
+     var $t30: 0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: 0x1::i64::I64
+     var $t33: 0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: 0x1::i64::I64
+     var $t36: 0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: 0x1::i64::I64
+     var $t39: u64
+     var $t40: 0x1::i64::I64
+     var $t41: u64
+     var $t42: 0x1::i64::I64
+     var $t43: u64
+     var $t44: 0x1::i64::I64
+     var $t45: u64
+     var $t46: 0x1::i64::I64
+     var $t47: u64
+     var $t48: 0x1::i64::I64
+     var $t49: u64
+     var $t50: 0x1::i64::I64
+     var $t51: u64
+     var $t52: 0x1::i64::I64
+     var $t53: u64
+     var $t54: 0x1::i64::I64
+     var $t55: u64
+  0: $t2 := 0
+  1: $t1 := i64::pack($t2)
+  2: $t4 := 1
+  3: $t3 := i64::pack($t4)
+  4: $t6 := 0
+  5: $t5 := i64::pack($t6)
+  6: $t8 := 9223372036854775807
+  7: $t7 := i64::pack($t8)
+  8: $t10 := 0
+  9: $t9 := i64::pack($t10)
+ 10: $t12 := 0
+ 11: $t11 := i64::pack($t12)
+ 12: $t14 := 1
+ 13: $t13 := i64::pack($t14)
+ 14: $t16 := 0
+ 15: $t15 := i64::pack($t16)
+ 16: $t18 := 9223372036854775807
+ 17: $t17 := i64::pack($t18)
+ 18: $t20 := 0
+ 19: $t19 := i64::pack($t20)
+ 20: $t39 := 0
+ 21: $t38 := i64::pack($t39)
+ 22: $t41 := 1
+ 23: $t40 := i64::pack($t41)
+ 24: $t37 := i64::add($t38, $t40)
+ 25: $t43 := 1
+ 26: $t42 := i64::pack($t43)
+ 27: $t36 := i64::add($t37, $t42)
+ 28: $t45 := 0
+ 29: $t44 := i64::pack($t45)
+ 30: $t35 := i64::add($t36, $t44)
+ 31: $t47 := 0
+ 32: $t46 := i64::pack($t47)
+ 33: $t34 := i64::add($t35, $t46)
+ 34: $t49 := 9223372036854775807
+ 35: $t48 := i64::pack($t49)
+ 36: $t33 := i64::add($t34, $t48)
+ 37: $t51 := 9223372036854775807
+ 38: $t50 := i64::pack($t51)
+ 39: $t32 := i64::add($t33, $t50)
+ 40: $t53 := 0
+ 41: $t52 := i64::pack($t53)
+ 42: $t31 := i64::add($t32, $t52)
+ 43: $t55 := 0
+ 44: $t54 := i64::pack($t55)
+ 45: $t30 := i64::add($t31, $t54)
+ 46: $t29 := i64::add($t30, $t1)
+ 47: $t28 := i64::add($t29, $t3)
+ 48: $t27 := i64::add($t28, $t5)
+ 49: $t26 := i64::add($t27, $t7)
+ 50: $t25 := i64::add($t26, $t9)
+ 51: $t24 := i64::add($t25, $t11)
+ 52: $t23 := i64::add($t24, $t13)
+ 53: $t22 := i64::add($t23, $t15)
+ 54: $t21 := i64::add($t22, $t17)
+ 55: $t0 := i64::add($t21, $t19)
+ 56: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+public fun constants::test_i128(): 0x1::i128::I128 {
+     var $t0: 0x1::i128::I128
+     var $t1: 0x1::i128::I128
+     var $t2: u128
+     var $t3: 0x1::i128::I128
+     var $t4: u128
+     var $t5: 0x1::i128::I128
+     var $t6: u128
+     var $t7: 0x1::i128::I128
+     var $t8: u128
+     var $t9: 0x1::i128::I128
+     var $t10: u128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     var $t13: 0x1::i128::I128
+     var $t14: u128
+     var $t15: 0x1::i128::I128
+     var $t16: u128
+     var $t17: 0x1::i128::I128
+     var $t18: u128
+     var $t19: 0x1::i128::I128
+     var $t20: u128
+     var $t21: 0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: 0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: 0x1::i128::I128
+     var $t27: 0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: 0x1::i128::I128
+     var $t30: 0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: 0x1::i128::I128
+     var $t33: 0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: 0x1::i128::I128
+     var $t36: 0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: 0x1::i128::I128
+     var $t39: u128
+     var $t40: 0x1::i128::I128
+     var $t41: u128
+     var $t42: 0x1::i128::I128
+     var $t43: u128
+     var $t44: 0x1::i128::I128
+     var $t45: u128
+     var $t46: 0x1::i128::I128
+     var $t47: u128
+     var $t48: 0x1::i128::I128
+     var $t49: u128
+     var $t50: 0x1::i128::I128
+     var $t51: u128
+     var $t52: 0x1::i128::I128
+     var $t53: u128
+     var $t54: 0x1::i128::I128
+     var $t55: u128
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := i128::pack($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  2: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := i128::pack($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  4: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  5: $t5 := i128::pack($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5
+     # refs: []
+     #
+  6: $t8 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t8
+     # refs: []
+     #
+  7: $t7 := i128::pack($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7
+     # refs: []
+     #
+  8: $t10 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t10
+     # refs: []
+     #
+  9: $t9 := i128::pack($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9
+     # refs: []
+     #
+ 10: $t12 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t12
+     # refs: []
+     #
+ 11: $t11 := i128::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11
+     # refs: []
+     #
+ 12: $t14 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t14
+     # refs: []
+     #
+ 13: $t13 := i128::pack($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13
+     # refs: []
+     #
+ 14: $t16 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t16
+     # refs: []
+     #
+ 15: $t15 := i128::pack($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+     # refs: []
+     #
+ 16: $t18 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t18
+     # refs: []
+     #
+ 17: $t17 := i128::pack($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+     # refs: []
+     #
+ 18: $t20 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t20
+     # refs: []
+     #
+ 19: $t19 := i128::pack($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+     # refs: []
+     #
+ 20: $t39 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t39
+     # refs: []
+     #
+ 21: $t38 := i128::pack($t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+     # refs: []
+     #
+ 22: $t41 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t41
+     # refs: []
+     #
+ 23: $t40 := i128::pack($t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+     # refs: []
+     #
+ 24: $t37 := i128::add($t38, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37
+     # refs: []
+     #
+ 25: $t43 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37, $t43
+     # refs: []
+     #
+ 26: $t42 := i128::pack($t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37, $t42
+     # refs: []
+     #
+ 27: $t36 := i128::add($t37, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36
+     # refs: []
+     #
+ 28: $t45 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36, $t45
+     # refs: []
+     #
+ 29: $t44 := i128::pack($t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36, $t44
+     # refs: []
+     #
+ 30: $t35 := i128::add($t36, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35
+     # refs: []
+     #
+ 31: $t47 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35, $t47
+     # refs: []
+     #
+ 32: $t46 := i128::pack($t47)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35, $t46
+     # refs: []
+     #
+ 33: $t34 := i128::add($t35, $t46)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34
+     # refs: []
+     #
+ 34: $t49 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34, $t49
+     # refs: []
+     #
+ 35: $t48 := i128::pack($t49)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34, $t48
+     # refs: []
+     #
+ 36: $t33 := i128::add($t34, $t48)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33
+     # refs: []
+     #
+ 37: $t51 := 170141183460469231731687303715884105727
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33, $t51
+     # refs: []
+     #
+ 38: $t50 := i128::pack($t51)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33, $t50
+     # refs: []
+     #
+ 39: $t32 := i128::add($t33, $t50)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32
+     # refs: []
+     #
+ 40: $t53 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32, $t53
+     # refs: []
+     #
+ 41: $t52 := i128::pack($t53)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32, $t52
+     # refs: []
+     #
+ 42: $t31 := i128::add($t32, $t52)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31
+     # refs: []
+     #
+ 43: $t55 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31, $t55
+     # refs: []
+     #
+ 44: $t54 := i128::pack($t55)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31, $t54
+     # refs: []
+     #
+ 45: $t30 := i128::add($t31, $t54)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t30
+     # refs: []
+     #
+ 46: $t29 := i128::add($t30, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t29
+     # refs: []
+     #
+ 47: $t28 := i128::add($t29, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t28
+     # refs: []
+     #
+ 48: $t27 := i128::add($t28, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t27
+     # refs: []
+     #
+ 49: $t26 := i128::add($t27, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t11, $t13, $t15, $t17, $t19, $t26
+     # refs: []
+     #
+ 50: $t25 := i128::add($t26, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t13, $t15, $t17, $t19, $t25
+     # refs: []
+     #
+ 51: $t24 := i128::add($t25, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t15, $t17, $t19, $t24
+     # refs: []
+     #
+ 52: $t23 := i128::add($t24, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t17, $t19, $t23
+     # refs: []
+     #
+ 53: $t22 := i128::add($t23, $t15)
+     # abort state: {returns,aborts}
+     # live vars: $t17, $t19, $t22
+     # refs: []
+     #
+ 54: $t21 := i128::add($t22, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t21
+     # refs: []
+     #
+ 55: $t0 := i128::add($t21, $t19)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 56: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): 0x1::i64::I64 {
+     var $t0: 0x1::i64::I64
+     var $t1: 0x1::i64::I64
+     var $t2: u64
+     var $t3: 0x1::i64::I64
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: u64
+     var $t7: 0x1::i64::I64
+     var $t8: u64
+     var $t9: 0x1::i64::I64
+     var $t10: u64
+     var $t11: 0x1::i64::I64
+     var $t12: u64
+     var $t13: 0x1::i64::I64
+     var $t14: u64
+     var $t15: 0x1::i64::I64
+     var $t16: u64
+     var $t17: 0x1::i64::I64
+     var $t18: u64
+     var $t19: 0x1::i64::I64
+     var $t20: u64
+     var $t21: 0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: 0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: 0x1::i64::I64
+     var $t27: 0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: 0x1::i64::I64
+     var $t30: 0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: 0x1::i64::I64
+     var $t33: 0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: 0x1::i64::I64
+     var $t36: 0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: 0x1::i64::I64
+     var $t39: u64
+     var $t40: 0x1::i64::I64
+     var $t41: u64
+     var $t42: 0x1::i64::I64
+     var $t43: u64
+     var $t44: 0x1::i64::I64
+     var $t45: u64
+     var $t46: 0x1::i64::I64
+     var $t47: u64
+     var $t48: 0x1::i64::I64
+     var $t49: u64
+     var $t50: 0x1::i64::I64
+     var $t51: u64
+     var $t52: 0x1::i64::I64
+     var $t53: u64
+     var $t54: 0x1::i64::I64
+     var $t55: u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t2 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := i64::pack($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  2: $t4 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := i64::pack($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: []
+     #
+  4: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t6
+     # refs: []
+     #
+  5: $t5 := i64::pack($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5
+     # refs: []
+     #
+  6: $t8 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t8
+     # refs: []
+     #
+  7: $t7 := i64::pack($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7
+     # refs: []
+     #
+  8: $t10 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t10
+     # refs: []
+     #
+  9: $t9 := i64::pack($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9
+     # refs: []
+     #
+ 10: $t12 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t12
+     # refs: []
+     #
+ 11: $t11 := i64::pack($t12)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11
+     # refs: []
+     #
+ 12: $t14 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t14
+     # refs: []
+     #
+ 13: $t13 := i64::pack($t14)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13
+     # refs: []
+     #
+ 14: $t16 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t16
+     # refs: []
+     #
+ 15: $t15 := i64::pack($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+     # refs: []
+     #
+ 16: $t18 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t18
+     # refs: []
+     #
+ 17: $t17 := i64::pack($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+     # refs: []
+     #
+ 18: $t20 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t20
+     # refs: []
+     #
+ 19: $t19 := i64::pack($t20)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+     # refs: []
+     #
+ 20: $t39 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t39
+     # refs: []
+     #
+ 21: $t38 := i64::pack($t39)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+     # refs: []
+     #
+ 22: $t41 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t41
+     # refs: []
+     #
+ 23: $t40 := i64::pack($t41)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+     # refs: []
+     #
+ 24: $t37 := i64::add($t38, $t40)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37
+     # refs: []
+     #
+ 25: $t43 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37, $t43
+     # refs: []
+     #
+ 26: $t42 := i64::pack($t43)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t37, $t42
+     # refs: []
+     #
+ 27: $t36 := i64::add($t37, $t42)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36
+     # refs: []
+     #
+ 28: $t45 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36, $t45
+     # refs: []
+     #
+ 29: $t44 := i64::pack($t45)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t36, $t44
+     # refs: []
+     #
+ 30: $t35 := i64::add($t36, $t44)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35
+     # refs: []
+     #
+ 31: $t47 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35, $t47
+     # refs: []
+     #
+ 32: $t46 := i64::pack($t47)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t35, $t46
+     # refs: []
+     #
+ 33: $t34 := i64::add($t35, $t46)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34
+     # refs: []
+     #
+ 34: $t49 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34, $t49
+     # refs: []
+     #
+ 35: $t48 := i64::pack($t49)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t34, $t48
+     # refs: []
+     #
+ 36: $t33 := i64::add($t34, $t48)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33
+     # refs: []
+     #
+ 37: $t51 := 9223372036854775807
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33, $t51
+     # refs: []
+     #
+ 38: $t50 := i64::pack($t51)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t33, $t50
+     # refs: []
+     #
+ 39: $t32 := i64::add($t33, $t50)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32
+     # refs: []
+     #
+ 40: $t53 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32, $t53
+     # refs: []
+     #
+ 41: $t52 := i64::pack($t53)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t32, $t52
+     # refs: []
+     #
+ 42: $t31 := i64::add($t32, $t52)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31
+     # refs: []
+     #
+ 43: $t55 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31, $t55
+     # refs: []
+     #
+ 44: $t54 := i64::pack($t55)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t31, $t54
+     # refs: []
+     #
+ 45: $t30 := i64::add($t31, $t54)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t30
+     # refs: []
+     #
+ 46: $t29 := i64::add($t30, $t1)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t29
+     # refs: []
+     #
+ 47: $t28 := i64::add($t29, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t28
+     # refs: []
+     #
+ 48: $t27 := i64::add($t28, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t27
+     # refs: []
+     #
+ 49: $t26 := i64::add($t27, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t9, $t11, $t13, $t15, $t17, $t19, $t26
+     # refs: []
+     #
+ 50: $t25 := i64::add($t26, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t13, $t15, $t17, $t19, $t25
+     # refs: []
+     #
+ 51: $t24 := i64::add($t25, $t11)
+     # abort state: {returns,aborts}
+     # live vars: $t13, $t15, $t17, $t19, $t24
+     # refs: []
+     #
+ 52: $t23 := i64::add($t24, $t13)
+     # abort state: {returns,aborts}
+     # live vars: $t15, $t17, $t19, $t23
+     # refs: []
+     #
+ 53: $t22 := i64::add($t23, $t15)
+     # abort state: {returns,aborts}
+     # live vars: $t17, $t19, $t22
+     # refs: []
+     #
+ 54: $t21 := i64::add($t22, $t17)
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t21
+     # refs: []
+     #
+ 55: $t0 := i64::add($t21, $t19)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 56: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::constants {
+    public fun test_i128(): 0x1::i128::I128 {
+        {
+          let a_ann: 0x1::i128::I128 = i128::pack(0);
+          {
+            let b_ann: 0x1::i128::I128 = i128::pack(1);
+            {
+              let c_ann: 0x1::i128::I128 = i128::pack(-1);
+              {
+                let d_ann: 0x1::i128::I128 = i128::pack(170141183460469231731687303715884105727);
+                {
+                  let e_ann: 0x1::i128::I128 = i128::pack(-170141183460469231731687303715884105728);
+                  {
+                    let a: 0x1::i128::I128 = i128::pack(0);
+                    {
+                      let b: 0x1::i128::I128 = i128::pack(1);
+                      {
+                        let c: 0x1::i128::I128 = i128::pack(-1);
+                        {
+                          let d: 0x1::i128::I128 = i128::pack(170141183460469231731687303715884105727);
+                          {
+                            let e: 0x1::i128::I128 = i128::pack(-170141183460469231731687303715884105728);
+                            i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::add(i128::pack(0), i128::pack(1)), i128::pack(1)), i128::pack(-1)), i128::pack(-1)), i128::pack(170141183460469231731687303715884105727)), i128::pack(170141183460469231731687303715884105727)), i128::pack(-170141183460469231731687303715884105728)), i128::pack(-170141183460469231731687303715884105728)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    public fun test_i64(): 0x1::i64::I64 {
+        {
+          let a_ann: 0x1::i64::I64 = i64::pack(0);
+          {
+            let b_ann: 0x1::i64::I64 = i64::pack(1);
+            {
+              let c_ann: 0x1::i64::I64 = i64::pack(-1);
+              {
+                let d_ann: 0x1::i64::I64 = i64::pack(9223372036854775807);
+                {
+                  let e_ann: 0x1::i64::I64 = i64::pack(-9223372036854775808);
+                  {
+                    let a: 0x1::i64::I64 = i64::pack(0);
+                    {
+                      let b: 0x1::i64::I64 = i64::pack(1);
+                      {
+                        let c: 0x1::i64::I64 = i64::pack(-1);
+                        {
+                          let d: 0x1::i64::I64 = i64::pack(9223372036854775807);
+                          {
+                            let e: 0x1::i64::I64 = i64::pack(-9223372036854775808);
+                            i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::add(i64::pack(0), i64::pack(1)), i64::pack(1)), i64::pack(-1)), i64::pack(-1)), i64::pack(9223372036854775807)), i64::pack(9223372036854775807)), i64::pack(-9223372036854775808)), i64::pack(-9223372036854775808)), a_ann), b_ann), c_ann), d_ann), e_ann), a), b), c), d), e)
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::constants
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun constants::test_i128(): 0x1::i128::I128 {
+     var $t0: 0x1::i128::I128
+     var $t1: 0x1::i128::I128
+     var $t2: u128
+     var $t3: 0x1::i128::I128
+     var $t4: u128
+     var $t5: 0x1::i128::I128
+     var $t6: u128
+     var $t7: 0x1::i128::I128
+     var $t8: u128
+     var $t9: 0x1::i128::I128
+     var $t10: u128
+     var $t11: 0x1::i128::I128
+     var $t12: u128
+     var $t13: 0x1::i128::I128
+     var $t14: u128
+     var $t15: 0x1::i128::I128
+     var $t16: u128
+     var $t17: 0x1::i128::I128
+     var $t18: u128
+     var $t19: 0x1::i128::I128
+     var $t20: u128
+     var $t21: 0x1::i128::I128
+     var $t22: 0x1::i128::I128
+     var $t23: 0x1::i128::I128
+     var $t24: 0x1::i128::I128
+     var $t25: 0x1::i128::I128
+     var $t26: 0x1::i128::I128
+     var $t27: 0x1::i128::I128
+     var $t28: 0x1::i128::I128
+     var $t29: 0x1::i128::I128
+     var $t30: 0x1::i128::I128
+     var $t31: 0x1::i128::I128
+     var $t32: 0x1::i128::I128
+     var $t33: 0x1::i128::I128
+     var $t34: 0x1::i128::I128
+     var $t35: 0x1::i128::I128
+     var $t36: 0x1::i128::I128
+     var $t37: 0x1::i128::I128
+     var $t38: 0x1::i128::I128
+     var $t39: u128
+     var $t40: 0x1::i128::I128
+     var $t41: u128
+     var $t42: 0x1::i128::I128
+     var $t43: u128
+     var $t44: 0x1::i128::I128
+     var $t45: u128
+     var $t46: 0x1::i128::I128
+     var $t47: u128
+     var $t48: 0x1::i128::I128
+     var $t49: u128
+     var $t50: 0x1::i128::I128
+     var $t51: u128
+     var $t52: 0x1::i128::I128
+     var $t53: u128
+     var $t54: 0x1::i128::I128
+     var $t55: u128
+  0: $t2 := 0
+  1: $t1 := i128::pack($t2)
+  2: $t4 := 1
+  3: $t3 := i128::pack($t4)
+  4: $t6 := 0
+  5: $t5 := i128::pack($t6)
+  6: $t8 := 170141183460469231731687303715884105727
+  7: $t7 := i128::pack($t8)
+  8: $t10 := 0
+  9: $t9 := i128::pack($t10)
+ 10: $t12 := 0
+ 11: $t11 := i128::pack($t12)
+ 12: $t14 := 1
+ 13: $t13 := i128::pack($t14)
+ 14: $t16 := 0
+ 15: $t15 := i128::pack($t16)
+ 16: $t18 := 170141183460469231731687303715884105727
+ 17: $t17 := i128::pack($t18)
+ 18: $t20 := 0
+ 19: $t19 := i128::pack($t20)
+ 20: $t39 := 0
+ 21: $t38 := i128::pack($t39)
+ 22: $t41 := 1
+ 23: $t40 := i128::pack($t41)
+ 24: $t37 := i128::add($t38, $t40)
+ 25: $t43 := 1
+ 26: $t42 := i128::pack($t43)
+ 27: $t36 := i128::add($t37, $t42)
+ 28: $t45 := 0
+ 29: $t44 := i128::pack($t45)
+ 30: $t35 := i128::add($t36, $t44)
+ 31: $t47 := 0
+ 32: $t46 := i128::pack($t47)
+ 33: $t34 := i128::add($t35, $t46)
+ 34: $t49 := 170141183460469231731687303715884105727
+ 35: $t48 := i128::pack($t49)
+ 36: $t33 := i128::add($t34, $t48)
+ 37: $t51 := 170141183460469231731687303715884105727
+ 38: $t50 := i128::pack($t51)
+ 39: $t32 := i128::add($t33, $t50)
+ 40: $t53 := 0
+ 41: $t52 := i128::pack($t53)
+ 42: $t31 := i128::add($t32, $t52)
+ 43: $t55 := 0
+ 44: $t54 := i128::pack($t55)
+ 45: $t30 := i128::add($t31, $t54)
+ 46: $t29 := i128::add($t30, $t1)
+ 47: $t28 := i128::add($t29, $t3)
+ 48: $t27 := i128::add($t28, $t5)
+ 49: $t26 := i128::add($t27, $t7)
+ 50: $t25 := i128::add($t26, $t9)
+ 51: $t24 := i128::add($t25, $t11)
+ 52: $t23 := i128::add($t24, $t13)
+ 53: $t22 := i128::add($t23, $t15)
+ 54: $t21 := i128::add($t22, $t17)
+ 55: $t0 := i128::add($t21, $t19)
+ 56: return $t0
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): 0x1::i64::I64 {
+     var $t0: 0x1::i64::I64
+     var $t1: 0x1::i64::I64
+     var $t2: u64
+     var $t3: 0x1::i64::I64
+     var $t4: u64
+     var $t5: 0x1::i64::I64
+     var $t6: u64
+     var $t7: 0x1::i64::I64
+     var $t8: u64
+     var $t9: 0x1::i64::I64
+     var $t10: u64
+     var $t11: 0x1::i64::I64
+     var $t12: u64
+     var $t13: 0x1::i64::I64
+     var $t14: u64
+     var $t15: 0x1::i64::I64
+     var $t16: u64
+     var $t17: 0x1::i64::I64
+     var $t18: u64
+     var $t19: 0x1::i64::I64
+     var $t20: u64
+     var $t21: 0x1::i64::I64
+     var $t22: 0x1::i64::I64
+     var $t23: 0x1::i64::I64
+     var $t24: 0x1::i64::I64
+     var $t25: 0x1::i64::I64
+     var $t26: 0x1::i64::I64
+     var $t27: 0x1::i64::I64
+     var $t28: 0x1::i64::I64
+     var $t29: 0x1::i64::I64
+     var $t30: 0x1::i64::I64
+     var $t31: 0x1::i64::I64
+     var $t32: 0x1::i64::I64
+     var $t33: 0x1::i64::I64
+     var $t34: 0x1::i64::I64
+     var $t35: 0x1::i64::I64
+     var $t36: 0x1::i64::I64
+     var $t37: 0x1::i64::I64
+     var $t38: 0x1::i64::I64
+     var $t39: u64
+     var $t40: 0x1::i64::I64
+     var $t41: u64
+     var $t42: 0x1::i64::I64
+     var $t43: u64
+     var $t44: 0x1::i64::I64
+     var $t45: u64
+     var $t46: 0x1::i64::I64
+     var $t47: u64
+     var $t48: 0x1::i64::I64
+     var $t49: u64
+     var $t50: 0x1::i64::I64
+     var $t51: u64
+     var $t52: 0x1::i64::I64
+     var $t53: u64
+     var $t54: 0x1::i64::I64
+     var $t55: u64
+  0: $t2 := 0
+  1: $t1 := i64::pack($t2)
+  2: $t4 := 1
+  3: $t3 := i64::pack($t4)
+  4: $t6 := 0
+  5: $t5 := i64::pack($t6)
+  6: $t8 := 9223372036854775807
+  7: $t7 := i64::pack($t8)
+  8: $t10 := 0
+  9: $t9 := i64::pack($t10)
+ 10: $t12 := 0
+ 11: $t11 := i64::pack($t12)
+ 12: $t14 := 1
+ 13: $t13 := i64::pack($t14)
+ 14: $t16 := 0
+ 15: $t15 := i64::pack($t16)
+ 16: $t18 := 9223372036854775807
+ 17: $t17 := i64::pack($t18)
+ 18: $t20 := 0
+ 19: $t19 := i64::pack($t20)
+ 20: $t39 := 0
+ 21: $t38 := i64::pack($t39)
+ 22: $t41 := 1
+ 23: $t40 := i64::pack($t41)
+ 24: $t37 := i64::add($t38, $t40)
+ 25: $t43 := 1
+ 26: $t42 := i64::pack($t43)
+ 27: $t36 := i64::add($t37, $t42)
+ 28: $t45 := 0
+ 29: $t44 := i64::pack($t45)
+ 30: $t35 := i64::add($t36, $t44)
+ 31: $t47 := 0
+ 32: $t46 := i64::pack($t47)
+ 33: $t34 := i64::add($t35, $t46)
+ 34: $t49 := 9223372036854775807
+ 35: $t48 := i64::pack($t49)
+ 36: $t33 := i64::add($t34, $t48)
+ 37: $t51 := 9223372036854775807
+ 38: $t50 := i64::pack($t51)
+ 39: $t32 := i64::add($t33, $t50)
+ 40: $t53 := 0
+ 41: $t52 := i64::pack($t53)
+ 42: $t31 := i64::add($t32, $t52)
+ 43: $t55 := 0
+ 44: $t54 := i64::pack($t55)
+ 45: $t30 := i64::add($t31, $t54)
+ 46: $t29 := i64::add($t30, $t1)
+ 47: $t28 := i64::add($t29, $t3)
+ 48: $t27 := i64::add($t28, $t5)
+ 49: $t26 := i64::add($t27, $t7)
+ 50: $t25 := i64::add($t26, $t9)
+ 51: $t24 := i64::add($t25, $t11)
+ 52: $t23 := i64::add($t24, $t13)
+ 53: $t22 := i64::add($t23, $t15)
+ 54: $t21 := i64::add($t22, $t17)
+ 55: $t0 := i64::add($t21, $t19)
+ 56: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun constants::test_i128(): 0x1::i128::I128 {
+     var $t0: 0x1::i128::I128 [unused]
+     var $t1: 0x1::i128::I128
+     var $t2: u128
+     var $t3: 0x1::i128::I128
+     var $t4: u128 [unused]
+     var $t5: 0x1::i128::I128
+     var $t6: u128 [unused]
+     var $t7: 0x1::i128::I128
+     var $t8: u128 [unused]
+     var $t9: 0x1::i128::I128
+     var $t10: u128 [unused]
+     var $t11: 0x1::i128::I128
+     var $t12: u128 [unused]
+     var $t13: 0x1::i128::I128
+     var $t14: u128 [unused]
+     var $t15: 0x1::i128::I128
+     var $t16: u128 [unused]
+     var $t17: 0x1::i128::I128
+     var $t18: u128 [unused]
+     var $t19: 0x1::i128::I128
+     var $t20: u128 [unused]
+     var $t21: 0x1::i128::I128 [unused]
+     var $t22: 0x1::i128::I128 [unused]
+     var $t23: 0x1::i128::I128 [unused]
+     var $t24: 0x1::i128::I128 [unused]
+     var $t25: 0x1::i128::I128 [unused]
+     var $t26: 0x1::i128::I128 [unused]
+     var $t27: 0x1::i128::I128 [unused]
+     var $t28: 0x1::i128::I128 [unused]
+     var $t29: 0x1::i128::I128 [unused]
+     var $t30: 0x1::i128::I128 [unused]
+     var $t31: 0x1::i128::I128 [unused]
+     var $t32: 0x1::i128::I128 [unused]
+     var $t33: 0x1::i128::I128 [unused]
+     var $t34: 0x1::i128::I128 [unused]
+     var $t35: 0x1::i128::I128 [unused]
+     var $t36: 0x1::i128::I128 [unused]
+     var $t37: 0x1::i128::I128 [unused]
+     var $t38: 0x1::i128::I128
+     var $t39: u128 [unused]
+     var $t40: 0x1::i128::I128
+     var $t41: u128 [unused]
+     var $t42: 0x1::i128::I128 [unused]
+     var $t43: u128 [unused]
+     var $t44: 0x1::i128::I128 [unused]
+     var $t45: u128 [unused]
+     var $t46: 0x1::i128::I128 [unused]
+     var $t47: u128 [unused]
+     var $t48: 0x1::i128::I128 [unused]
+     var $t49: u128 [unused]
+     var $t50: 0x1::i128::I128 [unused]
+     var $t51: u128 [unused]
+     var $t52: 0x1::i128::I128 [unused]
+     var $t53: u128 [unused]
+     var $t54: 0x1::i128::I128 [unused]
+     var $t55: u128 [unused]
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := i128::pack($t2)
+     # live vars: $t1
+  2: $t2 := 1
+     # live vars: $t1, $t2
+  3: $t3 := i128::pack($t2)
+     # live vars: $t1, $t3
+  4: $t2 := 0
+     # live vars: $t1, $t2, $t3
+  5: $t5 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5
+  6: $t2 := 170141183460469231731687303715884105727
+     # live vars: $t1, $t2, $t3, $t5
+  7: $t7 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7
+  8: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7
+  9: $t9 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9
+ 10: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9
+ 11: $t11 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11
+ 12: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11
+ 13: $t13 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13
+ 14: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13
+ 15: $t15 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+ 16: $t2 := 170141183460469231731687303715884105727
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+ 17: $t17 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+ 18: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+ 19: $t19 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 20: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 21: $t38 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 22: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 23: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 24: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 25: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 26: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 27: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 28: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 29: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 30: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 31: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 32: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 33: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 34: $t2 := 170141183460469231731687303715884105727
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 35: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 36: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 37: $t2 := 170141183460469231731687303715884105727
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 38: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 39: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 40: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 41: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 42: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 43: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 44: $t40 := i128::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 45: $t38 := i128::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 46: $t1 := i128::add($t38, $t1)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 47: $t1 := i128::add($t1, $t3)
+     # live vars: $t1, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 48: $t1 := i128::add($t1, $t5)
+     # live vars: $t1, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 49: $t1 := i128::add($t1, $t7)
+     # live vars: $t1, $t9, $t11, $t13, $t15, $t17, $t19
+ 50: $t1 := i128::add($t1, $t9)
+     # live vars: $t1, $t11, $t13, $t15, $t17, $t19
+ 51: $t1 := i128::add($t1, $t11)
+     # live vars: $t1, $t13, $t15, $t17, $t19
+ 52: $t1 := i128::add($t1, $t13)
+     # live vars: $t1, $t15, $t17, $t19
+ 53: $t1 := i128::add($t1, $t15)
+     # live vars: $t1, $t17, $t19
+ 54: $t1 := i128::add($t1, $t17)
+     # live vars: $t1, $t19
+ 55: $t1 := i128::add($t1, $t19)
+     # live vars: $t1
+ 56: return $t1
+}
+
+
+[variant baseline]
+public fun constants::test_i64(): 0x1::i64::I64 {
+     var $t0: 0x1::i64::I64 [unused]
+     var $t1: 0x1::i64::I64
+     var $t2: u64
+     var $t3: 0x1::i64::I64
+     var $t4: u64 [unused]
+     var $t5: 0x1::i64::I64
+     var $t6: u64 [unused]
+     var $t7: 0x1::i64::I64
+     var $t8: u64 [unused]
+     var $t9: 0x1::i64::I64
+     var $t10: u64 [unused]
+     var $t11: 0x1::i64::I64
+     var $t12: u64 [unused]
+     var $t13: 0x1::i64::I64
+     var $t14: u64 [unused]
+     var $t15: 0x1::i64::I64
+     var $t16: u64 [unused]
+     var $t17: 0x1::i64::I64
+     var $t18: u64 [unused]
+     var $t19: 0x1::i64::I64
+     var $t20: u64 [unused]
+     var $t21: 0x1::i64::I64 [unused]
+     var $t22: 0x1::i64::I64 [unused]
+     var $t23: 0x1::i64::I64 [unused]
+     var $t24: 0x1::i64::I64 [unused]
+     var $t25: 0x1::i64::I64 [unused]
+     var $t26: 0x1::i64::I64 [unused]
+     var $t27: 0x1::i64::I64 [unused]
+     var $t28: 0x1::i64::I64 [unused]
+     var $t29: 0x1::i64::I64 [unused]
+     var $t30: 0x1::i64::I64 [unused]
+     var $t31: 0x1::i64::I64 [unused]
+     var $t32: 0x1::i64::I64 [unused]
+     var $t33: 0x1::i64::I64 [unused]
+     var $t34: 0x1::i64::I64 [unused]
+     var $t35: 0x1::i64::I64 [unused]
+     var $t36: 0x1::i64::I64 [unused]
+     var $t37: 0x1::i64::I64 [unused]
+     var $t38: 0x1::i64::I64
+     var $t39: u64 [unused]
+     var $t40: 0x1::i64::I64
+     var $t41: u64 [unused]
+     var $t42: 0x1::i64::I64 [unused]
+     var $t43: u64 [unused]
+     var $t44: 0x1::i64::I64 [unused]
+     var $t45: u64 [unused]
+     var $t46: 0x1::i64::I64 [unused]
+     var $t47: u64 [unused]
+     var $t48: 0x1::i64::I64 [unused]
+     var $t49: u64 [unused]
+     var $t50: 0x1::i64::I64 [unused]
+     var $t51: u64 [unused]
+     var $t52: 0x1::i64::I64 [unused]
+     var $t53: u64 [unused]
+     var $t54: 0x1::i64::I64 [unused]
+     var $t55: u64 [unused]
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := i64::pack($t2)
+     # live vars: $t1
+  2: $t2 := 1
+     # live vars: $t1, $t2
+  3: $t3 := i64::pack($t2)
+     # live vars: $t1, $t3
+  4: $t2 := 0
+     # live vars: $t1, $t2, $t3
+  5: $t5 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5
+  6: $t2 := 9223372036854775807
+     # live vars: $t1, $t2, $t3, $t5
+  7: $t7 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7
+  8: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7
+  9: $t9 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9
+ 10: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9
+ 11: $t11 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11
+ 12: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11
+ 13: $t13 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13
+ 14: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13
+ 15: $t15 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+ 16: $t2 := 9223372036854775807
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15
+ 17: $t17 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+ 18: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17
+ 19: $t19 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 20: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 21: $t38 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 22: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 23: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 24: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 25: $t2 := 1
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 26: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 27: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 28: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 29: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 30: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 31: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 32: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 33: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 34: $t2 := 9223372036854775807
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 35: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 36: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 37: $t2 := 9223372036854775807
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 38: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 39: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 40: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 41: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 42: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 43: $t2 := 0
+     # live vars: $t1, $t2, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 44: $t40 := i64::pack($t2)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38, $t40
+ 45: $t38 := i64::add($t38, $t40)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19, $t38
+ 46: $t1 := i64::add($t38, $t1)
+     # live vars: $t1, $t3, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 47: $t1 := i64::add($t1, $t3)
+     # live vars: $t1, $t5, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 48: $t1 := i64::add($t1, $t5)
+     # live vars: $t1, $t7, $t9, $t11, $t13, $t15, $t17, $t19
+ 49: $t1 := i64::add($t1, $t7)
+     # live vars: $t1, $t9, $t11, $t13, $t15, $t17, $t19
+ 50: $t1 := i64::add($t1, $t9)
+     # live vars: $t1, $t11, $t13, $t15, $t17, $t19
+ 51: $t1 := i64::add($t1, $t11)
+     # live vars: $t1, $t13, $t15, $t17, $t19
+ 52: $t1 := i64::add($t1, $t13)
+     # live vars: $t1, $t15, $t17, $t19
+ 53: $t1 := i64::add($t1, $t15)
+     # live vars: $t1, $t17, $t19
+ 54: $t1 := i64::add($t1, $t17)
+     # live vars: $t1, $t19
+ 55: $t1 := i64::add($t1, $t19)
+     # live vars: $t1
+ 56: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v8
+module 42.constants {
+use 0000000000000000000000000000000000000000000000000000000000000001::i128;
+use 0000000000000000000000000000000000000000000000000000000000000001::i64;
+
+
+
+
+public test_i128(): I128 /* def_idx: 0 */ {
+L0:	a_ann: I128
+L1:	b_ann: I128
+L2:	c_ann: I128
+L3:	d_ann: I128
+L4:	e_ann: I128
+L5:	a: I128
+L6:	b: I128
+L7:	c: I128
+L8:	d: I128
+L9:	e: I128
+B0:
+	0: LdU128(0)
+	1: Call i128::pack(u128): I128
+	2: StLoc[0](a_ann: I128)
+	3: LdU128(1)
+	4: Call i128::pack(u128): I128
+	5: StLoc[1](b_ann: I128)
+	6: LdU128(0)
+	7: Call i128::pack(u128): I128
+	8: StLoc[2](c_ann: I128)
+	9: LdU128(170141183460469231731687303715884105727)
+	10: Call i128::pack(u128): I128
+	11: StLoc[3](d_ann: I128)
+	12: LdU128(0)
+	13: Call i128::pack(u128): I128
+	14: StLoc[4](e_ann: I128)
+	15: LdU128(0)
+	16: Call i128::pack(u128): I128
+	17: StLoc[5](a: I128)
+	18: LdU128(1)
+	19: Call i128::pack(u128): I128
+	20: StLoc[6](b: I128)
+	21: LdU128(0)
+	22: Call i128::pack(u128): I128
+	23: StLoc[7](c: I128)
+	24: LdU128(170141183460469231731687303715884105727)
+	25: Call i128::pack(u128): I128
+	26: StLoc[8](d: I128)
+	27: LdU128(0)
+	28: Call i128::pack(u128): I128
+	29: StLoc[9](e: I128)
+	30: LdU128(0)
+	31: Call i128::pack(u128): I128
+	32: LdU128(1)
+	33: Call i128::pack(u128): I128
+	34: Call i128::add(I128, I128): I128
+	35: LdU128(1)
+	36: Call i128::pack(u128): I128
+	37: Call i128::add(I128, I128): I128
+	38: LdU128(0)
+	39: Call i128::pack(u128): I128
+	40: Call i128::add(I128, I128): I128
+	41: LdU128(0)
+	42: Call i128::pack(u128): I128
+	43: Call i128::add(I128, I128): I128
+	44: LdU128(170141183460469231731687303715884105727)
+	45: Call i128::pack(u128): I128
+	46: Call i128::add(I128, I128): I128
+	47: LdU128(170141183460469231731687303715884105727)
+	48: Call i128::pack(u128): I128
+	49: Call i128::add(I128, I128): I128
+	50: LdU128(0)
+	51: Call i128::pack(u128): I128
+	52: Call i128::add(I128, I128): I128
+	53: LdU128(0)
+	54: Call i128::pack(u128): I128
+	55: Call i128::add(I128, I128): I128
+	56: MoveLoc[0](a_ann: I128)
+	57: Call i128::add(I128, I128): I128
+	58: MoveLoc[1](b_ann: I128)
+	59: Call i128::add(I128, I128): I128
+	60: MoveLoc[2](c_ann: I128)
+	61: Call i128::add(I128, I128): I128
+	62: MoveLoc[3](d_ann: I128)
+	63: Call i128::add(I128, I128): I128
+	64: MoveLoc[4](e_ann: I128)
+	65: Call i128::add(I128, I128): I128
+	66: MoveLoc[5](a: I128)
+	67: Call i128::add(I128, I128): I128
+	68: MoveLoc[6](b: I128)
+	69: Call i128::add(I128, I128): I128
+	70: MoveLoc[7](c: I128)
+	71: Call i128::add(I128, I128): I128
+	72: MoveLoc[8](d: I128)
+	73: Call i128::add(I128, I128): I128
+	74: MoveLoc[9](e: I128)
+	75: Call i128::add(I128, I128): I128
+	76: Ret
+}
+public test_i64(): I64 /* def_idx: 1 */ {
+L0:	a_ann: I64
+L1:	b_ann: I64
+L2:	c_ann: I64
+L3:	d_ann: I64
+L4:	e_ann: I64
+L5:	a: I64
+L6:	b: I64
+L7:	c: I64
+L8:	d: I64
+L9:	e: I64
+B0:
+	0: LdU64(0)
+	1: Call i64::pack(u64): I64
+	2: StLoc[0](a_ann: I64)
+	3: LdU64(1)
+	4: Call i64::pack(u64): I64
+	5: StLoc[1](b_ann: I64)
+	6: LdU64(0)
+	7: Call i64::pack(u64): I64
+	8: StLoc[2](c_ann: I64)
+	9: LdU64(9223372036854775807)
+	10: Call i64::pack(u64): I64
+	11: StLoc[3](d_ann: I64)
+	12: LdU64(0)
+	13: Call i64::pack(u64): I64
+	14: StLoc[4](e_ann: I64)
+	15: LdU64(0)
+	16: Call i64::pack(u64): I64
+	17: StLoc[5](a: I64)
+	18: LdU64(1)
+	19: Call i64::pack(u64): I64
+	20: StLoc[6](b: I64)
+	21: LdU64(0)
+	22: Call i64::pack(u64): I64
+	23: StLoc[7](c: I64)
+	24: LdU64(9223372036854775807)
+	25: Call i64::pack(u64): I64
+	26: StLoc[8](d: I64)
+	27: LdU64(0)
+	28: Call i64::pack(u64): I64
+	29: StLoc[9](e: I64)
+	30: LdU64(0)
+	31: Call i64::pack(u64): I64
+	32: LdU64(1)
+	33: Call i64::pack(u64): I64
+	34: Call i64::add(I64, I64): I64
+	35: LdU64(1)
+	36: Call i64::pack(u64): I64
+	37: Call i64::add(I64, I64): I64
+	38: LdU64(0)
+	39: Call i64::pack(u64): I64
+	40: Call i64::add(I64, I64): I64
+	41: LdU64(0)
+	42: Call i64::pack(u64): I64
+	43: Call i64::add(I64, I64): I64
+	44: LdU64(9223372036854775807)
+	45: Call i64::pack(u64): I64
+	46: Call i64::add(I64, I64): I64
+	47: LdU64(9223372036854775807)
+	48: Call i64::pack(u64): I64
+	49: Call i64::add(I64, I64): I64
+	50: LdU64(0)
+	51: Call i64::pack(u64): I64
+	52: Call i64::add(I64, I64): I64
+	53: LdU64(0)
+	54: Call i64::pack(u64): I64
+	55: Call i64::add(I64, I64): I64
+	56: MoveLoc[0](a_ann: I64)
+	57: Call i64::add(I64, I64): I64
+	58: MoveLoc[1](b_ann: I64)
+	59: Call i64::add(I64, I64): I64
+	60: MoveLoc[2](c_ann: I64)
+	61: Call i64::add(I64, I64): I64
+	62: MoveLoc[3](d_ann: I64)
+	63: Call i64::add(I64, I64): I64
+	64: MoveLoc[4](e_ann: I64)
+	65: Call i64::add(I64, I64): I64
+	66: MoveLoc[5](a: I64)
+	67: Call i64::add(I64, I64): I64
+	68: MoveLoc[6](b: I64)
+	69: Call i64::add(I64, I64): I64
+	70: MoveLoc[7](c: I64)
+	71: Call i64::add(I64, I64): I64
+	72: MoveLoc[8](d: I64)
+	73: Call i64::add(I64, I64): I64
+	74: MoveLoc[9](e: I64)
+	75: Call i64::add(I64, I64): I64
+	76: Ret
+}
+}
+============ bytecode verification succeeded ========
