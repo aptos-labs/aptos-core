@@ -3,7 +3,8 @@
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
 use aptos_types::{
     error,
@@ -24,6 +25,7 @@ use std::collections::VecDeque;
 
 pub mod abort_codes {
     pub const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
+    pub const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 2;
 }
 
 /// The native transaction context extension. This needs to be attached to the
@@ -35,11 +37,17 @@ pub struct NativeTransactionContext {
     /// The number of AUIDs (Aptos unique identifiers) issued during the
     /// execution of this transaction.
     auid_counter: u64,
+    /// The local counter to support the monotonically increasing counter feature.
+    /// The monotically increasing counter outputs `<reserved_byte> timestamp || transaction_index || session counter || local_counter`.
+    local_counter: u16,
+
     script_hash: Vec<u8>,
     chain_id: u8,
     /// A transaction context is available upon transaction prologue/execution/epilogue. It is not available
     /// when a VM session is created for other purposes, such as for processing validator transactions.
     user_transaction_context_opt: Option<UserTransactionContext>,
+    /// A number to represent the sessions inside the execution of a transaction. Used for computing the `monotonically_increasing_counter` method.
+    session_counter: u8,
 }
 
 impl NativeTransactionContext {
@@ -50,13 +58,16 @@ impl NativeTransactionContext {
         script_hash: Vec<u8>,
         chain_id: u8,
         user_transaction_context_opt: Option<UserTransactionContext>,
+        session_counter: u8,
     ) -> Self {
         Self {
             txn_hash,
             auid_counter: 0,
+            local_counter: 0,
             script_hash,
             chain_id,
             user_transaction_context_opt,
+            session_counter,
         }
     }
 
@@ -108,6 +119,50 @@ fn native_generate_unique_address(
     )
     .account_address();
     Ok(smallvec![Value::address(auid)])
+}
+
+/***************************************************************************************************
+ * native fun monotonically_increasing_counter_internal
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+fn native_monotonically_increasing_counter_internal(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_MONOTONICALLY_INCREASING_COUNTER_BASE)?;
+
+    let transaction_context = context
+        .extensions_mut()
+        .get_mut::<NativeTransactionContext>();
+    if transaction_context.local_counter == u16::MAX {
+        return Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(
+                abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW,
+            ),
+        });
+    }
+    transaction_context.local_counter += 1;
+    let local_counter = transaction_context.local_counter as u128;
+    let session_counter = transaction_context.session_counter as u128;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    if let Some(user_transaction_context) = user_transaction_context_opt {
+        // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits) = 0 for block/chunk execution, 1 for validation/simulation> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
+        let timestamp_us = safely_pop_arg!(args, u64);
+        let transaction_index = user_transaction_context.transaction_index();
+        let mut monotonically_increasing_counter: u128 = (timestamp_us as u128) << 56;
+        monotonically_increasing_counter |= (transaction_index.unwrap_or(1) as u128) << 24;
+        monotonically_increasing_counter |= session_counter << 16;
+        monotonically_increasing_counter |= local_counter;
+        Ok(smallvec![Value::u128(monotonically_increasing_counter)])
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
 }
 
 /***************************************************************************************************
@@ -387,6 +442,10 @@ pub fn make_all(
     let natives = [
         ("get_script_hash", native_get_script_hash as RawSafeNative),
         ("generate_unique_address", native_generate_unique_address),
+        (
+            "monotonically_increasing_counter_internal",
+            native_monotonically_increasing_counter_internal,
+        ),
         ("get_txn_hash", native_get_txn_hash),
         ("sender_internal", native_sender_internal),
         (

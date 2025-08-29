@@ -300,7 +300,7 @@ impl AptosDB {
             s.spawn(|_| {
                 self.ledger_db
                     .persisted_auxiliary_info_db()
-                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_info)
+                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_auxiliary_infos)
                     .unwrap()
             });
             s.spawn(|_| {

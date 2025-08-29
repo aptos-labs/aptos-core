@@ -4,7 +4,7 @@
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
     signature_verified_transaction::SignatureVerifiedTransaction,
-    AuxiliaryInfo, Transaction,
+    AuxiliaryInfo, AuxiliaryInfoTrait, Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};

@@ -159,7 +159,7 @@ impl StateComputeResult {
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
             transactions: &self.execution_output.to_commit.transactions,
-            persisted_info: &self.execution_output.to_commit.persisted_info,
+            persisted_auxiliary_infos: &self.execution_output.to_commit.persisted_auxiliary_infos,
             transaction_outputs: &self.execution_output.to_commit.transaction_outputs,
             transaction_infos: &self.ledger_update_output.transaction_infos,
             state: &self.execution_output.result_state,
