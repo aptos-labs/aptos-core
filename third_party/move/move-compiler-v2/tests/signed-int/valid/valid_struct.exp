@@ -1,0 +1,157 @@
+
+Diagnostics:
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:35:31
+   │
+35 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:35:38
+   │
+35 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:36:32
+   │
+36 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:36:39
+   │
+36 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:37:30
+   │
+37 │         let s3 = S3<i64> {x: -1, y: s1, z: s2};
+   │                              ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:49:31
+   │
+49 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:49:38
+   │
+49 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:50:32
+   │
+50 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:50:39
+   │
+50 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:51:31
+   │
+51 │         let s3 = S3<i128> {x: -1, y: s1, z: s2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:56:31
+   │
+56 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:56:38
+   │
+56 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:62:31
+   │
+62 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:62:38
+   │
+62 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:63:32
+   │
+63 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:63:39
+   │
+63 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:69:31
+   │
+69 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:69:38
+   │
+69 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:70:32
+   │
+70 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:70:39
+   │
+70 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:71:30
+   │
+71 │         let s3 = S3<i64> {x: -1, y: s1, z: s2};
+   │                              ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:77:31
+   │
+77 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:77:38
+   │
+77 │         let s1 = S1 {x: 1, y: -1, z: -2};
+   │                                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:78:32
+   │
+78 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:78:39
+   │
+78 │         let s2 = S2 {x: s1, y: -1, z: -2};
+   │                                       ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_struct.move:79:31
+   │
+79 │         let s3 = S3<i128> {x: -1, y: s1, z: s2};
+   │                               ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'

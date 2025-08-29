@@ -24,7 +24,7 @@ error: expected function of type `|integer|` but found `u64`
 61 │         x(1) // expected to be not a function
    │         ^^^^
 
-error: cannot use `&u64` with an operator which expects a value of type `integer`
+error: cannot use `&u64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
    ┌─ tests/checking/typing/lambda_typed.move:67:43
    │
 67 │         foreach(&v, |e: &u64| sum = sum + e) // expected to cannot infer type

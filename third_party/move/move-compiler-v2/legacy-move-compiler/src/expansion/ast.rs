@@ -488,6 +488,10 @@ pub enum Value_ {
     U128(u128),
     // <num>u256
     U256(move_core_types::u256::U256),
+    // <num>i64
+    I64(i64),
+    // <num>i128
+    I128(i128),
     // true
     // false
     Bool(bool),
@@ -1596,6 +1600,8 @@ impl AstDebug for Value_ {
             V::U64(u) => w.write(&format!("{}u64", u)),
             V::U128(u) => w.write(&format!("{}u128", u)),
             V::U256(u) => w.write(&format!("{}u256", u)),
+            V::I64(i) => w.write(&format!("{}i64", i)),
+            V::I128(i) => w.write(&format!("{}i128", i)),
             V::Bool(b) => w.write(&format!("{}", b)),
             V::Bytearray(v) => w.write(&format!("{:?}", v)),
         }

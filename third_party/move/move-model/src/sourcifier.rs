@@ -1114,6 +1114,10 @@ impl<'a> ExpSourcifier<'a> {
                 let ty = self.env().get_node_type(id);
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
+            Operation::Neg => self.parenthesize(context_prio, Prio::Prefix, || {
+                emit!(self.wr(), "-");
+                self.print_exp(Prio::Prefix, false, &args[0])
+            }),
             Operation::Exists(_) => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "exists");
                 self.print_node_inst(id);

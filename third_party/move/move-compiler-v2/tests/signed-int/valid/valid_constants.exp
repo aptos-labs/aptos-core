@@ -1,0 +1,85 @@
+
+Diagnostics:
+error: invalid number literal
+  ┌─ tests/signed-int/valid/valid_constants.move:5:22
+  │
+5 │   const V4_64: i64 = -1; // constant with annotated type but non-annotated negative value
+  │                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+  ┌─ tests/signed-int/valid/valid_constants.move:9:22
+  │
+9 │   const V8_64: i64 = -9223372036854775808; // constant with annotated type but non-annotated, min value
+  │                      ^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:15:24
+   │
+15 │   const V4_128: i128 = -1; // constant with annotated type but non-annotated negative value
+   │                        ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:19:24
+   │
+19 │   const V8_128: i128 = -170141183460469231731687303715884105728; // constant with annotated type but non-annotated, min value
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:31:13
+   │
+31 │     let c = -1; // constant with non-annotated type and non-annotated, negative value
+   │             ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:33:13
+   │
+33 │     let e = -9223372036854775808; // constant with non-annotated type and non-annotated, min value
+   │             ^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:35:22
+   │
+35 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:35:26
+   │
+35 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                          ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:35:30
+   │
+35 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                              ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:49:13
+   │
+49 │     let c = -1; // constant with non-annotated type and non-annotated, negative value
+   │             ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:51:13
+   │
+51 │     let e = -170141183460469231731687303715884105728; // constant with non-annotated type and non-annotated, min value
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:53:22
+   │
+53 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                      ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:53:26
+   │
+53 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                          ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'
+
+error: invalid number literal
+   ┌─ tests/signed-int/valid/valid_constants.move:53:30
+   │
+53 │     let (x, y, z) = (-1, -2, -3); // constants in tuple
+   │                              ^^ Invalid number literal. The given literal cannot fit into the largest possible integer type, 'u256'

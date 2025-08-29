@@ -27,6 +27,7 @@ use move_model::{
     },
     code_writer::CodeWriter,
     emit, emitln,
+    metadata::LanguageVersion,
     model::{
         FieldId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
         SpecFunId, SpecVarId, StructId,
@@ -1036,6 +1037,23 @@ impl SpecTranslator<'_> {
             // Unary operators
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
+            Operation::Neg => {
+                if self
+                    .env
+                    .language_version()
+                    .is_at_least(LanguageVersion::signed_int_ver())
+                {
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "unexpected `negation` operation",
+                    );
+                } else {
+                    unimplemented!(
+                        "`negation` operation not supported before language version `{:?}`",
+                        LanguageVersion::signed_int_ver()
+                    )
+                }
+            },
             Operation::Int2Bv => {
                 let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
                 if exp_arith_flag {

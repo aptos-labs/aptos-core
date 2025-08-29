@@ -29,7 +29,9 @@ use crate::{
     },
     FullyCompiledProgram,
 };
-use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
+use move_command_line_common::parser::{
+    parse_i128, parse_i64, parse_u16, parse_u256, parse_u32,
+};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
@@ -2829,50 +2831,65 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
         PV::Num(s) if s.ends_with("u8") => match parse_u8(&s[..s.len() - 2]) {
             Ok((u, _format)) => EV::U8(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u8'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u8'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u16") => match parse_u16(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U16(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u16'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u16'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u32") => match parse_u32(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U32(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u32'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u32'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u64") => match parse_u64(&s[..s.len() - 3]) {
             Ok((u, _format)) => EV::U64(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u64'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u64'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u128") => match parse_u128(&s[..s.len() - 4]) {
             Ok((u, _format)) => EV::U128(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u128'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u128'"));
                 return None;
             },
         },
         PV::Num(s) if s.ends_with("u256") => match parse_u256(&s[..s.len() - 4]) {
             Ok((u, _format)) => EV::U256(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(loc, "'u256'"));
+                context.env.add_diag(num_not_fit_error(loc, "'u256'"));
                 return None;
             },
         },
-
+        // Store the absolute value of an `i64` literal inside `I64`
+        PV::Num(s) if s.ends_with("i64") => match parse_i64(&s[..s.len() - 3]) {
+            Ok((i, _format)) => EV::I64(i),
+            Err(_) => {
+                context.env.add_diag(num_not_fit_error(loc, "'i64'"));
+                return None;
+            },
+        },
+        // Handled in the same way as i64
+        PV::Num(s) if s.ends_with("i128") => match parse_i128(&s[..s.len() - 4]) {
+            Ok((i, _format)) => EV::I128(i),
+            Err(_) => {
+                context.env.add_diag(num_not_fit_error(loc, "'i128'"));
+                return None;
+            },
+        },
         PV::Num(s) => match parse_u256(&s) {
             Ok((u, _format)) => EV::InferredNum(u),
             Err(_) => {
-                context.env.add_diag(num_too_big_error(
+                context.env.add_diag(num_not_fit_error(
                     loc,
                     "the largest possible integer type, 'u256'",
                 ));
@@ -2900,13 +2917,13 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
 
 // Create an error for an integer literal that is too big to fit in its type.
 // This assumes that the literal is the current token.
-fn num_too_big_error(loc: Loc, type_description: &'static str) -> Diagnostic {
+fn num_not_fit_error(loc: Loc, type_description: &'static str) -> Diagnostic {
     diag!(
         Syntax::InvalidNumber,
         (
             loc,
             format!(
-                "Invalid number literal. The given literal is too large to fit into {}",
+                "Invalid number literal. The given literal cannot fit into {}",
                 type_description
             )
         ),

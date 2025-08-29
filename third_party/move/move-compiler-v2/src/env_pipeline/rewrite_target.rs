@@ -3,7 +3,8 @@
 
 use move_model::{
     ast::{Exp, Spec, SpecBlockTarget},
-    model::{FunId, GlobalEnv, NodeId, QualifiedId, SpecFunId},
+    model::{FieldId, FunId, GlobalEnv, NodeId, Parameter, QualifiedId, SpecFunId, StructId},
+    ty::Type,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -13,6 +14,8 @@ use std::{
 /// Represents a target for rewriting.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 pub enum RewriteTarget {
+    /// A struct
+    MoveStruct(QualifiedId<StructId>),
     /// A Move function
     MoveFun(QualifiedId<FunId>),
     /// A specification function
@@ -26,6 +29,10 @@ pub enum RewriteTarget {
 pub enum RewriteState {
     /// The target has not been changed
     Unchanged,
+    /// The field type(s) of a Move struct have changed
+    StructDef(BTreeMap<FieldId, Type>),
+    /// The parameter type(s) or return type of a Move or spec function has changed
+    Decl(Vec<Parameter>, Type),
     /// The definition of a Move or spec function has changed
     Def(Exp),
     /// A specification block has changed.
@@ -109,6 +116,8 @@ impl RewriteTargets {
                     );
                 }
                 for struct_env in module.get_structs() {
+                    let id = struct_env.get_qualified_id();
+                    targets.push(RewriteTarget::MoveStruct(id));
                     add_spec(
                         &mut targets,
                         SpecBlockTarget::Struct(module.get_id(), struct_env.get_id()),
@@ -179,6 +188,12 @@ impl RewriteTargets {
             use RewriteTarget::*;
             match (target, state) {
                 (_, Unchanged) => {},
+                (MoveStruct(id), StructDef(ty)) => {
+                    env.set_struct_def(id, ty);
+                },
+                (MoveFun(fnid), Decl(params, ret_type)) => {
+                    env.set_function_decl(fnid, params, ret_type);
+                },
                 (MoveFun(fnid), Def(def)) => env.set_function_def(fnid, def),
                 (SpecFun(fnid), Def(def)) => env.get_spec_fun_mut(fnid).body = Some(def),
                 (SpecBlock(sb_target), Spec(spec)) => {
@@ -213,6 +228,7 @@ impl RewriteTarget {
                 let spec = env.get_spec_block(target);
                 spec.used_funs_with_uses()
             },
+            MoveStruct(_) => BTreeMap::new(), // Nothing to do for struct decls.
         }
     }
 
@@ -221,6 +237,12 @@ impl RewriteTarget {
         use RewriteState::*;
         use RewriteTarget::*;
         match self {
+            MoveStruct(sid) => StructDef(
+                env.get_struct(*sid)
+                    .get_fields()
+                    .map(|f| (f.get_id(), f.get_type()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
             MoveFun(fid) => env
                 .get_function(*fid)
                 .get_def()

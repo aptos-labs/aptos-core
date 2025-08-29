@@ -183,7 +183,21 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             std::slice::from_ref(&param_t_decl),
             &[(
                 0,
-                Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
+                // Since language version 2.3, we support all integer types for arithmetic ops.
+                if trans
+                    .env
+                    .language_version()
+                    .is_at_least(LanguageVersion::signed_int_ver())
+                {
+                    Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect())
+                } else {
+                    // Before 2.3, we only support unsigned integers
+                    Constraint::SomeNumber(
+                        PrimitiveType::all_unsigned_int_types()
+                            .into_iter()
+                            .collect(),
+                    )
+                },
             )]
             .into_iter()
             .collect(),
@@ -233,7 +247,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             .is_at_least(LanguageVersion::V2_2)
         {
             // For LanguageVersion::V2_2 and later, we support comparison on all types.
-            // - integer types supported by the VM natively
+            // - unsigned integer types supported by the VM natively
+            // - on V2_2 and after, signed integer types are rewritten during AST transformation
             // - other types supported by the `compare` native function
             //      - implicitly through compiler rewrite at the AST level
             let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
@@ -248,7 +263,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 );
             }
         } else {
-            // For LanguageVersion::V2_1 and earlier, we support only integer types.
+            // For LanguageVersion::V2_1 and earlier, we support only unsigned integer types.
             // We use a generic function with a constraint, conceptually:
             // `fun _cmp_<A>(x: A, y: A): bool where A: u8|u16|..|u256`.
             declare_cmp_ops(
@@ -256,7 +271,11 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 std::slice::from_ref(&param_t_decl),
                 &[(
                     0,
-                    Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
+                    Constraint::SomeNumber(
+                        PrimitiveType::all_unsigned_int_types()
+                            .into_iter()
+                            .collect(),
+                    ),
                 )]
                 .into_iter()
                 .collect(),
@@ -347,6 +366,32 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 visibility: SpecAndImpl,
             },
         );
+
+        if trans
+            .env
+            .language_version()
+            .is_at_least(LanguageVersion::V2_3)
+        {
+            trans.define_spec_or_builtin_fun(
+                trans.unary_op_symbol(&PA::UnaryOp_::Neg),
+                SpecOrBuiltinFunEntry {
+                    loc: loc.clone(),
+                    oper: Operation::Neg,
+                    type_params: vec![param_t_decl.clone()],
+                    type_param_constraints: [(
+                        0,
+                        Constraint::SomeNumber(
+                            PrimitiveType::all_signed_int_types().into_iter().collect(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
+                    params: vec![mk_param(trans, 1, param_t.clone())],
+                    result_type: param_t.clone(),
+                    visibility: SpecAndImpl,
+                },
+            );
+        }
     }
 
     {

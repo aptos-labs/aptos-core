@@ -336,6 +336,22 @@ impl ModuleGenerator {
                 U256 => FF::SignatureToken::U256,
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
+                I64 | I128 => {
+                    if ctx
+                        .env
+                        .language_version()
+                        .is_at_least(LanguageVersion::signed_int_ver())
+                    {
+                        // after language version 2.3, `i64` and `i128` should not propagate to this point
+                        ctx.internal_error(loc, format!("unexpected signed int type `{:#?}`", ty));
+                        FF::SignatureToken::Bool
+                    } else {
+                        unimplemented!(
+                            "i64/i128 not supported before language version `{:?}`",
+                            LanguageVersion::signed_int_ver()
+                        )
+                    }
+                },
                 Num | Range | EventStore => {
                     ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool

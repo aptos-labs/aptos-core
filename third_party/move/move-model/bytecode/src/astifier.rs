@@ -2269,6 +2269,7 @@ impl AssignTransformer<'_> {
                 | Operation::Deref
                 | Operation::Not
                 | Operation::Cast
+                | Operation::Neg
                 | Operation::Select(_, _, _)
                 | Operation::SelectVariants(_, _, _)
                 | Operation::TestVariants(_, _, _) => args
